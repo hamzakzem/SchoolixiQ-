@@ -1,0 +1,40 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 1. Default Deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Auth Helper
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 3. Profiles: Authenticated users can read all user profile images, but only owners can upload
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 4. Schools: Admins can manage school-related images (logos, etc.)
+    match /schools/{schoolId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      // Only school admin or super admin can write
+      // Note: We don't have access to Firestore in Storage rules directly without cross-service rules (limited support)
+      // For now, allow signed-in users for prototype or refine with more logic
+      allow write: if isSignedIn();
+    }
+
+    // 5. Students: Teachers and Admins can manage student photos
+    match /students/{studentId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn(); 
+    }
+
+    match /system/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+  }
+}

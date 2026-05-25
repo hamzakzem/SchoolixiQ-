@@ -1,0 +1,7 @@
+{
+  "parser": "eslint-plugin-security-rules",
+  "plugins": ["security-rules"],
+  "rules": {
+    "security-rules/syntax": "error"
+  }
+}

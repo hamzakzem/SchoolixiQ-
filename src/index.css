@@ -1,0 +1,447 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 25s linear infinite;
+}
+
+@layer base {
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply font-sans text-slate-900 bg-slate-50 transition-colors duration-300;
+  }
+  .dark body {
+    @apply text-slate-100 bg-slate-950;
+  }
+}
+
+/* Solar System Loading Animation */
+.solar {
+  height: 50px;
+  width: 50px;
+  background: orange;
+  border-radius: 25px;
+  position: relative;
+  animation: glow 1.5s linear infinite;
+}
+
+.solar i {
+  border-radius: 250px;
+  display: block;
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-sizing: border-box;
+  transform-origin: 50% 50%;
+}
+
+.solar i:before {
+  content: "";
+  border-radius: 25px;
+  background: black;
+  display: block;
+  position: absolute;
+  top: -5px;
+  right: 45%;
+}
+
+.solar i.mercury {
+  width: 80px;
+  height: 80px;
+  margin-left: -40px;
+  left: 50%;
+  top: 50%;
+  margin-top: -40px;
+  animation: orbit 0.5s linear infinite;
+}
+
+.solar i.mercury:before {
+  background: #6f5f5f;
+  height: 7px;
+  width: 7px;
+}
+
+.solar i.venus {
+  width: 110px;
+  height: 110px;
+  margin-left: -55px;
+  left: 50%;
+  top: 50%;
+  margin-top: -55px;
+  animation: orbit 1s linear infinite;
+}
+
+.solar i.venus:before {
+  background: #e7a71f;
+  height: 10px;
+  width: 10px;
+}
+
+.solar i.earth {
+  width: 140px;
+  height: 140px;
+  margin-left: -70px;
+  left: 50%;
+  top: 50%;
+  margin-top: -70px;
+  animation: orbit 1.5s linear infinite;
+}
+
+.solar i.earth:before {
+  background: #63bee2;
+  height: 10px;
+  width: 10px;
+}
+
+.solar i.mars {
+  width: 170px;
+  height: 170px;
+  margin-left: -85px;
+  left: 50%;
+  top: 50%;
+  margin-top: -85px;
+  animation: orbit 2s linear infinite;
+}
+
+.solar i.mars:before {
+  background: red;
+  height: 10px;
+  width: 10px;
+}
+
+.solar i.belt {
+  box-sizing: border-box;
+  border-width: 25px;
+  width: 240px;
+  height: 240px;
+  margin-left: -120px;
+  border-color: rgba(36, 35, 35, 0.21);
+  left: 50%;
+  top: 50%;
+  margin-top: -120px;
+}
+
+.solar i.jupiter {
+  width: 260px;
+  height: 260px;
+  margin-left: -130px;
+  left: 50%;
+  top: 50%;
+  margin-top: -130px;
+  animation: orbit 2.5s linear infinite;
+}
+
+.solar i.jupiter:before {
+  background: #cf9b2b;
+  top: -15px;
+  height: 30px;
+  width: 30px;
+}
+
+.solar i.saturn {
+  width: 320px;
+  height: 320px;
+  margin-left: -160px;
+  left: 50%;
+  top: 50%;
+  margin-top: -160px;
+  animation: orbit 3s linear infinite;
+}
+
+.solar i.saturn:before {
+  background: #cf7a2b;
+  top: -10px;
+  height: 20px;
+  width: 20px;
+}
+
+.solar i.saturn:after {
+  background: #fff;
+  width: 30px;
+  height: 1px;
+  content: "";
+  position: absolute;
+  display: block;
+  right: 43.5%;
+  transform: rotate(20deg);
+}
+
+.solar i.uranus {
+  width: 360px;
+  height: 360px;
+  margin-left: -180px;
+  left: 50%;
+  top: 50%;
+  margin-top: -180px;
+  animation: orbit 3.5s linear infinite;
+}
+
+.solar i.uranus:before {
+  background: #10c593;
+  top: -8px;
+  height: 15px;
+  width: 15px;
+}
+
+.solar i.neptune {
+  width: 400px;
+  height: 400px;
+  margin-left: -200px;
+  left: 50%;
+  top: 50%;
+  margin-top: -200px;
+  animation: orbit 4s linear infinite;
+}
+
+.solar i.neptune:before {
+  background: #1470e4;
+  top: -8px;
+  height: 15px;
+  width: 15px;
+}
+
+@keyframes orbit {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(-180deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+@keyframes glow {
+  0% { box-shadow: none; }
+  50% { background: #ffeb00; box-shadow: 0 0 20px orange; }
+  100% { box-shadow: none; }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* Focus Mode: Add pulsing glow to the selected notification bell */
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > button:nth-of-type(1) {
+  animation: notification-glow 2s infinite alternate;
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+  border-color: rgba(79, 70, 229, 0.4);
+}
+
+@keyframes notification-glow {
+  0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
+  100% { box-shadow: 0 0 15px 5px rgba(79, 70, 229, 0.2); }
+}
+
+/* From Uiverse.io by vinodjangid07 */ 
+.social-card {
+  width: fit-content;
+  height: fit-content;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 10px;
+  gap: 20px;
+}
+
+/* for all social containers*/
+.socialContainer {
+  width: 52px;
+  height: 52px;
+  background-color: rgb(44, 44, 44);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition-duration: .3s;
+  border-radius: 50%;
+}
+/* instagram*/
+.containerOne:hover {
+  background-color: #d62976;
+  transition-duration: .3s;
+}
+/* twitter*/
+.containerTwo:hover {
+  background-color: #00acee;
+  transition-duration: .3s;
+}
+/* linkedin*/
+.containerThree:hover {
+  background-color: #0072b1;
+  transition-duration: .3s;
+}
+/* Whatsapp*/
+.containerFour:hover {
+  background-color: #128C7E;
+  transition-duration: .3s;
+}
+
+.socialContainer:active {
+  transform: scale(0.9);
+  transition-duration: .3s;
+}
+
+.socialSvg {
+  width: 17px;
+}
+
+.socialSvg path {
+  fill: rgb(255, 255, 255);
+}
+
+.socialContainer:hover .socialSvg {
+  animation: slide-in-top 0.3s both;
+}
+
+@keyframes slide-in-top {
+  0% {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Modern Fluid Animated Surface Background */
+body {
+  background-color: #FAFAFC;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(0, 123, 255, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(32, 201, 151, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(0, 180, 216, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(79, 70, 229, 0.05) 0px, transparent 50%);
+  background-size: 200% 200%;
+  animation: meshMovement 20s ease-in-out infinite alternate;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.dark body {
+  background-color: #0f172a;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(0, 123, 255, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(32, 201, 151, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(0, 180, 216, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(79, 70, 229, 0.08) 0px, transparent 50%);
+}
+
+@keyframes meshMovement {
+  0% { background-position: 0% 0%; }
+  25% { background-position: 100% 50%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 50% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+@media print {
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Preserve high-fidelity colors and gradients on modern browsers */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .page-break {
+    page-break-after: always;
+  }
+}
+
+/* Hide the print mount normally, only show when printing via the fallback class override */
+#print-mount {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  #root {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+  }
+
+  #print-mount {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    visibility: visible;
+  }
+
+  #print-mount * {
+    visibility: visible;
+  }
+}
+
+.student-card-print {
+  width: 54mm;
+  height: 85.6mm;
+  overflow: hidden;
+  background: white;
+  position: relative;
+  box-sizing: border-box;
+  page-break-inside: avoid;
+  break-inside: avoid;
+  border-radius: 4.5mm; /* standard physical rounded badge corners */
+}
+
+/* Print Certificate Specifics */
+.cert-frame {
+  position: absolute;
+  inset: 15mm;
+  border: 2pt solid #000;
+  padding: 5mm;
+  pointer-events: none;
+}
+.cert-inner-frame {
+  position: absolute;
+  inset: 18mm;
+  border: 0.5pt solid #000;
+  pointer-events: none;
+}
+.grade-table th, .grade-table td {
+  border: 1pt solid #000 !important;
+  padding: 6pt !important;
+}

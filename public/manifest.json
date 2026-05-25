@@ -1,0 +1,31 @@
+{
+  "name": "Schoolix IQ - Educational Platform",
+  "short_name": "Schoolix",
+  "description": "Premium School & Learning Management System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "orientation": "any",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Schoolix Chat",
+      "url": "/?shortcut=chat",
+      "description": "Open direct chat communication"
+    }
+  ]
+}

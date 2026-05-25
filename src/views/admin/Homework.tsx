@@ -1,0 +1,363 @@
+import React, { useState, useEffect } from 'react';
+import { db } from '../../lib/firebase';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '../../lib/AuthContext';
+import { useLanguage } from '../../lib/LanguageContext';
+import { BookOpen, Plus, Calendar, Edit2, Trash2, Send, X, Users, MessageSquare } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'motion/react';
+import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+import { notificationService } from '../../lib/notificationService';
+
+export default function Homework() {
+  const { profile } = useAuth();
+  const { t, language } = useLanguage();
+  const isRtl = language === 'ar';
+
+  const [classes, setClasses] = useState<any[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [students, setStudents] = useState<any[]>([]);
+  
+  const [homeworks, setHomeworks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newHomework, setNewHomework] = useState({ title: '', content: '', dueDate: '' });
+  const [editingHomework, setEditingHomework] = useState<any | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch classes
+  useEffect(() => {
+    if (!profile?.schoolId) return;
+    const q = query(collection(db, 'classes'), where('schoolId', '==', profile.schoolId));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const classData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setClasses(classData);
+      if (classData.length > 0 && !selectedClassId) setSelectedClassId(classData[0].id);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'classes'));
+    return () => unsubscribe();
+  }, [profile]);
+
+  // Fetch students for selected class to know to whom to send notifications eventually
+  useEffect(() => {
+    if (!profile?.schoolId || !selectedClassId) {
+      setStudents([]);
+      return;
+    }
+    const q = query(
+      collection(db, 'students'),
+      where('schoolId', '==', profile.schoolId),
+      where('classId', '==', selectedClassId)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'students'));
+    return () => unsubscribe();
+  }, [profile, selectedClassId]);
+
+  // Fetch homeworks
+  useEffect(() => {
+    if (!profile?.schoolId) return;
+    setLoading(true);
+    
+    const hq = query(
+      collection(db, 'homework'),
+      where('schoolId', '==', profile.schoolId)
+    );
+    
+    const unsubscribe = onSnapshot(hq, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setHomeworks(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'homework');
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [profile]);
+
+  const handleSaveHomework = async () => {
+    if (!selectedClassId || !newHomework.title.trim() || !newHomework.content.trim() || !newHomework.dueDate || !profile) return;
+    setIsSaving(true);
+    try {
+      if (editingHomework) {
+        await updateDoc(doc(db, 'homework', editingHomework.id), {
+          title: newHomework.title,
+          content: newHomework.content,
+          dueDate: newHomework.dueDate,
+          updatedAt: serverTimestamp()
+        });
+        toast.success(isRtl ? 'تم تحديث الواجب بنجاح' : 'Homework updated successfully');
+      } else {
+        const homeworkRef = await addDoc(collection(db, 'homework'), {
+          ...newHomework,
+          classId: selectedClassId,
+          teacherId: profile.uid,
+          teacherName: profile.name,
+          subject: 'إدارة المدرسة', // Meaning "School Administration"
+          schoolId: profile.schoolId,
+          createdAt: serverTimestamp(),
+          hiddenFor: []
+        });
+        
+        // Notify parents
+        if (students.length > 0) {
+          try {
+            await notificationService.notifyAllParents(profile.schoolId, {
+              title: `${isRtl ? 'واجب من الإدارة' : 'Homework from Admin'}: ${newHomework.title}`,
+              message: `${newHomework.content.substring(0, 50)}...`,
+              type: 'homework',
+              schoolId: profile.schoolId,
+              metadata: { sourceId: homeworkRef.id }
+            });
+          } catch(e) {
+            console.error('Failed to send notification', e);
+          }
+        }
+
+        toast.success(isRtl ? 'تم إضافة الواجب بنجاح' : 'Homework added successfully');
+      }
+      setShowAddModal(false);
+      setEditingHomework(null);
+      setNewHomework({ title: '', content: '', dueDate: '' });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'homework');
+      toast.error(isRtl ? 'فشل حفظ الواجب' : 'Failed to save homework');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteHomework = async (id: string) => {
+    if (confirm(isRtl ? 'هل أنت متأكد من حذف هذا الواجب؟' : 'Are you sure you want to delete this homework?')) {
+      try {
+        await deleteDoc(doc(db, 'homework', id));
+        await notificationService.deleteBySourceId(id);
+        toast.success(isRtl ? 'تم حذف الواجب بنجاح' : 'Homework deleted successfully');
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `homework/${id}`);
+        toast.error(isRtl ? 'فشل الحذف' : 'Deletion failed');
+      }
+    }
+  };
+
+  const filteredHomeworks = homeworks.filter(h => h.classId === selectedClassId);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-display">
+            {isRtl ? 'الواجبات البيتية' : 'Homework & Tasks'}
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            {isRtl ? 'إدارة وتقسيم الواجبات والأنشطة' : 'Manage and distribute homework'}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Left sidebar: Classes */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-4">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-4 px-2">{isRtl ? 'اختر الصف' : 'Select Class'}</h3>
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pl-2 pr-1 custom-scrollbar">
+              {classes.map(cls => (
+                <button
+                  key={cls.id}
+                  onClick={() => setSelectedClassId(cls.id)}
+                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                >
+                  {cls.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right content: Homeworks List */}
+        <div className="lg:col-span-3 space-y-6">
+           {selectedClassId ? (
+             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-12rem)] min-h-[600px]">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+                  <div className="flex items-center gap-4">
+                     <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center font-bold text-xl">
+                       <BookOpen size={24} />
+                     </div>
+                     <div>
+                       <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                         {classes.find(c => c.id === selectedClassId)?.name}
+                       </h2>
+                       <p className="text-sm font-bold text-slate-400">
+                         {isRtl ? 'الواجبات الحالية' : 'Current Homework'}
+                       </p>
+                     </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEditingHomework(null);
+                      setNewHomework({ title: '', content: '', dueDate: '' });
+                      setShowAddModal(true);
+                    }}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
+                  >
+                    <Plus size={18} />
+                    <span>{isRtl ? 'واجب جديد' : 'New Homework'}</span>
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                  {filteredHomeworks.length > 0 ? (
+                    filteredHomeworks.map((hw) => (
+                      <div key={hw.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 hover:shadow-md transition-shadow relative group">
+                        <div className="flex justify-between items-start mb-3">
+                           <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-500">
+                                <BookOpen size={18} />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{hw.title}</h4>
+                                <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                                  <span>{hw.teacherName || hw.subject}</span>
+                                  <span>•</span>
+                                  <span>{hw.createdAt?.seconds ? new Date(hw.createdAt.seconds * 1000).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : ''}</span>
+                                </div>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => {
+                                  setEditingHomework(hw);
+                                  setNewHomework({ title: hw.title, content: hw.content, dueDate: hw.dueDate });
+                                  setShowAddModal(true);
+                                }}
+                                className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-700 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteHomework(hw.id)}
+                                className="p-2 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 dark:bg-slate-700 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                           </div>
+                        </div>
+                        <p className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{hw.content}</p>
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                           <span className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-100 dark:border-amber-800 flex items-center gap-1">
+                             <Calendar size={12} />
+                             {t('deliveryDate')}: {hw.dueDate}
+                           </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-4">
+                      <BookOpen size={48} className="opacity-20" />
+                      <p className="font-bold">{isRtl ? 'لا توجد واجبات حالية لهذا الصف' : 'No current homework for this class'}</p>
+                    </div>
+                  )}
+                </div>
+             </div>
+           ) : (
+             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-12rem)] min-h-[600px] flex items-center justify-center">
+               <div className="text-center text-slate-400 space-y-4 max-w-sm px-6">
+                 <Users size={64} className="mx-auto opacity-20" />
+                 <h3 className="text-xl font-bold text-slate-600 dark:text-slate-300">{isRtl ? 'اختر صفاً دراسياً לעرض الواجبات' : 'Select a class to view homeworks'}</h3>
+               </div>
+             </div>
+           )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showAddModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setShowAddModal(false)}
+                className="absolute top-6 left-6 p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+                title={isRtl ? 'إغلاق' : 'Close'}
+              >
+                <X size={20} />
+              </button>
+
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+                {editingHomework ? (isRtl ? 'تعديل الواجب' : 'Edit Homework') : (isRtl ? 'إضافة واجب جديد' : 'New Homework')}
+              </h2>
+              <p className="text-slate-500 font-bold mb-6">
+                {classes.find(c => c.id === selectedClassId)?.name}
+              </p>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'عنوان الواجب' : 'Title'}</label>
+                  <input
+                    type="text"
+                    required
+                    value={newHomework.title}
+                    onChange={(e) => setNewHomework({...newHomework, title: e.target.value})}
+                    dir="auto"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'تاريخ التسليم' : 'Due Date'}</label>
+                  <input
+                    type="date"
+                    required
+                    value={newHomework.dueDate}
+                    onChange={(e) => setNewHomework({...newHomework, dueDate: e.target.value})}
+                    dir="auto"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'التفاصيل' : 'Details'}</label>
+                  <textarea
+                    value={newHomework.content}
+                    onChange={(e) => setNewHomework({...newHomework, content: e.target.value})}
+                    dir="auto"
+                    rows={4}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white resize-none"
+                  ></textarea>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowAddModal(false)}
+                    className="px-6 py-3 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    {isRtl ? 'إلغاء' : 'Cancel'}
+                  </button>
+                  <button
+                    onClick={handleSaveHomework}
+                    disabled={isSaving || !newHomework.title.trim() || !newHomework.content.trim() || !newHomework.dueDate}
+                    className="px-6 py-3 rounded-xl font-bold bg-indigo-600 text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Send size={18} />
+                        <span>{isRtl ? 'حفظ وإرسال' : 'Save & Send'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
