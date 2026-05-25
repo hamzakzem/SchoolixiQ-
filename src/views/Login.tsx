@@ -77,6 +77,26 @@ export default function Login() {
     return () => unsub();
   }, [mode]);
 
+  useEffect(() => {
+    const handleProxyMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+        console.log("Popup login completed successfully! Synchronizing system states with IndexedDB...");
+        setLoading(true);
+        let checkCount = 0;
+        const checkInterval = setInterval(() => {
+          checkCount++;
+          if (auth.currentUser || checkCount > 25) {
+            clearInterval(checkInterval);
+            setLoading(false);
+          }
+        }, 150);
+      }
+    };
+    window.addEventListener('message', handleProxyMessage);
+    return () => window.removeEventListener('message', handleProxyMessage);
+  }, []);
+
   const handleSubscribeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!showSubscriptionModal) return;
@@ -120,6 +140,34 @@ export default function Login() {
   const handleGoogleAuth = async () => {
     setUnauthorizedDomainError(null);
     setShowIframeHint(false);
+
+    // Active Iframe Shield: open the same-origin popup if running in an iframe
+    const isInIframe = window.self !== window.top;
+    if (isInIframe) {
+      setLoading(true);
+      const popupWidth = 500;
+      const popupHeight = 650;
+      const left = window.screen.width / 2 - popupWidth / 2;
+      const top = window.screen.height / 2 - popupHeight / 2;
+      
+      const popupUrl = `${window.location.origin}/login-popup?role=${role}`;
+      const popup = window.open(
+        popupUrl,
+        'Firebase_Google_Auth_Proxy',
+        `width=${popupWidth},height=${popupHeight},left=${left},top=${top}`
+      );
+      
+      if (!popup) {
+        setLoading(false);
+        toast.error(
+          isRtl 
+            ? 'تم حظر النافذة المنبثقة من قبل المتصفح. يرجى السماح بالنوافذ المنبثقة وإعادة المحاولة.' 
+            : 'Popup blocked by browser. Please allow popups and try again.'
+        );
+      }
+      return;
+    }
+
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();

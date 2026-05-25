@@ -40,6 +40,7 @@ import SuperAdminDashboard from "./views/SuperAdminDashboard";
 import TeacherDashboard from "./views/TeacherDashboard";
 import ScanHandler from "./components/ScanHandler";
 import PublicStudentVerify from "./views/PublicStudentVerify";
+import GoogleAuthPopupProxy from "./views/GoogleAuthPopupProxy";
 
 import SolarLoading from "./components/SolarLoading";
 import { LanguageToggle } from "./components/LanguageToggle";
@@ -799,6 +800,10 @@ export default function App() {
           <AuthProvider>
             <BrowserRouter>
               <Routes>
+                <Route
+                  path="/login-popup"
+                  element={<GoogleAuthPopupProxy />}
+                />
                 <Route
                   path="/verify/:studentId"
                   element={<PublicStudentVerify />}
