@@ -474,6 +474,7 @@ export default function Login() {
         className="bg-white w-full max-w-lg rounded-[2rem] sm:rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden mb-8 sm:mb-12"
       >
         <div className="p-6 sm:p-10">
+          {/* Enforced Brand: schoolixiQ */}
           <div className="flex flex-col items-center mb-6 sm:mb-10 text-center select-none">
             {/* Elegant Technical Logo Container */}
             {config.appLogo && (
