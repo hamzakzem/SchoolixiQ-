@@ -1,4 +1,4 @@
-const CACHE_NAME = 'schoolix-cache-v4';
+const CACHE_NAME = 'schoolix-cache-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -32,6 +32,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Only intercept same-origin requests to prevent cross-origin issues
   if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+  
+  // Only cache GET requests and do not cache dynamic API requests to prevent staleness and WebKit errors
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
     return;
   }
   
