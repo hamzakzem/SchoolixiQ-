@@ -475,15 +475,20 @@ export default function Login() {
       >
         <div className="p-6 sm:p-10">
           <div className="flex flex-col items-center mb-6 sm:mb-10 text-center">
-            {config.appLogo ? (
-              <div className="mb-3">
-                <img src={config.appLogo} alt="schoolixiQ" className="max-h-20 sm:max-h-24 object-contain" />
-              </div>
-            ) : (
-              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 shadow-xl shadow-slate-200">
-                <GraduationCap className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-              </div>
-            )}
+            <div className="h-20 sm:h-24 w-full flex items-center justify-center mb-3 sm:mb-4">
+              {config.appLogo ? (
+                <img 
+                  src={config.appLogo} 
+                  alt="schoolixiQ" 
+                  className="max-h-20 sm:max-h-24 object-contain" 
+                  loading="eager"
+                />
+              ) : (
+                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-900 rounded-2xl flex items-center justify-center shadow-xl shadow-slate-200">
+                  <GraduationCap className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+                </div>
+              )}
+            </div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-sans">
               schoolixiQ
             </h1>

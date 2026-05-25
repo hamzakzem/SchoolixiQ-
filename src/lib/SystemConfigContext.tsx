@@ -63,7 +63,17 @@ const defaultSystemConfig: SystemConfig = {
 const SystemConfigContext = createContext<{config: SystemConfig}>({ config: defaultSystemConfig });
 
 export const SystemConfigProvider = ({ children }: { children: React.ReactNode }) => {
-  const [config, setConfig] = useState<SystemConfig>(defaultSystemConfig);
+  const [config, setConfig] = useState<SystemConfig>(() => {
+    try {
+      const cached = localStorage.getItem('schoolixiq_system_config');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.warn("Error reading cached system config:", e);
+    }
+    return defaultSystemConfig;
+  });
 
   useEffect(() => {
     const configRef = doc(db, 'system', 'config');
@@ -74,12 +84,18 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
         const appLogo = typeof data.appLogo !== 'undefined' ? data.appLogo : '';
-        setConfig(prev => ({
-          ...prev,
+        const updatedConfig = {
+          ...defaultSystemConfig,
           ...data,
           appName: appName,
           appLogo: appLogo
-        }));
+        };
+        setConfig(updatedConfig);
+        try {
+          localStorage.setItem('schoolixiq_system_config', JSON.stringify(updatedConfig));
+        } catch (e) {
+          console.warn("Failed to update cache on getDoc:", e);
+        }
         document.title = appName;
       }
     }).catch(e => console.error("System config initial fetch failed:", e));
@@ -89,7 +105,7 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
         const appLogo = typeof data.appLogo !== 'undefined' ? data.appLogo : '';
-        setConfig({
+        const newConfig = {
           appName: appName,
           appLogo: appLogo,
           supportPhones: data.supportPhones || (data.supportPhone ? [data.supportPhone] : ['+964 770 000 0000']),
@@ -98,7 +114,13 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
           marketingTitle: data.marketingTitle || defaultSystemConfig.marketingTitle,
           marketingSubtitle: data.marketingSubtitle || defaultSystemConfig.marketingSubtitle,
           marketingFeatures: data.marketingFeatures || defaultSystemConfig.marketingFeatures
-        });
+        };
+        setConfig(newConfig);
+        try {
+          localStorage.setItem('schoolixiq_system_config', JSON.stringify(newConfig));
+        } catch (e) {
+          console.warn("Failed to cache system config on snapshot:", e);
+        }
         document.title = appName;
       }
     });
