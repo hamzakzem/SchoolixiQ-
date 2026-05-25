@@ -136,13 +136,21 @@ export default function Login() {
 
   const [unauthorizedDomainError, setUnauthorizedDomainError] = useState<string | null>(null);
   const [showIframeHint, setShowIframeHint] = useState<boolean>(false);
+  const [firebaseProviderError, setFirebaseProviderError] = useState<string | null>(null);
 
   const handleGoogleAuth = async () => {
     setUnauthorizedDomainError(null);
     setShowIframeHint(false);
+    setFirebaseProviderError(null);
 
     // Active Iframe Shield: open the same-origin popup if running in an iframe
-    const isInIframe = window.self !== window.top;
+    let isInIframe = false;
+    try {
+      isInIframe = window.self !== window.top;
+    } catch (e) {
+      isInIframe = true;
+    }
+    
     if (isInIframe) {
       setLoading(true);
       const popupWidth = 500;
@@ -267,6 +275,17 @@ export default function Login() {
             ? 'تم حظر النافذة المنبثقة من قبل المتصفح. يرجى السماح بالنوافذ المنبثقة وإعادة المحاولة.' 
             : 'Popup blocked by browser. Please allow popups and try again.'
         );
+      } else if (errorCode === 'auth/operation-not-allowed' || 
+                 errorMessage.includes('operation-not-allowed') ||
+                 errorMessage.toLowerCase().includes('operation not allowed') ||
+                 errorMessage.toLowerCase().includes('disabled for this firebase project') ||
+                 errorMessage.toLowerCase().includes('provider is disabled')) {
+        setFirebaseProviderError('google-disabled');
+        toast.error(
+          isRtl 
+            ? 'خطأ: لم يتم تفعيل تسجيل دخول Google في لوحة تحكم Firebase لمشروعك!' 
+            : 'Error: Google Sign-In is not enabled in your Firebase Authentication Console!'
+        );
       } else if (errorCode === 'auth/invalid-credential' || 
                  errorCode === 'INVALID_CREDENTIAL' ||
                  errorMessage.includes('invalid-credential') ||
@@ -274,6 +293,7 @@ export default function Login() {
         toast.error(t('authError'));
       } else {
         setShowIframeHint(true);
+        setFirebaseProviderError(`${errorCode || 'Exception'}: ${errorMessage || String(error)}`);
         toast.error(t('failedConnection'));
       }
     } finally {
@@ -456,17 +476,17 @@ export default function Login() {
         <div className="p-6 sm:p-10">
           <div className="flex flex-col items-center mb-6 sm:mb-10 text-center">
             {config.appLogo ? (
-              <div className="mb-4">
-                <img src={config.appLogo} alt={config.appName} className="max-h-20 sm:max-h-24 object-contain" />
+              <div className="mb-3">
+                <img src={config.appLogo} alt="schoolixiQ" className="max-h-20 sm:max-h-24 object-contain" />
               </div>
             ) : (
-              <>
-                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 shadow-xl shadow-slate-200">
-                  <GraduationCap className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{config.appName}</h1>
-              </>
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 shadow-xl shadow-slate-200">
+                <GraduationCap className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+              </div>
             )}
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-sans">
+              schoolixiQ
+            </h1>
             <p className="text-slate-400 mt-1 sm:mt-2 font-medium italic text-sm sm:text-base">{t('appTagline')}</p>
           </div>
 
@@ -693,6 +713,49 @@ export default function Login() {
                   <p>2. {isRtl ? 'اختر Build ثم Authentication ثم تبويب Settings.' : 'Click on Build, then Authentication, then Settings tab.'}</p>
                   <p>3. {isRtl ? 'تحت Authorized domains، اضغط على Add domain وألصق النطاق المنسوخ أعلاه.' : 'Under Authorized domains, click Add domain and paste the copied domain.'}</p>
                 </div>
+              </div>
+            )}
+
+            {firebaseProviderError && (
+              <div id="firebase-provider-error-card" className="mt-4 p-4 rounded-xl border-2 border-rose-200 bg-rose-50/50 text-slate-800 text-xs sm:text-sm shadow-sm text-right">
+                <div className="flex items-start gap-2.5 mb-2.5 rtl:flex-row-reverse">
+                  <ShieldAlert className="text-rose-600 shrink-0 mt-0.5" size={18} />
+                  <div>
+                    <h4 className="font-bold text-rose-950 text-sm">
+                      {firebaseProviderError === 'google-disabled' 
+                        ? (isRtl ? 'تفعيل دخول Google (خطأ إعدادات)' : 'Enable Google Auth (Configuration Error)')
+                        : (isRtl ? 'تفاصيل الخطأ الفني (Firebase Exception)' : 'Technical Error Details (Firebase Exception)')}
+                    </h4>
+                    <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
+                      {firebaseProviderError === 'google-disabled'
+                        ? (isRtl 
+                          ? 'لم يتم تفعيل موفر تسجيل الدخول Google في لوحة تحكم عتاد Firebase. يرجى تفعيله من Firebase Console لتشغيل الخدمة.' 
+                          : 'Google Authentication Sign-In is not activated in the Firebase Project Console.')
+                        : (isRtl
+                          ? 'لقد أطلق نظام المصادقة استثناءاً فنياً محدداً. التفاصيل معروضة أدناه للتحقق والإصلاح:'
+                          : 'The auth system threw an explicit technical exception. See details below to resolve: ')}
+                    </p>
+                  </div>
+                </div>
+
+                {firebaseProviderError !== 'google-disabled' ? (
+                  <div className="bg-white p-2.5 rounded-lg border border-rose-200 shadow-inner">
+                    <code className="font-mono text-[10px] sm:text-xs text-rose-700 select-all font-bold tracking-tight break-all">
+                      {firebaseProviderError}
+                    </code>
+                  </div>
+                ) : (
+                  <div className="mt-3 bg-white p-3 rounded-lg border border-slate-200 flex flex-col gap-2.5 shadow-sm text-center">
+                    <p className="font-bold text-slate-900 text-xs">
+                      {isRtl ? 'طريقة الحل وتفعيل موفر تسجيل الخدمة:' : 'Steps to Activate and Resolve:'}
+                    </p>
+                    <div className="text-[10px] sm:text-[11px] text-slate-500 list-decimal pr-4 pl-0 rtl:pl-4 space-y-1 font-medium leading-relaxed text-right">
+                      <p>1. {isRtl ? 'ادخل على حساب Firebase Console وافتح مشروعك.' : 'Open Firebase Console and pick your project.'}</p>
+                      <p>2. {isRtl ? 'اذهب إلى قائمة Build ثم Authentication ثم تبويب Sign-in method.' : 'Click on Build -> Authentication -> Sign-in method tab.'}</p>
+                      <p>3. {isRtl ? 'اضغط على Add provider واختر Google وقم بتفعيله ثم حفظ.' : 'Click Add provider -> Google -> Enable and save the changes.'}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
