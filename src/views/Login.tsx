@@ -22,7 +22,7 @@ import {
   addDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import { LogIn, GraduationCap, Users, Building2, Mail, Lock, ShieldCheck, ArrowRight, Check, Package, Phone, MapPin, X, Coins, Sparkles, TrendingUp, Bell, Copy, ShieldAlert } from 'lucide-react';
+import { LogIn, GraduationCap, Users, Building2, Mail, Lock, ShieldCheck, ArrowRight, Check, Package, Phone, MapPin, X, Coins, Sparkles, TrendingUp, Bell, Copy, ShieldAlert, ExternalLink } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { UserRole } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -115,9 +115,11 @@ export default function Login() {
   };
 
   const [unauthorizedDomainError, setUnauthorizedDomainError] = useState<string | null>(null);
+  const [showIframeHint, setShowIframeHint] = useState<boolean>(false);
 
   const handleGoogleAuth = async () => {
     setUnauthorizedDomainError(null);
+    setShowIframeHint(false);
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -223,6 +225,7 @@ export default function Login() {
                  errorMessage.toLowerCase().includes('invalid credential')) {
         toast.error(t('authError'));
       } else {
+        setShowIframeHint(true);
         toast.error(t('failedConnection'));
       }
     } finally {
@@ -641,6 +644,46 @@ export default function Login() {
                   <p>1. {isRtl ? 'اذهب لـ Firebase Console وافتح مشروعك.' : 'Go to Firebase Console and open your project.'}</p>
                   <p>2. {isRtl ? 'اختر Build ثم Authentication ثم تبويب Settings.' : 'Click on Build, then Authentication, then Settings tab.'}</p>
                   <p>3. {isRtl ? 'تحت Authorized domains، اضغط على Add domain وألصق النطاق المنسوخ أعلاه.' : 'Under Authorized domains, click Add domain and paste the copied domain.'}</p>
+                </div>
+              </div>
+            )}
+
+            {showIframeHint && (
+              <div id="iframe-connection-hint-card" className="mt-4 p-4 rounded-xl border-2 border-indigo-200 bg-indigo-50/50 text-slate-800 text-xs sm:text-sm shadow-sm text-right">
+                <div className="flex items-start gap-2.5 mb-2.5 rtl:flex-row-reverse">
+                  <ShieldAlert className="text-indigo-600 shrink-0 mt-0.5" size={18} />
+                  <div>
+                    <h4 className="font-bold text-indigo-950 text-sm">
+                      {isRtl ? 'لماذا تظهر هذه الرسالة؟ (مشكلة تقييد المتصفح)' : 'Why does this message appear? (Browser Restriction)'}
+                    </h4>
+                    <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
+                      {isRtl 
+                        ? 'عند تشغيل التطبيق داخل نافذة المعاينة بالمنصة، يقوم المتصفح بحظر ملفات تعريف الارتباط للطرف الثالث (Third-Party Cookies) وتخزين الويب لأسباب أمنية، مما يمنع Google من مكاملة الاتصال.' 
+                        : 'When running the application inside the platform preview frame, browsers block third-party cookies & web storage for security, which prevents Google Auth from completing.'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="mt-3 bg-white p-3 rounded-lg border border-slate-200 flex flex-col gap-2.5 shadow-sm">
+                  <p className="font-bold text-slate-900 text-xs text-center">
+                    {isRtl ? 'الحل الأبسط والأسرع: تشغيله في علامة تبويب جديدة' : 'Easiest solution: Run in a separate tab'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(window.location.href, '_blank');
+                    }}
+                    className="w-full flex items-center justify-center gap-2 hover:bg-indigo-600 hover:text-white bg-indigo-500 text-white px-3 py-2 sm:py-2.5 rounded-lg font-bold transition-all text-xs sm:text-sm active:scale-95 shadow"
+                  >
+                    <ExternalLink size={14} />
+                    <span>{isRtl ? 'الفتح وتشغيل التطبيق في علامة تبويب مستقلة' : 'Open & Run App in New Tab'}</span>
+                  </button>
+                </div>
+
+                <div className="mt-2.5 text-[10px] sm:text-[11px] text-slate-500 list-decimal pr-4 pl-0 rtl:pl-4 space-y-1 font-medium leading-relaxed">
+                  <p>1. {isRtl ? 'اضغط على الزر الزرق أعلاه لفتح التطبيق بشكل كامل.' : 'Click the blue button above to open the application fully.'}</p>
+                  <p>2. {isRtl ? 'أو يمكنك تفعيل "قبول ملفات تعريف الارتباط للطرف الثالث" (Third-Party Cookies) في المتصفح.' : 'Or you can enable "Third-Party Cookies" in your browser settings.'}</p>
+                  <p>3. {isRtl ? 'يمكنك أيضاً استخدام نظام تسجيل الدخول العادي بالبريد الإلكتروني وكلمة المرور دون أي قيود.' : 'You can also use standard email & password login directly without restrictions.'}</p>
                 </div>
               </div>
             )}
