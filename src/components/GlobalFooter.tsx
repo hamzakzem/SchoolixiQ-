@@ -66,7 +66,27 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
   }, [compact]);
 
   if (loading) return null;
-  if (!compact && schools.length === 0 && partners.length === 0) return null;
+  if (compact) {
+    return (
+      <footer className="bg-slate-50/50 dark:bg-slate-950/50 border-t border-slate-200/50 dark:border-slate-800/50 py-4 mt-auto shrink-0 relative w-full overflow-hidden transition-all duration-300 print:hidden">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 relative">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-right">
+            <div className="text-slate-400 dark:text-slate-500 text-xs font-bold tracking-wide">
+              &copy; {new Date().getFullYear()} {config.appName}. جميع الحقوق محفوظة.
+            </div>
+            {config.appLogo && (
+              <img
+                src={config.appLogo}
+                alt={config.appName}
+                className="max-h-6 object-contain opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all"
+              />
+            )}
+          </div>
+        </div>
+      </footer>
+    );
+  }
+  if (schools.length === 0 && partners.length === 0) return null;
 
   return (
     <footer className={`bg-slate-50 dark:bg-slate-950 border-t border-slate-200/60 dark:border-slate-800/60 mt-auto shrink-0 relative w-full overflow-hidden transition-all duration-300 ${isExpanded ? 'pt-16 pb-24 md:pb-10' : 'pt-6 pb-20 md:pb-8'}`}>

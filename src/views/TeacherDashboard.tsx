@@ -1097,7 +1097,7 @@ export default function TeacherDashboard() {
           </div>
         </header>
 
-        <div className={`flex-1 flex flex-col min-h-0 print:overflow-visible ${activeTab === 'chat' ? 'overflow-hidden h-full pb-[72px] lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-[96px] lg:pb-0'}`}>
+        <div className={`flex-1 flex flex-col min-h-0 print:overflow-visible ${activeTab === 'chat' ? 'overflow-hidden h-full pb-[72px] lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-[90px] lg:pb-10'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

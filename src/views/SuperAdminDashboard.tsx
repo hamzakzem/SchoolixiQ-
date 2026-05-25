@@ -1627,7 +1627,7 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        <div className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full' : 'overflow-y-auto custom-scrollbar pb-[96px] lg:pb-0'}`}>
+        <div className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full' : 'overflow-y-auto custom-scrollbar pb-10'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

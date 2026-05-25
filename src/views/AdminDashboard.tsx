@@ -1202,7 +1202,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        <main className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full pb-safe' : 'overflow-y-auto pb-safe'}`}>
+        <main className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0' : 'overflow-y-auto pb-10'}`}>
           <div className={`w-full mx-auto flex flex-col print:min-h-0 print:pb-0 print:p-0 ${
             activeTab === "chat" ? "h-full max-w-none p-0 flex-1 min-h-0" : "max-w-7xl p-4 md:p-8"
           }`}>
