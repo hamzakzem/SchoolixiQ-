@@ -474,25 +474,45 @@ export default function Login() {
         className="bg-white w-full max-w-lg rounded-[2rem] sm:rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden mb-8 sm:mb-12"
       >
         <div className="p-6 sm:p-10">
-          <div className="flex flex-col items-center mb-6 sm:mb-10 text-center">
-            <div className="h-20 sm:h-24 w-full flex items-center justify-center mb-3 sm:mb-4">
-              {config.appLogo ? (
-                <img 
-                  src={config.appLogo} 
-                  alt="schoolixiQ" 
-                  className="max-h-20 sm:max-h-24 object-contain" 
-                  loading="eager"
-                />
-              ) : (
-                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-900 rounded-2xl flex items-center justify-center shadow-xl shadow-slate-200">
-                  <GraduationCap className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+          <div className="flex flex-col items-center mb-6 sm:mb-10 text-center select-none">
+            {/* Elegant Technical Logo Container */}
+            {config.appLogo && (
+              <div className="mb-4 relative group">
+                {/* Tech Aura Backlight */}
+                <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-sky-500 rounded-full blur-xl opacity-15 group-hover:opacity-25 transition duration-500"></div>
+                <div className="relative h-20 sm:h-24 flex items-center justify-center">
+                  <img 
+                    src={config.appLogo} 
+                    alt="schoolixiQ Logo" 
+                    className="max-h-20 sm:max-h-24 w-auto object-contain drop-shadow-sm transition-transform duration-500 hover:scale-105" 
+                    loading="eager"
+                  />
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* Platform Brand Title styled geometrically/technically */}
+            <div className="relative mt-2 flex flex-col items-center">
+              {/* Elegant Geometric Accents around the main brand */}
+              <div className="flex items-center gap-3">
+                <span className="h-[2px] w-8 bg-gradient-to-r from-transparent to-slate-200 rounded-full"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                <span className="h-[2px] w-8 bg-gradient-to-l from-transparent to-slate-200 rounded-full"></span>
+              </div>
+
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 mt-2 font-sans select-none">
+                <span className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 bg-clip-text text-transparent">schoolix</span>
+                <span className="text-indigo-600 font-extrabold relative">
+                  iQ
+                  <span className="absolute -top-0.5 -right-2.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                </span>
+              </h1>
+
+              {/* Tagline or subheading */}
+              <p className="text-slate-400 mt-2 font-medium tracking-wide text-xs sm:text-sm uppercase font-mono max-w-xs leading-relaxed">
+                {t('appTagline')}
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-sans">
-              schoolixiQ
-            </h1>
-            <p className="text-slate-400 mt-1 sm:mt-2 font-medium italic text-sm sm:text-base">{t('appTagline')}</p>
           </div>
 
           <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6 sm:mb-8">
