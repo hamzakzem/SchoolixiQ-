@@ -1,4 +1,4 @@
-const CACHE_NAME = 'schoolix-cache-v5';
+const CACHE_NAME = 'schoolix-cache-v6';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -40,31 +40,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Network-First with Cache Fallback for dynamic updates and reliable offline access
+  // Stale-While-Revalidate strategy for lightning-fast UI rendering & offline stability
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // If the request was successful, clone and update the cache
-        if (response && response.status === 200 && response.type === 'basic') {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Fallback to cache if network is unavailable (offline state)
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
           }
-          // Fallback to index.html for client-side route navigations when offline
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
+          return networkResponse;
+        })
+        .catch((error) => {
+          console.warn('Network request failed inside Service Worker:', error);
+          return cachedResponse;
         });
-      })
+
+      return cachedResponse || fetchPromise;
+    })
   );
 });
 
