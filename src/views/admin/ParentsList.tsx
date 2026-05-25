@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { Users, Search, Trash2, Mail, User, GraduationCap, AlertTriangle, X, Plus, Phone, Edit2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
