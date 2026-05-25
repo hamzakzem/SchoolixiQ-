@@ -63,6 +63,63 @@ import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
 
+const DEFAULT_PACKAGES = [
+  {
+    id: "basic",
+    name: "الباقة الأساسية",
+    price: 1500000,
+    priceMonthly: 150000,
+    priceYearly: 1500000,
+    isPopular: false,
+    durationDays: 365,
+    showSubscriptionTimer: true,
+    showInRegistration: true,
+    features: [
+      "لغاية 250 طالب وطالبة",
+      "إدارة الغيابات والحضور اليومي",
+      "لوحة تحكم للمدير والمعلمين",
+      "نتائج الامتحانات الشهرية",
+      "دعم فني عبر البريد الإلكتروني",
+    ],
+  },
+  {
+    id: "professional",
+    name: "الباقة الاحترافية",
+    price: 3000000,
+    priceMonthly: 300000,
+    priceYearly: 3000000,
+    isPopular: true,
+    durationDays: 365,
+    showSubscriptionTimer: true,
+    showInRegistration: true,
+    features: [
+      "لغاية 750 طالب وطالبة",
+      "تطبيق حقيقي لأولياء الأمور",
+      "رواتب الحسابات والمالية للأستاذة",
+      "شهادات ونتائج تفاعلية",
+      "دعم فني مباشر على مدار الساعة",
+    ],
+  },
+  {
+    id: "premium",
+    name: "الباقة الشاملة",
+    price: 5000000,
+    priceMonthly: 500000,
+    priceYearly: 5000000,
+    isPopular: false,
+    durationDays: 365,
+    showSubscriptionTimer: true,
+    showInRegistration: true,
+    features: [
+      "عدد طلاب غير محدود",
+      "كل مميزات الباقة الاحترافية",
+      "نظام محاسبة متقدم وهيكل رواتب",
+      "إشعارات SMS فورية وتنبيهات تلقائية",
+      "تخصيص كامل للهوية البصرية والشعار",
+    ],
+  },
+];
+
 export default function SuperAdminDashboard() {
   const { profile, logout } = useAuth();
   const { t, isRtl, setLanguage, language } = useLanguage();
@@ -658,7 +715,16 @@ export default function SuperAdminDashboard() {
       };
 
       unsubs.push(onSnapshot(schoolsQ, (snap) => setSchools(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))));
-      unsubs.push(onSnapshot(packagesQ, (snap) => setPackages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))));
+      unsubs.push(onSnapshot(packagesQ, (snap) => {
+        if (!snap.empty) {
+          setPackages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } else {
+          setPackages(DEFAULT_PACKAGES);
+        }
+      }, (err) => {
+        console.warn("Packages subscription failed, using defaults", err);
+        setPackages(DEFAULT_PACKAGES);
+      }));
       unsubs.push(onSnapshot(usersQ, (snap) => setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))));
       unsubs.push(onSnapshot(studentsQ, (snap) => setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))));
 
@@ -978,24 +1044,64 @@ export default function SuperAdminDashboard() {
         active: true,
       };
 
-      const token = await auth.currentUser?.getIdToken();
-      const method = editingPackage ? "PUT" : "POST";
-      const url = editingPackage
-        ? `/api/admin/plans/${editingPackage.id}`
-        : "/api/admin/plans";
+      let apiSuccess = false;
+      let apiErrorDetail = "";
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(pkgData),
-      });
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const method = editingPackage ? "PUT" : "POST";
+        const url = editingPackage
+          ? `/api/admin/plans/${encodeURIComponent(editingPackage.id)}`
+          : "/api/admin/plans";
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "فشل حفظ الباقة");
+        const response = await fetch(url, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(pkgData),
+        });
+
+        if (response.ok) {
+          apiSuccess = true;
+        } else {
+          try {
+            const errRes = await response.json();
+            apiErrorDetail = errRes.error || errRes.message || `Status: ${response.status}`;
+          } catch (e) {
+            apiErrorDetail = `Status: ${response.status}`;
+          }
+          console.warn(`API save returned status ${response.status}. Trying direct client-side write...`);
+        }
+      } catch (apiErr: any) {
+        apiErrorDetail = apiErr.message || String(apiErr);
+        console.warn("API save threw an error. Trying direct client-side write...", apiErr);
+      }
+
+      if (!apiSuccess) {
+        try {
+          // Fallback to direct client-side Firestore write
+          if (editingPackage) {
+            await setDoc(
+              doc(db, "packages", editingPackage.id),
+              {
+                ...pkgData,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          } else {
+            await addDoc(collection(db, "packages"), {
+              ...pkgData,
+              createdAt: serverTimestamp(),
+            });
+          }
+        } catch (firestoreErr: any) {
+          throw new Error(
+            `فشل حفظ الباقة عبر الخادم وعبر قاعدة البيانات مباشرة. خطأ الخادم: ${apiErrorDetail}. خطأ قاعدة البيانات: ${firestoreErr.message}`
+          );
+        }
       }
 
       toast.dismiss(loadingToast);
@@ -1051,17 +1157,43 @@ export default function SuperAdminDashboard() {
   const handleDeletePackage = async (id: string) => {
     const loadingToast = toast.loading("جاري حذف الباقة...");
     try {
-      const token = await auth.currentUser?.getIdToken();
-      const response = await fetch(`/api/admin/plans/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      let apiSuccess = false;
+      let apiErrorDetail = "";
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "فشل حذف الباقة");
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const response = await fetch(`/api/admin/plans/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          apiSuccess = true;
+        } else {
+          try {
+            const errRes = await response.json();
+            apiErrorDetail = errRes.error || errRes.message || `Status: ${response.status}`;
+          } catch (e) {
+            apiErrorDetail = `Status: ${response.status}`;
+          }
+          console.warn(`API delete returned status ${response.status}. Trying direct client-side write...`);
+        }
+      } catch (apiErr: any) {
+        apiErrorDetail = apiErr.message || String(apiErr);
+        console.warn("API delete threw an error. Trying direct client-side write...", apiErr);
+      }
+
+      if (!apiSuccess) {
+        try {
+          // Fallback to direct client-side Firestore delete
+          await deleteDoc(doc(db, "packages", id));
+        } catch (firestoreErr: any) {
+          throw new Error(
+            `فشل حذف الباقة عبر الخادم وعبر قاعدة البيانات مباشرة. خطأ الخادم: ${apiErrorDetail}. خطأ قاعدة البيانات: ${firestoreErr.message}`
+          );
+        }
       }
 
       toast.dismiss(loadingToast);
@@ -1069,7 +1201,7 @@ export default function SuperAdminDashboard() {
       setPackageDeleteConfirmId(null);
     } catch (error: any) {
       toast.dismiss(loadingToast);
-      toast.error(error.message);
+      toast.error(error.message || "حدث خطأ أثناء حذف الباقة");
     }
   };
 

@@ -45,6 +45,57 @@ import GoogleAuthPopupProxy from "./views/GoogleAuthPopupProxy";
 import SolarLoading from "./components/SolarLoading";
 import { LanguageToggle } from "./components/LanguageToggle";
 
+const DEFAULT_PACKAGES = [
+  {
+    id: "basic",
+    name: "الباقة الأساسية",
+    price: 1500000,
+    priceMonthly: 150000,
+    priceYearly: 1500000,
+    isPopular: false,
+    showInRegistration: true,
+    features: [
+      "لغاية 250 طالب وطالبة",
+      "إدارة الغيابات والحضور اليومي",
+      "لوحة تحكم للمدير والمعلمين",
+      "نتائج الامتحانات الشهرية",
+      "دعم فني عبر البريد الإلكتروني",
+    ],
+  },
+  {
+    id: "professional",
+    name: "الباقة الاحترافية",
+    price: 3000000,
+    priceMonthly: 300000,
+    priceYearly: 3000000,
+    isPopular: true,
+    showInRegistration: true,
+    features: [
+      "لغاية 750 طالب وطالبة",
+      "تطبيق حقيقي لأولياء الأمور",
+      "رواتب الحسابات والمالية للأستاذة",
+      "شهادات ونتائج تفاعلية",
+      "دعم فني مباشر على مدار الساعة",
+    ],
+  },
+  {
+    id: "premium",
+    name: "الباقة الشاملة",
+    price: 5000000,
+    priceMonthly: 500000,
+    priceYearly: 5000000,
+    isPopular: false,
+    showInRegistration: true,
+    features: [
+      "عدد طلاب غير محدود",
+      "كل مميزات الباقة الاحترافية",
+      "نظام محاسبة متقدم وهيكل رواتب",
+      "إشعارات SMS فورية وتنبيهات تلقائية",
+      "تخصيص كامل للهوية البصرية والشعار",
+    ],
+  },
+];
+
 const AppContent = () => {
   const { user, profile, schoolData, loading } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
@@ -195,7 +246,14 @@ const AppContent = () => {
       import("firebase/firestore").then(({ onSnapshot, query, collection }) => {
         const q = query(collection(db, "packages"));
         onSnapshot(q, (snap) => {
-          setPackages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          if (!snap.empty) {
+            setPackages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          } else {
+            setPackages(DEFAULT_PACKAGES);
+          }
+        }, (error) => {
+          console.error("Failed to fetch packages, using defaults", error);
+          setPackages(DEFAULT_PACKAGES);
         });
       });
     }

@@ -460,7 +460,7 @@ async function startServer() {
         ...req.body,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      await logAudit(req, 'UPDATE_PLAN', { before: beforeDoc.data(), after: req.body });
+      await logAudit(req, 'UPDATE_PLAN', { before: beforeDoc.data() || null, after: req.body });
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -474,7 +474,7 @@ async function startServer() {
       const { id } = req.params;
       const beforeDoc = await db.collection('packages').doc(id).get();
       await db.collection('packages').doc(id).delete();
-      await logAudit(req, 'DELETE_PLAN', { before: beforeDoc.data() });
+      await logAudit(req, 'DELETE_PLAN', { before: beforeDoc.data() || null });
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

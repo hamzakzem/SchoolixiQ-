@@ -115,8 +115,11 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         isSuperAdmin() ||
         (request.auth.uid == userId && 
-         request.resource.data.get('role', '') == resource.data.get('role', '') && 
-         request.resource.data.get('schoolId', '') == resource.data.get('schoolId', '')) ||
+         request.resource.data.get('role', '') == resource.data.get('role', '') && (
+           request.resource.data.get('schoolId', '') == resource.data.get('schoolId', '') ||
+           resource.data.get('schoolId', '') == '' ||
+           !('schoolId' in resource.data)
+         )) ||
         (isSchoolAdmin(resource.data.get('schoolId', '')) && 
          request.resource.data.get('schoolId', '') == resource.data.get('schoolId', ''))
       );
@@ -126,7 +129,9 @@ service cloud.firestore {
     }
 
     match /subscriptionRequests/{id} {
-      allow read, write: if isSuperAdmin();
+      allow read: if isSuperAdmin() || (isSignedIn() && (resource == null || resource.data.get('adminEmail', '') == getUserEmail() || resource.data.get('schoolId', '') == getSchoolId()));
+      allow create: if isSignedIn();
+      allow update, delete: if isSuperAdmin();
     }
     
     match /schools/{schoolId} {
@@ -141,7 +146,8 @@ service cloud.firestore {
         getSchoolId() == schoolId || 
         getTokenSchoolId() == schoolId
       ));
-      allow write: if isSuperAdmin() || isSchoolStaff(schoolId);
+      allow create: if isSuperAdmin() || (isSignedIn() && (getUserRole() == 'admin' || getTokenRole() == 'admin'));
+      allow update, delete: if isSuperAdmin() || isSchoolStaff(schoolId);
     }
 
     match /packages/{id} {

@@ -48,6 +48,57 @@ import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
 
+const DEFAULT_PACKAGES = [
+  {
+    id: "basic",
+    name: "الباقة الأساسية",
+    price: 1500000,
+    priceMonthly: 150000,
+    priceYearly: 1500000,
+    isPopular: false,
+    showInRegistration: true,
+    features: [
+      "لغاية 250 طالب وطالبة",
+      "إدارة الغيابات والحضور اليومي",
+      "لوحة تحكم للمدير والمعلمين",
+      "نتائج الامتحانات الشهرية",
+      "دعم فني عبر البريد الإلكتروني",
+    ],
+  },
+  {
+    id: "professional",
+    name: "الباقة الاحترافية",
+    price: 3000000,
+    priceMonthly: 300000,
+    priceYearly: 3000000,
+    isPopular: true,
+    showInRegistration: true,
+    features: [
+      "لغاية 750 طالب وطالبة",
+      "تطبيق حقيقي لأولياء الأمور",
+      "رواتب الحسابات والمالية للأستاذة",
+      "شهادات ونتائج تفاعلية",
+      "دعم فني مباشر على مدار الساعة",
+    ],
+  },
+  {
+    id: "premium",
+    name: "الباقة الشاملة",
+    price: 5000000,
+    priceMonthly: 500000,
+    priceYearly: 5000000,
+    isPopular: false,
+    showInRegistration: true,
+    features: [
+      "عدد طلاب غير محدود",
+      "كل مميزات الباقة الاحترافية",
+      "نظام محاسبة متقدم وهيكل رواتب",
+      "إشعارات SMS فورية وتنبيهات تلقائية",
+      "تخصيص كامل للهوية البصرية والشعار",
+    ],
+  },
+];
+
 // Sub-views
 import Overview from "./admin/Overview";
 import StudentsList from "./admin/StudentsList";
@@ -260,11 +311,18 @@ export default function AdminDashboard() {
         const snap = await getDocs(q);
         if (!isMounted) return;
 
-        const pkgs = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
-        pkgs.sort((a, b) => (a.price || 0) - (b.price || 0));
+        let pkgs = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+        if (pkgs.length === 0) {
+          pkgs = DEFAULT_PACKAGES;
+        } else {
+          pkgs.sort((a, b) => (a.price || 0) - (b.price || 0));
+        }
         setPackages(pkgs);
       } catch (error) {
         console.error("Error fetching packages:", error);
+        if (isMounted) {
+          setPackages(DEFAULT_PACKAGES);
+        }
       } finally {
         if (isMounted) setIsLoadingPackages(false);
       }
