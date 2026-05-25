@@ -19,9 +19,13 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
   const [schools, setSchools] = useState<School[]>([]);
   const [partners, setPartners] = useState<{ id: string; name: string; logoUrl: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const isExpanded = true;
+  const isExpanded = !compact;
 
   useEffect(() => {
+    if (compact) {
+      setLoading(false);
+      return;
+    }
     const fetchFooterData = async () => {
       try {
         // Fetch active schools with logos
@@ -59,9 +63,10 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
     };
 
     fetchFooterData();
-  }, []);
+  }, [compact]);
 
-  if (loading || (schools.length === 0 && partners.length === 0)) return null;
+  if (loading) return null;
+  if (!compact && schools.length === 0 && partners.length === 0) return null;
 
   return (
     <footer className={`bg-slate-50 dark:bg-slate-950 border-t border-slate-200/60 dark:border-slate-800/60 mt-auto shrink-0 relative w-full overflow-hidden transition-all duration-300 ${isExpanded ? 'pt-16 pb-24 md:pb-10' : 'pt-6 pb-20 md:pb-8'}`}>
