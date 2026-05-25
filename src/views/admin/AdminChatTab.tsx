@@ -198,7 +198,6 @@ export default function AdminChatTab() {
 
       // Notify the receiver
       if (activeContact.id === 'super_admin') {
-        const { notificationService } = await import('../../lib/notificationService');
         await notificationService.notifySuperAdmins({
           title: 'رسالة جديدة من إدارة مدرسة',
           message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
