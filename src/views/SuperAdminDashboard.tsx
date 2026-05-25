@@ -376,6 +376,8 @@ export default function SuperAdminDashboard() {
   const [newPackage, setNewPackage] = useState({
     name: "",
     price: 0,
+    priceMonthly: 0,
+    priceYearly: 0,
     maxStudents: 500,
     features: "",
     durationDays: 365,
@@ -957,7 +959,9 @@ export default function SuperAdminDashboard() {
     try {
       const pkgData = {
         name: newPackage.name,
-        price: Number(newPackage.price),
+        price: Number(newPackage.priceYearly !== undefined ? newPackage.priceYearly : newPackage.price),
+        priceMonthly: Number(newPackage.priceMonthly !== undefined ? newPackage.priceMonthly : Math.round((newPackage.price || 0) / 12)),
+        priceYearly: Number(newPackage.priceYearly !== undefined ? newPackage.priceYearly : newPackage.price),
         maxStudents: Number(newPackage.maxStudents),
         durationDays: Number(newPackage.durationDays),
         showSubscriptionTimer: newPackage.showSubscriptionTimer,
@@ -1004,6 +1008,8 @@ export default function SuperAdminDashboard() {
       setNewPackage({
         name: "",
         price: 0,
+        priceMonthly: 0,
+        priceYearly: 0,
         maxStudents: 500,
         features: "",
         durationDays: 365,
@@ -2339,13 +2345,23 @@ export default function SuperAdminDashboard() {
                         <h4 className="text-xl font-bold text-slate-800 mb-2">
                           {pkg.name}
                         </h4>
-                        <div className="flex items-baseline gap-1 mb-6">
-                          <span className="text-3xl font-bold text-slate-900">
-                            {pkg.price} د.ع
-                          </span>
-                          <span className="text-slate-400 text-xs">
-                            /سنوياً
-                          </span>
+                        <div className="flex flex-col gap-1.5 mb-6">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-black text-slate-950 dark:text-white">
+                              {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price)?.toLocaleString()} د.ع
+                            </span>
+                            <span className="text-slate-400 text-xs font-bold">
+                              / سنوياً
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-base font-bold text-slate-600 dark:text-slate-400">
+                              {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12))?.toLocaleString()} د.ع
+                            </span>
+                            <span className="text-slate-400 text-[10px] font-bold">
+                              / شهرياً
+                            </span>
+                          </div>
                         </div>
                         <ul className="space-y-3 mb-8 flex-1">
                           {pkg.features?.map((f: string, i: number) => (
@@ -2386,6 +2402,8 @@ export default function SuperAdminDashboard() {
                                   setNewPackage({
                                     name: pkg.name,
                                     price: pkg.price,
+                                    priceMonthly: pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12),
+                                    priceYearly: pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price,
                                     maxStudents: pkg.maxStudents || 500,
                                     features: Array.isArray(pkg.features)
                                       ? pkg.features.join(", ")
@@ -4188,7 +4206,7 @@ export default function SuperAdminDashboard() {
                         <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
                         المعلومات الأساسية
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                           <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">
                             اسم الباقة
@@ -4209,24 +4227,53 @@ export default function SuperAdminDashboard() {
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">
-                            السعر (د.ع)
+                            السعر السنوي (د.ع / سنوياً)
                           </label>
                           <input
                             required
                             type="number"
                             value={
-                              Number.isNaN(newPackage.price)
+                              Number.isNaN(newPackage.priceYearly)
                                 ? ""
-                                : newPackage.price
+                                : newPackage.priceYearly || newPackage.price || ""
                             }
                             onChange={(e) => {
                               const val = e.target.value;
+                              const numVal = val === "" ? 0 : Number(val) || 0;
                               setNewPackage({
                                 ...newPackage,
-                                price: val === "" ? 0 : Number(val) || 0,
+                                priceYearly: numVal,
+                                price: numVal, // set fallback legacy price
                               });
                             }}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
+                            placeholder="مثال: 1200000"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">
+                            السعر الشهري (د.ع / شهرياً)
+                          </label>
+                          <input
+                            required
+                            type="number"
+                            value={
+                              Number.isNaN(newPackage.priceMonthly)
+                                ? ""
+                                : (newPackage.priceMonthly !== undefined && newPackage.priceMonthly !== 0)
+                                  ? newPackage.priceMonthly
+                                  : Math.round((newPackage.price || 0) / 12) || ""
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const numVal = val === "" ? 0 : Number(val) || 0;
+                              setNewPackage({
+                                ...newPackage,
+                                priceMonthly: numVal,
+                              });
+                            }}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
+                            placeholder="مثال: 100000"
                           />
                         </div>
                       </div>
@@ -4674,19 +4721,30 @@ function PackageDetailsModal({
         </div>
 
         <div className="p-8 space-y-6">
-          <div className="flex items-center justify-between p-6 bg-blue-50 dark:bg-blue-900/20 rounded-[2rem] border border-blue-100 dark:border-blue-800/30 transition-colors">
+          <div className="grid grid-cols-2 gap-4 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-[2rem] border border-blue-100 dark:border-blue-800/30 transition-colors">
             <div>
               <p className="text-[10px] font-black text-blue-400 uppercase mb-1 tracking-widest">
                 السعر السنوي
               </p>
-              <p className="text-3xl font-black text-blue-600 dark:text-blue-400 transition-colors">
-                {pkg.price === 0 ? "مجاني" : pkg.price.toLocaleString("ar-IQ")}
-                {pkg.price > 0 && (
-                  <span className="text-base font-bold mr-1">د.ع</span>
+              <p className="text-2xl font-black text-blue-600 dark:text-blue-400 transition-colors">
+                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) === 0 ? "مجاني" : (pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price).toLocaleString("ar-IQ")}
+                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) > 0 && (
+                  <span className="text-xs font-bold mr-1">د.ع</span>
                 )}
               </p>
             </div>
-            <div className="text-right">
+            <div>
+              <p className="text-[10px] font-black text-blue-400 uppercase mb-1 tracking-widest">
+                السعر الشهري
+              </p>
+              <p className="text-2xl font-black text-blue-600 dark:text-blue-400 transition-colors">
+                {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)) === 0 ? "مجاني" : (pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)).toLocaleString("ar-IQ")}
+                {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)) > 0 && (
+                  <span className="text-xs font-bold mr-1">د.ع</span>
+                )}
+              </p>
+            </div>
+            <div className="col-span-2 border-t border-blue-150/40 dark:border-blue-800/10 pt-4 mt-2 text-right">
               <p className="text-[10px] font-black text-blue-400 uppercase mb-1 tracking-widest">
                 سعة الطلاب
               </p>

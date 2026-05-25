@@ -864,7 +864,11 @@ export default function Login() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-2 sm:px-0">
           {packages.map((pkg) => {
-            const displayPrice = billingCycle === 'annually' ? pkg.price : Math.round((pkg.price || 0) / 12);
+            const displayPrice = billingCycle === 'annually'
+              ? (pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price)
+              : (pkg.priceMonthly !== undefined && pkg.priceMonthly !== 0
+                  ? pkg.priceMonthly
+                  : Math.round((pkg.price || 0) / 12));
             return (
             <motion.div 
               key={pkg.id}

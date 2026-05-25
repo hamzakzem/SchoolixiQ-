@@ -1334,19 +1334,30 @@ function PackageDetailsModal({
         </div>
 
         <div className="p-8 space-y-6">
-          <div className="flex items-center justify-between p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-[2rem] border border-indigo-100 dark:border-indigo-800/30">
+          <div className="grid grid-cols-2 gap-4 p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-[2rem] border border-indigo-100 dark:border-indigo-800/30">
             <div>
               <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
                 السعر السنوي
               </p>
-              <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
-                {pkg.price === 0 ? "مجاني" : pkg.price.toLocaleString("ar-IQ")}
-                {pkg.price > 0 && (
-                  <span className="text-base font-bold mr-1">د.ع</span>
+              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) === 0 ? "مجاني" : (pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price).toLocaleString("ar-IQ")}
+                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) > 0 && (
+                  <span className="text-xs font-bold mr-1">د.ع</span>
                 )}
               </p>
             </div>
-            <div className="text-right">
+            <div>
+              <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
+                السعر الشهري
+              </p>
+              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)) === 0 ? "مجاني" : (pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)).toLocaleString("ar-IQ")}
+                {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)) > 0 && (
+                  <span className="text-xs font-bold mr-1">د.ع</span>
+                )}
+              </p>
+            </div>
+            <div className="col-span-2 border-t border-indigo-150/40 dark:border-indigo-800/10 pt-4 mt-2 text-right">
               <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
                 سعة الطلاب
               </p>
