@@ -385,18 +385,21 @@ function StatCard({ title, value, icon: Icon, color, iconColor, unit = '', actio
   return (
     <div 
       onClick={action}
-      className={`p-6 rounded-2xl border shadow-sm flex items-center justify-between transition-all ${color} dark:bg-slate-900 dark:border-slate-800 ${action ? 'cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-95 group' : ''}`}
+      className={`p-6 rounded-2xl border shadow-sm flex items-center justify-between transition-all duration-500 transform ${color} dark:bg-slate-900 dark:border-slate-800 ${action ? 'group relative overflow-hidden cursor-pointer hover:scale-105 hover:shadow-2xl' : ''}`}
     >
-      <div>
+      {action && (
+        <span className="absolute top-0 left-0 z-0 h-32 w-32 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 opacity-0 transition-all duration-500 transform group-hover:scale-[20] group-hover:opacity-75"></span>
+      )}
+      <div className={`relative z-10 transition-all duration-500 ${action ? 'group-hover:text-white' : ''}`}>
         <div className="flex items-center gap-2">
-          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{title}</p>
-          {action && <Settings2 size={12} className="text-slate-300 group-hover:text-slate-500 transition-colors" />}
+          <p className={`text-slate-500 dark:text-slate-400 text-sm font-medium transition-colors duration-500 ${action ? 'group-hover:text-white' : ''}`}>{title}</p>
+          {action && <Settings2 size={12} className="text-slate-300 transition-colors duration-500 group-hover:text-white" />}
         </div>
-        <p className="text-3xl font-bold text-slate-900 dark:text-white mt-1">
-          {value} <span className="text-xs font-normal text-slate-400">{unit}</span>
+        <p className={`text-3xl font-bold text-slate-900 dark:text-white mt-1 transition-colors duration-500 ${action ? 'group-hover:text-white' : ''}`}>
+          {value} <span className={`text-xs font-normal text-slate-400 transition-colors duration-500 ${action ? 'group-hover:text-white/80' : ''}`}>{unit}</span>
         </p>
       </div>
-      <div className={`w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm ${iconColor}`}>
+      <div className={`relative z-10 w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm transition-all duration-500 ${iconColor} ${action ? 'group-hover:bg-transparent group-hover:border-white/20 group-hover:text-white' : ''}`}>
         <Icon size={24} />
       </div>
     </div>
