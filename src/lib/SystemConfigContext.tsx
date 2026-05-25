@@ -128,6 +128,27 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    if (config.appName) {
+      document.title = config.appName;
+    }
+    const updateFavicon = () => {
+      let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = config.appLogo || "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg";
+      
+      let appleLink: HTMLLinkElement | null = document.querySelector("link[rel='apple-touch-icon']");
+      if (appleLink) {
+        appleLink.href = config.appLogo || "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg";
+      }
+    };
+    updateFavicon();
+  }, [config.appLogo, config.appName]);
+
   return (
     <SystemConfigContext.Provider value={{ config }}>
       {children}
