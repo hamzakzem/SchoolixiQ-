@@ -22,7 +22,7 @@ import {
   addDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import { LogIn, GraduationCap, Users, Building2, Mail, Lock, ShieldCheck, ArrowRight, Check, Package, Phone, MapPin, X, Coins, Sparkles, TrendingUp, Bell } from 'lucide-react';
+import { LogIn, GraduationCap, Users, Building2, Mail, Lock, ShieldCheck, ArrowRight, Check, Package, Phone, MapPin, X, Coins, Sparkles, TrendingUp, Bell, Copy, ShieldAlert } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { UserRole } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -52,6 +52,7 @@ export default function Login() {
 
   // Packages State
   const [packages, setPackages] = useState<any[]>([]);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
   const [showSubscriptionModal, setShowSubscriptionModal] = useState<any>(null);
   const [subscriptionForm, setSubscriptionForm] = useState({
     name: '',
@@ -113,14 +114,10 @@ export default function Login() {
     setCaptchaAnswer('');
   };
 
-  const handleGoogleAuth = async () => {
-    // Verify Captcha
-    if (parseInt(captchaAnswer) !== captchaChallenge.a + captchaChallenge.b) {
-      toast.error('حل المسألة الحسابية غير صحيح (تحقق من أنك لست روبوت)');
-      generateCaptcha();
-      return;
-    }
+  const [unauthorizedDomainError, setUnauthorizedDomainError] = useState<string | null>(null);
 
+  const handleGoogleAuth = async () => {
+    setUnauthorizedDomainError(null);
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -203,6 +200,23 @@ export default function Login() {
       
       if (errorCode === 'auth/popup-closed-by-user') {
         toast.error(t('popupClosed'));
+      } else if (errorCode === 'auth/unauthorized-domain' || 
+                 errorCode === 'auth/unauthorized-client' ||
+                 errorMessage.includes('unauthorized-domain') ||
+                 errorMessage.includes('unauthorized_domain') ||
+                 errorMessage.toLowerCase().includes('unauthorized domain')) {
+        setUnauthorizedDomainError(window.location.hostname);
+        toast.error(
+          isRtl 
+            ? 'خطأ: النطاق الحالي غير مصرح به في إعدادات Firebase Console الخاصة بـ Google Auth.' 
+            : 'Error: The current domain is not authorized in Firebase Console settings for Google Auth.'
+        );
+      } else if (errorCode === 'auth/popup-blocked') {
+        toast.error(
+          isRtl 
+            ? 'تم حظر النافذة المنبثقة من قبل المتصفح. يرجى السماح بالنوافذ المنبثقة وإعادة المحاولة.' 
+            : 'Popup blocked by browser. Please allow popups and try again.'
+        );
       } else if (errorCode === 'auth/invalid-credential' || 
                  errorCode === 'INVALID_CREDENTIAL' ||
                  errorMessage.includes('invalid-credential') ||
@@ -589,6 +603,47 @@ export default function Login() {
               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>{isRtl ? 'دخول سريع باستخدام Google' : 'Quick Sign-in with Google'}</span>
             </button>
+
+            {unauthorizedDomainError && (
+              <div id="unauthorized-domain-card" className="mt-4 p-4 rounded-xl border-2 border-amber-200 bg-amber-50/50 text-slate-800 text-xs sm:text-sm shadow-sm">
+                <div className="flex items-start gap-2.5 mb-2.5">
+                  <ShieldAlert className="text-amber-500 shrink-0 mt-0.5" size={18} />
+                  <div>
+                    <h4 className="font-bold text-amber-950 text-sm">
+                      {isRtl ? 'تفعيل دخول Google (خطوة مطلوبة)' : 'Enable Google Sign-in (Action Required)'}
+                    </h4>
+                    <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
+                      {isRtl 
+                        ? 'نظراً لأن التطبيق يعمل في بيئة معاينة آمنة، يجب عليك إضافة هذا النطاق يدوياً كمجال مصرح به في لوحة تحكم Firebase الخاص بمشروعك (Authentication -> Settings -> Authorized domains).'
+                        : 'Because this preview runs in a sandboxed environment, you must manually add this domain into your Firebase project settings (Authentication -> Settings -> Authorized domains).'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="bg-white/90 p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2 shadow-inner">
+                  <code id="domain-to-copy" className="font-mono text-[10px] sm:text-xs text-slate-700 select-all font-bold tracking-tight bg-slate-50 px-1.5 py-0.5 rounded break-all">
+                    {unauthorizedDomainError}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(unauthorizedDomainError);
+                      toast.success(isRtl ? 'تم نسخ النطاق بنجاح!' : 'Domain copied successfully!');
+                    }}
+                    className="flex items-center gap-1.5 hover:bg-slate-100 px-2.5 py-1.5 rounded-md font-bold transition-all text-[11px] text-blue-600 shrink-0 active:scale-95 border border-slate-200 bg-white shadow-sm"
+                  >
+                    <Copy size={13} />
+                    <span>{isRtl ? 'نسخ' : 'Copy'}</span>
+                  </button>
+                </div>
+
+                <div className="mt-2 text-[10px] sm:text-[11px] text-slate-500 list-decimal pl-4 space-y-0.5 rtl:pr-4 rtl:pl-0 font-medium leading-relaxed">
+                  <p>1. {isRtl ? 'اذهب لـ Firebase Console وافتح مشروعك.' : 'Go to Firebase Console and open your project.'}</p>
+                  <p>2. {isRtl ? 'اختر Build ثم Authentication ثم تبويب Settings.' : 'Click on Build, then Authentication, then Settings tab.'}</p>
+                  <p>3. {isRtl ? 'تحت Authorized domains، اضغط على Add domain وألصق النطاق المنسوخ أعلاه.' : 'Under Authorized domains, click Add domain and paste the copied domain.'}</p>
+                </div>
+              </div>
+            )}
           </form>
 
           <p className="mt-6 sm:mt-8 text-center text-slate-400 text-xs sm:text-sm font-medium">
@@ -601,11 +656,28 @@ export default function Login() {
       <div className="w-full max-w-6xl mt-12 sm:mt-20">
         <div className="text-center mb-8 sm:mb-12">
           <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 sm:mb-4 font-display">{isRtl ? `باقات الاشتراك في ${config.appName}` : `${config.appName} Subscription Plans`}</h2>
-          <p className="text-slate-500 font-bold text-sm sm:text-base">{isRtl ? 'اختر الباقة المناسبة لمدرستك وابدأ مسار التحول الرقمي اليوم' : 'Choose the right plan for your school and start your digital transformation today'}</p>
+          <p className="text-slate-500 font-bold text-sm sm:text-base mb-8">{isRtl ? 'اختر الباقة المناسبة لمدرستك وابدأ مسار التحول الرقمي اليوم' : 'Choose the right plan for your school and start your digital transformation today'}</p>
+          
+          <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full items-center shadow-inner">
+            <button
+              onClick={() => setBillingCycle('monthly')}
+              className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-md shadow-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              {isRtl ? 'شهرياً' : 'Monthly'}
+            </button>
+            <button
+              onClick={() => setBillingCycle('annually')}
+              className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm font-bold transition-all ${billingCycle === 'annually' ? 'bg-white text-slate-900 shadow-md shadow-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              {isRtl ? 'سنوياً' : 'Annually'}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-2 sm:px-0">
-          {packages.map((pkg) => (
+          {packages.map((pkg) => {
+            const displayPrice = billingCycle === 'annually' ? pkg.price : Math.round((pkg.price || 0) / 12);
+            return (
             <motion.div 
               key={pkg.id}
               whileHover={{ y: -8 }}
@@ -616,8 +688,10 @@ export default function Login() {
               )}
               <h3 className="text-2xl font-black text-slate-900 mb-2">{pkg.name}</h3>
               <div className="flex items-baseline gap-2 mb-8">
-                 <span className="text-4xl font-black text-slate-900">{pkg.price?.toLocaleString()}</span>
-                 <span className="text-slate-400 font-bold text-sm">{t('annualShort')}</span>
+                 <span className="text-4xl font-black text-slate-900">{displayPrice?.toLocaleString()}</span>
+                 <span className="text-slate-400 font-bold text-sm">
+                   {billingCycle === 'annually' ? t('annualShort') : (isRtl ? '/ شهرياً' : '/ Monthly')}
+                 </span>
               </div>
               
               <ul className="space-y-4 mb-10 flex-1">
@@ -638,7 +712,8 @@ export default function Login() {
                 {t('subscribeNow')}
               </button>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

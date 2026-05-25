@@ -61,6 +61,7 @@ const AppContent = () => {
     | "approved"
   >("loading");
   const [packages, setPackages] = useState<any[]>([]);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [myRequest, setMyRequest] = useState<any>(null);
   const [subscriptionForm, setSubscriptionForm] = useState({
@@ -440,21 +441,39 @@ const AppContent = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="w-full max-w-4xl mx-auto mt-8"
               >
-                <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-2xl font-black text-slate-900 font-display">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+                  <h2 className="text-2xl font-black text-slate-900 font-display text-center sm:text-right">
                     {isRtl ? "اختر باقة المدرسة" : "Choose School Package"}
                   </h2>
-                  <button
-                    onClick={() => setOnboardingState("options")}
-                    className="text-slate-500 hover:text-slate-900 flex items-center gap-2 font-bold text-sm"
-                  >
-                    {isRtl ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
-                    {isRtl ? "رجوع" : "Back"}
-                  </button>
+                  <div className="flex items-center gap-4">
+                    <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1 rounded-full items-center shadow-inner">
+                      <button
+                        onClick={() => setBillingCycle('monthly')}
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        {isRtl ? 'شهرياً' : 'Monthly'}
+                      </button>
+                      <button
+                        onClick={() => setBillingCycle('annually')}
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === 'annually' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        {isRtl ? 'سنوياً' : 'Annually'}
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => setOnboardingState("options")}
+                      className="text-slate-500 hover:text-slate-900 flex items-center gap-2 font-bold text-sm"
+                    >
+                      {isRtl ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
+                      {isRtl ? "رجوع" : "Back"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {packages.map((pkg) => (
+                  {packages.map((pkg) => {
+                    const displayPrice = billingCycle === 'annually' ? pkg.price : Math.round((pkg.price || 0) / 12);
+                    return (
                     <div
                       key={pkg.id}
                       className={`bg-white rounded-3xl p-6 border-2 transition-all flex flex-col text-right ${pkg.isPopular ? "border-blue-600 shadow-xl shadow-blue-100" : "border-slate-100 shadow-lg"}`}
@@ -469,10 +488,10 @@ const AppContent = () => {
                       </h3>
                       <div className="flex items-baseline gap-2 mb-6">
                         <span className="text-3xl font-black text-slate-900">
-                          {pkg.price?.toLocaleString()}
+                          {displayPrice?.toLocaleString()}
                         </span>
                         <span className="text-slate-400 font-bold text-xs">
-                          د.ع
+                          د.ع {billingCycle === 'monthly' ? (isRtl ? ' / شهرياً' : '/ Monthly') : ''}
                         </span>
                       </div>
                       <ul className="space-y-3 mb-8 flex-1">
@@ -499,7 +518,8 @@ const AppContent = () => {
                         اختيار الباقة
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </motion.div>
             )}

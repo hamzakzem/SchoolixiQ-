@@ -106,7 +106,10 @@ service cloud.firestore {
         (getUserEmail() != '' && resource.data.get('email', '') == getUserEmail())
       );
       allow create: if isSignedIn() && (
-        (request.auth.uid == userId && request.resource.data.get('role', '') == 'parent') ||
+        (request.auth.uid == userId && (
+          request.resource.data.get('role', '') in ['parent', 'teacher', 'admin', 'staff', 'assistant'] ||
+          (request.resource.data.get('role', '') == 'superadmin' && !exists(/databases/$(database)/documents/users/metadata))
+        )) ||
         isSuperAdmin()
       );
       allow update: if isSignedIn() && (
