@@ -32,6 +32,7 @@ export interface School {
   subscriptionExpiresAt?: any; // Timestamp
   showSubscriptionTimer?: boolean;
   notificationsEnabled?: boolean;
+  featured?: boolean;
 }
 
 export interface Student {

@@ -6,6 +6,8 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   sendEmailVerification
 } from 'firebase/auth';
 import { 
@@ -153,6 +155,103 @@ export default function Login() {
     return () => window.removeEventListener('message', handleProxyMessage);
   }, []);
 
+  // Check for Redirect Result (Standalone UI via signInWithRedirect fallback)
+  useEffect(() => {
+    const checkRedirectFlow = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          setLoading(true);
+          const user = result.user;
+          const pendingRole = (window.sessionStorage.getItem('pendingGoogleRole') as UserRole) || UserRole.PARENT;
+          const pendingMode = window.sessionStorage.getItem('pendingGoogleMode') || 'login';
+          window.sessionStorage.removeItem('pendingGoogleRole');
+          window.sessionStorage.removeItem('pendingGoogleMode');
+
+          // Check if user document exists
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          
+          if (!userDoc.exists()) {
+            const emailLower = user.email?.toLowerCase() || '';
+            const q = query(collection(db, 'users'), where('email', '==', emailLower));
+            const querySnap = await getDocs(q);
+            let provisionedData: any = null;
+            let oldDocId = '';
+            
+            if (!querySnap.empty) {
+              const found = querySnap.docs[0];
+              provisionedData = found.data();
+              oldDocId = found.id;
+            }
+
+            let isFirstUser = false;
+            try {
+              const metadataSnap = await getDoc(doc(db, 'users', 'metadata'));
+              isFirstUser = !metadataSnap.exists();
+            } catch (err) {}
+
+            const finalRole = isFirstUser ? UserRole.SUPERADMIN : (provisionedData?.role || pendingRole);
+
+            // Create admin registration record if needed
+            if (finalRole === UserRole.ADMIN && pendingMode === 'signup') {
+              try {
+                await addDoc(collection(db, 'registrations'), {
+                  type: 'direct_school_signup',
+                  name: user.displayName || 'School via Google',
+                  email: user.email,
+                  phone: '', 
+                  status: 'needs_review',
+                  createdAt: serverTimestamp()
+                });
+              } catch (e) {
+                console.warn('Failed to record direct signup credentials', e);
+              }
+            }
+
+            // Create permanent profile
+            await setDoc(doc(db, 'users', user.uid), {
+              name: user.displayName || provisionedData?.name || (isRtl ? 'مستخدم جديد' : 'New User'),
+              email: user.email,
+              role: finalRole,
+              schoolId: provisionedData?.schoolId || '',
+              createdAt: new Date().toISOString(),
+              uid: user.uid,
+              photoURL: user.photoURL
+            });
+
+            // Migrate students if needed
+            if (oldDocId && oldDocId !== user.uid) {
+              const studentsQ = query(collection(db, 'students'), where('parentIds', 'array-contains', oldDocId));
+              const studentsSnap = await getDocs(studentsQ);
+              
+              const migrationPromises = studentsSnap.docs.map(studentDoc => {
+                const currentIds = studentDoc.data().parentIds || [];
+                const updatedIds = currentIds.map((id: string) => id === oldDocId ? user.uid : id);
+                return updateDoc(doc(db, 'students', studentDoc.id), { parentIds: updatedIds });
+              });
+              
+              await Promise.all(migrationPromises);
+              await deleteDoc(doc(db, 'users', oldDocId));
+            }
+
+            if (isFirstUser) {
+              await setDoc(doc(db, 'users', 'metadata'), { initialized: true });
+            }
+            toast.success(isRtl ? 'تم تسجيل الدخول بنجاح!' : 'Login Success!');
+          } else {
+            toast.success(`${t('welcomeLabel') || 'Welcome'} ${user.displayName}`);
+          }
+        }
+      } catch (error: any) {
+        console.error("Redirect check error:", error);
+        toast.error(error.message || t('failedConnection'));
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkRedirectFlow();
+  }, []);
+
   const handleSubscribeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!showSubscriptionModal) return;
@@ -214,7 +313,7 @@ export default function Login() {
       const left = window.screen.width / 2 - popupWidth / 2;
       const top = window.screen.height / 2 - popupHeight / 2;
       
-      const popupUrl = `${window.location.origin}/login-popup?role=${role}`;
+      const popupUrl = `${window.location.origin}/login-popup?role=${role}&mode=${mode}`;
       const popup = window.open(
         popupUrl,
         'Firebase_Google_Auth_Proxy',
@@ -235,86 +334,16 @@ export default function Login() {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Check if user document exists
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      if (!userDoc.exists()) {
-        // Check for provisioned user by email
-        const emailLower = user.email?.toLowerCase() || '';
-        const q = query(collection(db, 'users'), where('email', '==', emailLower));
-        const querySnap = await getDocs(q);
-        let provisionedData = null;
-        let oldDocId = '';
-        
-        if (!querySnap.empty) {
-          const found = querySnap.docs[0];
-          provisionedData = found.data();
-          oldDocId = found.id;
-        }
-
-        // Check if first user for SuperAdmin
-        let isFirstUser = false;
-        try {
-          const metadataSnap = await getDoc(doc(db, 'users', 'metadata'));
-          isFirstUser = !metadataSnap.exists();
-        } catch (err) {
-          console.warn('Metadata check error', err);
-        }
-
-        const finalRole = isFirstUser ? UserRole.SUPERADMIN : (provisionedData?.role || role);
-
-        // Role conflict check: management cannot be teacher or parent
-        const isManagement = ['admin', 'staff', 'assistant', 'superadmin'].includes(provisionedData?.role);
-        if (isManagement && (role === UserRole.PARENT || role === UserRole.TEACHER)) {
-          toast.error(t('managementRoleConflict'));
-          setLoading(false);
-          return;
-        }
-
-        // 1. Create the permanent profile
-        await setDoc(doc(db, 'users', user.uid), {
-          name: user.displayName || provisionedData?.name || t('newUser'),
-          email: user.email,
-          role: finalRole,
-          schoolId: provisionedData?.schoolId || '',
-          createdAt: new Date().toISOString(),
-          uid: user.uid,
-          photoURL: user.photoURL
-        });
-
-        // 2. If provisioned, migrate students and delete old doc
-        if (oldDocId && oldDocId !== user.uid) {
-          const studentsQ = query(collection(db, 'students'), where('parentIds', 'array-contains', oldDocId));
-          const studentsSnap = await getDocs(studentsQ);
-          
-          const migrationPromises = studentsSnap.docs.map(studentDoc => {
-            const currentIds = studentDoc.data().parentIds || [];
-            const updatedIds = currentIds.map((id: string) => id === oldDocId ? user.uid : id);
-            return updateDoc(doc(db, 'students', studentDoc.id), { parentIds: updatedIds });
-          });
-          
-          await Promise.all(migrationPromises);
-          await deleteDoc(doc(db, 'users', oldDocId));
-        }
-
-        if (isFirstUser) {
-          await setDoc(doc(db, 'users', 'metadata'), { initialized: true });
-        }
-        toast.success(t('loginSuccess'));
-      } else {
-        toast.success(`${t('welcomeLabel') || 'Welcome'} ${user.displayName}`);
-      }
+      window.sessionStorage.setItem('pendingGoogleRole', role);
+      window.sessionStorage.setItem('pendingGoogleMode', mode);
+      await signInWithRedirect(auth, provider);
+      // Logic continues in useEffect getRedirectResult after page reload
     } catch (error: any) {
       console.error("Google Auth Error:", error);
       const errorCode = error.code || "";
       const errorMessage = error.message || "";
       
-      if (errorCode === 'auth/popup-closed-by-user') {
-        toast.error(t('popupClosed'));
-      } else if (errorCode === 'auth/unauthorized-domain' || 
+      if (errorCode === 'auth/unauthorized-domain' || 
                  errorCode === 'auth/unauthorized-client' ||
                  errorMessage.includes('unauthorized-domain') ||
                  errorMessage.includes('unauthorized_domain') ||
@@ -324,12 +353,6 @@ export default function Login() {
           isRtl 
             ? 'خطأ: النطاق الحالي غير مصرح به في إعدادات Firebase Console الخاصة بـ Google Auth.' 
             : 'Error: The current domain is not authorized in Firebase Console settings for Google Auth.'
-        );
-      } else if (errorCode === 'auth/popup-blocked') {
-        toast.error(
-          isRtl 
-            ? 'تم حظر النافذة المنبثقة من قبل المتصفح. يرجى السماح بالنوافذ المنبثقة وإعادة المحاولة.' 
-            : 'Popup blocked by browser. Please allow popups and try again.'
         );
       } else if (errorCode === 'auth/operation-not-allowed' || 
                  errorMessage.includes('operation-not-allowed') ||
@@ -342,17 +365,11 @@ export default function Login() {
             ? 'خطأ: لم يتم تفعيل تسجيل دخول Google في لوحة تحكم Firebase لمشروعك!' 
             : 'Error: Google Sign-In is not enabled in your Firebase Authentication Console!'
         );
-      } else if (errorCode === 'auth/invalid-credential' || 
-                 errorCode === 'INVALID_CREDENTIAL' ||
-                 errorMessage.includes('invalid-credential') ||
-                 errorMessage.toLowerCase().includes('invalid credential')) {
-        toast.error(t('authError'));
       } else {
         setShowIframeHint(true);
         setFirebaseProviderError(`${errorCode || 'Exception'}: ${errorMessage || String(error)}`);
         toast.error(t('failedConnection'));
       }
-    } finally {
       setLoading(false);
     }
   };

@@ -24,6 +24,7 @@ interface SystemConfig {
   marketingSubtitle?: string;
   marketingFeatures?: MarketingFeature[];
   socialLinks?: SocialLinks;
+  promotionalBanners?: { id: string; imageUrl: string; active: boolean; link?: string }[];
 }
 
 const defaultSystemConfig: SystemConfig = {
@@ -57,7 +58,8 @@ const defaultSystemConfig: SystemConfig = {
     twitter: '',
     linkedin: '',
     whatsapp: ''
-  }
+  },
+  promotionalBanners: []
 };
 
 const SystemConfigContext = createContext<{config: SystemConfig}>({ config: defaultSystemConfig });

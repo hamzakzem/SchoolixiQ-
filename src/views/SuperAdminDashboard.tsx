@@ -49,6 +49,7 @@ import {
   Activity,
   Upload,
   Sparkles,
+  Star,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
@@ -180,7 +181,9 @@ export default function SuperAdminDashboard() {
   );
   const [viewingPackage, setViewingPackage] = useState<any | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    window.innerWidth >= 768 && window.innerWidth < 1024,
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -289,7 +292,7 @@ export default function SuperAdminDashboard() {
     marketingTitle: "",
     marketingSubtitle: "",
     marketingFeatures: [],
-    socialLinks: { instagram: "", twitter: "", linkedin: "", whatsapp: "" }
+    socialLinks: { instagram: "", twitter: "", linkedin: "", whatsapp: "" },
   });
   const [isSavingConfig, setIsSavingConfig] = useState(false);
 
@@ -316,7 +319,12 @@ export default function SuperAdminDashboard() {
             marketingTitle: data.marketingTitle || "",
             marketingSubtitle: data.marketingSubtitle || "",
             marketingFeatures: data.marketingFeatures || [],
-            socialLinks: data.socialLinks || { instagram: "", twitter: "", linkedin: "", whatsapp: "" },
+            socialLinks: data.socialLinks || {
+              instagram: "",
+              twitter: "",
+              linkedin: "",
+              whatsapp: "",
+            },
           });
         }
       },
@@ -592,6 +600,26 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  const handleToggleFeatured = async (
+    schoolId: string,
+    currentFeatured?: boolean,
+  ) => {
+    try {
+      await updateDoc(doc(db, "schools", schoolId), {
+        featured: !currentFeatured,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success(
+        !currentFeatured
+          ? "تم التحديد كمدرسة مميزة"
+          : "تم الإلغاء من المدارس المميزة",
+      );
+    } catch (error) {
+      console.error("Error toggling featured status:", error);
+      toast.error("فشل في تغيير حالة التميز للمدرسة");
+    }
+  };
+
   const handleDeleteSchool = async (schoolId: string) => {
     const loadingToast = toast.loading(
       "جاري مسح بيانات المدرسة والمستخدمين...",
@@ -711,41 +739,82 @@ export default function SuperAdminDashboard() {
       let currentOrders: any[] = [];
 
       const updateRequests = () => {
-        setSubscriptionRequests([...currentReg, ...currentSubReq, ...currentOrders]);
+        setSubscriptionRequests([
+          ...currentReg,
+          ...currentSubReq,
+          ...currentOrders,
+        ]);
       };
 
-      unsubs.push(onSnapshot(schoolsQ, (snap) => setSchools(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))));
-      unsubs.push(onSnapshot(packagesQ, (snap) => {
-        if (!snap.empty) {
-          setPackages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        } else {
-          setPackages(DEFAULT_PACKAGES);
-        }
-      }, (err) => {
-        console.warn("Packages subscription failed, using defaults", err);
-        setPackages(DEFAULT_PACKAGES);
-      }));
-      unsubs.push(onSnapshot(usersQ, (snap) => setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))));
-      unsubs.push(onSnapshot(studentsQ, (snap) => setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))));
+      unsubs.push(
+        onSnapshot(schoolsQ, (snap) =>
+          setSchools(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
+        ),
+      );
+      unsubs.push(
+        onSnapshot(
+          packagesQ,
+          (snap) => {
+            if (!snap.empty) {
+              setPackages(
+                snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+              );
+            } else {
+              setPackages(DEFAULT_PACKAGES);
+            }
+          },
+          (err) => {
+            console.warn("Packages subscription failed, using defaults", err);
+            setPackages(DEFAULT_PACKAGES);
+          },
+        ),
+      );
+      unsubs.push(
+        onSnapshot(usersQ, (snap) =>
+          setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
+        ),
+      );
+      unsubs.push(
+        onSnapshot(studentsQ, (snap) =>
+          setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
+        ),
+      );
 
-      unsubs.push(onSnapshot(regQ, (snap) => {
-        currentReg = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), _source: "registrations" }));
-        updateRequests();
-      }));
-      unsubs.push(onSnapshot(subReqQ, (snap) => {
-        currentSubReq = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), _source: "subscriptionRequests" }));
-        updateRequests();
-      }));
-      unsubs.push(onSnapshot(ordersQ, (snap) => {
-        currentOrders = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), _source: "orders" }));
-        updateRequests();
-      }));
-
+      unsubs.push(
+        onSnapshot(regQ, (snap) => {
+          currentReg = snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            _source: "registrations",
+          }));
+          updateRequests();
+        }),
+      );
+      unsubs.push(
+        onSnapshot(subReqQ, (snap) => {
+          currentSubReq = snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            _source: "subscriptionRequests",
+          }));
+          updateRequests();
+        }),
+      );
+      unsubs.push(
+        onSnapshot(ordersQ, (snap) => {
+          currentOrders = snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            _source: "orders",
+          }));
+          updateRequests();
+        }),
+      );
     } catch (error) {
       console.error("Error setting up SuperAdmin Dashboard listeners:", error);
     }
 
-    return () => unsubs.forEach(unsub => unsub());
+    return () => unsubs.forEach((unsub) => unsub());
   }, []);
 
   const handleApproveSubscription = async (request: any) => {
@@ -1025,9 +1094,21 @@ export default function SuperAdminDashboard() {
     try {
       const pkgData = {
         name: newPackage.name,
-        price: Number(newPackage.priceYearly !== undefined ? newPackage.priceYearly : newPackage.price),
-        priceMonthly: Number(newPackage.priceMonthly !== undefined ? newPackage.priceMonthly : Math.round((newPackage.price || 0) / 12)),
-        priceYearly: Number(newPackage.priceYearly !== undefined ? newPackage.priceYearly : newPackage.price),
+        price: Number(
+          newPackage.priceYearly !== undefined
+            ? newPackage.priceYearly
+            : newPackage.price,
+        ),
+        priceMonthly: Number(
+          newPackage.priceMonthly !== undefined
+            ? newPackage.priceMonthly
+            : Math.round((newPackage.price || 0) / 12),
+        ),
+        priceYearly: Number(
+          newPackage.priceYearly !== undefined
+            ? newPackage.priceYearly
+            : newPackage.price,
+        ),
         maxStudents: Number(newPackage.maxStudents),
         durationDays: Number(newPackage.durationDays),
         showSubscriptionTimer: newPackage.showSubscriptionTimer,
@@ -1068,15 +1149,21 @@ export default function SuperAdminDashboard() {
         } else {
           try {
             const errRes = await response.json();
-            apiErrorDetail = errRes.error || errRes.message || `Status: ${response.status}`;
+            apiErrorDetail =
+              errRes.error || errRes.message || `Status: ${response.status}`;
           } catch (e) {
             apiErrorDetail = `Status: ${response.status}`;
           }
-          console.warn(`API save returned status ${response.status}. Trying direct client-side write...`);
+          console.warn(
+            `API save returned status ${response.status}. Trying direct client-side write...`,
+          );
         }
       } catch (apiErr: any) {
         apiErrorDetail = apiErr.message || String(apiErr);
-        console.warn("API save threw an error. Trying direct client-side write...", apiErr);
+        console.warn(
+          "API save threw an error. Trying direct client-side write...",
+          apiErr,
+        );
       }
 
       if (!apiSuccess) {
@@ -1089,7 +1176,7 @@ export default function SuperAdminDashboard() {
                 ...pkgData,
                 updatedAt: serverTimestamp(),
               },
-              { merge: true }
+              { merge: true },
             );
           } else {
             await addDoc(collection(db, "packages"), {
@@ -1099,7 +1186,7 @@ export default function SuperAdminDashboard() {
           }
         } catch (firestoreErr: any) {
           throw new Error(
-            `فشل حفظ الباقة عبر الخادم وعبر قاعدة البيانات مباشرة. خطأ الخادم: ${apiErrorDetail}. خطأ قاعدة البيانات: ${firestoreErr.message}`
+            `فشل حفظ الباقة عبر الخادم وعبر قاعدة البيانات مباشرة. خطأ الخادم: ${apiErrorDetail}. خطأ قاعدة البيانات: ${firestoreErr.message}`,
           );
         }
       }
@@ -1162,27 +1249,36 @@ export default function SuperAdminDashboard() {
 
       try {
         const token = await auth.currentUser?.getIdToken();
-        const response = await fetch(`/api/admin/plans/${encodeURIComponent(id)}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
+        const response = await fetch(
+          `/api/admin/plans/${encodeURIComponent(id)}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           },
-        });
+        );
 
         if (response.ok) {
           apiSuccess = true;
         } else {
           try {
             const errRes = await response.json();
-            apiErrorDetail = errRes.error || errRes.message || `Status: ${response.status}`;
+            apiErrorDetail =
+              errRes.error || errRes.message || `Status: ${response.status}`;
           } catch (e) {
             apiErrorDetail = `Status: ${response.status}`;
           }
-          console.warn(`API delete returned status ${response.status}. Trying direct client-side write...`);
+          console.warn(
+            `API delete returned status ${response.status}. Trying direct client-side write...`,
+          );
         }
       } catch (apiErr: any) {
         apiErrorDetail = apiErr.message || String(apiErr);
-        console.warn("API delete threw an error. Trying direct client-side write...", apiErr);
+        console.warn(
+          "API delete threw an error. Trying direct client-side write...",
+          apiErr,
+        );
       }
 
       if (!apiSuccess) {
@@ -1191,7 +1287,7 @@ export default function SuperAdminDashboard() {
           await deleteDoc(doc(db, "packages", id));
         } catch (firestoreErr: any) {
           throw new Error(
-            `فشل حذف الباقة عبر الخادم وعبر قاعدة البيانات مباشرة. خطأ الخادم: ${apiErrorDetail}. خطأ قاعدة البيانات: ${firestoreErr.message}`
+            `فشل حذف الباقة عبر الخادم وعبر قاعدة البيانات مباشرة. خطأ الخادم: ${apiErrorDetail}. خطأ قاعدة البيانات: ${firestoreErr.message}`,
           );
         }
       }
@@ -1377,7 +1473,9 @@ export default function SuperAdminDashboard() {
             className={`bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
-              <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-4 border-b border-slate-700 dark:border-slate-800'} pb-6`}>
+              <div
+                className={`p-6 flex ${isSidebarCollapsed ? "justify-center border-b border-transparent" : "items-center gap-4 border-b border-slate-700 dark:border-slate-800"} pb-6`}
+              >
                 {config.appLogo ? (
                   <img
                     src={config.appLogo}
@@ -1390,255 +1488,376 @@ export default function SuperAdminDashboard() {
                   </span>
                 )}
                 {!isSidebarCollapsed && (
-                  <motion.h1 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-lg md:text-xl font-bold font-display tracking-tight leading-none min-w-0">
-                    <span className="truncate block w-full">{isRtl ? `منصة ${config.appName} التعليمية` : `${config.appName} Educational Platform`}</span>
+                  <motion.h1
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="text-lg md:text-xl font-bold font-display tracking-tight leading-none min-w-0"
+                  >
+                    <span className="truncate block w-full">
+                      {isRtl
+                        ? `منصة ${config.appName} التعليمية`
+                        : `${config.appName} Educational Platform`}
+                    </span>
                   </motion.h1>
                 )}
               </div>
               <nav className="flex-1 overflow-x-hidden overflow-y-auto px-3 md:px-4 py-4 space-y-1.5 custom-scrollbar">
-              {hasPermission("manage_schools") && (
-                <button
-                  onClick={() => {
-                    navigateToTab("schools");
-                    if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                  }}
-                  title={isSidebarCollapsed ? "إدارة المدارس" : undefined}
-                  className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "schools" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
-                >
-                  <Building size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                  {!isSidebarCollapsed && <span className="truncate">إدارة المدارس</span>}
-                  {isSidebarCollapsed && (
-                    <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                      إدارة المدارس
-                    </div>
-                  )}
-                </button>
-              )}
-              {hasPermission("manage_schools") && (
-                <button
-                  onClick={() => {
-                    navigateToTab("accounts");
-                    if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                  }}
-                  title={isSidebarCollapsed ? "حسابات المدارس" : undefined}
-                  className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "accounts" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
-                >
-                  <Lock size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                  {!isSidebarCollapsed && <span className="truncate">حسابات المدارس</span>}
-                  {isSidebarCollapsed && (
-                    <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                      حسابات المدارس
-                    </div>
-                  )}
-                </button>
-              )}
-              {profile?.role === "superadmin" && (
-                <button
-                  onClick={() => {
-                    navigateToTab("team");
-                    if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                  }}
-                  title={isSidebarCollapsed ? "فريق العمل (System Team)" : undefined}
-                  className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "team" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
-                >
-                  <ShieldCheck size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                  {!isSidebarCollapsed && <span className="truncate">فريق العمل (System Team)</span>}
-                  {isSidebarCollapsed && (
-                    <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                      فريق العمل (System Team)
-                    </div>
-                  )}
-                </button>
-              )}
-              {hasPermission("manage_packages") && (
-                <button
-                  onClick={() => {
-                    navigateToTab("packages");
-                    if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                  }}
-                  title={isSidebarCollapsed ? "إدارة الباقات" : undefined}
-                  className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "packages" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
-                >
-                  <Plus size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                  {!isSidebarCollapsed && <span className="truncate">إدارة الباقات</span>}
-                  {isSidebarCollapsed && (
-                    <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                      إدارة الباقات
-                    </div>
-                  )}
-                </button>
-              )}
-              {hasPermission("view_requests") && (
-                <button
-                  onClick={() => {
-                    navigateToTab("requests");
-                    if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                  }}
-                  title={isSidebarCollapsed ? "طلبات الاشتراك" : undefined}
-                  className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "requests" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
-                >
-                  <Mail size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                  {!isSidebarCollapsed && <span className="truncate">طلبات الاشتراك</span>}
-                  {subscriptionRequests.length > 0 && !isSidebarCollapsed && (
-                    <span className="mr-auto bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-black animate-pulse">
-                      {subscriptionRequests.length}
-                    </span>
-                  )}
-                  {subscriptionRequests.length > 0 && isSidebarCollapsed && (
-                    <span className="absolute top-2 right-2 bg-red-500 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black animate-pulse border-2 border-slate-900">
-                      {subscriptionRequests.length}
-                    </span>
-                  )}
-                  {isSidebarCollapsed && (
-                    <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                      طلبات الاشتراك
-                    </div>
-                  )}
-                </button>
-              )}
-              {hasPermission("manage_schools") && (
-                <button
-                  onClick={() => {
-                    navigateToTab("chat");
-                    if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                  }}
-                  title={isSidebarCollapsed ? "مراسلة المدارس" : undefined}
-                  className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "chat" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
-                >
-                  <MessageSquare size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                  {!isSidebarCollapsed && <span className="truncate">مراسلة المدارس</span>}
-                  {isSidebarCollapsed && (
-                    <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                      مراسلة المدارس
-                    </div>
-                  )}
-                </button>
-              )}
-              {hasPermission("manage_users") && (
-                <>
+                {hasPermission("manage_schools") && (
                   <button
                     onClick={() => {
-                      navigateToTab("users");
+                      navigateToTab("schools");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "إدارة المستخدمين" : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "users" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    title={isSidebarCollapsed ? "إدارة المدارس" : undefined}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "schools" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
-                    <Users size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                    {!isSidebarCollapsed && <span className="truncate">إدارة المستخدمين</span>}
+                    <Building
+                      size={isSidebarCollapsed ? 24 : 20}
+                      className="shrink-0"
+                    />
+                    {!isSidebarCollapsed && (
+                      <span className="truncate">إدارة المدارس</span>
+                    )}
                     {isSidebarCollapsed && (
-                      <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                        إدارة المستخدمين
+                      <div
+                        className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                      >
+                        إدارة المدارس
                       </div>
                     )}
                   </button>
+                )}
+                {hasPermission("manage_schools") && (
                   <button
                     onClick={() => {
-                      navigateToTab("parents");
+                      navigateToTab("accounts");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "أولياء الأمور" : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "parents" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    title={isSidebarCollapsed ? "حسابات المدارس" : undefined}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "accounts" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
-                    <Users size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                    {!isSidebarCollapsed && <span className="truncate">أولياء الأمور</span>}
+                    <Lock
+                      size={isSidebarCollapsed ? 24 : 20}
+                      className="shrink-0"
+                    />
+                    {!isSidebarCollapsed && (
+                      <span className="truncate">حسابات المدارس</span>
+                    )}
                     {isSidebarCollapsed && (
-                      <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                        أولياء الأمور
+                      <div
+                        className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                      >
+                        حسابات المدارس
                       </div>
                     )}
                   </button>
-                </>
-              )}
-              {hasPermission("system_settings") && (
-                <>
+                )}
+                {profile?.role === "superadmin" && (
                   <button
                     onClick={() => {
-                      navigateToTab("settings");
+                      navigateToTab("team");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "إعدادات النظام" : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "settings" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    title={
+                      isSidebarCollapsed
+                        ? "فريق العمل (System Team)"
+                        : undefined
+                    }
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "team" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
-                    <SettingsIcon size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                    {!isSidebarCollapsed && <span className="truncate">إعدادات النظام</span>}
+                    <ShieldCheck
+                      size={isSidebarCollapsed ? 24 : 20}
+                      className="shrink-0"
+                    />
+                    {!isSidebarCollapsed && (
+                      <span className="truncate">فريق العمل (System Team)</span>
+                    )}
                     {isSidebarCollapsed && (
-                      <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                        إعدادات النظام
+                      <div
+                        className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                      >
+                        فريق العمل (System Team)
                       </div>
                     )}
                   </button>
+                )}
+                {hasPermission("manage_packages") && (
                   <button
                     onClick={() => {
-                      navigateToTab("footer");
+                      navigateToTab("packages");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "إعدادات الفوتر (الشركاء)" : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "footer" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    title={isSidebarCollapsed ? "إدارة الباقات" : undefined}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "packages" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
-                    <LayoutDashboard size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                    {!isSidebarCollapsed && <span className="truncate">إعدادات الفوتر (الشركاء)</span>}
+                    <Plus
+                      size={isSidebarCollapsed ? 24 : 20}
+                      className="shrink-0"
+                    />
+                    {!isSidebarCollapsed && (
+                      <span className="truncate">إدارة الباقات</span>
+                    )}
                     {isSidebarCollapsed && (
-                      <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                        إعدادات الفوتر (الشركاء)
+                      <div
+                        className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                      >
+                        إدارة الباقات
                       </div>
                     )}
                   </button>
+                )}
+                {hasPermission("view_requests") && (
                   <button
                     onClick={() => {
-                      navigateToTab("backups");
+                      navigateToTab("requests");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "النسخ الاحتياطي" : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "backups" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    title={isSidebarCollapsed ? "طلبات الاشتراك" : undefined}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "requests" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
-                    <Save size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                    {!isSidebarCollapsed && <span className="truncate">النسخ الاحتياطي</span>}
+                    <Mail
+                      size={isSidebarCollapsed ? 24 : 20}
+                      className="shrink-0"
+                    />
+                    {!isSidebarCollapsed && (
+                      <span className="truncate">طلبات الاشتراك</span>
+                    )}
+                    {subscriptionRequests.length > 0 && !isSidebarCollapsed && (
+                      <span className="mr-auto bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-black animate-pulse">
+                        {subscriptionRequests.length}
+                      </span>
+                    )}
+                    {subscriptionRequests.length > 0 && isSidebarCollapsed && (
+                      <span className="absolute top-2 right-2 bg-red-500 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black animate-pulse border-2 border-slate-900">
+                        {subscriptionRequests.length}
+                      </span>
+                    )}
                     {isSidebarCollapsed && (
-                      <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                        النسخ الاحتياطي
+                      <div
+                        className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                      >
+                        طلبات الاشتراك
                       </div>
                     )}
                   </button>
+                )}
+                {hasPermission("manage_schools") && (
                   <button
                     onClick={() => {
-                      navigateToTab("diagnostics");
+                      navigateToTab("chat");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "سجل الأداء (Diagnostics)" : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "diagnostics" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    title={isSidebarCollapsed ? "مراسلة المدارس" : undefined}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "chat" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
-                    <Activity size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                    {!isSidebarCollapsed && <span className="truncate">سجل الأداء (Diagnostics)</span>}
+                    <MessageSquare
+                      size={isSidebarCollapsed ? 24 : 20}
+                      className="shrink-0"
+                    />
+                    {!isSidebarCollapsed && (
+                      <span className="truncate">مراسلة المدارس</span>
+                    )}
                     {isSidebarCollapsed && (
-                      <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                        سجل الأداء (Diagnostics)
+                      <div
+                        className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                      >
+                        مراسلة المدارس
                       </div>
                     )}
                   </button>
-                </>
-              )}
-            </nav>
-            <div className="p-4 md:p-6 mt-auto">
-              {isSidebarCollapsed ? (
-                 <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 mx-auto rounded-full flex items-center justify-center text-white font-bold mb-4 shadow-sm" title={profile?.name}>
+                )}
+                {hasPermission("manage_users") && (
+                  <>
+                    <button
+                      onClick={() => {
+                        navigateToTab("users");
+                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      }}
+                      title={
+                        isSidebarCollapsed ? "إدارة المستخدمين" : undefined
+                      }
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "users" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    >
+                      <Users
+                        size={isSidebarCollapsed ? 24 : 20}
+                        className="shrink-0"
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate">إدارة المستخدمين</span>
+                      )}
+                      {isSidebarCollapsed && (
+                        <div
+                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                        >
+                          إدارة المستخدمين
+                        </div>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigateToTab("parents");
+                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      }}
+                      title={isSidebarCollapsed ? "أولياء الأمور" : undefined}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "parents" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    >
+                      <Users
+                        size={isSidebarCollapsed ? 24 : 20}
+                        className="shrink-0"
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate">أولياء الأمور</span>
+                      )}
+                      {isSidebarCollapsed && (
+                        <div
+                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                        >
+                          أولياء الأمور
+                        </div>
+                      )}
+                    </button>
+                  </>
+                )}
+                {hasPermission("system_settings") && (
+                  <>
+                    <button
+                      onClick={() => {
+                        navigateToTab("settings");
+                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      }}
+                      title={isSidebarCollapsed ? "إعدادات النظام" : undefined}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "settings" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    >
+                      <SettingsIcon
+                        size={isSidebarCollapsed ? 24 : 20}
+                        className="shrink-0"
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate">إعدادات النظام</span>
+                      )}
+                      {isSidebarCollapsed && (
+                        <div
+                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                        >
+                          إعدادات النظام
+                        </div>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigateToTab("footer");
+                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      }}
+                      title={
+                        isSidebarCollapsed
+                          ? "إعدادات الفوتر (الشركاء)"
+                          : undefined
+                      }
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "footer" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    >
+                      <LayoutDashboard
+                        size={isSidebarCollapsed ? 24 : 20}
+                        className="shrink-0"
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate">
+                          إعدادات الفوتر (الشركاء)
+                        </span>
+                      )}
+                      {isSidebarCollapsed && (
+                        <div
+                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                        >
+                          إعدادات الفوتر (الشركاء)
+                        </div>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigateToTab("backups");
+                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      }}
+                      title={isSidebarCollapsed ? "النسخ الاحتياطي" : undefined}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "backups" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    >
+                      <Save
+                        size={isSidebarCollapsed ? 24 : 20}
+                        className="shrink-0"
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate">النسخ الاحتياطي</span>
+                      )}
+                      {isSidebarCollapsed && (
+                        <div
+                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                        >
+                          النسخ الاحتياطي
+                        </div>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigateToTab("diagnostics");
+                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      }}
+                      title={
+                        isSidebarCollapsed
+                          ? "سجل الأداء (Diagnostics)"
+                          : undefined
+                      }
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "diagnostics" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    >
+                      <Activity
+                        size={isSidebarCollapsed ? 24 : 20}
+                        className="shrink-0"
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate">
+                          سجل الأداء (Diagnostics)
+                        </span>
+                      )}
+                      {isSidebarCollapsed && (
+                        <div
+                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                        >
+                          سجل الأداء (Diagnostics)
+                        </div>
+                      )}
+                    </button>
+                  </>
+                )}
+              </nav>
+              <div className="p-4 md:p-6 mt-auto">
+                {isSidebarCollapsed ? (
+                  <div
+                    className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 mx-auto rounded-full flex items-center justify-center text-white font-bold mb-4 shadow-sm"
+                    title={profile?.name}
+                  >
                     {profile?.name?.[0]}
-                 </div>
-              ) : (
-                <div className="bg-slate-800/50 p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] mb-3 md:mb-4 border border-slate-700/50 min-w-0">
-                  <p className="text-[9px] text-slate-500 mb-1 uppercase tracking-widest font-bold truncate">المستخدم النشط</p>
-                  <p className="text-sm font-bold text-white truncate font-display">{profile?.name || "مدير النظام"}</p>
-                </div>
-              )}
-              <button
-                onClick={() => auth.signOut()}
-                title={isSidebarCollapsed ? "تسجيل الخروج" : undefined}
-                className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3 px-4 md:px-5'} py-3 md:py-4 bg-slate-800 dark:bg-slate-900 rounded-xl md:rounded-2xl text-red-400 hover:bg-slate-700 dark:hover:bg-slate-800 transition-colors shadow-inner font-bold text-sm`}
-              >
-                <LogOut size={isSidebarCollapsed ? 24 : 18} className="shrink-0" />
-                {!isSidebarCollapsed && <span>تسجيل الخروج</span>}
-              </button>
-            </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-800/50 p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] mb-3 md:mb-4 border border-slate-700/50 min-w-0">
+                    <p className="text-[9px] text-slate-500 mb-1 uppercase tracking-widest font-bold truncate">
+                      المستخدم النشط
+                    </p>
+                    <p className="text-sm font-bold text-white truncate font-display">
+                      {profile?.name || "مدير النظام"}
+                    </p>
+                  </div>
+                )}
+                <button
+                  onClick={() => auth.signOut()}
+                  title={isSidebarCollapsed ? "تسجيل الخروج" : undefined}
+                  className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3 px-4 md:px-5"} py-3 md:py-4 bg-slate-800 dark:bg-slate-900 rounded-xl md:rounded-2xl text-red-400 hover:bg-slate-700 dark:hover:bg-slate-800 transition-colors shadow-inner font-bold text-sm`}
+                >
+                  <LogOut
+                    size={isSidebarCollapsed ? 24 : 18}
+                    className="shrink-0"
+                  />
+                  {!isSidebarCollapsed && <span>تسجيل الخروج</span>}
+                </button>
+              </div>
             </div>
           </motion.aside>
         )}
@@ -1650,12 +1869,12 @@ export default function SuperAdminDashboard() {
             <button
               onClick={() => {
                 if (window.innerWidth >= 1024) {
-                   setIsSidebarCollapsed(!isSidebarCollapsed);
+                  setIsSidebarCollapsed(!isSidebarCollapsed);
                 } else {
-                   setIsSidebarOpen(!isSidebarOpen);
-                   if (!isSidebarOpen) {
-                     setIsSidebarCollapsed(false);
-                   }
+                  setIsSidebarOpen(!isSidebarOpen);
+                  if (!isSidebarOpen) {
+                    setIsSidebarCollapsed(false);
+                  }
                 }
               }}
               className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm"
@@ -1663,7 +1882,8 @@ export default function SuperAdminDashboard() {
               <Menu
                 size={22}
                 className={
-                  (!isSidebarOpen && window.innerWidth < 1024) || isSidebarCollapsed
+                  (!isSidebarOpen && window.innerWidth < 1024) ||
+                  isSidebarCollapsed
                     ? "rotate-90 transition-transform"
                     : "transition-transform"
                 }
@@ -1708,7 +1928,7 @@ export default function SuperAdminDashboard() {
 
         {!auth.currentUser?.emailVerified && !hideVerificationBanner && (
           <div className="mx-4 md:mx-8 mt-4 md:mt-6 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 p-3 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm shrink-0 relative">
-            <button 
+            <button
               onClick={handleHideVerification}
               className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-700 p-1 rounded-full shadow-sm hover:scale-110 active:scale-95 transition-all z-10"
               title="إخفاء مؤقتاً"
@@ -1759,14 +1979,20 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        <div className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full' : 'overflow-y-auto custom-scrollbar pb-10'}`}>
+        <div
+          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full" : "overflow-y-auto custom-scrollbar pb-10"}`}
+        >
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-4 md:p-8 flex flex-col"}
-              initial={{ opacity: 0, y: activeTab === 'chat' ? 0 : 15 }}
+              className={
+                activeTab === "chat"
+                  ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden"
+                  : "w-full p-4 md:p-8 flex flex-col"
+              }
+              initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: activeTab === 'chat' ? 0 : -15 }}
+              exit={{ opacity: 0, y: activeTab === "chat" ? 0 : -15 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
             >
               {activeTab === "schools" ? (
@@ -2020,6 +2246,29 @@ export default function SuperAdminDashboard() {
                                 ) : (
                                   <>
                                     <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/50 p-1 rounded-2xl border border-slate-100 dark:border-slate-700 group-hover:border-blue-100 dark:group-hover:border-blue-900/30 transition-all">
+                                      <button
+                                        onClick={() =>
+                                          handleToggleFeatured(
+                                            school.id,
+                                            school.featured,
+                                          )
+                                        }
+                                        title={
+                                          school.featured
+                                            ? "إزالة المدرسة من قائمة شركاء النجاح في الصفحة الرئيسية"
+                                            : "إضافة المدرسة كشريك نجاح في الصفحة الرئيسية"
+                                        }
+                                        className={`p-2.5 rounded-xl transition-all ${school.featured ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 shadow-sm border border-amber-200 dark:border-amber-800/50" : "text-slate-400 hover:text-amber-500 hover:bg-white dark:hover:bg-slate-900"}`}
+                                      >
+                                        <Star
+                                          size={16}
+                                          fill={
+                                            school.featured
+                                              ? "currentColor"
+                                              : "none"
+                                          }
+                                        />
+                                      </button>
                                       <button
                                         onClick={() =>
                                           handleToggleTimer(
@@ -2480,7 +2729,11 @@ export default function SuperAdminDashboard() {
                         <div className="flex flex-col gap-1.5 mb-6">
                           <div className="flex items-baseline gap-1">
                             <span className="text-3xl font-black text-slate-950 dark:text-white">
-                              {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price)?.toLocaleString()} د.ع
+                              {(pkg.priceYearly !== undefined
+                                ? pkg.priceYearly
+                                : pkg.price
+                              )?.toLocaleString()}{" "}
+                              د.ع
                             </span>
                             <span className="text-slate-400 text-xs font-bold">
                               / سنوياً
@@ -2488,7 +2741,11 @@ export default function SuperAdminDashboard() {
                           </div>
                           <div className="flex items-baseline gap-1">
                             <span className="text-base font-bold text-slate-600 dark:text-slate-400">
-                              {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12))?.toLocaleString()} د.ع
+                              {(pkg.priceMonthly !== undefined
+                                ? pkg.priceMonthly
+                                : Math.round((pkg.price || 0) / 12)
+                              )?.toLocaleString()}{" "}
+                              د.ع
                             </span>
                             <span className="text-slate-400 text-[10px] font-bold">
                               / شهرياً
@@ -2534,8 +2791,14 @@ export default function SuperAdminDashboard() {
                                   setNewPackage({
                                     name: pkg.name,
                                     price: pkg.price,
-                                    priceMonthly: pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12),
-                                    priceYearly: pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price,
+                                    priceMonthly:
+                                      pkg.priceMonthly !== undefined
+                                        ? pkg.priceMonthly
+                                        : Math.round((pkg.price || 0) / 12),
+                                    priceYearly:
+                                      pkg.priceYearly !== undefined
+                                        ? pkg.priceYearly
+                                        : pkg.price,
                                     maxStudents: pkg.maxStudents || 500,
                                     features: Array.isArray(pkg.features)
                                       ? pkg.features.join(", ")
@@ -3720,44 +3983,84 @@ export default function SuperAdminDashboard() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Instagram Link</label>
+                          <label className="text-[10px] uppercase text-slate-500 font-bold mb-1 block">
+                            Instagram Link
+                          </label>
                           <input
                             type="url"
                             value={systemConfig.socialLinks?.instagram || ""}
-                            onChange={(e) => setSystemConfig({...systemConfig, socialLinks: {...systemConfig.socialLinks, instagram: e.target.value}})}
+                            onChange={(e) =>
+                              setSystemConfig({
+                                ...systemConfig,
+                                socialLinks: {
+                                  ...systemConfig.socialLinks,
+                                  instagram: e.target.value,
+                                },
+                              })
+                            }
                             placeholder="https://instagram.com/..."
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm outline-none focus:border-blue-500 transition-all"
                             dir="ltr"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Twitter (X) Link</label>
+                          <label className="text-[10px] uppercase text-slate-500 font-bold mb-1 block">
+                            Twitter (X) Link
+                          </label>
                           <input
                             type="url"
                             value={systemConfig.socialLinks?.twitter || ""}
-                            onChange={(e) => setSystemConfig({...systemConfig, socialLinks: {...systemConfig.socialLinks, twitter: e.target.value}})}
+                            onChange={(e) =>
+                              setSystemConfig({
+                                ...systemConfig,
+                                socialLinks: {
+                                  ...systemConfig.socialLinks,
+                                  twitter: e.target.value,
+                                },
+                              })
+                            }
                             placeholder="https://twitter.com/..."
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm outline-none focus:border-blue-500 transition-all"
                             dir="ltr"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] uppercase text-slate-500 font-bold mb-1 block">LinkedIn Link</label>
+                          <label className="text-[10px] uppercase text-slate-500 font-bold mb-1 block">
+                            LinkedIn Link
+                          </label>
                           <input
                             type="url"
                             value={systemConfig.socialLinks?.linkedin || ""}
-                            onChange={(e) => setSystemConfig({...systemConfig, socialLinks: {...systemConfig.socialLinks, linkedin: e.target.value}})}
+                            onChange={(e) =>
+                              setSystemConfig({
+                                ...systemConfig,
+                                socialLinks: {
+                                  ...systemConfig.socialLinks,
+                                  linkedin: e.target.value,
+                                },
+                              })
+                            }
                             placeholder="https://linkedin.com/..."
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm outline-none focus:border-blue-500 transition-all"
                             dir="ltr"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] uppercase text-slate-500 font-bold mb-1 block">WhatsApp Link</label>
+                          <label className="text-[10px] uppercase text-slate-500 font-bold mb-1 block">
+                            WhatsApp Link
+                          </label>
                           <input
                             type="url"
                             value={systemConfig.socialLinks?.whatsapp || ""}
-                            onChange={(e) => setSystemConfig({...systemConfig, socialLinks: {...systemConfig.socialLinks, whatsapp: e.target.value}})}
+                            onChange={(e) =>
+                              setSystemConfig({
+                                ...systemConfig,
+                                socialLinks: {
+                                  ...systemConfig.socialLinks,
+                                  whatsapp: e.target.value,
+                                },
+                              })
+                            }
                             placeholder="https://wa.me/..."
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm outline-none focus:border-blue-500 transition-all"
                             dir="ltr"
@@ -3774,8 +4077,177 @@ export default function SuperAdminDashboard() {
                           الواجهة التعريفية والتسويقية للمنصة (Landing Section)
                         </h4>
                         <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">
-                          تخصيص العبارات الرنانة والمميزات التي تظهر للزوار وأولياء الأمور بالصفحة الرئيسية لزيادة التسجيل والتحول الرقمي
+                          تخصيص العبارات الرنانة والمميزات التي تظهر للزوار
+                          وأولياء الأمور بالصفحة الرئيسية لزيادة التسجيل والتحول
+                          الرقمي
                         </p>
+                      </div>
+
+                      {/* Banners Control Section */}
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 space-y-6">
+                        <div className="flex items-center justify-between px-1">
+                          <label className="block text-[10px] sm:text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                            الواجهة الإعلانية الرئيسية صور العرض (Banners)
+                          </label>
+                          <button
+                            onClick={() => {
+                              const currentBanners =
+                                systemConfig.promotionalBanners || [];
+                              setSystemConfig({
+                                ...systemConfig,
+                                promotionalBanners: [
+                                  ...currentBanners,
+                                  {
+                                    id: `banner-${Date.now()}`,
+                                    imageUrl: "",
+                                    active: true,
+                                    link: "",
+                                  },
+                                ],
+                              });
+                            }}
+                            className="text-blue-600 dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
+                          >
+                            <Plus size={14} /> إضافة لافته عرض (Banner)
+                          </button>
+                        </div>
+
+                        <div className="space-y-4">
+                          {(systemConfig.promotionalBanners || []).map(
+                            (banner, idx) => (
+                              <div
+                                key={banner.id || idx}
+                                className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-150 dark:border-slate-800/50 flex flex-col md:flex-row gap-4"
+                              >
+                                <div className="flex-1 space-y-4">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500">
+                                      بانر إعلاني {idx + 1}
+                                    </span>
+                                    <button
+                                      onClick={() => {
+                                        const currentBanners =
+                                          systemConfig.promotionalBanners || [];
+                                        setSystemConfig({
+                                          ...systemConfig,
+                                          promotionalBanners:
+                                            currentBanners.filter(
+                                              (_, i) => i !== idx,
+                                            ),
+                                        });
+                                      }}
+                                      className="text-red-500 hover:text-red-700 p-1 text-xs font-black transition-colors"
+                                    >
+                                      حذف
+                                    </button>
+                                  </div>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                                        رابط الصورة الإعلانية (عالية الجودة،
+                                        أفقية العرض)
+                                      </label>
+                                      <input
+                                        type="url"
+                                        required
+                                        value={banner.imageUrl}
+                                        onChange={(e) => {
+                                          const currentBanners = [
+                                            ...(systemConfig.promotionalBanners ||
+                                              []),
+                                          ];
+                                          currentBanners[idx] = {
+                                            ...currentBanners[idx],
+                                            imageUrl: e.target.value,
+                                          };
+                                          setSystemConfig({
+                                            ...systemConfig,
+                                            promotionalBanners: currentBanners,
+                                          });
+                                        }}
+                                        placeholder="https://example.com/promotion.jpg"
+                                        className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-905 dark:text-white font-bold outline-none focus:border-blue-500"
+                                        dir="ltr"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                                        الرابط الموجه عند النقر (اختياري)
+                                      </label>
+                                      <input
+                                        type="url"
+                                        value={banner.link || ""}
+                                        onChange={(e) => {
+                                          const currentBanners = [
+                                            ...(systemConfig.promotionalBanners ||
+                                              []),
+                                          ];
+                                          currentBanners[idx] = {
+                                            ...currentBanners[idx],
+                                            link: e.target.value,
+                                          };
+                                          setSystemConfig({
+                                            ...systemConfig,
+                                            promotionalBanners: currentBanners,
+                                          });
+                                        }}
+                                        placeholder="https://wa.me/..."
+                                        className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-905 dark:text-white font-bold outline-none focus:border-blue-500"
+                                        dir="ltr"
+                                      />
+                                    </div>
+                                    <div className="pt-2">
+                                      <label className="flex items-center gap-2 cursor-pointer w-max">
+                                        <input
+                                          type="checkbox"
+                                          checked={banner.active}
+                                          onChange={(e) => {
+                                            const currentBanners = [
+                                              ...(systemConfig.promotionalBanners ||
+                                                []),
+                                            ];
+                                            currentBanners[idx] = {
+                                              ...currentBanners[idx],
+                                              active: e.target.checked,
+                                            };
+                                            setSystemConfig({
+                                              ...systemConfig,
+                                              promotionalBanners:
+                                                currentBanners,
+                                            });
+                                          }}
+                                          className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 transition-all cursor-pointer"
+                                        />
+                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 select-none">
+                                          تفعيل النشر (يظهر للزائر)
+                                        </span>
+                                      </label>
+                                    </div>
+                                  </div>
+                                </div>
+                                {banner.imageUrl && (
+                                  <div className="w-full md:w-64 h-32 md:h-full min-h-[120px] rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 shrink-0 border border-slate-200 dark:border-slate-700 self-center">
+                                    <img
+                                      src={banner.imageUrl}
+                                      alt="Preview"
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.src =
+                                          "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOTQ5NzlkIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHJlY3QgeD0iMyIgeT0iMyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiByeD0iMiIgcnk9IjIiPjwvcmVjdD48Y2lyY2xlIGN4PSI4LjUiIGN5PSI4LjUiIHI9IjEuNSI+PC9jaXJjbGU+PHBvbHlsaW5lIHBvaW50cz0iMjEgMTUgMTYgMTAgNSAyMSI+PC9wb2x5bGluZT48L3N2Zz4=";
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ),
+                          )}
+                          {(systemConfig.promotionalBanners || []).length ===
+                            0 && (
+                            <div className="col-span-full py-8 text-center text-slate-400 text-xs bg-slate-50 dark:bg-slate-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                              لا توجد واجهات عرض إعلانية مضافة حالياً.
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="space-y-4">
@@ -3824,13 +4296,14 @@ export default function SuperAdminDashboard() {
                             </label>
                             <button
                               onClick={() => {
-                                const currentFeatures = systemConfig.marketingFeatures || [];
+                                const currentFeatures =
+                                  systemConfig.marketingFeatures || [];
                                 setSystemConfig({
                                   ...systemConfig,
                                   marketingFeatures: [
                                     ...currentFeatures,
-                                    { title: "", description: "" }
-                                  ]
+                                    { title: "", description: "" },
+                                  ],
                                 });
                               }}
                               className="text-blue-600 dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
@@ -3840,56 +4313,88 @@ export default function SuperAdminDashboard() {
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {(systemConfig.marketingFeatures || []).map((feat, idx) => (
-                              <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-150 dark:border-slate-800/50 space-y-3 relative">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500">العنصر رقم {idx + 1}</span>
-                                  <button
-                                    onClick={() => {
-                                      const currentFeatures = systemConfig.marketingFeatures || [];
-                                      setSystemConfig({
-                                        ...systemConfig,
-                                        marketingFeatures: currentFeatures.filter((_, i) => i !== idx)
-                                      });
-                                    }}
-                                    className="text-red-500 hover:text-red-700 p-1 text-xs font-black transition-colors"
-                                  >
-                                    حذف
-                                  </button>
+                            {(systemConfig.marketingFeatures || []).map(
+                              (feat, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-150 dark:border-slate-800/50 space-y-3 relative"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500">
+                                      العنصر رقم {idx + 1}
+                                    </span>
+                                    <button
+                                      onClick={() => {
+                                        const currentFeatures =
+                                          systemConfig.marketingFeatures || [];
+                                        setSystemConfig({
+                                          ...systemConfig,
+                                          marketingFeatures:
+                                            currentFeatures.filter(
+                                              (_, i) => i !== idx,
+                                            ),
+                                        });
+                                      }}
+                                      className="text-red-500 hover:text-red-700 p-1 text-xs font-black transition-colors"
+                                    >
+                                      حذف
+                                    </button>
+                                  </div>
+                                  <div>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={feat.title}
+                                      onChange={(e) => {
+                                        const currentFeatures = [
+                                          ...(systemConfig.marketingFeatures ||
+                                            []),
+                                        ];
+                                        currentFeatures[idx] = {
+                                          ...currentFeatures[idx],
+                                          title: e.target.value,
+                                        };
+                                        setSystemConfig({
+                                          ...systemConfig,
+                                          marketingFeatures: currentFeatures,
+                                        });
+                                      }}
+                                      placeholder="عنوان الميزة (مثال: متابعة ذكية للأقساط)"
+                                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-905 dark:text-white font-bold outline-none focus:border-blue-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <textarea
+                                      required
+                                      value={feat.description}
+                                      onChange={(e) => {
+                                        const currentFeatures = [
+                                          ...(systemConfig.marketingFeatures ||
+                                            []),
+                                        ];
+                                        currentFeatures[idx] = {
+                                          ...currentFeatures[idx],
+                                          description: e.target.value,
+                                        };
+                                        setSystemConfig({
+                                          ...systemConfig,
+                                          marketingFeatures: currentFeatures,
+                                        });
+                                      }}
+                                      placeholder="شرح مبسط لكيفية عمل الميزة لـ ولي الأمر أو المدرسة..."
+                                      rows={2}
+                                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-905 dark:text-white font-medium outline-none resize-none focus:border-blue-500"
+                                    />
+                                  </div>
                                 </div>
-                                <div>
-                                  <input
-                                    type="text"
-                                    required
-                                    value={feat.title}
-                                    onChange={(e) => {
-                                      const currentFeatures = [...(systemConfig.marketingFeatures || [])];
-                                      currentFeatures[idx] = { ...currentFeatures[idx], title: e.target.value };
-                                      setSystemConfig({ ...systemConfig, marketingFeatures: currentFeatures });
-                                    }}
-                                    placeholder="عنوان الميزة (مثال: متابعة ذكية للأقساط)"
-                                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-905 dark:text-white font-bold outline-none focus:border-blue-500"
-                                  />
-                                </div>
-                                <div>
-                                  <textarea
-                                    required
-                                    value={feat.description}
-                                    onChange={(e) => {
-                                      const currentFeatures = [...(systemConfig.marketingFeatures || [])];
-                                      currentFeatures[idx] = { ...currentFeatures[idx], description: e.target.value };
-                                      setSystemConfig({ ...systemConfig, marketingFeatures: currentFeatures });
-                                    }}
-                                    placeholder="شرح مبسط لكيفية عمل الميزة لـ ولي الأمر أو المدرسة..."
-                                    rows={2}
-                                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-905 dark:text-white font-medium outline-none resize-none focus:border-blue-500"
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                            {(systemConfig.marketingFeatures || []).length === 0 && (
+                              ),
+                            )}
+                            {(systemConfig.marketingFeatures || []).length ===
+                              0 && (
                               <div className="col-span-full py-6 text-center text-slate-400 text-xs bg-slate-50 dark:bg-slate-800/10 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-                                سيتم استخدام المميزات الأربعة الافتراضية إذا تُرِك هذا الحقل فارغاً. اضغط على 'إضافة ميزة تسويقية' للبدء.
+                                سيتم استخدام المميزات الأربعة الافتراضية إذا
+                                تُرِك هذا الحقل فارغاً. اضغط على 'إضافة ميزة
+                                تسويقية' للبدء.
                               </div>
                             )}
                           </div>
@@ -4367,7 +4872,9 @@ export default function SuperAdminDashboard() {
                             value={
                               Number.isNaN(newPackage.priceYearly)
                                 ? ""
-                                : newPackage.priceYearly || newPackage.price || ""
+                                : newPackage.priceYearly ||
+                                  newPackage.price ||
+                                  ""
                             }
                             onChange={(e) => {
                               const val = e.target.value;
@@ -4392,9 +4899,11 @@ export default function SuperAdminDashboard() {
                             value={
                               Number.isNaN(newPackage.priceMonthly)
                                 ? ""
-                                : (newPackage.priceMonthly !== undefined && newPackage.priceMonthly !== 0)
+                                : newPackage.priceMonthly !== undefined &&
+                                    newPackage.priceMonthly !== 0
                                   ? newPackage.priceMonthly
-                                  : Math.round((newPackage.price || 0) / 12) || ""
+                                  : Math.round((newPackage.price || 0) / 12) ||
+                                    ""
                             }
                             onChange={(e) => {
                               const val = e.target.value;
@@ -4859,10 +5368,16 @@ function PackageDetailsModal({
                 السعر السنوي
               </p>
               <p className="text-2xl font-black text-blue-600 dark:text-blue-400 transition-colors">
-                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) === 0 ? "مجاني" : (pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price).toLocaleString("ar-IQ")}
-                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) > 0 && (
-                  <span className="text-xs font-bold mr-1">د.ع</span>
-                )}
+                {(pkg.priceYearly !== undefined
+                  ? pkg.priceYearly
+                  : pkg.price) === 0
+                  ? "مجاني"
+                  : (pkg.priceYearly !== undefined
+                      ? pkg.priceYearly
+                      : pkg.price
+                    ).toLocaleString("ar-IQ")}
+                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) >
+                  0 && <span className="text-xs font-bold mr-1">د.ع</span>}
               </p>
             </div>
             <div>
@@ -4870,8 +5385,17 @@ function PackageDetailsModal({
                 السعر الشهري
               </p>
               <p className="text-2xl font-black text-blue-600 dark:text-blue-400 transition-colors">
-                {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)) === 0 ? "مجاني" : (pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)).toLocaleString("ar-IQ")}
-                {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)) > 0 && (
+                {(pkg.priceMonthly !== undefined
+                  ? pkg.priceMonthly
+                  : Math.round((pkg.price || 0) / 12)) === 0
+                  ? "مجاني"
+                  : (pkg.priceMonthly !== undefined
+                      ? pkg.priceMonthly
+                      : Math.round((pkg.price || 0) / 12)
+                    ).toLocaleString("ar-IQ")}
+                {(pkg.priceMonthly !== undefined
+                  ? pkg.priceMonthly
+                  : Math.round((pkg.price || 0) / 12)) > 0 && (
                   <span className="text-xs font-bold mr-1">د.ع</span>
                 )}
               </p>

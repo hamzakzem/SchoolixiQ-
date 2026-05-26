@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { getDoc, setDoc, doc, query, collection, where, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { getDoc, setDoc, doc, query, collection, where, getDocs, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { UserRole } from '../types';
 import { useLanguage } from '../lib/LanguageContext';
 import { ShieldCheck, AlertCircle, RefreshCw, CheckCircle2 } from 'lucide-react';
@@ -11,6 +11,7 @@ import { toast } from 'react-hot-toast';
 export default function GoogleAuthPopupProxy() {
   const [searchParams] = useSearchParams();
   const selectedRole = (searchParams.get('role') as UserRole) || UserRole.PARENT;
+  const selectedMode = searchParams.get('mode') || 'login';
   const { isRtl, t } = useLanguage();
   
   const [status, setStatus] = useState<'loading' | 'signing' | 'saving' | 'success' | 'error'>('loading');
@@ -24,18 +25,32 @@ export default function GoogleAuthPopupProxy() {
       if (!active) return;
       setStatus('signing');
       try {
-        const provider = new GoogleAuthProvider();
-        
-        // Prevent Google from auto-selecting if they want to switch accounts
-        provider.setCustomParameters({
-          prompt: 'select_account'
-        });
+        const result = await getRedirectResult(auth);
+        let user;
 
-        // 1. Run Top-Level popup sign-in
-        const result = await signInWithPopup(auth, provider);
+        if (result && result.user) {
+          user = result.user;
+        } else {
+          // Check if we are already redirecting
+          if (window.sessionStorage.getItem('googleRedirectStarted') === 'true') {
+             // We are just waiting for the page to navigate away
+             return;
+          }
+          window.sessionStorage.setItem('googleRedirectStarted', 'true');
+          const provider = new GoogleAuthProvider();
+          
+          // Prevent Google from auto-selecting if they want to switch accounts
+          provider.setCustomParameters({
+            prompt: 'select_account'
+          });
+
+          // 1. Run Top-Level popup sign-in
+          await signInWithRedirect(auth, provider);
+          return; // Wait for redirect
+        }
+
         if (!active) return;
         
-        const user = result.user;
         setUserName(user.displayName || user.email || '');
         setStatus('saving');
 
@@ -75,6 +90,22 @@ export default function GoogleAuthPopupProxy() {
             throw new Error(conflictErr);
           }
 
+          // Create admin registration record if needed
+          if (finalRole === UserRole.ADMIN && selectedMode === 'signup') {
+            try {
+              await addDoc(collection(db, 'registrations'), {
+                type: 'direct_school_signup',
+                name: user.displayName || 'School via Google',
+                email: user.email,
+                phone: '', 
+                status: 'needs_review',
+                createdAt: serverTimestamp()
+              });
+            } catch (e) {
+              console.warn('Failed to record direct signup credentials', e);
+            }
+          }
+
           // Create standard user profile
           await setDoc(doc(db, 'users', user.uid), {
             name: user.displayName || provisionedData?.name || (isRtl ? 'مستخدم جديد' : 'New User'),
@@ -108,6 +139,7 @@ export default function GoogleAuthPopupProxy() {
 
         if (!active) return;
         setStatus('success');
+        window.sessionStorage.removeItem('googleRedirectStarted');
 
         // 3. Post authentication signal back to parent frame
         if (window.opener) {
@@ -125,6 +157,7 @@ export default function GoogleAuthPopupProxy() {
         }, 1500);
 
       } catch (error: any) {
+        window.sessionStorage.removeItem('googleRedirectStarted');
         console.error("Popup Auth Proxy Error:", error);
         if (!active) return;
         setStatus('error');
