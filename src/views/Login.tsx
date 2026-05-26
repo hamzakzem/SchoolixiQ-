@@ -45,6 +45,8 @@ import {
   Copy,
   ShieldAlert,
   ExternalLink,
+  Smartphone,
+  ClipboardList,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { UserRole } from "../types";
@@ -1308,6 +1310,22 @@ export default function Login() {
                       ? "بيانات مدرستك في أمان تام مع أعلى معايير التشفير والنسخ الاحتياطي السحابي."
                       : "Your school data is secure with the highest encryption and cloud backup standards.",
                   },
+                  {
+                    title: isRtl
+                      ? "تطبيق للهواتف الذكية"
+                      : "Mobile Application",
+                    description: isRtl
+                      ? "تطبيق مخصص لأولياء الأمور للوصول المباشر وتتبع مستوى الطالب بشكل فوري."
+                      : "Dedicated mobile app for parents to track student progress instantly.",
+                  },
+                  {
+                    title: isRtl
+                      ? "إدارة وتصدير التقارير"
+                      : "Reports Management",
+                    description: isRtl
+                      ? "أرشفة وتصدير تقارير وتقييمات الطلاب بسهولة وبصيغ متعددة بضغطة زر واحدة."
+                      : "Easily archive and export student reports in multiple formats with one click.",
+                  },
                 ]
             ).map((feat, idx) => {
               const bgColors = [
@@ -1317,6 +1335,8 @@ export default function Login() {
                 "from-purple-500/10 to-fuchsia-500/10 dark:from-purple-500/20 dark:to-fuchsia-500/20 text-purple-600 dark:text-purple-400 group-hover:from-purple-500 group-hover:to-fuchsia-600",
                 "from-pink-500/10 to-rose-500/10 dark:from-pink-500/20 dark:to-rose-500/20 text-pink-600 dark:text-pink-400 group-hover:from-pink-500 group-hover:to-rose-600",
                 "from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 text-cyan-600 dark:text-cyan-400 group-hover:from-cyan-500 group-hover:to-blue-600",
+                "from-yellow-500/10 to-amber-500/10 dark:from-yellow-500/20 dark:to-amber-500/20 text-yellow-600 dark:text-yellow-400 group-hover:from-yellow-500 group-hover:to-amber-600",
+                "from-sky-500/10 to-blue-500/10 dark:from-sky-500/20 dark:to-blue-500/20 text-sky-600 dark:text-sky-400 group-hover:from-sky-500 group-hover:to-blue-600",
               ];
               const IconsList = [
                 Coins,
@@ -1325,6 +1345,8 @@ export default function Login() {
                 TrendingUp,
                 GraduationCap,
                 ShieldCheck,
+                Smartphone,
+                ClipboardList,
               ];
 
               const themeClass = bgColors[idx % bgColors.length];

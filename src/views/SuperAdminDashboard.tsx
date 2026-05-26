@@ -4543,7 +4543,7 @@ export default function SuperAdminDashboard() {
                             {(systemConfig.marketingFeatures || []).length ===
                               0 && (
                               <div className="col-span-full py-6 text-center text-slate-400 text-xs bg-slate-50 dark:bg-slate-800/10 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-                                سيتم استخدام المميزات الأربعة الافتراضية إذا
+                                سيتم استخدام المميزات الافتراضية إذا
                                 تُرِك هذا الحقل فارغاً. اضغط على 'إضافة ميزة
                                 تسويقية' للبدء.
                               </div>

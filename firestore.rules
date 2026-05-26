@@ -142,21 +142,8 @@ service cloud.firestore {
     }
     
     match /schools/{schoolId} {
-      allow get: if isSignedIn() && (
-        isSuperAdmin() || 
-        getSchoolId() == schoolId || 
-        getTokenSchoolId() == schoolId ||
-        (getUserData() != null && getUserData().get('schoolId', '') == schoolId) ||
-        (resource != null && resource.data.get('adminEmail', '') == getUserEmail()) ||
-        (resource != null && resource.data.get('ownerUid', '') == request.auth.uid) ||
-        (resource != null && resource.data.get('status', '') == 'active')
-      );
-      allow list: if isSignedIn() && (
-        isSuperAdmin() || 
-        getSchoolId() == schoolId || 
-        getTokenSchoolId() == schoolId ||
-        (resource != null && resource.data.get('status', '') == 'active')
-      );
+      allow get: if isSignedIn() || (resource != null && resource.data.get('status', '') == 'active');
+      allow list: if isSignedIn() || (resource != null && resource.data.get('status', '') == 'active');
       allow create: if isSuperAdmin() || (isSignedIn() && (getUserRole() == 'admin' || getTokenRole() == 'admin' || request.resource.data.get('ownerUid', '') == request.auth.uid || request.resource.data.get('adminEmail', '') == getUserEmail()));
       allow update, delete: if isSuperAdmin() || isSchoolStaff(schoolId) || (isSignedIn() && resource.data.get('ownerUid', '') == request.auth.uid);
     }

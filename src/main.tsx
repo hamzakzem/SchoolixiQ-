@@ -34,14 +34,58 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 
 // Handle Vit's HMR websocket errors which are benign in this environment
 if (typeof window !== 'undefined') {
+  const checkAndHandleDbError = (errMessage: string) => {
+    if (errMessage && (errMessage.includes('refusing to open IndexedDB') || errMessage.includes('corruption of the IndexedDB') || errMessage.includes('IndexedDB database data'))) {
+      const reloadCount = parseInt(sessionStorage.getItem('db_error_reload_count') || '0', 10);
+      if (reloadCount < 3) {
+        sessionStorage.setItem('db_error_reload_count', (reloadCount + 1).toString());
+        if (window.indexedDB && window.indexedDB.databases) {
+          window.indexedDB.databases().then((databases) => {
+            databases.forEach((dbInfo) => {
+              if (dbInfo.name) {
+                try {
+                  window.indexedDB.deleteDatabase(dbInfo.name);
+                } catch (e) {
+                  console.error('Failed to delete corrupted database:', dbInfo.name, e);
+                }
+              }
+            });
+            setTimeout(() => {
+              window.location.reload();
+            }, 500);
+          }).catch(() => {
+            window.location.reload();
+          });
+        } else {
+          window.location.reload();
+        }
+      } else {
+        const warningDiv = document.createElement('div');
+        warningDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ef4444;color:white;text-align:center;padding:12px;font-weight:bold;z-index:99999;font-family:sans-serif;direction:rtl;';
+        warningDiv.innerText = 'تنبيه: تم اكتشاف تعارض في قاعدة البيانات المحلية للمتصفح. يرجى إغلاق الصفحة ومحاولة فتح الرابط في علامة تبويب جديدة تماماً أو إعادة تحميل الصفحة يدوياً.';
+        document.body.prepend(warningDiv);
+      }
+    }
+  };
+
+  window.addEventListener('error', (event) => {
+    if (event.message) {
+      checkAndHandleDbError(event.message);
+    }
+  });
+
   window.addEventListener('unhandledrejection', (event) => {
-    if (event.reason && (
-      event.reason === 'WebSocket closed without opened.' ||
-      (typeof event.reason === 'string' && event.reason.includes('WebSocket')) ||
-      (event.reason.message && event.reason.message.includes('WebSocket'))
-    )) {
-      event.preventDefault();
-      console.warn('Caught and suppressed benign Vite HMR WebSocket error.');
+    if (event.reason) {
+      const msg = typeof event.reason === 'string' ? event.reason : (event.reason.message || '');
+      checkAndHandleDbError(msg);
+
+      if (
+        event.reason === 'WebSocket closed without opened.' ||
+        msg.includes('WebSocket')
+      ) {
+        event.preventDefault();
+        console.warn('Caught and suppressed benign Vite HMR WebSocket error.');
+      }
     }
   });
 }
