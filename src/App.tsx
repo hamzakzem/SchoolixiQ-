@@ -40,7 +40,6 @@ import SuperAdminDashboard from "./views/SuperAdminDashboard";
 import TeacherDashboard from "./views/TeacherDashboard";
 import ScanHandler from "./components/ScanHandler";
 import PublicStudentVerify from "./views/PublicStudentVerify";
-import GoogleAuthPopupProxy from "./views/GoogleAuthPopupProxy";
 
 import SolarLoading from "./components/SolarLoading";
 import { LanguageToggle } from "./components/LanguageToggle";
@@ -113,7 +112,9 @@ const AppContent = () => {
     | "approved"
   >("loading");
   const [packages, setPackages] = useState<any[]>([]);
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annually">(
+    "annually",
+  );
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [myRequest, setMyRequest] = useState<any>(null);
   const [subscriptionForm, setSubscriptionForm] = useState({
@@ -245,16 +246,20 @@ const AppContent = () => {
     if (onboardingState === "packages") {
       import("firebase/firestore").then(({ onSnapshot, query, collection }) => {
         const q = query(collection(db, "packages"));
-        onSnapshot(q, (snap) => {
-          if (!snap.empty) {
-            setPackages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-          } else {
+        onSnapshot(
+          q,
+          (snap) => {
+            if (!snap.empty) {
+              setPackages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            } else {
+              setPackages(DEFAULT_PACKAGES);
+            }
+          },
+          (error) => {
+            console.error("Failed to fetch packages, using defaults", error);
             setPackages(DEFAULT_PACKAGES);
-          }
-        }, (error) => {
-          console.error("Failed to fetch packages, using defaults", error);
-          setPackages(DEFAULT_PACKAGES);
-        });
+          },
+        );
       });
     }
   }, [onboardingState]);
@@ -507,23 +512,27 @@ const AppContent = () => {
                   <div className="flex items-center gap-4">
                     <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1 rounded-full items-center shadow-inner">
                       <button
-                        onClick={() => setBillingCycle('monthly')}
-                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setBillingCycle("monthly")}
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                       >
-                        {isRtl ? 'شهرياً' : 'Monthly'}
+                        {isRtl ? "شهرياً" : "Monthly"}
                       </button>
                       <button
-                        onClick={() => setBillingCycle('annually')}
-                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === 'annually' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setBillingCycle("annually")}
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === "annually" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                       >
-                        {isRtl ? 'سنوياً' : 'Annually'}
+                        {isRtl ? "سنوياً" : "Annually"}
                       </button>
                     </div>
                     <button
                       onClick={() => setOnboardingState("options")}
                       className="text-slate-500 hover:text-slate-900 flex items-center gap-2 font-bold text-sm"
                     >
-                      {isRtl ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
+                      {isRtl ? (
+                        <ArrowRight size={16} />
+                      ) : (
+                        <ArrowLeft size={16} />
+                      )}
                       {isRtl ? "رجوع" : "Back"}
                     </button>
                   </div>
@@ -531,56 +540,64 @@ const AppContent = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {packages.map((pkg) => {
-                    const displayPrice = billingCycle === 'annually'
-                      ? (pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price)
-                      : (pkg.priceMonthly !== undefined && pkg.priceMonthly !== 0
+                    const displayPrice =
+                      billingCycle === "annually"
+                        ? pkg.priceYearly !== undefined
+                          ? pkg.priceYearly
+                          : pkg.price
+                        : pkg.priceMonthly !== undefined
                           ? pkg.priceMonthly
-                          : Math.round((pkg.price || 0) / 12));
+                          : Math.round((pkg.price || 0) / 12);
                     return (
-                    <div
-                      key={pkg.id}
-                      className={`bg-white rounded-3xl p-6 border-2 transition-all flex flex-col text-right ${pkg.isPopular ? "border-blue-600 shadow-xl shadow-blue-100" : "border-slate-100 shadow-lg"}`}
-                    >
-                      {pkg.isPopular && (
-                        <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-4">
-                          الأكثر طلباً
-                        </span>
-                      )}
-                      <h3 className="text-xl font-black text-slate-900 mb-2">
-                        {pkg.name}
-                      </h3>
-                      <div className="flex items-baseline gap-2 mb-6">
-                        <span className="text-3xl font-black text-slate-900">
-                          {displayPrice?.toLocaleString()}
-                        </span>
-                        <span className="text-slate-400 font-bold text-xs">
-                          د.ع {billingCycle === 'monthly' ? (isRtl ? ' / شهرياً' : '/ Monthly') : ''}
-                        </span>
-                      </div>
-                      <ul className="space-y-3 mb-8 flex-1">
-                        {(pkg.features || []).map((f: string, i: number) => (
-                          <li
-                            key={i}
-                            className="flex items-start gap-2 text-sm text-slate-600 font-medium"
-                          >
-                            <Check
-                              size={14}
-                              className="text-emerald-500 mt-0.5 shrink-0"
-                            />
-                            <span>{f}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        onClick={() => {
-                          setSelectedPackage(pkg);
-                          setOnboardingState("registration_form");
-                        }}
-                        className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
+                      <div
+                        key={pkg.id}
+                        className={`bg-white rounded-3xl p-6 border-2 transition-all flex flex-col text-right ${pkg.isPopular ? "border-blue-600 shadow-xl shadow-blue-100" : "border-slate-100 shadow-lg"}`}
                       >
-                        اختيار الباقة
-                      </button>
-                    </div>
+                        {pkg.isPopular && (
+                          <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-4">
+                            الأكثر طلباً
+                          </span>
+                        )}
+                        <h3 className="text-xl font-black text-slate-900 mb-2">
+                          {pkg.name}
+                        </h3>
+                        <div className="flex items-baseline gap-2 mb-6">
+                          <span className="text-3xl font-black text-slate-900">
+                            {displayPrice?.toLocaleString()}
+                          </span>
+                          <span className="text-slate-400 font-bold text-xs">
+                            د.ع{" "}
+                            {billingCycle === "monthly"
+                              ? isRtl
+                                ? " / شهرياً"
+                                : "/ Monthly"
+                              : ""}
+                          </span>
+                        </div>
+                        <ul className="space-y-3 mb-8 flex-1">
+                          {(pkg.features || []).map((f: string, i: number) => (
+                            <li
+                              key={i}
+                              className="flex items-start gap-2 text-sm text-slate-600 font-medium"
+                            >
+                              <Check
+                                size={14}
+                                className="text-emerald-500 mt-0.5 shrink-0"
+                              />
+                              <span>{f}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          onClick={() => {
+                            setSelectedPackage(pkg);
+                            setOnboardingState("registration_form");
+                          }}
+                          className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
+                        >
+                          اختيار الباقة
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -611,6 +628,15 @@ const AppContent = () => {
                     if (!user) return;
                     setIsCreatingProfile(true);
                     try {
+                      const isMonthly = billingCycle === "monthly";
+                      const actualPrice = isMonthly
+                        ? selectedPackage.priceMonthly !== undefined
+                          ? selectedPackage.priceMonthly
+                          : Math.round((selectedPackage.price || 0) / 12)
+                        : selectedPackage.priceYearly !== undefined
+                          ? selectedPackage.priceYearly
+                          : selectedPackage.price;
+
                       await addDoc(collection(db, "registrations"), {
                         type: "direct_school_signup",
                         uid: user.uid,
@@ -620,6 +646,9 @@ const AppContent = () => {
                         address: subscriptionForm.address,
                         packageName: selectedPackage.name,
                         packageId: selectedPackage.id,
+                        price: actualPrice,
+                        billingCycle: billingCycle,
+                        durationDays: isMonthly ? 30 : 365,
                         status: "pending",
                         createdAt: serverTimestamp(),
                       });
@@ -862,10 +891,6 @@ export default function App() {
           <AuthProvider>
             <BrowserRouter>
               <Routes>
-                <Route
-                  path="/login-popup"
-                  element={<GoogleAuthPopupProxy />}
-                />
                 <Route
                   path="/verify/:studentId"
                   element={<PublicStudentVerify />}

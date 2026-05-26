@@ -50,6 +50,7 @@ import {
   Upload,
   Sparkles,
   Star,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
@@ -824,8 +825,9 @@ export default function SuperAdminDashboard() {
     }
     const loadingToast = toast.loading("جاري تفعيل الحساب...");
     try {
+      const durationDays = request.durationDays || 365;
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 365); // Default 1 year
+      expiresAt.setDate(expiresAt.getDate() + durationDays);
 
       // 1. Update school status
       await updateDoc(doc(db, "schools", request.schoolId), {
@@ -912,8 +914,9 @@ export default function SuperAdminDashboard() {
       "جاري تجهيز المدرسة وتفعيل حساب المدير وتسجيل البيانات...",
     );
     try {
+      const durationDays = request.durationDays || 365;
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 365); // 1 year package by default
+      expiresAt.setDate(expiresAt.getDate() + durationDays);
 
       const name =
         request.customerInfo?.name ||
@@ -2906,6 +2909,13 @@ export default function SuperAdminDashboard() {
                                   ? "طلب تجديد"
                                   : request.planId || request.packageName}
                               </span>
+                              {request.billingCycle && (
+                                <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] font-black rounded-full border border-purple-100 dark:border-purple-900/30">
+                                  {request.billingCycle === "monthly"
+                                    ? "شهرياً"
+                                    : "سنوياً"}
+                                </span>
+                              )}
                               {request.subscriberCode && (
                                 <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-full border border-emerald-100 dark:border-emerald-900/30">
                                   رمز: {request.subscriberCode}
@@ -2928,6 +2938,17 @@ export default function SuperAdminDashboard() {
                                   request.email}
                               </span>
                             </div>
+                            {request.price !== undefined && (
+                              <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                <CreditCard
+                                  size={14}
+                                  className="text-amber-500"
+                                />
+                                <span className="font-bold text-amber-600 dark:text-amber-400">
+                                  {request.price.toLocaleString("ar-IQ")} د.ع
+                                </span>
+                              </div>
+                            )}
                             <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900/30">
                               <Lock size={14} className="text-indigo-500" />
                               <PasswordCell
