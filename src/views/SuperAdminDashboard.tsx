@@ -426,10 +426,18 @@ export default function SuperAdminDashboard() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterGovernorate, setFilterGovernorate] = useState("");
+  const [filterDirectorate, setFilterDirectorate] = useState("");
 
   const [newSchool, setNewSchool] = useState({
     name: "",
     address: "",
+    governorate: "",
+    directorate: "",
+    stage: "",
+    shift: "",
+    genderType: "",
+    approximateStudents: "",
     adminName: "",
     adminEmail: "",
     adminPassword: "",
@@ -519,11 +527,18 @@ export default function SuperAdminDashboard() {
     settings: "الإعدادات",
   };
 
-  const filteredSchools = schools.filter(
-    (s) =>
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.address.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredSchools = schools.filter((s) => {
+    const matchesSearch =
+      s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.address?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGov = filterGovernorate
+      ? s.governorate === filterGovernorate
+      : true;
+    const matchesDir = filterDirectorate
+      ? s.directorate === filterDirectorate
+      : true;
+    return matchesSearch && matchesGov && matchesDir;
+  });
 
   const stats = {
     total: schools.length,
@@ -1317,6 +1332,12 @@ export default function SuperAdminDashboard() {
           {
             name: newSchool.name,
             address: newSchool.address,
+            governorate: newSchool.governorate,
+            directorate: newSchool.directorate,
+            stage: newSchool.stage,
+            shift: newSchool.shift,
+            genderType: newSchool.genderType,
+            approximateStudents: newSchool.approximateStudents,
             planId: newSchool.planId,
             subscriptionExpiresAt: expiresAt.toISOString(),
             showSubscriptionTimer: newSchool.showSubscriptionTimer,
@@ -1347,6 +1368,12 @@ export default function SuperAdminDashboard() {
         setNewSchool({
           name: "",
           address: "",
+          governorate: "",
+          directorate: "",
+          stage: "",
+          shift: "",
+          genderType: "",
+          approximateStudents: "",
           adminName: "",
           adminEmail: "",
           adminPassword: "",
@@ -1379,6 +1406,12 @@ export default function SuperAdminDashboard() {
       const schoolRef = await addDoc(collection(db, "schools"), {
         name: newSchool.name,
         address: newSchool.address,
+        governorate: newSchool.governorate,
+        directorate: newSchool.directorate,
+        stage: newSchool.stage,
+        shift: newSchool.shift,
+        genderType: newSchool.genderType,
+        approximateStudents: newSchool.approximateStudents,
         status: "active",
         planId: newSchool.planId,
         studentCount: 0, // Initialize student counter
@@ -1431,6 +1464,12 @@ export default function SuperAdminDashboard() {
       setNewSchool({
         name: "",
         address: "",
+        governorate: "",
+        directorate: "",
+        stage: "",
+        shift: "",
+        genderType: "",
+        approximateStudents: "",
         adminName: "",
         adminEmail: "",
         adminPassword: "",
@@ -2074,18 +2113,80 @@ export default function SuperAdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="relative w-full md:w-96 group">
-                        <Search
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors"
-                          size={18}
-                        />
-                        <input
-                          type="text"
-                          placeholder="بحث عن مدرسة باسمها أو العنوان..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pr-12 pl-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-600 transition-all text-sm font-bold shadow-sm"
-                        />
+                      <div className="flex flex-col items-end gap-2 w-full md:w-auto">
+                        <div className="relative w-full md:w-96 group">
+                          <Search
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors"
+                            size={18}
+                          />
+                          <input
+                            type="text"
+                            placeholder="بحث عن مدرسة باسمها أو العنوان..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pr-12 pl-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-600 transition-all text-sm font-bold shadow-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+                          <select
+                            value={filterGovernorate}
+                            onChange={(e) =>
+                              setFilterGovernorate(e.target.value)
+                            }
+                            className="w-full md:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-600 transition-all text-xs font-bold shadow-sm appearance-none min-w-[120px]"
+                          >
+                            <option value="">كل المحافظات</option>
+                            <option value="بغداد">بغداد</option>
+                            <option value="البصرة">البصرة</option>
+                            <option value="نينوى">نينوى</option>
+                            <option value="أربيل">أربيل</option>
+                            <option value="النجف">النجف</option>
+                            <option value="ذي قار">ذي قار</option>
+                            <option value="كركوك">كركوك</option>
+                            <option value="الأنبار">الأنبار</option>
+                            <option value="ديالى">ديالى</option>
+                            <option value="المثنى">المثنى</option>
+                            <option value="القادسية">القادسية</option>
+                            <option value="ميسان">ميسان</option>
+                            <option value="واسط">واسط</option>
+                            <option value="صلاح الدين">صلاح الدين</option>
+                            <option value="دهوك">دهوك</option>
+                            <option value="السليمانية">السليمانية</option>
+                            <option value="بابل">بابل</option>
+                            <option value="كربلاء">كربلاء</option>
+                            <option value="حلبجة">حلبجة</option>
+                          </select>
+                          <select
+                            value={filterDirectorate}
+                            onChange={(e) =>
+                              setFilterDirectorate(e.target.value)
+                            }
+                            className="w-full md:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-600 transition-all text-xs font-bold shadow-sm appearance-none min-w-[150px]"
+                          >
+                            <option value="">كل المديريات</option>
+                            <option value="مديرية الكرخ الاولى">
+                              مديرية الكرخ الاولى
+                            </option>
+                            <option value="مديرية الكرخ الثانية">
+                              مديرية الكرخ الثانية
+                            </option>
+                            <option value="مديرية الكرخ الثالثه">
+                              مديرية الكرخ الثالثه
+                            </option>
+                            <option value="مديرية الرصافة الاولى">
+                              مديرية الرصافة الاولى
+                            </option>
+                            <option value="مديرية الرصافة الثانية">
+                              مديرية الرصافة الثانية
+                            </option>
+                            <option value="مديرية الرصافة الثالثه">
+                              مديرية الرصافة الثالثه
+                            </option>
+                            <option value="أخرى / مديرية أخرى">
+                              أخرى / مديرية أخرى
+                            </option>
+                          </select>
+                        </div>
                       </div>
                     </div>
                     <table className="w-full text-right border-collapse">
@@ -2133,6 +2234,26 @@ export default function SuperAdminDashboard() {
                                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
                                       ID: {school.id?.slice(0, 8)}
                                     </span>
+                                    {school.governorate && (
+                                      <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-bold max-w-[180px]">
+                                        {school.governorate}{" "}
+                                        {school.directorate
+                                          ? ` - ${school.directorate}`
+                                          : ""}
+                                        {school.stage
+                                          ? ` - ${school.stage}`
+                                          : ""}
+                                        {school.shift
+                                          ? ` - ${school.shift}`
+                                          : ""}
+                                        {school.genderType
+                                          ? ` - ${school.genderType}`
+                                          : ""}
+                                        {school.approximateStudents
+                                          ? ` - ${school.approximateStudents} طالب تقريباً`
+                                          : ""}
+                                      </div>
+                                    )}
                                     {school.address && (
                                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[180px]">
                                         <MapPin
@@ -2298,6 +2419,15 @@ export default function SuperAdminDashboard() {
                                           setNewSchool({
                                             name: school.name,
                                             address: school.address,
+                                            governorate:
+                                              school.governorate || "",
+                                            directorate:
+                                              school.directorate || "",
+                                            stage: school.stage || "",
+                                            shift: school.shift || "",
+                                            genderType: school.genderType || "",
+                                            approximateStudents:
+                                              school.approximateStudents || "",
                                             adminName: school.adminName || "",
                                             adminEmail: school.adminEmail || "",
                                             adminPassword: "",
@@ -4535,7 +4665,207 @@ export default function SuperAdminDashboard() {
                     </div>
                     <div>
                       <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
-                        العنوان / المحافظة / المنطقة
+                        المحافظة
+                      </label>
+                      <div className="relative">
+                        <MapPin
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={newSchool.governorate}
+                          onChange={(e) =>
+                            setNewSchool({
+                              ...newSchool,
+                              governorate: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر المحافظة...
+                          </option>
+                          <option value="بغداد">بغداد</option>
+                          <option value="البصرة">البصرة</option>
+                          <option value="نينوى">نينوى</option>
+                          <option value="أربيل">أربيل</option>
+                          <option value="النجف">النجف</option>
+                          <option value="ذي قار">ذي قار</option>
+                          <option value="كركوك">كركوك</option>
+                          <option value="الأنبار">الأنبار</option>
+                          <option value="ديالى">ديالى</option>
+                          <option value="المثنى">المثنى</option>
+                          <option value="القادسية">القادسية (الديوانية)</option>
+                          <option value="ميسان">ميسان</option>
+                          <option value="واسط">واسط</option>
+                          <option value="صلاح الدين">صلاح الدين</option>
+                          <option value="دهوك">دهوك</option>
+                          <option value="السليمانية">السليمانية</option>
+                          <option value="بابل">بابل</option>
+                          <option value="كربلاء">كربلاء</option>
+                          <option value="حلبجة">حلبجة</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        المديرية
+                      </label>
+                      <div className="relative">
+                        <Building
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={newSchool.directorate}
+                          onChange={(e) =>
+                            setNewSchool({
+                              ...newSchool,
+                              directorate: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر المديرية...
+                          </option>
+                          <option value="مديرية الكرخ الاولى">
+                            مديرية الكرخ الاولى
+                          </option>
+                          <option value="مديرية الكرخ الثانية">
+                            مديرية الكرخ الثانية
+                          </option>
+                          <option value="مديرية الكرخ الثالثه">
+                            مديرية الكرخ الثالثه
+                          </option>
+                          <option value="مديرية الرصافة الاولى">
+                            مديرية الرصافة الاولى
+                          </option>
+                          <option value="مديرية الرصافة الثانية">
+                            مديرية الرصافة الثانية
+                          </option>
+                          <option value="مديرية الرصافة الثالثه">
+                            مديرية الرصافة الثالثه
+                          </option>
+                          <option value="أخرى / مديرية أخرى">
+                            أخرى / مديرية أخرى
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        المرحلة الدراسية
+                      </label>
+                      <div className="relative">
+                        <Building
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={newSchool.stage}
+                          onChange={(e) =>
+                            setNewSchool({
+                              ...newSchool,
+                              stage: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر المرحلة...
+                          </option>
+                          <option value="روضة">روضة</option>
+                          <option value="ابتدائي">ابتدائي</option>
+                          <option value="متوسطة">متوسطة</option>
+                          <option value="اعدادية">اعدادية</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        وقت الدوام
+                      </label>
+                      <div className="relative">
+                        <Building
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={newSchool.shift}
+                          onChange={(e) =>
+                            setNewSchool({
+                              ...newSchool,
+                              shift: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر وقت الدوام...
+                          </option>
+                          <option value="صباحي">صباحي</option>
+                          <option value="مسائي">مسائي</option>
+                          <option value="مدمج">مدمج</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        نوع الدراسة
+                      </label>
+                      <div className="relative">
+                        <Building
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={newSchool.genderType}
+                          onChange={(e) =>
+                            setNewSchool({
+                              ...newSchool,
+                              genderType: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر نوع الدراسة...
+                          </option>
+                          <option value="مختلطة">مختلطة</option>
+                          <option value="بنات فقط">بنات فقط</option>
+                          <option value="اولاد فقط">اولاد فقط</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        العدد التقريبي للطلاب
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min="1"
+                        value={newSchool.approximateStudents}
+                        onChange={(e) =>
+                          setNewSchool({
+                            ...newSchool,
+                            approximateStudents: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-mono placeholder:font-sans placeholder:font-medium text-right"
+                        placeholder="مثال: 500"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        العنوان التفصيلي (المنطقة / الشارع)
                       </label>
                       <div className="relative">
                         <MapPin
@@ -4553,7 +4883,7 @@ export default function SuperAdminDashboard() {
                             })
                           }
                           className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all"
-                          placeholder="مثال: بغداد - حي المنصور - شارع 14 رمضان"
+                          placeholder="تكملة العنوان"
                         />
                       </div>
                     </div>
@@ -4772,6 +5102,12 @@ export default function SuperAdminDashboard() {
                     setNewSchool({
                       name: "",
                       address: "",
+                      governorate: "",
+                      directorate: "",
+                      stage: "",
+                      shift: "",
+                      genderType: "",
+                      approximateStudents: "",
                       adminName: "",
                       adminEmail: "",
                       adminPassword: "",

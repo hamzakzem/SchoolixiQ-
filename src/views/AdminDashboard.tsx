@@ -132,7 +132,9 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    window.innerWidth >= 768 && window.innerWidth < 1024,
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -223,18 +225,23 @@ export default function AdminDashboard() {
         if (item.id === "payroll") return perms.staff_payroll !== false;
         if (item.id === "attendance") return perms.attendance_track !== false;
         if (item.id === "grades") return perms.exams_and_results !== false;
-        if (item.id === "student_archive") return perms.student_archive !== false;
-        if (item.id === "inventory") return perms.inventory_and_assets !== false;
+        if (item.id === "student_archive")
+          return perms.student_archive !== false;
+        if (item.id === "inventory")
+          return perms.inventory_and_assets !== false;
         if (item.id === "behavior") return perms.behavior_management !== false;
-        if (item.id === "evaluation_reports") return perms.student_evaluation_reports !== false;
+        if (item.id === "evaluation_reports")
+          return perms.student_evaluation_reports !== false;
         if (item.id === "homework") return perms.homework_and_tasks !== false;
         if (item.id === "classes") return perms.classes !== false;
         if (item.id === "schedules") return perms.automated_schedules !== false;
         if (item.id === "announcements") return perms.announcements !== false;
-        if (item.id === "advanced_reports") return perms.advanced_reports !== false;
+        if (item.id === "advanced_reports")
+          return perms.advanced_reports !== false;
         if (item.id === "market") return perms.marketplace_ordering !== false;
         if (item.id === "id_cards") return perms.id_card_generation !== false;
-        if (item.id === "assistants") return perms.assistants_manage !== false && profile.role === "admin";
+        if (item.id === "assistants")
+          return perms.assistants_manage !== false && profile.role === "admin";
         if (item.id === "settings") return perms.settings !== false;
 
         return true; // Fallback for any other unmatched modules
@@ -264,10 +271,23 @@ export default function AdminDashboard() {
   });
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const primaryItems = filteredMenuItems.filter(item => ["overview", "students", "tuition", "chat"].includes(item.id));
-  const moreItems = filteredMenuItems.filter(item => !["overview", "students", "tuition", "chat"].includes(item.id));
+  const primaryItems = filteredMenuItems.filter((item) =>
+    ["overview", "students", "tuition", "chat"].includes(item.id),
+  );
+  const moreItems = filteredMenuItems.filter(
+    (item) => !["overview", "students", "tuition", "chat"].includes(item.id),
+  );
 
-  const [schoolSetup, setSchoolSetup] = useState({ name: "", address: "" });
+  const [schoolSetup, setSchoolSetup] = useState({
+    name: "",
+    address: "",
+    governorate: "",
+    directorate: "",
+    stage: "",
+    shift: "",
+    genderType: "",
+    approximateStudents: "",
+  });
   const [isSettingUp, setIsSettingUp] = useState(false);
   const [schoolData, setSchoolData] = useState<School | null>(null);
   const [isExpired, setIsExpired] = useState(false);
@@ -878,7 +898,163 @@ export default function AdminDashboard() {
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                الموقع / العنوان
+                المحافظة
+              </label>
+              <select
+                required
+                value={schoolSetup.governorate}
+                onChange={(e) =>
+                  setSchoolSetup({
+                    ...schoolSetup,
+                    governorate: e.target.value,
+                  })
+                }
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+              >
+                <option value="" disabled>
+                  اختر المحافظة...
+                </option>
+                <option value="بغداد">بغداد</option>
+                <option value="البصرة">البصرة</option>
+                <option value="نينوى">نينوى</option>
+                <option value="أربيل">أربيل</option>
+                <option value="النجف">النجف</option>
+                <option value="ذي قار">ذي قار</option>
+                <option value="كركوك">كركوك</option>
+                <option value="الأنبار">الأنبار</option>
+                <option value="ديالى">ديالى</option>
+                <option value="المثنى">المثنى</option>
+                <option value="القادسية">القادسية (الديوانية)</option>
+                <option value="ميسان">ميسان</option>
+                <option value="واسط">واسط</option>
+                <option value="صلاح الدين">صلاح الدين</option>
+                <option value="دهوك">دهوك</option>
+                <option value="السليمانية">السليمانية</option>
+                <option value="بابل">بابل</option>
+                <option value="كربلاء">كربلاء</option>
+                <option value="حلبجة">حلبجة</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                المديرية
+              </label>
+              <select
+                required
+                value={schoolSetup.directorate}
+                onChange={(e) =>
+                  setSchoolSetup({
+                    ...schoolSetup,
+                    directorate: e.target.value,
+                  })
+                }
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+              >
+                <option value="" disabled>
+                  اختر المديرية...
+                </option>
+                <option value="مديرية الكرخ الاولى">مديرية الكرخ الاولى</option>
+                <option value="مديرية الكرخ الثانية">
+                  مديرية الكرخ الثانية
+                </option>
+                <option value="مديرية الكرخ الثالثه">
+                  مديرية الكرخ الثالثه
+                </option>
+                <option value="مديرية الرصافة الاولى">
+                  مديرية الرصافة الاولى
+                </option>
+                <option value="مديرية الرصافة الثانية">
+                  مديرية الرصافة الثانية
+                </option>
+                <option value="مديرية الرصافة الثالثه">
+                  مديرية الرصافة الثالثه
+                </option>
+                <option value="أخرى / مديرية أخرى">أخرى / مديرية أخرى</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                المرحلة الدراسية
+              </label>
+              <select
+                required
+                value={schoolSetup.stage}
+                onChange={(e) =>
+                  setSchoolSetup({ ...schoolSetup, stage: e.target.value })
+                }
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+              >
+                <option value="" disabled>
+                  اختر المرحلة...
+                </option>
+                <option value="روضة">روضة</option>
+                <option value="ابتدائي">ابتدائي</option>
+                <option value="متوسطة">متوسطة</option>
+                <option value="اعدادية">اعدادية</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                وقت الدوام
+              </label>
+              <select
+                required
+                value={schoolSetup.shift}
+                onChange={(e) =>
+                  setSchoolSetup({ ...schoolSetup, shift: e.target.value })
+                }
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+              >
+                <option value="" disabled>
+                  اختر وقت الدوام...
+                </option>
+                <option value="صباحي">صباحي</option>
+                <option value="مسائي">مسائي</option>
+                <option value="مدمج">مدمج</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                نوع الدراسة
+              </label>
+              <select
+                required
+                value={schoolSetup.genderType}
+                onChange={(e) =>
+                  setSchoolSetup({ ...schoolSetup, genderType: e.target.value })
+                }
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+              >
+                <option value="" disabled>
+                  اختر نوع الدراسة...
+                </option>
+                <option value="مختلطة">مختلطة</option>
+                <option value="بنات فقط">بنات فقط</option>
+                <option value="اولاد فقط">اولاد فقط</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                عدد الطلاب التقريبي
+              </label>
+              <input
+                required
+                type="number"
+                min="1"
+                value={schoolSetup.approximateStudents}
+                onChange={(e) =>
+                  setSchoolSetup({
+                    ...schoolSetup,
+                    approximateStudents: e.target.value,
+                  })
+                }
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+                placeholder="مثال: 500"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                الموقع / العنوان (التفصيلي)
               </label>
               <input
                 required
@@ -888,7 +1064,7 @@ export default function AdminDashboard() {
                   setSchoolSetup({ ...schoolSetup, address: e.target.value })
                 }
                 className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
-                placeholder="المحافظة - القضاء..."
+                placeholder="تكملة العنوان (القضاء - الحي)..."
               />
             </div>
             <button
@@ -1026,7 +1202,9 @@ export default function AdminDashboard() {
             className={`fixed inset-y-0 ${isRtl ? "right-0 rounded-l-[2rem] lg:rounded-none border-l" : "left-0 rounded-r-[2rem] lg:rounded-none border-r"} z-50 bg-slate-900 dark:bg-black text-white flex flex-col pt-safe lg:relative border-slate-800 dark:border-slate-900 print:hidden shadow-2xl lg:shadow-none shrink-0 overflow-visible`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
-              <div className={`p-6 border-b border-slate-800/50 flex ${isSidebarCollapsed ? 'justify-center' : 'items-center gap-4'}`}>
+              <div
+                className={`p-6 border-b border-slate-800/50 flex ${isSidebarCollapsed ? "justify-center" : "items-center gap-4"}`}
+              >
                 {schoolData?.logoUrl ? (
                   <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1 shadow-xl shrink-0 overflow-hidden">
                     <img
@@ -1049,7 +1227,12 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 {!isSidebarCollapsed && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="min-w-0"
+                  >
                     <h1 className="font-bold text-lg md:text-xl text-white font-display tracking-tight leading-none truncate">
                       {config.appName}
                     </h1>
@@ -1069,7 +1252,7 @@ export default function AdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? item.label : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${
                       activeTab === item.id
                         ? "bg-white text-slate-900 shadow-xl"
                         : "text-slate-400 hover:text-white hover:bg-slate-800/50"
@@ -1086,7 +1269,9 @@ export default function AdminDashboard() {
 
                     {/* Tooltip for collapsed state */}
                     {isSidebarCollapsed && (
-                      <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
+                      <div
+                        className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                      >
                         {item.label}
                       </div>
                     )}
@@ -1105,16 +1290,22 @@ export default function AdminDashboard() {
                     </p>
                   </div>
                 ) : (
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 mx-auto rounded-full flex items-center justify-center text-white font-bold mb-4 shadow-sm" title={profile?.name}>
+                  <div
+                    className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 mx-auto rounded-full flex items-center justify-center text-white font-bold mb-4 shadow-sm"
+                    title={profile?.name}
+                  >
                     {profile?.name?.[0]}
                   </div>
                 )}
                 <button
                   onClick={() => auth.signOut()}
                   title={isSidebarCollapsed ? "تسجيل الخروج" : undefined}
-                  className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3 px-4 md:px-5'} py-3 md:py-4 rounded-xl md:rounded-2xl text-red-400 hover:bg-red-500/10 transition-all font-bold text-sm`}
+                  className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3 px-4 md:px-5"} py-3 md:py-4 rounded-xl md:rounded-2xl text-red-400 hover:bg-red-500/10 transition-all font-bold text-sm`}
                 >
-                  <LogOut size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
+                  <LogOut
+                    size={isSidebarCollapsed ? 24 : 20}
+                    className="shrink-0"
+                  />
                   {!isSidebarCollapsed && <span>تسجيل الخروج</span>}
                 </button>
               </div>
@@ -1130,13 +1321,13 @@ export default function AdminDashboard() {
             <button
               onClick={() => {
                 if (window.innerWidth >= 1024) {
-                   setIsSidebarCollapsed(!isSidebarCollapsed);
+                  setIsSidebarCollapsed(!isSidebarCollapsed);
                 } else {
-                   setIsSidebarOpen(!isSidebarOpen);
-                   if (!isSidebarOpen) {
-                     // Ensure it's not collapsed when opened as mobile drawer
-                     setIsSidebarCollapsed(false);
-                   }
+                  setIsSidebarOpen(!isSidebarOpen);
+                  if (!isSidebarOpen) {
+                    // Ensure it's not collapsed when opened as mobile drawer
+                    setIsSidebarCollapsed(false);
+                  }
                 }
               }}
               className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm"
@@ -1144,7 +1335,8 @@ export default function AdminDashboard() {
               <Menu
                 size={20}
                 className={
-                  (!isSidebarOpen && window.innerWidth < 1024) || isSidebarCollapsed
+                  (!isSidebarOpen && window.innerWidth < 1024) ||
+                  isSidebarCollapsed
                     ? "rotate-90 transition-transform"
                     : "transition-transform"
                 }
@@ -1176,7 +1368,7 @@ export default function AdminDashboard() {
             <div className="scale-90 md:scale-100">
               <LanguageToggle />
             </div>
-            
+
             <div className="scale-90 md:scale-100">
               <ThemeToggle />
             </div>
@@ -1209,7 +1401,7 @@ export default function AdminDashboard() {
 
         {!auth.currentUser?.emailVerified && !hideVerificationBanner && (
           <div className="mx-4 md:mx-8 mt-4 md:mt-6 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 p-3 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm shrink-0 relative">
-            <button 
+            <button
               onClick={handleHideVerification}
               className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-700 p-1 rounded-full shadow-sm hover:scale-110 active:scale-95 transition-all z-10"
               title="إخفاء مؤقتاً"
@@ -1260,17 +1452,27 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        <main className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0' : 'overflow-y-auto pb-10'}`}>
-          <div className={`w-full mx-auto flex flex-col print:min-h-0 print:pb-0 print:p-0 ${
-            activeTab === "chat" ? "h-full max-w-none p-0 flex-1 min-h-0" : "max-w-7xl p-4 md:p-8"
-          }`}>
+        <main
+          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0" : "overflow-y-auto pb-10"}`}
+        >
+          <div
+            className={`w-full mx-auto flex flex-col print:min-h-0 print:pb-0 print:p-0 ${
+              activeTab === "chat"
+                ? "h-full max-w-none p-0 flex-1 min-h-0"
+                : "max-w-7xl p-4 md:p-8"
+            }`}
+          >
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
-                className={activeTab === "chat" ? "flex-1 flex flex-col min-h-0" : "w-full flex flex-col"}
-                initial={{ opacity: 0, y: activeTab === 'chat' ? 0 : 15 }}
+                className={
+                  activeTab === "chat"
+                    ? "flex-1 flex flex-col min-h-0"
+                    : "w-full flex flex-col"
+                }
+                initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: activeTab === 'chat' ? 0 : -15 }}
+                exit={{ opacity: 0, y: activeTab === "chat" ? 0 : -15 }}
                 transition={{ duration: 0.25, ease: "easeOut" }}
               >
                 {renderContent()}
@@ -1398,10 +1600,16 @@ function PackageDetailsModal({
                 السعر السنوي
               </p>
               <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) === 0 ? "مجاني" : (pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price).toLocaleString("ar-IQ")}
-                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) > 0 && (
-                  <span className="text-xs font-bold mr-1">د.ع</span>
-                )}
+                {(pkg.priceYearly !== undefined
+                  ? pkg.priceYearly
+                  : pkg.price) === 0
+                  ? "مجاني"
+                  : (pkg.priceYearly !== undefined
+                      ? pkg.priceYearly
+                      : pkg.price
+                    ).toLocaleString("ar-IQ")}
+                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) >
+                  0 && <span className="text-xs font-bold mr-1">د.ع</span>}
               </p>
             </div>
             <div>
@@ -1409,8 +1617,17 @@ function PackageDetailsModal({
                 السعر الشهري
               </p>
               <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)) === 0 ? "مجاني" : (pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)).toLocaleString("ar-IQ")}
-                {(pkg.priceMonthly !== undefined ? pkg.priceMonthly : Math.round((pkg.price || 0) / 12)) > 0 && (
+                {(pkg.priceMonthly !== undefined
+                  ? pkg.priceMonthly
+                  : Math.round((pkg.price || 0) / 12)) === 0
+                  ? "مجاني"
+                  : (pkg.priceMonthly !== undefined
+                      ? pkg.priceMonthly
+                      : Math.round((pkg.price || 0) / 12)
+                    ).toLocaleString("ar-IQ")}
+                {(pkg.priceMonthly !== undefined
+                  ? pkg.priceMonthly
+                  : Math.round((pkg.price || 0) / 12)) > 0 && (
                   <span className="text-xs font-bold mr-1">د.ع</span>
                 )}
               </p>

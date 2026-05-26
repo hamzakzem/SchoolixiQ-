@@ -5,7 +5,9 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function isValidEmail(email) { return email is string && email.size() <= 256 && email.matches('^.+@.+\\..+$'); }
-    function getUserEmail() { return ('email' in request.auth.token) ? request.auth.token.email.lower() : ''; }
+    function getUserEmail() { 
+      return ('email' in request.auth.token && request.auth.token.email is string) ? request.auth.token.email.lower() : ''; 
+    }
     
     function isMasterAdmin() {
       return isSignedIn() && getUserEmail() in [
@@ -43,11 +45,16 @@ service cloud.firestore {
       return 'schoolId' in request.auth.token ? request.auth.token.schoolId : ''; 
     }
 
+    function isSystemAssistant() {
+      return isSignedIn() && ((getTokenRole() == 'assistant' && getTokenSchoolId() == '') || (getUserRole() == 'assistant' && getSchoolId() == ''));
+    }
+
     function isSuperAdmin() {
       return isSignedIn() && (
         isMasterAdmin() || 
         getTokenRole() == 'superadmin' ||
         getUserRole() == 'superadmin' ||
+        isSystemAssistant() ||
         request.auth.uid in ["ArbxvuSjySdr6AeiUFa7bi6CYTk1", "IrAmEHNuOeQHigG5wGpUvttzz5K2", "E31eRIwjNdfXpeS9UC0nffHOVMz1"]
       );
     }
@@ -139,15 +146,19 @@ service cloud.firestore {
         isSuperAdmin() || 
         getSchoolId() == schoolId || 
         getTokenSchoolId() == schoolId ||
-        (getUserData() != null && getUserData().get('schoolId', '') == schoolId)
+        (getUserData() != null && getUserData().get('schoolId', '') == schoolId) ||
+        (resource != null && resource.data.get('adminEmail', '') == getUserEmail()) ||
+        (resource != null && resource.data.get('ownerUid', '') == request.auth.uid) ||
+        (resource != null && resource.data.get('status', '') == 'active')
       );
-      allow list: if resource.data.get('status', '') == 'active' || (isSignedIn() && (
+      allow list: if isSignedIn() && (
         isSuperAdmin() || 
         getSchoolId() == schoolId || 
-        getTokenSchoolId() == schoolId
-      ));
-      allow create: if isSuperAdmin() || (isSignedIn() && (getUserRole() == 'admin' || getTokenRole() == 'admin'));
-      allow update, delete: if isSuperAdmin() || isSchoolStaff(schoolId);
+        getTokenSchoolId() == schoolId ||
+        (resource != null && resource.data.get('status', '') == 'active')
+      );
+      allow create: if isSuperAdmin() || (isSignedIn() && (getUserRole() == 'admin' || getTokenRole() == 'admin' || request.resource.data.get('ownerUid', '') == request.auth.uid || request.resource.data.get('adminEmail', '') == getUserEmail()));
+      allow update, delete: if isSuperAdmin() || isSchoolStaff(schoolId) || (isSignedIn() && resource.data.get('ownerUid', '') == request.auth.uid);
     }
 
     match /packages/{id} {
