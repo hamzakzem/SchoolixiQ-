@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { 
@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [schoolData, setSchoolData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Basic connection test as per skill guidelines
@@ -56,6 +57,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (authUser) => {
       setUser(authUser);
+      
+      if (authUser) {
+        lastUserIdRef.current = authUser.uid;
+      } else {
+        if (lastUserIdRef.current) {
+          try {
+            const { unregisterPushToken } = await import('./pushService');
+            await unregisterPushToken(lastUserIdRef.current);
+          } catch (e) {}
+          lastUserIdRef.current = null;
+        }
+      }
       
       if (unsubscribeProfile) {
         unsubscribeProfile();
@@ -83,6 +96,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               ...data,
               permissions: claims.p || data.permissions 
             } as UserProfile);
+            
+            // Register for Push Notifications automatically (only native)
+            try {
+              const { registerForPushNotifications } = await import('./pushService');
+              await registerForPushNotifications(authUser.uid, data.role, data.schoolId || '');
+            } catch (err) {
+              console.error('Failed to init push notifications', err);
+            }
 
             // Listen to school data if schoolId exists
             if (data.schoolId && (!schoolData || schoolData.id !== data.schoolId)) {

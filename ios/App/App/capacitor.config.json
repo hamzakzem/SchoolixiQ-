@@ -1,0 +1,13 @@
+{
+	"appId": "com.schoolix.app",
+	"appName": "Schoolix",
+	"webDir": "dist",
+	"packageClassList": [
+		"AppPlugin",
+		"DevicePlugin",
+		"FilesystemPlugin",
+		"PushNotificationsPlugin",
+		"SplashScreenPlugin",
+		"StatusBarPlugin"
+	]
+}

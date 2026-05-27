@@ -57,7 +57,7 @@ import ParentChatTab from "./ParentChatTab";
 import ParentSchedules from "./parent/ParentSchedules";
 import StudentCard from "../components/admin/idcards/StudentCard";
 import { IdCardTemplate } from "../types/idCardTemplate";
-import { Phone, Mail, MapPin, Save, Sparkles, ShieldAlert } from "lucide-react";
+import { Phone, Mail, MapPin, Save, Sparkles, ShieldAlert, ExternalLink } from "lucide-react";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
@@ -124,6 +124,26 @@ export default function ParentDashboard() {
   const [editEmail, setEditEmail] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [isUpdatingCard, setIsUpdatingCard] = useState(false);
+
+  const [schoolInfo, setSchoolInfo] = useState<any>(null);
+
+  useEffect(() => {
+    if (!selectedStudent?.schoolId) {
+      setSchoolInfo(null);
+      return;
+    }
+    const schoolRef = doc(db, "schools", selectedStudent.schoolId);
+    getDoc(schoolRef).then((snap) => {
+      if (snap.exists()) {
+        setSchoolInfo({ id: snap.id, ...snap.data() });
+      } else {
+        setSchoolInfo(null);
+      }
+    }).catch((err) => {
+      console.error("Error fetching school locator:", err);
+      setSchoolInfo(null);
+    });
+  }, [selectedStudent?.schoolId]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
@@ -1365,6 +1385,57 @@ export default function ParentDashboard() {
             >
               {activeTab === "home" && (
                 <div className="space-y-4 md:space-y-6">
+                  {/* Detailed School Address and Google Maps Location Card */}
+                  {schoolInfo && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-5 md:p-6 rounded-[2rem] bg-gradient-to-br from-indigo-50/70 via-white to-blue-50/50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800/80 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-5 transition-all text-right"
+                    >
+                      <div className="flex items-start gap-4 w-full md:w-auto">
+                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-600/20">
+                          <MapPin size={24} className="animate-bounce" style={{ animationDuration: '3s' }} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{isRtl ? 'الموقع الجغرافي للمدرسة' : 'Detailed School Location & Address'}</p>
+                          <h3 className="text-lg font-black text-slate-950 dark:text-white mt-1 leading-snug">{schoolInfo.name}</h3>
+                          <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                            <p className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-400 font-mono text-xs">{isRtl ? 'العنوان المدرسي:' : 'Address:'}</span>
+                              <span className="font-bold text-slate-700 dark:text-slate-300">{schoolInfo.address || (isRtl ? 'غير محدد' : 'Not specified')}</span>
+                            </p>
+                            {schoolInfo.googleMapsUrl && (
+                              <p className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-400 font-mono text-xs">{isRtl ? 'الموقع التفصيلي:' : 'Location link:'}</span>
+                                <a 
+                                  href={schoolInfo.googleMapsUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1 font-bold"
+                                >
+                                  {isRtl ? 'خرائط جوجل (Google Maps)' : 'Google Maps'}
+                                  <ExternalLink size={11} />
+                                </a>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {schoolInfo.googleMapsUrl && (
+                        <a
+                          href={schoolInfo.googleMapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full md:w-auto px-5 py-3 bg-indigo-600 hover:bg-indigo-505 text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-indigo-600/10 cursor-pointer"
+                        >
+                          <MapPin size={14} />
+                          <span>{isRtl ? 'الذهاب إلى خريطة المدرسة التفصيلية' : 'Open Detailed School Google Map'}</span>
+                        </a>
+                      )}
+                    </motion.div>
+                  )}
+
                   {/* Highlight Stats Bento */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                     <div className="bg-white dark:bg-slate-900 p-4 md:p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { FileText, Plus, Edit2, Trash2, Send, X, Users, BarChart } from 'lucide-react';
@@ -31,13 +31,18 @@ export default function AdvancedReports() {
   // Fetch classes
   useEffect(() => {
     if (!profile?.schoolId) return;
-    const q = query(collection(db, 'classes'), where('schoolId', '==', profile.schoolId));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const classData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setClasses(classData);
-      if (classData.length > 0 && !selectedClassId) setSelectedClassId(classData[0].id);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'classes'));
-    return () => unsubscribe();
+    const fetchClasses = async () => {
+       try {
+         const q = query(collection(db, 'classes'), where('schoolId', '==', profile.schoolId));
+         const snapshot = await getDocs(q);
+         const classData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+         setClasses(classData);
+         if (classData.length > 0 && !selectedClassId) setSelectedClassId(classData[0].id);
+       } catch (error) {
+         handleFirestoreError(error, OperationType.LIST, 'classes');
+       }
+    };
+    fetchClasses();
   }, [profile]);
 
   // Fetch students for selected class
@@ -46,36 +51,43 @@ export default function AdvancedReports() {
       setStudents([]);
       return;
     }
-    const q = query(
-      collection(db, 'students'),
-      where('schoolId', '==', profile.schoolId),
-      where('classId', '==', selectedClassId)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'students'));
-    return () => unsubscribe();
+    const fetchStudents = async () => {
+      try {
+        const q = query(
+          collection(db, 'students'),
+          where('schoolId', '==', profile.schoolId),
+          where('classId', '==', selectedClassId)
+        );
+        const snapshot = await getDocs(q);
+        setStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'students');
+      }
+    };
+    fetchStudents();
   }, [profile, selectedClassId]);
+
+  const fetchReports = async () => {
+    if (!profile?.schoolId) return;
+    setLoading(true);
+    try {
+      const reportsQ = query(
+        collection(db, 'advanced_reports'),
+        where('schoolId', '==', profile.schoolId)
+      );
+      const snapshot = await getDocs(reportsQ);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setReports(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+    } catch (error) {
+       handleFirestoreError(error, OperationType.LIST, 'advanced_reports');
+    } finally {
+       setLoading(false);
+    }
+  };
 
   // Fetch advanced reports
   useEffect(() => {
-    if (!profile?.schoolId) return;
-    setLoading(true);
-    
-    const reportsQ = query(
-      collection(db, 'advanced_reports'),
-      where('schoolId', '==', profile.schoolId)
-    );
-    
-    const unsubscribe = onSnapshot(reportsQ, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setReports(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'advanced_reports');
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    fetchReports();
   }, [profile]);
 
   const handleSaveReport = async () => {
@@ -114,6 +126,7 @@ export default function AdvancedReports() {
 
         toast.success(isRtl ? 'تم إضافة التقرير بنجاح' : 'Report added successfully');
       }
+      fetchReports();
       setShowAddModal(false);
       setEditingReport(null);
       setReportTitle('');
@@ -131,6 +144,7 @@ export default function AdvancedReports() {
       try {
         await deleteDoc(doc(db, 'advanced_reports', id));
         await notificationService.deleteBySourceId(id);
+        fetchReports();
         toast.success(isRtl ? 'تم حذف التقرير بنجاح' : 'Report deleted successfully');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `advanced_reports/${id}`);

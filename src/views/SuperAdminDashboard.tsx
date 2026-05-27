@@ -432,6 +432,7 @@ export default function SuperAdminDashboard() {
   const [newSchool, setNewSchool] = useState({
     name: "",
     address: "",
+    googleMapsUrl: "",
     governorate: "",
     directorate: "",
     stage: "",
@@ -1332,6 +1333,7 @@ export default function SuperAdminDashboard() {
           {
             name: newSchool.name,
             address: newSchool.address,
+            googleMapsUrl: newSchool.googleMapsUrl,
             governorate: newSchool.governorate,
             directorate: newSchool.directorate,
             stage: newSchool.stage,
@@ -1406,6 +1408,7 @@ export default function SuperAdminDashboard() {
       const schoolRef = await addDoc(collection(db, "schools"), {
         name: newSchool.name,
         address: newSchool.address,
+        googleMapsUrl: newSchool.googleMapsUrl,
         governorate: newSchool.governorate,
         directorate: newSchool.directorate,
         stage: newSchool.stage,
@@ -2419,6 +2422,7 @@ export default function SuperAdminDashboard() {
                                           setNewSchool({
                                             name: school.name,
                                             address: school.address,
+                                            googleMapsUrl: school.googleMapsUrl || "",
                                             governorate:
                                               school.governorate || "",
                                             directorate:
@@ -4884,6 +4888,30 @@ export default function SuperAdminDashboard() {
                           }
                           className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all"
                           placeholder="تكملة العنوان"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        رابط الموقع الجغرافي للمدرسة (Google Maps)
+                      </label>
+                      <div className="relative">
+                        <MapPin
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <input
+                          type="url"
+                          value={newSchool.googleMapsUrl}
+                          onChange={(e) =>
+                            setNewSchool({
+                              ...newSchool,
+                              googleMapsUrl: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-mono"
+                          placeholder="https://maps.google.com/..."
                         />
                       </div>
                     </div>

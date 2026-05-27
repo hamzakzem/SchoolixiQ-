@@ -20,21 +20,40 @@ service firebase.storage {
     // 4. Schools: Admins can manage school-related images (logos, etc.)
     match /schools/{schoolId}/{allPaths=**} {
       allow read: if isSignedIn();
-      // Only school admin or super admin can write
-      // Note: We don't have access to Firestore in Storage rules directly without cross-service rules (limited support)
-      // For now, allow signed-in users for prototype or refine with more logic
-      allow write: if isSignedIn();
+      allow write: if isSignedIn() && (
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId == schoolId || 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
+      );
     }
 
     // 5. Students: Teachers and Admins can manage student photos
+    match /students/{schoolId}/{studentId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId == schoolId || 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
+      );
+    }
+    
+    // Legacy generic path
     match /students/{studentId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn(); 
+      allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
+    }
+
+    // Attachments
+    match /chat_attachments/{messageId}/{allPaths=**} {
+       allow read, write: if isSignedIn();
+    }
+    
+    match /market/{itemId}/{allPaths=**} {
+       allow read: if isSignedIn();
+       allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
     }
 
     match /system/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
     }
   }
 }

@@ -21,6 +21,13 @@ service cloud.firestore {
         : null;
     }
 
+    function isSchoolActive(schoolId) {
+      let schoolDoc = exists(/databases/$(database)/documents/schools/$(schoolId)) 
+          ? get(/databases/$(database)/documents/schools/$(schoolId)).data 
+          : null;
+      return schoolDoc != null && schoolDoc.get('status', '') == 'active';
+    }
+    
     function hasRoleIn(roles) {
       let data = getUserData();
       return data != null && ('role' in data) && data.role in roles;
@@ -185,7 +192,7 @@ service cloud.firestore {
         // Allow searching for a student while restricting bulk scraping
         (request.query.limit <= 1)
       );
-      allow write: if isSuperAdmin() || (isSignedIn() && isStaffWithPerm(request.resource.data.get('schoolId', ''), 'students_edit')) || (
+      allow write: if isSuperAdmin() || (isSchoolActive(request.resource.data.get('schoolId', '')) && (isSignedIn() && isStaffWithPerm(request.resource.data.get('schoolId', ''), 'students_edit'))) || (
         isSignedIn() && 
         getUserEmail() == resource.data.get('parentEmail', '')
       ) || isParentOf(id);
@@ -205,9 +212,9 @@ service cloud.firestore {
         request.auth.uid in resource.data.get('parentIds', []) ||
         (getUserEmail() == resource.data.get('parentEmail', ''))
       );
-      allow create: if isSuperAdmin() || (isSignedIn() && isSchoolStaff(request.resource.data.get('schoolId', '')));
-      allow update: if isSuperAdmin() || (isSignedIn() && isSchoolStaff(resource.data.get('schoolId', '')) && isSchoolStaff(request.resource.data.get('schoolId', '')));
-      allow delete: if isSuperAdmin() || (isSignedIn() && isSchoolStaff(resource.data.get('schoolId', '')));
+      allow create: if isSuperAdmin() || (isSchoolActive(request.resource.data.get('schoolId', '')) && isSignedIn() && isSchoolStaff(request.resource.data.get('schoolId', '')));
+      allow update: if isSuperAdmin() || (isSchoolActive(request.resource.data.get('schoolId', '')) && isSignedIn() && isSchoolStaff(resource.data.get('schoolId', '')) && isSchoolStaff(request.resource.data.get('schoolId', '')));
+      allow delete: if isSuperAdmin() || (isSchoolActive(resource.data.get('schoolId', '')) && isSignedIn() && isSchoolStaff(resource.data.get('schoolId', '')));
     }
 
     match /attendance/{id} {
@@ -253,7 +260,7 @@ service cloud.firestore {
           resource.data.get('targetParentId', '') == request.auth.uid
         ))
       );
-      allow write: if isSuperAdmin() || (isSignedIn() && isSchoolStaff(request.resource.data.get('schoolId', '')));
+      allow write: if isSuperAdmin() || (isSchoolActive(request.resource.data.get('schoolId', '')) && isSignedIn() && isSchoolStaff(request.resource.data.get('schoolId', '')));
     }
 
     match /payments/{id} {

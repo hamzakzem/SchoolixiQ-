@@ -1,5 +1,38 @@
+import { Capacitor } from '@capacitor/core';
+import { savePdf } from './pdfUtils';
+
 export function printElement(element: HTMLElement | null, title: string = 'طباعة') {
-  if (!element) return;
+  if (!element) return false;
+
+  if (Capacitor.isNativePlatform()) {
+     // Run async PDF generation in background for native
+     (async () => {
+       try {
+         const { toPng } = await import('html-to-image');
+         const { default: jsPDF } = await import('jspdf');
+         
+         const dataUrl = await toPng(element, {
+            cacheBust: true,
+            style: { background: "white" },
+            pixelRatio: 2,
+         });
+         
+         const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+         const imgProps = pdf.getImageProperties(dataUrl);
+         const pdfWidth = pdf.internal.pageSize.getWidth();
+         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+         
+         pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
+         const dataUriString = pdf.output('datauristring');
+         
+         const safeTitle = title.replace(/[^a-zA-Z0-9\u0600-\u06FF]/gi, '_');
+         await savePdf(dataUriString, `${safeTitle}.pdf`);
+       } catch (err) {
+         console.error('Native print/pdf failure:', err);
+       }
+     })();
+     return true;
+  }
 
   const printWindow = window.open('', '_blank');
   if (!printWindow) {

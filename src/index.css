@@ -22,14 +22,150 @@
 }
 
 @layer base {
+  :root {
+    --chart-grid: #f1f5f9;
+    --chart-text: #64748b;
+    --chart-tooltip-bg: #ffffff;
+    --chart-tooltip-border: #e2e8f0;
+    --chart-tooltip-text: #0f172a;
+    --chart-cursor: #f8fafc;
+  }
   html.dark {
     color-scheme: dark;
+    --chart-grid: #1e293b;
+    --chart-text: #94a3b8;
+    --chart-tooltip-bg: #0f172a;
+    --chart-tooltip-border: #334155;
+    --chart-tooltip-text: #f1f5f9;
+    --chart-cursor: #1e293b;
   }
   body {
     @apply font-sans text-slate-900 bg-slate-50 transition-colors duration-300;
   }
   .dark body {
     @apply text-slate-100 bg-slate-950;
+  }
+}
+
+/* Custom Dark Mode Visual Polish */
+.dark {
+  /* Tables and Cards background overrides */
+  & .bg-white:not(.bg-white-keep):not(.student-card-print):not(.print-card) {
+    background-color: #111827 !important; /* smooth deep slate-900 */
+  }
+  
+  & .bg-slate-50:not(.bg-white-keep), 
+  & .bg-slate-50\/50:not(.bg-white-keep), 
+  & .bg-slate-50\/80:not(.bg-white-keep) {
+    background-color: #1f2937 !important; /* smooth slate-800 */
+  }
+
+  & .bg-slate-100:not(.bg-white-keep) {
+    background-color: #1f2937 !important;
+  }
+  
+  & .border-slate-200, 
+  & .border-slate-100, 
+  & .border-slate-150 {
+    border-color: #374151 !important; /* smooth slate-750 */
+  }
+
+  & .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  & .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #374151 !important;
+  }
+
+  /* Table head modifications */
+  & thead tr {
+    background-color: #1f2937 !important;
+    border-bottom: 2px solid #374151 !important;
+  }
+
+  & thead th {
+    color: #9ca3af !important; /* clear secondary text */
+  }
+
+  /* Hovers on tables and list elements */
+  & .hover\:bg-slate-50\/50:hover, 
+  & .hover\:bg-slate-50:hover {
+    background-color: #1f2937 !important;
+  }
+
+  /* Text elements */
+  & .text-slate-900, 
+  & .text-slate-800, 
+  & .text-slate-700 {
+    color: #f3f4f6 !important; /* bright white/slate */
+  }
+
+  & .text-slate-600, 
+  & .text-slate-500 {
+    color: #9cb3af !important; /* comfortable secondary text */
+  }
+
+  /* Status Badges Dark Theme Polish */
+  & .bg-emerald-50 {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #34d399 !important;
+    border-color: rgba(16, 185, 129, 0.2) !important;
+  }
+  & .text-emerald-600 {
+    color: #34d399 !important;
+  }
+
+  & .bg-rose-50 {
+    background-color: rgba(244, 63, 94, 0.15) !important;
+    color: #fb7185 !important;
+    border-color: rgba(244, 63, 94, 0.2) !important;
+  }
+  & .text-rose-600 {
+    color: #fb7185 !important;
+  }
+
+  & .bg-amber-50 {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+    border-color: rgba(245, 158, 11, 0.2) !important;
+  }
+  & .text-amber-600 {
+    color: #fbbf24 !important;
+  }
+
+  & .bg-indigo-50 {
+    background-color: rgba(99, 102, 241, 0.15) !important;
+    color: #818cf8 !important;
+    border-color: rgba(99, 102, 241, 0.2) !important;
+  }
+  & .text-indigo-600 {
+    color: #818cf8 !important;
+  }
+
+  & .bg-blue-50 {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    color: #60a5fa !important;
+    border-color: rgba(59, 130, 246, 0.2) !important;
+  }
+  & .text-blue-600 {
+    color: #60a5fa !important;
+  }
+
+  /* Input fields, select dialogs, textareas */
+  & input:not([type="checkbox"]):not([type="radio"]), 
+  & select, 
+  & textarea {
+    background-color: #111827 !important;
+    border-color: #374151 !important;
+    color: #f3f4f6 !important;
+  }
+  
+  & input::placeholder, 
+  & textarea::placeholder {
+    color: #6b7280 !important;
+  }
+
+  & select option {
+    background-color: #111827 !important;
+    color: #f3f4f6 !important;
   }
 }
 

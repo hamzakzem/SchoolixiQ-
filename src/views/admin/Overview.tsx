@@ -3,7 +3,7 @@ import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, getCountFromServer, getAggregateFromServer, sum, limit, orderBy } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { useAuth } from '../../lib/AuthContext';
-import { Users, UserRound, BookOpen, Wallet, ShoppingBag, Trash2, Settings2 } from 'lucide-react';
+import { Users, UserRound, BookOpen, Wallet, ShoppingBag, Trash2, Settings2, MapPin, ExternalLink, Edit2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
@@ -40,17 +40,26 @@ export default function Overview() {
   const [tuitionAdjustValue, setTuitionAdjustValue] = useState(0);
   const [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([]);
 
+  const [schoolInfo, setSchoolInfo] = useState<any>(null);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [newAddress, setNewAddress] = useState('');
+  const [newMapsUrl, setNewMapsUrl] = useState('');
+  const [savingLocation, setSavingLocation] = useState(false);
+
   useEffect(() => {
     if (!profile?.schoolId) return;
 
     const fetchData = async () => {
       if (!profile?.schoolId) return;
 
-      // Fetch school adjustment (realtime is fine for this single document)
+      // Fetch school adjustment and base info (realtime is fine for this single document)
       const schoolRef = doc(db, 'schools', profile.schoolId);
       const unsubscribeSchool = onSnapshot(schoolRef, (doc) => {
         if (doc.exists()) {
           const data = doc.data();
+          setSchoolInfo({ id: doc.id, ...data });
+          setNewAddress(data.address || '');
+          setNewMapsUrl(data.googleMapsUrl || '');
           setStats(prev => ({ 
             ...prev, 
             adjustment: data.salesAdjustment || 0,
@@ -113,6 +122,23 @@ export default function Overview() {
       });
     };
   }, [profile]);
+
+  const handleSaveLocation = async () => {
+    if (!profile?.schoolId) return;
+    setSavingLocation(true);
+    try {
+      await updateDoc(doc(db, 'schools', profile.schoolId), {
+        address: newAddress.trim(),
+        googleMapsUrl: newMapsUrl.trim()
+      });
+      setShowLocationModal(false);
+      toast.success(isRtl ? 'تم تحديث مدرسة والعنوان والموقع بنجاح' : 'Location details updated successfully');
+    } catch (err) {
+      toast.error(isRtl ? 'فشل تحديث معلومات الموقع' : 'Failed to update location details');
+    } finally {
+      setSavingLocation(false);
+    }
+  };
 
   const handleUpdateAdjustment = async () => {
     if (!profile?.schoolId) return;
@@ -198,6 +224,63 @@ export default function Overview() {
           }}
         />
       </div>
+
+      {schoolInfo && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-850 shadow-sm transition-colors flex flex-col md:flex-row items-center justify-between gap-6"
+        >
+          <div className="flex items-start gap-4 w-full md:w-auto">
+            <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/30 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 border border-indigo-100 dark:border-indigo-900/40 shadow-sm">
+              <MapPin size={28} className="animate-pulse" />
+            </div>
+            <div>
+              <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{isRtl ? 'تفاصيل عنوان وموقع المدرسة' : 'School Address & Location Details'}</p>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-1 font-display">{schoolInfo.name}</h3>
+              <div className="mt-2.5 space-y-1.5 text-sm">
+                <p className="text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                  <span className="font-mono font-bold text-slate-400">{isRtl ? 'العنوان المدرسي:' : 'School Address:'}</span> 
+                  <span className="font-bold">{schoolInfo.address || (isRtl ? 'غير محدد بعد' : 'Not specified yet')}</span>
+                </p>
+                {schoolInfo.googleMapsUrl ? (
+                  <p className="text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-slate-400">{isRtl ? 'رابط الموقع الجغرافي:' : 'Geographical Location:'}</span> 
+                    <a href={schoolInfo.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1 font-bold">
+                      {isRtl ? 'عرض الخريطة' : 'View Map'}
+                      <ExternalLink size={12} />
+                    </a>
+                  </p>
+                ) : (
+                  <p className="text-amber-600 dark:text-amber-400 font-bold text-xs">
+                    * {isRtl ? 'لم يتم ربط الموقع الخريطة التفصيلي بعد' : 'Detailed Map is not linked yet'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3 w-full md:w-auto shrink-0 self-end md:self-center justify-end">
+            <button
+              onClick={() => setShowLocationModal(true)}
+              className="px-5 py-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 cursor-pointer shadow-sm"
+            >
+              <Edit2 size={14} />
+              <span>{isRtl ? 'تحديث الموقع واللوكيشن' : 'Update Location & Address'}</span>
+            </button>
+            {schoolInfo.googleMapsUrl && (
+              <a
+                href={schoolInfo.googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 shadow-lg shadow-indigo-600/10"
+              >
+                <MapPin size={14} />
+                <span>{isRtl ? 'الذهاب للعنوان' : 'Navigate To Map'}</span>
+              </a>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       <AnimatePresence>
         {showAdjustModal && (
@@ -323,6 +406,72 @@ export default function Overview() {
             </motion.div>
           </div>
         )}
+
+        {showLocationModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" dir="rtl">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 relative"
+            >
+              <div className="flex items-center gap-4 mb-6 text-indigo-600 dark:text-indigo-400">
+                <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center border border-indigo-100 dark:border-indigo-900/30">
+                  <MapPin size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">{isRtl ? 'تحديث الموقع الجغرافي والعنوان' : 'Update Location & Address'}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
+                    {schoolInfo?.name}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">{isRtl ? 'العنوان المدرسي التفصيلي' : 'School Detailed Address'}</label>
+                  <input 
+                    type="text"
+                    value={newAddress}
+                    onChange={(e) => setNewAddress(e.target.value)}
+                    placeholder={isRtl ? 'مثال: بغداد، الكرادة، قرب ساحة التحري' : 'e.g. Baghdad, Karrada'}
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">{isRtl ? 'رابط الموقع الجغرافي (Google Maps Link)' : 'Google Maps Location URL'}</label>
+                  <input 
+                    type="url"
+                    value={newMapsUrl}
+                    onChange={(e) => setNewMapsUrl(e.target.value)}
+                    placeholder="https://maps.google.com/..."
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none font-bold font-mono text-xs text-slate-900 dark:text-white"
+                  />
+                  <p className="mt-1.5 text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed font-bold px-1">
+                    * {isRtl ? 'انسخ الرابط التفصيلي من خرائط جوجل والصقه هنا.' : 'Copy the detailed share link from google maps and paste here.'}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 mt-6">
+                  <button 
+                    onClick={handleSaveLocation}
+                    disabled={savingLocation}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/10 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {savingLocation ? (isRtl ? 'جاري الحفظ...' : 'Saving...') : (isRtl ? 'حفظ التغييرات ومزامنتها' : 'Save & Sync Changes')}
+                  </button>
+                  <button 
+                    onClick={() => setShowLocationModal(false)}
+                    className="w-full py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-bold transition-all active:scale-95 cursor-pointer"
+                  >
+                    {isRtl ? 'إلغاء' : 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -331,23 +480,33 @@ export default function Overview() {
           <div className="h-[300px] w-full" style={{ minWidth: 0 }}>
             <ResponsiveContainer width="99%" height="100%">
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
                 <XAxis 
                   dataKey="name" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} 
+                  tick={{ fontSize: 11, fill: 'var(--chart-text)', fontWeight: 600 }} 
                 />
                 <YAxis 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fontSize: 11, fill: '#94a3b8' }} 
+                  tick={{ fontSize: 11, fill: 'var(--chart-text)' }} 
                 />
                 <Tooltip 
-                   contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', direction: isRtl ? 'rtl' : 'ltr', padding: '12px' }}
-                   cursor={{ fill: '#f8fafc' }}
+                   contentStyle={{ 
+                     borderRadius: '20px', 
+                     border: '1px solid var(--chart-tooltip-border)', 
+                     backgroundColor: 'var(--chart-tooltip-bg)',
+                     color: 'var(--chart-tooltip-text)',
+                     boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.15)', 
+                     direction: isRtl ? 'rtl' : 'ltr', 
+                     padding: '12px' 
+                   }}
+                   itemStyle={{ color: 'var(--chart-tooltip-text)' }}
+                   labelStyle={{ color: 'var(--chart-text)', fontWeight: 'bold' }}
+                   cursor={{ fill: 'var(--chart-cursor)' }}
                 />
-                <Bar dataKey="attendance" fill="#2563eb" radius={[12, 12, 0, 0]} barSize={40} />
+                <Bar dataKey="attendance" fill="#3b82f6" radius={[12, 12, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>

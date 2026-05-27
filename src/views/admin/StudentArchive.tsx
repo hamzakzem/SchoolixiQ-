@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Capacitor } from '@capacitor/core';
 import { db } from "../../lib/firebase";
 import {
   collection,
@@ -323,8 +324,16 @@ export default function StudentArchive() {
           const pdfWidth = pdf.internal.pageSize.getWidth();
           const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
+          const { savePdf } = await import("../../lib/pdfUtils");
           pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
-          pdf.save(`أرشيف_${selectedStudent.name}_${currentMonthYear}.pdf`);
+          const pdfFileName = `أرشيف_${selectedStudent.name}_${currentMonthYear}.pdf`;
+          
+          if (Capacitor.isNativePlatform()) {
+             const dataUriString = pdf.output('datauristring');
+             await savePdf(dataUriString, pdfFileName);
+          } else {
+             pdf.save(pdfFileName);
+          }
         }
       } catch (pdfError) {
         console.error("PDF Generation failed:", pdfError);
@@ -502,11 +511,24 @@ export default function StudentArchive() {
                       const pdfHeight =
                         (imgProps.height * pdfWidth) / imgProps.width;
 
+                      const { savePdf } = await import("../../lib/pdfUtils");
                       pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
-                      pdf.save(`أرشيف_${selectedStudent?.name || "طالب"}.pdf`);
-                      toast.success("تم تنزيل ملف الـ PDF بنجاح", {
-                        id: "pdf-toast",
-                      });
+                      const pdfFileName = `أرشيف_${selectedStudent?.name || "طالب"}.pdf`;
+
+                      if (Capacitor.isNativePlatform()) {
+                        const dataUriString = pdf.output('datauristring');
+                        const ok = await savePdf(dataUriString, pdfFileName);
+                        if (ok) {
+                          toast.success("تم تنزيل وتخزين ملف الـ PDF بنجاح في المستندات", {
+                            id: "pdf-toast",
+                          });
+                        }
+                      } else {
+                        pdf.save(pdfFileName);
+                        toast.success("تم تنزيل ملف الـ PDF بنجاح", {
+                          id: "pdf-toast",
+                        });
+                      }
                     } catch (e) {
                       console.error("PDF generation error: ", e);
                       toast.error("حدث خطأ أثناء تنزيل الملف", {

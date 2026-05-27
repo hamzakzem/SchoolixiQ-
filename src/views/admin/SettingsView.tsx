@@ -42,6 +42,7 @@ export default function SettingsView() {
   const [formData, setFormData] = useState({
     name: '',
     address: '',
+    googleMapsUrl: '',
     showSubscriptionTimer: true,
     notificationsEnabled: true,
     logoUrl: '',
@@ -54,11 +55,12 @@ export default function SettingsView() {
       try {
         const snap = await getDoc(doc(db, 'schools', profile.schoolId));
         if (snap.exists()) {
-          const data = snap.data() as School;
+          const data = snap.data() as any;
           setSchoolData(data);
           setFormData({
             name: data.name || '',
             address: data.address || '',
+            googleMapsUrl: data.googleMapsUrl || '',
             logoUrl: data.logoUrl || '',
             showSubscriptionTimer: data.showSubscriptionTimer !== false,
             notificationsEnabled: data.notificationsEnabled !== false,
@@ -138,6 +140,7 @@ export default function SettingsView() {
       await updateDoc(doc(db, 'schools', profile.schoolId), {
         name: formData.name,
         address: formData.address,
+        googleMapsUrl: formData.googleMapsUrl,
         logoUrl: formData.logoUrl,
         showSubscriptionTimer: formData.showSubscriptionTimer,
         notificationsEnabled: formData.notificationsEnabled,
@@ -238,6 +241,22 @@ export default function SettingsView() {
                     className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2.5 px-1">رابط الموقع التفصيلي للمدرسة (Google Maps)</label>
+                <div className="relative">
+                  <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="url"
+                    value={formData.googleMapsUrl}
+                    onChange={e => setFormData({ ...formData, googleMapsUrl: e.target.value })}
+                    placeholder="https://maps.google.com/..."
+                    className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold font-mono"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-slate-400 dark:text-slate-500 font-bold">
+                  * ضع رابط الخريطة التفصيلي لموقع المدرسة هنا لتسهيل عثور أولياء الأمور وتوجيههم للمدرسة من حسابهم الشخصي.
+                </p>
               </div>
             </div>
           </section>
