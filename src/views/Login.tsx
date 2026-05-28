@@ -1410,7 +1410,11 @@ export default function Login() {
                 </ul>
 
                 <button
-                  onClick={() => setShowSubscriptionModal(pkg)}
+                  onClick={() => {
+                    setMode("signup");
+                    setPendingRole("admin");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                   className={`w-full py-4 rounded-2xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                 >
                   {t("subscribeNow")}

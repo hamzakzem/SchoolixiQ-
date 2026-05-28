@@ -680,7 +680,7 @@ async function startServer() {
         });
       } catch (ignore) {}
     } catch (err: any) {
-      console.error(`Failed to send email to ${adminEmail} via SMTP:`, err.message);
+      console.warn(`[SMTP Warning] Failed to send email to ${adminEmail}: ${err.message}. Check your email/password config (use Google App Passwords for Gmail).`);
       
       // Log as failed with error details so they can troubleshoot SMTP config
       try {

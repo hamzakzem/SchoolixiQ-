@@ -2128,6 +2128,7 @@ export default function SuperAdminDashboard() {
                       value={users.length}
                       hint="نشط للآن"
                       color="text-indigo-600"
+                      onClick={() => navigateToTab("users")}
                     />
                   </div>
 
@@ -2921,7 +2922,7 @@ export default function SuperAdminDashboard() {
                           </div>
                         </div>
                         <ul className="space-y-3 mb-8 flex-1">
-                          {pkg.features?.map((f: string, i: number) => (
+                          {(Array.isArray(pkg.features) ? pkg.features : typeof pkg.features === 'string' ? pkg.features.split(',').map((f:any)=>f.trim()).filter((f:any)=>f) : []).map((f: string, i: number) => (
                             <li
                               key={i}
                               className="flex items-center gap-2 text-sm text-slate-600"
@@ -3512,6 +3513,7 @@ export default function SuperAdminDashboard() {
                             <>
                               <th className="px-6 py-4">المدرسة المشترك بها</th>
                               <th className="px-6 py-4">الطلاب المرتبطين</th>
+                              <th className="px-6 py-4 text-center">الإجراءات</th>
                             </>
                           )}
                         </tr>
@@ -3668,6 +3670,58 @@ export default function SuperAdminDashboard() {
                                         )}
                                       </div>
                                     </td>
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center justify-center gap-2">
+                                        {userDeleteConfirmId === user.id ? (
+                                          <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
+                                            <button
+                                              onClick={() =>
+                                                handleDeleteUser(user.id)
+                                              }
+                                              className="px-4 py-2 bg-red-600 text-white text-[9px] font-black rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20"
+                                            >
+                                              تأكيد الحذف
+                                            </button>
+                                            <button
+                                              onClick={() =>
+                                                setUserDeleteConfirmId(null)
+                                              }
+                                              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                                            >
+                                              إلغاء
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <button
+                                              onClick={() => {
+                                                setEditingUser(user);
+                                                setNewUser({
+                                                  name: user.name,
+                                                  email: user.email,
+                                                  role: user.role,
+                                                  schoolId: user.schoolId || "",
+                                                });
+                                                setShowUserModal(true);
+                                              }}
+                                              className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/30"
+                                              title="تعديل المستخدم"
+                                            >
+                                              <SettingsIcon size={16} />
+                                            </button>
+                                            <button
+                                              onClick={() =>
+                                                setUserDeleteConfirmId(user.id)
+                                              }
+                                              className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-red-100 dark:hover:border-red-900/20"
+                                              title="حذف المستخدم"
+                                            >
+                                              <Trash2 size={16} />
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
                                   </>
                                 )}
                               </tr>
@@ -3697,6 +3751,7 @@ export default function SuperAdminDashboard() {
                           <th className="px-6 py-4">ولي الأمر</th>
                           <th className="px-6 py-4">المدرسة المشتركة</th>
                           <th className="px-6 py-4">الطلاب المرتبطين</th>
+                          <th className="px-6 py-4 text-center">الإجراءات</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -3764,6 +3819,58 @@ export default function SuperAdminDashboard() {
                                     )}
                                   </div>
                                 </td>
+                                <td className="px-6 py-4">
+                                    <div className="flex items-center justify-center gap-2">
+                                      {userDeleteConfirmId === user.id ? (
+                                        <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
+                                          <button
+                                            onClick={() =>
+                                              handleDeleteUser(user.id)
+                                            }
+                                            className="px-4 py-2 bg-red-600 text-white text-[9px] font-black rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20"
+                                          >
+                                            تأكيد الحذف
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              setUserDeleteConfirmId(null)
+                                            }
+                                            className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                                          >
+                                            إلغاء
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              setEditingUser(user);
+                                              setNewUser({
+                                                name: user.name,
+                                                email: user.email,
+                                                role: user.role,
+                                                schoolId: user.schoolId || "",
+                                              });
+                                              setShowUserModal(true);
+                                            }}
+                                            className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/30"
+                                            title="تعديل المستخدم"
+                                          >
+                                            <SettingsIcon size={16} />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              setUserDeleteConfirmId(user.id)
+                                            }
+                                            className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-red-100 dark:hover:border-red-900/20"
+                                            title="حذف المستخدم"
+                                          >
+                                            <Trash2 size={16} />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                </td>
                               </tr>
                             );
                           })}
@@ -3771,7 +3878,7 @@ export default function SuperAdminDashboard() {
                           0 && (
                           <tr>
                             <td
-                              colSpan={3}
+                              colSpan={4}
                               className="px-6 py-10 text-center text-slate-400 italic"
                             >
                               لا يوجد أولياء أمور مسجلين حالياً
@@ -5873,9 +5980,12 @@ function PasswordCell({ password }: { password?: string }) {
   );
 }
 
-function AdminStatCard({ title, value, hint, color }: any) {
+function AdminStatCard({ title, value, hint, color, onClick }: any) {
   return (
-    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between transition-colors">
+    <div 
+      onClick={onClick}
+      className={`bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between transition-all ${onClick ? "cursor-pointer hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 hover:-translate-y-1 active:scale-95" : ""}`}
+    >
       <p className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">
         {title}
       </p>
