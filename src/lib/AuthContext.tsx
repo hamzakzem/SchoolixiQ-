@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from './firestore-errors';
+import { useLanguage } from './LanguageContext';
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +38,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [schoolData, setSchoolData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const lastUserIdRef = useRef<string | null>(null);
+  
+  const { language, setLanguage } = useLanguage();
+  const languageRef = useRef(language);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
 
   useEffect(() => {
     // Basic connection test as per skill guidelines
@@ -88,6 +96,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         unsubscribeProfile = onSnapshot(docRef, async (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data() as any;
+            
+            // Sync user language from firestore database, or save local default
+            if (data.language && data.language !== languageRef.current) {
+              setLanguage(data.language);
+            } else if (!data.language && languageRef.current) {
+              try {
+                await updateDoc(docRef, { language: languageRef.current });
+              } catch (e) {
+                console.warn('Failed to save default user language to database:', e);
+              }
+            }
+
             const tokenResult = await authUser.getIdTokenResult();
             const claims = tokenResult.claims as any;
             

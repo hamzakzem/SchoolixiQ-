@@ -178,20 +178,20 @@ export default function AdminDashboard() {
 
   const menuItems = [
     { id: "overview", label: t("overview"), icon: LayoutDashboard },
-    { id: "chat", label: t("chat") || "الدردشة", icon: MessageSquare },
+    { id: "chat", label: t("chat") || (isRtl ? "الدردشة" : "Chat"), icon: MessageSquare },
     { id: "students", label: t("viewStudents"), icon: Users },
     { id: "students_edit", label: t("manageStudents"), icon: Users },
     { id: "staff", label: t("manageStaff"), icon: UserRound },
     { id: "attendance", label: t("attendance"), icon: ClipboardCheck },
     { id: "grades", label: t("grades"), icon: BarChart3 },
-    { id: "student_archive", label: "أرشيف الطالب", icon: FileArchive },
+    { id: "student_archive", label: isRtl ? "أرشيف الطالب" : "Student Archive", icon: FileArchive },
     { id: "tuition", label: t("tuition"), icon: Wallet },
     { id: "payroll", label: t("payroll"), icon: Wallet },
     { id: "inventory", label: t("inventory"), icon: Package },
     { id: "behavior", label: t("behavior"), icon: MessageSquare },
     { id: "evaluation_reports", label: t("evaluations"), icon: ClipboardCheck },
     { id: "homework", label: t("homework"), icon: Calendar },
-    { id: "classes", label: t("classes") || "الصفوف", icon: Building },
+    { id: "classes", label: t("classes") || (isRtl ? "الصفوف" : "Classes"), icon: Building },
     { id: "schedules", label: t("schedules"), icon: Calendar },
     { id: "announcements", label: t("announcements"), icon: MessageSquare },
     { id: "parents", label: t("parentApp"), icon: Users },
@@ -862,38 +862,38 @@ export default function AdminDashboard() {
   if (profile?.role === "admin" && !profile.schoolId) {
     return (
       <div
-        className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-12 px-4 md:px-6 font-sans overflow-y-auto"
-        dir="rtl"
+        className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center py-12 px-4 md:px-6 font-sans overflow-y-auto transition-colors duration-300"
+        dir={isRtl ? "rtl" : "ltr"}
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-12 shadow-2xl w-full max-w-xl border border-slate-100 my-auto"
+          className="bg-white dark:bg-slate-900 rounded-[2rem] md:rounded-[3rem] p-6 md:p-12 shadow-2xl w-full max-w-xl border border-slate-100 dark:border-slate-800/80 my-auto"
         >
-          <div className="flex justify-between items-start mb-8">
-            <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600">
+          <div className="flex justify-between items-start mb-8 gap-4">
+            <div className="bg-blue-50 dark:bg-blue-950/40 w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 shadow-sm shrink-0">
               <Building size={32} />
             </div>
             <button
               type="button"
               onClick={() => signOut(auth)}
-              className="px-4 py-2 bg-slate-100 text-slate-600 hover:text-red-600 hover:bg-slate-200 transition-all rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-200"
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-200 dark:border-slate-700 cursor-pointer"
             >
               <LogOut size={14} />
-              تسجيل الخروج
+              {isRtl ? "تسجيل الخروج" : "Logout"}
             </button>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            إعداد سجل المدرسة
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2 leading-none">
+            {isRtl ? "إعداد سجل المدرسة" : "Configure School Record"}
           </h1>
-          <p className="text-slate-500 mb-10 italic">
-            أهلاً بك كمدير جديد. يرجى إدخال بيانات مدرستك للبدء.
+          <p className="text-slate-500 dark:text-slate-400 mb-10 italic text-sm font-semibold">
+            {isRtl ? "أهلاً بك كمدير جديد. يرجى إدخال بيانات مدرستك للبدء." : "Welcome as a school administrator. Please input your school statistics to get started."}
           </p>
 
           <form onSubmit={handleSetupSchool} className="space-y-6">
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                اسم المؤسسة التعليمة
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">
+                {isRtl ? "اسم المؤسسة التعليمة" : "School or Institution Name"}
               </label>
               <input
                 required
@@ -902,13 +902,13 @@ export default function AdminDashboard() {
                 onChange={(e) =>
                   setSchoolSetup({ ...schoolSetup, name: e.target.value })
                 }
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
-                placeholder="اسم المدرسة..."
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30 dark:text-white focus:bg-white dark:focus:bg-slate-900 transition-all outline-none focus:border-slate-900 dark:focus:border-indigo-500 font-bold text-sm"
+                placeholder={isRtl ? "اسم المدرسة..." : "Enter school name..."}
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                المحافظة
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">
+                {isRtl ? "المحافظة" : "Governorate"}
               </label>
               <select
                 required
@@ -919,35 +919,35 @@ export default function AdminDashboard() {
                     governorate: e.target.value,
                   })
                 }
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30 dark:text-white focus:bg-white dark:focus:bg-slate-900 transition-all outline-none focus:border-slate-900 dark:focus:border-indigo-500 font-bold text-sm"
               >
                 <option value="" disabled>
-                  اختر المحافظة...
+                  {isRtl ? "اختر المحافظة..." : "Select Governorate..."}
                 </option>
-                <option value="بغداد">بغداد</option>
-                <option value="البصرة">البصرة</option>
-                <option value="نينوى">نينوى</option>
-                <option value="أربيل">أربيل</option>
-                <option value="النجف">النجف</option>
-                <option value="ذي قار">ذي قار</option>
-                <option value="كركوك">كركوك</option>
-                <option value="الأنبار">الأنبار</option>
-                <option value="ديالى">ديالى</option>
-                <option value="المثنى">المثنى</option>
-                <option value="القادسية">القادسية (الديوانية)</option>
-                <option value="ميسان">ميسان</option>
-                <option value="واسط">واسط</option>
-                <option value="صلاح الدين">صلاح الدين</option>
-                <option value="دهوك">دهوك</option>
-                <option value="السليمانية">السليمانية</option>
-                <option value="بابل">بابل</option>
-                <option value="كربلاء">كربلاء</option>
-                <option value="حلبجة">حلبجة</option>
+                <option value="بغداد">{isRtl ? "بغداد" : "Baghdad"}</option>
+                <option value="البصرة">{isRtl ? "البصرة" : "Basra"}</option>
+                <option value="نينوى">{isRtl ? "نينوى" : "Nineveh"}</option>
+                <option value="أربيل">{isRtl ? "أربيل" : "Erbil"}</option>
+                <option value="النجف">{isRtl ? "النجف" : "Najaf"}</option>
+                <option value="ذي قار">{isRtl ? "ذي قار" : "Dhi Qar"}</option>
+                <option value="كركوك">{isRtl ? "كركوك" : "Kirkuk"}</option>
+                <option value="الأنبار">{isRtl ? "الأنبار" : "Anbar"}</option>
+                <option value="ديالى">{isRtl ? "ديالى" : "Diyala"}</option>
+                <option value="المثنى">{isRtl ? "المثنى" : "Muthanna"}</option>
+                <option value="القادسية">{isRtl ? "القادسية (الديوانية)" : "Qadisiyah (Diwaniyah)"}</option>
+                <option value="ميسان">{isRtl ? "ميسان" : "Maysan"}</option>
+                <option value="واسط">{isRtl ? "واسط" : "Wasit"}</option>
+                <option value="صلاح الدين">{isRtl ? "صلاح الدين" : "Salah al-Din"}</option>
+                <option value="دهوك">{isRtl ? "دهوك" : "Duhok"}</option>
+                <option value="السليمانية">{isRtl ? "السليمانية" : "Sulaymaniyah"}</option>
+                <option value="بابل">{isRtl ? "بابل" : "Babylon"}</option>
+                <option value="كربلاء">{isRtl ? "كربلاء" : "Karbala"}</option>
+                <option value="حلبجة">{isRtl ? "حلبجة" : "Halabja"}</option>
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                المديرية
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">
+                {isRtl ? "المديرية" : "Directorate"}
               </label>
               <select
                 required
@@ -958,33 +958,23 @@ export default function AdminDashboard() {
                     directorate: e.target.value,
                   })
                 }
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30 dark:text-white focus:bg-white dark:focus:bg-slate-900 transition-all outline-none focus:border-slate-900 dark:focus:border-indigo-500 font-bold text-sm"
               >
                 <option value="" disabled>
-                  اختر المديرية...
+                  {isRtl ? "اختر المديرية..." : "Select Directorate..."}
                 </option>
-                <option value="مديرية الكرخ الاولى">مديرية الكرخ الاولى</option>
-                <option value="مديرية الكرخ الثانية">
-                  مديرية الكرخ الثانية
-                </option>
-                <option value="مديرية الكرخ الثالثه">
-                  مديرية الكرخ الثالثه
-                </option>
-                <option value="مديرية الرصافة الاولى">
-                  مديرية الرصافة الاولى
-                </option>
-                <option value="مديرية الرصافة الثانية">
-                  مديرية الرصافة الثانية
-                </option>
-                <option value="مديرية الرصافة الثالثه">
-                  مديرية الرصافة الثالثه
-                </option>
-                <option value="أخرى / مديرية أخرى">أخرى / مديرية أخرى</option>
+                <option value="مديرية الكرخ الاولى">{isRtl ? "مديرية الكرخ الاولى" : "Karkh 1st Directorate"}</option>
+                <option value="مديرية الكرخ الثانية">{isRtl ? "مديرية الكرخ الثانية" : "Karkh 2nd Directorate"}</option>
+                <option value="مديرية الكرخ الثالثه">{isRtl ? "مديرية الكرخ الثالثه" : "Karkh 3rd Directorate"}</option>
+                <option value="مديرية الرصافة الاولى">{isRtl ? "مديرية الرصافة الاولى" : "Rusafa 1st Directorate"}</option>
+                <option value="مديرية الرصافة الثانية">{isRtl ? "مديرية الرصافة الثانية" : "Rusafa 2nd Directorate"}</option>
+                <option value="مديرية الرصافة الثالثه">{isRtl ? "مديرية الرصافة الثالثه" : "Rusafa 3rd Directorate"}</option>
+                <option value="أخرى / مديرية أخرى">{isRtl ? "أخرى / مديرية أخرى" : "Other Directorate"}</option>
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                المرحلة الدراسية
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">
+                {isRtl ? "المرحلة الدراسية" : "School Stage"}
               </label>
               <select
                 required
@@ -992,20 +982,20 @@ export default function AdminDashboard() {
                 onChange={(e) =>
                   setSchoolSetup({ ...schoolSetup, stage: e.target.value })
                 }
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30 dark:text-white focus:bg-white dark:focus:bg-slate-900 transition-all outline-none focus:border-slate-900 dark:focus:border-indigo-500 font-bold text-sm"
               >
                 <option value="" disabled>
-                  اختر المرحلة...
+                  {isRtl ? "اختر المرحلة..." : "Select Stage..."}
                 </option>
-                <option value="روضة">روضة</option>
-                <option value="ابتدائي">ابتدائي</option>
-                <option value="متوسطة">متوسطة</option>
-                <option value="اعدادية">اعدادية</option>
+                <option value="روضة">{isRtl ? "روضة" : "Kindergarten"}</option>
+                <option value="ابتدائي">{isRtl ? "ابتدائي" : "Primary"}</option>
+                <option value="متوسطة">{isRtl ? "متوسطة" : "Middle School"}</option>
+                <option value="اعدادية">{isRtl ? "اعدادية" : "High School"}</option>
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                وقت الدوام
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">
+                {isRtl ? "وقت الدوام" : "School Shift"}
               </label>
               <select
                 required
@@ -1013,19 +1003,19 @@ export default function AdminDashboard() {
                 onChange={(e) =>
                   setSchoolSetup({ ...schoolSetup, shift: e.target.value })
                 }
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30 dark:text-white focus:bg-white dark:focus:bg-slate-900 transition-all outline-none focus:border-slate-900 dark:focus:border-indigo-500 font-bold text-sm"
               >
                 <option value="" disabled>
-                  اختر وقت الدوام...
+                  {isRtl ? "اختر وقت الدوام..." : "Select Shift..."}
                 </option>
-                <option value="صباحي">صباحي</option>
-                <option value="مسائي">مسائي</option>
-                <option value="مدمج">مدمج</option>
+                <option value="صباحي">{isRtl ? "صباحي" : "Morning Shift"}</option>
+                <option value="مسائي">{isRtl ? "مسائي" : "Evening Shift"}</option>
+                <option value="مدمج">{isRtl ? "مدمج" : "Merged/Joint Shift"}</option>
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                نوع الدراسة
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">
+                {isRtl ? "نوع الدراسة" : "Study Gender Type"}
               </label>
               <select
                 required
@@ -1033,19 +1023,19 @@ export default function AdminDashboard() {
                 onChange={(e) =>
                   setSchoolSetup({ ...schoolSetup, genderType: e.target.value })
                 }
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30 dark:text-white focus:bg-white dark:focus:bg-slate-900 transition-all outline-none focus:border-slate-900 dark:focus:border-indigo-500 font-bold text-sm"
               >
                 <option value="" disabled>
-                  اختر نوع الدراسة...
+                  {isRtl ? "اختر نوع الدراسة..." : "Select Type..."}
                 </option>
-                <option value="مختلطة">مختلطة</option>
-                <option value="بنات فقط">بنات فقط</option>
-                <option value="اولاد فقط">اولاد فقط</option>
+                <option value="مختلطة">{isRtl ? "مختلطة" : "Co-educational"}</option>
+                <option value="بنات فقط">{isRtl ? "بنات فقط" : "Girls Only"}</option>
+                <option value="اولاد فقط">{isRtl ? "اولاد فقط" : "Boys Only"}</option>
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                عدد الطلاب التقريبي
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">
+                {isRtl ? "عدد الطلاب التقريبي" : "Approximate Number of Students"}
               </label>
               <input
                 required
@@ -1058,13 +1048,13 @@ export default function AdminDashboard() {
                     approximateStudents: e.target.value,
                   })
                 }
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
-                placeholder="مثال: 500"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30 dark:text-white focus:bg-white dark:focus:bg-slate-900 transition-all outline-none focus:border-slate-900 dark:focus:border-indigo-500 font-bold text-sm"
+                placeholder={isRtl ? "مثال: 500" : "e.g. 500"}
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                الموقع / العنوان (التفصيلي)
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">
+                {isRtl ? "الموقع / العنوان (التفصيلي)" : "Address / Location (Detailed)"}
               </label>
               <input
                 required
@@ -1073,15 +1063,15 @@ export default function AdminDashboard() {
                 onChange={(e) =>
                   setSchoolSetup({ ...schoolSetup, address: e.target.value })
                 }
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white transition-all outline-none focus:border-slate-900 font-bold"
-                placeholder="تكملة العنوان (القضاء - الحي)..."
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30 dark:text-white focus:bg-white dark:focus:bg-slate-900 transition-all outline-none focus:border-slate-900 dark:focus:border-indigo-500 font-bold text-sm"
+                placeholder={isRtl ? "تكملة العنوان (القضاء - الحي)..." : "Address details (District, Neighborhood...)"}
               />
             </div>
             <button
               disabled={isSettingUp}
-              className="w-full py-5 bg-slate-900 text-white rounded-[1.5rem] font-bold text-lg hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50"
+              className="w-full py-5 bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-[1.5rem] font-bold text-lg hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50 cursor-pointer"
             >
-              {isSettingUp ? "جاري الإعداد..." : "حفظ البيانات والبدء"}
+              {isSettingUp ? (isRtl ? "جاري الإعداد..." : "Setting up...") : (isRtl ? "حفظ البيانات والبدء" : "Save Record & Start")}
             </button>
           </form>
         </motion.div>
@@ -1293,7 +1283,7 @@ export default function AdminDashboard() {
                 {!isSidebarCollapsed ? (
                   <div className="bg-slate-800/50 p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] mb-3 md:mb-4 border border-slate-700/50 min-w-0">
                     <p className="text-[9px] text-slate-500 mb-1 uppercase tracking-widest font-bold truncate">
-                      المستخدم النشط
+                      {isRtl ? "المستخدم النشط" : "Active User"}
                     </p>
                     <p className="text-sm font-bold text-white truncate font-display">
                       {profile?.name}
@@ -1309,14 +1299,14 @@ export default function AdminDashboard() {
                 )}
                 <button
                   onClick={() => auth.signOut()}
-                  title={isSidebarCollapsed ? "تسجيل الخروج" : undefined}
+                  title={isSidebarCollapsed ? (isRtl ? "تسجيل الخروج" : "Logout") : undefined}
                   className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3 px-4 md:px-5"} py-3 md:py-4 rounded-xl md:rounded-2xl text-red-400 hover:bg-red-500/10 transition-all font-bold text-sm`}
                 >
                   <LogOut
                     size={isSidebarCollapsed ? 24 : 20}
                     className="shrink-0"
                   />
-                  {!isSidebarCollapsed && <span>تسجيل الخروج</span>}
+                  {!isSidebarCollapsed && <span>{isRtl ? "تسجيل الخروج" : "Logout"}</span>}
                 </button>
               </div>
             </div>

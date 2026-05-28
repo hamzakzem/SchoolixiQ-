@@ -69,6 +69,24 @@ import IdCards from "./admin/IdCards";
 import { useLanguage } from "../lib/LanguageContext";
 import { GlobalFooter } from "../components/GlobalFooter";
 
+export const getGradeTypeLabel = (val: string, isRtl: boolean) => {
+  if (isRtl) return val;
+  switch (val) {
+    case "درجة الشهر الاول": return "First Month Grade (Teacher Only)";
+    case "درجة الشهر الثاني": return "Second Month Grade (Teacher Only)";
+    case "معدل النصف الاول": return "First Half Avg";
+    case "درجة امتحان نصف السنة": return "Midyear Exam Grade";
+    case "درجة الشهر الاول الكورس الثاني": return "First Month Term 2 (Teacher Only)";
+    case "درجة الشهر الثاني الكورس الثاني": return "Second Month Term 2 (Teacher Only)";
+    case "معدل النصف الثاني": return "Second Half Avg";
+    case "معدل السعي السنوي": return "Yearly Effort Avg";
+    case "درجة الامتحان النهائي": return "Final Exam Grade";
+    case "الدرجة النهائية": return "Final Grade";
+    case "النتيجة": return "Final Outcome / Result";
+    default: return val;
+  }
+};
+
 export default function TeacherDashboard() {
   const { profile, schoolData } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
@@ -631,50 +649,50 @@ export default function TeacherDashboard() {
   };
 
   const sidebarItems = [
-    { id: "home", label: "الرئيسية", icon: LayoutDashboard },
+    { id: "home", label: isRtl ? "الرئيسية" : "Home", icon: LayoutDashboard },
     {
       id: "schedules",
-      label: "الجدول الدراسي",
+      label: isRtl ? "الجدول الدراسي" : "Study Schedule",
       icon: Calendar,
       permission: "automated_schedules",
     },
     {
       id: "homework",
-      label: "الالواحب اليومي",
+      label: isRtl ? "الالواحب اليومي" : "Daily Homework",
       icon: BookOpen,
       permission: "homework_and_tasks",
     },
     {
       id: "grades",
-      label: "النتائج والدرجات",
+      label: isRtl ? "النتائج والدرجات" : "Results & Grades",
       icon: Star,
       permission: "exams_and_results",
     },
     {
       id: "behavior",
-      label: "السلوك والطلاب",
+      label: isRtl ? "السلوك والطلاب" : "Behavior & Students",
       icon: Users,
       permission: "behavior_management",
     },
     {
       id: "reports",
-      label: "تقارير التقييم",
+      label: isRtl ? "تقارير التقييم" : "Evaluation Reports",
       icon: FileText,
       permission: "student_evaluation_reports",
     },
     {
       id: "advanced_reports",
-      label: "تقارير متقدمة",
+      label: isRtl ? "تقارير متقدمة" : "Advanced Reports",
       icon: BarChart3,
       permission: "advanced_reports",
     },
     {
       id: "id_cards",
-      label: "هويات الطالب",
+      label: isRtl ? "هويات الطالب" : "Student ID Cards",
       icon: ShieldCheck,
       permission: "id_card_generation",
     },
-    { id: "chat", label: "الدردشة", icon: MessageSquare },
+    { id: "chat", label: isRtl ? "الدردشة" : "Chat", icon: MessageSquare },
   ].filter((item) => {
     if (item.id === "home" || item.id === "chat") return true;
     if (perms && typeof perms === "object" && !Array.isArray(perms)) {
@@ -1583,24 +1601,24 @@ export default function TeacherDashboard() {
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
-                              نوع التقييم
+                              {isRtl ? "نوع التقييم" : "Evaluation Type"}
                             </label>
                             <select
                               value={gradeType}
                               onChange={(e) => setGradeType(e.target.value)}
                               className="w-full px-5 py-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-600/10 font-bold text-slate-900 transition-all appearance-none"
                             >
-                              <option value="درجة الشهر الاول">درجة الشهر الاول (للمعلم فقط)</option>
-                              <option value="درجة الشهر الثاني">درجة الشهر الثاني (للمعلم فقط)</option>
-                              <option value="معدل النصف الاول">معدل النصف الاول</option>
-                              <option value="درجة امتحان نصف السنة">درجة امتحان نصف السنة</option>
-                              <option value="درجة الشهر الاول الكورس الثاني">درجة الشهر الاول الكورس الثاني (للمعلم فقط)</option>
-                              <option value="درجة الشهر الثاني الكورس الثاني">درجة الشهر الثاني الكورس الثاني (للمعلم فقط)</option>
-                              <option value="معدل النصف الثاني">معدل النصف الثاني</option>
-                              <option value="معدل السعي السنوي">معدل السعي السنوي</option>
-                              <option value="درجة الامتحان النهائي">درجة الامتحان النهائي</option>
-                              <option value="الدرجة النهائية">الدرجة النهائية</option>
-                              <option value="النتيجة">النتيجة</option>
+                              <option value="درجة الشهر الاول">{getGradeTypeLabel("درجة الشهر الاول", isRtl)}</option>
+                              <option value="درجة الشهر الثاني">{getGradeTypeLabel("درجة الشهر الثاني", isRtl)}</option>
+                              <option value="معدل النصف الاول">{getGradeTypeLabel("معدل النصف الاول", isRtl)}</option>
+                              <option value="درجة امتحان نصف السنة">{getGradeTypeLabel("درجة امتحان نصف السنة", isRtl)}</option>
+                              <option value="درجة الشهر الاول الكورس الثاني">{getGradeTypeLabel("درجة الشهر الاول الكورس الثاني", isRtl)}</option>
+                              <option value="درجة الشهر الثاني الكورس الثاني">{getGradeTypeLabel("درجة الشهر الثاني الكورس الثاني", isRtl)}</option>
+                              <option value="معدل النصف الثاني">{getGradeTypeLabel("معدل النصف الثاني", isRtl)}</option>
+                              <option value="معدل السعي السنوي">{getGradeTypeLabel("معدل السعي السنوي", isRtl)}</option>
+                              <option value="درجة الامتحان النهائي">{getGradeTypeLabel("درجة الامتحان النهائي", isRtl)}</option>
+                              <option value="الدرجة النهائية">{getGradeTypeLabel("الدرجة النهائية", isRtl)}</option>
+                              <option value="النتيجة">{getGradeTypeLabel("النتيجة", isRtl)}</option>
                             </select>
                           </div>
                           <div>

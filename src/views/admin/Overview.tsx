@@ -3,12 +3,81 @@ import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, getCountFromServer, getAggregateFromServer, sum, limit, orderBy } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { useAuth } from '../../lib/AuthContext';
-import { Users, UserRound, BookOpen, Wallet, ShoppingBag, Trash2, Settings2, MapPin, ExternalLink, Edit2 } from 'lucide-react';
+import { Users, UserRound, BookOpen, Wallet, ShoppingBag, Trash2, Settings2, MapPin, ExternalLink, Edit2, Building2, GraduationCap, Clock, Map } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
 import { useLanguage } from '../../lib/LanguageContext';
+
+const translateSchoolValue = (value: string, isRtl: boolean): string => {
+  if (!value) return isRtl ? 'غير محدد' : 'Not specified';
+  if (isRtl) return value; // keep original Arabic
+
+  const mapping: { [key: string]: string } = {
+    // Stages
+    'روضة': 'Kindergarten',
+    'ابتدائي': 'Primary',
+    'متوسطة': 'Middle School',
+    'اعدادية': 'High School',
+    'ثانوي': 'Secondary School',
+    
+    // Shifts
+    'صباحي': 'Morning Shift',
+    'مسائي': 'Evening Shift',
+    'مزدوج': 'Double Shift',
+    'مدمج': 'Merged Shift',
+    
+    // Gender
+    'مختلطة': 'Co-educational',
+    'بنات فقط': 'Girls Only',
+    'ذكور فقط': 'Boys Only',
+    'بنين فقط': 'Boys Only',
+    'اولاد فقط': 'Boys Only',
+
+    // Governorates
+    'بغداد': 'Baghdad',
+    'البصرة': 'Basra',
+    'نينوى': 'Nineveh',
+    'أربيل': 'Erbil',
+    'النجف': 'Najaf',
+    'ذي قار': 'Dhi Qar',
+    'كركوك': 'Kirkuk',
+    'الأنبار': 'Anbar',
+    'ديالى': 'Diyala',
+    'المثنى': 'Muthanna',
+    'القادسية': 'Qadisiyah',
+    'ميسان': 'Maysan',
+    'واسط': 'Wasit',
+    'صلاح الدين': 'Salah al-Din',
+    'دهوك': 'Duhok',
+    'السليمانية': 'Sulaymaniyah',
+    'بابل': 'Babylon',
+    'كربلاء': 'Karbala',
+    'حلبجة': 'Halabja',
+
+    // Directorates
+    'مديرية الكرخ الاولى': 'Karkh 1st Directorate',
+    'مديرية الكرخ الثانية': 'Karkh 2nd Directorate',
+    'مديرية الكرخ الثالثه': 'Karkh 3rd Directorate',
+    'مديرية الرصافة الاولى': 'Rusafa 1st Directorate',
+    'مديرية الرصافة الثانية': 'Rusafa 2nd Directorate',
+    'مديرية الرصافة الثالثه': 'Rusafa 3rd Directorate',
+    'أخرى / مديرية أخرى': 'Other Directorate',
+  };
+
+  // Check direct fit
+  if (mapping[value]) return mapping[value];
+
+  // Try sub-string replacement for other directorates or patterns
+  for (const [key, val] of Object.entries(mapping)) {
+    if (value.includes(key)) {
+      return value.replace(key, val);
+    }
+  }
+
+  return value;
+};
 
 export default function Overview() {
   const { profile } = useAuth();
@@ -44,6 +113,12 @@ export default function Overview() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [newAddress, setNewAddress] = useState('');
   const [newMapsUrl, setNewMapsUrl] = useState('');
+  const [newGovernorate, setNewGovernorate] = useState('');
+  const [newDirectorate, setNewDirectorate] = useState('');
+  const [newStage, setNewStage] = useState('');
+  const [newShift, setNewShift] = useState('');
+  const [newGenderType, setNewGenderType] = useState('');
+  const [newApproximateStudents, setNewApproximateStudents] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
 
   useEffect(() => {
@@ -60,6 +135,12 @@ export default function Overview() {
           setSchoolInfo({ id: doc.id, ...data });
           setNewAddress(data.address || '');
           setNewMapsUrl(data.googleMapsUrl || '');
+          setNewGovernorate(data.governorate || '');
+          setNewDirectorate(data.directorate || '');
+          setNewStage(data.stage || '');
+          setNewShift(data.shift || '');
+          setNewGenderType(data.genderType || '');
+          setNewApproximateStudents(data.approximateStudents || '');
           setStats(prev => ({ 
             ...prev, 
             adjustment: data.salesAdjustment || 0,
@@ -129,12 +210,18 @@ export default function Overview() {
     try {
       await updateDoc(doc(db, 'schools', profile.schoolId), {
         address: newAddress.trim(),
-        googleMapsUrl: newMapsUrl.trim()
+        googleMapsUrl: newMapsUrl.trim(),
+        governorate: newGovernorate.trim(),
+        directorate: newDirectorate.trim(),
+        stage: newStage.trim(),
+        shift: newShift.trim(),
+        genderType: newGenderType.trim(),
+        approximateStudents: newApproximateStudents.trim()
       });
       setShowLocationModal(false);
-      toast.success(isRtl ? 'تم تحديث مدرسة والعنوان والموقع بنجاح' : 'Location details updated successfully');
+      toast.success(isRtl ? 'تم تحديث مدرسة والعنوان وجميع بيانات السجل بنجاح' : 'School details, address and registry synced successfully');
     } catch (err) {
-      toast.error(isRtl ? 'فشل تحديث معلومات الموقع' : 'Failed to update location details');
+      toast.error(isRtl ? 'فشل تحديث معلومات مدرسة والسجل' : 'Failed to update school registry details');
     } finally {
       setSavingLocation(false);
     }
@@ -229,55 +316,121 @@ export default function Overview() {
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-850 shadow-sm transition-colors flex flex-col md:flex-row items-center justify-between gap-6"
+          className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-6 md:p-8 shadow-sm transition-all"
         >
-          <div className="flex items-start gap-4 w-full md:w-auto">
-            <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/30 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 border border-indigo-100 dark:border-indigo-900/40 shadow-sm">
-              <MapPin size={28} className="animate-pulse" />
-            </div>
-            <div>
-              <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{isRtl ? 'تفاصيل عنوان وموقع المدرسة' : 'School Address & Location Details'}</p>
-              <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-1 font-display">{schoolInfo.name}</h3>
-              <div className="mt-2.5 space-y-1.5 text-sm">
-                <p className="text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                  <span className="font-mono font-bold text-slate-400">{isRtl ? 'العنوان المدرسي:' : 'School Address:'}</span> 
-                  <span className="font-bold">{schoolInfo.address || (isRtl ? 'غير محدد بعد' : 'Not specified yet')}</span>
+          {/* Header row: School name and main update actions */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-100 dark:border-slate-800/80 gap-4 mb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shadow-sm shrink-0">
+                <Building2 size={28} className="animate-pulse" />
+              </div>
+              <div>
+                <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">
+                  {isRtl ? 'سجل وبطاقة البيانات التعريفية للمدرسة' : 'Official Registered School Profile Card'}
                 </p>
-                {schoolInfo.googleMapsUrl ? (
-                  <p className="text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                    <span className="font-mono font-bold text-slate-400">{isRtl ? 'رابط الموقع الجغرافي:' : 'Geographical Location:'}</span> 
-                    <a href={schoolInfo.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1 font-bold">
-                      {isRtl ? 'عرض الخريطة' : 'View Map'}
-                      <ExternalLink size={12} />
-                    </a>
-                  </p>
-                ) : (
-                  <p className="text-amber-600 dark:text-amber-400 font-bold text-xs">
-                    * {isRtl ? 'لم يتم ربط الموقع الخريطة التفصيلي بعد' : 'Detailed Map is not linked yet'}
-                  </p>
-                )}
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1.5 font-display flex flex-wrap items-center gap-2">
+                  {schoolInfo.name}
+                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30">
+                    {isRtl ? 'حساب نشط' : 'Active Account'}
+                  </span>
+                </h3>
               </div>
             </div>
-          </div>
-          <div className="flex gap-3 w-full md:w-auto shrink-0 self-end md:self-center justify-end">
-            <button
-              onClick={() => setShowLocationModal(true)}
-              className="px-5 py-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 cursor-pointer shadow-sm"
-            >
-              <Edit2 size={14} />
-              <span>{isRtl ? 'تحديث الموقع واللوكيشن' : 'Update Location & Address'}</span>
-            </button>
-            {schoolInfo.googleMapsUrl && (
-              <a
-                href={schoolInfo.googleMapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 shadow-lg shadow-indigo-600/10"
+            
+            <div className="flex flex-wrap gap-2.5 justify-start md:justify-end">
+              <button
+                onClick={() => setShowLocationModal(true)}
+                className="px-5 py-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 cursor-pointer shadow-sm"
               >
-                <MapPin size={14} />
-                <span>{isRtl ? 'الذهاب للعنوان' : 'Navigate To Map'}</span>
-              </a>
-            )}
+                <Edit2 size={14} />
+                <span>{isRtl ? 'تحديث وتعديل السجل' : 'Update School Profile'}</span>
+              </button>
+              {schoolInfo.googleMapsUrl && (
+                <a
+                  href={schoolInfo.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 shadow-md shadow-indigo-600/10"
+                >
+                  <MapPin size={14} />
+                  <span>{isRtl ? 'الذهاب للعنوان' : 'Navigate To Map'}</span>
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* School Attributes Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
+              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
+                <MapPin size={16} className="text-rose-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'الموقع والعنوان' : 'Detailed Address'}</span>
+              </div>
+              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate" title={schoolInfo.address}>
+                {schoolInfo.address || (isRtl ? 'غير محدد' : 'Not specified')}
+              </p>
+            </div>
+
+            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
+              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
+                <Map size={16} className="text-blue-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'المحافظة' : 'Governorate'}</span>
+              </div>
+              <p className="text-sm font-black text-slate-800 dark:text-slate-100">
+                {translateSchoolValue(schoolInfo.governorate, isRtl)}
+              </p>
+            </div>
+
+            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
+              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
+                <Building2 size={16} className="text-indigo-500" />
+                <span className="text-[11px] font-black uppercase tracking-widest">{isRtl ? 'المديرية' : 'Directorate'}</span>
+              </div>
+              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate" title={schoolInfo.directorate}>
+                {translateSchoolValue(schoolInfo.directorate, isRtl)}
+              </p>
+            </div>
+
+            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
+              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
+                <GraduationCap size={16} className="text-emerald-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'المرحلة الدراسية' : 'School Stage'}</span>
+              </div>
+              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate">
+                {translateSchoolValue(schoolInfo.stage, isRtl)}
+              </p>
+            </div>
+
+            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
+              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
+                <Clock size={16} className="text-amber-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'دوام المدرسة' : 'School Shift'}</span>
+              </div>
+              <p className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 truncate">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                {translateSchoolValue(schoolInfo.shift, isRtl)}
+              </p>
+            </div>
+
+            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
+              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
+                <Users size={16} className="text-purple-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'جنس الطلاب/فئة الدراسة' : 'Study Gender Type'}</span>
+              </div>
+              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate">
+                {translateSchoolValue(schoolInfo.genderType, isRtl)}
+              </p>
+            </div>
+
+            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-805/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
+                <Users size={16} className="text-cyan-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'العدد التقريبي للطلاب' : 'Approximate Students'}</span>
+              </div>
+              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate">
+                {schoolInfo.approximateStudents ? `${schoolInfo.approximateStudents} ${isRtl ? 'طالب' : 'students'}` : (isRtl ? 'غير محدد' : 'Not specified')}
+              </p>
+            </div>
           </div>
         </motion.div>
       )}
@@ -413,61 +566,168 @@ export default function Overview() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 relative"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] w-full max-w-lg shadow-2xl p-6 md:p-8 relative max-h-[90vh] flex flex-col"
             >
-              <div className="flex items-center gap-4 mb-6 text-indigo-600 dark:text-indigo-400">
+              <div className="flex items-center gap-4 mb-4 text-indigo-600 dark:text-indigo-400 shrink-0">
                 <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center border border-indigo-100 dark:border-indigo-900/30">
                   <MapPin size={24} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">{isRtl ? 'تحديث الموقع الجغرافي والعنوان' : 'Update Location & Address'}</h3>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">{isRtl ? 'تحديث السجل وبيانات المدرسة' : 'Update School Registry Profile'}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
                     {schoolInfo?.name}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-4 overflow-y-auto pr-1 flex-1 py-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Governorate */}
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1">{isRtl ? 'المحافظة' : 'Governorate'}</label>
+                    <select
+                      value={newGovernorate}
+                      onChange={(e) => setNewGovernorate(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
+                    >
+                      <option value="" disabled>{isRtl ? 'اختر المحافظة...' : 'Select Governorate...'}</option>
+                      <option value="بغداد">بغداد</option>
+                      <option value="البصرة">البصرة</option>
+                      <option value="نينوى">نينوى</option>
+                      <option value="أربيل">أربيل</option>
+                      <option value="النجف">النجف</option>
+                      <option value="ذي قار">ذي قار</option>
+                      <option value="كركوك">كركوك</option>
+                      <option value="الأنبار">الأنبار</option>
+                      <option value="ديالى">ديالى</option>
+                      <option value="المثنى">المثنى</option>
+                      <option value="القادسية">القادسية (الديوانية)</option>
+                      <option value="ميسان">ميسان</option>
+                      <option value="واسط">واسط</option>
+                      <option value="صلاح الدين">صلاح الدين</option>
+                      <option value="دهوك">دهوك</option>
+                      <option value="السليمانية">السليمانية</option>
+                      <option value="بابل">بابل</option>
+                      <option value="كربلاء">كربلاء</option>
+                      <option value="حلبجة">حلبجة</option>
+                    </select>
+                  </div>
+
+                  {/* Directorate */}
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1">{isRtl ? 'المديرية' : 'Directorate'}</label>
+                    <input
+                      type="text"
+                      value={newDirectorate}
+                      onChange={(e) => setNewDirectorate(e.target.value)}
+                      placeholder={isRtl ? 'مثال: مديرية الكرخ الاولى' : 'e.g. Karkh 1st Directorate'}
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
+                    />
+                  </div>
+
+                  {/* School Stage */}
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1">{isRtl ? 'المرحلة الدراسية' : 'School Stage'}</label>
+                    <select
+                      value={newStage}
+                      onChange={(e) => setNewStage(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
+                    >
+                      <option value="" disabled>{isRtl ? 'اختر المرحلة...' : 'Select Stage...'}</option>
+                      <option value="روضة">روضة</option>
+                      <option value="ابتدائي">ابتدائي</option>
+                      <option value="متوسطة">متوسطة</option>
+                      <option value="اعدادية">اعدادية</option>
+                    </select>
+                  </div>
+
+                  {/* Shift */}
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1">{isRtl ? 'وقت الدوام' : 'School Shift'}</label>
+                    <select
+                      value={newShift}
+                      onChange={(e) => setNewShift(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
+                    >
+                      <option value="" disabled>{isRtl ? 'اختر وقت الدوام...' : 'Select Shift...'}</option>
+                      <option value="صباحي">صباحي</option>
+                      <option value="مسائي">مسائي</option>
+                      <option value="مدمج">مدمج</option>
+                    </select>
+                  </div>
+
+                  {/* Gender Category */}
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1">{isRtl ? 'نوع فئة الدراسة' : 'Study Gender Type'}</label>
+                    <select
+                      value={newGenderType}
+                      onChange={(e) => setNewGenderType(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
+                    >
+                      <option value="" disabled>{isRtl ? 'اختر نوع الدراسة...' : 'Select Gender Type...'}</option>
+                      <option value="مختلطة">مختلطة</option>
+                      <option value="بنات فقط">بنات فقط</option>
+                      <option value="اولاد فقط">اولاد فقط</option>
+                    </select>
+                  </div>
+
+                  {/* Approximate Students */}
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1">{isRtl ? 'العدد التقريبي للطلاب' : 'Approximate Students'}</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newApproximateStudents}
+                      onChange={(e) => setNewApproximateStudents(e.target.value)}
+                      placeholder="e.g. 500"
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Address */}
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">{isRtl ? 'العنوان المدرسي التفصيلي' : 'School Detailed Address'}</label>
+                  <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1">{isRtl ? 'العنوان المدرسي التفصيلي' : 'School Detailed Address'}</label>
                   <input 
                     type="text"
                     value={newAddress}
                     onChange={(e) => setNewAddress(e.target.value)}
                     placeholder={isRtl ? 'مثال: بغداد، الكرادة، قرب ساحة التحري' : 'e.g. Baghdad, Karrada'}
-                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none font-bold text-slate-900 dark:text-white"
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
                   />
                 </div>
 
+                {/* Maps URL */}
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">{isRtl ? 'رابط الموقع الجغرافي (Google Maps Link)' : 'Google Maps Location URL'}</label>
+                  <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1">{isRtl ? 'رابط الموقع الجغرافي (Google Maps Link)' : 'Google Maps Location URL'}</label>
                   <input 
                     type="url"
                     value={newMapsUrl}
                     onChange={(e) => setNewMapsUrl(e.target.value)}
                     placeholder="https://maps.google.com/..."
-                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none font-bold font-mono text-xs text-slate-900 dark:text-white"
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 font-mono text-xs text-slate-900 dark:text-white transition-all outline-none"
                   />
-                  <p className="mt-1.5 text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed font-bold px-1">
-                    * {isRtl ? 'انسخ الرابط التفصيلي من خرائط جوجل والصقه هنا.' : 'Copy the detailed share link from google maps and paste here.'}
+                  <p className="mt-1 text-[9px] text-slate-400 dark:text-slate-500 leading-normal font-bold px-1">
+                    * {isRtl ? 'انسخ الرابط التفصيلي من خرائط جوجل والصقه هنا لمزامنة فورية.' : 'Copy from google maps and paste here.'}
                   </p>
                 </div>
+              </div>
 
-                <div className="flex flex-col gap-3 mt-6">
-                  <button 
-                    onClick={handleSaveLocation}
-                    disabled={savingLocation}
-                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/10 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {savingLocation ? (isRtl ? 'جاري الحفظ...' : 'Saving...') : (isRtl ? 'حفظ التغييرات ومزامنتها' : 'Save & Sync Changes')}
-                  </button>
-                  <button 
-                    onClick={() => setShowLocationModal(false)}
-                    className="w-full py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-bold transition-all active:scale-95 cursor-pointer"
-                  >
-                    {isRtl ? 'إلغاء' : 'Cancel'}
-                  </button>
-                </div>
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-3 mt-4 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-850">
+                <button 
+                  onClick={handleSaveLocation}
+                  disabled={savingLocation}
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/10 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {savingLocation ? (isRtl ? 'جاري الحفظ والمزامنة...' : 'Saving & Syncing...') : (isRtl ? 'حفظ التغييرات ومزامنتها' : 'Save & Sync Changes')}
+                </button>
+                <button 
+                  onClick={() => setShowLocationModal(false)}
+                  className="w-full py-3 bg-slate-100 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold transition-all active:scale-95 cursor-pointer"
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
               </div>
             </motion.div>
           </div>

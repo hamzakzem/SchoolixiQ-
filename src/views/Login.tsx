@@ -57,6 +57,43 @@ import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { GlobalFooter } from "../components/GlobalFooter";
 
+export const getLocalizedPackages = (packagesList: any[], isRtl: boolean) => {
+  return packagesList.map(pkg => {
+    if (isRtl) return pkg;
+    let name = pkg.name;
+    let features = pkg.features || [];
+    if (pkg.id === "basic" || pkg.name?.includes("الأساسية") || pkg.name?.toLowerCase().includes("basic")) {
+      name = "Basic Plan";
+      features = [
+        "Up to 250 students",
+        "Daily attendance and absence management",
+        "Admin & teacher dashboard",
+        "Monthly exam results",
+        "Email technical support",
+      ];
+    } else if (pkg.id === "professional" || pkg.name?.includes("الاحترافية") || pkg.name?.toLowerCase().includes("professional")) {
+      name = "Professional Plan";
+      features = [
+        "Up to 750 students",
+        "Real app for parents",
+        "Teacher payroll and accounts",
+        "Interactive certificates and results",
+        "24/7 direct technical support",
+      ];
+    } else if (pkg.id === "premium" || pkg.name?.includes("الشاملة") || pkg.name?.includes("الماسية") || pkg.name?.toLowerCase().includes("premium")) {
+      name = "Premium Plan";
+      features = [
+        "Unlimited students",
+        "All Professional features included",
+        "Advanced accounting system and payroll structure",
+        "Instant SMS notifications & automatic alerts",
+        "Full visual identity & logo customization",
+      ];
+    }
+    return { ...pkg, name, features };
+  });
+};
+
 const DEFAULT_PACKAGES = [
   {
     id: "basic",
@@ -1290,7 +1327,7 @@ export default function Login() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-2 sm:px-0">
-          {packages.map((pkg) => {
+          {getLocalizedPackages(packages, isRtl).map((pkg) => {
             const displayPrice =
               billingCycle === "annually"
                 ? pkg.priceYearly !== undefined
