@@ -28,19 +28,19 @@ import {
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { motion } from "motion/react";
 import * as Sentry from "@sentry/react";
 
-// Views
-import Login from "./views/Login";
-import AdminDashboard from "./views/AdminDashboard";
-import ParentDashboard from "./views/ParentDashboard";
-import SuperAdminDashboard from "./views/SuperAdminDashboard";
-import TeacherDashboard from "./views/TeacherDashboard";
-import ScanHandler from "./components/ScanHandler";
-import PublicStudentVerify from "./views/PublicStudentVerify";
+// Views (Lazy-Loaded for Performance Optimization)
+const Login = lazy(() => import("./views/Login"));
+const AdminDashboard = lazy(() => import("./views/AdminDashboard"));
+const ParentDashboard = lazy(() => import("./views/ParentDashboard"));
+const SuperAdminDashboard = lazy(() => import("./views/SuperAdminDashboard"));
+const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
+const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 
+import ScanHandler from "./components/ScanHandler";
 import SolarLoading from "./components/SolarLoading";
 import { LanguageToggle } from "./components/LanguageToggle";
 
@@ -890,13 +890,15 @@ export default function App() {
         <LanguageProvider>
           <AuthProvider>
             <BrowserRouter>
-              <Routes>
-                <Route
-                  path="/verify/:studentId"
-                  element={<PublicStudentVerify />}
-                />
-                <Route path="*" element={<AppContent />} />
-              </Routes>
+              <Suspense fallback={<SolarLoading />}>
+                <Routes>
+                  <Route
+                    path="/verify/:studentId"
+                    element={<PublicStudentVerify />}
+                  />
+                  <Route path="*" element={<AppContent />} />
+                </Routes>
+              </Suspense>
               <Toaster position="top-right" />
             </BrowserRouter>
           </AuthProvider>
