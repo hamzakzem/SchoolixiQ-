@@ -773,9 +773,21 @@ export default function SuperAdminDashboard() {
           packagesQ,
           (snap) => {
             if (!snap.empty) {
-              setPackages(
-                snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+              const dbPackages = snap.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+              }));
+              
+              // If there are default packages that haven't been saved to DB yet,
+              // we combine them in the UI so the user doesn't lose sight of them.
+              const defaultIds = DEFAULT_PACKAGES.map(p => p.id);
+              const dbIds = dbPackages.map(p => p.id);
+              
+              const missingDefaults = DEFAULT_PACKAGES.filter(
+                (dp) => !dbIds.includes(dp.id) && !dbPackages.find((dbp: any) => dbp.name === dp.name)
               );
+              
+              setPackages([...missingDefaults, ...dbPackages]);
             } else {
               setPackages(DEFAULT_PACKAGES);
             }
