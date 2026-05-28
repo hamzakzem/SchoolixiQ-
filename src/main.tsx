@@ -2,7 +2,7 @@ import {StrictMode, useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import * as Sentry from "@sentry/react";
+import { initSentry } from './lib/sentryWrapper';
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   let dsn = import.meta.env.VITE_SENTRY_DSN;
@@ -11,22 +11,9 @@ if (import.meta.env.VITE_SENTRY_DSN) {
   }
 
   try {
-    Sentry.init({
-      dsn: dsn,
-      integrations: [
-        Sentry.browserTracingIntegration(),
-        Sentry.replayIntegration({
-          maskAllText: false,
-          blockAllMedia: false,
-        }),
-      ],
-      tracesSampleRate: 1.0,
-      tracePropagationTargets: ["localhost", /^https:\/\/yourserver\.io\/api/],
-      replaysSessionSampleRate: 0.1,
-      replaysOnErrorSampleRate: 1.0,
-    });
+    initSentry(dsn);
   } catch (error) {
-    console.error("Failed to initialize Sentry:", error);
+    console.error("Failed to call initSentry:", error);
   }
 } else {
   console.warn("Sentry error tracking is disabled: VITE_SENTRY_DSN is not set.");
@@ -35,7 +22,14 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 // Handle Vit's HMR websocket errors which are benign in this environment
 if (typeof window !== 'undefined') {
   const checkAndHandleDbError = (errMessage: string) => {
-    if (errMessage && (errMessage.includes('refusing to open IndexedDB') || errMessage.includes('corruption of the IndexedDB') || errMessage.includes('IndexedDB database data'))) {
+    if (
+      errMessage && 
+      (errMessage.includes('refusing to open IndexedDB') || 
+       errMessage.includes('corruption of the IndexedDB') || 
+       errMessage.includes('IndexedDB database data') || 
+       errMessage.includes('Connection to Indexed Database') || 
+       errMessage.includes('Database server lost'))
+    ) {
       const reloadCount = parseInt(sessionStorage.getItem('db_error_reload_count') || '0', 10);
       if (reloadCount < 3) {
         sessionStorage.setItem('db_error_reload_count', (reloadCount + 1).toString());

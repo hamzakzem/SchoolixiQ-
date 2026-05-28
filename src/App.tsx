@@ -28,9 +28,9 @@ import {
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, Component, ReactNode, ErrorInfo } from "react";
 import { motion } from "motion/react";
-import * as Sentry from "@sentry/react";
+import { captureException } from "./lib/sentryWrapper";
 
 // Views (Lazy-Loaded for Performance Optimization)
 const Login = lazy(() => import("./views/Login"));
@@ -861,6 +861,38 @@ const queryClient = new QueryClient({
   },
 });
 
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class SafeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false
+  };
+
+  public static getDerivedStateFromError(_: Error): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught application error:", error, errorInfo);
+    captureException(error, { extra: errorInfo as any });
+  }
+
+  public render() {
+    const props = (this as any).props;
+    if (this.state.hasError) {
+      return props.fallback;
+    }
+    return props.children;
+  }
+}
+
 function FallbackComponent() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-transparent p-6 text-center">
@@ -885,7 +917,7 @@ function FallbackComponent() {
 
 export default function App() {
   return (
-    <Sentry.ErrorBoundary fallback={<FallbackComponent />}>
+    <SafeErrorBoundary fallback={<FallbackComponent />}>
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
           <AuthProvider>
@@ -904,6 +936,6 @@ export default function App() {
           </AuthProvider>
         </LanguageProvider>
       </QueryClientProvider>
-    </Sentry.ErrorBoundary>
+    </SafeErrorBoundary>
   );
 }

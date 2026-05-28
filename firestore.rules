@@ -161,10 +161,10 @@ service cloud.firestore {
     }
 
     match /registrations/{id} {
-      allow read: if isSuperAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow read: if isSuperAdmin() || (isSignedIn() && resource.data.get('uid', '') == request.auth.uid);
       allow create: if true;
       allow update: if isSuperAdmin();
-      allow delete: if isSuperAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow delete: if isSuperAdmin() || (isSignedIn() && resource.data.get('uid', '') == request.auth.uid);
     }
     
     match /orders/{id} {

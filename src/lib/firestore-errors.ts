@@ -1,5 +1,5 @@
 import { auth } from './firebase';
-import * as Sentry from '@sentry/react';
+import { captureException } from './sentryWrapper';
 
 export enum OperationType {
   CREATE = 'create',
@@ -47,7 +47,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   
-  Sentry.captureException(error, {
+  captureException(error, {
     extra: {
       firestoreErrorInfo: errInfo
     },

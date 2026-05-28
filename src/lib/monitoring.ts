@@ -1,5 +1,5 @@
 import { getDocs, Query, DocumentData, QuerySnapshot } from 'firebase/firestore';
-import * as Sentry from '@sentry/react';
+import { captureMessage } from './sentryWrapper';
 import { db, auth } from './firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
@@ -17,7 +17,7 @@ export async function monitoredGetDocs<T = DocumentData>(
     // Log slow queries (> 1s)
     if (duration > 1000) {
       console.warn(`[SLOW QUERY] ${contextName} took ${Math.round(duration)}ms and returned ${documentCount} docs`);
-      Sentry.captureMessage('Slow Firestore Query', {
+      captureMessage('Slow Firestore Query', {
         level: 'warning',
         extra: { contextName, durationMs: duration, count: documentCount }
       });
@@ -38,7 +38,7 @@ export async function monitoredGetDocs<T = DocumentData>(
     // Log expensive queries (> 100 documents)
     if (documentCount > 100) {
       console.warn(`[EXPENSIVE QUERY] ${contextName} returned ${documentCount} docs in ${Math.round(duration)}ms`);
-      Sentry.captureMessage('Expensive Firestore Query', {
+      captureMessage('Expensive Firestore Query', {
         level: 'warning',
         extra: { contextName, durationMs: duration, count: documentCount }
       });

@@ -1,5 +1,5 @@
 import { addDoc, updateDoc, deleteDoc, DocumentReference, CollectionReference, WithFieldValue, UpdateData } from 'firebase/firestore';
-import * as Sentry from '@sentry/react';
+import { captureMessage } from './sentryWrapper';
 import { handleFirestoreError, OperationType } from './firestore-errors';
 
 // Simple token bucket rate limiter per session
@@ -36,7 +36,7 @@ export async function rateLimitedAdd<T = any>(
   data: WithFieldValue<T>
 ): Promise<DocumentReference<T>> {
   if (!writeLimiter.canConsume()) {
-    Sentry.captureMessage('Rate limit exceeded (Add)', { level: 'warning' });
+    captureMessage('Rate limit exceeded (Add)', { level: 'warning' });
     throw new Error('تم تجاوز الحد المسموح للعمليات. يرجى الانتظار قليلاً.');
   }
   return addDoc(ref, data);
@@ -47,7 +47,7 @@ export async function rateLimitedUpdate<T = { [x: string]: any }>(
   data: UpdateData<T>
 ): Promise<void> {
   if (!writeLimiter.canConsume()) {
-    Sentry.captureMessage('Rate limit exceeded (Update)', { level: 'warning' });
+    captureMessage('Rate limit exceeded (Update)', { level: 'warning' });
     throw new Error('تم تجاوز الحد المسموح للعمليات. يرجى الانتظار قليلاً.');
   }
   return updateDoc(ref, data as any);
@@ -57,7 +57,7 @@ export async function rateLimitedDelete<T = any>(
   ref: DocumentReference<T>
 ): Promise<void> {
   if (!writeLimiter.canConsume()) {
-    Sentry.captureMessage('Rate limit exceeded (Delete)', { level: 'warning' });
+    captureMessage('Rate limit exceeded (Delete)', { level: 'warning' });
     throw new Error('تم تجاوز الحد المسموح للعمليات. يرجى الانتظار قليلاً.');
   }
   return deleteDoc(ref);
