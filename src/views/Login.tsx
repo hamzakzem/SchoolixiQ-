@@ -59,9 +59,13 @@ import { GlobalFooter } from "../components/GlobalFooter";
 
 export const getLocalizedPackages = (packagesList: any[], isRtl: boolean) => {
   return packagesList.map(pkg => {
-    if (isRtl) return pkg;
     let name = pkg.name;
     let features = pkg.features || [];
+    if (typeof features === 'string') {
+      features = features.split(',').map(f => f.trim()).filter(f => f);
+    }
+    
+    if (isRtl) return { ...pkg, name, features };
     if (pkg.id === "basic" || pkg.name?.includes("الأساسية") || pkg.name?.toLowerCase().includes("basic")) {
       name = "Basic Plan";
       features = [
@@ -204,10 +208,16 @@ export default function Login() {
 
           const allPackages = [...missingDefaults, ...dbPackages];
           allPackages.sort((a: any, b: any) => {
-            const timeA =
-              a.createdAt?.seconds || a.createdAt?._seconds || 0;
-            const timeB =
-              b.createdAt?.seconds || b.createdAt?._seconds || 0;
+            const getMillis = (pkg: any) => {
+              if (!pkg.createdAt && ["basic", "professional", "premium"].includes(pkg.id)) return 0;
+              if (!pkg.createdAt) return Date.now(); // Optimistic local write
+              if (pkg.createdAt?.toMillis) return pkg.createdAt.toMillis();
+              if (pkg.createdAt?.seconds) return pkg.createdAt.seconds * 1000;
+              if (pkg.createdAt?._seconds) return pkg.createdAt._seconds * 1000;
+              return Date.now();
+            };
+            const timeA = getMillis(a);
+            const timeB = getMillis(b);
             return timeB - timeA;
           });
 
