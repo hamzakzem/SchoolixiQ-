@@ -5079,7 +5079,7 @@ export default function SuperAdminDashboard() {
                               adminPhone: e.target.value,
                             })
                           }
-                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all"
+                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
                           placeholder="077XXXXXXXX"
                           dir="ltr"
                         />
@@ -5155,9 +5155,8 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
       )}
-
       {showPackageModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md overflow-hidden">
+        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md overflow-hidden animate-fade-in">
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-2xl shadow-2xl relative border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200 my-8 flex flex-col max-h-[90vh]">
             <div className="p-8 pb-4 shrink-0">
               <div className="flex items-center justify-between mb-6">
@@ -5214,19 +5213,19 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 pt-2">
-              <form
-                onSubmit={handleAddPackage}
-                id="package-form"
-                className="space-y-8"
-              >
+            <form
+              onSubmit={handleAddPackage}
+              id="package-form"
+              className="flex-1 flex flex-col min-h-0 overflow-hidden"
+            >
+              <div className="flex-1 overflow-y-auto p-8 pt-2 space-y-8">
                 {packageModalTab === "general" && (
                   <>
                     {/* Section 1: Basic Info */}
                     <div className="space-y-4">
                       <h3 className="text-[10px] font-black uppercase text-blue-600 tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-                        المعلومات الأساسية
+                        المعلومات الأساسية والأسعار
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
@@ -5243,7 +5242,7 @@ export default function SuperAdminDashboard() {
                                 name: e.target.value,
                               })
                             }
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
                             placeholder="مثال: الباقة الماسية"
                           />
                         </div>
@@ -5267,10 +5266,10 @@ export default function SuperAdminDashboard() {
                               setNewPackage({
                                 ...newPackage,
                                 priceYearly: numVal,
-                                price: numVal, // set fallback legacy price
+                                price: numVal,
                               });
                             }}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
                             placeholder="مثال: 1200000"
                           />
                         </div>
@@ -5285,10 +5284,9 @@ export default function SuperAdminDashboard() {
                               Number.isNaN(newPackage.priceMonthly)
                                 ? ""
                                 : newPackage.priceMonthly !== undefined &&
-                                    newPackage.priceMonthly !== 0
-                                  ? newPackage.priceMonthly
-                                  : Math.round((newPackage.price || 0) / 12) ||
-                                    ""
+                                  newPackage.priceMonthly !== 0
+                                ? newPackage.priceMonthly
+                                : Math.round((newPackage.price || 0) / 12) || ""
                             }
                             onChange={(e) => {
                               const val = e.target.value;
@@ -5298,7 +5296,7 @@ export default function SuperAdminDashboard() {
                                 priceMonthly: numVal,
                               });
                             }}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
                             placeholder="مثال: 100000"
                           />
                         </div>
@@ -5333,7 +5331,7 @@ export default function SuperAdminDashboard() {
                                     val === "" ? 0 : Number(val) || 0,
                                 });
                               }}
-                              className="w-full pr-4 pl-12 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
+                              className="w-full pr-4 pl-12 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
                             />
                             <Users
                               size={16}
@@ -5360,7 +5358,7 @@ export default function SuperAdminDashboard() {
                                 durationDays: val === "" ? 0 : Number(val) || 0,
                               });
                             }}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
                           />
                         </div>
                         <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 md:col-span-2">
@@ -5462,7 +5460,7 @@ export default function SuperAdminDashboard() {
                               className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity"
                             />
                           </div>
-                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors">
+                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors font-sans">
                             {label}
                           </span>
                         </label>
@@ -5495,68 +5493,69 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
                 )}
-              </form>
-            </div>
-
-            <div className="p-8 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
-              <div className="flex gap-4">
-                <button
-                  type="submit"
-                  form="package-form"
-                  className="flex-1 px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/10 active:scale-95"
-                >
-                  {editingPackage ? "حفظ التعديلات" : "إنشاء الباقة"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowPackageModal(false);
-                    setEditingPackage(null);
-                    setNewPackage({
-                      name: "",
-                      price: 0,
-                      maxStudents: 500,
-                      features: "",
-                      durationDays: 365,
-                      showSubscriptionTimer: true,
-                      showInRegistration: true,
-                      isPopular: false,
-                      permissions: {
-                        overview: true,
-                        chat: true,
-                        students_view: true,
-                        students_edit: true,
-                        staff_manage: true,
-                        attendance_track: true,
-                        exams_and_results: true,
-                        student_archive: true,
-                        tuition_fees: false,
-                        staff_payroll: false,
-                        inventory_and_assets: false,
-                        behavior_management: true,
-                        student_evaluation_reports: true,
-                        homework_and_tasks: true,
-                        classes: true,
-                        automated_schedules: false,
-                        announcements: true,
-                        parent_app_access: true,
-                        advanced_reports: false,
-                        marketplace_ordering: true,
-                        id_card_generation: false,
-                        assistants_manage: false,
-                        settings: true,
-                      },
-                    });
-                  }}
-                  className="px-8 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
-                >
-                  إلغاء
-                </button>
               </div>
-            </div>
+
+              <div className="p-8 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="flex gap-4">
+                  <button
+                    type="submit"
+                    className="flex-1 px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/10 active:scale-95"
+                  >
+                    {editingPackage ? "حفظ التعديلات" : "إنشاء الباقة"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPackageModal(false);
+                      setEditingPackage(null);
+                      setNewPackage({
+                        name: "",
+                        price: 0,
+                        maxStudents: 500,
+                        features: "",
+                        durationDays: 365,
+                        showSubscriptionTimer: true,
+                        showInRegistration: true,
+                        isPopular: false,
+                        permissions: {
+                          overview: true,
+                          chat: true,
+                          students_view: true,
+                          students_edit: true,
+                          staff_manage: true,
+                          attendance_track: true,
+                          exams_and_results: true,
+                          student_archive: true,
+                          tuition_fees: false,
+                          staff_payroll: false,
+                          inventory_and_assets: false,
+                          behavior_management: true,
+                          student_evaluation_reports: true,
+                          homework_and_tasks: true,
+                          classes: true,
+                          automated_schedules: false,
+                          announcements: true,
+                          parent_app_access: true,
+                          advanced_reports: false,
+                          marketplace_ordering: true,
+                          id_card_generation: false,
+                          assistants_manage: false,
+                          settings: true,
+                        },
+                      });
+                    }}
+                    className="px-8 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}
+
+
 
       {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
