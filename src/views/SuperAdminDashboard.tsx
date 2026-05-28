@@ -1109,6 +1109,10 @@ export default function SuperAdminDashboard() {
 
   const handleAddPackage = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newPackage.name) {
+      toast.error("يرجى إدخال اسم الباقة");
+      return;
+    }
     const loadingToast = toast.loading("جاري حفظ الباقة...");
     try {
       const pkgData = {
@@ -1117,22 +1121,22 @@ export default function SuperAdminDashboard() {
           newPackage.priceYearly !== undefined
             ? newPackage.priceYearly
             : newPackage.price,
-        ),
+        ) || 0,
         priceMonthly: Number(
           newPackage.priceMonthly !== undefined
             ? newPackage.priceMonthly
             : Math.round((newPackage.price || 0) / 12),
-        ),
+        ) || 0,
         priceYearly: Number(
           newPackage.priceYearly !== undefined
             ? newPackage.priceYearly
             : newPackage.price,
-        ),
-        maxStudents: Number(newPackage.maxStudents),
-        durationDays: Number(newPackage.durationDays),
-        showSubscriptionTimer: newPackage.showSubscriptionTimer,
-        showInRegistration: newPackage.showInRegistration,
-        isPopular: newPackage.isPopular,
+        ) || 0,
+        maxStudents: Number(newPackage.maxStudents) || 0,
+        durationDays: Number(newPackage.durationDays) || 0,
+        showSubscriptionTimer: newPackage.showSubscriptionTimer ?? true,
+        showInRegistration: newPackage.showInRegistration ?? true,
+        isPopular: newPackage.isPopular ?? false,
         permissions: newPackage.permissions,
         features:
           typeof newPackage.features === "string"
@@ -5233,7 +5237,6 @@ export default function SuperAdminDashboard() {
                             اسم الباقة
                           </label>
                           <input
-                            required
                             type="text"
                             value={newPackage.name}
                             onChange={(e) =>
@@ -5251,7 +5254,6 @@ export default function SuperAdminDashboard() {
                             السعر السنوي (د.ع / سنوياً)
                           </label>
                           <input
-                            required
                             type="number"
                             value={
                               Number.isNaN(newPackage.priceYearly)
@@ -5278,7 +5280,6 @@ export default function SuperAdminDashboard() {
                             السعر الشهري (د.ع / شهرياً)
                           </label>
                           <input
-                            required
                             type="number"
                             value={
                               Number.isNaN(newPackage.priceMonthly)
@@ -5316,7 +5317,6 @@ export default function SuperAdminDashboard() {
                           </label>
                           <div className="relative">
                             <input
-                              required
                               type="number"
                               value={
                                 Number.isNaN(newPackage.maxStudents)
@@ -5344,7 +5344,6 @@ export default function SuperAdminDashboard() {
                             مدة الاشتراك (يوم)
                           </label>
                           <input
-                            required
                             type="number"
                             value={
                               Number.isNaN(newPackage.durationDays)
