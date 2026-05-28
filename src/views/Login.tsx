@@ -186,9 +186,32 @@ export default function Login() {
       collection(db, "packages"),
       (snapshot) => {
         if (!snapshot.empty) {
-          setPackages(
-            snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+          const dbPackages = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+
+          // If there are default packages that haven't been saved to DB yet,
+          // we combine them in the UI.
+          const defaultIds = DEFAULT_PACKAGES.map((p) => p.id);
+          const dbIds = dbPackages.map((p) => p.id);
+
+          const missingDefaults = DEFAULT_PACKAGES.filter(
+            (dp) =>
+              !dbIds.includes(dp.id) &&
+              !dbPackages.find((dbp: any) => dbp.name === dp.name),
           );
+
+          const allPackages = [...missingDefaults, ...dbPackages];
+          allPackages.sort((a: any, b: any) => {
+            const timeA =
+              a.createdAt?.seconds || a.createdAt?._seconds || 0;
+            const timeB =
+              b.createdAt?.seconds || b.createdAt?._seconds || 0;
+            return timeB - timeA;
+          });
+
+          setPackages(allPackages);
         } else {
           setPackages(DEFAULT_PACKAGES);
         }

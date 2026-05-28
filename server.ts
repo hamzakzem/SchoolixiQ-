@@ -432,13 +432,21 @@ async function startServer() {
 
   // --- PLAN MANAGEMENT (SUPERADMIN ONLY) ---
   app.post('/api/admin/plans', verifyAdmin, async (req: any, res: any) => {
-    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
+    if (req.user.role !== 'superadmin' && req.user.role !== 'admin' && req.user.role !== 'assistant') {
+      return res.status(403).json({ error: 'SuperAdmin access required' });
+    }
+    // Basic permissions check
+    if (req.user.role === 'assistant' && !req.user.permissions?.includes('manage_packages')) {
+      return res.status(403).json({ error: 'Missing manage_packages permission' });
+    }
+    
     try {
       const db = getDb();
       const plan = req.body;
       const docRef = await db.collection('packages').add({
         ...plan,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       await logAudit(req, 'CREATE_PLAN', { after: plan });
       res.json({ id: docRef.id });
@@ -448,7 +456,13 @@ async function startServer() {
   });
 
   app.put('/api/admin/plans/:id', verifyAdmin, async (req: any, res: any) => {
-    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
+    if (req.user.role !== 'superadmin' && req.user.role !== 'admin' && req.user.role !== 'assistant') {
+      return res.status(403).json({ error: 'SuperAdmin access required' });
+    }
+    // Basic permissions check
+    if (req.user.role === 'assistant' && !req.user.permissions?.includes('manage_packages')) {
+      return res.status(403).json({ error: 'Missing manage_packages permission' });
+    }
     try {
       const db = getDb();
       const { id } = req.params;
@@ -465,7 +479,13 @@ async function startServer() {
   });
 
   app.delete('/api/admin/plans/:id', verifyAdmin, async (req: any, res: any) => {
-    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
+    if (req.user.role !== 'superadmin' && req.user.role !== 'admin' && req.user.role !== 'assistant') {
+       return res.status(403).json({ error: 'SuperAdmin access required' });
+    }
+    // Basic permissions check
+    if (req.user.role === 'assistant' && !req.user.permissions?.includes('manage_packages')) {
+      return res.status(403).json({ error: 'Missing manage_packages permission' });
+    }
     try {
       const db = getDb();
       const { id } = req.params;
