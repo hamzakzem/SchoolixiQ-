@@ -862,16 +862,26 @@ export default function AdminDashboard() {
   if (profile?.role === "admin" && !profile.schoolId) {
     return (
       <div
-        className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans"
+        className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-12 px-4 md:px-6 font-sans overflow-y-auto"
         dir="rtl"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-[3rem] p-12 shadow-2xl w-full max-w-xl border border-slate-100"
+          className="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-12 shadow-2xl w-full max-w-xl border border-slate-100 my-auto"
         >
-          <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600 mb-8">
-            <Building size={32} />
+          <div className="flex justify-between items-start mb-8">
+            <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600">
+              <Building size={32} />
+            </div>
+            <button
+              type="button"
+              onClick={() => signOut(auth)}
+              className="px-4 py-2 bg-slate-100 text-slate-600 hover:text-red-600 hover:bg-slate-200 transition-all rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-200"
+            >
+              <LogOut size={14} />
+              تسجيل الخروج
+            </button>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
             إعداد سجل المدرسة

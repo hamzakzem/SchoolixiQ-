@@ -46,6 +46,12 @@ export default function SettingsView() {
     showSubscriptionTimer: true,
     notificationsEnabled: true,
     logoUrl: '',
+    governorate: '',
+    directorate: '',
+    stage: '',
+    shift: '',
+    genderType: '',
+    approximateStudents: '',
   });
 
   useEffect(() => {
@@ -64,6 +70,12 @@ export default function SettingsView() {
             logoUrl: data.logoUrl || '',
             showSubscriptionTimer: data.showSubscriptionTimer !== false,
             notificationsEnabled: data.notificationsEnabled !== false,
+            governorate: data.governorate || '',
+            directorate: data.directorate || '',
+            stage: data.stage || '',
+            shift: data.shift || '',
+            genderType: data.genderType || '',
+            approximateStudents: data.approximateStudents || '',
           });
         }
       } catch (error) {
@@ -144,6 +156,12 @@ export default function SettingsView() {
         logoUrl: formData.logoUrl,
         showSubscriptionTimer: formData.showSubscriptionTimer,
         notificationsEnabled: formData.notificationsEnabled,
+        governorate: formData.governorate,
+        directorate: formData.directorate,
+        stage: formData.stage,
+        shift: formData.shift,
+        genderType: formData.genderType,
+        approximateStudents: formData.approximateStudents,
       });
       toast.success('تم حفظ الإعدادات بنجاح');
     } catch (error) {
@@ -239,6 +257,114 @@ export default function SettingsView() {
                     value={formData.address}
                     onChange={e => setFormData({ ...formData, address: e.target.value })}
                     className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2.5 px-1">المحافظة</label>
+                  <select
+                    value={formData.governorate}
+                    onChange={e => setFormData({ ...formData, governorate: e.target.value })}
+                    className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="" disabled>اختر المحافظة...</option>
+                    <option value="بغداد">بغداد</option>
+                    <option value="البصرة">البصرة</option>
+                    <option value="نينوى">نينوى</option>
+                    <option value="أربيل">أربيل</option>
+                    <option value="النجف">النجف</option>
+                    <option value="ذي قار">ذي قار</option>
+                    <option value="كركوك">كركوك</option>
+                    <option value="الأنبار">الأنبار</option>
+                    <option value="ديالى">ديالى</option>
+                    <option value="المثنى">المثنى</option>
+                    <option value="القادسية">القادسية (الديوانية)</option>
+                    <option value="ميسان">ميسان</option>
+                    <option value="واسط">واسط</option>
+                    <option value="صلاح الدين">صلاح الدين</option>
+                    <option value="دهوك">دهوك</option>
+                    <option value="السليمانية">السليمانية</option>
+                    <option value="بابل">بابل</option>
+                    <option value="كربلاء">كربلاء</option>
+                    <option value="حلبجة">حلبجة</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2.5 px-1">المديرية</label>
+                  <select
+                    value={formData.directorate}
+                    onChange={e => setFormData({ ...formData, directorate: e.target.value })}
+                    className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="" disabled>اختر المديرية...</option>
+                    <option value="مديرية الكرخ الاولى">مديرية الكرخ الاولى</option>
+                    <option value="مديرية الكرخ الثانية">مديرية الكرخ الثانية</option>
+                    <option value="مديرية الكرخ الثالثه">مديرية الكرخ الثالثه</option>
+                    <option value="مديرية الرصافة الاولى">مديرية الرصافة الاولى</option>
+                    <option value="مديرية الرصافة الثانية">مديرية الرصافة الثانية</option>
+                    <option value="مديرية الرصافة الثالثه">مديرية الرصافة الثالثه</option>
+                    <option value="أخرى / مديرية أخرى">أخرى / مديرية أخرى</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2.5 px-1">المرحلة الدراسية</label>
+                  <select
+                    value={formData.stage}
+                    onChange={e => setFormData({ ...formData, stage: e.target.value })}
+                    className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="" disabled>اختر المرحلة...</option>
+                    <option value="روضة">روضة</option>
+                    <option value="ابتدائي">ابتدائي</option>
+                    <option value="متوسطة">متوسطة</option>
+                    <option value="اعدادية">اعدادية</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2.5 px-1">وقت الدوام</label>
+                  <select
+                    value={formData.shift}
+                    onChange={e => setFormData({ ...formData, shift: e.target.value })}
+                    className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="" disabled>اختر وقت الدوام...</option>
+                    <option value="صباحي">صباحي</option>
+                    <option value="مسائي">مسائي</option>
+                    <option value="مدمج">مدمج</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2.5 px-1">نوع الدراسة</label>
+                  <select
+                    value={formData.genderType}
+                    onChange={e => setFormData({ ...formData, genderType: e.target.value })}
+                    className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="" disabled>اختر نوع الدراسة...</option>
+                    <option value="مختلطة">مختلطة</option>
+                    <option value="بنات فقط">بنات فقط</option>
+                    <option value="اولاد فقط">اولاد فقط</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2.5 px-1">عدد الطلاب التقريبي</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.approximateStudents}
+                    onChange={e => setFormData({ ...formData, approximateStudents: e.target.value })}
+                    className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+                    placeholder="مثال: 500"
                   />
                 </div>
               </div>

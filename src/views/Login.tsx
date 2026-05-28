@@ -957,43 +957,6 @@ export default function Login() {
               </span>
             </button>
 
-            {inIframe && (
-              <div 
-                id="iframe-active-warning-banner"
-                className="mt-4 p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-slate-800 text-xs shadow-sm flex flex-col gap-3 font-sans transition-all duration-300"
-              >
-                <div className="flex items-start gap-2.5 rtl:flex-row-reverse text-right">
-                  <ShieldAlert className="text-amber-600 shrink-0 mt-0.5 animate-pulse" size={18} />
-                  <div>
-                    <h5 className="font-bold text-amber-900 text-sm">
-                      {isRtl ? "⚠️ تنبيه للمعاينة داخل إطار" : "⚠️ Preview Environment Notice"}
-                    </h5>
-                    <p className="text-slate-600 mt-1 leading-relaxed text-[11px] sm:text-xs">
-                      {isRtl
-                        ? "أنت تشاهد التطبيق داخل إطار المعاينة. تقوم المتصفحات تلقائياً بحظر ملفات تعريف الارتباط للطرف الثالث وتخزين الويب لأسباب أمنية، مما قد يعيق تسجيل الدخول عبر Google ويعرض خطأ (initial state error)."
-                        : "You are viewing the app inside a preview frame. Browsers automatically block third-party cookies & web storage, which may prevent Google Sign-In from completing successfully and show an initial state error."}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.open(window.location.href, "_blank");
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-2 rounded-xl transition-all text-xs active:scale-95 shadow"
-                  >
-                    <ExternalLink size={14} />
-                    <span>{isRtl ? "الفتح في علامة تبويب مستقلة لتسجيل الدخول" : "Open in New Tab to Login"}</span>
-                  </button>
-                </div>
-                <div className="text-[10px] text-slate-400 text-center font-medium">
-                  {isRtl
-                    ? "أو يمكنك بسهولة استخدام البريد الإلكتروني وكلمة المرور دون أي قيود."
-                    : "Or you can easily use Email & Password directly without restrictions."}
-                </div>
-              </div>
-            )}
 
             {unauthorizedDomainError && (
               <div
