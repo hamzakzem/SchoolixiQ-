@@ -353,12 +353,70 @@ export default function Login() {
   const [firebaseProviderError, setFirebaseProviderError] = useState<
     string | null
   >(null);
+  const [nativePlatformNotice, setNativePlatformNotice] = useState<boolean>(false);
+  const [googleClientId, setGoogleClientId] = useState<string>(() => {
+    return localStorage.getItem("override_google_client_id") || 
+      import.meta.env.VITE_GOOGLE_CLIENT_ID || 
+      "377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com";
+  });
+  const [showClientIdConfig, setShowClientIdConfig] = useState<boolean>(false);
+
+  // Check if running as native Capacitor app on Android/iOS
+  const isNativeApp = 
+    window.location.hostname === "localhost" || 
+    window.location.protocol.startsWith("capacitor") || 
+    window.location.protocol.startsWith("file");
 
   const handleGoogleAuth = async () => {
     setUnauthorizedDomainError(null);
     setShowIframeHint(false);
     setFirebaseProviderError(null);
+    setNativePlatformNotice(false);
     setLoading(true);
+
+    if (isNativeApp) {
+      try {
+        const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
+        
+        try {
+          await GoogleAuth.initialize({
+            clientId: googleClientId,
+            scopes: ["profile", "email"],
+            grantOfflineAccess: true,
+          });
+        } catch (initErr) {
+          console.warn("GoogleAuth already initialized or failed to init:", initErr);
+        }
+
+        const googleUser = await GoogleAuth.signIn();
+        if (googleUser && googleUser.authentication?.idToken) {
+          const idToken = googleUser.authentication.idToken;
+          
+          const { GoogleAuthProvider, signInWithCredential } = await import("firebase/auth");
+          const credential = GoogleAuthProvider.credential(idToken);
+          const result = await signInWithCredential(auth, credential);
+          
+          if (result && result.user) {
+            await processGoogleUser(result.user, role, mode);
+            toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
+          }
+        } else {
+          throw new Error("Missing ID Token from Google Auth native plugin.");
+        }
+      } catch (error: any) {
+        console.error("Native Google Auth Error:", error);
+        setNativePlatformNotice(true);
+        setShowClientIdConfig(true);
+        setLoading(false);
+        
+        toast.error(
+          isRtl
+            ? `فشل تسجيل الدخول الأصلي. يرجى تهيئة الـ Client ID وبصمات SHA-1`
+            : `Native login failed. Please configure Web Client ID and SHA-1 fingerprint.`
+        );
+      }
+      return;
+    }
 
     try {
       const provider = new GoogleAuthProvider();
@@ -963,6 +1021,88 @@ export default function Login() {
                       ? "تحت Authorized domains، اضغط على Add domain وألصق النطاق المنسوخ أعلاه."
                       : "Under Authorized domains, click Add domain and paste the copied domain."}
                   </p>
+                </div>
+              </div>
+            )}
+
+            {nativePlatformNotice && (
+              <div
+                id="native-platform-notice-card"
+                className="mt-4 p-4 rounded-xl border-2 border-amber-200 bg-amber-50/50 text-slate-800 text-xs sm:text-sm shadow-sm"
+              >
+                <div className="flex items-start gap-2.5 mb-3">
+                  <ShieldAlert
+                    className="text-amber-600 shrink-0 mt-0.5"
+                    size={20}
+                  />
+                  <div>
+                    <h4 className="font-bold text-amber-950 text-sm">
+                      {isRtl
+                        ? "تفعيل الدخول بـ Google للأجهزة والتطبيقات الكابستور"
+                        : "Native Google Sign-In for Capacitor Mobile Packages"}
+                    </h4>
+                    <p className="text-slate-700 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
+                      {isRtl
+                        ? "أنت تقوم بتشغيل التطبيق حالياً كحزمة هاتف مثبتة (Capacitor WebView). للتسجيل بنجاح ومنع المشاكل الناتجة عن متصفحات الويب الخارجية، قمنا بدمج كود أصلي (Native Plugin) يفتح واجهة نظام التشغيل المباشرة لالتقاط حساب Google."
+                        : "You are running the app inside a mobile package (Capacitor). To prevent login issues with external browsers, we have integrated a native plugin that triggers the native OS account picker seamlessly."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 p-3 rounded-lg border border-slate-200 text-slate-700 space-y-2 text-[11px] sm:text-xs">
+                  <p className="font-bold text-slate-900 border-b border-slate-100 pb-1">
+                    {isRtl ? "💡 كيف تقوم بتهيئة الخدمة للعمل بشكل طبيعي 100%؟" : "💡 How to configure Native Google Auth successfully:"}
+                  </p>
+                  <p>
+                    <strong>{isRtl ? "المتطلب 1: كود الويب (Web Client ID):" : "Requirement 1: Web Client ID:"}</strong>{" "}
+                    {isRtl
+                      ? "اذهب إلى Firebase Console -> الـ Authentication ثم تبويب Sign-in method -> ثم اختر Google -> وقم بنسخ معرّف Web Client ID ولصقه في الحقل أدناه وحفظه لتجربته مباشرة."
+                      : "Go to Firebase Console -> Authentication -> Sign-in method -> edit Google -> copy the Web Client ID, paste it below, and save to test immediately."}
+                  </p>
+                  <p>
+                    <strong>{isRtl ? "المتطلب 2: بصمة SHA-1 للأندرويد:" : "Requirement 2: Android SHA-1 fingerprint:"}</strong>{" "}
+                    {isRtl
+                      ? "يجب إضافة بصمة SHA-1 الخاصة بشهادة التوقيع (Signing Certificate) لملف الـ APK الخاص بك في إعدادات تطبيق الأندرويد داخل Firebase Console وإلا سيرجع جوجل خطأ 'developer_error - 10'."
+                      : "You must add your build's SHA-1 signing certificate fingerprint to your Android app settings in the Firebase Console. Otherwise, Google returning 'developer_error - 10'."}
+                  </p>
+                  <p>
+                    <strong>{isRtl ? "الخيار البديل (الأسرع):" : "Alternative Option (Fastest):"}</strong>{" "}
+                    {isRtl
+                      ? "استخدم البريد الإلكتروني وكلمة المرور لعمل حساب جديد والدخول فوراً بدون أي ضبط إضافي للمفاتيح وبأعلى أمان."
+                      : "Use standard 'Email and Password' to sign in instantly with no extra Google settings is always fully supported."}
+                  </p>
+                </div>
+
+                <div className="mt-4 p-3 rounded-lg border border-slate-200 bg-white shadow-sm font-sans">
+                  <p className="font-bold text-slate-950 text-xs mb-1.5 flex items-center gap-1.5 justify-start">
+                    <Smartphone size={15} className="text-blue-500 animate-pulse" />
+                    <span>{isRtl ? "تعديل واختبار Web Client ID مباشر" : "Live Test Web Client ID Override"}</span>
+                  </p>
+                  <p className="text-[10px] text-slate-500 mb-2 leading-normal">
+                    {isRtl
+                      ? "قم بتحديث المعرّف الذي نسخته من منصة Firebase هنا واحفظه ليتم ربطه بكود تسجيل الدخول مباشرة على جهازك الحالي:"
+                      : "Update your Client ID from Firebase here and click Save to test on your phone in real-time:"}
+                  </p>
+                  
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={googleClientId}
+                      onChange={(e) => setGoogleClientId(e.target.value)}
+                      placeholder="xxxxx-xxxxx.apps.googleusercontent.com"
+                      className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 placeholder-slate-400 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.setItem("override_google_client_id", googleClientId);
+                        toast.success(isRtl ? "تم الحفظ محلياً! اضغط على أيقونة جوجل بالأعلى لإعادة المحاولة" : "Saved locally! Tap Google Sign-In above to retry.");
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded transition-colors active:scale-95 duration-100 shrink-0"
+                    >
+                      {isRtl ? "حفظ" : "Save"}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
