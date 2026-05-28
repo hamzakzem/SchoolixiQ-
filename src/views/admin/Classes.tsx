@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, getDocs, limit, runTransaction, increment, getDoc } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { Search, Plus, Filter, MoreVertical, LayoutDashboard, Trash2, AlertTriangle, X, Users, Edit2, UserPlus, ArrowRightLeft, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -127,21 +127,50 @@ export default function Classes() {
     
     setIsProcessing(true);
     try {
-      await addDoc(collection(db, 'students'), {
-        name: quickNewStudent.name,
-        registrationNumber: quickNewStudent.registrationNumber,
-        classId: selectedClassForStudents.id,
-        schoolId: profile.schoolId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        linkedParents: []
+      const studentId = doc(collection(db, 'students')).id;
+      
+      await runTransaction(db, async (transaction) => {
+        const schoolRef = doc(db, 'schools', profile.schoolId as string);
+        const schoolSnap = await transaction.get(schoolRef);
+        
+        if (!schoolSnap.exists()) throw new Error('المدرسة غير موجودة');
+        
+        const schoolData = schoolSnap.data();
+        const currentCount = schoolData.studentCount || 0;
+        
+        const planId = schoolData.planId || 'basic';
+        const planSnap = await transaction.get(doc(db, 'packages', planId));
+        const maxStudents = planSnap.exists() ? (planSnap.data().maxStudents || 500) : 500;
+        
+        if (currentCount >= maxStudents) {
+          throw new Error(`لقد وصلت للحد الأقصى للطلاب المسموح به في باقتك الحالية (${maxStudents} طالب). يرجى الترقية لإضافة المزيد.`);
+        }
+        
+        transaction.set(doc(db, 'students', studentId), {
+          name: quickNewStudent.name,
+          registrationNumber: quickNewStudent.registrationNumber,
+          classId: selectedClassForStudents.id,
+          schoolId: profile.schoolId,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          linkedParents: []
+        });
+        
+        transaction.update(schoolRef, {
+          studentCount: increment(1)
+        });
       });
+
       toast.success('تمت إضافة الطالب بنجاح');
       setQuickNewStudent({ name: '', registrationNumber: '' });
       setShowQuickAdd(false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'students');
-      toast.error('حدث خطأ أثناء إضافة الطالب');
+    } catch (error: any) {
+      if (error?.message?.includes('الحد الأقصى')) {
+        toast.error(error.message);
+      } else {
+        handleFirestoreError(error, OperationType.WRITE, 'students');
+        toast.error('حدث خطأ أثناء إضافة الطالب');
+      }
     } finally {
       setIsProcessing(false);
     }

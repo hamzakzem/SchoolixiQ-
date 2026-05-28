@@ -730,7 +730,7 @@ export default function SuperAdminDashboard() {
 
     try {
       const schoolsQ = query(collection(db, "schools"), limit(100));
-      const packagesQ = query(collection(db, "packages"), limit(50));
+      const packagesQ = query(collection(db, "packages"), limit(500));
       const usersQ = query(collection(db, "users"), limit(1000));
       const studentsQ = query(collection(db, "students"), limit(1000));
 
@@ -787,7 +787,14 @@ export default function SuperAdminDashboard() {
                 (dp) => !dbIds.includes(dp.id) && !dbPackages.find((dbp: any) => dbp.name === dp.name)
               );
               
-              setPackages([...missingDefaults, ...dbPackages]);
+              const allPackages = [...missingDefaults, ...dbPackages];
+              allPackages.sort((a: any, b: any) => {
+                const timeA = a.createdAt?.seconds || a.createdAt?._seconds || 0;
+                const timeB = b.createdAt?.seconds || b.createdAt?._seconds || 0;
+                return timeB - timeA;
+              });
+              
+              setPackages(allPackages);
             } else {
               setPackages(DEFAULT_PACKAGES);
             }
