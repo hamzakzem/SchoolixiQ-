@@ -223,6 +223,73 @@ export default function Login() {
     return () => unsub();
   }, [mode]);
 
+  const downloadMobileConfig = () => {
+    const profileXML = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>FullScreen</key>
+      <true/>
+      <key>Icon</key>
+      <data>
+        iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAABXklEQVR4nO2WsU4CMRRFb8EILg6OJsYBB3+Co4Oji/8g
+        /of7MjoZsDo6EAcX6XW6pVAeF7pG03uS9gXb0pS778vLqyAiIiIiIiIiIiIiIiIiIiIiIiIiIiIievX09DzMv063BvABrIEtQAfoA8cAtG2fM9K1XpE+sKst
+        q2Fq+77nZf66bY7AIn9dFfV6O1/Zz6B0U+6y5W0H2AKX6iX6p9rZ9oT153uI5yv6U8gYI5+v9KdyqZ5yZ+Q3mOepbE7kK9YpZ0be6m9b6BGrv23r78/S9Zlz
+        9S7lXN9D4Gv+2m/Tfshb6Anb0FfM0f6v+Xv0XbO8beXFfA9GvsIcsU5nzDbyjP31U3O8Tfvk7DlyzH6asV72/99039/Zf39Xvv5PcsR+GvscEWevWe6/XofY
+        DWe6mUfsp/Fj9G+YyZfR/SMyrYn92N8RERERERERERERERERERERERERERERkR79AdA9W8G957+9AAAAAElFTkSuQmCC
+      </data>
+      <key>IsRemovable</key>
+      <true/>
+      <key>Label</key>
+      <string>SchoolixiQ</string>
+      <key>PayloadDescription</key>
+      <string>منصة SchoolixiQ التعليمية</string>
+      <key>PayloadDisplayName</key>
+      <string>SchoolixiQ</string>
+      <key>PayloadIdentifier</key>
+      <string>com.schoolixiq.app</string>
+      <key>PayloadType</key>
+      <string>com.apple.webclip.managed</string>
+      <key>PayloadUUID</key>
+      <string>9B6DB8A9-9A2E-47C2-9852-B3EA5D0408CD</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>URL</key>
+      <string>https://schoolixiq.com</string>
+    </dict>
+  </array>
+  <key>PayloadDisplayName</key>
+  <string>منصة SchoolixiQ</string>
+  <key>PayloadIdentifier</key>
+  <string>com.schoolixiq.profile</string>
+  <key>PayloadOrganization</key>
+  <string>SchoolixiQ</string>
+  <key>PayloadRemovalDisallowed</key>
+  <false/>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadUUID</key>
+  <string>1A3FB4D2-8A7E-41F6-9EF3-94DC2E0407EF</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+</dict>
+</plist>`;
+
+    const blob = new Blob([profileXML], { type: "application/x-apple-aspen-config" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "schoolixiq.mobileconfig";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(isRtl ? "جاري تنزيل ملف التعريف الإلكتروني بنجاح!" : "Downloading profile configuration file successfully!");
+  };
+
   const startDirectInstall = (platform: "android" | "ios") => {
     setInstallingPlatform(platform);
     setInstallProgress(0);
@@ -1472,32 +1539,78 @@ export default function Login() {
                       </button>
                     </div>
                   ) : (
-                    // iOS Instruction Set
-                    <div className="space-y-3 font-bold text-xs text-slate-600 leading-relaxed text-right md:-mr-1">
-                      <p className="text-indigo-600 font-black mb-1">
-                        {isRtl ? "✓ تم إعداد حزمة التثبيت لجهاز الآيفون" : "✓ iOS Installation Package Ready!"}
+                    // iOS Instruction Set with Profile Downloader option
+                    <div className="space-y-4 font-bold text-xs text-slate-800 dark:text-slate-100 leading-relaxed text-right">
+                      <p className="text-indigo-600 font-black text-center text-sm md:text-base mb-2">
+                        {isRtl ? "✓ تم تحضير حزمة التثبيت الذكية للآيفون" : "✓ iOS Smart Installer Ready!"}
                       </p>
-                      
-                      <div className="flex items-start gap-2 bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
-                        <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">1</span>
-                        <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                          {isRtl ? "اضغط على زر المشاركة (Share) في متصفح Safari بالأسفل." : "Tap the 'Share' icon in your bottom Safari browser toolbar."}
+
+                      {/* Professional Automatic iOS Setup */}
+                      <div className="bg-gradient-to-br from-indigo-50/70 to-violet-50/70 dark:from-indigo-950/20 dark:to-violet-950/20 p-4 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/30 text-center">
+                        <p className="font-black text-xs text-indigo-900 dark:text-indigo-200 mb-1">
+                          {isRtl ? "الطريقة الذكية الفورية بنقرتين (موصى بها جداً):" : "Instant Smart Install (Highly Recommended):"}
                         </p>
+                        <p className="text-[11px] text-slate-500 mb-3 font-medium">
+                          {isRtl ? "تنزيل مباشر دون متاجر وبأقصى سرعة تشغيل عبر ملف تعريف معتمد آمن." : "Fast direct install via official secure Apple Web Clip configuration profile."}
+                        </p>
+                        
+                        <button
+                          type="button"
+                          onClick={downloadMobileConfig}
+                          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                        >
+                          <Download size={13} />
+                          {isRtl ? "تحميل وتثبيت فوري للآيفون" : "Download Instant iOS App"}
+                        </button>
+
+                        <div className="mt-3 space-y-2 text-[11px] font-semibold text-slate-600 dark:text-slate-400 text-right bg-white/70 dark:bg-slate-900/50 p-2.5 rounded-xl border border-indigo-50/50">
+                          <p className="font-extrabold text-indigo-700 dark:text-indigo-400">⚠️ خطوتان بسيطتان لإكمال التثبيت على الآيفون:</p>
+                          <p>
+                            {isRtl ? "١. اضغط 'السماح' بالتحميل عند ظهور تنبيه آبل." : "1. Click 'Allow' when the Apple iOS system prompt appears."}
+                          </p>
+                          <p>
+                            {isRtl ? "٢. افتح تطبيق (الإعدادات Settings) بجهازك ثم انقر على (تم تنزيل ملف التعريف) في الأعلى واضغط تثبيت." : "2. Open (Settings) on your device, tap (Profile Downloaded) at the top and select Install."}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="flex items-start gap-2 bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
-                        <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">2</span>
-                        <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                          {isRtl ? "اختر إضافة للشاشة الرئيسية (Add to Home Screen)." : "Scroll down and select 'Add to Home Screen' from the menu."}
-                        </p>
+                      {/* Separation Line */}
+                      <div className="relative flex items-center justify-center my-3">
+                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200/60"></div></div>
+                        <span className="relative px-3 bg-slate-50 text-[10px] text-slate-400 font-extrabold select-none">
+                          {isRtl ? "أو التثبيت اليدوي التقليدي" : "OR Traditional Manual Installation"}
+                        </span>
                       </div>
 
-                      <div className="flex items-start gap-2 bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
-                        <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">3</span>
-                        <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                          {isRtl ? "اضغط على إضافة (Add) في أعلى اليسار لإكمال التثبيت والبدء فوراً." : "Click 'Add' in the top-right corner to place it on your home screen."}
-                        </p>
-                      </div>
+                      {/* Safari Manual Guide */}
+                      <details className="group border border-slate-100 hover:border-slate-200 bg-white hover:bg-slate-50 rounded-2xl transition-all">
+                        <summary className="flex items-center justify-between p-3 text-xs font-black text-slate-700 cursor-pointer select-none">
+                          <span>{isRtl ? "عرض طريقة التثبيت اليدوي عبر متصفح سفاري" : "View manual installation instructions for Safari"}</span>
+                          <span className="transition-transform group-open:rotate-180">▼</span>
+                        </summary>
+                        <div className="p-3 pt-0 border-t border-slate-50 space-y-3">
+                          <div className="flex items-start gap-2 pt-2.5">
+                            <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">1</span>
+                            <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                              {isRtl ? "اضغط على زر المشاركة (Share) في متصفح Safari بالأسفل." : "Tap the 'Share' icon in your bottom Safari browser toolbar."}
+                            </p>
+                          </div>
+
+                          <div className="flex items-start gap-2">
+                            <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">2</span>
+                            <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                              {isRtl ? "اختر إضافة للشاشة الرئيسية (Add to Home Screen)." : "Scroll down and select 'Add to Home Screen' from the menu."}
+                            </p>
+                          </div>
+
+                          <div className="flex items-start gap-2">
+                            <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">3</span>
+                            <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                              {isRtl ? "اضغط على إضافة (Add) في أعلى اليسار لإكمال التثبيت والبدء فوراً." : "Click 'Add' in the top-right corner to place it on your home screen."}
+                            </p>
+                          </div>
+                        </div>
+                      </details>
                     </div>
                   )}
 
