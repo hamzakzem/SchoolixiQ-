@@ -123,6 +123,12 @@ const AppContent = () => {
     email: "",
     address: "",
     password: "",
+    governorate: "",
+    directorate: "",
+    stage: "",
+    shift: "",
+    genderType: "",
+    approximateStudents: "",
   });
 
   // Automatic Parent Provisioning with Student Link
@@ -643,7 +649,7 @@ const AppContent = () => {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (!subscriptionForm.name || !subscriptionForm.phone || !subscriptionForm.address) {
+                    if (!subscriptionForm.name || !subscriptionForm.phone || !subscriptionForm.address || !subscriptionForm.governorate) {
                       toast.error("يرجى ملء كافة الحقول");
                       return;
                     }
@@ -652,8 +658,8 @@ const AppContent = () => {
                   className="space-y-4"
                 >
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">
-                      اسم المدرسة
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                      {isRtl ? "اسم المؤسسة التعليمة" : "School Name"}
                     </label>
                     <input
                       required
@@ -665,13 +671,174 @@ const AppContent = () => {
                           name: e.target.value,
                         })
                       }
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 transition-colors font-bold text-slate-700"
-                      placeholder="مدرسة المستقبل الأهلية"
+                      className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
+                      placeholder={isRtl ? "اسم المدرسة..." : "Enter school name..."}
                     />
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                        {isRtl ? "المحافظة" : "Governorate"}
+                      </label>
+                      <select
+                        required
+                        value={subscriptionForm.governorate}
+                        onChange={(e) =>
+                          setSubscriptionForm({
+                            ...subscriptionForm,
+                            governorate: e.target.value,
+                          })
+                        }
+                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
+                      >
+                        <option value="" disabled>
+                          {isRtl ? "اختر المحافظة..." : "Select..."}
+                        </option>
+                        <option value="بغداد">{isRtl ? "بغداد" : "Baghdad"}</option>
+                        <option value="البصرة">{isRtl ? "البصرة" : "Basra"}</option>
+                        <option value="نينوى">{isRtl ? "نينوى" : "Nineveh"}</option>
+                        <option value="أربيل">{isRtl ? "أربيل" : "Erbil"}</option>
+                        <option value="النجف">{isRtl ? "النجف" : "Najaf"}</option>
+                        <option value="ذي قار">{isRtl ? "ذي قار" : "Dhi Qar"}</option>
+                        <option value="كركوك">{isRtl ? "كركوك" : "Kirkuk"}</option>
+                        <option value="الأنبار">{isRtl ? "الأنبار" : "Anbar"}</option>
+                        <option value="ديالى">{isRtl ? "ديالى" : "Diyala"}</option>
+                        <option value="المثنى">{isRtl ? "المثنى" : "Muthanna"}</option>
+                        <option value="القادسية">{isRtl ? "القادسية (الديوانية)" : "Qadisiyah (Diwaniyah)"}</option>
+                        <option value="ميسان">{isRtl ? "ميسان" : "Maysan"}</option>
+                        <option value="واسط">{isRtl ? "واسط" : "Wasit"}</option>
+                        <option value="صلاح الدين">{isRtl ? "صلاح الدين" : "Salah al-Din"}</option>
+                        <option value="دهوك">{isRtl ? "دهوك" : "Duhok"}</option>
+                        <option value="السليمانية">{isRtl ? "السليمانية" : "Sulaymaniyah"}</option>
+                        <option value="بابل">{isRtl ? "بابل" : "Babylon"}</option>
+                        <option value="كربلاء">{isRtl ? "كربلاء" : "Karbala"}</option>
+                        <option value="حلبجة">{isRtl ? "حلبجة" : "Halabja"}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                        {isRtl ? "المديرية" : "Directorate"}
+                      </label>
+                      <select
+                        required
+                        value={subscriptionForm.directorate}
+                        onChange={(e) =>
+                          setSubscriptionForm({
+                            ...subscriptionForm,
+                            directorate: e.target.value,
+                          })
+                        }
+                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
+                      >
+                        <option value="" disabled>
+                          {isRtl ? "اختر المديرية..." : "Select..."}
+                        </option>
+                        <option value="مديرية الكرخ الاولى">{isRtl ? "مديرية الكرخ الاولى" : "Karkh 1st"}</option>
+                        <option value="مديرية الكرخ الثانية">{isRtl ? "مديرية الكرخ الثانية" : "Karkh 2nd"}</option>
+                        <option value="مديرية الكرخ الثالثه">{isRtl ? "مديرية الكرخ الثالثه" : "Karkh 3rd"}</option>
+                        <option value="مديرية الرصافة الاولى">{isRtl ? "مديرية الرصافة الاولى" : "Rusafa 1st"}</option>
+                        <option value="مديرية الرصافة الثانية">{isRtl ? "مديرية الرصافة الثانية" : "Rusafa 2nd"}</option>
+                        <option value="مديرية الرصافة الثالثه">{isRtl ? "مديرية الرصافة الثالثه" : "Rusafa 3rd"}</option>
+                        <option value="أخرى / مديرية أخرى">{isRtl ? "أخرى / مديرية أخرى" : "Other Directorate"}</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                        {isRtl ? "المرحلة الدراسية" : "Stage"}
+                      </label>
+                      <select
+                        required
+                        value={subscriptionForm.stage}
+                        onChange={(e) =>
+                          setSubscriptionForm({
+                            ...subscriptionForm,
+                            stage: e.target.value,
+                          })
+                        }
+                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
+                      >
+                        <option value="" disabled>
+                          {isRtl ? "اختر المرحلة..." : "Select..."}
+                        </option>
+                        <option value="روضة">{isRtl ? "روضة" : "Kindergarten"}</option>
+                        <option value="ابتدائي">{isRtl ? "ابتدائي" : "Primary"}</option>
+                        <option value="متوسطة">{isRtl ? "متوسطة" : "Middle School"}</option>
+                        <option value="اعدادية">{isRtl ? "اعدادية" : "High School"}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                        {isRtl ? "وقت الدوام" : "Shift"}
+                      </label>
+                      <select
+                        required
+                        value={subscriptionForm.shift}
+                        onChange={(e) =>
+                          setSubscriptionForm({
+                            ...subscriptionForm,
+                            shift: e.target.value,
+                          })
+                        }
+                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
+                      >
+                        <option value="" disabled>
+                          {isRtl ? "اختر وقت الدوام..." : "Select..."}
+                        </option>
+                        <option value="صباحي">{isRtl ? "صباحي" : "Morning Shift"}</option>
+                        <option value="مسائي">{isRtl ? "مسائي" : "Evening Shift"}</option>
+                        <option value="مدمج">{isRtl ? "مدمج" : "Merged/Joint Shift"}</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                        {isRtl ? "نوع الدراسة" : "Gender Type"}
+                      </label>
+                      <select
+                        required
+                        value={subscriptionForm.genderType}
+                        onChange={(e) =>
+                          setSubscriptionForm({
+                            ...subscriptionForm,
+                            genderType: e.target.value,
+                          })
+                        }
+                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
+                      >
+                        <option value="" disabled>
+                          {isRtl ? "اختر نوع الدراسة..." : "Select..."}
+                        </option>
+                        <option value="مختلطة">{isRtl ? "مختلطة" : "Co-educational"}</option>
+                        <option value="بنات فقط">{isRtl ? "بنات فقط" : "Girls Only"}</option>
+                        <option value="اولاد فقط">{isRtl ? "اولاد فقط" : "Boys Only"}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                        {isRtl ? "عدد الطلاب التقريبي" : "Approx. Students"}
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min="1"
+                        value={subscriptionForm.approximateStudents}
+                        onChange={(e) =>
+                          setSubscriptionForm({
+                            ...subscriptionForm,
+                            approximateStudents: e.target.value,
+                          })
+                        }
+                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
+                        placeholder={isRtl ? "مثال: 500" : "e.g. 500"}
+                      />
+                    </div>
+                  </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">
-                      رقم هاتف الإدارة
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                      {isRtl ? "رقم هاتف الإدارة" : "Phone Number"}
                     </label>
                     <input
                       required
@@ -683,14 +850,14 @@ const AppContent = () => {
                           phone: e.target.value,
                         })
                       }
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 transition-colors font-bold text-slate-700 text-left"
+                      className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700 text-left"
                       dir="ltr"
                       placeholder="07XXXXXXXXXX"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">
-                      العنوان التفصيلي
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                      {isRtl ? "العنوان التفصيلي" : "Location"}
                     </label>
                     <input
                       required
@@ -702,8 +869,8 @@ const AppContent = () => {
                           address: e.target.value,
                         })
                       }
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 transition-colors font-bold text-slate-700"
-                      placeholder="المحافظة - القضاء - الحي"
+                      className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
+                      placeholder={isRtl ? "المحافظة - القضاء - الحي..." : "Address..."}
                     />
                   </div>
 
@@ -776,10 +943,24 @@ const AppContent = () => {
                     </span>
                     <span className="text-slate-500 text-sm">{isRtl ? "السعر" : "Price"}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between border-b pb-2">
                     <span className="font-bold text-slate-900">{subscriptionForm.name}</span>
                     <span className="text-slate-500 text-sm">{isRtl ? "اسم المدرسة" : "School Name"}</span>
                   </div>
+                  {(subscriptionForm.governorate || subscriptionForm.directorate) && (
+                    <div className="flex justify-between border-b pb-2">
+                      <span className="font-bold text-slate-900">
+                        {subscriptionForm.governorate} {subscriptionForm.directorate ? `- ${subscriptionForm.directorate}` : ""}
+                      </span>
+                      <span className="text-slate-500 text-sm">{isRtl ? "الموقع" : "Location"}</span>
+                    </div>
+                  )}
+                  {subscriptionForm.stage && (
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-900">{subscriptionForm.stage}</span>
+                      <span className="text-slate-500 text-sm">{isRtl ? "المرحلة الدراسية" : "Stage"}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-between gap-3">
@@ -812,6 +993,12 @@ const AppContent = () => {
                               name: subscriptionForm.name,
                               phone: subscriptionForm.phone,
                               address: subscriptionForm.address,
+                              governorate: subscriptionForm.governorate,
+                              directorate: subscriptionForm.directorate,
+                              stage: subscriptionForm.stage,
+                              shift: subscriptionForm.shift,
+                              genderType: subscriptionForm.genderType,
+                              approximateStudents: subscriptionForm.approximateStudents,
                               packageName: selectedPackage.name,
                               packageId: selectedPackage.id,
                               price: actualPrice,

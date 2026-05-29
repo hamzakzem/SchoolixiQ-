@@ -765,6 +765,30 @@ async function startServer() {
                     <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${customerAddress}</td>
                   </tr>
                   <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">المحافظة</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.governorate || 'غير محدد'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">المديرية</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.directorate || 'غير محدد'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">المرحلة الدراسية</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.stage || 'غير محدد'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">وقت الدوام</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.shift || 'غير محدد'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">نوع الدراسة</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.genderType || 'غير محدد'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">العدد التقريبي للطلاب</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.approximateStudents || 'غير محدد'}</td>
+                  </tr>
+                  <tr>
                     <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">الباقة المطلوبة</td>
                     <td style="padding: 12px; border-bottom: 1px solid #eee; color: #2980b9; font-weight: bold;">${packageName}</td>
                   </tr>
