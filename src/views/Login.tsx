@@ -1587,8 +1587,6 @@ export default function Login() {
                         <div className="pr-8 space-y-3">
                           <a
                             href="/api/download/schoolixiq.mobileconfig"
-                            target="_blank"
-                            rel="noopener noreferrer"
                             onClick={() => {
                               toast.success(isRtl ? "جاري تحضير ملف التعريف وتنزيله بنجاح..." : "Preparing and downloading configuration profile...");
                             }}
