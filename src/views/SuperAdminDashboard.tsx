@@ -2942,7 +2942,7 @@ export default function SuperAdminDashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         key={request.id}
-                        className="bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 md:gap-6 xl:gap-8 transition-all hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 group relative"
+                        className="bg-white dark:bg-slate-900 p-5 sm:p-6 lg:p-8 rounded-[1.5rem] lg:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 lg:gap-6 transition-all hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 group relative"
                       >
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 flex-1 w-full">
                           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors duration-500 shrink-0">
@@ -3056,29 +3056,29 @@ export default function SuperAdminDashboard() {
                           </div>
                         </div>
 
-                        <div className="flex flex-row xl:flex-col items-center xl:items-end justify-between xl:justify-center gap-1 px-3 sm:px-4 xl:px-8 py-3 xl:py-0 bg-slate-50/50 xl:bg-transparent rounded-2xl xl:rounded-none xl:border-r border-slate-100 dark:border-slate-800 h-full w-full xl:w-auto mt-2 xl:mt-0">
+                        <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between lg:justify-center gap-1 px-3 sm:px-4 lg:px-8 py-3 lg:py-0 bg-slate-50/50 lg:bg-transparent rounded-2xl lg:rounded-none lg:border-r border-slate-100 dark:border-slate-800 h-full w-full lg:w-auto mt-2 lg:mt-0">
                           <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter shrink-0">
                             نوع الطلب
                           </span>
-                          <span className="text-slate-900 dark:text-white font-black text-sm sm:text-base md:text-lg tracking-tighter uppercase whitespace-nowrap text-right">
+                          <span className="text-slate-900 dark:text-white font-black text-sm sm:text-base tracking-tighter uppercase whitespace-nowrap text-right">
                             {request.type === "renewal_request"
                                 ? "تجديد اشتراك"
                                 : "اشتراك جديد"}
                           </span>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row gap-3 xl:gap-4 items-stretch sm:items-center w-full xl:w-auto mt-2 xl:mt-0">
+                        <div className="flex items-center gap-2 lg:gap-3 w-full lg:w-max mt-4 lg:mt-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800 shrink-0">
                           {deleteConfirmId === request.id ? (
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-2xl border border-red-100 dark:border-red-900/30 animate-in fade-in zoom-in duration-300 w-full">
+                            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-xl border border-red-100 dark:border-red-900/30 animate-in fade-in zoom-in w-full lg:w-auto">
                               <button
                                 onClick={() => handleDeleteRequest(request)}
-                                className="px-4 md:px-6 py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-all active:scale-95 whitespace-nowrap"
+                                className="flex-1 lg:flex-none px-4 py-2.5 bg-red-600 text-white rounded-lg font-bold text-xs hover:bg-red-700 transition-all active:scale-95 whitespace-nowrap"
                               >
                                 تأكيد الحذف
                               </button>
                               <button
                                 onClick={() => setDeleteConfirmId(null)}
-                                className="px-4 md:px-6 py-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95 whitespace-nowrap"
+                                className="flex-1 lg:flex-none px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-xs hover:bg-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95 whitespace-nowrap"
                               >
                                 إلغاء
                               </button>
@@ -3117,9 +3117,9 @@ export default function SuperAdminDashboard() {
                                   }
                                   handleApproveRequest(request);
                                 }}
-                                className="w-full sm:w-auto px-6 xl:px-8 py-3.5 xl:py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-600 dark:hover:bg-blue-700 transition-all active:scale-90 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/10 cursor-pointer relative z-30 whitespace-nowrap"
+                                className="flex-1 lg:flex-none px-4 py-2.5 bg-slate-900 dark:bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-600 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm whitespace-nowrap text-xs"
                               >
-                                <CheckCircle size={20} />
+                                <CheckCircle size={16} />
                                 {request._source === "subscriptionRequests" &&
                                 request.schoolId
                                   ? "تفعيل فوري"
@@ -3132,14 +3132,13 @@ export default function SuperAdminDashboard() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  console.log("Delete click:", request.id);
                                   setDeleteConfirmId(request.id);
                                 }}
-                                className="w-full sm:w-auto px-4 xl:px-6 h-12 xl:h-14 bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 rounded-2xl font-black hover:bg-red-600 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 border border-red-100 dark:border-red-900/30 cursor-pointer active:scale-95 relative z-30 shadow-sm whitespace-nowrap"
-                                title="حذف نهائي"
+                                className="flex-1 lg:flex-none px-4 py-2.5 bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 border border-red-100 dark:border-red-900/30 cursor-pointer active:scale-95 shadow-sm whitespace-nowrap text-xs"
+                                title="إلغاء الطلب"
                               >
-                                <XCircle size={20} />
-                                <span>إلغاء الطلب</span>
+                                <XCircle size={16} />
+                                <span>إلغاء</span>
                               </button>
                             </>
                           )}
