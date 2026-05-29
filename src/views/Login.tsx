@@ -1541,76 +1541,72 @@ export default function Login() {
                   ) : (
                     // iOS Instruction Set with Profile Downloader option
                     <div className="space-y-4 font-bold text-xs text-slate-800 dark:text-slate-100 leading-relaxed text-right">
-                      <p className="text-indigo-600 font-black text-center text-sm md:text-base mb-2">
-                        {isRtl ? "✓ تم تحضير حزمة التثبيت الذكية للآيفون" : "✓ iOS Smart Installer Ready!"}
+                      <p className="text-emerald-600 dark:text-emerald-400 font-extrabold text-center text-sm md:text-base mb-1 flex items-center justify-center gap-1">
+                        <span>✨</span>
+                        {isRtl ? "تم تحضير طريقتين ميسّرتين لتثبيت التطبيق على الآيفون" : "Two easy ways prepared for iOS Installation!"}
                       </p>
 
-                      {/* Professional Automatic iOS Setup */}
-                      <div className="bg-gradient-to-br from-indigo-50/70 to-violet-50/70 dark:from-indigo-950/20 dark:to-violet-950/20 p-4 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/30 text-center">
-                        <p className="font-black text-xs text-indigo-900 dark:text-indigo-200 mb-1">
-                          {isRtl ? "الطريقة الذكية الفورية بنقرتين (موصى بها جداً):" : "Instant Smart Install (Highly Recommended):"}
+                      {/* Method 1: The Official Safari App Store Method (Add to Home Screen) - Safe, built-in, trusted, 100% sign status */}
+                      <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/10 p-4 rounded-3xl border border-emerald-100/60 dark:border-emerald-900/40 text-right">
+                        <div className="flex items-center gap-2 mb-2 font-black text-emerald-900 dark:text-emerald-200">
+                          <span className="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs">١</span>
+                          <span className="text-xs sm:text-sm font-black">{isRtl ? "طريقة سفاري الفورية (موصى بها جداً - آمنة وموثوقة 100٪)" : "Official Safari Method (Highly Recommended - 100% Secure)"}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-8">
+                          {isRtl 
+                            ? "طريقة آبل الرسمية المعتمدة التي تضمن لك تثبيت فوري آمن وموثوق تماماً، بدون ظهور أي رسائل تحذيرية أو حاجة للدخول في إعدادات الهاتف."
+                            : "Apple's native secure method. Guarantees a fully trusted install directly, with no system configuration warning screens."}
                         </p>
-                        <p className="text-[11px] text-slate-500 mb-3 font-medium">
-                          {isRtl ? "تنزيل مباشر دون متاجر وبأقصى سرعة تشغيل عبر ملف تعريف معتمد آمن." : "Fast direct install via official secure Apple Web Clip configuration profile."}
-                        </p>
-                        
-                        <button
-                          type="button"
-                          onClick={downloadMobileConfig}
-                          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
-                        >
-                          <Download size={13} />
-                          {isRtl ? "تحميل وتثبيت فوري للآيفون" : "Download Instant iOS App"}
-                        </button>
 
-                        <div className="mt-3 space-y-2 text-[11px] font-semibold text-slate-600 dark:text-slate-400 text-right bg-white/70 dark:bg-slate-900/50 p-2.5 rounded-xl border border-indigo-50/50">
-                          <p className="font-extrabold text-indigo-700 dark:text-indigo-400">⚠️ خطوتان بسيطتان لإكمال التثبيت على الآيفون:</p>
-                          <p>
-                            {isRtl ? "١. اضغط 'السماح' بالتحميل عند ظهور تنبيه آبل." : "1. Click 'Allow' when the Apple iOS system prompt appears."}
-                          </p>
-                          <p>
-                            {isRtl ? "٢. افتح تطبيق (الإعدادات Settings) بجهازك ثم انقر على (تم تنزيل ملف التعريف) في الأعلى واضغط تثبيت." : "2. Open (Settings) on your device, tap (Profile Downloaded) at the top and select Install."}
-                          </p>
+                        <div className="space-y-2.5 pr-8 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-emerald-600">•</span>
+                            <p>
+                              {isRtl ? "اضغط على زر المشاركة (Share) في شريط متصفح Safari بالأسفل." : "Tap the Share icon in iOS Safari (bottom bar)."}
+                            </p>
+                          </div>
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-emerald-600">•</span>
+                            <p>
+                              {isRtl ? "اختر إضافة للشاشة الرئيسية (Add to Home Screen)." : "Select 'Add to Home Screen'."}
+                            </p>
+                          </div>
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-emerald-600">•</span>
+                            <p>
+                              {isRtl ? "انقر على إضافة (Add) في أعلى اليسار لبدء استخدام التطبيق فوراً وبشكل كامل." : "Tap 'Add' at the top right to launch instantly."}
+                            </p>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Separation Line */}
-                      <div className="relative flex items-center justify-center my-3">
-                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200/60"></div></div>
-                        <span className="relative px-3 bg-slate-50 text-[10px] text-slate-400 font-extrabold select-none">
-                          {isRtl ? "أو التثبيت اليدوي التقليدي" : "OR Traditional Manual Installation"}
-                        </span>
-                      </div>
+                      {/* Method 2: Config Profile File */}
+                      <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/50 dark:from-indigo-950/10 dark:to-violet-950/10 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-right">
+                        <div className="flex items-center gap-2 mb-2 font-black text-slate-800 dark:text-slate-200">
+                          <span className="w-6 h-6 rounded-lg bg-indigo-500 text-white flex items-center justify-center text-xs">٢</span>
+                          <span className="text-xs sm:text-sm font-black">{isRtl ? "طريقة ملف التعريف التلقائي بنقرة واحدة" : "Or Download Secure iOS Configuration Profile"}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-8">
+                          {isRtl 
+                            ? "يتيح لك تثبيت فوري بنقرة واحدة. عند تنزيل ملف التعريف، من الطبيعي تماماً لجميع التطبيقات والمنصات الخارجية المستقلة أن يظهر لك نظام iOS عبارة (لم يتم التوقيع - Unsigned) باللون الأحمر لأنها لا تعتمد على حساب مطور تجاري مدفوع، وهي آمنة تماماً ومضمونة 100% ولا تسبب أي مشاكل."
+                            : "Download custom shortcut profile. Note that iOS naturally labels local profiles as 'Unsigned' (Not Signed), which is standard for custom clips, but perfectly safe."}
+                        </p>
 
-                      {/* Safari Manual Guide */}
-                      <details className="group border border-slate-100 hover:border-slate-200 bg-white hover:bg-slate-50 rounded-2xl transition-all">
-                        <summary className="flex items-center justify-between p-3 text-xs font-black text-slate-700 cursor-pointer select-none">
-                          <span>{isRtl ? "عرض طريقة التثبيت اليدوي عبر متصفح سفاري" : "View manual installation instructions for Safari"}</span>
-                          <span className="transition-transform group-open:rotate-180">▼</span>
-                        </summary>
-                        <div className="p-3 pt-0 border-t border-slate-50 space-y-3">
-                          <div className="flex items-start gap-2 pt-2.5">
-                            <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">1</span>
-                            <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                              {isRtl ? "اضغط على زر المشاركة (Share) في متصفح Safari بالأسفل." : "Tap the 'Share' icon in your bottom Safari browser toolbar."}
-                            </p>
-                          </div>
+                        <div className="pr-8 space-y-3">
+                          <button
+                            type="button"
+                            onClick={downloadMobileConfig}
+                            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                          >
+                            <Download size={13} />
+                            {isRtl ? "تنزيل وتثبيت الملف بنقرة واحدة" : "Download Configuration Profile"}
+                          </button>
 
-                          <div className="flex items-start gap-2">
-                            <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">2</span>
-                            <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                              {isRtl ? "اختر إضافة للشاشة الرئيسية (Add to Home Screen)." : "Scroll down and select 'Add to Home Screen' from the menu."}
-                            </p>
-                          </div>
-
-                          <div className="flex items-start gap-2">
-                            <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">3</span>
-                            <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                              {isRtl ? "اضغط على إضافة (Add) في أعلى اليسار لإكمال التثبيت والبدء فوراً." : "Click 'Add' in the top-right corner to place it on your home screen."}
-                            </p>
+                          <div className="text-[10px] bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100/80 dark:border-slate-800/80 leading-normal text-slate-500 font-medium">
+                            {isRtl ? "طريقة التشغيل بعد التحميل: اضغط 'سماح' للتنزيل، ثم افتح تطبيق (الإعدادات بجهازك Settings) واضغط على (تم تنزيل ملف التعريف) بالأعلى، ثم اضغط على تثبيت." : "Activation context: tap Allow, then go to Settings on your device, tap (Profile Downloaded) at the top and select Install."}
                           </div>
                         </div>
-                      </details>
+                      </div>
                     </div>
                   )}
 
