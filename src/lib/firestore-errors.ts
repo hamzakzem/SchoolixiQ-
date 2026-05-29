@@ -27,7 +27,7 @@ export interface FirestoreErrorInfo {
   }
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null, shouldThrow = true) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -57,5 +57,8 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     }
   });
 
-  throw new Error(JSON.stringify(errInfo));
+  // Only throw error for state mutation/write operations to prevent read/list sockets from crashing the React rendering tree
+  if (shouldThrow && [OperationType.CREATE, OperationType.UPDATE, OperationType.DELETE, OperationType.WRITE].includes(operationType)) {
+    throw new Error(JSON.stringify(errInfo));
+  }
 }

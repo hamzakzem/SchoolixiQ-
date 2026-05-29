@@ -863,20 +863,22 @@ const queryClient = new QueryClient({
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  fallback: ReactNode;
+  fallback: ReactNode | ((error: Error | null) => ReactNode);
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
+  error: Error | null;
 }
 
 class SafeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = {
-    hasError: false
+    hasError: false,
+    error: null
   };
 
-  public static getDerivedStateFromError(_: Error): ErrorBoundaryState {
-    return { hasError: true };
+  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -887,16 +889,21 @@ class SafeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
   public render() {
     const props = (this as any).props;
     if (this.state.hasError) {
+      if (typeof props.fallback === 'function') {
+        return props.fallback(this.state.error);
+      }
       return props.fallback;
     }
     return props.children;
   }
 }
 
-function FallbackComponent() {
+function FallbackComponent({ error }: { error?: Error | null }) {
+  const [showDetails, setShowDetails] = useState(false);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-transparent p-6 text-center">
-      <div className="max-w-md bg-white p-8 rounded-3xl shadow-xl">
+      <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
         <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
         <h1 className="text-xl font-bold text-slate-900 mb-2">
           عذراً، حدث خطأ غير متوقع
@@ -904,12 +911,53 @@ function FallbackComponent() {
         <p className="text-slate-500 mb-6">
           تم تسجيل الخطأ وجاري العمل على حله. يرجى إعادة تحميل الصفحة.
         </p>
+
         <button
           onClick={() => window.location.reload()}
-          className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors"
+          className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
         >
+          <RefreshCw className="w-4 h-4 animate-spin-hover" />
           إعادة تحميل الصفحة
         </button>
+
+        {error && (
+          <div className="mt-6 border-t border-slate-100 pt-4 text-right">
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1 cursor-pointer focus:outline-none"
+            >
+              <span>{showDetails ? "إخفاء التفاصيل الفنية للخطأ" : "عرض التفاصيل الفنية للخطأ"}</span>
+              <span className="text-[10px]">
+                {showDetails ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {showDetails && (
+              <div className="mt-3 bg-slate-50 p-4 rounded-xl border border-slate-200/60 overflow-x-auto text-left max-h-60">
+                <p className="text-[11px] font-bold text-red-600 font-mono mb-2 break-all">
+                  [Error] {error.name || "Error"}: {error.message}
+                </p>
+                {error.stack && (
+                  <pre className="text-[10px] text-slate-600 font-mono whitespace-pre-wrap word-break-all leading-relaxed max-h-40 overflow-y-auto">
+                    {error.stack}
+                  </pre>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `Error: ${error.message}\nStack: ${error.stack || "N/A"}`
+                    );
+                    toast.success("تم نسخ التفاصيل الفنية لحافظة المطور بنجاح!");
+                  }}
+                  className="mt-3 text-[10px] bg-slate-200 text-slate-700 hover:bg-slate-300 px-2 py-1 rounded border border-slate-300 font-sans cursor-pointer focus:outline-none"
+                >
+                  نسخ تفاصيل الخطأ
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -917,7 +965,7 @@ function FallbackComponent() {
 
 export default function App() {
   return (
-    <SafeErrorBoundary fallback={<FallbackComponent />}>
+    <SafeErrorBoundary fallback={(err) => <FallbackComponent error={err} />}>
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
           <AuthProvider>

@@ -710,8 +710,13 @@ export default function SuperAdminDashboard() {
       };
 
       unsubs.push(
-        onSnapshot(schoolsQ, (snap) =>
-          setSchools(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
+        onSnapshot(
+          schoolsQ,
+          (snap) => setSchools(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
+          (error) => {
+            console.error("SuperAdminDashboard: Failed to listen to schools:", error);
+            handleFirestoreError(error, OperationType.GET, "schools", false);
+          }
         ),
       );
       unsubs.push(
@@ -728,50 +733,82 @@ export default function SuperAdminDashboard() {
           },
           (err) => {
             console.warn("Packages subscription failed, using defaults", err);
+            handleFirestoreError(err, OperationType.GET, "packages", false);
             setPackages(DEFAULT_PACKAGES);
           },
         ),
       );
       unsubs.push(
-        onSnapshot(usersQ, (snap) =>
-          setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
+        onSnapshot(
+          usersQ,
+          (snap) => setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
+          (error) => {
+            console.error("SuperAdminDashboard: Failed to listen to users:", error);
+            handleFirestoreError(error, OperationType.GET, "users", false);
+          }
         ),
       );
       unsubs.push(
-        onSnapshot(studentsQ, (snap) =>
-          setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
+        onSnapshot(
+          studentsQ,
+          (snap) => setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
+          (error) => {
+            console.error("SuperAdminDashboard: Failed to listen to students:", error);
+            handleFirestoreError(error, OperationType.GET, "students", false);
+          }
         ),
       );
 
       unsubs.push(
-        onSnapshot(regQ, (snap) => {
-          currentReg = snap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-            _source: "registrations",
-          }));
-          updateRequests();
-        }),
+        onSnapshot(
+          regQ,
+          (snap) => {
+            currentReg = snap.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+              _source: "registrations",
+            }));
+            updateRequests();
+          },
+          (error) => {
+            console.error("SuperAdminDashboard: Failed to listen to registrations:", error);
+            handleFirestoreError(error, OperationType.GET, "registrations", false);
+          }
+        ),
       );
       unsubs.push(
-        onSnapshot(subReqQ, (snap) => {
-          currentSubReq = snap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-            _source: "subscriptionRequests",
-          }));
-          updateRequests();
-        }),
+        onSnapshot(
+          subReqQ,
+          (snap) => {
+            currentSubReq = snap.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+              _source: "subscriptionRequests",
+            }));
+            updateRequests();
+          },
+          (error) => {
+            console.error("SuperAdminDashboard: Failed to listen to subscriptionRequests:", error);
+            handleFirestoreError(error, OperationType.GET, "subscriptionRequests", false);
+          }
+        ),
       );
       unsubs.push(
-        onSnapshot(ordersQ, (snap) => {
-          currentOrders = snap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-            _source: "orders",
-          }));
-          updateRequests();
-        }),
+        onSnapshot(
+          ordersQ,
+          (snap) => {
+            currentOrders = snap.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+              _source: "orders",
+            }));
+            updateRequests();
+          },
+          (error) => {
+            console.error("SuperAdminDashboard: Failed to listen to orders:", error);
+            handleFirestoreError(error, OperationType.GET, "orders", false);
+          }
+        ),
       );
     } catch (error) {
       console.error("Error setting up SuperAdmin Dashboard listeners:", error);

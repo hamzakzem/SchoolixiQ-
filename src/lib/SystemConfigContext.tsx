@@ -125,6 +125,8 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         }
         document.title = appName;
       }
+    }, (error) => {
+      console.warn("System config real-time listener failed, falling back to local/cached state:", error);
     });
 
     return () => unsub();
