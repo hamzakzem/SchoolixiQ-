@@ -2271,23 +2271,35 @@ export default function SuperAdminDashboard() {
                                       ID: {school.id?.slice(0, 8)}
                                     </span>
                                     {school.governorate && (
-                                      <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-bold max-w-[180px]">
-                                        {school.governorate}{" "}
-                                        {school.directorate
-                                          ? ` - ${school.directorate}`
-                                          : ""}
-                                        {school.stage
-                                          ? ` - ${school.stage}`
-                                          : ""}
-                                        {school.shift
-                                          ? ` - ${school.shift}`
-                                          : ""}
-                                        {school.genderType
-                                          ? ` - ${school.genderType}`
-                                          : ""}
-                                        {school.approximateStudents
-                                          ? ` - ${school.approximateStudents} طالب تقريباً`
-                                          : ""}
+                                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5 max-w-xs">
+                                        <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800">
+                                          {school.governorate}
+                                        </span>
+                                        {school.directorate && (
+                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800">
+                                            {school.directorate}
+                                          </span>
+                                        )}
+                                        {school.stage && (
+                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800">
+                                            {school.stage}
+                                          </span>
+                                        )}
+                                        {school.shift && (
+                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800">
+                                            {school.shift}
+                                          </span>
+                                        )}
+                                        {school.genderType && (
+                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800">
+                                            {school.genderType}
+                                          </span>
+                                        )}
+                                        {school.approximateStudents && (
+                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 border border-cyan-100 dark:border-cyan-800">
+                                            {school.approximateStudents} طالب تقريباً
+                                          </span>
+                                        )}
                                       </div>
                                     )}
                                     {school.address && (
@@ -2977,6 +2989,51 @@ export default function SuperAdminDashboard() {
                             </div>
                             
                             <div className="flex flex-wrap gap-2">
+                              {request.governorate && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                                  <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
+                                    {request.governorate}
+                                  </span>
+                                </div>
+                              )}
+                              {request.directorate && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/10 rounded-lg border border-indigo-100 dark:border-indigo-900/30">
+                                  <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400">
+                                    {request.directorate}
+                                  </span>
+                                </div>
+                              )}
+                              {request.stage && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
+                                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                                    {request.stage}
+                                  </span>
+                                </div>
+                              )}
+                              {request.shift && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                  <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                                    {request.shift}
+                                  </span>
+                                </div>
+                              )}
+                              {request.genderType && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-900/30">
+                                  <span className="text-xs font-bold text-purple-700 dark:text-purple-400">
+                                    {request.genderType}
+                                  </span>
+                                </div>
+                              )}
+                              {request.approximateStudents && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 dark:bg-cyan-900/10 rounded-lg border border-cyan-100 dark:border-cyan-900/30">
+                                  <span className="text-xs font-bold text-cyan-700 dark:text-cyan-400">
+                                    {request.approximateStudents} طالب تقريباً
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2">
                               <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 max-w-full">
                                 <Phone size={14} className="text-slate-400 shrink-0" />
                                 <span className="select-all text-sm truncate">
@@ -3067,18 +3124,18 @@ export default function SuperAdminDashboard() {
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 lg:gap-3 w-full lg:w-max mt-4 lg:mt-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800 shrink-0">
+                        <div className="flex flex-row items-center gap-2 lg:gap-3 w-full sm:w-auto shrink-0 self-end lg:self-center">
                           {deleteConfirmId === request.id ? (
-                            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-xl border border-red-100 dark:border-red-900/30 animate-in fade-in zoom-in w-full lg:w-auto">
+                            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 p-1 rounded-xl w-full sm:w-auto">
                               <button
                                 onClick={() => handleDeleteRequest(request)}
-                                className="flex-1 lg:flex-none px-4 py-2.5 bg-red-600 text-white rounded-lg font-bold text-xs hover:bg-red-700 transition-all active:scale-95 whitespace-nowrap"
+                                className="flex-1 sm:flex-none px-4 py-2.5 bg-red-600 text-white rounded-lg font-bold text-xs hover:bg-red-700 transition-all active:scale-95 whitespace-nowrap"
                               >
                                 تأكيد الحذف
                               </button>
                               <button
                                 onClick={() => setDeleteConfirmId(null)}
-                                className="flex-1 lg:flex-none px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-xs hover:bg-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95 whitespace-nowrap"
+                                className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-xs hover:bg-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95 whitespace-nowrap"
                               >
                                 إلغاء
                               </button>
@@ -3117,7 +3174,7 @@ export default function SuperAdminDashboard() {
                                   }
                                   handleApproveRequest(request);
                                 }}
-                                className="flex-1 lg:flex-none px-4 py-2.5 bg-slate-900 dark:bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-600 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm whitespace-nowrap text-xs"
+                                className="flex-1 sm:flex-none px-5 py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-600 transition-all active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap text-xs shadow-sm"
                               >
                                 <CheckCircle size={16} />
                                 {request._source === "subscriptionRequests" &&
@@ -3134,7 +3191,7 @@ export default function SuperAdminDashboard() {
                                   e.stopPropagation();
                                   setDeleteConfirmId(request.id);
                                 }}
-                                className="flex-1 lg:flex-none px-4 py-2.5 bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 border border-red-100 dark:border-red-900/30 cursor-pointer active:scale-95 shadow-sm whitespace-nowrap text-xs"
+                                className="flex-1 sm:flex-none px-4 py-3 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white dark:bg-red-900/10 dark:text-red-400 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap text-xs"
                                 title="إلغاء الطلب"
                               >
                                 <XCircle size={16} />

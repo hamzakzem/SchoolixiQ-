@@ -605,61 +605,15 @@ const AppContent = () => {
                           ))}
                         </ul>
                         <button
-                          onClick={async () => {
+                          onClick={() => {
                             if (!user) return;
                             setSelectedPackage(pkg);
-                            setIsCreatingProfile(true);
-                            try {
-                              const isMonthly = billingCycle === "monthly";
-                              const actualPrice = isMonthly
-                                ? pkg.priceMonthly !== undefined
-                                  ? pkg.priceMonthly
-                                  : Math.round((pkg.price || 0) / 12)
-                                : pkg.priceYearly !== undefined
-                                  ? pkg.priceYearly
-                                  : pkg.price;
-
-                              await import("firebase/firestore").then(
-                                ({ addDoc, collection, serverTimestamp }) => {
-                                  return addDoc(
-                                    collection(db, "registrations"),
-                                    {
-                                      type: "subscription_request",
-                                      uid: user.uid,
-                                      email: user.email,
-                                      name: subscriptionForm.name,
-                                      phone: subscriptionForm.phone,
-                                      address: subscriptionForm.address,
-                                      packageName: pkg.name,
-                                      packageId: pkg.id,
-                                      price: actualPrice,
-                                      billingCycle: billingCycle,
-                                      durationDays: isMonthly ? 30 : 365,
-                                      status: "pending",
-                                      createdAt: serverTimestamp(),
-                                    },
-                                  );
-                                },
-                              );
-                              setOnboardingState("waiting_approval");
-                            } catch (err) {
-                              toast.error(
-                                isRtl
-                                  ? "حدث خطأ أثناء الإرسال"
-                                  : "An error occurred",
-                              );
-                            } finally {
-                              setIsCreatingProfile(false);
-                            }
+                            setOnboardingState("confirm_package");
                           }}
                           disabled={isCreatingProfile || !subscriptionForm.name || !subscriptionForm.phone || !subscriptionForm.address}
                           className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                         >
-                          {isCreatingProfile && selectedPackage?.id === pkg.id ? (
-                            <RefreshCw className="animate-spin" size={18} />
-                          ) : (
-                            <span>{isRtl ? "تأكيد الاشتراك بهذا الباقة" : "Confirm Subscription"}</span>
-                          )}
+                          <span>{isRtl ? "اختيار الباقة" : "Select Package"}</span>
                         </button>
                       </div>
                     );
@@ -782,6 +736,109 @@ const AppContent = () => {
                   في الإدارة.
                 </p>
                 <div className="w-12 h-12 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto"></div>
+              </motion.div>
+            )}
+
+            {onboardingState === "confirm_package" && selectedPackage && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full max-w-lg mx-auto bg-white p-8 rounded-[2rem] shadow-xl border border-slate-100 mt-8 text-center"
+              >
+                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex justify-center items-center mx-auto mb-6">
+                  <CheckCircle size={32} />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 mb-2">
+                  {isRtl ? "تأكيد طلب الاشتراك" : "Confirm Subscription Request"}
+                </h3>
+                <p className="text-slate-500 font-bold mb-6">
+                  {isRtl ? "مراجعة تفاصيل الطلب وتأكيده للبدء" : "Review and confirm your request"}
+                </p>
+
+                <div className="bg-slate-50 rounded-xl p-4 text-right mb-6 space-y-3">
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="font-bold text-slate-900">{selectedPackage.name}</span>
+                    <span className="text-slate-500 text-sm">{isRtl ? "الباقة المطلوبة" : "Selected Package"}</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="font-bold text-blue-600">
+                      {(() => {
+                        const isMonthly = billingCycle === "monthly";
+                        const actualPrice = isMonthly
+                          ? selectedPackage.priceMonthly !== undefined
+                            ? selectedPackage.priceMonthly
+                            : Math.round((selectedPackage.price || 0) / 12)
+                          : selectedPackage.priceYearly !== undefined
+                            ? selectedPackage.priceYearly
+                            : selectedPackage.price;
+                        return `${actualPrice?.toLocaleString()} د.ع / ${isMonthly ? (isRtl ? "شهر" : "Month") : (isRtl ? "سنة" : "Year")}`;
+                      })()}
+                    </span>
+                    <span className="text-slate-500 text-sm">{isRtl ? "السعر" : "Price"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-bold text-slate-900">{subscriptionForm.name}</span>
+                    <span className="text-slate-500 text-sm">{isRtl ? "اسم المدرسة" : "School Name"}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between gap-3">
+                  <button
+                    onClick={() => setOnboardingState("packages")}
+                    className="w-1/3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
+                  >
+                    {isRtl ? "تغيير الباقة" : "Change Package"}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!user || !selectedPackage) return;
+                      setIsCreatingProfile(true);
+                      try {
+                        const isMonthly = billingCycle === "monthly";
+                        const actualPrice = isMonthly
+                          ? selectedPackage.priceMonthly !== undefined
+                            ? selectedPackage.priceMonthly
+                            : Math.round((selectedPackage.price || 0) / 12)
+                          : selectedPackage.priceYearly !== undefined
+                            ? selectedPackage.priceYearly
+                            : selectedPackage.price;
+
+                        await import("firebase/firestore").then(
+                          ({ addDoc, collection, serverTimestamp }) => {
+                            return addDoc(collection(db, "registrations"), {
+                              type: "subscription_request",
+                              uid: user.uid,
+                              email: user.email,
+                              name: subscriptionForm.name,
+                              phone: subscriptionForm.phone,
+                              address: subscriptionForm.address,
+                              packageName: selectedPackage.name,
+                              packageId: selectedPackage.id,
+                              price: actualPrice,
+                              billingCycle: billingCycle,
+                              durationDays: isMonthly ? 30 : 365,
+                              status: "pending",
+                              createdAt: serverTimestamp(),
+                            });
+                          }
+                        );
+                        setOnboardingState("waiting_approval");
+                      } catch (err) {
+                        toast.error(isRtl ? "حدث خطأ أثناء الإرسال" : "An error occurred");
+                      } finally {
+                        setIsCreatingProfile(false);
+                      }
+                    }}
+                    disabled={isCreatingProfile}
+                    className="w-2/3 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition-all flex justify-center items-center gap-2"
+                  >
+                    {isCreatingProfile ? (
+                      <RefreshCw className="animate-spin" size={18} />
+                    ) : (
+                      isRtl ? "تأكيد وإرسال الطلب" : "Confirm and Submit"
+                    )}
+                  </button>
+                </div>
               </motion.div>
             )}
 

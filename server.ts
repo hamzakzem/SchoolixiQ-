@@ -8,7 +8,7 @@ import dotEnv from 'dotenv';
 import fs from 'fs';
 import nodemailer from 'nodemailer';
 
-dotEnv.config();
+dotEnv.config({ override: true });
 
 // Initialize Firebase Admin
 const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
@@ -71,14 +71,14 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
 const getDb = () => {
   const dbId = (firebaseConfig as any).firestoreDatabaseId || (firebaseConfig as any).databaseId;
   if (admin.apps.length === 0) {
-    return getFirestore();
+    throw new Error('Firebase Admin not fully initialized - no default app');
   }
   return getFirestore(admin.app(), dbId || '(default)');
 };
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = 3000; // Hardcoded to 3000 per infrastructure requirements
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -622,10 +622,10 @@ async function startServer() {
     const adminEmail = "hamzakazem1999@gmail.com";
     
     // Read SMTP settings from environment variables
-    const host = process.env.SMTP_HOST || process.env.EMAIL_HOST;
+    const host = process.env.SMTP_HOST || process.env.EMAIL_HOST || "smtp.gmail.com";
     const port = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT) || 587;
-    const user = process.env.SMTP_USER || process.env.EMAIL_USER;
-    const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+    const user = process.env.SMTP_USER || process.env.EMAIL_USER || "hamzakazem1999@gmail.com";
+    const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS || "mkhtngtsdhrhjjgm";
     const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || user || 'no-reply@schoolixiq.com';
 
     if (!user || !pass) {
@@ -701,11 +701,12 @@ async function startServer() {
 
   // Realtime subscriber and signup notifier
   const initSubscriptionNotifier = () => {
-    const db = getDb();
-    console.log('Initializing realtime subscription notifications listeners...');
+    try {
+      const db = getDb();
+      console.log('Initializing realtime subscription notifications listeners...');
 
-    // 1. Listen to 'registrations' for any type of new registrations/subscriptions
-    db.collection('registrations')
+      // 1. Listen to 'registrations' for any type of new registrations/subscriptions
+      db.collection('registrations')
       .where('status', '==', 'pending')
       .onSnapshot((snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
@@ -894,6 +895,9 @@ async function startServer() {
       }, (error) => {
         console.error('Error in subscriptionRequests notifications listener:', error);
       });
+    } catch (e) {
+      console.warn('Realtime subscription notifier disabled (Firebase not fully initialized).');
+    }
   };
 
   // Initialize background subscription notifier
