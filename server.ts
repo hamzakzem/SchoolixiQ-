@@ -260,6 +260,10 @@ async function startServer() {
 
   // iOS Configuration Profile Download API
   app.get('/api/download/schoolixiq.mobileconfig', (req, res) => {
+    const host = req.get('host') || 'schoolixiq.com';
+    const protocol = req.headers['x-forwarded-proto'] === 'https' || req.secure ? 'https' : 'http';
+    const currentUrl = `${protocol}://${host}`;
+
     const profileXML = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -294,7 +298,7 @@ async function startServer() {
       <key>PayloadVersion</key>
       <integer>1</integer>
       <key>URL</key>
-      <string>https://schoolixiq.com</string>
+      <string>${currentUrl}</string>
     </dict>
   </array>
   <key>PayloadDisplayName</key>
@@ -315,7 +319,10 @@ async function startServer() {
 </plist>`;
 
     res.setHeader('Content-Type', 'application/x-apple-aspen-config');
-    res.setHeader('Content-Disposition', 'attachment; filename="schoolixiq.mobileconfig"');
+    res.setHeader('Content-Disposition', 'inline; filename="schoolixiq.mobileconfig"');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.send(profileXML);
   });
 
