@@ -15,9 +15,28 @@ export default defineConfig(({mode}) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            'react-vendor': ['react', 'react-dom', 'react-router-dom', 'react-is'],
-            'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/analytics'],
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('firebase')) {
+                return 'firebase-vendor';
+              }
+              if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('scheduler') || id.includes('react-is')) {
+                return 'react-vendor';
+              }
+              if (id.includes('lucide-react')) {
+                return 'icons-vendor';
+              }
+              if (id.includes('recharts') || id.includes('d3')) {
+                return 'charts-vendor';
+              }
+              if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('html-to-image')) {
+                return 'pdf-vendor';
+              }
+              if (id.includes('framer-motion') || id.includes('motion')) {
+                return 'motion-vendor';
+              }
+              return 'vendor';
+            }
           }
         }
       }
