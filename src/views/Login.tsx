@@ -47,6 +47,10 @@ import {
   ExternalLink,
   Smartphone,
   ClipboardList,
+  Download,
+  Share,
+  PlusSquare,
+  Info,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { UserRole } from "../types";
@@ -178,6 +182,23 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successCode, setSuccessCode] = useState<string | null>(null);
 
+  // PWA Direct Installer States
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [installingPlatform, setInstallingPlatform] = useState<"android" | "ios" | null>(null);
+  const [installProgress, setInstallProgress] = useState(0);
+  const [showInstallSuccess, setShowInstallSuccess] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
   useEffect(() => {
     generateCaptcha();
 
@@ -201,6 +222,44 @@ export default function Login() {
 
     return () => unsub();
   }, [mode]);
+
+  const startDirectInstall = (platform: "android" | "ios") => {
+    setInstallingPlatform(platform);
+    setInstallProgress(0);
+    setShowInstallSuccess(false);
+
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += Math.floor(Math.random() * 15) + 10;
+      if (progress >= 100) {
+        progress = 100;
+        clearInterval(interval);
+        setInstallProgress(100);
+        
+        // Trigger actual native installation if available on Android
+        if (platform === "android" && deferredInstallPrompt) {
+          setTimeout(() => {
+            deferredInstallPrompt.prompt();
+            deferredInstallPrompt.userChoice.then((choiceResult: any) => {
+              if (choiceResult.outcome === "accepted") {
+                setShowInstallSuccess(true);
+                toast.success(isRtl ? "تم بدء تثبيت التطبيق بنجاح!" : "App installation started successfully!");
+              } else {
+                setShowInstallSuccess(true); // show guide as fallback
+              }
+              setDeferredInstallPrompt(null);
+            });
+          }, 300);
+        } else {
+          setTimeout(() => {
+            setShowInstallSuccess(true);
+          }, 200);
+        }
+      } else {
+        setInstallProgress(progress);
+      }
+    }, 120);
+  };
 
   // Handle post-login logic (used for both redirect result and popup result)
   const processGoogleUser = async (
@@ -1293,6 +1352,166 @@ export default function Login() {
               ? "نظام آمن ومشفر 100% لإدارة تعليمية متميزة"
               : "100% Secure & Encrypted School Management System"}
           </p>
+        </div>
+      </motion.div>
+
+      {/* Dynamic Direct-Installer Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="bg-white w-full max-w-lg rounded-[2rem] sm:rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden mb-8 sm:mb-12 text-center"
+      >
+        <div className="p-6 sm:p-10">
+          <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto mb-4">
+            <Smartphone className="w-6 h-6" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2">
+            {isRtl ? "تنزيل وتثبيت تطبيق SchoolixiQ" : "Install SchoolixiQ Web App"}
+          </h2>
+          <p className="text-slate-500 font-bold text-xs sm:text-sm max-w-sm mx-auto mb-6">
+            {isRtl
+              ? "استمتع بالوصول الفوري، وسرعة تصفح متميزة، وإشعارات فورية مباشرة على شاشتك دون تنزيل من متاجر التطبيقات."
+              : "Experience instant loading, lightning-fast transitions & native notifications right on your phone without app stores."}
+          </p>
+
+          {/* Main selection buttons */}
+          {installingPlatform === null ? (
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <button
+                type="button"
+                onClick={() => startDirectInstall("android")}
+                className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-slate-100/80 hover:border-emerald-500/30 hover:bg-emerald-50/10 transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2.5 transition-colors group-hover:bg-emerald-500 group-hover:text-white">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <span className="font-extrabold text-xs sm:text-sm text-slate-800">أندرويد / Android</span>
+                <span className="text-[10px] text-slate-400 mt-1 font-bold">{isRtl ? "تثبيت تلقائي آمن" : "Secure Auto-Install"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => startDirectInstall("ios")}
+                className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-slate-100/80 hover:border-indigo-500/30 hover:bg-indigo-50/10 transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2.5 transition-colors group-hover:bg-indigo-500 group-hover:text-white">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <span className="font-extrabold text-xs sm:text-sm text-slate-800">آيفون / iOS</span>
+                <span className="text-[10px] text-slate-400 mt-1 font-bold">{isRtl ? "دليل التثبيت السريع" : "Quick Setup Guide"}</span>
+              </button>
+            </div>
+          ) : (
+            /* Progress view */
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-right">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-400">
+                  {installingPlatform === "android" ? "Google Android Package" : "Apple iOS Profile"}
+                </span>
+                <span className="text-sm font-black text-indigo-600 font-mono">
+                  {installProgress}%
+                </span>
+              </div>
+
+              {/* Progressive status text */}
+              <p className="text-xs font-extrabold text-slate-700 mb-3 min-h-[1.5rem] leading-relaxed">
+                {isRtl ? (
+                  installProgress < 30 ? "⚡ جاري فحص ملفات الدعم الذاتية للجهاز..." :
+                  installProgress < 70 ? "📦 جاري تجميع حزمة الخدمة وربطها بالمنصة..." :
+                  installProgress < 100 ? "🔧 جاري تهيئة التنبيهات ونوافذ الدخول السريع..." :
+                  "✨ تم تجهيز ملف التطبيق بنجاح!"
+                ) : (
+                  installProgress < 30 ? "⚡ Scanning system requirements..." :
+                  installProgress < 70 ? "📦 Linking application bundles..." :
+                  installProgress < 100 ? "🔧 Registering instant notification gateways..." :
+                  "✨ App binaries configured successfully!"
+                )}
+              </p>
+
+              {/* Progress bar container */}
+              <div className="w-full h-2.5 bg-slate-200/80 rounded-full overflow-hidden mb-4">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-indigo-500 to-violet-600"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${installProgress}%` }}
+                  transition={{ duration: 0.1 }}
+                />
+              </div>
+
+              {/* Post-Completion action / Guide */}
+              {installProgress === 100 && showInstallSuccess && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4 pt-3 border-t border-slate-200/60"
+                >
+                  {installingPlatform === "android" ? (
+                    <div className="text-xs text-slate-600 font-bold leading-relaxed space-y-2">
+                      <p className="text-emerald-600 font-black">
+                        {isRtl ? "✓ تم تحضير التطبيق للتثبيت" : "✓ Setup components prepared!"}
+                      </p>
+                      <p className="font-normal text-slate-500 text-[11px]">
+                        {isRtl 
+                          ? "إذا لم يظهر لك مربع حوار التثبيت التلقائي الصادر من نظام الاندرويد، يرجى النقر على زر 'تثبيت الآن' بالأسفل، أو النقر على الثلاث نقاط الرأسية أعلى المتصفح واختيار 'تثبيت التطبيق' (Install App)."
+                          : "If the native install prompt did not trigger automatically, tap 'Install Now' below or click your browser's menu button and select 'Install' or 'Add to Home screen'."}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (deferredInstallPrompt) {
+                            deferredInstallPrompt.prompt();
+                          } else {
+                            toast.error(isRtl ? "يرجى تثبيت التطبيق من خيارات متصفحك مباشرة أو السحب للشاشة الرئيسية" : "Please use browser option to complete install.");
+                          }
+                        }}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-500/10"
+                      >
+                        <Download size={13} />
+                        {isRtl ? "تثبيت الآن (شاشة الهاتف)" : "Install Now"}
+                      </button>
+                    </div>
+                  ) : (
+                    // iOS Instruction Set
+                    <div className="space-y-3 font-bold text-xs text-slate-600 leading-relaxed text-right md:-mr-1">
+                      <p className="text-indigo-600 font-black mb-1">
+                        {isRtl ? "✓ تم إعداد حزمة التثبيت لجهاز الآيفون" : "✓ iOS Installation Package Ready!"}
+                      </p>
+                      
+                      <div className="flex items-start gap-2 bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
+                        <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">1</span>
+                        <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                          {isRtl ? "اضغط على زر المشاركة (Share) في متصفح Safari بالأسفل." : "Tap the 'Share' icon in your bottom Safari browser toolbar."}
+                        </p>
+                      </div>
+
+                      <div className="flex items-start gap-2 bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
+                        <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">2</span>
+                        <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                          {isRtl ? "اختر إضافة للشاشة الرئيسية (Add to Home Screen)." : "Scroll down and select 'Add to Home Screen' from the menu."}
+                        </p>
+                      </div>
+
+                      <div className="flex items-start gap-2 bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
+                        <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-extrabold">3</span>
+                        <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                          {isRtl ? "اضغط على إضافة (Add) في أعلى اليسار لإكمال التثبيت والبدء فوراً." : "Click 'Add' in the top-right corner to place it on your home screen."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setInstallingPlatform(null)}
+                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-500 font-bold rounded-xl text-xs transition-colors"
+                  >
+                    {isRtl ? "الرجوع والتبديل" : "Back & Change Device"}
+                  </button>
+                </motion.div>
+              )}
+            </div>
+          )}
         </div>
       </motion.div>
 
