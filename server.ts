@@ -258,6 +258,67 @@ async function startServer() {
     }
   });
 
+  // iOS Configuration Profile Download API
+  app.get('/api/download/schoolixiq.mobileconfig', (req, res) => {
+    const profileXML = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>FullScreen</key>
+      <true/>
+      <key>Icon</key>
+      <data>
+        iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAABXklEQVR4nO2WsU4CMRRFb8EILg6OJsYBB3+Co4Oji/8g
+        /of7MjoZsDo6EAcX6XW6pVAeF7pG03uS9gXb0pS778vLqyAiIiIiIiIiIiIiIiIiIiIiIiIiIiIievX09DzMv063BvABrIEtQAfoA8cAtG2fM9K1XpE+sKst
+        q2Fq+77nZf66bY7AIn9dFfV6O1/Zz6B0U+6y5W0H2AKX6iX6p9rZ9oT153uI5yv6U8gYI5+v9KdyqZ5yZ+Q3mOepbE7kK9YpZ0be6m9b6BGrv23r78/S9Zlz
+        9S7lXN9D4Gv+2m/Tfshb6Anb0FfM0f6v+Xv0XbO8beXFfA9GvsIcsU5nzDbyjP31U3O8Tfvk7DlyzH6asV72/99039/Zf39Xvv5PcsR+GvscEWevWe6/XofY
+        DWe6mUfsp/Fj9G+YyZfR/SMyrYn92N8RERERERERERERERERERERERERERERkR79AdA9W8G957+9AAAAAElFTkSuQmCC
+      </data>
+      <key>IsRemovable</key>
+      <true/>
+      <key>Label</key>
+      <string>SchoolixiQ</string>
+      <key>PayloadDescription</key>
+      <string>منصة SchoolixiQ التعليمية</string>
+      <key>PayloadDisplayName</key>
+      <string>SchoolixiQ</string>
+      <key>PayloadIdentifier</key>
+      <string>com.schoolixiq.app</string>
+      <key>PayloadType</key>
+      <string>com.apple.webclip.managed</string>
+      <key>PayloadUUID</key>
+      <string>9B6DB8A9-9A2E-47C2-9852-B3EA5D0408CD</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>URL</key>
+      <string>https://schoolixiq.com</string>
+    </dict>
+  </array>
+  <key>PayloadDisplayName</key>
+  <string>منصة SchoolixiQ</string>
+  <key>PayloadIdentifier</key>
+  <string>com.schoolixiq.profile</string>
+  <key>PayloadOrganization</key>
+  <string>SchoolixiQ</string>
+  <key>PayloadRemovalDisallowed</key>
+  <false/>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadUUID</key>
+  <string>1A3FB4D2-8A7E-41F6-9EF3-94DC2E0407EF</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+</dict>
+</plist>`;
+
+    res.setHeader('Content-Type', 'application/x-apple-aspen-config');
+    res.setHeader('Content-Disposition', 'attachment; filename="schoolixiq.mobileconfig"');
+    res.send(profileXML);
+  });
+
   // Admin APIs
   app.post('/api/admin/create-user', verifyAdmin, async (req: any, res: any) => {
     const { email, password, displayName, role, schoolId, additionalData } = req.body;

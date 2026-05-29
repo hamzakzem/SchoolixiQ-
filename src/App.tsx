@@ -27,6 +27,10 @@ import {
   getDocs,
   addDoc,
   serverTimestamp,
+  arrayUnion,
+  updateDoc,
+  onSnapshot,
+  deleteDoc,
 } from "firebase/firestore";
 import { useState, useEffect, lazy, Suspense, Component, ReactNode, ErrorInfo } from "react";
 import { motion } from "motion/react";
@@ -161,9 +165,6 @@ const AppContent = () => {
           const firstStudentData = allStudentDocs[0].data();
           const allStudentIds = allStudentDocs.map((d) => d.id);
 
-          const { arrayUnion, serverTimestamp } =
-            await import("firebase/firestore");
-
           // Create the parent profile with ALL linked student IDs
           await setDoc(doc(db, "users", user.uid), {
             uid: user.uid,
@@ -181,7 +182,6 @@ const AppContent = () => {
             const sData = sDoc.data();
             const currentParentIds = sData.parentIds || [];
             if (!currentParentIds.includes(user.uid)) {
-              const { updateDoc } = await import("firebase/firestore");
               await updateDoc(doc(db, "students", sDoc.id), {
                 parentIds: arrayUnion(user.uid),
                 updatedAt: serverTimestamp(),
@@ -210,69 +210,68 @@ const AppContent = () => {
   // Handle Onboarding States
   useEffect(() => {
     let timer: NodeJS.Timeout;
+    let unsub: (() => void) | undefined;
     if (!loading && user && !profile && autoLinkChecked) {
       // First check if they have a pending registration
-      import("firebase/firestore").then(
-        ({ onSnapshot, query, collection, where }) => {
-          const q = query(
-            collection(db, "registrations"),
-            where("uid", "==", user.uid),
-          );
-          const unsub = onSnapshot(
-            q,
-            (snap) => {
-              if (!snap.empty) {
-                const req = snap.docs[0];
-                setMyRequest({ id: req.id, ...req.data() });
-                if (req.data().status === "rejected") {
-                  setOnboardingState("rejected");
-                } else if (req.data().status === "approved") {
-                  setOnboardingState("approved");
-                } else {
-                  setOnboardingState("waiting_approval");
-                }
-              } else {
-                // If no pending request, check if we should show options (with a short delay to not flick)
-                timer = setTimeout(() => setOnboardingState("options"), 1000);
-              }
-            },
-            (error) => {
-              console.error("Failed to read registrations:", error);
-              timer = setTimeout(() => setOnboardingState("options"), 1000);
-            },
-          );
-
-          // This is a bit leaky if the component unmounts but it's safe enough for now
-          // A full cleanup would be better
+      const q = query(
+        collection(db, "registrations"),
+        where("uid", "==", user.uid),
+      );
+      unsub = onSnapshot(
+        q,
+        (snap) => {
+          if (!snap.empty) {
+            const req = snap.docs[0];
+            setMyRequest({ id: req.id, ...req.data() });
+            if (req.data().status === "rejected") {
+              setOnboardingState("rejected");
+            } else if (req.data().status === "approved") {
+              setOnboardingState("approved");
+            } else {
+              setOnboardingState("waiting_approval");
+            }
+          } else {
+            // If no pending request, check if we should show options (with a short delay to not flick)
+            timer = setTimeout(() => setOnboardingState("options"), 1000);
+          }
+        },
+        (error) => {
+          console.error("Failed to read registrations:", error);
+          timer = setTimeout(() => setOnboardingState("options"), 1000);
         },
       );
     } else if (!user) {
       setOnboardingState("loading");
     }
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (unsub) unsub();
+    };
   }, [loading, user, profile, autoLinkChecked]);
 
   // Fetch packages when in 'packages' state
   useEffect(() => {
+    let unsub: (() => void) | undefined;
     if (onboardingState === "packages") {
-      import("firebase/firestore").then(({ onSnapshot, query, collection }) => {
-        const q = query(collection(db, "packages"));
-        onSnapshot(
-          q,
-          (snap) => {
-            if (!snap.empty) {
-              setPackages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            } else {
-              setPackages(DEFAULT_PACKAGES);
-            }
-          },
-          (error) => {
-            console.error("Failed to fetch packages, using defaults", error);
+      const q = query(collection(db, "packages"));
+      unsub = onSnapshot(
+        q,
+        (snap) => {
+          if (!snap.empty) {
+            setPackages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          } else {
             setPackages(DEFAULT_PACKAGES);
-          },
-        );
-      });
+          }
+        },
+        (error) => {
+          console.error("Failed to fetch packages, using defaults", error);
+          setPackages(DEFAULT_PACKAGES);
+        },
+      );
     }
+    return () => {
+      if (unsub) unsub();
+    };
   }, [onboardingState]);
 
   if (loading) {
@@ -811,15 +810,11 @@ const AppContent = () => {
                     onClick={() => {
                       // Delete the rejected request and let them try again
                       if (myRequest?.id) {
-                        import("firebase/firestore").then(
-                          ({ deleteDoc, doc }) => {
-                            deleteDoc(
-                              doc(db, "registrations", myRequest.id),
-                            ).then(() => {
-                              setOnboardingState("options");
-                            });
-                          },
-                        );
+                        deleteDoc(
+                          doc(db, "registrations", myRequest.id),
+                        ).then(() => {
+                          setOnboardingState("options");
+                        });
                       } else {
                         setOnboardingState("options");
                       }
