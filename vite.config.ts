@@ -17,24 +17,19 @@ export default defineConfig(({mode}) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
+              // Firebase is very large, isolate it cleanly
               if (id.includes('firebase')) {
                 return 'firebase-vendor';
               }
-              if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('scheduler') || id.includes('react-is')) {
-                return 'react-vendor';
-              }
-              if (id.includes('lucide-react')) {
-                return 'icons-vendor';
-              }
-              if (id.includes('recharts') || id.includes('d3')) {
-                return 'charts-vendor';
-              }
+              // PDF utilities are massive and only loaded for printing/reports
               if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('html-to-image')) {
                 return 'pdf-vendor';
               }
-              if (id.includes('framer-motion') || id.includes('motion')) {
-                return 'motion-vendor';
+              // Charts libraries can be dynamically split
+              if (id.includes('recharts') || id.includes('d3')) {
+                return 'charts-vendor';
               }
+              // Keep other highly co-dependent core React & UI stuff together as 'vendor' to avoid WebKit evaluation loops
               return 'vendor';
             }
           }

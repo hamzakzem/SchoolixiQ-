@@ -66,12 +66,44 @@ if (typeof window !== 'undefined') {
     if (event.message) {
       checkAndHandleDbError(event.message);
     }
+    const errorMsg = event.message || (event.error && event.error.message) || '';
+    if (errorMsg) {
+      const isChunkError = 
+        errorMsg.toLowerCase().includes('failed to fetch dynamically imported module') || 
+        errorMsg.toLowerCase().includes('chunkloaderror') || 
+        errorMsg.toLowerCase().includes('loading chunk') ||
+        errorMsg.toLowerCase().includes('error loading dynamically imported module');
+      
+      if (isChunkError) {
+        const chunkReloadCount = parseInt(sessionStorage.getItem('chunk_error_reload_count') || '0', 10);
+        if (chunkReloadCount < 2) {
+          sessionStorage.setItem('chunk_error_reload_count', (chunkReloadCount + 1).toString());
+          console.warn('Dynamic import load error caught. Forcing application update-reload...');
+          window.location.reload();
+        }
+      }
+    }
   });
 
   window.addEventListener('unhandledrejection', (event) => {
     if (event.reason) {
       const msg = typeof event.reason === 'string' ? event.reason : (event.reason.message || '');
       checkAndHandleDbError(msg);
+
+      const isChunkError = 
+        msg.toLowerCase().includes('failed to fetch dynamically imported module') || 
+        msg.toLowerCase().includes('chunkloaderror') || 
+        msg.toLowerCase().includes('loading chunk') ||
+        msg.toLowerCase().includes('error loading dynamically imported module');
+
+      if (isChunkError) {
+        const chunkReloadCount = parseInt(sessionStorage.getItem('chunk_error_reload_count') || '0', 10);
+        if (chunkReloadCount < 2) {
+          sessionStorage.setItem('chunk_error_reload_count', (chunkReloadCount + 1).toString());
+          console.warn('Dynamic import rejection caught. Forcing application update-reload...');
+          window.location.reload();
+        }
+      }
 
       if (
         event.reason === 'WebSocket closed without opened.' ||

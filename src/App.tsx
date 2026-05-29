@@ -101,6 +101,16 @@ const AppContent = () => {
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [autoLinkChecked, setAutoLinkChecked] = useState(false);
 
+  // Reset chunk error reload and IndexedDb reload counters on successful render/mount
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('chunk_error_reload_count');
+      sessionStorage.removeItem('db_error_reload_count');
+    } catch (e) {
+      console.warn("Could not access sessionStorage:", e);
+    }
+  }, []);
+
   // Onboarding state
   const [onboardingState, setOnboardingState] = useState<
     | "loading"
