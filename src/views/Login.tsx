@@ -273,20 +273,8 @@ export default function Login() {
           : provisionedData?.role || pendingRole;
 
         // Create admin registration record if needed
-        if (finalRole === UserRole.ADMIN && pendingMode === "signup") {
-          try {
-            await addDoc(collection(db, "registrations"), {
-              type: "direct_school_signup",
-              name: user.displayName || "School via Google",
-              email: user.email,
-              phone: "",
-              status: "needs_review",
-              createdAt: serverTimestamp(),
-            });
-          } catch (e) {
-            console.warn("Failed to record direct signup credentials", e);
-          }
-        }
+        // Removed direct_school_signup record creation.
+        // It is now handled internally in App.tsx onboarding flow AFTER selecting a package.
 
         // Create permanent profile
         await setDoc(doc(db, "users", user.uid), {
@@ -629,22 +617,8 @@ export default function Login() {
           return;
         }
 
-        // Record for superadmin if it's a school registration
-        if (finalRole === UserRole.ADMIN && mode === "signup") {
-          try {
-            await addDoc(collection(db, "registrations"), {
-              type: "direct_school_signup",
-              name: name,
-              email: emailTrimmed,
-              password: passwordValue,
-              phone: phone,
-              status: "needs_review",
-              createdAt: serverTimestamp(),
-            });
-          } catch (e) {
-            console.warn("Failed to record direct signup credentials", e);
-          }
-        }
+        // Removed direct_school_signup record creation.
+        // It is now handled internally in App.tsx onboarding flow AFTER selecting a package.
 
         // 1. Create permanent profile
         await setDoc(doc(db, "users", user.uid), {
@@ -1411,9 +1385,7 @@ export default function Login() {
 
                 <button
                   onClick={() => {
-                    setMode("signup");
-                    setPendingRole("admin");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    setShowSubscriptionModal(pkg);
                   }}
                   className={`w-full py-4 rounded-2xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                 >

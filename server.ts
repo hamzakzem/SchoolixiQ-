@@ -69,7 +69,7 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
 
 // Get Firestore instance with database ID if available
 const getDb = () => {
-  const dbId = (firebaseConfig as any).firestoreDatabaseId;
+  const dbId = (firebaseConfig as any).firestoreDatabaseId || (firebaseConfig as any).databaseId;
   if (admin.apps.length === 0) {
     return getFirestore();
   }
@@ -442,6 +442,8 @@ async function startServer() {
     
     try {
       const db = getDb();
+      //@ts-ignore
+      console.log('API POST /api/admin/plans dbId:', db.databaseId);
       const plan = req.body;
       const docRef = await db.collection('packages').add({
         ...plan,

@@ -199,7 +199,9 @@ const AppContent = () => {
   // Handle Onboarding States
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (!loading && user && !profile && autoLinkChecked) {
+    const needsOnboarding = !profile || (profile.role === "admin" && !profile.schoolId);
+
+    if (!loading && user && autoLinkChecked && needsOnboarding) {
       // First check if they have a pending registration
       import("firebase/firestore").then(
         ({ onSnapshot, query, collection, where }) => {
@@ -221,13 +223,25 @@ const AppContent = () => {
                   setOnboardingState("waiting_approval");
                 }
               } else {
-                // If no pending request, check if we should show options (with a short delay to not flick)
-                timer = setTimeout(() => setOnboardingState("options"), 1000);
+                // If no pending request, decide where to start
+                timer = setTimeout(() => {
+                  if (profile && profile.role === "admin" && !profile.schoolId) {
+                    setOnboardingState("registration_form");
+                  } else {
+                    setOnboardingState("options");
+                  }
+                }, 1000);
               }
             },
             (error) => {
               console.error("Failed to read registrations:", error);
-              timer = setTimeout(() => setOnboardingState("options"), 1000);
+              timer = setTimeout(() => {
+                if (profile && profile.role === "admin" && !profile.schoolId) {
+                  setOnboardingState("registration_form");
+                } else {
+                  setOnboardingState("options");
+                }
+              }, 1000);
             },
           );
 
@@ -351,13 +365,15 @@ const AppContent = () => {
     }
   };
 
+  const showDashboard = profile && !(profile.role === "admin" && !profile.schoolId);
+
   return (
     <>
       <div
         dir={isRtl ? "rtl" : "ltr"}
         className={isRtl ? "font-sans" : "font-sans"}
       >
-        {profile ? (
+        {showDashboard ? (
           <>
             <ScanHandler />
             {renderDashboard()}
@@ -478,7 +494,7 @@ const AppContent = () => {
                     <button
                       type="button"
                       disabled={isCreatingProfile}
-                      onClick={() => setOnboardingState("packages")}
+                      onClick={() => setOnboardingState("registration_form")}
                       className="w-full px-6 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-bold shadow-sm active:scale-95 transition-all outline-none focus:ring-4 focus:ring-blue-100 hover:border-blue-500 hover:text-blue-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
                     >
                       <Building size={18} />
@@ -505,36 +521,36 @@ const AppContent = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="w-full max-w-4xl mx-auto mt-8"
               >
-                <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-                  <h2 className="text-2xl font-black text-slate-900 font-display text-center sm:text-right">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 px-2 sm:px-0">
+                  <h2 className="text-2xl font-black text-slate-900 font-display text-center relative z-10 w-full md:w-auto">
                     {isRtl ? "اختر باقة المدرسة" : "Choose School Package"}
                   </h2>
-                  <div className="flex items-center gap-4">
-                    <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1 rounded-full items-center shadow-inner">
-                      <button
-                        onClick={() => setBillingCycle("monthly")}
-                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-                      >
-                        {isRtl ? "شهرياً" : "Monthly"}
-                      </button>
-                      <button
-                        onClick={() => setBillingCycle("annually")}
-                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === "annually" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-                      >
-                        {isRtl ? "سنوياً" : "Annually"}
-                      </button>
-                    </div>
+                  <div className="flex flex-col-reverse sm:flex-row items-center gap-4 w-full md:w-auto justify-between md:justify-end">
                     <button
-                      onClick={() => setOnboardingState("options")}
-                      className="text-slate-500 hover:text-slate-900 flex items-center gap-2 font-bold text-sm"
+                      onClick={() => setOnboardingState("registration_form")}
+                      className="text-slate-500 hover:text-slate-900 flex items-center gap-2 font-bold text-sm bg-white md:bg-transparent py-2.5 px-6 md:p-0 rounded-full md:rounded-none w-full sm:w-auto justify-center border md:border-none shadow-sm md:shadow-none order-2 sm:order-1"
                     >
                       {isRtl ? (
                         <ArrowRight size={16} />
                       ) : (
                         <ArrowLeft size={16} />
                       )}
-                      {isRtl ? "رجوع" : "Back"}
+                      {isRtl ? "تعديل بيانات المدرسة" : "Edit Details"}
                     </button>
+                    <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full items-center shadow-inner w-full sm:w-auto justify-center order-1 sm:order-2">
+                      <button
+                        onClick={() => setBillingCycle("monthly")}
+                        className={`w-1/2 sm:w-auto px-6 py-2.5 rounded-full text-sm font-bold transition-all ${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-md" : "text-slate-500 hover:text-slate-700"}`}
+                      >
+                        {isRtl ? "شهرياً" : "Monthly"}
+                      </button>
+                      <button
+                        onClick={() => setBillingCycle("annually")}
+                        className={`w-1/2 sm:w-auto px-6 py-2.5 rounded-full text-sm font-bold transition-all ${billingCycle === "annually" ? "bg-white text-slate-900 shadow-md" : "text-slate-500 hover:text-slate-700"}`}
+                      >
+                        {isRtl ? "سنوياً" : "Annually"}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -589,13 +605,61 @@ const AppContent = () => {
                           ))}
                         </ul>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
+                            if (!user) return;
                             setSelectedPackage(pkg);
-                            setOnboardingState("registration_form");
+                            setIsCreatingProfile(true);
+                            try {
+                              const isMonthly = billingCycle === "monthly";
+                              const actualPrice = isMonthly
+                                ? pkg.priceMonthly !== undefined
+                                  ? pkg.priceMonthly
+                                  : Math.round((pkg.price || 0) / 12)
+                                : pkg.priceYearly !== undefined
+                                  ? pkg.priceYearly
+                                  : pkg.price;
+
+                              await import("firebase/firestore").then(
+                                ({ addDoc, collection, serverTimestamp }) => {
+                                  return addDoc(
+                                    collection(db, "registrations"),
+                                    {
+                                      type: "direct_school_signup",
+                                      uid: user.uid,
+                                      email: user.email,
+                                      name: subscriptionForm.name,
+                                      phone: subscriptionForm.phone,
+                                      address: subscriptionForm.address,
+                                      packageName: pkg.name,
+                                      packageId: pkg.id,
+                                      price: actualPrice,
+                                      billingCycle: billingCycle,
+                                      durationDays: isMonthly ? 30 : 365,
+                                      status: "pending",
+                                      createdAt: serverTimestamp(),
+                                    },
+                                  );
+                                },
+                              );
+                              setOnboardingState("waiting_approval");
+                            } catch (err) {
+                              toast.error(
+                                isRtl
+                                  ? "حدث خطأ أثناء الإرسال"
+                                  : "An error occurred",
+                              );
+                            } finally {
+                              setIsCreatingProfile(false);
+                            }
                           }}
-                          className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
+                          disabled={isCreatingProfile || !subscriptionForm.name || !subscriptionForm.phone || !subscriptionForm.address}
+                          className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                         >
-                          اختيار الباقة
+                          {isCreatingProfile && selectedPackage?.id === pkg.id ? (
+                            <RefreshCw className="animate-spin" size={18} />
+                          ) : (
+                            <span>{isRtl ? "تأكيد الاشتراك بهذا الباقة" : "Confirm Subscription"}</span>
+                          )}
                         </button>
                       </div>
                     );
@@ -604,7 +668,7 @@ const AppContent = () => {
               </motion.div>
             )}
 
-            {onboardingState === "registration_form" && selectedPackage && (
+            {onboardingState === "registration_form" && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -615,7 +679,7 @@ const AppContent = () => {
                     {isRtl ? "معلومات المدرسة" : "School Information"}
                   </h3>
                   <button
-                    onClick={() => setOnboardingState("packages")}
+                    onClick={() => setOnboardingState("options")}
                     className="text-slate-400 hover:text-slate-900"
                   >
                     <ArrowRight size={20} />
@@ -623,41 +687,13 @@ const AppContent = () => {
                 </div>
 
                 <form
-                  onSubmit={async (e) => {
+                  onSubmit={(e) => {
                     e.preventDefault();
-                    if (!user) return;
-                    setIsCreatingProfile(true);
-                    try {
-                      const isMonthly = billingCycle === "monthly";
-                      const actualPrice = isMonthly
-                        ? selectedPackage.priceMonthly !== undefined
-                          ? selectedPackage.priceMonthly
-                          : Math.round((selectedPackage.price || 0) / 12)
-                        : selectedPackage.priceYearly !== undefined
-                          ? selectedPackage.priceYearly
-                          : selectedPackage.price;
-
-                      await addDoc(collection(db, "registrations"), {
-                        type: "direct_school_signup",
-                        uid: user.uid,
-                        email: user.email,
-                        name: subscriptionForm.name,
-                        phone: subscriptionForm.phone,
-                        address: subscriptionForm.address,
-                        packageName: selectedPackage.name,
-                        packageId: selectedPackage.id,
-                        price: actualPrice,
-                        billingCycle: billingCycle,
-                        durationDays: isMonthly ? 30 : 365,
-                        status: "pending",
-                        createdAt: serverTimestamp(),
-                      });
-                      setOnboardingState("waiting_approval");
-                    } catch (err) {
-                      toast.error("حدث خطأ أثناء الإرسال");
-                    } finally {
-                      setIsCreatingProfile(false);
+                    if (!subscriptionForm.name || !subscriptionForm.phone || !subscriptionForm.address) {
+                      toast.error("يرجى ملء كافة الحقول");
+                      return;
                     }
+                    setOnboardingState("packages");
                   }}
                   className="space-y-4"
                 >
@@ -719,14 +755,9 @@ const AppContent = () => {
 
                   <button
                     type="submit"
-                    disabled={isCreatingProfile}
                     className="w-full py-4 mt-4 bg-blue-600 text-white rounded-xl font-black shadow-lg shadow-blue-600/20 active:scale-95 transition-all text-sm flex justify-center items-center gap-2"
                   >
-                    {isCreatingProfile ? (
-                      <RefreshCw className="animate-spin" size={18} />
-                    ) : (
-                      <span>إرسال طلب الاشتراك</span>
-                    )}
+                    <span>{isRtl ? "متابعة لاختيار الباقة" : "Continue to Select Package"}</span>
                   </button>
                 </form>
               </motion.div>

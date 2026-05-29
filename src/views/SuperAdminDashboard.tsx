@@ -802,6 +802,7 @@ export default function SuperAdminDashboard() {
                 return timeB - timeA;
               });
 
+              console.log("SuperAdminDashboard setPackages length:", allPackages.length, "DB:", dbPackages.length);
               setPackages(allPackages);
             } else {
               setPackages(DEFAULT_PACKAGES);
