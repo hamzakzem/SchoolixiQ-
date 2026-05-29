@@ -43,6 +43,7 @@ const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 import ScanHandler from "./components/ScanHandler";
 import SolarLoading from "./components/SolarLoading";
 import { LanguageToggle } from "./components/LanguageToggle";
+import InstallAppBanner from "./components/InstallAppBanner";
 
 const DEFAULT_PACKAGES = [
   {
@@ -990,6 +991,7 @@ export default function App() {
                 </Routes>
               </Suspense>
               <Toaster position="top-right" />
+              <InstallAppBanner />
             </BrowserRouter>
           </AuthProvider>
         </LanguageProvider>
