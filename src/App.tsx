@@ -123,12 +123,6 @@ const AppContent = () => {
     email: "",
     address: "",
     password: "",
-    governorate: "",
-    directorate: "",
-    stage: "",
-    shift: "",
-    genderType: "",
-    approximateStudents: "",
   });
 
   // Automatic Parent Provisioning with Student Link
@@ -205,9 +199,7 @@ const AppContent = () => {
   // Handle Onboarding States
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    const needsOnboarding = !profile || (profile.role === "admin" && !profile.schoolId);
-
-    if (!loading && user && autoLinkChecked && needsOnboarding) {
+    if (!loading && user && !profile && autoLinkChecked) {
       // First check if they have a pending registration
       import("firebase/firestore").then(
         ({ onSnapshot, query, collection, where }) => {
@@ -229,25 +221,13 @@ const AppContent = () => {
                   setOnboardingState("waiting_approval");
                 }
               } else {
-                // If no pending request, decide where to start
-                timer = setTimeout(() => {
-                  if (profile && profile.role === "admin" && !profile.schoolId) {
-                    setOnboardingState("registration_form");
-                  } else {
-                    setOnboardingState("options");
-                  }
-                }, 1000);
+                // If no pending request, check if we should show options (with a short delay to not flick)
+                timer = setTimeout(() => setOnboardingState("options"), 1000);
               }
             },
             (error) => {
               console.error("Failed to read registrations:", error);
-              timer = setTimeout(() => {
-                if (profile && profile.role === "admin" && !profile.schoolId) {
-                  setOnboardingState("registration_form");
-                } else {
-                  setOnboardingState("options");
-                }
-              }, 1000);
+              timer = setTimeout(() => setOnboardingState("options"), 1000);
             },
           );
 
@@ -371,15 +351,13 @@ const AppContent = () => {
     }
   };
 
-  const showDashboard = profile && !(profile.role === "admin" && !profile.schoolId);
-
   return (
     <>
       <div
         dir={isRtl ? "rtl" : "ltr"}
         className={isRtl ? "font-sans" : "font-sans"}
       >
-        {showDashboard ? (
+        {profile ? (
           <>
             <ScanHandler />
             {renderDashboard()}
@@ -500,7 +478,7 @@ const AppContent = () => {
                     <button
                       type="button"
                       disabled={isCreatingProfile}
-                      onClick={() => setOnboardingState("registration_form")}
+                      onClick={() => setOnboardingState("packages")}
                       className="w-full px-6 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-bold shadow-sm active:scale-95 transition-all outline-none focus:ring-4 focus:ring-blue-100 hover:border-blue-500 hover:text-blue-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
                     >
                       <Building size={18} />
@@ -527,36 +505,36 @@ const AppContent = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="w-full max-w-4xl mx-auto mt-8"
               >
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 px-2 sm:px-0">
-                  <h2 className="text-2xl font-black text-slate-900 font-display text-center relative z-10 w-full md:w-auto">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+                  <h2 className="text-2xl font-black text-slate-900 font-display text-center sm:text-right">
                     {isRtl ? "اختر باقة المدرسة" : "Choose School Package"}
                   </h2>
-                  <div className="flex flex-col-reverse sm:flex-row items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                  <div className="flex items-center gap-4">
+                    <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1 rounded-full items-center shadow-inner">
+                      <button
+                        onClick={() => setBillingCycle("monthly")}
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                      >
+                        {isRtl ? "شهرياً" : "Monthly"}
+                      </button>
+                      <button
+                        onClick={() => setBillingCycle("annually")}
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === "annually" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                      >
+                        {isRtl ? "سنوياً" : "Annually"}
+                      </button>
+                    </div>
                     <button
-                      onClick={() => setOnboardingState("registration_form")}
-                      className="text-slate-500 hover:text-slate-900 flex items-center gap-2 font-bold text-sm bg-white md:bg-transparent py-2.5 px-6 md:p-0 rounded-full md:rounded-none w-full sm:w-auto justify-center border md:border-none shadow-sm md:shadow-none order-2 sm:order-1"
+                      onClick={() => setOnboardingState("options")}
+                      className="text-slate-500 hover:text-slate-900 flex items-center gap-2 font-bold text-sm"
                     >
                       {isRtl ? (
                         <ArrowRight size={16} />
                       ) : (
                         <ArrowLeft size={16} />
                       )}
-                      {isRtl ? "تعديل بيانات المدرسة" : "Edit Details"}
+                      {isRtl ? "رجوع" : "Back"}
                     </button>
-                    <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full items-center shadow-inner w-full sm:w-auto justify-center order-1 sm:order-2">
-                      <button
-                        onClick={() => setBillingCycle("monthly")}
-                        className={`w-1/2 sm:w-auto px-6 py-2.5 rounded-full text-sm font-bold transition-all ${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-md" : "text-slate-500 hover:text-slate-700"}`}
-                      >
-                        {isRtl ? "شهرياً" : "Monthly"}
-                      </button>
-                      <button
-                        onClick={() => setBillingCycle("annually")}
-                        className={`w-1/2 sm:w-auto px-6 py-2.5 rounded-full text-sm font-bold transition-all ${billingCycle === "annually" ? "bg-white text-slate-900 shadow-md" : "text-slate-500 hover:text-slate-700"}`}
-                      >
-                        {isRtl ? "سنوياً" : "Annually"}
-                      </button>
-                    </div>
                   </div>
                 </div>
 
@@ -612,14 +590,12 @@ const AppContent = () => {
                         </ul>
                         <button
                           onClick={() => {
-                            if (!user) return;
                             setSelectedPackage(pkg);
-                            setOnboardingState("confirm_package");
+                            setOnboardingState("registration_form");
                           }}
-                          disabled={isCreatingProfile || !subscriptionForm.name || !subscriptionForm.phone || !subscriptionForm.address}
-                          className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
+                          className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                         >
-                          <span>{isRtl ? "اختيار الباقة" : "Select Package"}</span>
+                          اختيار الباقة
                         </button>
                       </div>
                     );
@@ -628,7 +604,7 @@ const AppContent = () => {
               </motion.div>
             )}
 
-            {onboardingState === "registration_form" && (
+            {onboardingState === "registration_form" && selectedPackage && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -639,7 +615,7 @@ const AppContent = () => {
                     {isRtl ? "معلومات المدرسة" : "School Information"}
                   </h3>
                   <button
-                    onClick={() => setOnboardingState("options")}
+                    onClick={() => setOnboardingState("packages")}
                     className="text-slate-400 hover:text-slate-900"
                   >
                     <ArrowRight size={20} />
@@ -647,19 +623,47 @@ const AppContent = () => {
                 </div>
 
                 <form
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
-                    if (!subscriptionForm.name || !subscriptionForm.phone || !subscriptionForm.address || !subscriptionForm.governorate) {
-                      toast.error("يرجى ملء كافة الحقول");
-                      return;
+                    if (!user) return;
+                    setIsCreatingProfile(true);
+                    try {
+                      const isMonthly = billingCycle === "monthly";
+                      const actualPrice = isMonthly
+                        ? selectedPackage.priceMonthly !== undefined
+                          ? selectedPackage.priceMonthly
+                          : Math.round((selectedPackage.price || 0) / 12)
+                        : selectedPackage.priceYearly !== undefined
+                          ? selectedPackage.priceYearly
+                          : selectedPackage.price;
+
+                      await addDoc(collection(db, "registrations"), {
+                        type: "direct_school_signup",
+                        uid: user.uid,
+                        email: user.email,
+                        name: subscriptionForm.name,
+                        phone: subscriptionForm.phone,
+                        address: subscriptionForm.address,
+                        packageName: selectedPackage.name,
+                        packageId: selectedPackage.id,
+                        price: actualPrice,
+                        billingCycle: billingCycle,
+                        durationDays: isMonthly ? 30 : 365,
+                        status: "pending",
+                        createdAt: serverTimestamp(),
+                      });
+                      setOnboardingState("waiting_approval");
+                    } catch (err) {
+                      toast.error("حدث خطأ أثناء الإرسال");
+                    } finally {
+                      setIsCreatingProfile(false);
                     }
-                    setOnboardingState("packages");
                   }}
                   className="space-y-4"
                 >
                   <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
-                      {isRtl ? "اسم المؤسسة التعليمة" : "School Name"}
+                    <label className="block text-xs font-bold text-slate-400 mb-1">
+                      اسم المدرسة
                     </label>
                     <input
                       required
@@ -671,174 +675,13 @@ const AppContent = () => {
                           name: e.target.value,
                         })
                       }
-                      className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
-                      placeholder={isRtl ? "اسم المدرسة..." : "Enter school name..."}
+                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 transition-colors font-bold text-slate-700"
+                      placeholder="مدرسة المستقبل الأهلية"
                     />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
-                        {isRtl ? "المحافظة" : "Governorate"}
-                      </label>
-                      <select
-                        required
-                        value={subscriptionForm.governorate}
-                        onChange={(e) =>
-                          setSubscriptionForm({
-                            ...subscriptionForm,
-                            governorate: e.target.value,
-                          })
-                        }
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
-                      >
-                        <option value="" disabled>
-                          {isRtl ? "اختر المحافظة..." : "Select..."}
-                        </option>
-                        <option value="بغداد">{isRtl ? "بغداد" : "Baghdad"}</option>
-                        <option value="البصرة">{isRtl ? "البصرة" : "Basra"}</option>
-                        <option value="نينوى">{isRtl ? "نينوى" : "Nineveh"}</option>
-                        <option value="أربيل">{isRtl ? "أربيل" : "Erbil"}</option>
-                        <option value="النجف">{isRtl ? "النجف" : "Najaf"}</option>
-                        <option value="ذي قار">{isRtl ? "ذي قار" : "Dhi Qar"}</option>
-                        <option value="كركوك">{isRtl ? "كركوك" : "Kirkuk"}</option>
-                        <option value="الأنبار">{isRtl ? "الأنبار" : "Anbar"}</option>
-                        <option value="ديالى">{isRtl ? "ديالى" : "Diyala"}</option>
-                        <option value="المثنى">{isRtl ? "المثنى" : "Muthanna"}</option>
-                        <option value="القادسية">{isRtl ? "القادسية (الديوانية)" : "Qadisiyah (Diwaniyah)"}</option>
-                        <option value="ميسان">{isRtl ? "ميسان" : "Maysan"}</option>
-                        <option value="واسط">{isRtl ? "واسط" : "Wasit"}</option>
-                        <option value="صلاح الدين">{isRtl ? "صلاح الدين" : "Salah al-Din"}</option>
-                        <option value="دهوك">{isRtl ? "دهوك" : "Duhok"}</option>
-                        <option value="السليمانية">{isRtl ? "السليمانية" : "Sulaymaniyah"}</option>
-                        <option value="بابل">{isRtl ? "بابل" : "Babylon"}</option>
-                        <option value="كربلاء">{isRtl ? "كربلاء" : "Karbala"}</option>
-                        <option value="حلبجة">{isRtl ? "حلبجة" : "Halabja"}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
-                        {isRtl ? "المديرية" : "Directorate"}
-                      </label>
-                      <select
-                        required
-                        value={subscriptionForm.directorate}
-                        onChange={(e) =>
-                          setSubscriptionForm({
-                            ...subscriptionForm,
-                            directorate: e.target.value,
-                          })
-                        }
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
-                      >
-                        <option value="" disabled>
-                          {isRtl ? "اختر المديرية..." : "Select..."}
-                        </option>
-                        <option value="مديرية الكرخ الاولى">{isRtl ? "مديرية الكرخ الاولى" : "Karkh 1st"}</option>
-                        <option value="مديرية الكرخ الثانية">{isRtl ? "مديرية الكرخ الثانية" : "Karkh 2nd"}</option>
-                        <option value="مديرية الكرخ الثالثه">{isRtl ? "مديرية الكرخ الثالثه" : "Karkh 3rd"}</option>
-                        <option value="مديرية الرصافة الاولى">{isRtl ? "مديرية الرصافة الاولى" : "Rusafa 1st"}</option>
-                        <option value="مديرية الرصافة الثانية">{isRtl ? "مديرية الرصافة الثانية" : "Rusafa 2nd"}</option>
-                        <option value="مديرية الرصافة الثالثه">{isRtl ? "مديرية الرصافة الثالثه" : "Rusafa 3rd"}</option>
-                        <option value="أخرى / مديرية أخرى">{isRtl ? "أخرى / مديرية أخرى" : "Other Directorate"}</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
-                        {isRtl ? "المرحلة الدراسية" : "Stage"}
-                      </label>
-                      <select
-                        required
-                        value={subscriptionForm.stage}
-                        onChange={(e) =>
-                          setSubscriptionForm({
-                            ...subscriptionForm,
-                            stage: e.target.value,
-                          })
-                        }
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
-                      >
-                        <option value="" disabled>
-                          {isRtl ? "اختر المرحلة..." : "Select..."}
-                        </option>
-                        <option value="روضة">{isRtl ? "روضة" : "Kindergarten"}</option>
-                        <option value="ابتدائي">{isRtl ? "ابتدائي" : "Primary"}</option>
-                        <option value="متوسطة">{isRtl ? "متوسطة" : "Middle School"}</option>
-                        <option value="اعدادية">{isRtl ? "اعدادية" : "High School"}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
-                        {isRtl ? "وقت الدوام" : "Shift"}
-                      </label>
-                      <select
-                        required
-                        value={subscriptionForm.shift}
-                        onChange={(e) =>
-                          setSubscriptionForm({
-                            ...subscriptionForm,
-                            shift: e.target.value,
-                          })
-                        }
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
-                      >
-                        <option value="" disabled>
-                          {isRtl ? "اختر وقت الدوام..." : "Select..."}
-                        </option>
-                        <option value="صباحي">{isRtl ? "صباحي" : "Morning Shift"}</option>
-                        <option value="مسائي">{isRtl ? "مسائي" : "Evening Shift"}</option>
-                        <option value="مدمج">{isRtl ? "مدمج" : "Merged/Joint Shift"}</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
-                        {isRtl ? "نوع الدراسة" : "Gender Type"}
-                      </label>
-                      <select
-                        required
-                        value={subscriptionForm.genderType}
-                        onChange={(e) =>
-                          setSubscriptionForm({
-                            ...subscriptionForm,
-                            genderType: e.target.value,
-                          })
-                        }
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
-                      >
-                        <option value="" disabled>
-                          {isRtl ? "اختر نوع الدراسة..." : "Select..."}
-                        </option>
-                        <option value="مختلطة">{isRtl ? "مختلطة" : "Co-educational"}</option>
-                        <option value="بنات فقط">{isRtl ? "بنات فقط" : "Girls Only"}</option>
-                        <option value="اولاد فقط">{isRtl ? "اولاد فقط" : "Boys Only"}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
-                        {isRtl ? "عدد الطلاب التقريبي" : "Approx. Students"}
-                      </label>
-                      <input
-                        required
-                        type="number"
-                        min="1"
-                        value={subscriptionForm.approximateStudents}
-                        onChange={(e) =>
-                          setSubscriptionForm({
-                            ...subscriptionForm,
-                            approximateStudents: e.target.value,
-                          })
-                        }
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
-                        placeholder={isRtl ? "مثال: 500" : "e.g. 500"}
-                      />
-                    </div>
-                  </div>
                   <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
-                      {isRtl ? "رقم هاتف الإدارة" : "Phone Number"}
+                    <label className="block text-xs font-bold text-slate-400 mb-1">
+                      رقم هاتف الإدارة
                     </label>
                     <input
                       required
@@ -850,14 +693,14 @@ const AppContent = () => {
                           phone: e.target.value,
                         })
                       }
-                      className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700 text-left"
+                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 transition-colors font-bold text-slate-700 text-left"
                       dir="ltr"
                       placeholder="07XXXXXXXXXX"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
-                      {isRtl ? "العنوان التفصيلي" : "Location"}
+                    <label className="block text-xs font-bold text-slate-400 mb-1">
+                      العنوان التفصيلي
                     </label>
                     <input
                       required
@@ -869,16 +712,21 @@ const AppContent = () => {
                           address: e.target.value,
                         })
                       }
-                      className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white transition-all outline-none focus:border-blue-500 font-bold text-sm text-slate-700"
-                      placeholder={isRtl ? "المحافظة - القضاء - الحي..." : "Address..."}
+                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 transition-colors font-bold text-slate-700"
+                      placeholder="المحافظة - القضاء - الحي"
                     />
                   </div>
 
                   <button
                     type="submit"
+                    disabled={isCreatingProfile}
                     className="w-full py-4 mt-4 bg-blue-600 text-white rounded-xl font-black shadow-lg shadow-blue-600/20 active:scale-95 transition-all text-sm flex justify-center items-center gap-2"
                   >
-                    <span>{isRtl ? "متابعة لاختيار الباقة" : "Continue to Select Package"}</span>
+                    {isCreatingProfile ? (
+                      <RefreshCw className="animate-spin" size={18} />
+                    ) : (
+                      <span>إرسال طلب الاشتراك</span>
+                    )}
                   </button>
                 </form>
               </motion.div>
@@ -903,129 +751,6 @@ const AppContent = () => {
                   في الإدارة.
                 </p>
                 <div className="w-12 h-12 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto"></div>
-              </motion.div>
-            )}
-
-            {onboardingState === "confirm_package" && selectedPackage && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="w-full max-w-lg mx-auto bg-white p-8 rounded-[2rem] shadow-xl border border-slate-100 mt-8 text-center"
-              >
-                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex justify-center items-center mx-auto mb-6">
-                  <CheckCircle size={32} />
-                </div>
-                <h3 className="text-xl font-black text-slate-900 mb-2">
-                  {isRtl ? "تأكيد طلب الاشتراك" : "Confirm Subscription Request"}
-                </h3>
-                <p className="text-slate-500 font-bold mb-6">
-                  {isRtl ? "مراجعة تفاصيل الطلب وتأكيده للبدء" : "Review and confirm your request"}
-                </p>
-
-                <div className="bg-slate-50 rounded-xl p-4 text-right mb-6 space-y-3">
-                  <div className="flex justify-between border-b pb-2">
-                    <span className="font-bold text-slate-900">{selectedPackage.name}</span>
-                    <span className="text-slate-500 text-sm">{isRtl ? "الباقة المطلوبة" : "Selected Package"}</span>
-                  </div>
-                  <div className="flex justify-between border-b pb-2">
-                    <span className="font-bold text-blue-600">
-                      {(() => {
-                        const isMonthly = billingCycle === "monthly";
-                        const actualPrice = isMonthly
-                          ? selectedPackage.priceMonthly !== undefined
-                            ? selectedPackage.priceMonthly
-                            : Math.round((selectedPackage.price || 0) / 12)
-                          : selectedPackage.priceYearly !== undefined
-                            ? selectedPackage.priceYearly
-                            : selectedPackage.price;
-                        return `${actualPrice?.toLocaleString()} د.ع / ${isMonthly ? (isRtl ? "شهر" : "Month") : (isRtl ? "سنة" : "Year")}`;
-                      })()}
-                    </span>
-                    <span className="text-slate-500 text-sm">{isRtl ? "السعر" : "Price"}</span>
-                  </div>
-                  <div className="flex justify-between border-b pb-2">
-                    <span className="font-bold text-slate-900">{subscriptionForm.name}</span>
-                    <span className="text-slate-500 text-sm">{isRtl ? "اسم المدرسة" : "School Name"}</span>
-                  </div>
-                  {(subscriptionForm.governorate || subscriptionForm.directorate) && (
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="font-bold text-slate-900">
-                        {subscriptionForm.governorate} {subscriptionForm.directorate ? `- ${subscriptionForm.directorate}` : ""}
-                      </span>
-                      <span className="text-slate-500 text-sm">{isRtl ? "الموقع" : "Location"}</span>
-                    </div>
-                  )}
-                  {subscriptionForm.stage && (
-                    <div className="flex justify-between">
-                      <span className="font-bold text-slate-900">{subscriptionForm.stage}</span>
-                      <span className="text-slate-500 text-sm">{isRtl ? "المرحلة الدراسية" : "Stage"}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-between gap-3">
-                  <button
-                    onClick={() => setOnboardingState("packages")}
-                    className="w-1/3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
-                  >
-                    {isRtl ? "تغيير الباقة" : "Change Package"}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (!user || !selectedPackage) return;
-                      setIsCreatingProfile(true);
-                      try {
-                        const isMonthly = billingCycle === "monthly";
-                        const actualPrice = isMonthly
-                          ? selectedPackage.priceMonthly !== undefined
-                            ? selectedPackage.priceMonthly
-                            : Math.round((selectedPackage.price || 0) / 12)
-                          : selectedPackage.priceYearly !== undefined
-                            ? selectedPackage.priceYearly
-                            : selectedPackage.price;
-
-                        await import("firebase/firestore").then(
-                          ({ addDoc, collection, serverTimestamp }) => {
-                            return addDoc(collection(db, "registrations"), {
-                              type: "subscription_request",
-                              uid: user.uid,
-                              email: user.email,
-                              name: subscriptionForm.name,
-                              phone: subscriptionForm.phone,
-                              address: subscriptionForm.address,
-                              governorate: subscriptionForm.governorate,
-                              directorate: subscriptionForm.directorate,
-                              stage: subscriptionForm.stage,
-                              shift: subscriptionForm.shift,
-                              genderType: subscriptionForm.genderType,
-                              approximateStudents: subscriptionForm.approximateStudents,
-                              packageName: selectedPackage.name,
-                              packageId: selectedPackage.id,
-                              price: actualPrice,
-                              billingCycle: billingCycle,
-                              durationDays: isMonthly ? 30 : 365,
-                              status: "pending",
-                              createdAt: serverTimestamp(),
-                            });
-                          }
-                        );
-                        setOnboardingState("waiting_approval");
-                      } catch (err) {
-                        toast.error(isRtl ? "حدث خطأ أثناء الإرسال" : "An error occurred");
-                      } finally {
-                        setIsCreatingProfile(false);
-                      }
-                    }}
-                    disabled={isCreatingProfile}
-                    className="w-2/3 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition-all flex justify-center items-center gap-2"
-                  >
-                    {isCreatingProfile ? (
-                      <RefreshCw className="animate-spin" size={18} />
-                    ) : (
-                      isRtl ? "تأكيد وإرسال الطلب" : "Confirm and Submit"
-                    )}
-                  </button>
-                </div>
               </motion.div>
             )}
 

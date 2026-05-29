@@ -59,13 +59,9 @@ import { GlobalFooter } from "../components/GlobalFooter";
 
 export const getLocalizedPackages = (packagesList: any[], isRtl: boolean) => {
   return packagesList.map(pkg => {
+    if (isRtl) return pkg;
     let name = pkg.name;
     let features = pkg.features || [];
-    if (typeof features === 'string') {
-      features = features.split(',').map(f => f.trim()).filter(f => f);
-    }
-    
-    if (isRtl) return { ...pkg, name, features };
     if (pkg.id === "basic" || pkg.name?.includes("الأساسية") || pkg.name?.toLowerCase().includes("basic")) {
       name = "Basic Plan";
       features = [
@@ -190,38 +186,9 @@ export default function Login() {
       collection(db, "packages"),
       (snapshot) => {
         if (!snapshot.empty) {
-          const dbPackages = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-
-          // If there are default packages that haven't been saved to DB yet,
-          // we combine them in the UI.
-          const defaultIds = DEFAULT_PACKAGES.map((p) => p.id);
-          const dbIds = dbPackages.map((p) => p.id);
-
-          const missingDefaults = DEFAULT_PACKAGES.filter(
-            (dp) =>
-              !dbIds.includes(dp.id) &&
-              !dbPackages.find((dbp: any) => dbp.name === dp.name),
+          setPackages(
+            snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
           );
-
-          const allPackages = [...missingDefaults, ...dbPackages];
-          allPackages.sort((a: any, b: any) => {
-            const getMillis = (pkg: any) => {
-              if (!pkg.createdAt && ["basic", "professional", "premium"].includes(pkg.id)) return 0;
-              if (!pkg.createdAt) return Date.now(); // Optimistic local write
-              if (pkg.createdAt?.toMillis) return pkg.createdAt.toMillis();
-              if (pkg.createdAt?.seconds) return pkg.createdAt.seconds * 1000;
-              if (pkg.createdAt?._seconds) return pkg.createdAt._seconds * 1000;
-              return Date.now();
-            };
-            const timeA = getMillis(a);
-            const timeB = getMillis(b);
-            return timeB - timeA;
-          });
-
-          setPackages(allPackages);
         } else {
           setPackages(DEFAULT_PACKAGES);
         }
@@ -273,8 +240,20 @@ export default function Login() {
           : provisionedData?.role || pendingRole;
 
         // Create admin registration record if needed
-        // Removed direct_school_signup record creation.
-        // It is now handled internally in App.tsx onboarding flow AFTER selecting a package.
+        if (finalRole === UserRole.ADMIN && pendingMode === "signup") {
+          try {
+            await addDoc(collection(db, "registrations"), {
+              type: "direct_school_signup",
+              name: user.displayName || "School via Google",
+              email: user.email,
+              phone: "",
+              status: "needs_review",
+              createdAt: serverTimestamp(),
+            });
+          } catch (e) {
+            console.warn("Failed to record direct signup credentials", e);
+          }
+        }
 
         // Create permanent profile
         await setDoc(doc(db, "users", user.uid), {
@@ -617,8 +596,22 @@ export default function Login() {
           return;
         }
 
-        // Removed direct_school_signup record creation.
-        // It is now handled internally in App.tsx onboarding flow AFTER selecting a package.
+        // Record for superadmin if it's a school registration
+        if (finalRole === UserRole.ADMIN && mode === "signup") {
+          try {
+            await addDoc(collection(db, "registrations"), {
+              type: "direct_school_signup",
+              name: name,
+              email: emailTrimmed,
+              password: passwordValue,
+              phone: phone,
+              status: "needs_review",
+              createdAt: serverTimestamp(),
+            });
+          } catch (e) {
+            console.warn("Failed to record direct signup credentials", e);
+          }
+        }
 
         // 1. Create permanent profile
         await setDoc(doc(db, "users", user.uid), {
@@ -1384,9 +1377,7 @@ export default function Login() {
                 </ul>
 
                 <button
-                  onClick={() => {
-                    setShowSubscriptionModal(pkg);
-                  }}
+                  onClick={() => setShowSubscriptionModal(pkg)}
                   className={`w-full py-4 rounded-2xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                 >
                   {t("subscribeNow")}

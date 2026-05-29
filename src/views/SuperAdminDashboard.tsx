@@ -730,7 +730,7 @@ export default function SuperAdminDashboard() {
 
     try {
       const schoolsQ = query(collection(db, "schools"), limit(100));
-      const packagesQ = query(collection(db, "packages"), limit(500));
+      const packagesQ = query(collection(db, "packages"), limit(50));
       const usersQ = query(collection(db, "users"), limit(1000));
       const studentsQ = query(collection(db, "students"), limit(1000));
 
@@ -773,37 +773,9 @@ export default function SuperAdminDashboard() {
           packagesQ,
           (snap) => {
             if (!snap.empty) {
-              const dbPackages = snap.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-              }));
-              
-              // If there are default packages that haven't been saved to DB yet,
-              // we combine them in the UI so the user doesn't lose sight of them.
-              const defaultIds = DEFAULT_PACKAGES.map(p => p.id);
-              const dbIds = dbPackages.map(p => p.id);
-              
-              const missingDefaults = DEFAULT_PACKAGES.filter(
-                (dp) => !dbIds.includes(dp.id) && !dbPackages.find((dbp: any) => dbp.name === dp.name)
+              setPackages(
+                snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
               );
-              
-              const allPackages = [...missingDefaults, ...dbPackages];
-              allPackages.sort((a: any, b: any) => {
-                const getMillis = (pkg: any) => {
-                  if (!pkg.createdAt && ["basic", "professional", "premium"].includes(pkg.id)) return 0;
-                  if (!pkg.createdAt) return Date.now(); // Optimistic local write
-                  if (pkg.createdAt?.toMillis) return pkg.createdAt.toMillis();
-                  if (pkg.createdAt?.seconds) return pkg.createdAt.seconds * 1000;
-                  if (pkg.createdAt?._seconds) return pkg.createdAt._seconds * 1000;
-                  return Date.now();
-                };
-                const timeA = getMillis(a);
-                const timeB = getMillis(b);
-                return timeB - timeA;
-              });
-
-              console.log("SuperAdminDashboard setPackages length:", allPackages.length, "DB:", dbPackages.length);
-              setPackages(allPackages);
             } else {
               setPackages(DEFAULT_PACKAGES);
             }
@@ -1137,10 +1109,6 @@ export default function SuperAdminDashboard() {
 
   const handleAddPackage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPackage.name) {
-      toast.error("يرجى إدخال اسم الباقة");
-      return;
-    }
     const loadingToast = toast.loading("جاري حفظ الباقة...");
     try {
       const pkgData = {
@@ -1149,22 +1117,22 @@ export default function SuperAdminDashboard() {
           newPackage.priceYearly !== undefined
             ? newPackage.priceYearly
             : newPackage.price,
-        ) || 0,
+        ),
         priceMonthly: Number(
           newPackage.priceMonthly !== undefined
             ? newPackage.priceMonthly
             : Math.round((newPackage.price || 0) / 12),
-        ) || 0,
+        ),
         priceYearly: Number(
           newPackage.priceYearly !== undefined
             ? newPackage.priceYearly
             : newPackage.price,
-        ) || 0,
-        maxStudents: Number(newPackage.maxStudents) || 0,
-        durationDays: Number(newPackage.durationDays) || 0,
-        showSubscriptionTimer: newPackage.showSubscriptionTimer ?? true,
-        showInRegistration: newPackage.showInRegistration ?? true,
-        isPopular: newPackage.isPopular ?? false,
+        ),
+        maxStudents: Number(newPackage.maxStudents),
+        durationDays: Number(newPackage.durationDays),
+        showSubscriptionTimer: newPackage.showSubscriptionTimer,
+        showInRegistration: newPackage.showInRegistration,
+        isPopular: newPackage.isPopular,
         permissions: newPackage.permissions,
         features:
           typeof newPackage.features === "string"
@@ -2129,7 +2097,6 @@ export default function SuperAdminDashboard() {
                       value={users.length}
                       hint="نشط للآن"
                       color="text-indigo-600"
-                      onClick={() => navigateToTab("users")}
                     />
                   </div>
 
@@ -2271,35 +2238,23 @@ export default function SuperAdminDashboard() {
                                       ID: {school.id?.slice(0, 8)}
                                     </span>
                                     {school.governorate && (
-                                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5 max-w-xs">
-                                        <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800">
-                                          {school.governorate}
-                                        </span>
-                                        {school.directorate && (
-                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800">
-                                            {school.directorate}
-                                          </span>
-                                        )}
-                                        {school.stage && (
-                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800">
-                                            {school.stage}
-                                          </span>
-                                        )}
-                                        {school.shift && (
-                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800">
-                                            {school.shift}
-                                          </span>
-                                        )}
-                                        {school.genderType && (
-                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800">
-                                            {school.genderType}
-                                          </span>
-                                        )}
-                                        {school.approximateStudents && (
-                                          <span className="px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 border border-cyan-100 dark:border-cyan-800">
-                                            {school.approximateStudents} طالب تقريباً
-                                          </span>
-                                        )}
+                                      <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-bold max-w-[180px]">
+                                        {school.governorate}{" "}
+                                        {school.directorate
+                                          ? ` - ${school.directorate}`
+                                          : ""}
+                                        {school.stage
+                                          ? ` - ${school.stage}`
+                                          : ""}
+                                        {school.shift
+                                          ? ` - ${school.shift}`
+                                          : ""}
+                                        {school.genderType
+                                          ? ` - ${school.genderType}`
+                                          : ""}
+                                        {school.approximateStudents
+                                          ? ` - ${school.approximateStudents} طالب تقريباً`
+                                          : ""}
                                       </div>
                                     )}
                                     {school.address && (
@@ -2736,6 +2691,120 @@ export default function SuperAdminDashboard() {
                       </table>
                     </div>
                   </div>
+
+                  {subscriptionRequests.filter(
+                    (r) => r.type === "direct_school_signup",
+                  ).length > 0 && (
+                    <div className="mt-12">
+                      <div className="mb-6">
+                        <h4 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                          <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-xl text-orange-600">
+                            <Users size={24} />
+                          </div>
+                          تسجيلات مدرسية بانتظار المراجعة (New Nodes)
+                        </h4>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs font-bold mt-1 opacity-80 pr-12">
+                          حسابات تم إنشاؤها عبر بوابات الويب ولم يتم تعيينها
+                          لمراكز بيانات مدرسية (تتطلب تفعيل يدوي)
+                        </p>
+                      </div>
+                      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-orange-200/50 dark:border-orange-900/20 shadow-xl shadow-orange-500/5 overflow-hidden transition-all">
+                        <table className="w-full text-right border-collapse">
+                          <thead>
+                            <tr className="bg-orange-50/50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase tracking-widest border-b border-orange-100/50 dark:border-orange-900/20">
+                              <th className="px-8 py-5">
+                                المؤسسة والبيانات الشخصية
+                              </th>
+                              <th className="px-6 py-5">المصادقة المؤقتة</th>
+                              <th className="px-8 py-5 text-center">
+                                التحكم بالنظام
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-orange-50/50 dark:divide-orange-900/10">
+                            {subscriptionRequests
+                              .filter((r) => r.type === "direct_school_signup")
+                              .map((req) => (
+                                <tr
+                                  key={req.id}
+                                  className="group hover:bg-orange-50/30 dark:hover:bg-orange-900/5 transition-all"
+                                >
+                                  <td className="px-8 py-6">
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-slate-900 dark:text-white font-black text-sm tracking-tight truncate max-w-[250px]">
+                                        {req.name}
+                                      </span>
+                                      <div className="flex flex-col gap-0.5 mt-1 font-mono text-[10px]">
+                                        <span className="text-slate-500 dark:text-slate-400 lowercase">
+                                          {req.email}
+                                        </span>
+                                        {req.phone && (
+                                          <span className="text-slate-400">
+                                            {req.phone}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-[9px] text-orange-500 font-bold uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
+                                        <div className="w-1 h-1 rounded-full bg-orange-500 animate-ping"></div>
+                                        ORPHAN_ACCOUNT
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-6">
+                                    <div className="inline-flex items-center gap-2 bg-orange-50/30 dark:bg-orange-950 px-3 py-2 rounded-xl border border-orange-100/50 dark:border-orange-900/30 transition-colors">
+                                      <PasswordCell password={req.password} />
+                                    </div>
+                                  </td>
+                                  <td className="px-8 py-6 text-center">
+                                    <div className="flex justify-center gap-2">
+                                      {deleteConfirmId === req.id ? (
+                                        <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-300">
+                                          <button
+                                            onClick={() =>
+                                              handleDeleteRequest(req)
+                                            }
+                                            className="px-4 py-2 bg-red-600 text-white rounded-xl text-[10px] font-black hover:bg-red-700 shadow-lg shadow-red-600/20"
+                                          >
+                                            مسح البيانات
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              setDeleteConfirmId(null)
+                                            }
+                                            className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl text-[10px] font-black"
+                                          >
+                                            إلغاء
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <button
+                                            className="px-4 py-2 bg-orange-500 text-white rounded-xl text-[10px] font-black shadow-lg shadow-orange-500/20 hover:bg-orange-600 transition-all active:scale-95"
+                                            onClick={() => {
+                                              handleApproveRequest(req);
+                                            }}
+                                          >
+                                            تفعيل وإنشاء المدارس
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              setDeleteConfirmId(req.id)
+                                            }
+                                            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-red-500 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 hover:border-red-100 transition-all"
+                                          >
+                                            <Trash2 size={16} />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : activeTab === "packages" ? (
                 <>
@@ -2821,7 +2890,7 @@ export default function SuperAdminDashboard() {
                           </div>
                         </div>
                         <ul className="space-y-3 mb-8 flex-1">
-                          {(Array.isArray(pkg.features) ? pkg.features : typeof pkg.features === 'string' ? pkg.features.split(',').map((f:any)=>f.trim()).filter((f:any)=>f) : []).map((f: string, i: number) => (
+                          {pkg.features?.map((f: string, i: number) => (
                             <li
                               key={i}
                               className="flex items-center gap-2 text-sm text-slate-600"
@@ -2954,130 +3023,82 @@ export default function SuperAdminDashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         key={request.id}
-                        className="bg-white dark:bg-slate-900 p-5 sm:p-6 lg:p-8 rounded-[1.5rem] lg:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 lg:gap-6 transition-all hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 group relative"
+                        className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8 transition-all hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 group relative"
                       >
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 flex-1 w-full">
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors duration-500 shrink-0">
-                            <Building size={32} className="scale-75 sm:scale-100" />
+                        <div className="flex items-center gap-8 flex-1">
+                          <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors duration-500">
+                            <Building size={32} />
                           </div>
-                          <div className="space-y-3 sm:space-y-2 flex-1 w-full">
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                              <h4 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white line-clamp-2">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                              <h4 className="text-xl font-black text-slate-900 dark:text-white">
                                 {request.customerInfo?.name ||
                                   request.schoolName ||
                                   request.adminName}
                               </h4>
                               <span
-                                className={`px-2.5 sm:px-3 py-1 ${request.type === "renewal_request" ? "bg-orange-100 text-orange-600 border border-orange-200" : "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"} text-[10px] font-black rounded-full uppercase tracking-widest whitespace-nowrap`}
+                                className={`px-3 py-1 ${request.type === "renewal_request" ? "bg-orange-100 text-orange-600 border border-orange-200" : "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"} text-[10px] font-black rounded-full uppercase tracking-widest`}
                               >
                                 {request.type === "renewal_request"
                                   ? "طلب تجديد"
                                   : request.planId || request.packageName}
                               </span>
                               {request.billingCycle && (
-                                <span className="px-2.5 sm:px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] font-black rounded-full border border-purple-100 dark:border-purple-900/30 whitespace-nowrap">
+                                <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] font-black rounded-full border border-purple-100 dark:border-purple-900/30">
                                   {request.billingCycle === "monthly"
                                     ? "شهرياً"
                                     : "سنوياً"}
                                 </span>
                               )}
                               {request.subscriberCode && (
-                                <span className="px-2.5 sm:px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-full border border-emerald-100 dark:border-emerald-900/30 whitespace-nowrap">
+                                <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-full border border-emerald-100 dark:border-emerald-900/30">
                                   رمز: {request.subscriberCode}
                                 </span>
                               )}
                             </div>
-                            
-                            <div className="flex flex-wrap gap-2">
-                              {request.governorate && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
-                                  <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
-                                    {request.governorate}
-                                  </span>
-                                </div>
-                              )}
-                              {request.directorate && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/10 rounded-lg border border-indigo-100 dark:border-indigo-900/30">
-                                  <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400">
-                                    {request.directorate}
-                                  </span>
-                                </div>
-                              )}
-                              {request.stage && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
-                                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                                    {request.stage}
-                                  </span>
-                                </div>
-                              )}
-                              {request.shift && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-900/30">
-                                  <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                                    {request.shift}
-                                  </span>
-                                </div>
-                              )}
-                              {request.genderType && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-900/30">
-                                  <span className="text-xs font-bold text-purple-700 dark:text-purple-400">
-                                    {request.genderType}
-                                  </span>
-                                </div>
-                              )}
-                              {request.approximateStudents && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 dark:bg-cyan-900/10 rounded-lg border border-cyan-100 dark:border-cyan-900/30">
-                                  <span className="text-xs font-bold text-cyan-700 dark:text-cyan-400">
-                                    {request.approximateStudents} طالب تقريباً
-                                  </span>
-                                </div>
-                              )}
+                            <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                              <Phone size={14} className="text-slate-400" />
+                              <span className="select-all">
+                                {request.customerInfo?.phone ||
+                                  request.adminPhone ||
+                                  request.phone}
+                              </span>
                             </div>
-                            
-                            <div className="flex flex-wrap gap-2">
-                              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 max-w-full">
-                                <Phone size={14} className="text-slate-400 shrink-0" />
-                                <span className="select-all text-sm truncate">
-                                  {request.customerInfo?.phone ||
-                                    request.adminPhone ||
-                                    request.phone}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 max-w-full">
-                                <Mail size={14} className="text-slate-400 shrink-0" />
-                                <span className="lowercase select-all text-sm truncate">
-                                  {request.customerInfo?.email ||
-                                    request.adminEmail ||
-                                    request.email}
-                                </span>
-                              </div>
-                              {request.price !== undefined && (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-900/30">
-                                  <CreditCard
-                                    size={14}
-                                    className="text-amber-500 shrink-0"
-                                  />
-                                  <span className="font-bold text-amber-600 dark:text-amber-400 text-sm">
-                                    {request.price.toLocaleString("ar-IQ")} د.ع
-                                  </span>
-                                </div>
-                              )}
-                              <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900/30 max-w-full">
-                                <Lock size={14} className="text-indigo-500 shrink-0" />
-                                <PasswordCell
-                                  password={
-                                    request.adminPassword ||
-                                    request.password ||
-                                    request.customerInfo?.password
-                                  }
+                            <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                              <Mail size={14} className="text-slate-400" />
+                              <span className="lowercase select-all">
+                                {request.customerInfo?.email ||
+                                  request.adminEmail ||
+                                  request.email}
+                              </span>
+                            </div>
+                            {request.price !== undefined && (
+                              <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                <CreditCard
+                                  size={14}
+                                  className="text-amber-500"
                                 />
+                                <span className="font-bold text-amber-600 dark:text-amber-400">
+                                  {request.price.toLocaleString("ar-IQ")} د.ع
+                                </span>
                               </div>
-                              {request.customerInfo?.address && (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 max-w-full">
-                                  <MapPin size={14} className="text-slate-400 shrink-0" />
-                                  <span className="text-sm truncate">{request.customerInfo?.address}</span>
-                                </div>
-                              )}
+                            )}
+                            <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900/30">
+                              <Lock size={14} className="text-indigo-500" />
+                              <PasswordCell
+                                password={
+                                  request.adminPassword ||
+                                  request.password ||
+                                  request.customerInfo?.password
+                                }
+                              />
                             </div>
+                            {request.customerInfo?.address && (
+                              <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                                <MapPin size={14} className="text-slate-400" />
+                                <span>{request.customerInfo?.address}</span>
+                              </div>
+                            )}
                             <button
                               onClick={() => {
                                 const planId =
@@ -3093,49 +3114,45 @@ export default function SuperAdminDashboard() {
                                   );
                                 }
                               }}
-                              className="flex items-center gap-2 text-[10px] sm:text-[11px] text-blue-600 dark:text-blue-400 underline decoration-2 underline-offset-4 font-black hover:text-blue-700 transition-colors bg-blue-50/50 dark:bg-blue-900/10 px-3 py-1.5 rounded-lg w-fit mt-1 max-w-full"
+                              className="flex items-center gap-2 text-[10px] text-blue-600 dark:text-blue-400 underline decoration-2 underline-offset-4 font-black hover:text-blue-700 transition-colors"
                             >
-                              <Plus size={12} className="shrink-0" />
-                              <span className="truncate">تحديد/عرض تفاصيل الباقة المطلوبة</span>
+                              <Plus size={12} />
+                              تحديد/عرض تفاصيل الباقة المطلوبة
                             </button>
-                            <div className="text-[10px] text-slate-400 font-mono italic mt-1 block sm:hidden">
-                              {request.createdAt
-                                ?.toDate?.()
-                                ?.toLocaleString("ar-IQ") || "جاري التحميل..."}
-                            </div>
                           </div>
-                          <div className="text-[10px] text-slate-300 font-mono italic hidden sm:block min-w-max self-start mt-2">
+                          <div className="text-[10px] text-slate-300 font-mono italic">
                             تاريخ الطلب:{" "}
-                            <br className="hidden sm:block" />
                             {request.createdAt
                               ?.toDate?.()
                               ?.toLocaleString("ar-IQ") || "جاري التحميل..."}
                           </div>
                         </div>
 
-                        <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between lg:justify-center gap-1 px-3 sm:px-4 lg:px-8 py-3 lg:py-0 bg-slate-50/50 lg:bg-transparent rounded-2xl lg:rounded-none lg:border-r border-slate-100 dark:border-slate-800 h-full w-full lg:w-auto mt-2 lg:mt-0">
-                          <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter shrink-0">
+                        <div className="flex flex-col items-center md:items-end gap-1 px-8 md:border-r border-slate-100 dark:border-slate-800 h-full justify-center">
+                          <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">
                             نوع الطلب
                           </span>
-                          <span className="text-slate-900 dark:text-white font-black text-sm sm:text-base tracking-tighter uppercase whitespace-nowrap text-right">
-                            {request.type === "renewal_request"
+                          <span className="text-slate-900 dark:text-white font-black text-lg tracking-tighter uppercase">
+                            {request._source === "subscriptionRequests"
+                              ? "اشتراك جديد"
+                              : request.type === "renewal_request"
                                 ? "تجديد اشتراك"
-                                : "اشتراك جديد"}
+                                : "طلب مباشر"}
                           </span>
                         </div>
 
-                        <div className="flex flex-row items-center gap-2 lg:gap-3 w-full sm:w-auto shrink-0 self-end lg:self-center">
+                        <div className="flex gap-4 items-center">
                           {deleteConfirmId === request.id ? (
-                            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 p-1 rounded-xl w-full sm:w-auto">
+                            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-2xl border border-red-100 dark:border-red-900/30 animate-in fade-in zoom-in duration-300">
                               <button
                                 onClick={() => handleDeleteRequest(request)}
-                                className="flex-1 sm:flex-none px-4 py-2.5 bg-red-600 text-white rounded-lg font-bold text-xs hover:bg-red-700 transition-all active:scale-95 whitespace-nowrap"
+                                className="px-6 py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-all active:scale-95"
                               >
                                 تأكيد الحذف
                               </button>
                               <button
                                 onClick={() => setDeleteConfirmId(null)}
-                                className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-xs hover:bg-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95 whitespace-nowrap"
+                                className="px-6 py-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
                               >
                                 إلغاء
                               </button>
@@ -3174,9 +3191,9 @@ export default function SuperAdminDashboard() {
                                   }
                                   handleApproveRequest(request);
                                 }}
-                                className="flex-1 sm:flex-none px-5 py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-600 transition-all active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap text-xs shadow-sm"
+                                className="px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-600 dark:hover:bg-blue-700 transition-all active:scale-90 flex items-center gap-2 shadow-lg shadow-blue-600/10 cursor-pointer relative z-30"
                               >
-                                <CheckCircle size={16} />
+                                <CheckCircle size={20} />
                                 {request._source === "subscriptionRequests" &&
                                 request.schoolId
                                   ? "تفعيل فوري"
@@ -3189,13 +3206,14 @@ export default function SuperAdminDashboard() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
+                                  console.log("Delete click:", request.id);
                                   setDeleteConfirmId(request.id);
                                 }}
-                                className="flex-1 sm:flex-none px-4 py-3 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white dark:bg-red-900/10 dark:text-red-400 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap text-xs"
-                                title="إلغاء الطلب"
+                                className="px-6 h-14 bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 rounded-2xl font-black hover:bg-red-600 hover:text-white transition-all duration-300 flex items-center gap-2 border border-red-100 dark:border-red-900/30 cursor-pointer active:scale-95 relative z-30 shadow-sm"
+                                title="حذف نهائي"
                               >
-                                <XCircle size={16} />
-                                <span>إلغاء</span>
+                                <XCircle size={20} />
+                                <span>إلغاء الطلب</span>
                               </button>
                             </>
                           )}
@@ -3463,7 +3481,6 @@ export default function SuperAdminDashboard() {
                             <>
                               <th className="px-6 py-4">المدرسة المشترك بها</th>
                               <th className="px-6 py-4">الطلاب المرتبطين</th>
-                              <th className="px-6 py-4 text-center">الإجراءات</th>
                             </>
                           )}
                         </tr>
@@ -3620,58 +3637,6 @@ export default function SuperAdminDashboard() {
                                         )}
                                       </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                      <div className="flex items-center justify-center gap-2">
-                                        {userDeleteConfirmId === user.id ? (
-                                          <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
-                                            <button
-                                              onClick={() =>
-                                                handleDeleteUser(user.id)
-                                              }
-                                              className="px-4 py-2 bg-red-600 text-white text-[9px] font-black rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20"
-                                            >
-                                              تأكيد الحذف
-                                            </button>
-                                            <button
-                                              onClick={() =>
-                                                setUserDeleteConfirmId(null)
-                                              }
-                                              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-                                            >
-                                              إلغاء
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          <>
-                                            <button
-                                              onClick={() => {
-                                                setEditingUser(user);
-                                                setNewUser({
-                                                  name: user.name,
-                                                  email: user.email,
-                                                  role: user.role,
-                                                  schoolId: user.schoolId || "",
-                                                });
-                                                setShowUserModal(true);
-                                              }}
-                                              className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/30"
-                                              title="تعديل المستخدم"
-                                            >
-                                              <SettingsIcon size={16} />
-                                            </button>
-                                            <button
-                                              onClick={() =>
-                                                setUserDeleteConfirmId(user.id)
-                                              }
-                                              className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-red-100 dark:hover:border-red-900/20"
-                                              title="حذف المستخدم"
-                                            >
-                                              <Trash2 size={16} />
-                                            </button>
-                                          </>
-                                        )}
-                                      </div>
-                                    </td>
                                   </>
                                 )}
                               </tr>
@@ -3701,7 +3666,6 @@ export default function SuperAdminDashboard() {
                           <th className="px-6 py-4">ولي الأمر</th>
                           <th className="px-6 py-4">المدرسة المشتركة</th>
                           <th className="px-6 py-4">الطلاب المرتبطين</th>
-                          <th className="px-6 py-4 text-center">الإجراءات</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -3769,58 +3733,6 @@ export default function SuperAdminDashboard() {
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center justify-center gap-2">
-                                      {userDeleteConfirmId === user.id ? (
-                                        <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
-                                          <button
-                                            onClick={() =>
-                                              handleDeleteUser(user.id)
-                                            }
-                                            className="px-4 py-2 bg-red-600 text-white text-[9px] font-black rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20"
-                                          >
-                                            تأكيد الحذف
-                                          </button>
-                                          <button
-                                            onClick={() =>
-                                              setUserDeleteConfirmId(null)
-                                            }
-                                            className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-                                          >
-                                            إلغاء
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <>
-                                          <button
-                                            onClick={() => {
-                                              setEditingUser(user);
-                                              setNewUser({
-                                                name: user.name,
-                                                email: user.email,
-                                                role: user.role,
-                                                schoolId: user.schoolId || "",
-                                              });
-                                              setShowUserModal(true);
-                                            }}
-                                            className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/30"
-                                            title="تعديل المستخدم"
-                                          >
-                                            <SettingsIcon size={16} />
-                                          </button>
-                                          <button
-                                            onClick={() =>
-                                              setUserDeleteConfirmId(user.id)
-                                            }
-                                            className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-red-100 dark:hover:border-red-900/20"
-                                            title="حذف المستخدم"
-                                          >
-                                            <Trash2 size={16} />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                </td>
                               </tr>
                             );
                           })}
@@ -3828,7 +3740,7 @@ export default function SuperAdminDashboard() {
                           0 && (
                           <tr>
                             <td
-                              colSpan={4}
+                              colSpan={3}
                               className="px-6 py-10 text-center text-slate-400 italic"
                             >
                               لا يوجد أولياء أمور مسجلين حالياً
@@ -5167,7 +5079,7 @@ export default function SuperAdminDashboard() {
                               adminPhone: e.target.value,
                             })
                           }
-                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
+                          className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all"
                           placeholder="077XXXXXXXX"
                           dir="ltr"
                         />
@@ -5243,8 +5155,9 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
       )}
+
       {showPackageModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md overflow-hidden animate-fade-in">
+        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md overflow-hidden">
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-2xl shadow-2xl relative border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200 my-8 flex flex-col max-h-[90vh]">
             <div className="p-8 pb-4 shrink-0">
               <div className="flex items-center justify-between mb-6">
@@ -5301,19 +5214,19 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
 
-            <form
-              onSubmit={handleAddPackage}
-              id="package-form"
-              className="flex-1 flex flex-col min-h-0 overflow-hidden"
-            >
-              <div className="flex-1 overflow-y-auto p-8 pt-2 space-y-8">
+            <div className="flex-1 overflow-y-auto p-8 pt-2">
+              <form
+                onSubmit={handleAddPackage}
+                id="package-form"
+                className="space-y-8"
+              >
                 {packageModalTab === "general" && (
                   <>
                     {/* Section 1: Basic Info */}
                     <div className="space-y-4">
                       <h3 className="text-[10px] font-black uppercase text-blue-600 tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-                        المعلومات الأساسية والأسعار
+                        المعلومات الأساسية
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
@@ -5321,6 +5234,7 @@ export default function SuperAdminDashboard() {
                             اسم الباقة
                           </label>
                           <input
+                            required
                             type="text"
                             value={newPackage.name}
                             onChange={(e) =>
@@ -5329,7 +5243,7 @@ export default function SuperAdminDashboard() {
                                 name: e.target.value,
                               })
                             }
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
                             placeholder="مثال: الباقة الماسية"
                           />
                         </div>
@@ -5338,6 +5252,7 @@ export default function SuperAdminDashboard() {
                             السعر السنوي (د.ع / سنوياً)
                           </label>
                           <input
+                            required
                             type="number"
                             value={
                               Number.isNaN(newPackage.priceYearly)
@@ -5352,10 +5267,10 @@ export default function SuperAdminDashboard() {
                               setNewPackage({
                                 ...newPackage,
                                 priceYearly: numVal,
-                                price: numVal,
+                                price: numVal, // set fallback legacy price
                               });
                             }}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
                             placeholder="مثال: 1200000"
                           />
                         </div>
@@ -5364,14 +5279,16 @@ export default function SuperAdminDashboard() {
                             السعر الشهري (د.ع / شهرياً)
                           </label>
                           <input
+                            required
                             type="number"
                             value={
                               Number.isNaN(newPackage.priceMonthly)
                                 ? ""
                                 : newPackage.priceMonthly !== undefined &&
-                                  newPackage.priceMonthly !== 0
-                                ? newPackage.priceMonthly
-                                : Math.round((newPackage.price || 0) / 12) || ""
+                                    newPackage.priceMonthly !== 0
+                                  ? newPackage.priceMonthly
+                                  : Math.round((newPackage.price || 0) / 12) ||
+                                    ""
                             }
                             onChange={(e) => {
                               const val = e.target.value;
@@ -5381,7 +5298,7 @@ export default function SuperAdminDashboard() {
                                 priceMonthly: numVal,
                               });
                             }}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
                             placeholder="مثال: 100000"
                           />
                         </div>
@@ -5401,6 +5318,7 @@ export default function SuperAdminDashboard() {
                           </label>
                           <div className="relative">
                             <input
+                              required
                               type="number"
                               value={
                                 Number.isNaN(newPackage.maxStudents)
@@ -5415,7 +5333,7 @@ export default function SuperAdminDashboard() {
                                     val === "" ? 0 : Number(val) || 0,
                                 });
                               }}
-                              className="w-full pr-4 pl-12 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
+                              className="w-full pr-4 pl-12 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
                             />
                             <Users
                               size={16}
@@ -5428,6 +5346,7 @@ export default function SuperAdminDashboard() {
                             مدة الاشتراك (يوم)
                           </label>
                           <input
+                            required
                             type="number"
                             value={
                               Number.isNaN(newPackage.durationDays)
@@ -5441,7 +5360,7 @@ export default function SuperAdminDashboard() {
                                 durationDays: val === "" ? 0 : Number(val) || 0,
                               });
                             }}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold text-sm"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-bold"
                           />
                         </div>
                         <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 md:col-span-2">
@@ -5543,7 +5462,7 @@ export default function SuperAdminDashboard() {
                               className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity"
                             />
                           </div>
-                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors font-sans">
+                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors">
                             {label}
                           </span>
                         </label>
@@ -5576,69 +5495,68 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
                 )}
-              </div>
+              </form>
+            </div>
 
-              <div className="p-8 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
-                <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    className="flex-1 px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/10 active:scale-95"
-                  >
-                    {editingPackage ? "حفظ التعديلات" : "إنشاء الباقة"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowPackageModal(false);
-                      setEditingPackage(null);
-                      setNewPackage({
-                        name: "",
-                        price: 0,
-                        maxStudents: 500,
-                        features: "",
-                        durationDays: 365,
-                        showSubscriptionTimer: true,
-                        showInRegistration: true,
-                        isPopular: false,
-                        permissions: {
-                          overview: true,
-                          chat: true,
-                          students_view: true,
-                          students_edit: true,
-                          staff_manage: true,
-                          attendance_track: true,
-                          exams_and_results: true,
-                          student_archive: true,
-                          tuition_fees: false,
-                          staff_payroll: false,
-                          inventory_and_assets: false,
-                          behavior_management: true,
-                          student_evaluation_reports: true,
-                          homework_and_tasks: true,
-                          classes: true,
-                          automated_schedules: false,
-                          announcements: true,
-                          parent_app_access: true,
-                          advanced_reports: false,
-                          marketplace_ordering: true,
-                          id_card_generation: false,
-                          assistants_manage: false,
-                          settings: true,
-                        },
-                      });
-                    }}
-                    className="px-8 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
-                  >
-                    إلغاء
-                  </button>
-                </div>
+            <div className="p-8 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex gap-4">
+                <button
+                  type="submit"
+                  form="package-form"
+                  className="flex-1 px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/10 active:scale-95"
+                >
+                  {editingPackage ? "حفظ التعديلات" : "إنشاء الباقة"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPackageModal(false);
+                    setEditingPackage(null);
+                    setNewPackage({
+                      name: "",
+                      price: 0,
+                      maxStudents: 500,
+                      features: "",
+                      durationDays: 365,
+                      showSubscriptionTimer: true,
+                      showInRegistration: true,
+                      isPopular: false,
+                      permissions: {
+                        overview: true,
+                        chat: true,
+                        students_view: true,
+                        students_edit: true,
+                        staff_manage: true,
+                        attendance_track: true,
+                        exams_and_results: true,
+                        student_archive: true,
+                        tuition_fees: false,
+                        staff_payroll: false,
+                        inventory_and_assets: false,
+                        behavior_management: true,
+                        student_evaluation_reports: true,
+                        homework_and_tasks: true,
+                        classes: true,
+                        automated_schedules: false,
+                        announcements: true,
+                        parent_app_access: true,
+                        advanced_reports: false,
+                        marketplace_ordering: true,
+                        id_card_generation: false,
+                        assistants_manage: false,
+                        settings: true,
+                      },
+                    });
+                  }}
+                  className="px-8 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+                >
+                  إلغاء
+                </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
-
-
 
       {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -5930,12 +5848,9 @@ function PasswordCell({ password }: { password?: string }) {
   );
 }
 
-function AdminStatCard({ title, value, hint, color, onClick }: any) {
+function AdminStatCard({ title, value, hint, color }: any) {
   return (
-    <div 
-      onClick={onClick}
-      className={`bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between transition-all ${onClick ? "cursor-pointer hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 hover:-translate-y-1 active:scale-95" : ""}`}
-    >
+    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between transition-colors">
       <p className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">
         {title}
       </p>

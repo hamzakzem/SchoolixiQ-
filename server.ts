@@ -1,17 +1,20 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import dotEnv from 'dotenv';
 import fs from 'fs';
-import nodemailer from 'nodemailer';
 
-dotEnv.config({ override: true });
+dotEnv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin
-const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
+const firebaseConfigPath = path.join(__dirname, 'firebase-applet-config.json');
 let firebaseConfig: any = { projectId: '' };
 if (fs.existsSync(firebaseConfigPath)) {
   firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf8'));
@@ -69,16 +72,16 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
 
 // Get Firestore instance with database ID if available
 const getDb = () => {
-  const dbId = (firebaseConfig as any).firestoreDatabaseId || (firebaseConfig as any).databaseId;
+  const dbId = (firebaseConfig as any).firestoreDatabaseId;
   if (admin.apps.length === 0) {
-    throw new Error('Firebase Admin not fully initialized - no default app');
+    return getFirestore();
   }
   return getFirestore(admin.app(), dbId || '(default)');
 };
 
 async function startServer() {
   const app = express();
-  const PORT = 3000; // Hardcoded to 3000 per infrastructure requirements
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -137,15 +140,15 @@ async function startServer() {
       const decodedToken = await admin.auth().verifyIdToken(token);
       const email = decodedToken.email?.toLowerCase();
       
-      // 1. Check Bootstrap Admins (Robust login for designated accounts)
-      const isBootstrapAdmin = getBootstrapAdmins().includes(email);
+      // 1. Check Bootstrap Admins (Security Hardening: must be verified)
+      const isBootstrapAdmin = getBootstrapAdmins().includes(email) && decodedToken.email_verified === true;
       
       if (isBootstrapAdmin && decodedToken.role !== 'superadmin') {
         await syncUserClaims(decodedToken.uid, 'superadmin');
       }
 
       // 2. Roles & Permissions Authorization
-      let role = isBootstrapAdmin ? 'superadmin' : decodedToken.role;
+      let role = decodedToken.role;
       let schoolId = decodedToken.schoolId;
 
       // 3. Fallback to Firestore if claims are missing
@@ -432,23 +435,13 @@ async function startServer() {
 
   // --- PLAN MANAGEMENT (SUPERADMIN ONLY) ---
   app.post('/api/admin/plans', verifyAdmin, async (req: any, res: any) => {
-    if (req.user.role !== 'superadmin' && req.user.role !== 'admin' && req.user.role !== 'assistant') {
-      return res.status(403).json({ error: 'SuperAdmin access required' });
-    }
-    // Basic permissions check
-    if (req.user.role === 'assistant' && !req.user.permissions?.includes('manage_packages')) {
-      return res.status(403).json({ error: 'Missing manage_packages permission' });
-    }
-    
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
     try {
       const db = getDb();
-      //@ts-ignore
-      console.log('API POST /api/admin/plans dbId:', db.databaseId);
       const plan = req.body;
       const docRef = await db.collection('packages').add({
         ...plan,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
       await logAudit(req, 'CREATE_PLAN', { after: plan });
       res.json({ id: docRef.id });
@@ -458,13 +451,7 @@ async function startServer() {
   });
 
   app.put('/api/admin/plans/:id', verifyAdmin, async (req: any, res: any) => {
-    if (req.user.role !== 'superadmin' && req.user.role !== 'admin' && req.user.role !== 'assistant') {
-      return res.status(403).json({ error: 'SuperAdmin access required' });
-    }
-    // Basic permissions check
-    if (req.user.role === 'assistant' && !req.user.permissions?.includes('manage_packages')) {
-      return res.status(403).json({ error: 'Missing manage_packages permission' });
-    }
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
     try {
       const db = getDb();
       const { id } = req.params;
@@ -481,13 +468,7 @@ async function startServer() {
   });
 
   app.delete('/api/admin/plans/:id', verifyAdmin, async (req: any, res: any) => {
-    if (req.user.role !== 'superadmin' && req.user.role !== 'admin' && req.user.role !== 'assistant') {
-       return res.status(403).json({ error: 'SuperAdmin access required' });
-    }
-    // Basic permissions check
-    if (req.user.role === 'assistant' && !req.user.permissions?.includes('manage_packages')) {
-      return res.status(403).json({ error: 'Missing manage_packages permission' });
-    }
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
     try {
       const db = getDb();
       const { id } = req.params;
@@ -616,316 +597,6 @@ async function startServer() {
       res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
   });
-
-  // Helper to send emails using Nodemailer with SMTP or Firestore Fallback
-  const sendEmailNotification = async (subject: string, htmlContent: string) => {
-    const adminEmail = "hamzakazem1999@gmail.com";
-    
-    // Read SMTP settings from environment variables
-    const host = process.env.SMTP_HOST || process.env.EMAIL_HOST || "smtp.gmail.com";
-    const port = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT) || 587;
-    const user = process.env.SMTP_USER || process.env.EMAIL_USER || "hamzakazem1999@gmail.com";
-    const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS || "mkhtngtsdhrhjjgm";
-    const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || user || 'no-reply@schoolixiq.com';
-
-    if (!user || !pass) {
-      console.warn(`[Email Notification Fallback] SMTP credentials not set. Unable to send real email to ${adminEmail}.`);
-      console.log(`[Email Subject]: ${subject}`);
-      
-      // Save this notification to a "system_notifications" collection in Firestore!
-      try {
-        const db = getDb();
-        await db.collection('system_notifications').add({
-          title: subject,
-          body: htmlContent,
-          recipient: adminEmail,
-          status: 'pending_smtp',
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        console.log(`[Email Notification Status] Logged to 'system_notifications' collection.`);
-      } catch (dbErr) {
-        console.error('Failed to log system notification to Firestore:', dbErr);
-      }
-      return;
-    }
-
-    // Create SMTP transporter
-    const transporter = nodemailer.createTransport({
-      host: host || 'smtp.gmail.com',
-      port: port,
-      secure: port === 465,
-      auth: {
-        user: user,
-        pass: pass
-      }
-    });
-
-    try {
-      const info = await transporter.sendMail({
-        from: `"Schoolix Notifications" <${from}>`,
-        to: adminEmail,
-        subject: subject,
-        html: htmlContent
-      });
-      console.log(`Email notification sent successfully to ${adminEmail}. MessageID: ${info.messageId}`);
-      
-      // Update system_notifications log as sent
-      try {
-        const db = getDb();
-        await db.collection('system_notifications').add({
-          title: subject,
-          body: htmlContent,
-          recipient: adminEmail,
-          status: 'sent',
-          messageId: info.messageId,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      } catch (ignore) {}
-    } catch (err: any) {
-      console.warn(`[SMTP Warning] Failed to send email to ${adminEmail}: ${err.message}. Check your email/password config (use Google App Passwords for Gmail).`);
-      
-      // Log as failed with error details so they can troubleshoot SMTP config
-      try {
-        const db = getDb();
-        await db.collection('system_notifications').add({
-          title: subject,
-          body: htmlContent,
-          recipient: adminEmail,
-          status: 'failed',
-          error: err.message,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      } catch (ignore) {}
-    }
-  };
-
-  // Realtime subscriber and signup notifier
-  const initSubscriptionNotifier = () => {
-    try {
-      const db = getDb();
-      console.log('Initializing realtime subscription notifications listeners...');
-
-      // 1. Listen to 'registrations' for any type of new registrations/subscriptions
-      db.collection('registrations')
-      .where('status', '==', 'pending')
-      .onSnapshot((snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
-          if (change.type === 'added') {
-            const data = change.doc.data();
-            // Check if we already notified for this request to prevent double execution
-            if (data.notifiedAdmin === true) return;
-
-            const docId = change.doc.id;
-            const typeLabel = data.type === 'subscription_request' 
-              ? 'طلب اشتراك جديد (باقة)' 
-              : data.type === 'direct_school_signup'
-              ? 'تسجيل مدرسة مباشر'
-              : `طلب جديد (${data.type})`;
-
-            const customerName = data.name || (data.customerInfo ? data.customerInfo.name : 'غير محدد');
-            const customerPhone = data.phone || (data.customerInfo ? data.customerInfo.phone : 'غير محدد');
-            const customerEmail = data.email || (data.customerInfo ? data.customerInfo.email : 'غير محدد');
-            const customerAddress = data.address || (data.customerInfo ? data.customerInfo.address : 'غير محدد');
-            const packageName = data.packageName || 'غير محدد';
-            const price = data.price || 'غير محدد';
-            const billingCycle = data.billingCycle === 'monthly' ? 'شهري' : (data.billingCycle === 'yearly' ? 'سنوي' : (data.billingCycle || 'غير محدد'));
-            const subscriberCode = data.subscriberCode || 'غير محدد';
-
-            const emailSubject = `📢 ${typeLabel} - Schoolix (${customerName})`;
-            
-            const htmlContent = `
-              <div style="direction: rtl; font-family: 'Tahoma', 'Arial', sans-serif; text-align: right; background-color: #f6f8fa; padding: 20px; border-radius: 8px;">
-                <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">إشعار بطلب اشتراك جديد في منصة Schoolix</h2>
-                
-                <p style="font-size: 16px; color: #34495e;">لقد تم استلام طلب اشتراك جديد، وفيما يلي كامل تفاصيل الطلب:</p>
-                
-                <table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                  <tr style="background-color: #f2f4f8;">
-                    <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd; width: 30%;">بند التفاصيل</th>
-                    <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">القيمة / المدخلات</th>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">نوع الطلب</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #e67e22; font-weight: bold;">${typeLabel}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">الاسم بالكامل</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${customerName}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">رقم الهاتف</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${customerPhone}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">البريد الإلكتروني</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${customerEmail}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">العنوان / الموقع</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${customerAddress}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">المحافظة</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.governorate || 'غير محدد'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">المديرية</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.directorate || 'غير محدد'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">المرحلة الدراسية</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.stage || 'غير محدد'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">وقت الدوام</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.shift || 'غير محدد'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">نوع الدراسة</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.genderType || 'غير محدد'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">العدد التقريبي للطلاب</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${data.approximateStudents || 'غير محدد'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">الباقة المطلوبة</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #2980b9; font-weight: bold;">${packageName}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">سعر الاشتراك</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #27ae60; font-weight: bold;">${price} د.ع</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">دورة الفوترة</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${billingCycle}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">كود المشترك (غير مكرر)</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #8e44ad; font-weight: bold;">${subscriberCode}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">معرف الطلب (Firestore)</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #7f8c8d; font-family: monospace;">${docId}</td>
-                  </tr>
-                </table>
-
-                <div style="margin-top: 25px; padding: 15px; background: #e8f4fc; border-right: 5px solid #3498db; border-radius: 4px; font-size: 14px; color: #2c3e50;">
-                  ⚠️ كمسير للنظام، يمكنك المتابعة إلى <strong>لوحة تحكم السوبر أدمن (Super Admin Dashboard)</strong> لتفعيل حساب هذه المدرسة أو تعديل صلاحياتها يدوياً.
-                </div>
-                
-                <p style="margin-top: 30px; font-size: 12px; color: #95a5a6; text-align: center; border-top: 1px solid #ddd; padding-top: 15px;">
-                  هذا البريد تم إرساله تلقائياً من نظام الإشعارات الذكي لمنصة Schoolix لعام 2026.
-                </p>
-              </div>
-            `;
-
-            try {
-              // Mark as notified inside a transaction or quick update to resolve race conditions
-              await change.doc.ref.update({ notifiedAdmin: true });
-              
-              // Trigger email
-              await sendEmailNotification(emailSubject, htmlContent);
-            } catch (err: any) {
-              console.error(`Failed to handle registration notification for ${docId}:`, err);
-            }
-          }
-        });
-      }, (error) => {
-        console.error('Error in registrations notifications listener:', error);
-      });
-
-    // 2. Listen to 'subscriptionRequests' for existing school plan changes or subscription modification requests
-    db.collection('subscriptionRequests')
-      .where('status', '==', 'pending')
-      .onSnapshot((snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
-          if (change.type === 'added') {
-            const data = change.doc.data();
-            // Check if we already notified for this request to prevent double execution
-            if (data.notifiedAdmin === true) return;
-
-            const docId = change.doc.id;
-            const schoolName = data.schoolName || 'مدرسة غير محددة';
-            const adminName = data.adminName || 'مدير غير محدد';
-            const adminEmail = data.adminEmail || 'غير محدد';
-            const adminPhone = data.adminPhone || 'غير محدد';
-            const planId = data.planId || 'غير محدد';
-
-            const emailSubject = `📢 طلب تفعيل اشتراك مدرسة - Schoolix (${schoolName})`;
-            
-            const htmlContent = `
-              <div style="direction: rtl; font-family: 'Tahoma', 'Arial', sans-serif; text-align: right; background-color: #f6f8fa; padding: 20px; border-radius: 8px;">
-                <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">طلب تفعيل باقة لمدرسة قائمة</h2>
-                
-                <p style="font-size: 16px; color: #34495e;">قامت مدرسة مسجلة بإرسال طلب لتفعيل / ترقية باقة اشتراكها المعلقة:</p>
-                
-                <table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                  <tr style="background-color: #f2f4f8;">
-                    <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd; width: 30%;">بند التفاصيل</th>
-                    <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">القيمة / المدخلات</th>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">اسم المدرسة</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #e74c3c; font-weight: bold;">${schoolName}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">مدير المدرسة (صاحب الطلب)</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${adminName}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">رقم هاتف المدير</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${adminPhone}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">البريد الإلكتروني للمدير</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #34495e;">${adminEmail}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">معرف الباقة المطلوبة (Plan ID)</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #2980b9; font-weight: bold;">${planId}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">معرف المدرسة (Firestore ID)</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #7f8c8d; font-family: monospace;">${data.schoolId || 'غير محدد'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">معرف طلب التفعيل</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #eee; color: #7f8c8d; font-family: monospace;">${docId}</td>
-                  </tr>
-                </table>
-
-                <div style="margin-top: 25px; padding: 15px; background: #fdf2f2; border-right: 5px solid #e74c3c; border-radius: 4px; font-size: 14px; color: #2c3e50;">
-                  ⚠️ يرجى تفعيل أو مراجعة هذا الطلب من شريط طلبات الاشتراك داخل لوحة تحكم الـ Super Admin لتعديل حالة المدرسة إلى نشطة وتحديد مدة الاشتراك المناسبة.
-                </div>
-                
-                <p style="margin-top: 30px; font-size: 12px; color: #95a5a6; text-align: center; border-top: 1px solid #ddd; padding-top: 15px;">
-                  هذا البريد تم إرساله تلقائياً من نظام الإشعارات الذكي لمنصة Schoolix لعام 2026.
-                </p>
-              </div>
-            `;
-
-            try {
-              // Mark as notified in Firestore immediately to prevent concurrent duplicate sends
-              await change.doc.ref.update({ notifiedAdmin: true });
-
-              // Send the actual email
-              await sendEmailNotification(emailSubject, htmlContent);
-            } catch (err: any) {
-              console.error(`Failed to handle subscription request notification for ${docId}:`, err);
-            }
-          }
-        });
-      }, (error) => {
-        console.error('Error in subscriptionRequests notifications listener:', error);
-      });
-    } catch (e) {
-      console.warn('Realtime subscription notifier disabled (Firebase not fully initialized).');
-    }
-  };
-
-  // Initialize background subscription notifier
-  initSubscriptionNotifier();
 
   // Global API 404 handler - MUST be before Vite middleware
   app.all('/api/*', (req, res) => {

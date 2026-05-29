@@ -24,22 +24,26 @@ export async function adminCreateUser(userData: {
     let errorMessage = 'Failed to create user';
     const responseClone = response.clone();
     try {
-      const error = await response.json();
-      errorMessage = error.message || error.error || errorMessage;
-    } catch (e) {
-      // If not JSON, get the text content
-      try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const error = await response.json();
+        errorMessage = error.message || error.error || errorMessage;
+      } else {
         const text = await responseClone.text();
-        console.error('Server returned non-JSON error:', text);
         errorMessage = `Server Error (${response.status}): ${text.substring(0, 100)}...`;
-      } catch (textErr) {
-        errorMessage = `Failed to create user (Status ${response.status})`;
       }
+    } catch (e) {
+      errorMessage = `Failed to create user (Status ${response.status})`;
     }
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return response.json();
+  } else {
+    throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+  }
 }
 
 export async function adminDeleteUser(uid: string) {
@@ -59,21 +63,26 @@ export async function adminDeleteUser(uid: string) {
     let errorMessage = 'Failed to delete user';
     const responseClone = response.clone();
     try {
-      const error = await response.json();
-      errorMessage = error.message || error.error || errorMessage;
-    } catch (e) {
-      try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const error = await response.json();
+        errorMessage = error.message || error.error || errorMessage;
+      } else {
         const text = await responseClone.text();
-        console.error('Server returned non-JSON error:', text);
         errorMessage = `Server Error (${response.status}): ${text.substring(0, 100)}...`;
-      } catch (textErr) {
-        errorMessage = `Failed to delete user (Status ${response.status})`;
       }
+    } catch (e) {
+      errorMessage = `Failed to delete user (Status ${response.status})`;
     }
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return response.json();
+  } else {
+    throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+  }
 }
 
 export async function adminDeleteStudent(id: string) {
@@ -93,19 +102,24 @@ export async function adminDeleteStudent(id: string) {
     let errorMessage = 'Failed to delete student';
     const responseClone = response.clone();
     try {
-      const error = await response.json();
-      errorMessage = error.message || error.error || errorMessage;
-    } catch (e) {
-      try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const error = await response.json();
+        errorMessage = error.message || error.error || errorMessage;
+      } else {
         const text = await responseClone.text();
-        console.error('Server returned non-JSON error:', text);
         errorMessage = `Server Error (${response.status}): ${text.substring(0, 100)}...`;
-      } catch (textErr) {
-        errorMessage = `Failed to delete student (Status ${response.status})`;
       }
+    } catch (e) {
+      errorMessage = `Failed to delete student (Status ${response.status})`;
     }
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return response.json();
+  } else {
+    throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+  }
 }

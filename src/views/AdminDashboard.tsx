@@ -511,9 +511,8 @@ export default function AdminDashboard() {
   };
 
   const [isSubscribing, setIsSubscribing] = useState(false);
-  const [selectedPlanObj, setSelectedPlanObj] = useState<any>(null);
 
-  const handleSelectPlan = async (plan: any) => {
+  const handleSelectPlan = async (planId: string) => {
     if (!profile?.schoolId || !schoolData) return;
 
     setIsSubscribing(true);
@@ -529,13 +528,13 @@ export default function AdminDashboard() {
           adminEmail: profile.email,
           adminName: profile.name,
           adminPhone: (profile as any).phone || schoolData.adminPhone || "",
-          planId: plan.id,
+          planId: planId,
           status: "pending",
           createdAt: serverTimestamp(),
         }),
         updateDoc(doc(db, "schools", profile.schoolId), {
           status: "pending_approval",
-          selectedPackageId: plan.id,
+          selectedPackageId: planId,
           updatedAt: serverTimestamp(),
         }),
       ]);
@@ -604,62 +603,15 @@ export default function AdminDashboard() {
                 لمدرستكم وإرسال طلب تفعيل.
               </p>
 
-              {selectedPlanObj ? (
-                <div className="w-full max-w-lg mx-auto bg-white dark:bg-slate-800 p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-700 text-center">
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">
-                    تأكيد طلب الاشتراك
-                  </h3>
-                  <p className="text-slate-500 dark:text-slate-400 font-bold mb-6">
-                    مراجعة تفاصيل الطلب وتأكيده للبدء
-                  </p>
-
-                  <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 text-right mb-6 space-y-3">
-                    <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-                      <span className="font-bold text-slate-900 dark:text-white">{selectedPlanObj.name}</span>
-                      <span className="text-slate-500 text-sm">الباقة المطلوبة</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-                      <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                        {selectedPlanObj.price === 0 ? "مجاني" : `${selectedPlanObj.price?.toLocaleString()} د.ع`}
-                      </span>
-                      <span className="text-slate-500 text-sm">السعر المبدئي</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-bold text-slate-900 dark:text-white">{schoolData.name}</span>
-                      <span className="text-slate-500 text-sm">اسم المدرسة</span>
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6 text-right">
+                {isLoadingPackages ? (
+                  <div className="col-span-full py-20 flex flex-col items-center justify-center gap-4">
+                    <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-slate-500 font-bold">
+                      جاري تحميل الباقات المتاحة...
+                    </p>
                   </div>
-
-                  <div className="flex flex-col sm:flex-row justify-between gap-3">
-                    <button
-                      onClick={() => setSelectedPlanObj(null)}
-                      className="w-full sm:w-1/3 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl transition-all"
-                    >
-                      تغيير الباقة
-                    </button>
-                    <button
-                      onClick={() => handleSelectPlan(selectedPlanObj)}
-                      disabled={isSubscribing}
-                      className="w-full sm:w-2/3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex justify-center items-center gap-2"
-                    >
-                      {isSubscribing ? (
-                        <RefreshCw className="animate-spin" size={18} />
-                      ) : (
-                        "تأكيد وإرسال الطلب"
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6 text-right">
-                  {isLoadingPackages ? (
-                    <div className="col-span-full py-20 flex flex-col items-center justify-center gap-4">
-                      <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-slate-500 font-bold">
-                        جاري تحميل الباقات المتاحة...
-                      </p>
-                    </div>
-                  ) : packages.length > 0 ? (
+                ) : packages.length > 0 ? (
                   packages.map((plan) => (
                     <div
                       key={plan.id}
@@ -740,14 +692,17 @@ export default function AdminDashboard() {
                       </div>
 
                       <button
-                        onClick={() => setSelectedPlanObj(plan)}
-                        className={`w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 active:scale-95 shadow-xl ${
+                        onClick={() => handleSelectPlan(plan.id)}
+                        disabled={isSubscribing}
+                        className={`w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 shadow-xl ${
                           plan.isPopular
                             ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/20"
                             : "bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600 shadow-slate-600/10"
                         }`}
                       >
-                        اختيار هذه الباقة
+                        {isSubscribing
+                          ? "جاري الإرسال..."
+                          : "اختيار هذه الباقة"}
                         <ArrowRight size={18} />
                       </button>
                     </div>
@@ -761,7 +716,6 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
-              )}
             </motion.div>
           ) : schoolData.status === "rejected" ? (
             <motion.div
