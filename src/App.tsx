@@ -624,7 +624,7 @@ const AppContent = () => {
                                   return addDoc(
                                     collection(db, "registrations"),
                                     {
-                                      type: "direct_school_signup",
+                                      type: "subscription_request",
                                       uid: user.uid,
                                       email: user.email,
                                       name: subscriptionForm.name,

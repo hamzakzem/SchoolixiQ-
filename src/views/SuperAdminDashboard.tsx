@@ -2724,120 +2724,6 @@ export default function SuperAdminDashboard() {
                       </table>
                     </div>
                   </div>
-
-                  {subscriptionRequests.filter(
-                    (r) => r.type === "direct_school_signup",
-                  ).length > 0 && (
-                    <div className="mt-12">
-                      <div className="mb-6">
-                        <h4 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-                          <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-xl text-orange-600">
-                            <Users size={24} />
-                          </div>
-                          تسجيلات مدرسية بانتظار المراجعة (New Nodes)
-                        </h4>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs font-bold mt-1 opacity-80 pr-12">
-                          حسابات تم إنشاؤها عبر بوابات الويب ولم يتم تعيينها
-                          لمراكز بيانات مدرسية (تتطلب تفعيل يدوي)
-                        </p>
-                      </div>
-                      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-orange-200/50 dark:border-orange-900/20 shadow-xl shadow-orange-500/5 overflow-hidden transition-all">
-                        <table className="w-full text-right border-collapse">
-                          <thead>
-                            <tr className="bg-orange-50/50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase tracking-widest border-b border-orange-100/50 dark:border-orange-900/20">
-                              <th className="px-8 py-5">
-                                المؤسسة والبيانات الشخصية
-                              </th>
-                              <th className="px-6 py-5">المصادقة المؤقتة</th>
-                              <th className="px-8 py-5 text-center">
-                                التحكم بالنظام
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-orange-50/50 dark:divide-orange-900/10">
-                            {subscriptionRequests
-                              .filter((r) => r.type === "direct_school_signup")
-                              .map((req) => (
-                                <tr
-                                  key={req.id}
-                                  className="group hover:bg-orange-50/30 dark:hover:bg-orange-900/5 transition-all"
-                                >
-                                  <td className="px-8 py-6">
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="text-slate-900 dark:text-white font-black text-sm tracking-tight truncate max-w-[250px]">
-                                        {req.name}
-                                      </span>
-                                      <div className="flex flex-col gap-0.5 mt-1 font-mono text-[10px]">
-                                        <span className="text-slate-500 dark:text-slate-400 lowercase">
-                                          {req.email}
-                                        </span>
-                                        {req.phone && (
-                                          <span className="text-slate-400">
-                                            {req.phone}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span className="text-[9px] text-orange-500 font-bold uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
-                                        <div className="w-1 h-1 rounded-full bg-orange-500 animate-ping"></div>
-                                        ORPHAN_ACCOUNT
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-6">
-                                    <div className="inline-flex items-center gap-2 bg-orange-50/30 dark:bg-orange-950 px-3 py-2 rounded-xl border border-orange-100/50 dark:border-orange-900/30 transition-colors">
-                                      <PasswordCell password={req.password} />
-                                    </div>
-                                  </td>
-                                  <td className="px-8 py-6 text-center">
-                                    <div className="flex justify-center gap-2">
-                                      {deleteConfirmId === req.id ? (
-                                        <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-300">
-                                          <button
-                                            onClick={() =>
-                                              handleDeleteRequest(req)
-                                            }
-                                            className="px-4 py-2 bg-red-600 text-white rounded-xl text-[10px] font-black hover:bg-red-700 shadow-lg shadow-red-600/20"
-                                          >
-                                            مسح البيانات
-                                          </button>
-                                          <button
-                                            onClick={() =>
-                                              setDeleteConfirmId(null)
-                                            }
-                                            className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl text-[10px] font-black"
-                                          >
-                                            إلغاء
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <>
-                                          <button
-                                            className="px-4 py-2 bg-orange-500 text-white rounded-xl text-[10px] font-black shadow-lg shadow-orange-500/20 hover:bg-orange-600 transition-all active:scale-95"
-                                            onClick={() => {
-                                              handleApproveRequest(req);
-                                            }}
-                                          >
-                                            تفعيل وإنشاء المدارس
-                                          </button>
-                                          <button
-                                            onClick={() =>
-                                              setDeleteConfirmId(req.id)
-                                            }
-                                            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-red-500 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 hover:border-red-100 transition-all"
-                                          >
-                                            <Trash2 size={16} />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
                 </>
               ) : activeTab === "packages" ? (
                 <>
@@ -3056,82 +2942,85 @@ export default function SuperAdminDashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         key={request.id}
-                        className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8 transition-all hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 group relative"
+                        className="bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 md:gap-6 xl:gap-8 transition-all hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 group relative"
                       >
-                        <div className="flex items-center gap-8 flex-1">
-                          <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors duration-500">
-                            <Building size={32} />
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 flex-1 w-full">
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors duration-500 shrink-0">
+                            <Building size={32} className="scale-75 sm:scale-100" />
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-3">
-                              <h4 className="text-xl font-black text-slate-900 dark:text-white">
+                          <div className="space-y-3 sm:space-y-2 flex-1 w-full">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                              <h4 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white line-clamp-2">
                                 {request.customerInfo?.name ||
                                   request.schoolName ||
                                   request.adminName}
                               </h4>
                               <span
-                                className={`px-3 py-1 ${request.type === "renewal_request" ? "bg-orange-100 text-orange-600 border border-orange-200" : "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"} text-[10px] font-black rounded-full uppercase tracking-widest`}
+                                className={`px-2.5 sm:px-3 py-1 ${request.type === "renewal_request" ? "bg-orange-100 text-orange-600 border border-orange-200" : "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"} text-[10px] font-black rounded-full uppercase tracking-widest whitespace-nowrap`}
                               >
                                 {request.type === "renewal_request"
                                   ? "طلب تجديد"
                                   : request.planId || request.packageName}
                               </span>
                               {request.billingCycle && (
-                                <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] font-black rounded-full border border-purple-100 dark:border-purple-900/30">
+                                <span className="px-2.5 sm:px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] font-black rounded-full border border-purple-100 dark:border-purple-900/30 whitespace-nowrap">
                                   {request.billingCycle === "monthly"
                                     ? "شهرياً"
                                     : "سنوياً"}
                                 </span>
                               )}
                               {request.subscriberCode && (
-                                <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-full border border-emerald-100 dark:border-emerald-900/30">
+                                <span className="px-2.5 sm:px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-full border border-emerald-100 dark:border-emerald-900/30 whitespace-nowrap">
                                   رمز: {request.subscriberCode}
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                              <Phone size={14} className="text-slate-400" />
-                              <span className="select-all">
-                                {request.customerInfo?.phone ||
-                                  request.adminPhone ||
-                                  request.phone}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                              <Mail size={14} className="text-slate-400" />
-                              <span className="lowercase select-all">
-                                {request.customerInfo?.email ||
-                                  request.adminEmail ||
-                                  request.email}
-                              </span>
-                            </div>
-                            {request.price !== undefined && (
-                              <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-900/30">
-                                <CreditCard
-                                  size={14}
-                                  className="text-amber-500"
-                                />
-                                <span className="font-bold text-amber-600 dark:text-amber-400">
-                                  {request.price.toLocaleString("ar-IQ")} د.ع
+                            
+                            <div className="flex flex-wrap gap-2">
+                              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 max-w-full">
+                                <Phone size={14} className="text-slate-400 shrink-0" />
+                                <span className="select-all text-sm truncate">
+                                  {request.customerInfo?.phone ||
+                                    request.adminPhone ||
+                                    request.phone}
                                 </span>
                               </div>
-                            )}
-                            <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900/30">
-                              <Lock size={14} className="text-indigo-500" />
-                              <PasswordCell
-                                password={
-                                  request.adminPassword ||
-                                  request.password ||
-                                  request.customerInfo?.password
-                                }
-                              />
-                            </div>
-                            {request.customerInfo?.address && (
-                              <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                                <MapPin size={14} className="text-slate-400" />
-                                <span>{request.customerInfo?.address}</span>
+                              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 max-w-full">
+                                <Mail size={14} className="text-slate-400 shrink-0" />
+                                <span className="lowercase select-all text-sm truncate">
+                                  {request.customerInfo?.email ||
+                                    request.adminEmail ||
+                                    request.email}
+                                </span>
                               </div>
-                            )}
+                              {request.price !== undefined && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                  <CreditCard
+                                    size={14}
+                                    className="text-amber-500 shrink-0"
+                                  />
+                                  <span className="font-bold text-amber-600 dark:text-amber-400 text-sm">
+                                    {request.price.toLocaleString("ar-IQ")} د.ع
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900/30 max-w-full">
+                                <Lock size={14} className="text-indigo-500 shrink-0" />
+                                <PasswordCell
+                                  password={
+                                    request.adminPassword ||
+                                    request.password ||
+                                    request.customerInfo?.password
+                                  }
+                                />
+                              </div>
+                              {request.customerInfo?.address && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 max-w-full">
+                                  <MapPin size={14} className="text-slate-400 shrink-0" />
+                                  <span className="text-sm truncate">{request.customerInfo?.address}</span>
+                                </div>
+                              )}
+                            </div>
                             <button
                               onClick={() => {
                                 const planId =
@@ -3147,45 +3036,49 @@ export default function SuperAdminDashboard() {
                                   );
                                 }
                               }}
-                              className="flex items-center gap-2 text-[10px] text-blue-600 dark:text-blue-400 underline decoration-2 underline-offset-4 font-black hover:text-blue-700 transition-colors"
+                              className="flex items-center gap-2 text-[10px] sm:text-[11px] text-blue-600 dark:text-blue-400 underline decoration-2 underline-offset-4 font-black hover:text-blue-700 transition-colors bg-blue-50/50 dark:bg-blue-900/10 px-3 py-1.5 rounded-lg w-fit mt-1 max-w-full"
                             >
-                              <Plus size={12} />
-                              تحديد/عرض تفاصيل الباقة المطلوبة
+                              <Plus size={12} className="shrink-0" />
+                              <span className="truncate">تحديد/عرض تفاصيل الباقة المطلوبة</span>
                             </button>
+                            <div className="text-[10px] text-slate-400 font-mono italic mt-1 block sm:hidden">
+                              {request.createdAt
+                                ?.toDate?.()
+                                ?.toLocaleString("ar-IQ") || "جاري التحميل..."}
+                            </div>
                           </div>
-                          <div className="text-[10px] text-slate-300 font-mono italic">
+                          <div className="text-[10px] text-slate-300 font-mono italic hidden sm:block min-w-max self-start mt-2">
                             تاريخ الطلب:{" "}
+                            <br className="hidden sm:block" />
                             {request.createdAt
                               ?.toDate?.()
                               ?.toLocaleString("ar-IQ") || "جاري التحميل..."}
                           </div>
                         </div>
 
-                        <div className="flex flex-col items-center md:items-end gap-1 px-8 md:border-r border-slate-100 dark:border-slate-800 h-full justify-center">
-                          <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">
+                        <div className="flex flex-row xl:flex-col items-center xl:items-end justify-between xl:justify-center gap-1 px-3 sm:px-4 xl:px-8 py-3 xl:py-0 bg-slate-50/50 xl:bg-transparent rounded-2xl xl:rounded-none xl:border-r border-slate-100 dark:border-slate-800 h-full w-full xl:w-auto mt-2 xl:mt-0">
+                          <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter shrink-0">
                             نوع الطلب
                           </span>
-                          <span className="text-slate-900 dark:text-white font-black text-lg tracking-tighter uppercase">
-                            {request._source === "subscriptionRequests"
-                              ? "اشتراك جديد"
-                              : request.type === "renewal_request"
+                          <span className="text-slate-900 dark:text-white font-black text-sm sm:text-base md:text-lg tracking-tighter uppercase whitespace-nowrap text-right">
+                            {request.type === "renewal_request"
                                 ? "تجديد اشتراك"
-                                : "طلب مباشر"}
+                                : "اشتراك جديد"}
                           </span>
                         </div>
 
-                        <div className="flex gap-4 items-center">
+                        <div className="flex flex-col sm:flex-row gap-3 xl:gap-4 items-stretch sm:items-center w-full xl:w-auto mt-2 xl:mt-0">
                           {deleteConfirmId === request.id ? (
-                            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-2xl border border-red-100 dark:border-red-900/30 animate-in fade-in zoom-in duration-300">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-2xl border border-red-100 dark:border-red-900/30 animate-in fade-in zoom-in duration-300 w-full">
                               <button
                                 onClick={() => handleDeleteRequest(request)}
-                                className="px-6 py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-all active:scale-95"
+                                className="px-4 md:px-6 py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-all active:scale-95 whitespace-nowrap"
                               >
                                 تأكيد الحذف
                               </button>
                               <button
                                 onClick={() => setDeleteConfirmId(null)}
-                                className="px-6 py-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
+                                className="px-4 md:px-6 py-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95 whitespace-nowrap"
                               >
                                 إلغاء
                               </button>
@@ -3224,7 +3117,7 @@ export default function SuperAdminDashboard() {
                                   }
                                   handleApproveRequest(request);
                                 }}
-                                className="px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-600 dark:hover:bg-blue-700 transition-all active:scale-90 flex items-center gap-2 shadow-lg shadow-blue-600/10 cursor-pointer relative z-30"
+                                className="w-full sm:w-auto px-6 xl:px-8 py-3.5 xl:py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-600 dark:hover:bg-blue-700 transition-all active:scale-90 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/10 cursor-pointer relative z-30 whitespace-nowrap"
                               >
                                 <CheckCircle size={20} />
                                 {request._source === "subscriptionRequests" &&
@@ -3242,7 +3135,7 @@ export default function SuperAdminDashboard() {
                                   console.log("Delete click:", request.id);
                                   setDeleteConfirmId(request.id);
                                 }}
-                                className="px-6 h-14 bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 rounded-2xl font-black hover:bg-red-600 hover:text-white transition-all duration-300 flex items-center gap-2 border border-red-100 dark:border-red-900/30 cursor-pointer active:scale-95 relative z-30 shadow-sm"
+                                className="w-full sm:w-auto px-4 xl:px-6 h-12 xl:h-14 bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 rounded-2xl font-black hover:bg-red-600 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 border border-red-100 dark:border-red-900/30 cursor-pointer active:scale-95 relative z-30 shadow-sm whitespace-nowrap"
                                 title="حذف نهائي"
                               >
                                 <XCircle size={20} />
