@@ -529,6 +529,62 @@ async function startServer() {
     }
   });
 
+  app.post('/api/admin/delete-school', verifyAdmin, async (req: any, res: any) => {
+    const { schoolId } = req.body;
+    if (!schoolId) return res.status(400).json({ error: 'School ID required' });
+    
+    try {
+      const db = getDb();
+      
+      // 1. Delete all users associated with this school
+      const usersQuery = await db.collection('users').where('schoolId', '==', schoolId).get();
+      const userDeletions = usersQuery.docs.map(async (uDoc) => {
+        try {
+          await admin.auth().deleteUser(uDoc.id);
+        } catch (e) {
+          // ignore auth not found
+        }
+        await uDoc.ref.delete();
+      });
+      await Promise.all(userDeletions);
+
+      // 2. Delete all students
+      const studentsQuery = await db.collection('students').where('schoolId', '==', schoolId).get();
+      const studentDeletions = studentsQuery.docs.map(sDoc => sDoc.ref.delete());
+      await Promise.all(studentDeletions);
+
+      // 3. Delete other related collections (limit to 10 for safety if huge, or just batch)
+      const collectionsToCleanup = [
+        "staff", "homework", "exams", "fees", "expenses", "logs", 
+        "notifications", "attendance", "announcements", "payroll", 
+        "inventory", "market", "orders", "payments", "behavior_reports", 
+        "behavior", "grades", "installments", "teacher_reports", "classes", "subscriptionRequests"
+      ];
+      
+      for (const colName of collectionsToCleanup) {
+        try {
+          const snap = await db.collection(colName).where('schoolId', '==', schoolId).get();
+          if (!snap.empty) {
+            const batch = db.batch();
+            snap.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+          }
+        } catch (e) {
+          console.log(`Cleanup failed for ${colName}:`, e);
+        }
+      }
+
+      // 4. Finally delete school
+      await db.collection('schools').doc(schoolId).delete();
+      await logAudit(req, 'DELETE_SCHOOL', { metadata: { targetSchoolId: schoolId } });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete School Error:', error);
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
   app.post('/api/admin/delete-student', verifyAdmin, async (req: any, res: any) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'Student ID required' });

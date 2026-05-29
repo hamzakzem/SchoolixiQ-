@@ -642,77 +642,24 @@ export default function SuperAdminDashboard() {
       "جاري مسح بيانات المدرسة والمستخدمين...",
     );
     try {
-      // 1. Delete all users associated with this school (Auth + Firestore)
-      const usersQuery = query(
-        collection(db, "users"),
-        where("schoolId", "==", schoolId),
-      );
-      const usersSnap = await getDocs(usersQuery);
-
-      const userDeletions = usersSnap.docs.map(async (uDoc) => {
-        try {
-          await adminDeleteUser(uDoc.id);
-        } catch (err) {
-          console.error(`Failed to delete user ${uDoc.id}:`, err);
-        }
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/delete-school', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ schoolId })
       });
-      await Promise.all(userDeletions);
 
-      // 2. Delete all students associated with this school
-      const studentsQuery = query(
-        collection(db, "students"),
-        where("schoolId", "==", schoolId),
-      );
-      const studentsSnap = await getDocs(studentsQuery);
-      const studentDeletions = studentsSnap.docs.map((sDoc) =>
-        deleteDoc(doc(db, "students", sDoc.id)),
-      );
-      await Promise.all(studentDeletions);
-
-      // 3. Delete other common associated collections if they exist
-      const collectionsToCleanup = [
-        "staff",
-        "homework",
-        "exams",
-        "fees",
-        "expenses",
-        "logs",
-        "notifications",
-        "attendance",
-        "announcements",
-        "payroll",
-        "inventory",
-        "market",
-        "orders",
-        "payments",
-        "behavior_reports",
-        "behavior",
-        "grades",
-        "installments",
-        "teacher_reports",
-        "classes",
-        "subscriptionRequests",
-      ];
-      for (const colName of collectionsToCleanup) {
+      if (!response.ok) {
+        let msg = 'فشل الحذف الكامل للبيانات';
         try {
-          const q = query(
-            collection(db, colName),
-            where("schoolId", "==", schoolId),
-          );
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            const deletions = snap.docs.map((d) =>
-              deleteDoc(doc(db, colName, d.id)),
-            );
-            await Promise.all(deletions);
-          }
-        } catch (e) {
-          console.log(`Note: Cleanup failed for ${colName}:`, e);
-        }
+           const errRes = await response.json();
+           msg = errRes.error || msg;
+        } catch(e) {}
+        throw new Error(msg);
       }
-
-      // 4. Finally delete the school document
-      await deleteDoc(doc(db, "schools", schoolId));
 
       toast.dismiss(loadingToast);
       toast.success("تم حذف المدرسة وكامل بياناتها بنجاح");
@@ -720,7 +667,6 @@ export default function SuperAdminDashboard() {
       toast.dismiss(loadingToast);
       console.error("Full school deletion failed:", error);
       toast.error("فشل الحذف الكامل: " + (error.message || "خطأ غير متوقع"));
-      handleFirestoreError(error, OperationType.DELETE, `schools/${schoolId}`);
     }
   };
 
