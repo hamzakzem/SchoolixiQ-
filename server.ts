@@ -227,9 +227,8 @@ async function startServer() {
       }
 
       await admin.auth().setCustomUserClaims(uid, claims);
-      // Revoke refresh tokens to force new token acquisition
-      await admin.auth().revokeRefreshTokens(uid);
-      console.log(`Claims synced & tokens revoked for user ${uid}: role=${role}, sv=${securityVersion}`);
+      // Removed revokeRefreshTokens to prevent forcefully logging out active sessions when claims simply need syncing
+      console.log(`Claims synced for user ${uid}: role=${role}, sv=${securityVersion}`);
     } catch (error) {
       console.error(`Error setting claims for user ${uid}:`, error);
     }
@@ -550,6 +549,8 @@ async function startServer() {
       
       const db = getDb();
       let uid = '';
+      let isExistingUser = false;
+      let existingUserData: any = null;
 
       // Check if user already exists in Firebase Auth
       try {
@@ -560,24 +561,24 @@ async function startServer() {
         // Check if user exists in our Firestore 'users' collection
         const userDoc = await db.collection('users').doc(uid).get();
         if (userDoc.exists) {
-          const userData = userDoc.data();
-          // If already in another school, block it (unless same school)
-          if (userData?.schoolId && userData.schoolId !== schoolId && req.user.role !== 'superadmin') {
-            return res.status(400).json({ 
-              error: 'USER_ALREADY_IN_ANOTHER_SCHOOL', 
-              message: 'هذا البريد الإلكتروني مسجل بالفعل لمدرسة أخرى' 
-            });
-          }
-
-          // Role conflict check: management cannot be teacher or parent
-          const isManagement = ['admin', 'staff', 'assistant', 'superadmin'].includes(userData?.role);
-          const requestedIsRestricted = ['teacher', 'parent'].includes(role);
+          isExistingUser = true;
+          existingUserData = userDoc.data();
           
-          if (isManagement && requestedIsRestricted) {
-            return res.status(400).json({ 
-              error: 'ROLE_CONFLICT', 
-              message: 'هذا الحساب مسجل كإدارة مدرسة ولا يمكن استخدامه كمعلم أو ولي أمر بنفس البريد' 
-            });
+          if (role === 'parent') {
+            if (existingUserData?.role && existingUserData.role !== 'parent') {
+              return res.status(400).json({
+                error: 'ROLE_CONFLICT',
+                message: 'هذا البريد الإلكتروني مسجل بحساب موظف أو معلم. يرجى استخدام بريد مختلف لولي الأمر.'
+              });
+            }
+          } else {
+            // For non-parent roles, enforce school exclusivity
+            if (existingUserData?.schoolId && existingUserData.schoolId !== schoolId && req.user.role !== 'superadmin') {
+              return res.status(400).json({ 
+                error: 'USER_ALREADY_IN_ANOTHER_SCHOOL', 
+                message: 'هذا البريد الإلكتروني مسجل بالفعل لمدرسة أخرى' 
+              });
+            }
           }
         }
         
@@ -623,6 +624,11 @@ async function startServer() {
       }
 
       if (role === 'student' && schoolId) {
+        let shouldIncrement = true;
+        if (isExistingUser && existingUserData?.schoolId === schoolId && existingUserData?.role === 'student') {
+          shouldIncrement = false;
+        }
+
         await db.runTransaction(async (transaction) => {
           const schoolRef = db.collection('schools').doc(schoolId);
           const schoolSnap = await transaction.get(schoolRef);
@@ -635,7 +641,7 @@ async function startServer() {
           const planDoc = await db.collection('packages').doc(planId).get();
           const maxStudents = planDoc.exists ? (planDoc.data()?.maxStudents || 500) : 500;
           
-          if (currentCount >= maxStudents) {
+          if (shouldIncrement && currentCount >= maxStudents) {
             throw new Error(`وصلت للحد الأقصى المسموح به للطلاب (${maxStudents})`);
           }
 
@@ -646,12 +652,24 @@ async function startServer() {
             role,
             schoolId,
             ...additionalData,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+          
+          // Data link bug fix: also sync to students collection to maintain reference integrity
+          transaction.set(db.collection('students').doc(uid), {
+            id: uid,
+            email: emailLower,
+            name: displayName,
+            schoolId,
+            ...additionalData,
+            createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp(),
           }, { merge: true });
 
-          transaction.update(schoolRef, {
-            studentCount: admin.firestore.FieldValue.increment(1)
-          });
+          if (shouldIncrement) {
+            transaction.update(schoolRef, {
+              studentCount: admin.firestore.FieldValue.increment(1)
+            });
+          }
         });
 
         // Sync custom claims safely OUTSIDE the database transaction
@@ -666,7 +684,7 @@ async function startServer() {
           role,
           schoolId,
           ...additionalData,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
       }
 
