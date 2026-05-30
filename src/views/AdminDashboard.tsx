@@ -1098,7 +1098,7 @@ export default function AdminDashboard() {
   const renderContent = () => {
     switch (activeTab) {
       case "overview":
-        return <Overview />;
+        return <Overview setActiveTab={setActiveTab} />;
       case "chat":
         return <AdminChatTab />;
       case "classes":

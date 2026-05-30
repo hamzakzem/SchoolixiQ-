@@ -175,6 +175,7 @@ export default function SuperAdminDashboard() {
     | "backups"
     | "diagnostics"
   >("schools");
+  const [schoolFilter, setSchoolFilter] = useState<"all" | "active" | "expiring">("all");
   const [usersTab, setUsersTab] = useState<"management" | "parents">(
     "management",
   );
@@ -554,7 +555,19 @@ export default function SuperAdminDashboard() {
     const matchesDir = filterDirectorate
       ? s.directorate === filterDirectorate
       : true;
-    return matchesSearch && matchesGov && matchesDir;
+      
+    let matchesFilter = true;
+    if (schoolFilter === "active") {
+      matchesFilter = s.status === "active";
+    } else if (schoolFilter === "expiring") {
+      const days = s.subscriptionExpiresAt ? Math.ceil(
+        (new Date(s.subscriptionExpiresAt).getTime() - new Date().getTime()) /
+          (1000 * 3600 * 24),
+      ) : -1;
+      matchesFilter = days > 0 && days <= 7;
+    }
+
+    return matchesSearch && matchesGov && matchesDir && matchesFilter;
   });
 
   const stats = {
@@ -2098,24 +2111,32 @@ export default function SuperAdminDashboard() {
                       value={stats.total}
                       hint="عبر النظام"
                       color="text-slate-800"
+                      onClick={() => setSchoolFilter("all")}
+                      isActive={schoolFilter === "all"}
                     />
                     <AdminStatCard
                       title="المدارس النشطة"
                       value={stats.active}
                       hint="مشترك حالي"
                       color="text-green-600"
+                      onClick={() => setSchoolFilter("active")}
+                      isActive={schoolFilter === "active"}
                     />
                     <AdminStatCard
                       title="تنتهي قريباً"
                       value={stats.expiringSoon}
                       hint="خلال أسبوع"
                       color="text-orange-600"
+                      onClick={() => setSchoolFilter("expiring")}
+                      isActive={schoolFilter === "expiring"}
                     />
                     <AdminStatCard
                       title="إجمالي المستخدمين"
                       value={users.length}
                       hint="نشط للآن"
                       color="text-indigo-600"
+                      onClick={() => setActiveTab("users")}
+                      isActive={activeTab === "users"}
                     />
                   </div>
 
@@ -5877,9 +5898,16 @@ function PasswordCell({ password }: { password?: string }) {
   );
 }
 
-function AdminStatCard({ title, value, hint, color }: any) {
+function AdminStatCard({ title, value, hint, color, onClick, isActive }: any) {
   return (
-    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between transition-colors">
+    <div 
+      onClick={onClick}
+      className={`bg-white dark:bg-slate-900 p-6 rounded-3xl border shadow-sm flex flex-col justify-between transition-all ${
+        onClick ? 'cursor-pointer hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700' : ''
+      } ${
+        isActive ? 'border-indigo-500 dark:border-indigo-500 ring-2 ring-indigo-500/20' : 'border-slate-200 dark:border-slate-800'
+      }`}
+    >
       <p className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">
         {title}
       </p>

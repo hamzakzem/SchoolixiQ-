@@ -539,7 +539,11 @@ export default function Login() {
       window.sessionStorage.setItem("pendingGoogleRole", role);
       window.sessionStorage.setItem("pendingGoogleMode", mode);
       
-      await signInWithRedirect(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      if (result && result.user) {
+        await processGoogleUser(result.user, role, mode);
+        toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
+      }
     } catch (error: any) {
       console.error("Google Auth Error with GSI SDK:", error);
       const errorCode = error.code || "";
