@@ -48,6 +48,7 @@ import ScanHandler from "./components/ScanHandler";
 import SolarLoading from "./components/SolarLoading";
 import { LanguageToggle } from "./components/LanguageToggle";
 import InstallAppBanner from "./components/InstallAppBanner";
+import { AudioNotificationManager } from "./components/AudioNotificationManager";
 
 const DEFAULT_PACKAGES = [
   {
@@ -1052,6 +1053,7 @@ export default function App() {
               </Suspense>
               <Toaster position="top-right" />
               <InstallAppBanner />
+              <AudioNotificationManager />
             </BrowserRouter>
           </AuthProvider>
         </LanguageProvider>
