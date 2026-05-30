@@ -10,12 +10,6 @@ export function getApiUrl(path: string): string {
       (window as any).Capacitor !== undefined
     );
 
-  // For all standard web browsers, relative paths are 100% reliable, zero-CORS risk,
-  // and always match the server currently serving the web application.
-  if (!isMobileContainer) {
-    return path;
-  }
-
   // Only for mobile apps, look for dynamic API URL stored in localStorage
   let savedUrl = '';
   if (typeof window !== 'undefined') {
