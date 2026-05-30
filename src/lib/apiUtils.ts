@@ -10,12 +10,7 @@ export function getApiUrl(path: string): string {
       (window as any).Capacitor !== undefined
     );
 
-  // If on the web browser, relative URL paths always work natively and avoid CORS blocks or stale domains
-  if (!isMobileContainer) {
-    return path;
-  }
-
-  // Only for mobile apps, look for dynamic API URL stored in localStorage
+  // Only for mobile apps or external origins, look for dynamic API URL stored in localStorage
   let savedUrl = '';
   if (typeof window !== 'undefined') {
     try {
@@ -59,6 +54,16 @@ export function getApiUrl(path: string): string {
   // CRITICAL: Force upgrade HTTP to HTTPS for external domains to prevent POST method downgrades from redirects
   if (cleanSavedUrl && !cleanSavedUrl.startsWith('http://localhost') && !cleanSavedUrl.startsWith('http://127.0.0.1')) {
     cleanSavedUrl = cleanSavedUrl.replace(/^http:\/\//i, 'https://');
+  }
+
+  // Check if we are running on a custom frontend domain separate from the backend
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const isDifferentOrigin = currentOrigin && cleanSavedUrl && 
+    currentOrigin.replace(/\/$/, '').toLowerCase() !== cleanSavedUrl.toLowerCase();
+
+  // If on the web browser and the domain matches our current location, relative path is safer
+  if (!isMobileContainer && !isDifferentOrigin) {
+    return path;
   }
 
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
