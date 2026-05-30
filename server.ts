@@ -848,16 +848,42 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
     
     // Save APP_URL dynamically to Firestore system config so all clients (including Mobile Apps) have access to the actual server URL
-    if (process.env.APP_URL) {
+    // CRITICAL: We ONLY save in production, and only if it's not a development/dev environment.
+    // This prevents development servers from contaminating the shared database.
+    const isProductionEnv = process.env.NODE_ENV === 'production';
+    const isDevUrl = process.env.APP_URL && (
+      process.env.APP_URL.includes('-dev-') || 
+      process.env.APP_URL.includes('localhost') || 
+      process.env.APP_URL.includes('127.0.0.1')
+    );
+
+    if (process.env.APP_URL && isProductionEnv && !isDevUrl) {
       try {
         const db = getDb();
         const appUrlClean = process.env.APP_URL.replace(/\/$/, '');
         await db.collection('system').doc('config').set({
           appUrl: appUrlClean
         }, { merge: true });
-        console.log(`Successfully saved APP_URL (${appUrlClean}) to system/config.`);
+        console.log(`Successfully saved production APP_URL (${appUrlClean}) to system/config.`);
       } catch (err: any) {
         console.error('Failed to save APP_URL to system/config:', err.message);
+      }
+    } else {
+      // Self-healing: if database has a contaminated dev URL, delete it so clients fallback to their built-in production URLs safely!
+      try {
+        const db = getDb();
+        const configDoc = await db.collection('system').doc('config').get();
+        if (configDoc.exists) {
+          const currentUrl = configDoc.data()?.appUrl || '';
+          if (currentUrl.includes('-dev-') || currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
+            await db.collection('system').doc('config').update({
+              appUrl: admin.firestore.FieldValue.delete()
+            });
+            console.log('Self-healing: Cleared contaminated development appUrl from system/config.');
+          }
+        }
+      } catch (err: any) {
+        console.warn('Failed self-healing check of system/config:', err.message);
       }
     }
   });
