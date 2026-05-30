@@ -9,6 +9,7 @@ import {
   signInWithRedirect,
   getRedirectResult,
   sendEmailVerification,
+  signInWithCredential,
 } from "firebase/auth";
 import {
   doc,
@@ -148,6 +149,29 @@ const DEFAULT_PACKAGES = [
     ],
   },
 ];
+
+const loadGsiScript = (): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    if ((window as any).google?.accounts?.oauth2) {
+      resolve((window as any).google);
+      return;
+    }
+    const existingScript = document.getElementById("gsi-sdk-script");
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve((window as any).google));
+      existingScript.addEventListener("error", (e) => reject(e));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.id = "gsi-sdk-script";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve((window as any).google);
+    script.onerror = (e) => reject(e);
+    document.head.appendChild(script);
+  });
+};
 
 export default function Login() {
   const { t, isRtl } = useLanguage();
@@ -507,15 +531,43 @@ export default function Login() {
     }
 
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
+      const google = await loadGsiScript();
+      
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: googleClientId,
+        scope: "openid email profile",
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            try {
+              const credential = GoogleAuthProvider.credential(null, tokenResponse.access_token);
+              const result = await signInWithCredential(auth, credential);
+              if (result && result.user) {
+                await processGoogleUser(result.user, role, mode);
+              }
+            } catch (authErr: any) {
+              console.error("Firebase auth login error:", authErr);
+              toast.error(
+                isRtl
+                  ? "فشل تسجيل الدخول عبر Google في نظام الأساسي."
+                  : "Google Authentication failed to connect with the server."
+              );
+              setLoading(false);
+            }
+          } else {
+            console.warn("No token response", tokenResponse);
+            setLoading(false);
+          }
+        },
+        error_callback: (err: any) => {
+          console.error("GIS Token Client Error:", err);
+          toast.error(isRtl ? "تم إلغاء أو فشل الاتصال مع جوجل." : "Google Sign-In was cancelled or failed.");
+          setLoading(false);
+        }
+      });
 
-      const result = await signInWithPopup(auth, provider);
-      if (result && result.user) {
-        await processGoogleUser(result.user, role, mode);
-      }
+      client.requestAccessToken({ prompt: "select_account" });
     } catch (error: any) {
-      console.error("Google Auth Error:", error);
+      console.error("Google Auth Error with GSI SDK:", error);
       const errorCode = error.code || "";
       const errorMessage = error.message || "";
 
@@ -810,7 +862,7 @@ export default function Login() {
                   {/* Tech Aura Backlight */}
                   <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 to-sky-500 rounded-full blur-xl opacity-10 group-hover:opacity-25 transition duration-500"></div>
                   <img
-                    src={config.appLogo}
+                    src={config.appLogo || undefined}
                     alt="schoolixiQ Logo"
                     className="max-h-20 sm:max-h-24 w-auto object-contain drop-shadow-sm transition-all duration-500 hover:scale-105 relative z-10"
                     loading="eager"

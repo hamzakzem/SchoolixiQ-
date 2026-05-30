@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { adminCreateUser, adminDeleteUser } from "../lib/adminApi";
+import { getApiUrl } from "../lib/apiUtils";
 import {
   collection,
   onSnapshot,
@@ -658,7 +659,7 @@ export default function SuperAdminDashboard() {
     );
     try {
       const token = await auth.currentUser?.getIdToken();
-      const response = await fetch('/api/admin/delete-school', {
+      const response = await fetch(getApiUrl('/api/admin/delete-school'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -988,7 +989,7 @@ export default function SuperAdminDashboard() {
 
         // Sync claims via admin API
         try {
-          await fetch("/api/admin/sync-claims", {
+          await fetch(getApiUrl("/api/admin/sync-claims"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -1010,7 +1011,7 @@ export default function SuperAdminDashboard() {
             schoolId: schoolRef.id,
           });
           if (userResult && userResult.uid) {
-            await fetch("/api/admin/sync-claims", {
+            await fetch(getApiUrl("/api/admin/sync-claims"), {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -1149,8 +1150,8 @@ export default function SuperAdminDashboard() {
         const token = await auth.currentUser?.getIdToken();
         const method = editingPackage ? "PUT" : "POST";
         const url = editingPackage
-          ? `/api/admin/plans/${encodeURIComponent(editingPackage.id)}`
-          : "/api/admin/plans";
+          ? getApiUrl(`/api/admin/plans/${encodeURIComponent(editingPackage.id)}`)
+          : getApiUrl("/api/admin/plans");
 
         const response = await fetch(url, {
           method,
@@ -1352,7 +1353,7 @@ export default function SuperAdminDashboard() {
           (u) => u.schoolId === editingSchool.id && u.role === "admin",
         );
         for (const user of schoolUsers) {
-          await fetch("/api/admin/sync-claims", {
+          await fetch(getApiUrl("/api/admin/sync-claims"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -1437,7 +1438,7 @@ export default function SuperAdminDashboard() {
 
       // 3. Sync claims immediately for the new admin
       if (userResult && userResult.uid) {
-        await fetch("/api/admin/sync-claims", {
+        await fetch(getApiUrl("/api/admin/sync-claims"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1521,7 +1522,7 @@ export default function SuperAdminDashboard() {
               >
                 {config.appLogo ? (
                   <img
-                    src={config.appLogo}
+                    src={config.appLogo || undefined}
                     alt={config.appName}
                     className="w-10 h-10 md:w-12 md:h-12 object-contain rounded-xl bg-white p-1 shrink-0"
                   />
@@ -1907,8 +1908,8 @@ export default function SuperAdminDashboard() {
       </AnimatePresence>
 
       <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className="h-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 shrink-0 transition-colors shadow-sm relative z-10 print:hidden">
-          <div className="flex items-center gap-4">
+        <header className="h-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-10 print:hidden">
+          <div className="flex items-center gap-1.5 sm:gap-4 min-w-0">
             <button
               onClick={() => {
                 if (window.innerWidth >= 1024) {
@@ -1920,10 +1921,10 @@ export default function SuperAdminDashboard() {
                   }
                 }
               }}
-              className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm"
+              className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
             >
               <Menu
-                size={22}
+                size={20}
                 className={
                   (!isSidebarOpen && window.innerWidth < 1024) ||
                   isSidebarCollapsed
@@ -1932,29 +1933,29 @@ export default function SuperAdminDashboard() {
                 }
               />
             </button>
-            <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-2"></div>
+            <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-1 shrink-0 hidden sm:block"></div>
             {activeTab !== "schools" && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 onClick={handleBack}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all font-bold text-xs shadow-sm hover:shadow active:scale-95 group"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all font-bold text-xs shadow-sm active:scale-95 group shrink-0"
               >
                 <ArrowRight
-                  size={16}
+                  size={14}
                   className="transition-transform group-hover:translate-x-0.5"
                 />
-                <span>رجوع</span>
+                <span className="hidden xs:inline">رجوع</span>
               </motion.button>
             )}
             <h2
               id="super-admin-header"
-              className="text-xl font-black text-slate-900 dark:text-white font-display tracking-tight hover:text-blue-600 transition-colors cursor-default"
+              className="text-sm sm:text-base md:text-xl font-black text-slate-900 dark:text-white font-display tracking-tight hover:text-blue-600 transition-colors cursor-default truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none"
             >
-              لوحة إدارة النظام (Super Admin)
+              {isRtl ? "إدارة النظام" : "Super Admin"}
             </h2>
           </div>
-          <div className="flex items-center gap-3 md:gap-6">
+          <div className="flex items-center gap-1.5 sm:gap-3 md:gap-6 shrink-0">
             <LanguageToggle />
             <ThemeToggle />
 
@@ -2058,17 +2059,17 @@ export default function SuperAdminDashboard() {
             >
               {activeTab === "schools" ? (
                 <>
-                  <div className="flex flex-col md:flex-row items-center justify-between mb-6 md:mb-8 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md group">
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md group gap-4">
                     <div id="overview-header-group">
                       <h3
                         id="overview-title"
-                        className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight group-hover:translate-x-1 transition-transform inline-block"
+                        className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight group-hover:translate-x-1 transition-transform inline-block"
                       >
                         نظرة عامة على المدارس
                       </h3>
                       <p
                         id="overview-subtitle"
-                        className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-sm"
+                        className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-xs sm:text-sm"
                       >
                         متابعة الاشتراكات والنشاط عبر النظام
                       </p>
@@ -2080,7 +2081,7 @@ export default function SuperAdminDashboard() {
                         setSchoolModalTab("info");
                         setShowAddModal(true);
                       }}
-                      className="mt-4 md:mt-0 w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl hover:bg-blue-600 dark:hover:bg-blue-700 transition-all font-black shadow-2xl shadow-blue-600/20 active:scale-95 group/btn text-sm"
+                      className="mt-2 md:mt-0 w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl hover:bg-blue-600 dark:hover:bg-blue-700 transition-all font-black shadow-2xl shadow-blue-600/20 active:scale-95 group/btn text-sm shrink-0"
                     >
                       <Plus
                         size={18}
@@ -2208,7 +2209,8 @@ export default function SuperAdminDashboard() {
                         </div>
                       </div>
                     </div>
-                    <table className="w-full text-right border-collapse">
+                    <div className="overflow-x-auto w-full custom-scrollbar">
+                      <table className="w-full text-right border-collapse min-w-[800px]">
                       <thead>
                         <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
                           <th className="px-8 py-5 text-right">
@@ -2509,22 +2511,23 @@ export default function SuperAdminDashboard() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </>
               ) : activeTab === "accounts" ? (
                 <>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div>
-                      <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight flex items-center gap-3">
-                        <ShieldCheck className="text-blue-600" size={28} />
+                      <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight flex items-center gap-2.5">
+                        <ShieldCheck className="text-blue-600 shrink-0" size={24} />
                         حسابات المدارس الرقمية
                       </h3>
-                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 flex items-center gap-2 text-sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 flex items-center gap-1.5 text-xs sm:text-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
                         إدارة بيانات الدخول والمصادقة للأنظمة المدرسية
                       </p>
                     </div>
-                    <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 self-start md:self-center shrink-0">
                       <div className="flex flex-col px-4 py-1 text-right">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
                           إجمالي الحسابات
@@ -2725,7 +2728,8 @@ export default function SuperAdminDashboard() {
                         </p>
                       </div>
                       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-orange-200/50 dark:border-orange-900/20 shadow-xl shadow-orange-500/5 overflow-hidden transition-all">
-                        <table className="w-full text-right border-collapse">
+                        <div className="overflow-x-auto w-full custom-scrollbar">
+                          <table className="w-full text-right border-collapse min-w-[700px]">
                           <thead>
                             <tr className="bg-orange-50/50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase tracking-widest border-b border-orange-100/50 dark:border-orange-900/20">
                               <th className="px-8 py-5">
@@ -2818,18 +2822,19 @@ export default function SuperAdminDashboard() {
                               ))}
                           </tbody>
                         </table>
+                        </div>
                       </div>
                     </div>
                   )}
                 </>
               ) : activeTab === "packages" ? (
                 <>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div>
-                      <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
+                      <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
                         إدارة باقات الاشتراك
                       </h3>
-                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-sm">
+                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-xs sm:text-sm">
                         التحكم في خيارات التسجيل المتاحة للمدارس وتخصيص صلاحيات
                         الباقات
                       </p>
@@ -2841,7 +2846,7 @@ export default function SuperAdminDashboard() {
                         setPackageModalTab("general");
                         setShowPackageModal(true);
                       }}
-                      className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-sm"
+                      className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-sm shrink-0"
                     >
                       <Plus size={18} />
                       إضافة باقة جديدة
@@ -3015,17 +3020,17 @@ export default function SuperAdminDashboard() {
                 <SuperAdminChatTab />
               ) : activeTab === "requests" ? (
                 <>
-                  <div className="mb-10 flex items-end justify-between">
+                  <div className="mb-6 md:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div>
-                      <h3 className="text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
+                      <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
                         طلبات الاشتراك
                       </h3>
-                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1.5 opacity-80">
+                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-xs sm:text-sm">
                         طلبات المدارس الجديدة التي تنتظر تفعيل الحساب
                       </p>
                     </div>
-                    <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-2xl border border-blue-100 dark:border-blue-800">
-                      <span className="text-blue-600 dark:text-blue-400 font-black text-sm">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-2xl border border-blue-100 dark:border-blue-800 shrink-0">
+                      <span className="text-blue-600 dark:text-blue-400 font-black text-xs sm:text-sm">
                         {subscriptionRequests.length} طلبات معلقة
                       </span>
                     </div>
@@ -3246,12 +3251,12 @@ export default function SuperAdminDashboard() {
                 </>
               ) : activeTab === "team" ? (
                 <>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div>
-                      <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
+                      <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
                         فريق عمل المنصة
                       </h3>
-                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-sm">
+                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-xs sm:text-sm">
                         إدارة حسابات Super Admins والمساعدين التقنيين للمنصة
                       </p>
                     </div>
@@ -3296,12 +3301,13 @@ export default function SuperAdminDashboard() {
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
-                    <table className="w-full text-right border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                          <th className="px-6 py-4">العضو</th>
-                          <th className="px-6 py-4">البريد الإلكتروني</th>
-                          <th className="px-6 py-4">الدور</th>
+                    <div className="overflow-x-auto w-full custom-scrollbar">
+                      <table className="w-full text-right border-collapse min-w-[800px]">
+                        <thead>
+                          <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
+                            <th className="px-6 py-4">العضو</th>
+                            <th className="px-6 py-4">البريد الإلكتروني</th>
+                            <th className="px-6 py-4">الدور</th>
                           <th className="px-6 py-4">الصلاحيات المخصصة</th>
                           <th className="px-6 py-4">الإجراءات</th>
                         </tr>
@@ -3442,21 +3448,22 @@ export default function SuperAdminDashboard() {
                           ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </>
               ) : activeTab === "users" ? (
                 <>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl md:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div>
-                      <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
+                      <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
                         قائمة المستخدمين
                       </h3>
-                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-sm">
+                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-xs sm:text-sm">
                         إدارة كافة حسابات المنصة
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="bg-slate-100 dark:bg-slate-800 p-1 flex items-center rounded-2xl">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto shrink-0">
+                      <div className="bg-slate-100 dark:bg-slate-800 p-1 flex items-center rounded-2xl w-full sm:w-auto">
                         <button
                           onClick={() => setUsersTab("management")}
                           className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${usersTab === "management" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
@@ -3483,11 +3490,12 @@ export default function SuperAdminDashboard() {
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
-                    <table className="w-full text-right border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                          <th className="px-6 py-4">المستخدم</th>
-                          <th className="px-6 py-4">البريد الإلكتروني</th>
+                    <div className="overflow-x-auto w-full custom-scrollbar">
+                      <table className="w-full text-right border-collapse min-w-[800px]">
+                        <thead>
+                          <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
+                            <th className="px-6 py-4">المستخدم</th>
+                            <th className="px-6 py-4">البريد الإلكتروني</th>
                           {usersTab === "management" ? (
                             <>
                               <th className="px-6 py-4">الصلاحية</th>
@@ -3660,27 +3668,29 @@ export default function SuperAdminDashboard() {
                           })}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </>
               ) : activeTab === "parents" ? (
                 <>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div>
-                      <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
+                      <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
                         قائمة أولياء الأمور
                       </h3>
-                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-sm">
+                      <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-xs sm:text-sm">
                         حسابات أولياء الأمور وارتباطاتهم بالمدارس والطلاب
                       </p>
                     </div>
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
-                    <table className="w-full text-right border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                          <th className="px-6 py-4">ولي الأمر</th>
-                          <th className="px-6 py-4">المدرسة المشتركة</th>
+                    <div className="overflow-x-auto w-full custom-scrollbar">
+                      <table className="w-full text-right border-collapse min-w-[800px]">
+                        <thead>
+                          <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
+                            <th className="px-6 py-4">ولي الأمر</th>
+                            <th className="px-6 py-4">المدرسة المشتركة</th>
                           <th className="px-6 py-4">الطلاب المرتبطين</th>
                         </tr>
                       </thead>
@@ -3765,6 +3775,7 @@ export default function SuperAdminDashboard() {
                         )}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </>
               ) : activeTab === "settings" ? (

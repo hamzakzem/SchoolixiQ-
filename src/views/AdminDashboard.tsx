@@ -1224,7 +1224,7 @@ export default function AdminDashboard() {
                 {schoolData?.logoUrl ? (
                   <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1 shadow-xl shrink-0 overflow-hidden">
                     <img
-                      src={schoolData.logoUrl}
+                      src={schoolData.logoUrl || undefined}
                       alt="Logo"
                       className="w-full h-full object-contain"
                     />
@@ -1232,7 +1232,7 @@ export default function AdminDashboard() {
                 ) : config.appLogo ? (
                   <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1 shadow-xl shrink-0 overflow-hidden">
                     <img
-                      src={config.appLogo}
+                      src={config.appLogo || undefined}
                       alt={config.appName}
                       className="w-full h-full object-contain"
                     />

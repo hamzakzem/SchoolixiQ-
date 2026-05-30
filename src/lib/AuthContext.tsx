@@ -164,6 +164,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                      unsubscribePackage();
                      unsubscribePackage = null;
                    }
+                 } else {
+                   setSchoolData(null);
                  }
                }, (error) => {
                  handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${data.schoolId}`);
@@ -182,17 +184,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               console.warn("Failed to retrieve ID token before profile load:", tokenErr);
             }
             
-            if (claims.role) {
-              setProfile({
-                uid: authUser.uid,
-                email: authUser.email,
-                name: authUser.displayName || claims.name || 'مستخدم',
-                role: claims.role,
-                schoolId: claims.schoolId || '',
-                permissions: claims.p || null
-              } as UserProfile);
-              // Don't set loading to false yet if we're brand new, 
-              // let the claiming process below or firestore catch up
+            console.log(`[AUTH DIAG] Profile not found in Firestore for UID ${authUser.uid}. Claims:`, claims);
+            
+            if (claims && claims.role) {
+              const fallbackRole = claims.role;
+              const fallbackSchoolId = claims.schoolId || '';
+              const fallbackName = authUser.displayName || claims.name || (authUser.email ? authUser.email.split('@')[0] : 'مستخدم');
+              const fallbackEmail = authUser.email ? authUser.email.toLowerCase() : '';
+
+              console.log(`[AUTH PROFILE FALLBACK] Creating missing Firestore profile for UID ${authUser.uid} from Firebase claims/auth:`, {
+                email: fallbackEmail,
+                role: fallbackRole,
+                schoolId: fallbackSchoolId,
+                name: fallbackName
+              });
+
+              try {
+                // Ensure profile document is created
+                await setDoc(doc(db, 'users', authUser.uid), {
+                  uid: authUser.uid,
+                  email: fallbackEmail,
+                  name: fallbackName,
+                  role: fallbackRole,
+                  schoolId: fallbackSchoolId,
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                  autoProv: true // indicator for logging
+                }, { merge: true });
+                
+                // Return immediately, the onSnapshot listener will be reactively updated and correctly fetch it in the next cycle
+                return;
+              } catch (createErr) {
+                console.error("[AUTH PROFILE FALLBACK] Failed to auto-create missing user profile:", createErr);
+              }
             }
 
             // Profile doesn't exist for this UID, check if it was pre-registered by email

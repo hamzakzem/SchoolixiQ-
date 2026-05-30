@@ -89,11 +89,30 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
+  // Helper to sanitize objects for Firestore (removes/converts undefined values)
+  const sanitizeForFirestore = (val: any): any => {
+    if (val === undefined) return null;
+    if (val === null) return null;
+    if (Array.isArray(val)) return val.map(sanitizeForFirestore);
+    if (typeof val === 'object') {
+      const cleaned: any = {};
+      for (const key of Object.keys(val)) {
+        const value = val[key];
+        if (value !== undefined) {
+          cleaned[key] = sanitizeForFirestore(value);
+        }
+      }
+      return cleaned;
+    }
+    return val;
+  };
+
   // Middleware to log actions (Audit Logs) with IP and User Agent
   const logAudit = async (req: any, action: string, details: { before?: any, after?: any, metadata?: any }) => {
     try {
       const db = getDb();
       const user = req.user || {};
+      const sanitizedDetails = details ? sanitizeForFirestore(details) : {};
       await db.collection('audit_logs').add({
         action,
         performedBy: user.email || 'system',
@@ -101,7 +120,7 @@ async function startServer() {
         schoolId: user.schoolId || 'system',
         ip: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
         userAgent: req.headers['user-agent'],
-        details,
+        details: sanitizedDetails,
         timestamp: admin.firestore.FieldValue.serverTimestamp()
       });
     } catch (error) {
@@ -409,15 +428,6 @@ async function startServer() {
         }
       }
 
-      // Set custom claims for role-based access in Firestore rules (enables list rules without get() lookups)
-      if (uid) {
-        await admin.auth().setCustomUserClaims(uid, {
-          role: role,
-          schoolId: schoolId
-        });
-        console.log(`Set custom claims for user ${uid}: role=${role}, schoolId=${schoolId}`);
-      }
-
       if (role === 'student' && schoolId) {
         await db.runTransaction(async (transaction) => {
           const schoolRef = db.collection('schools').doc(schoolId);
@@ -435,8 +445,6 @@ async function startServer() {
             throw new Error(`وصلت للحد الأقصى المسموح به للطلاب (${maxStudents})`);
           }
 
-          await syncUserClaims(uid, role, schoolId);
-
           transaction.set(db.collection('users').doc(uid), {
             uid,
             email: emailLower,
@@ -451,6 +459,9 @@ async function startServer() {
             studentCount: admin.firestore.FieldValue.increment(1)
           });
         });
+
+        // Sync custom claims safely OUTSIDE the database transaction
+        await syncUserClaims(uid, role, schoolId, additionalData?.permissions || null);
       } else {
         await syncUserClaims(uid, role, schoolId, additionalData?.permissions || null);
 
@@ -811,8 +822,22 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    
+    // Save APP_URL dynamically to Firestore system config so all clients (including Mobile Apps) have access to the actual server URL
+    if (process.env.APP_URL) {
+      try {
+        const db = getDb();
+        const appUrlClean = process.env.APP_URL.replace(/\/$/, '');
+        await db.collection('system').doc('config').set({
+          appUrl: appUrlClean
+        }, { merge: true });
+        console.log(`Successfully saved APP_URL (${appUrlClean}) to system/config.`);
+      } catch (err: any) {
+        console.error('Failed to save APP_URL to system/config:', err.message);
+      }
+    }
   });
 }
 

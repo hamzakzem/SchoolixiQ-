@@ -1,14 +1,20 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
+
+// Avoid persistentMultipleTabManager in iframes to prevent BroadcastChannel/lock assertion errors
+const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
+    tabManager: isInIframe 
+      ? persistentSingleTabManager({}) 
+      : persistentMultipleTabManager()
   })
 }, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);

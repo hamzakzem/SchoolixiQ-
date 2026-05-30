@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { db } from "../lib/firebase";
 import { 
   collection, 
@@ -382,8 +383,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
       <div className={`bg-white dark:bg-slate-900 w-full max-w-4xl h-[85vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200/50 dark:border-slate-800 dir-${isArabic ? 'rtl' : 'ltr'}`}>
         
         {/* Header Section */}
@@ -900,6 +901,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

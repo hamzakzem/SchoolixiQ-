@@ -1,25 +1,5 @@
 import { auth } from './firebase';
-
-// Helper to determine the API server URL
-function getApiUrl(path: string): string {
-  // Check if we are in a mobile container (Capacitor) or localhost testing with cross-origin APIs
-  const isCapacitor = 
-    typeof window !== 'undefined' && (
-      window.location.href.startsWith('capacitor:') || 
-      window.location.href.startsWith('http://localhost') || 
-      window.location.href.startsWith('file:') ||
-      navigator.userAgent.includes('Capacitor') ||
-      (window as any).Capacitor !== undefined
-    );
-
-  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
-
-  if (isCapacitor && appUrl) {
-    return `${appUrl}${path}`;
-  }
-
-  return path;
-}
+import { getApiUrl } from './apiUtils';
 
 // Helper to log requests and responses for debugging
 async function logApiDebug(url: string, response: Response) {

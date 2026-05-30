@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Save, Download, Clock, AlertCircle, CheckCircle2, ShieldCheck, DatabaseBackup } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { auth } from '../lib/firebase';
+import { getApiUrl } from '../lib/apiUtils';
 
 export function SuperAdminBackupsTab() {
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -21,7 +22,7 @@ export function SuperAdminBackupsTab() {
       setIsBackingUp(true);
       const token = await auth.currentUser.getIdToken(true);
       
-      const response = await fetch('/api/admin/backup', {
+      const response = await fetch(getApiUrl('/api/admin/backup'), {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -1,3 +1,5 @@
+import { getApiUrl } from './apiUtils';
+
 export const compressImageToBase64 = (file: File, maxWidth = 400, maxHeight = 400): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -40,7 +42,7 @@ export const compressImageToBase64 = (file: File, maxWidth = 400, maxHeight = 40
 
 export const uploadImageToServer = async (file: File, storagePath: string, maxWidth = 400, maxHeight = 400): Promise<string> => {
   const base64 = await compressImageToBase64(file, maxWidth, maxHeight);
-  const response = await fetch('/api/upload', {
+  const response = await fetch(getApiUrl('/api/upload'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: storagePath, base64 })

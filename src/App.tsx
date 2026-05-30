@@ -15,6 +15,7 @@ import {
   ArrowRight,
   ArrowLeft,
   XCircle,
+  MapPin,
   CheckCircle,
 } from "lucide-react";
 import { auth, db } from "./lib/firebase";
@@ -115,6 +116,25 @@ const AppContent = () => {
     } catch (e) {
       console.warn("Could not access sessionStorage:", e);
     }
+
+    // Listen to system/config in Firestore for real-time API Server URL alignment (crucial for physical mobile apps)
+    const unsub = onSnapshot(doc(db, "system", "config"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data && data.appUrl) {
+          try {
+            localStorage.setItem("schoolix_app_api_url", data.appUrl);
+            console.info("[API CONFIG] Saved dynamic appUrl from Firestore to localStorage:", data.appUrl);
+          } catch (err) {
+            console.warn("localStorage is not writeable:", err);
+          }
+        }
+      }
+    }, (err) => {
+      console.warn("Failed to subscribe to system API URL config:", err);
+    });
+
+    return () => unsub();
   }, []);
 
   // Onboarding state
@@ -139,9 +159,14 @@ const AppContent = () => {
     email: "",
     address: "",
     password: "",
+    governorate: "",
+    directorate: "",
+    stage: "",
+    shift: "",
+    genderType: "",
   });
 
-  // Automatic Parent Provisioning with Student Link
+  // Automatic School Admin & Parent Provisioning with Student Link
   useEffect(() => {
     if (loading || !user || profile || autoLinkChecked) return;
 
@@ -153,7 +178,64 @@ const AppContent = () => {
       }
 
       try {
-        // Search for students matching this parent email
+        // 1. Check if they are an administrator of a registered and approved school
+        const schoolQuery = query(
+          collection(db, "schools"),
+          where("adminEmail", "==", email),
+        );
+        const schoolSnap = await getDocs(schoolQuery);
+
+        if (!schoolSnap.empty) {
+          setIsCreatingProfile(true);
+          const schoolDoc = schoolSnap.docs[0];
+          const schoolId = schoolDoc.id;
+          const schoolData = schoolDoc.data();
+
+          // Auto-provision their "admin" user profile in the users collection
+          await setDoc(doc(db, "users", user.uid), {
+            uid: user.uid,
+            email: email,
+            name: schoolData.adminName || user.displayName || schoolData.name || "مدير المدرسة",
+            role: "admin",
+            schoolId: schoolId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+
+          // Sync custom claims over our admin API securely
+          try {
+            await fetch("/api/admin/sync-claims", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${await user.getIdToken()}`,
+              },
+              body: JSON.stringify({ uid: user.uid }),
+            });
+            console.info("[AUTO PROVISION] Claims sync triggered for school admin:", email);
+          } catch (syncErr) {
+            console.warn("[AUTO PROVISION] Failed to sync claims over API, falling back to local snapshot matching:", syncErr);
+          }
+
+          toast.success(
+            isRtl
+              ? "تم التحقق من بيانات مدرستك وتفعيل حسابك كمدير بنجاح!"
+              : "Your registered school was verified! Admin account activated successfully!",
+          );
+          setAutoLinkChecked(true);
+          return;
+        }
+
+        // 2. Prevent parent auto-provisioning querying if this is a school user (has administrative/school claims)
+        const tokenResult = await user.getIdTokenResult();
+        const claims = tokenResult.claims || {};
+        if (claims?.role && claims.role !== "parent") {
+          console.info("[AUTO PROVISION] Skipping parent auto-provision for school role:", claims.role);
+          setAutoLinkChecked(true);
+          return;
+        }
+
+        // 3. Search for students matching this parent email
         const q = query(
           collection(db, "students"),
           where("parentEmail", "==", email),
@@ -213,7 +295,7 @@ const AppContent = () => {
     let timer: NodeJS.Timeout;
     let unsubs: (() => void)[] = [];
     
-    if (!loading && user && !profile && autoLinkChecked) {
+    if (!loading && user && (!profile || (profile.role === "admin" && !profile.schoolId)) && autoLinkChecked) {
       // Create three queries to locate registrations
       const qUid = query(
         collection(db, "registrations"),
@@ -254,7 +336,13 @@ const AppContent = () => {
           // If no pending request, check if we should show options (with a short delay to avoid flicker)
           setOnboardingState((prev) => {
             if (prev === "approved") return "approved";
-            timer = setTimeout(() => setOnboardingState("options"), 1000);
+            timer = setTimeout(() => {
+              if (profile?.role === "admin") {
+                setOnboardingState("packages");
+              } else {
+                setOnboardingState("options");
+              }
+            }, 1000);
             return prev;
           });
         }
@@ -266,7 +354,11 @@ const AppContent = () => {
         unsubs.push(onSnapshot(qCustEmail, (snap) => processSnap(snap, 'custEmail'), (err) => console.log('CustEmail listener err:', err)));
       } catch (e) {
         console.error("Listening setup failed:", e);
-        setOnboardingState("options");
+        if (profile?.role === "admin") {
+          setOnboardingState("packages");
+        } else {
+          setOnboardingState("options");
+        }
       }
 
     } else if (!user) {
@@ -338,6 +430,68 @@ const AppContent = () => {
   }
 
   const renderDashboard = () => {
+    // Dedicated recovery/error screen if profile has school role but schoolId or schoolData is missing or inaccessible in Firestore
+    const isSchoolRole = profile?.role && [
+      UserRole.ADMIN,
+      UserRole.STAFF,
+      UserRole.ASSISTANT
+    ].includes(profile.role);
+
+    if (isSchoolRole && (!profile?.schoolId || (!schoolData && !loading))) {
+      return (
+        <div
+          className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6"
+          dir={isRtl ? "rtl" : "ltr"}
+        >
+          <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 text-center shadow-2xl border border-amber-100 dark:border-amber-950/30">
+            <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <ShieldCheck className="text-amber-600 dark:text-amber-400 animate-pulse" size={40} />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">
+              {isRtl ? "بيانات المدرسة غير متوفرة" : "School Profile Unreachable"}
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6 leading-relaxed font-bold italic text-sm">
+              {isRtl
+                ? "تم تحميل حسابك بنجاح ولكن بيانات المدرسة المرتبطة به غير موجودة أو غير مصرح لك بالوصول إليها حالياً."
+                : "Your account loaded successfully, but the associated school data is missing or inaccessible."}
+            </p>
+            
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl text-right mb-8 flex flex-col gap-2 border border-slate-100 dark:border-slate-800 text-xs font-mono">
+              <div className="flex justify-between items-center text-right text-[11px]" dir={isRtl ? "rtl" : "ltr"}>
+                <span className="text-slate-400">{isRtl ? "البريد الإلكتروني:" : "Email:"}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-bold">{profile.email}</span>
+              </div>
+              <div className="flex justify-between items-center text-right text-[11px]" dir={isRtl ? "rtl" : "ltr"}>
+                <span className="text-slate-400">{isRtl ? "معرف المدرسة:" : "School ID:"}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-bold font-mono">{profile.schoolId || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between items-center text-right text-[11px]" dir={isRtl ? "rtl" : "ltr"}>
+                <span className="text-slate-400">{isRtl ? "دور الحساب:" : "Role:"}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-bold">{profile.role}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 font-sans">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw size={20} className="animate-spin" style={{ animationDuration: '3s' }} />
+                {isRtl ? "إعادة تحميل الصفحة" : "Retry / Reload"}
+              </button>
+              <button
+                onClick={() => auth.signOut()}
+                className="w-full py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <LogOut size={20} />
+                {isRtl ? "تسجيل الخروج" : "Logout"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // Check school expiration for everyone except super admin
     if (
       profile?.role &&
@@ -409,35 +563,13 @@ const AppContent = () => {
     }
   };
 
-  const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
-
   return (
     <>
-      {isInIframe && (
-        <div className="bg-amber-500 text-white text-xs font-bold py-3 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right sticky top-0 z-[999999] shadow-md border-b border-amber-600">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">⚠️</span>
-            <span>
-              {isRtl 
-                ? "تنبيه هام للايفون: لتنزيل التطبيق بظغطة زر واحدة وحفظ البيانات بشكل صحيح دون قيود، يرجى فتح المنصة في متصفح خارجي مستقل."
-                : "Important notice: For one-click iOS App installation and flawless data saving without iframe blocks, please open the platform in a standalone window."}
-            </span>
-          </div>
-          <a
-            href={window.location.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-white text-amber-600 hover:bg-amber-50 px-4 py-1.5 rounded-lg text-xs font-black transition-all shadow-sm flex items-center justify-center gap-1.5 shrink-0"
-          >
-            <span>{isRtl ? "فتح في نافذة مستقلة" : "Open in New Tab"}</span>
-          </a>
-        </div>
-      )}
       <div
         dir={isRtl ? "rtl" : "ltr"}
         className={isRtl ? "font-sans" : "font-sans"}
       >
-        {profile ? (
+        {profile && !(profile.role === "admin" && !profile.schoolId) ? (
           <>
             <ScanHandler />
             {renderDashboard()}
@@ -736,6 +868,11 @@ const AppContent = () => {
                         name: subscriptionForm.name,
                         phone: subscriptionForm.phone,
                         address: subscriptionForm.address,
+                        governorate: subscriptionForm.governorate,
+                        directorate: subscriptionForm.directorate,
+                        stage: subscriptionForm.stage,
+                        shift: subscriptionForm.shift,
+                        genderType: subscriptionForm.genderType,
                         packageName: selectedPackage.name,
                         packageId: selectedPackage.id,
                         price: actualPrice,
@@ -805,8 +942,177 @@ const AppContent = () => {
                         })
                       }
                       className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 transition-colors font-bold text-slate-700"
-                      placeholder="المحافظة - القضاء - الحي"
+                      placeholder="المحلة - الزقاق - رقم الدار (اختياري)"
                     />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        المحافظة
+                      </label>
+                      <div className="relative">
+                        <MapPin
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={subscriptionForm.governorate}
+                          onChange={(e) =>
+                            setSubscriptionForm({
+                              ...subscriptionForm,
+                              governorate: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر المحافظة...
+                          </option>
+                          <option value="بغداد">بغداد</option>
+                          <option value="البصرة">البصرة</option>
+                          <option value="نينوى">نينوى</option>
+                          <option value="أربيل">أربيل</option>
+                          <option value="النجف">النجف</option>
+                          <option value="ذي قار">ذي قار</option>
+                          <option value="كركوك">كركوك</option>
+                          <option value="الأنبار">الأنبار</option>
+                          <option value="ديالى">ديالى</option>
+                          <option value="المثنى">المثنى</option>
+                          <option value="القادسية">القادسية (الديوانية)</option>
+                          <option value="ميسان">ميسان</option>
+                          <option value="واسط">واسط</option>
+                          <option value="صلاح الدين">صلاح الدين</option>
+                          <option value="دهوك">دهوك</option>
+                          <option value="السليمانية">السليمانية</option>
+                          <option value="بابل">بابل</option>
+                          <option value="كربلاء">كربلاء</option>
+                          <option value="حلبجة">حلبجة</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        المديرية
+                      </label>
+                      <div className="relative">
+                        <Building
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={subscriptionForm.directorate}
+                          onChange={(e) =>
+                            setSubscriptionForm({
+                              ...subscriptionForm,
+                              directorate: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر المديرية...
+                          </option>
+                          <option value="مديرية الكرخ الاولى">مديرية الكرخ الاولى</option>
+                          <option value="مديرية الكرخ الثانية">مديرية الكرخ الثانية</option>
+                          <option value="مديرية الكرخ الثالثه">مديرية الكرخ الثالثه</option>
+                          <option value="مديرية الرصافة الاولى">مديرية الرصافة الاولى</option>
+                          <option value="مديرية الرصافة الثانية">مديرية الرصافة الثانية</option>
+                          <option value="مديرية الرصافة الثالثه">مديرية الرصافة الثالثه</option>
+                          <option value="أخرى / مديرية أخرى">أخرى / مديرية أخرى</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        المرحلة الدراسية
+                      </label>
+                      <div className="relative">
+                        <Building
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={subscriptionForm.stage}
+                          onChange={(e) =>
+                            setSubscriptionForm({
+                              ...subscriptionForm,
+                              stage: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر المرحلة...
+                          </option>
+                          <option value="روضة">روضة</option>
+                          <option value="ابتدائي">ابتدائي</option>
+                          <option value="متوسطة">متوسطة</option>
+                          <option value="اعدادية">اعدادية</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        وقت الدوام
+                      </label>
+                      <div className="relative">
+                        <Clock
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={subscriptionForm.shift}
+                          onChange={(e) =>
+                            setSubscriptionForm({
+                              ...subscriptionForm,
+                              shift: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر وقت الدوام...
+                          </option>
+                          <option value="صباحي">صباحي</option>
+                          <option value="مسائي">مسائي</option>
+                          <option value="مدمج">مدمج</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        نوع الدراسة
+                      </label>
+                      <div className="relative">
+                        <UserPlus
+                          size={18}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <select
+                          required
+                          value={subscriptionForm.genderType}
+                          onChange={(e) =>
+                            setSubscriptionForm({
+                              ...subscriptionForm,
+                              genderType: e.target.value,
+                            })
+                          }
+                          className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all appearance-none"
+                        >
+                          <option value="" disabled>
+                            اختر نوع الدراسة...
+                          </option>
+                          <option value="للبنين">للبنين</option>
+                          <option value="للبنات">للبنات</option>
+                          <option value="مختلط">مختلط</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
 
                   <button

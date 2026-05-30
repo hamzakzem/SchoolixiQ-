@@ -50,7 +50,7 @@ function PromotionalBannerSlider({
             aria-hidden={!isActive}
           >
             <img
-              src={banner.imageUrl}
+              src={banner.imageUrl || undefined}
               alt={`Promotional Banner ${index + 1}`}
               className="w-full h-full object-cover"
             />
@@ -132,7 +132,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
             </span>
             {config.appLogo && (
               <img
-                src={config.appLogo}
+                src={config.appLogo || undefined}
                 alt={config.appName}
                 className="max-h-4 md:max-h-5 object-contain opacity-35 dark:opacity-45 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300 pointer-events-none"
               />
@@ -175,7 +175,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
                 >
                   <div className="h-14 md:h-16 flex items-center justify-center mb-4 opacity-75 group-hover:opacity-100 transition-opacity duration-200">
                     <img
-                      src={partner.logoUrl}
+                      src={partner.logoUrl || undefined}
                       alt={partner.name}
                       className="max-h-full max-w-full object-contain filter grayscale group-hover:grayscale-0 group-hover:scale-[1.03] transition-all duration-200"
                     />
@@ -279,7 +279,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
         <div className="w-full flex flex-col items-center pt-8 border-t border-slate-200/60 dark:border-slate-800/60">
           {config.appLogo && (
             <img
-              src={config.appLogo}
+              src={config.appLogo || undefined}
               alt={config.appName}
               className="max-h-6 object-contain mb-4 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all pointer-events-none"
             />
