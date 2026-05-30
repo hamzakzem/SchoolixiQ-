@@ -22,6 +22,7 @@ import { useAuth } from "../lib/AuthContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { GlobalFooter } from "../components/GlobalFooter";
+import { NotificationCenter } from "../components/NotificationCenter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { toast } from "react-hot-toast";
 import {
@@ -1172,182 +1173,14 @@ export default function ParentDashboard() {
                   </button>
 
 
-                {/* Notifications Dropdown */}
-                <AnimatePresence>
-                  {showNotifications && (
-                    <>
-                      {/* Backdrop for dismissal */}
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setShowNotifications(false)}
-                      />
-
-                      <motion.div
-                        initial={{ opacity: 0, y: 15, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 15, scale: 0.95 }}
-                        className={`absolute top-full mt-4 ${isRtl ? "left-0" : "right-0"} w-[calc(100vw-3rem)] md:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl z-50 overflow-hidden`}
-                        style={{
-                          transformOrigin: isRtl ? "top left" : "top right",
-                        }}
-                      >
-                        {/* Triangle decorator (Desktop Only) */}
-                        <div className="absolute top-0 left-4 w-4 h-4 bg-white dark:bg-slate-900 border-t border-l border-slate-200 dark:border-slate-800 -translate-y-2 rotate-[45deg] z-[-1] hidden md:block"></div>
-
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
-                          <div>
-                            <h4 className="font-bold text-slate-900 dark:text-white">
-                              {t("notifications")}
-                            </h4>
-                            <p className="text-[10px] text-slate-400 font-medium">
-                              {t("youHave")}{" "}
-                              {notifications.filter((n) => !n.read).length}{" "}
-                              {t("unreadAlerts")}
-                            </p>
-                          </div>
-                          <button
-                            onClick={async () => {
-                              if (!profile?.uid) return;
-                              const { notificationService } =
-                                await import("../lib/notificationService");
-                              await notificationService.markAllAsRead(
-                                profile.uid,
-                              );
-                            }}
-                            className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 px-3 py-1.5 bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-900/30 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all shadow-sm cursor-pointer"
-                          >
-                            {t("markAllAsRead")}
-                          </button>
-                        </div>
-
-                        <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
-                          {notifications.length > 0 ? (
-                            <div className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                              {notifications.map((n) => (
-                                <div
-                                  key={n.id}
-                                  className={`group p-5 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-all relative ${!n.read ? "bg-indigo-50/40 dark:bg-indigo-900/10" : ""}`}
-                                >
-                                  <div className="flex gap-4">
-                                    <div
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        const { notificationService } =
-                                          await import("../lib/notificationService");
-                                        await notificationService.markAsRead(
-                                          n.id,
-                                        );
-                                      }}
-                                      className={`shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer ${
-                                        !n.read
-                                          ? "bg-white dark:bg-slate-800 shadow-md text-indigo-600 scale-105"
-                                          : "bg-slate-100 dark:bg-slate-800/50 text-slate-400"
-                                      }`}
-                                    >
-                                      {n.type === "homework" ? (
-                                        <BookOpen size={20} />
-                                      ) : n.type === "report" ? (
-                                        <FileText size={20} />
-                                      ) : n.type === "grade" ? (
-                                        <Star size={20} />
-                                      ) : n.type === "payment" ? (
-                                        <Wallet size={20} />
-                                      ) : n.type === "behavior" ? (
-                                        <AlertTriangle size={20} />
-                                      ) : (
-                                        <Bell size={20} />
-                                      )}
-                                    </div>
-
-                                    <div
-                                      className="flex-1 cursor-pointer"
-                                      onClick={async () => {
-                                        const { notificationService } =
-                                          await import("../lib/notificationService");
-                                        await notificationService.markAsRead(
-                                          n.id,
-                                        );
-                                        if (n.type === "behavior")
-                                          setActiveTab("behavior");
-                                        if (n.type === "grade")
-                                          setActiveTab("grades");
-                                        if (n.type === "payment")
-                                          setActiveTab("tuition");
-                                        if (n.type === "announcement")
-                                          setActiveTab("home");
-                                        setShowNotifications(false);
-                                      }}
-                                    >
-                                      <div className="flex items-start justify-between gap-2">
-                                        <p
-                                          className={`text-sm font-bold transition-colors ${!n.read ? "text-slate-900 dark:text-white" : "text-slate-500"}`}
-                                        >
-                                          {n.title}
-                                        </p>
-                                        <button
-                                          onClick={async (e) => {
-                                            e.stopPropagation();
-                                            const { notificationService } =
-                                              await import("../lib/notificationService");
-                                            await notificationService.delete(
-                                              n.id,
-                                            );
-                                          }}
-                                          className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                          title={t("deleteNotification")}
-                                        >
-                                          <Trash2 size={14} />
-                                        </button>
-                                      </div>
-                                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed mt-1">
-                                        {n.message}
-                                      </p>
-                                      <div className="flex items-center gap-2 mt-3 text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                                        <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></div>
-                                        {n.createdAt?.seconds
-                                          ? new Date(
-                                              n.createdAt.seconds * 1000,
-                                            ).toLocaleTimeString([], {
-                                              hour: "2-digit",
-                                              minute: "2-digit",
-                                            })
-                                          : "الآن"}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {!n.read && (
-                                    <div className="absolute left-3 top-[22px] w-2 h-2 bg-indigo-600 rounded-full shadow-[0_0_12px_rgba(79,70,229,0.6)] animate-pulse"></div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="py-16 text-center space-y-3">
-                              <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mx-auto text-slate-300 dark:text-slate-700">
-                                <Bell size={32} />
-                              </div>
-                              <p className="text-xs font-bold text-slate-400">
-                                {t("noAnnouncements")}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-
-                        {notifications.length > 0 && (
-                          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 text-center">
-                            <button
-                              onClick={() => setShowNotifications(false)}
-                              className="text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
-                            >
-                              {t("closeMenu")}
-                            </button>
-                          </div>
-                        )}
-                      </motion.div>
-                    </>
-                  )}
-                </AnimatePresence>
+                {/* Notifications Center Modal */}
+                {showNotifications && (
+                  <NotificationCenter
+                    onClose={() => setShowNotifications(false)}
+                    activeTabSetter={setActiveTab}
+                    userRole="parent"
+                  />
+                )}
               </div>
             </div>
           </div>

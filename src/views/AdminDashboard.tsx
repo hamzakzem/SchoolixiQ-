@@ -21,12 +21,14 @@ import {
   CheckCircle,
   Clock,
   FileArchive,
+  Bell,
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 import { sendEmailVerification, signOut } from "firebase/auth";
 import { useAuth } from "../lib/AuthContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
+import { NotificationCenter } from "../components/NotificationCenter";
 import { motion, AnimatePresence } from "motion/react";
 import {
   collection,
@@ -172,6 +174,20 @@ export default function AdminDashboard() {
   };
   // Filter menu items based on assistant or plan permissions
   const { profile, schoolData: authSchoolData } = useAuth();
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+    const qNotifications = query(
+      collection(db, "notifications"),
+      where("userId", "==", profile.uid)
+    );
+    return onSnapshot(qNotifications, (snap) => {
+      setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, [profile?.uid]);
 
   // Package permissions are controlled by the Super Admin via the package properties
   const perms = authSchoolData?.packagePermissions || profile?.permissions; // fallback to profile if not loaded yet
@@ -1369,9 +1385,27 @@ export default function AdminDashboard() {
               <LanguageToggle />
             </div>
 
-            <div className="scale-90 md:scale-100">
+            <div className="scale-90 md:scale-100 font-bold select-none">
               <ThemeToggle />
             </div>
+
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+            >
+              <Bell size={18} />
+              {notifications.filter((n: any) => !n.read).length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 border border-white rounded-full animate-pulse"></span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <NotificationCenter
+                onClose={() => setShowNotifications(false)}
+                activeTabSetter={setActiveTab}
+                userRole={profile?.role || "admin"}
+              />
+            )}
 
             <div className="flex items-center gap-2 md:gap-4">
               <div className="text-left hidden lg:block">

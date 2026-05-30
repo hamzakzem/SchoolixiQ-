@@ -1,9 +1,57 @@
 /**
- * Play synthesized high-end notification chimes for different app events.
- * Pure native Web Audio API, works offline, completely responsive, and bypasses missing file issues.
+ * Advanced Pure Web Audio Sound Synthesizer
+ * Provides professional, acoustic-grade feedback chimes.
+ * Offline-first, high performance, and consistent across modern Android, iOS WebViews, and desktop browsers.
  */
 
-// Simple helper to get a safe AudioContext
+export interface SoundProfile {
+  name: string;
+  type: 'crystal' | 'minimal' | 'relaxing' | 'modern';
+  volumeMultiplier: number;
+}
+
+export type NotificationCategory = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'homework' | 'report' | 'system' | 'message';
+
+export interface UserSoundSettings {
+  profile: 'crystal' | 'minimal' | 'relaxing' | 'modern';
+  volume: number; // 0.0 to 1.0
+  mutedCategories: NotificationCategory[];
+  pitchAdjust: number; // -300 to +300 Hz
+}
+
+// Get or save settings in client storage
+const SETTINGS_KEY = 'schoolix_notification_sound_settings_v2';
+
+const DEFAULT_SETTINGS: UserSoundSettings = {
+  profile: 'crystal',
+  volume: 0.7,
+  mutedCategories: [],
+  pitchAdjust: 0,
+};
+
+export function getSoundSettings(): UserSoundSettings {
+  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+  try {
+    const saved = localStorage.getItem(SETTINGS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    }
+  } catch (e) {
+    console.error('Error fetching sound settings:', e);
+  }
+  return DEFAULT_SETTINGS;
+}
+
+export function saveSoundSettings(settings: UserSoundSettings) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch (e) {
+    console.error('Error saving sound settings:', e);
+  }
+}
+
 function getAudioContext(): AudioContext | null {
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
   if (!AudioContextClass) return null;
@@ -11,204 +59,244 @@ function getAudioContext(): AudioContext | null {
 }
 
 /**
- * Normal chat message or generic notification sound.
- * Elegant crystal bubble chirp.
+ * Main sound dispatcher that plays categorized sounds based on user customization
  */
-export function playPremiumNotificationSound() {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(659.25, now); // E5
-    osc1.frequency.exponentialRampToValueAtTime(783.99, now + 0.12); // G5
-    
-    gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(0.25, now + 0.015);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-    
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.4);
-    
-    const delay = 0.07;
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(1046.50, now + delay); // C6
-    osc2.frequency.exponentialRampToValueAtTime(1318.51, now + delay + 0.12); // E6
-    
-    gain2.gain.setValueAtTime(0, now + delay);
-    gain2.gain.linearRampToValueAtTime(0.22, now + delay + 0.015);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.3);
-    
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + delay);
-    osc2.stop(now + delay + 0.35);
-  } catch (err) {
-    console.warn('Failed to synthesize notification chime:', err);
+export function playCategorizedSound(category: NotificationCategory, testSettings?: UserSoundSettings) {
+  const settings = testSettings || getSoundSettings();
+  
+  // 1. Check if category is muted
+  if (settings.mutedCategories.includes(category)) {
+    console.log(`Sound muted for category: ${category}`);
+    return;
+  }
+
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  // Audio Context unlock for mobile browsers (safari/chrome touch start requirement)
+  if (ctx.state === 'suspended') {
+    ctx.resume();
+  }
+
+  const now = ctx.currentTime;
+  const masterVolume = ctx.createGain();
+  masterVolume.gain.setValueAtTime(0, now);
+  masterVolume.gain.linearRampToValueAtTime(settings.volume, now + 0.01);
+  masterVolume.connect(ctx.destination);
+
+  const pitchShift = settings.pitchAdjust;
+
+  switch (settings.profile) {
+    case 'crystal':
+      playCrystalProfile(ctx, masterVolume, category, pitchShift);
+      break;
+    case 'minimal':
+      playMinimalProfile(ctx, masterVolume, category, pitchShift);
+      break;
+    case 'relaxing':
+      playRelaxingProfile(ctx, masterVolume, category, pitchShift);
+      break;
+    case 'modern':
+    default:
+      playModernProfile(ctx, masterVolume, category, pitchShift);
+      break;
   }
 }
 
 /**
- * Sound for Academic results / grades.
- * A warm, inspiring major chord arpeggio scale.
+ * Crystallone Chime: Transparent glass-like resonant bells
  */
-export function playGradeNotificationSound() {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-    
-    notes.forEach((freq, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const delay = index * 0.08;
-      
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + delay);
-      
-      gain.gain.setValueAtTime(0, now + delay);
-      gain.gain.linearRampToValueAtTime(0.18, now + delay + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.4);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now + delay);
-      osc.stop(now + delay + 0.45);
-    });
-  } catch (err) {
-    console.warn('Failed to synthesize grade notification sound:', err);
-  }
-}
+function playCrystalProfile(ctx: AudioContext, destination: AudioNode, category: NotificationCategory, pitchShift: number) {
+  const now = ctx.currentTime;
 
-/**
- * Sound for Reports (evaluation, advanced report updates).
- * Elegant dual-harmonic intellectual slide chime.
- */
-export function playReportNotificationSound() {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'triangle';
-    osc1.frequency.setValueAtTime(587.33, now); // D5
-    osc1.frequency.linearRampToValueAtTime(880.00, now + 0.25); // A5
-    
-    gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(0.15, now + 0.03);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-    
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.5);
-    
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(880.00, now + 0.05); // A5
-    osc2.frequency.linearRampToValueAtTime(1174.66, now + 0.3); // D6
-    
-    gain2.gain.setValueAtTime(0, now + 0.05);
-    gain2.gain.linearRampToValueAtTime(0.12, now + 0.08);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-    
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + 0.05);
-    osc2.stop(now + 0.5);
-  } catch (err) {
-    console.warn('Failed to synthesize report notification sound:', err);
+  // Base frequencies depending on notification category
+  let freqs = [523.25, 659.25, 783.99, 1046.50]; // Bright Major
+  if (category === 'payment' || category === 'system') {
+    freqs = [587.33, 739.99, 880.00, 1174.66]; // Golden D-Major
+  } else if (category === 'behavior') {
+    freqs = [440.00, 554.37, 659.25, 880.00]; // Neutral A-Major
+  } else if (category === 'attendance') {
+    freqs = [659.25, 880.00, 987.77, 1318.51]; // Bright E-Pentatonic
+  } else if (category === 'message') {
+    freqs = [783.99, 1046.50]; // Simple Double Chirp G5-C6
   }
-}
 
-/**
- * Sound for School Marketplace / purchases.
- * Crisp, high glass coin bell.
- */
-export function playMarketplaceNotificationSound() {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    
+  freqs.forEach((baseFreq, index) => {
     const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const subOsc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    const delay = index * 0.06;
+
+    const finalFreq = Math.max(100, baseFreq + pitchShift);
+
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(1760.00, now); // A6 (very high bell)
-    osc.frequency.exponentialRampToValueAtTime(2093.00, now + 0.08); // C7
+    osc.frequency.setValueAtTime(finalFreq, now + delay);
     
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.2, now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.35);
-    
-    // Quick echo coin chime
-    const oscEcho = ctx.createOscillator();
-    const gainEcho = ctx.createGain();
-    oscEcho.type = 'sine';
-    oscEcho.frequency.setValueAtTime(2093.00, now + 0.06);
-    
-    gainEcho.gain.setValueAtTime(0, now + 0.06);
-    gainEcho.gain.linearRampToValueAtTime(0.1, now + 0.07);
-    gainEcho.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-    
-    oscEcho.connect(gainEcho);
-    gainEcho.connect(ctx.destination);
-    oscEcho.start(now + 0.06);
-    oscEcho.stop(now + 0.3);
-  } catch (err) {
-    console.warn('Failed to synthesize marketplace notification sound:', err);
-  }
+    // Add glassy overtone
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(finalFreq * 2.01, now + delay); // slightly detuned octave for crystal airness
+
+    gainNode.gain.setValueAtTime(0, now + delay);
+    gainNode.gain.linearRampToValueAtTime(0.12, now + delay + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.4);
+
+    osc.connect(gainNode);
+    subOsc.connect(gainNode);
+    gainNode.connect(destination);
+
+    osc.start(now + delay);
+    subOsc.start(now + delay);
+
+    osc.stop(now + delay + 0.45);
+    subOsc.stop(now + delay + 0.45);
+  });
 }
 
 /**
- * Sound for subscription / registration requests.
- * Modern uplifting corporate executive triple-tone slide.
+ * Minimalist Tick: Soft hums and snappy aesthetic clicks
  */
-export function playSubscriptionNotificationSound() {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    
-    // Root tone
-    const notes = [440.00, 554.37, 659.25, 880.00]; // A4, C#5, E5, A5
-    
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const start = now + (idx * 0.06);
-      
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, start);
-      osc.frequency.linearRampToValueAtTime(freq * 1.5, start + 0.15);
-      
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.15, start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.45);
-    });
-  } catch (err) {
-    console.warn('Failed to synthesize subscription notification sound:', err);
-  }
+function playMinimalProfile(ctx: AudioContext, destination: AudioNode, category: NotificationCategory, pitchShift: number) {
+  const now = ctx.currentTime;
+  let freq = 440; // Soft feedback
+
+  if (category === 'message') freq = 523.25;
+  else if (category === 'payment') freq = 659.25;
+  else if (category === 'system') freq = 880;
+
+  const finalFreq = Math.max(80, freq + pitchShift);
+
+  const osc = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(finalFreq, now);
+
+  gainNode.gain.setValueAtTime(0, now);
+  gainNode.gain.linearRampToValueAtTime(0.2, now + 0.004); // Instant snap
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.12); // Short decay
+
+  osc.connect(gainNode);
+  gainNode.connect(destination);
+
+  osc.start(now);
+  osc.stop(now + 0.15);
 }
 
+/**
+ * Relaxing Water Droplet / Organic Harp: Calming, analog acoustic resonance
+ */
+function playRelaxingProfile(ctx: AudioContext, destination: AudioNode, category: NotificationCategory, pitchShift: number) {
+  const now = ctx.currentTime;
+  let baseFreq = 329.63; // E4 - deeply settling
+
+  if (category === 'announcement' || category === 'grade' || category === 'homework') {
+    baseFreq = 392.00; // G4
+  } else if (category === 'payment') {
+    baseFreq = 440.00; // A4
+  } else if (category === 'system' || category === 'message') {
+    baseFreq = 523.25; // C5
+  }
+
+  const finalFreq = Math.max(60, baseFreq + pitchShift);
+
+  // Synthesize an analog warm decay using two sine wave oscillators
+  const osc1 = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  const gain2 = ctx.createGain();
+
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(finalFreq, now);
+
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(finalFreq * 1.5, now); // perfect fifth overtone
+
+  gain1.gain.setValueAtTime(0, now);
+  gain1.gain.linearRampToValueAtTime(0.15, now + 0.03); // slower rise for warmth
+  gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+
+  gain2.gain.setValueAtTime(0, now);
+  gain2.gain.linearRampToValueAtTime(0.05, now + 0.05);
+  gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+
+  osc1.connect(gain1);
+  osc2.connect(gain2);
+  gain1.connect(destination);
+  gain2.connect(destination);
+
+  osc1.start(now);
+  osc2.start(now);
+
+  osc1.stop(now + 0.7);
+  osc2.stop(now + 0.5);
+}
+
+/**
+ * Modern High-Tech: Symmetrical geometric cyber clicks and corporate notification chimes
+ */
+function playModernProfile(ctx: AudioContext, destination: AudioNode, category: NotificationCategory, pitchShift: number) {
+  const now = ctx.currentTime;
+  let primaryFreq = 880.00; // A5
+  let secondaryFreq = 1318.51; // E6
+
+  if (category === 'behavior' || category === 'attendance') {
+    primaryFreq = 659.25; // E5
+    secondaryFreq = 987.77; // B5
+  } else if (category === 'message') {
+    primaryFreq = 1046.50; // C6
+    secondaryFreq = 1567.98; // G6
+  }
+
+  const base1 = Math.max(100, primaryFreq + pitchShift);
+  const base2 = Math.max(150, secondaryFreq + pitchShift);
+
+  const osc1 = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  const gain2 = ctx.createGain();
+
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(base1, now);
+  osc1.frequency.exponentialRampToValueAtTime(base1 * 1.2, now + 0.15); // futuristic pitch sweep
+
+  osc2.type = 'triangle';
+  osc2.frequency.setValueAtTime(base2, now + 0.05);
+  osc2.frequency.exponentialRampToValueAtTime(base2 * 1.1, now + 0.2);
+
+  gain1.gain.setValueAtTime(0, now);
+  gain1.gain.linearRampToValueAtTime(0.12, now + 0.01);
+  gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+
+  gain2.gain.setValueAtTime(0, now + 0.05);
+  gain2.gain.linearRampToValueAtTime(0.06, now + 0.06);
+  gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+
+  osc1.connect(gain1);
+  osc2.connect(gain2);
+  
+  gain1.connect(destination);
+  gain2.connect(destination);
+
+  osc1.start(now);
+  osc2.start(now + 0.05);
+
+  osc1.stop(now + 0.3);
+  osc2.stop(now + 0.25);
+}
+
+// Deprecated Sound Chime APIs - Retained for backward-compatibility with other dashboard views.
+export function playPremiumNotificationSound() {
+  playCategorizedSound('message');
+}
+export function playGradeNotificationSound() {
+  playCategorizedSound('grade');
+}
+export function playReportNotificationSound() {
+  playCategorizedSound('report' as any);
+}
+export function playMarketplaceNotificationSound() {
+  playCategorizedSound('payment');
+}
+export function playSubscriptionNotificationSound() {
+  playCategorizedSound('system');
+}

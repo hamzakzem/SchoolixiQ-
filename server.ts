@@ -466,10 +466,18 @@ async function startServer() {
       }
 
       await logAudit(req, 'CREATE_USER', { after: { email: emailLower, role, schoolId } });
-      res.json({ uid });
+      res.json({
+        success: true,
+        message: 'تم إنشاء المستخدم بنجاح',
+        data: { uid }
+      });
     } catch (error: any) {
       console.error('Create User Error:', error);
-      res.status(500).json({ error: error.message || 'Internal Server Error' });
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Internal Server Error',
+        message: error.message || 'حدث خطأ أثناء إنشاء المستخدم'
+      });
     }
   });
 
@@ -597,10 +605,18 @@ async function startServer() {
       // 4. Log the action with snapshot
       await logAudit(req, 'DELETE_USER', { before: beforeData, metadata: { targetUid: uid } });
 
-      res.json({ success: true });
+      res.json({
+        success: true,
+        message: 'تم حذف الحساب بنجاح',
+        data: { uid }
+      });
     } catch (error: any) {
       console.error('Delete User Error:', error);
-      res.status(500).json({ error: error.message || 'Internal Server Error' });
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Internal Server Error',
+        message: error.message || 'حدث خطأ أثناء حذف الحساب'
+      });
     }
   });
 
@@ -693,10 +709,18 @@ async function startServer() {
       // 4. Log audit
       await logAudit(req, 'DELETE_STUDENT', { before: beforeData, metadata: { targetId: id } });
 
-      res.json({ success: true });
+      res.json({
+        success: true,
+        message: 'تم حذف الطالب بنجاح',
+        data: { id }
+      });
     } catch (error: any) {
       console.error('Delete Student Error:', error);
-      res.status(500).json({ error: error.message || 'Internal Server Error' });
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Internal Server Error',
+        message: error.message || 'حدث خطأ أثناء حذف الطالب'
+      });
     }
   });
 
@@ -731,7 +755,24 @@ async function startServer() {
 
   // Global API 404 handler - MUST be before Vite middleware
   app.all('/api/*', (req, res) => {
-    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
+    res.setHeader('Content-Type', 'application/json');
+    res.status(404).json({
+      success: false,
+      error: `API route not found: ${req.method} ${req.url}`,
+      message: 'العنوان غير موجود أو غير معرف في النظام'
+    });
+  });
+
+  // Global error handler for API routes to prevent HTML error pages being returned
+  app.use('/api/*', (err: any, req: any, res: any, next: any) => {
+    console.error('Unhandled API Error:', err);
+    res.setHeader('Content-Type', 'application/json');
+    const statusCode = err.status || err.statusCode || 500;
+    res.status(statusCode).json({
+      success: false,
+      error: err.name || 'InternalServerError',
+      message: err.message || 'حدث خطأ داخلي في الخادم'
+    });
   });
 
   // Vite transformation
