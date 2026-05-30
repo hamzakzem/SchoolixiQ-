@@ -18,6 +18,7 @@ export const AudioNotificationManager: React.FC = () => {
   const isMessagesInitialLoad = useRef(true);
   const isSuperRegistrationsInitialLoad = useRef(true);
   const isSuperOrdersInitialLoad = useRef(true);
+  const isSuperSubRequestsInitialLoad = useRef(true);
 
   // Initialize browser permissions for desk notifications
   useEffect(() => {
@@ -181,6 +182,36 @@ export const AudioNotificationManager: React.FC = () => {
         (err) => console.log("Orders listener error in audio manager:", err)
       );
       unsubs.push(unsubOrders);
+
+      // --- 1D. Super Admin subscriptionRequests Listener ---
+      const subscriptionRequestsQ = query(
+        collection(db, "subscriptionRequests"),
+        where("status", "==", "pending")
+      );
+      const unsubSubRequests = onSnapshot(
+        subscriptionRequestsQ,
+        (snap) => {
+          if (isSuperSubRequestsInitialLoad.current) {
+            isSuperSubRequestsInitialLoad.current = false;
+            return;
+          }
+          snap.docChanges().forEach((change: any) => {
+            if (change.type === "added") {
+              const req = change.doc.data();
+              const schoolName = req.schoolName || req.name || "مدرسة جديدة";
+              const title = profile.language === "ar" ? "طلب اشتراك مدرسي جديد" : "New School Subscription Request";
+              const body = profile.language === "ar"
+                ? `المدرسة: ${schoolName} - يرجى مراجعة طلب الاشتراك وتفعيل الحساب.`
+                : `School: ${schoolName} - Please process the subscription request.`;
+
+              playSubscriptionNotificationSound();
+              triggerNativeNotification(title, body, change.doc.id);
+            }
+          });
+        },
+        (err) => console.log("SubRequests listener error in audio manager:", err)
+      );
+      unsubs.push(unsubSubRequests);
     }
 
     // --- 2. Direct Messages (system_messages) Listener ---

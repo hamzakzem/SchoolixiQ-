@@ -303,22 +303,6 @@ export default function Login() {
           ? UserRole.SUPERADMIN
           : provisionedData?.role || pendingRole;
 
-        // Create admin registration record if needed
-        if (finalRole === UserRole.ADMIN && pendingMode === "signup") {
-          try {
-            await addDoc(collection(db, "registrations"), {
-              type: "direct_school_signup",
-              name: user.displayName || "School via Google",
-              email: user.email,
-              phone: "",
-              status: "needs_review",
-              createdAt: serverTimestamp(),
-            });
-          } catch (e) {
-            console.warn("Failed to record direct signup credentials", e);
-          }
-        }
-
         // Create permanent profile
         await setDoc(doc(db, "users", user.uid), {
           name:
@@ -658,23 +642,6 @@ export default function Login() {
           );
           setLoading(false);
           return;
-        }
-
-        // Record for superadmin if it's a school registration
-        if (finalRole === UserRole.ADMIN && mode === "signup") {
-          try {
-            await addDoc(collection(db, "registrations"), {
-              type: "direct_school_signup",
-              name: name,
-              email: emailTrimmed,
-              password: passwordValue,
-              phone: phone,
-              status: "needs_review",
-              createdAt: serverTimestamp(),
-            });
-          } catch (e) {
-            console.warn("Failed to record direct signup credentials", e);
-          }
         }
 
         // 1. Create permanent profile
