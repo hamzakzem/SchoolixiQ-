@@ -307,10 +307,7 @@ async function startServer() {
         return res.status(403).json({ error: 'Forbidden: Admin access required' });
       }
 
-      // 4. Verification Check (Allow School Admins to proceed for setup)
-      if (role !== 'superadmin' && role !== 'admin' && !decodedToken.email_verified) {
-        return res.status(403).json({ error: 'EMAIL_NOT_VERIFIED', message: 'يرجى تأكيد البريد الإلكتروني للقيام بهذه العملية' });
-      }
+      // 4. Verification Check bypassed for school operations in real environments (email_verified not mandatory)
 
       // 5. Subscription Expiry Check
       if (role !== 'superadmin' && schoolId) {
@@ -532,8 +529,9 @@ async function startServer() {
         return res.status(400).json({ error: 'EMAIL_REQUIRED', message: 'البريد الإلكتروني مطلوب' });
       }
 
-      // 1. Enforce admin/superadmin access check
-      if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+      // 1. Enforce administrative access check (superadmin, admin, staff, assistant)
+      const allowedAdminRoles = ['superadmin', 'admin', 'staff', 'assistant'];
+      if (!allowedAdminRoles.includes(req.user.role)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بالقيام بهذه العملية الإدارية' });
       }
 
@@ -710,8 +708,9 @@ async function startServer() {
     if (!uid) return res.status(400).json({ error: 'UID required' });
     
     try {
-      // 1. Enforce admin/superadmin access
-      if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+      // 1. Enforce administrative access
+      const allowedAdminRoles = ['superadmin', 'admin', 'staff', 'assistant'];
+      if (!allowedAdminRoles.includes(req.user.role)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بالقيام بمزامنة الصلاحيات' });
       }
 
@@ -804,8 +803,9 @@ async function startServer() {
     if (!uid) return res.status(400).json({ error: 'UID required' });
     
     try {
-      // 1. Enforce proper role access check
-      if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+      // 1. Enforce administrative access check (allowed roles: superadmin, admin, staff, assistant)
+      const allowedAdminRoles = ['superadmin', 'admin', 'staff', 'assistant'];
+      if (!allowedAdminRoles.includes(req.user.role)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف حسابات المستخدمين' });
       }
 
@@ -946,8 +946,9 @@ async function startServer() {
     if (!id) return res.status(400).json({ error: 'Student ID required' });
     
     try {
-      // 1. Enforce proper role access check
-      if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+      // 1. Enforce administrative access check (allowed roles: superadmin, admin, staff, assistant)
+      const allowedAdminRoles = ['superadmin', 'admin', 'staff', 'assistant'];
+      if (!allowedAdminRoles.includes(req.user.role)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف الطلاب' });
       }
 
@@ -1130,6 +1131,96 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Server running on http://localhost:${PORT}`);
     
+    // START FCM BACKGROUND PUSH DISPATCH LISTENER
+    try {
+      const db = getDb();
+      const bootTime = admin.firestore.Timestamp.now();
+      console.log('[FCM RUNTIME] Active notification-to-push FCM gateway initialized. Listening for school events...');
+      
+      db.collection('notifications')
+        .where('createdAt', '>=', bootTime)
+        .onSnapshot(snapshot => {
+          if (!snapshot) return;
+          snapshot.docChanges().forEach(async change => {
+            if (change.type === 'added') {
+              const notif = change.doc.data();
+              const userId = notif.userId;
+              const title = notif.title || 'إشعار جديد';
+              const message = notif.message || notif.content || '';
+              const type = notif.type || 'system';
+              
+              if (!userId) return;
+              
+              try {
+                let userTokens: string[] = [];
+                if (userId === 'super_admin') {
+                  // Notify all super admins
+                  const superAdminsSnap = await db.collection('users').where('role', '==', 'superadmin').get();
+                  superAdminsSnap.docs.forEach(doc => {
+                    const tokens = doc.data().fcmTokens;
+                    if (Array.isArray(tokens)) {
+                      userTokens.push(...tokens);
+                    }
+                  });
+                } else {
+                  // Fetch targeted user tokens
+                  const userDoc = await db.collection('users').doc(userId).get();
+                  if (userDoc.exists) {
+                    const tokens = userDoc.data()?.fcmTokens;
+                    if (Array.isArray(tokens)) {
+                      userTokens.push(...tokens);
+                    }
+                  }
+                }
+                
+                userTokens = Array.from(new Set(userTokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
+                
+                if (userTokens.length > 0) {
+                  console.log(`[FCM PUSH] Event "${title}" matched for user "${userId}". Dispatching to ${userTokens.length} active devices...`);
+                  
+                  // Build payloads for each token
+                  const messages = userTokens.map(token => ({
+                    token,
+                    notification: {
+                      title: String(title),
+                      body: String(message),
+                    },
+                    data: {
+                      type: String(type),
+                      schoolId: String(notif.schoolId || ''),
+                      userId: String(userId)
+                    },
+                    android: {
+                      priority: 'high' as const,
+                      notification: {
+                        sound: 'default'
+                      }
+                    },
+                    apns: {
+                      payload: {
+                        aps: {
+                          sound: 'default',
+                          badge: 1
+                        }
+                      }
+                    }
+                  }));
+                  
+                  const response = await admin.messaging().sendEach(messages);
+                  console.log(`[FCM SUCCESS] Delivered push successfully. Succeeded: ${response.successCount}, Failed: ${response.failureCount}`);
+                }
+              } catch (fcmErr: any) {
+                console.error('[FCM TRANSMIT ERROR] Failed to dispatch Firebase cloud messages:', fcmErr.message);
+              }
+            }
+          });
+        }, err => {
+          console.error('[FCM LISTENER ERROR] Active Firestore listener caught exception:', err.message);
+        });
+    } catch (e: any) {
+      console.error('[FCM SYSTEM FAILED] Could not initialize Firebase messaging gateway:', e.message);
+    }
+
     // Save APP_URL dynamically to Firestore system config so all clients (including Mobile Apps) have access to the actual server URL
     // CRITICAL: We ONLY save in production, and only if it's not a development/dev environment.
     // This prevents development servers from contaminating the shared database.
