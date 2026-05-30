@@ -49,6 +49,7 @@ import {
   ShieldCheck,
   Image as ImageIcon,
   QrCode,
+  Building,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -951,14 +952,34 @@ export default function ParentDashboard() {
           <div className="flex flex-col gap-3 w-full max-w-xs">
             <button
               onClick={() => setShowAddStudentModal(true)}
-              className="px-6 py-4 bg-slate-900 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg"
+              className="px-6 py-4 bg-slate-900 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg cursor-pointer"
             >
               <Users size={20} />
               {t("linkStudentWithId")}
             </button>
+            
+            <button
+              onClick={async () => {
+                if (window.confirm(isRtl ? "هل أنت متأكد من رغبتك في تعديل نوع الحساب إلى إدارة مدرسة؟ سيتم تصفير خيارات الحساب والتحقق من اشتراكاتك." : "Are you sure you want to change your account type back to school management? This will reset your profile and re-evaluate your subscriptions.")) {
+                  try {
+                    await deleteDoc(doc(db, "users", auth.currentUser!.uid));
+                    toast.success(isRtl ? "تمت إعادة تعيين نوع الحساب بنجاح. جاري إعادة التحميل..." : "Account type successfully reset. Reloading...");
+                    setTimeout(() => window.location.reload(), 1500);
+                  } catch (e) {
+                    console.error("Failed to reset wrong parent account type:", e);
+                    toast.error(isRtl ? "حدث خطأ أثناء الاتصال" : "An error occurred during connection");
+                  }
+                }
+              }}
+              className="px-6 py-4 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 shadow-sm font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
+            >
+              <Building size={20} />
+              {isRtl ? "التحول لحساب مدرسة / إدارة" : "Switch to School Admin"}
+            </button>
+
             <button
               onClick={() => auth.signOut()}
-              className="px-6 py-4 bg-white text-red-600 border border-red-100 shadow-sm font-bold rounded-2xl flex items-center justify-center gap-2"
+              className="px-6 py-4 bg-white text-red-600 border border-red-100 shadow-sm font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer"
             >
               <LogOut size={20} />
               {t("logout")}

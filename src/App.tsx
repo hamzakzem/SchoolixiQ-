@@ -210,47 +210,70 @@ const AppContent = () => {
   // Handle Onboarding States
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    let unsub: (() => void) | undefined;
+    let unsubs: (() => void)[] = [];
+    
     if (!loading && user && !profile && autoLinkChecked) {
-      // First check if they have a pending registration
-      const q = query(
+      // Create three queries to locate registrations
+      const qUid = query(
         collection(db, "registrations"),
         where("uid", "==", user.uid),
       );
-      unsub = onSnapshot(
-        q,
-        (snap) => {
-          if (!snap.empty) {
-            const req = snap.docs[0];
-            setMyRequest({ id: req.id, ...req.data() });
-            if (req.data().status === "rejected") {
-              setOnboardingState("rejected");
-            } else if (req.data().status === "approved") {
-              setOnboardingState("approved");
-            } else {
-              setOnboardingState("waiting_approval");
-            }
-          } else {
-            // If no pending request, check if we should show options (with a short delay to not flick)
-            // But if they were already approved, do not revert to options
-            setOnboardingState((prev) => {
-              if (prev === "approved") return "approved";
-              timer = setTimeout(() => setOnboardingState("options"), 1000);
-              return prev;
-            });
-          }
-        },
-        (error) => {
-          console.error("Failed to read registrations:", error);
-          timer = setTimeout(() => setOnboardingState("options"), 1000);
-        },
+      const qEmail = query(
+        collection(db, "registrations"),
+        where("email", "==", user.email.toLowerCase()),
       );
+      const qCustEmail = query(
+        collection(db, "registrations"),
+        where("customerInfo.email", "==", user.email.toLowerCase()),
+      );
+
+      let results: Record<string, any> = {};
+
+      const processSnap = (snap: any, key: string) => {
+        if (!snap.empty) {
+          const docSnap = snap.docs[0];
+          results[key] = { id: docSnap.id, ...docSnap.data() };
+        } else {
+          delete results[key];
+        }
+
+        const mergedDocs = Object.values(results);
+        if (mergedDocs.length > 0) {
+          // Sort or pick the active one
+          const req: any = mergedDocs[0];
+          setMyRequest(req);
+          if (req.status === "rejected" || req.status === "cancelled") {
+            setOnboardingState("rejected");
+          } else if (req.status === "approved" || req.status === "active") {
+            setOnboardingState("approved");
+          } else {
+            setOnboardingState("waiting_approval");
+          }
+        } else {
+          // If no pending request, check if we should show options (with a short delay to avoid flicker)
+          setOnboardingState((prev) => {
+            if (prev === "approved") return "approved";
+            timer = setTimeout(() => setOnboardingState("options"), 1000);
+            return prev;
+          });
+        }
+      };
+
+      try {
+        unsubs.push(onSnapshot(qUid, (snap) => processSnap(snap, 'uid'), (err) => console.log('Uid listener err:', err)));
+        unsubs.push(onSnapshot(qEmail, (snap) => processSnap(snap, 'email'), (err) => console.log('Email listener err:', err)));
+        unsubs.push(onSnapshot(qCustEmail, (snap) => processSnap(snap, 'custEmail'), (err) => console.log('CustEmail listener err:', err)));
+      } catch (e) {
+        console.error("Listening setup failed:", e);
+        setOnboardingState("options");
+      }
+
     } else if (!user) {
       setOnboardingState("loading");
     }
     return () => {
       clearTimeout(timer);
-      if (unsub) unsub();
+      unsubs.forEach((unsub) => unsub());
     };
   }, [loading, user, profile, autoLinkChecked]);
 
@@ -420,24 +443,36 @@ const AppContent = () => {
           </>
         ) : (
           <div
-            className="flex flex-col items-center justify-center min-h-screen p-8 text-center bg-transparent font-sans"
+            className="flex flex-col items-center justify-center min-h-screen p-4 md:p-8 text-center bg-slate-50 dark:bg-slate-950 font-sans transition-all duration-300"
             dir={isRtl ? "rtl" : "ltr"}
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center mb-6"
-            >
-              <ShieldCheck size={40} />
-            </motion.div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-2 font-display">
-              {t("loading")}
-            </h1>
-            <p className="text-slate-500 mb-8 max-w-sm mx-auto leading-relaxed">
-              {isRtl
-                ? "نحن بصدد تجهيز بيانات حسابك والتحقق من الصلاحيات."
-                : "We are preparing your account data and verifying permissions."}
-            </p>
+            {onboardingState === "loading" && (
+              <div className="flex flex-col items-center justify-center text-center max-w-sm mx-auto p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center mb-6"
+                >
+                  <ShieldCheck size={40} />
+                </motion.div>
+                <h1 className="text-2xl font-bold text-slate-900 mb-2 font-display">
+                  {t("loading")}
+                </h1>
+                <p className="text-slate-500 mb-8 leading-relaxed">
+                  {isRtl
+                    ? "نحن بصدد تجهيز بيانات حسابك والتحقق من الصلاحيات."
+                    : "We are preparing your account data and verifying permissions."}
+                </p>
+                <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                <button
+                  onClick={() => auth.signOut()}
+                  className="px-6 py-3 bg-transparent text-slate-400 rounded-xl font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2 mt-8 text-xs cursor-pointer"
+                >
+                  <LogOut size={16} />
+                  {t("logout")}
+                </button>
+              </div>
+            )}
 
             {onboardingState === "options" && (
               <motion.div
@@ -814,7 +849,7 @@ const AppContent = () => {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="w-full max-w-sm mx-auto bg-white p-8 rounded-[2rem] shadow-xl border border-blue-100 mt-8 text-center relative overflow-hidden"
+                className="w-full max-w-sm mx-auto bg-white p-8 rounded-[2rem] shadow-xl border border-blue-100 text-center relative overflow-hidden"
               >
                 <div className="absolute top-0 left-0 w-full h-2 bg-blue-500 animate-pulse"></div>
                 <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex justify-center items-center mx-auto mb-6">
@@ -828,8 +863,9 @@ const AppContent = () => {
                   المدرسة، يرجى الانتظار لحين قبول الطلب.
                 </p>
                 <button
+                  type="button"
                   onClick={() => auth.signOut()}
-                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
+                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all cursor-pointer"
                 >
                   تسجيل الخروج مؤقتاً
                 </button>
@@ -840,7 +876,7 @@ const AppContent = () => {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="w-full max-w-sm mx-auto bg-white p-8 rounded-[2rem] shadow-xl border border-red-100 mt-8 text-center"
+                className="w-full max-w-sm mx-auto bg-white p-8 rounded-[2rem] shadow-xl border border-red-100 text-center"
               >
                 <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex justify-center items-center mx-auto mb-6">
                   <XCircle size={40} />
@@ -853,48 +889,31 @@ const AppContent = () => {
                 </p>
                 <div className="flex flex-col gap-3">
                   <button
+                    type="button"
                     onClick={() => {
-                      // Delete the rejected request and let them try again
                       if (myRequest?.id) {
                         deleteDoc(
                           doc(db, "registrations", myRequest.id),
                         ).then(() => {
-                          setOnboardingState("options");
+                           setOnboardingState("options");
                         });
                       } else {
                         setOnboardingState("options");
                       }
                     }}
-                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition-all"
+                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition-all cursor-pointer"
                   >
                     حاول مرة أخرى
                   </button>
                   <button
+                    type="button"
                     onClick={() => auth.signOut()}
-                    className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all"
+                    className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all cursor-pointer"
                   >
                     تسجيل الخروج
                   </button>
                 </div>
               </motion.div>
-            )}
-
-            {onboardingState === "loading" && (
-              <div className="flex flex-col items-center gap-4 mt-8">
-                <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                <p className="text-xs text-slate-400 font-bold">
-                  {isRtl
-                    ? "يرجى الانتظار قليلاً..."
-                    : "Please wait a moment..."}
-                </p>
-                <button
-                  onClick={() => auth.signOut()}
-                  className="px-6 py-3 bg-transparent text-slate-400 rounded-xl font-bold hover:bg-slate-100 transition-all flex items-center justify-center gap-2 mt-4 text-xs"
-                >
-                  <LogOut size={16} />
-                  {t("logout")}
-                </button>
-              </div>
             )}
           </div>
         )}
