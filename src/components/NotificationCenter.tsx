@@ -421,7 +421,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'all' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Bell className="w-3.5 h-3.5" />
-              {isArabic ? "كل الإشعارات" : "All Notifications"}
+              {isArabic ? "كل الإشعارات والرسائل" : "All Alerts & Messages"}
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'all' ? 'bg-indigo-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
                 {notifications.length}
               </span>
@@ -432,7 +432,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'unread' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Check className="w-3.5 h-3.5" />
-              {isArabic ? "غير المقرؤة" : "Unread Alerts"}
+              {isArabic ? "غير المقروءة والرسائل" : "Unread Messages & Alerts"}
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'unread' ? 'bg-indigo-700 text-white' : 'bg-red-500 text-white'}`}>
                 {notifications.filter(n => !n.read).length}
               </span>

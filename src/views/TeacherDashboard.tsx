@@ -952,7 +952,9 @@ export default function TeacherDashboard() {
               >
                 <Bell size={18} />
                 {notifications.filter((n) => !n.read).length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                    {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
+                  </span>
                 )}
               </button>
 

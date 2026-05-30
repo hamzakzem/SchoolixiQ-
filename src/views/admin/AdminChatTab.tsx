@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { db, storage } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc, orderBy, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useLanguage } from '../../lib/LanguageContext';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -29,6 +29,7 @@ export default function AdminChatTab() {
 
   const [students, setStudents] = useState<any[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [lastInteractionTimes, setLastInteractionTimes] = useState<Record<string, number>>({});
   const [mobileShowChat, setMobileShowChat] = useState(false);
 
   const prevMessagesLength = useRef<number>(0);
@@ -72,6 +73,7 @@ export default function AdminChatTab() {
       );
       const unsubUnread = onSnapshot(qUnread, (snapshot) => {
         const counts: Record<string, number> = {};
+        
         snapshot.docs.forEach(doc => {
           const msg = doc.data() as any;
           if (msg.receiverId === 'admin' || msg.receiverId === profile.uid) {
@@ -82,7 +84,38 @@ export default function AdminChatTab() {
         setUnreadCounts(counts);
       });
 
-      return () => { unsubscribe(); unsubStudents(); unsubUnread(); };
+      const qConversations = query(
+        collection(db, "conversations"),
+        where("schoolId", "==", profile.schoolId),
+        where("participants", "array-contains", "admin"),
+        orderBy("updatedAt", "desc")
+      );
+      
+      const unsubConversations = onSnapshot(qConversations, (snapshot) => {
+        setLastInteractionTimes(prev => {
+          const next = { ...prev };
+          let changed = false;
+          snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.updatedAt) {
+              const time = data.updatedAt.toMillis();
+              const otherIds = data.participants.filter((p: string) => p !== "admin");
+              otherIds.forEach((otherId: string) => {
+                const key = otherId === 'super_admin' ? 'super_admin' : otherId;
+                if (next[key] !== time) {
+                  next[key] = time;
+                  changed = true;
+                }
+              });
+            }
+          });
+          return changed ? next : prev;
+        });
+      }, (err) => {
+        console.warn("Conversations listener error:", err);
+      });
+
+      return () => { unsubscribe(); unsubStudents(); unsubUnread(); unsubConversations(); };
     }
   }, [profile?.schoolId, activeContact, isRtl]);
 
@@ -112,6 +145,18 @@ export default function AdminChatTab() {
 
       setMessages(docs);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+
+      // Update interactions for active chat
+      if (docs.length > 0) {
+        const lastMsg = docs[docs.length - 1];
+        const msgTime = lastMsg.createdAt?.toMillis() || Date.now();
+        setLastInteractionTimes(prev => {
+          if (msgTime > (prev[activeContact.id] || 0)) {
+            return { ...prev, [activeContact.id]: msgTime };
+          }
+          return prev;
+        });
+      }
 
       // Play chime if messages count increased and the last message is from others
       if (docs.length > prevMessagesLength.current) {
@@ -196,6 +241,15 @@ export default function AdminChatTab() {
         read: false
       });
 
+      // Update conversation document for real-time sorting
+      await setDoc(doc(db, "conversations", convId), {
+        conversationId: convId,
+        schoolId: profile.schoolId,
+        participants: ["admin", activeContact.id === 'super_admin' ? 'super_admin' : activeContact.id],
+        lastMessage: messageText || (isRtl ? 'ملف مرفق' : 'Attachment'),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
       // Notify the receiver
       if (activeContact.id === 'super_admin') {
         await notificationService.notifySuperAdmins({
@@ -215,6 +269,7 @@ export default function AdminChatTab() {
         });
       }
 
+      setLastInteractionTimes(prev => ({ ...prev, [activeContact.id]: Date.now() }));
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'system_messages');
@@ -238,7 +293,12 @@ export default function AdminChatTab() {
     (c.name && c.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (c.role && c.role.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ).sort((a, b) => {
+    const timeA = lastInteractionTimes[a.id] || 0;
+    const timeB = lastInteractionTimes[b.id] || 0;
+    if (timeA !== timeB) return timeB - timeA;
+    return (a.name || '').localeCompare(b.name || '');
+  });
 
   const groupedMessages = messages.reduce((acc, msg) => {
     let dateStr = isRtl ? 'اليوم' : 'Today';

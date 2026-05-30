@@ -11,6 +11,8 @@ import {
   doc,
   getDoc,
   updateDoc,
+  orderBy,
+  setDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useLanguage } from "../lib/LanguageContext";
@@ -63,6 +65,7 @@ export default function ParentChatTab() {
   
   const [schoolContacts, setSchoolContacts] = useState<any[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [lastInteractionTimes, setLastInteractionTimes] = useState<Record<string, number>>({});
   
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
@@ -144,6 +147,7 @@ export default function ParentChatTab() {
     );
     const unsubUnread = onSnapshot(qUnread, (snapshot) => {
       const counts: Record<string, number> = {};
+      
       snapshot.docs.forEach((doc) => {
         const msg = doc.data() as any;
         const senderIdStr =
@@ -155,9 +159,41 @@ export default function ParentChatTab() {
       setUnreadCounts(counts);
     });
 
+    const qConversations = query(
+      collection(db, "conversations"),
+      where("schoolId", "==", profile.schoolId),
+      where("participants", "array-contains", profile?.uid || ""),
+      orderBy("updatedAt", "desc")
+    );
+    
+    const unsubConversations = onSnapshot(qConversations, (snapshot) => {
+      setLastInteractionTimes(prev => {
+        const next = { ...prev };
+        let changed = false;
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.updatedAt) {
+            const time = data.updatedAt.toMillis();
+            const otherIds = data.participants.filter((p: string) => p !== profile?.uid);
+            otherIds.forEach((otherId: string) => {
+              const key = otherId === 'admin' ? 'admin' : otherId;
+              if (next[key] !== time) {
+                next[key] = time;
+                changed = true;
+              }
+            });
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, (err) => {
+      console.warn("Conversations listener error:", err);
+    });
+
     return () => {
       unsubscribe();
       unsubUnread();
+      unsubConversations();
     };
   }, [profile?.schoolId, activeContact]);
 
@@ -196,6 +232,18 @@ export default function ParentChatTab() {
           () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
           100,
         );
+
+        // Update interactions for active chat
+        if (docs.length > 0) {
+          const lastMsg = docs[docs.length - 1];
+          const msgTime = lastMsg.createdAt?.toMillis() || Date.now();
+          setLastInteractionTimes(prev => {
+            if (msgTime > (prev[activeContact.id] || 0)) {
+              return { ...prev, [activeContact.id]: msgTime };
+            }
+            return prev;
+          });
+        }
 
         // Play chime on receiving new notification
         if (docs.length > prevMessagesLength.current) {
@@ -298,7 +346,16 @@ export default function ParentChatTab() {
         read: false,
       });
 
-      // Notify the teacher or admin
+      // Update conversation document for real-time sorting
+      await setDoc(doc(db, "conversations", convId), {
+        conversationId: convId,
+        schoolId: profile.schoolId,
+        participants: [profile.uid, receiverId],
+        lastMessage: messageText || (isRtl ? 'ملف مرفق' : 'Attachment'),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      // Notify the teacher or admin...
       if (activeContact.type === "teacher") {
         await notificationService.send({
           userId: receiverId,
@@ -332,6 +389,8 @@ export default function ParentChatTab() {
           });
         }
       }
+      
+      setLastInteractionTimes(prev => ({ ...prev, [receiverId]: Date.now() }));
 
       setTimeout(
         () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
@@ -383,6 +442,13 @@ export default function ParentChatTab() {
     {} as Record<string, any[]>,
   );
 
+  const sortedContacts = [...schoolContacts].sort((a, b) => {
+    const timeA = lastInteractionTimes[a.id] || (a.id === "admin" ? Number.MAX_SAFE_INTEGER : 0);
+    const timeB = lastInteractionTimes[b.id] || (b.id === "admin" ? Number.MAX_SAFE_INTEGER : 0);
+    if (timeA !== timeB) return timeB - timeA;
+    return (a.name || "").localeCompare(b.name || "");
+  });
+
   return (
     <div
       className="h-full min-h-0 w-full bg-white dark:bg-[#090d16] overflow-hidden flex"
@@ -428,7 +494,7 @@ export default function ParentChatTab() {
         </div>
 
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar space-y-1 p-2">
-          {schoolContacts.map((contact) => {
+          {sortedContacts.map((contact) => {
             const unreadCount = unreadCounts[contact.id] || 0;
             const isSelected = activeContact?.id === contact.id;
             return (

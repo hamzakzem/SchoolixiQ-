@@ -11,6 +11,8 @@ import {
   doc,
   getDoc,
   updateDoc,
+  orderBy,
+  setDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useLanguage } from "../lib/LanguageContext";
@@ -85,6 +87,7 @@ export default function TeacherChatTab() {
 
   const [students, setStudents] = useState<any[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [lastInteractionTimes, setLastInteractionTimes] = useState<Record<string, number>>({});
 
   const prevMessagesLength = useRef<number>(0);
   const isFirstLoad = useRef<boolean>(true);
@@ -141,17 +144,51 @@ export default function TeacherChatTab() {
       );
       const unsubUnread = onSnapshot(qUnread, (snapshot) => {
         const counts: Record<string, number> = {};
+        
         snapshot.docs.forEach((doc) => {
           const msg = doc.data() as any;
           counts[msg.senderId] = (counts[msg.senderId] || 0) + 1;
         });
+        
         setUnreadCounts(counts);
+      });
+
+      const qConversations = query(
+        collection(db, "conversations"),
+        where("schoolId", "==", profile.schoolId),
+        where("participants", "array-contains", profile?.uid || ""),
+        orderBy("updatedAt", "desc")
+      );
+      
+      const unsubConversations = onSnapshot(qConversations, (snapshot) => {
+        setLastInteractionTimes(prev => {
+          const next = { ...prev };
+          let changed = false;
+          snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.updatedAt) {
+              const time = data.updatedAt.toMillis();
+              const otherIds = data.participants.filter((p: string) => p !== profile?.uid);
+              otherIds.forEach((otherId: string) => {
+                const key = otherId === 'admin' ? 'admin' : otherId;
+                if (next[key] !== time) {
+                  next[key] = time;
+                  changed = true;
+                }
+              });
+            }
+          });
+          return changed ? next : prev;
+        });
+      }, (err) => {
+        console.warn("Conversations listener error:", err);
       });
 
       return () => {
         unsubParents();
         unsubStudents();
         unsubUnread();
+        unsubConversations();
       };
     }
   }, [profile?.schoolId, activeContact, profile?.uid]);
@@ -264,6 +301,19 @@ export default function TeacherChatTab() {
           100,
         );
 
+        // Update interactions for active chat
+        if (docs.length > 0) {
+          const lastMsg = docs[docs.length - 1];
+          const msgTime = lastMsg.createdAt?.toMillis() || Date.now();
+          setLastInteractionTimes(prev => {
+            const opponentId = activeContact.id === 'admin' ? 'admin' : activeContact.id;
+            if (msgTime > (prev[opponentId] || 0)) {
+              return { ...prev, [opponentId]: msgTime };
+            }
+            return prev;
+          });
+        }
+
         // Sound Notification on Receipt
         if (docs.length > prevMessagesLength.current) {
           if (!isFirstLoad.current && docs.length > 0) {
@@ -364,6 +414,15 @@ export default function TeacherChatTab() {
         read: false,
       });
 
+      // Update conversation document for real-time sorting
+      await setDoc(doc(db, "conversations", convId), {
+        conversationId: convId,
+        schoolId: profile.schoolId,
+        participants: [profile.uid, receiverId],
+        lastMessage: messageText || (isRtl ? 'ملف مرفق' : 'Attachment'),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
       if (activeContact.type === "parent") {
         await notificationService.send({
           userId: receiverId,
@@ -397,6 +456,8 @@ export default function TeacherChatTab() {
           });
         }
       }
+      
+      setLastInteractionTimes(prev => ({ ...prev, [receiverId]: Date.now() }));
 
       setTimeout(
         () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
@@ -435,7 +496,12 @@ export default function TeacherChatTab() {
     (p) =>
       p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.email?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  ).sort((a, b) => {
+    const timeA = lastInteractionTimes[a.id] || 0;
+    const timeB = lastInteractionTimes[b.id] || 0;
+    if (timeA !== timeB) return timeB - timeA;
+    return (a.name || "").localeCompare(b.name || "");
+  });
 
   const groupedMessages = messages.reduce(
     (acc, msg) => {

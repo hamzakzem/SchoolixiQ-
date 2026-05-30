@@ -1168,7 +1168,9 @@ export default function ParentDashboard() {
                   >
                     <Bell size={16} />
                     {notifications.filter((n) => !n.read).length > 0 && (
-                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white dark:border-slate-900 rounded-[2px] animate-pulse"></span>
+                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[9px] font-black text-white flex items-center justify-center">
+                        {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
+                      </span>
                     )}
                   </button>
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { db, storage } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc, orderBy, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useLanguage } from '../../lib/LanguageContext';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -27,6 +27,7 @@ export default function SuperAdminChatTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeContact, setActiveContact] = useState<{ id: string, name: string, type: string, extra?: any } | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [lastInteractionTimes, setLastInteractionTimes] = useState<Record<string, number>>({});
   const [mobileShowChat, setMobileShowChat] = useState(false);
 
   const prevMessagesLength = useRef<number>(0);
@@ -59,7 +60,33 @@ export default function SuperAdminChatTab() {
       setUnreadCounts(counts);
     });
 
-    return () => { unsubscribe(); unsubUnread(); };
+    const qConversations = query(
+      collection(db, "conversations"),
+      where("participants", "array-contains", "super_admin"),
+      orderBy("updatedAt", "desc")
+    );
+    
+    const unsubConversations = onSnapshot(qConversations, (snapshot) => {
+      setLastInteractionTimes(prev => {
+        const next = { ...prev };
+        let changed = false;
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.updatedAt && data.schoolId) {
+            const time = data.updatedAt.toMillis();
+            if (next[data.schoolId] !== time) {
+              next[data.schoolId] = time;
+              changed = true;
+            }
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, (err) => {
+      console.warn("Conversations listener error:", err);
+    });
+
+    return () => { unsubscribe(); unsubUnread(); unsubConversations(); };
   }, [profile?.role]);
 
   useEffect(() => {
@@ -174,6 +201,15 @@ export default function SuperAdminChatTab() {
         read: false
       });
 
+      // Update conversation document for real-time sorting
+      await setDoc(doc(db, "conversations", convId), {
+        conversationId: convId,
+        schoolId: activeContact.id,
+        participants: ["super_admin", "admin"],
+        lastMessage: messageText || (isRtl ? 'ملف مرفق' : 'Attachment'),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
       // Notify the receiver (school admins)
       const q = query(
         collection(db, 'users'), 
@@ -213,7 +249,12 @@ export default function SuperAdminChatTab() {
 
   const filteredSchools = schools.filter(s => 
     (s.name && s.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ).sort((a, b) => {
+    const timeA = lastInteractionTimes[a.id] || 0;
+    const timeB = lastInteractionTimes[b.id] || 0;
+    if (timeA !== timeB) return timeB - timeA;
+    return (a.name || '').localeCompare(b.name || '');
+  });
 
   const groupedMessages = messages.reduce((acc, msg) => {
     let dateStr = isRtl ? 'اليوم' : 'Today';
