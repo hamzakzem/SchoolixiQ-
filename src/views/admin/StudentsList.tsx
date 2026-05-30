@@ -542,7 +542,19 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           <div className="flex gap-2">
             {!isViewOnly && (
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => {
+                  setEditingStudent(null);
+                  setNewStudent({
+                    name: '',
+                    classId: '',
+                    parentEmail: '',
+                    parentPhone: '',
+                    address: '',
+                    parentPassword: '',
+                    photoUrl: ''
+                  });
+                  setShowAddModal(true);
+                }}
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 md:px-8 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all font-bold shadow-lg active:scale-95 whitespace-nowrap text-sm"
               >
                 <Plus size={20} />
@@ -879,7 +891,19 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   <p className="text-slate-400 text-xs md:text-sm italic">جرب البحث بكلمات أخرى أو أضف طالب جديد</p>
                 </div>
                 {!isViewOnly && (
-                  <button onClick={() => setShowAddModal(true)} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-800 transition-all text-sm">أضف طالب</button>
+                  <button onClick={() => {
+                    setEditingStudent(null);
+                    setNewStudent({
+                      name: '',
+                      classId: '',
+                      parentEmail: '',
+                      parentPhone: '',
+                      address: '',
+                      parentPassword: '',
+                      photoUrl: ''
+                    });
+                    setShowAddModal(true);
+                  }} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-800 transition-all text-sm">أضف طالب</button>
                 )}
              </div>
           </div>

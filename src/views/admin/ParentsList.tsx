@@ -226,7 +226,10 @@ export default function ParentsList() {
           </div>
           
           <button 
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              setNewParent({ name: '', email: '', password: '', phoneNumber: '' });
+              setShowAddModal(true);
+            }}
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-500/20 active:scale-95"
           >
             <Plus size={20} />

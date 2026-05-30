@@ -309,15 +309,23 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           toast.success(isArabic ? "جاري تحويلك للصفحة: تقارير السلوك والملاحظات" : "Deep Linking: Navigating to Behavior Conduct");
           break;
         case 'announcement':
-          activeTabSetter('home');
+          activeTabSetter(userRole === 'admin' ? 'announcements' : 'home');
           toast.success(isArabic ? "جاري تحويلك للصفحة: الإعلانات والمستجدات" : "Deep Linking: Navigating to Announcements board");
           break;
         case 'message':
           activeTabSetter('chat');
           toast.success(isArabic ? "جاري تحويلك للصفحة: غرف المحادثات" : "Deep Linking: Navigating to Chats");
           break;
+        case 'attendance':
+          activeTabSetter(userRole === 'admin' ? 'attendance' : 'home');
+          toast.success(isArabic ? "جاري تحويلك للمتابعة" : "Deep Linking: Navigating");
+          break;
+        case 'report':
+          activeTabSetter(userRole === 'admin' ? 'evaluation_reports' : 'reports');
+          toast.success(isArabic ? "جاري تحويلك لصفحة التقارير" : "Deep Linking: Navigating to Reports");
+          break;
         default:
-          activeTabSetter('overview');
+          activeTabSetter(userRole === 'parent' || userRole === 'teacher' ? 'home' : 'overview');
           break;
       }
       onClose(); // Close the modal

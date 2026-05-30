@@ -287,7 +287,11 @@ export default function StaffList() {
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           </div>
           <button 
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              setEditingStaff(null);
+              resetNewStaff();
+              setShowModal(true);
+            }}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-sm active:scale-95"
           >
              <UserPlus size={20} />
