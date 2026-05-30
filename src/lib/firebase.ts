@@ -1,11 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  initializeAuth, 
-  browserLocalPersistence, 
-  browserSessionPersistence, 
-  inMemoryPersistence 
-} from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
@@ -83,23 +77,7 @@ export const db = initializeFirestore(app, {
   localCache: getResilientCache()
 }, firebaseConfig.firestoreDatabaseId);
 
-let authInstance;
-try {
-  if (isInIframe) {
-    console.log("Running inside iframe/preview: Using browserSessionPersistence/inMemoryPersistence for Auth to completely bypass IndexedDB connection error triggers.");
-    authInstance = initializeAuth(app, {
-      persistence: [browserSessionPersistence, inMemoryPersistence]
-    });
-  } else {
-    authInstance = initializeAuth(app, {
-      persistence: [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence]
-    });
-  }
-} catch (error) {
-  console.warn("initializeAuth failed or was already initialized. Falling back to getAuth(app):", error);
-  authInstance = getAuth(app);
-}
-export const auth = authInstance;
+export const auth = getAuth(app);
 export const storage = getStorage(app);
 
 // Initialize Analytics conditionally
