@@ -8,6 +8,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import dotEnv from 'dotenv';
 import fs from 'fs';
+import crypto from 'crypto';
 
 dotEnv.config();
 
@@ -87,14 +88,47 @@ async function startServer() {
   // Robust CORS Middleware supporting local Capacitor webviews (Android/iOS) and production domains
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    } else {
-      res.setHeader('Access-Control-Allow-Origin', '*');
+    const allowedOrigins = [
+      'https://schoolixiq.com',
+      'https://app.schoolixiq.com',
+      'https://schoolixiq.iq',
+      'https://app.schoolixiq.iq'
+    ];
+
+    if (process.env.APP_URL) {
+      allowedOrigins.push(process.env.APP_URL.replace(/\/$/, '').toLowerCase());
     }
+
+    const allowedPatterns = [
+      /\.run\.app$/, // Matches Cloud Run dev / preview URLs
+      /^http:\/\/localhost(:\d+)?$/,
+      /^http:\/\/127\.0\.0\.1(:\d+)?$/,
+      /^capacitor:\/\/localhost$/,
+      /^https?:\/\/.*-99877674137\.europe-west2\.run\.app$/ // Matches current / future previews environment
+    ];
+
+    let isAllowed = false;
+    if (!origin) {
+      isAllowed = true;
+    } else {
+      const lowerOrigin = origin.toLowerCase().trim();
+      if (allowedOrigins.map(o => o.toLowerCase().trim()).includes(lowerOrigin)) {
+        isAllowed = true;
+      } else {
+        isAllowed = allowedPatterns.some(pattern => pattern.test(lowerOrigin));
+      }
+    }
+
+    if (origin && isAllowed) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else if (origin) {
+      console.warn(`Blocked CORS request from origin: ${origin}`);
+      return res.status(403).json({ error: 'CORS_BLOCKED', message: 'غير مسموح بالوصول من هذا المصدر للواجهة البرمجية' });
+    }
+
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Authorization, x-requested-with, accept, origin');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
     
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
@@ -111,6 +145,22 @@ async function startServer() {
   const sanitizeForFirestore = (val: any): any => {
     if (val === undefined) return null;
     if (val === null) return null;
+
+    // Bypass Firestore special objects
+    if (typeof val === 'object') {
+      if (val instanceof admin.firestore.FieldValue || 
+          val instanceof admin.firestore.Timestamp || 
+          val instanceof admin.firestore.GeoPoint || 
+          val instanceof admin.firestore.DocumentReference) {
+        return val;
+      }
+      if (val.constructor && [
+        'FieldValue', 'Timestamp', 'GeoPoint', 'DocumentReference', 'FieldValueInside', 'TimestampInside'
+      ].includes(val.constructor.name)) {
+        return val;
+      }
+    }
+
     if (Array.isArray(val)) return val.map(sanitizeForFirestore);
     if (typeof val === 'object') {
       const cleaned: any = {};
@@ -186,10 +236,19 @@ async function startServer() {
       const email = decodedToken.email?.toLowerCase();
       
       // 1. Check Bootstrap Admins (Security Hardening: must be verified)
-      const isBootstrapAdmin = getBootstrapAdmins().includes(email) && decodedToken.email_verified === true;
-      
-      if (isBootstrapAdmin && decodedToken.role !== 'superadmin') {
-        await syncUserClaims(decodedToken.uid, 'superadmin');
+      let isBootstrapAdmin = false;
+      if (getBootstrapAdmins().includes(email) && decodedToken.email_verified === true) {
+        const db = getDb();
+        const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+        const usersCount = (await db.collection('users').limit(1).get()).size;
+        
+        // Only allow bootstrapping if database has no users, or if user is explicitly registered as superadmin
+        if (usersCount === 0 || (userDoc.exists && userDoc.data()?.role === 'superadmin')) {
+          isBootstrapAdmin = true;
+          if (decodedToken.role !== 'superadmin') {
+            await syncUserClaims(decodedToken.uid, 'superadmin');
+          }
+        }
       }
 
       // 2. Roles & Permissions Authorization
@@ -259,24 +318,100 @@ async function startServer() {
     }
   };
 
-  // Upload API using Firebase Admin Storage
-  app.post('/api/upload', express.json({ limit: '20mb' }), async (req: any, res: any) => {
+  // Helper to extract and verify JWT for general user actions (even non-admins, e.g. teachers/parents for homework/expenses upload)
+  const verifyToken = async (req: any, res: any, next: any) => {
+    let authHeader = req.headers.authorization;
+    if (!authHeader && req.headers['x-authorization']) {
+      authHeader = req.headers['x-authorization'];
+    }
+    
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized', message: 'يرجى تسجيل الدخول أولاً للقيام بهذه العملية' });
+    }
+    const token = authHeader.split('Bearer ')[1];
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      req.user = decodedToken;
+      next();
+    } catch (e: any) {
+      return res.status(401).json({ error: 'AuthenticationFailed', message: `فشل التحقق من الهوية: ${e.message}` });
+    }
+  };
+
+  // Upload API using Firebase Admin Storage (Securely Authenticated)
+  app.post('/api/upload', verifyToken, express.json({ limit: '20mb' }), async (req: any, res: any) => {
     try {
       const { path: storagePath, base64 } = req.body;
       if (!storagePath || !base64) return res.status(400).json({ error: 'Missing path or base64' });
+
+      // 1. File Size Verification (Max 10MB to avoid oversized uploads)
+      const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+      
+      if (buffer.length > maxSizeBytes) {
+        return res.status(400).json({
+          error: 'FILE_TOO_LARGE',
+          message: 'حجم الملف كبير جداً. الحد الأقصى المسموح به هو 10 ميجابايت.'
+        });
+      }
+
+      // 2. MIME Type / File Extension Validation
+      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.mp3', '.m4a', '.wav', '.json', '.mobileconfig'];
+      const ext = path.extname(storagePath).toLowerCase();
+      if (!allowedExtensions.includes(ext)) {
+        return res.status(400).json({
+          error: 'INVALID_FILE_TYPE',
+          message: 'نوع الملف غير مدعوم على هذه المنصة لأسباب أمنية.'
+        });
+      }
+
+      // 3. MIME type detection
+      let contentType = 'application/octet-stream';
+      if (base64.startsWith('data:')) {
+        const mimeMatch = base64.match(/^data:([^;]+);base64,/);
+        if (mimeMatch) {
+          contentType = mimeMatch[1];
+        }
+      } else {
+        const mimeTypes: any = {
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.png': 'image/png',
+          '.webp': 'image/webp',
+          '.pdf': 'application/pdf',
+          '.doc': 'application/msword',
+          '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          '.xls': 'application/vnd.ms-excel',
+          '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          '.txt': 'text/plain',
+          '.mp3': 'audio/mpeg',
+          '.m4a': 'audio/mp4',
+          '.wav': 'audio/wav',
+          '.json': 'application/json'
+        };
+        contentType = mimeTypes[ext] || 'application/octet-stream';
+      }
+
+      // Prevent script or executable execution via upload bypass
+      const disallowedMimeTypes = ['text/html', 'text/javascript', 'application/javascript', 'application/x-msdownload', 'application/x-sh', 'application/bat'];
+      if (disallowedMimeTypes.includes(contentType.toLowerCase())) {
+        return res.status(400).json({
+          error: 'FORBIDDEN_FILE_TYPE',
+          message: 'غير مسموح برفع ملفات برمجية أو صفحات ويب نهائياً.'
+        });
+      }
 
       try {
         const bucket = getStorage().bucket();
         const file = bucket.file(storagePath);
         
-        const base64Data = base64.replace(/^data:image\/\w+;base64,/, '');
-        const buffer = Buffer.from(base64Data, 'base64');
-        
-        const token = Date.now() + Math.random().toString(36).substring(2);
+        // Use secure cryptographically generated dynamic UUID tokens
+        const token = crypto.randomUUID();
         
         await file.save(buffer, {
           metadata: {
-            contentType: 'image/jpeg',
+            contentType,
             metadata: {
                firebaseStorageDownloadTokens: token
             }
@@ -374,6 +509,19 @@ async function startServer() {
       if (!email) {
         return res.status(400).json({ error: 'EMAIL_REQUIRED', message: 'البريد الإلكتروني مطلوب' });
       }
+
+      // 1. Enforce admin/superadmin access check
+      if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بالقيام بهذه العملية الإدارية' });
+      }
+
+      // 2. Enforce school boundary verification for multi-tenancy
+      if (req.user.role !== 'superadmin') {
+        if (!schoolId || schoolId !== req.user.schoolId) {
+          return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مسموح لك بإنشاء مستخدمين لمدرسة أخرى' });
+        }
+      }
+
       const emailLower = email.toLowerCase().trim();
       console.log(`Creating user: ${emailLower}, role: ${role}`);
       
@@ -415,15 +563,15 @@ async function startServer() {
           emailVerified: true // Set to true since admin is creating/linking
         };
         
-        // Use provided password, or if none provided and they don't have one, set default
+        // Use provided password, or if none provided and they don't have one, set dynamic random secure one
         if (password) {
           updateParams.password = password;
         } else {
           // Check if they have a password
           const hasPassword = existingUser.providerData.some(p => p.providerId === 'password');
           if (!hasPassword) {
-            updateParams.password = 'Parent123!';
-            console.log(`Setting default password for existing Google user: ${uid}`);
+            updateParams.password = crypto.randomBytes(16).toString('hex') + 'SecureP1!';
+            console.log(`Setting dynamic random password for existing Google user: ${uid}`);
           }
         }
         
@@ -437,9 +585,10 @@ async function startServer() {
       } catch (authError: any) {
         if (authError.code === 'auth/user-not-found') {
           // Normal case: create new user
+          const generatedSecurePass = crypto.randomBytes(16).toString('hex') + 'SecureP1!';
           const userRecord = await admin.auth().createUser({
             email: emailLower,
-            password: password || 'Parent123!', // Ensure a password is set
+            password: password || generatedSecurePass, // Ensure a password is set securely
             displayName,
             emailVerified: true,
           });
@@ -520,12 +669,24 @@ async function startServer() {
     if (!uid) return res.status(400).json({ error: 'UID required' });
     
     try {
+      // 1. Enforce admin/superadmin access
+      if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بالقيام بمزامنة الصلاحيات' });
+      }
+
       const db = getDb();
       const userDoc = await db.collection('users').doc(uid).get();
       if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
       
       const userData = userDoc.data() || {};
       const { role, schoolId } = userData;
+
+      // 2. Enforce school boundary verification for multi-tenancy
+      if (req.user.role !== 'superadmin') {
+        if (!schoolId || schoolId !== req.user.schoolId) {
+          return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مسموح لك بمزامنة صلاحيات أعضاء المدارس الأخرى' });
+        }
+      }
       
       // Get permissions from user doc or fallback to school's plan
       let permissions = userData.permissions || null;
@@ -602,11 +763,28 @@ async function startServer() {
     if (!uid) return res.status(400).json({ error: 'UID required' });
     
     try {
+      // 1. Enforce proper role access check
+      if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف حسابات المستخدمين' });
+      }
+
       const db = getDb();
       const userDoc = await db.collection('users').doc(uid).get();
-      const beforeData = userDoc.exists ? userDoc.data() : null;
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'المستخدم غير موجود' });
+      }
 
-      // 1. Delete from Auth
+      const beforeData = userDoc.data() || {};
+      const targetSchoolId = beforeData.schoolId;
+
+      // 2. Enforce strict multi-tenancy check
+      if (req.user.role !== 'superadmin') {
+        if (!targetSchoolId || targetSchoolId !== req.user.schoolId) {
+          return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف مستخدمى المدارس الأخرى' });
+        }
+      }
+
+      // 3. Delete from Auth
       try {
         await admin.auth().deleteUser(uid);
       } catch (authError: any) {
@@ -658,6 +836,11 @@ async function startServer() {
     if (!schoolId) return res.status(400).json({ error: 'School ID required' });
     
     try {
+      // 1. Restrict delete-school strictly to superadmin
+      if (req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف المدرسة. هذا الإجراء مخصص للمطور/SuperAdmin فقط' });
+      }
+
       const db = getDb();
       
       // 1. Delete all users associated with this school
@@ -677,7 +860,7 @@ async function startServer() {
       const studentDeletions = studentsQuery.docs.map(sDoc => sDoc.ref.delete());
       await Promise.all(studentDeletions);
 
-      // 3. Delete other related collections (limit to 10 for safety if huge, or just batch)
+      // 3. Delete other related collections in parallel and chunked batches
       const collectionsToCleanup = [
         "staff", "homework", "exams", "fees", "expenses", "logs", 
         "notifications", "attendance", "announcements", "payroll", 
@@ -685,18 +868,26 @@ async function startServer() {
         "behavior", "grades", "installments", "teacher_reports", "classes", "subscriptionRequests"
       ];
       
-      for (const colName of collectionsToCleanup) {
+      const deleteCollectionForSchool = async (colName: string) => {
         try {
           const snap = await db.collection(colName).where('schoolId', '==', schoolId).get();
           if (!snap.empty) {
-            const batch = db.batch();
-            snap.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
+            // Firestore batches have a limit of 500 operations
+            const docs = snap.docs;
+            const batchSize = 400;
+            for (let i = 0; i < docs.length; i += batchSize) {
+              const chunk = docs.slice(i, i + batchSize);
+              const batch = db.batch();
+              chunk.forEach(doc => batch.delete(doc.ref));
+              await batch.commit();
+            }
           }
         } catch (e) {
-          console.log(`Cleanup failed for ${colName}:`, e);
+          console.error(`Cleanup failed for ${colName}:`, e);
         }
-      }
+      };
+
+      await Promise.all(collectionsToCleanup.map(colName => deleteCollectionForSchool(colName)));
 
       // 4. Finally delete school
       await db.collection('schools').doc(schoolId).delete();
@@ -714,10 +905,22 @@ async function startServer() {
     if (!id) return res.status(400).json({ error: 'Student ID required' });
     
     try {
+      // 1. Enforce proper role access check
+      if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف الطلاب' });
+      }
+
       const db = getDb();
       const studentDoc = await db.collection('students').doc(id).get();
       const beforeData = studentDoc.exists ? studentDoc.data() : null;
       const schoolId = beforeData?.schoolId;
+
+      // 2. Enforce school boundary verification for multi-tenancy
+      if (req.user.role !== 'superadmin') {
+        if (!schoolId || schoolId !== req.user.schoolId) {
+          return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مسموح لك بحذف طلاب مدرسة أخرى' });
+        }
+      }
 
       await db.runTransaction(async (transaction) => {
         // 1. Delete from Firestore collections
@@ -761,28 +964,67 @@ async function startServer() {
     if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
     try {
       const db = getDb();
-      // Define collections to backup
       const collectionsToBackup = ['schools', 'users', 'students', 'classes', 'packages', 'orders', 'payments', 'installments', 'grades', 'attendance_records'];
-      
-      const backupData: any = {
-        timestamp: new Date().toISOString(),
-        collections: {}
-      };
 
-      for (const collName of collectionsToBackup) {
-        const snap = await db.collection(collName).get();
-        backupData.collections[collName] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', "attachment; filename=schoolixiq_backup_" + new Date().toISOString().split('T')[0] + ".json");
+      
+      res.write('{\n');
+      res.write('  "timestamp": "' + new Date().toISOString() + '",\n');
+      res.write('  "collections": {\n');
+
+      for (let i = 0; i < collectionsToBackup.length; i++) {
+        const collName = collectionsToBackup[i];
+        res.write('    "' + collName + '": [\n');
+
+        let lastDoc: any = null;
+        let hasMore = true;
+        let isFirstInColl = true;
+        
+        while (hasMore) {
+          let query = db.collection(collName).orderBy(admin.firestore.FieldPath.documentId()).limit(1000);
+          if (lastDoc) {
+            query = query.startAfter(lastDoc);
+          }
+          const snap = await query.get();
+          if (snap.empty) {
+            hasMore = false;
+            break;
+          }
+          
+          const docs = snap.docs;
+          lastDoc = docs[docs.length - 1];
+          if (docs.length < 1000) {
+            hasMore = false;
+          }
+
+          for (const doc of docs) {
+            if (!isFirstInColl) {
+              res.write(',\n');
+            }
+            res.write('      ' + JSON.stringify({ id: doc.id, ...doc.data() }));
+            isFirstInColl = false;
+          }
+        }
+
+        res.write('\n    ]');
+        if (i < collectionsToBackup.length - 1) {
+          res.write(',\n');
+        } else {
+          res.write('\n');
+        }
       }
 
+      res.write('  }\n');
+      res.write('}\n');
+      res.end();
+
       await logAudit(req, 'MANUAL_BACKUP', { metadata: { collectionsCount: collectionsToBackup.length } });
-      
-      // We could also upload this JSON to Storage and return a signed URL, for now just stream it back
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename=schoolixiq_backup_${new Date().toISOString().split('T')[0]}.json`);
-      res.send(JSON.stringify(backupData));
     } catch (error: any) {
       console.error('Backup Error:', error);
-      res.status(500).json({ error: error.message || 'Internal Server Error' });
+      if (!res.headersSent) {
+        res.status(500).json({ error: error.message || 'Internal Server Error' });
+      }
     }
   });
 
