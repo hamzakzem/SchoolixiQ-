@@ -1,5 +1,5 @@
 // Cache name with versioning
-const CACHE_NAME = 'schoolix-cache-v7';
+const CACHE_NAME = 'schoolix-cache-v8';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

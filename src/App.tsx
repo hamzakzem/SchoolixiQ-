@@ -232,7 +232,12 @@ const AppContent = () => {
             }
           } else {
             // If no pending request, check if we should show options (with a short delay to not flick)
-            timer = setTimeout(() => setOnboardingState("options"), 1000);
+            // But if they were already approved, do not revert to options
+            setOnboardingState((prev) => {
+              if (prev === "approved") return "approved";
+              timer = setTimeout(() => setOnboardingState("options"), 1000);
+              return prev;
+            });
           }
         },
         (error) => {
@@ -248,6 +253,25 @@ const AppContent = () => {
       if (unsub) unsub();
     };
   }, [loading, user, profile, autoLinkChecked]);
+
+  // Automatically trigger a profile sync & page reload if approved, to apply the new admin credentials smoothly
+  useEffect(() => {
+    if (onboardingState === "approved") {
+      const reloadTimer = setTimeout(async () => {
+        try {
+          if (auth.currentUser) {
+            // Force refresh ID Token to get updated claims from server
+            await auth.currentUser.getIdToken(true);
+          }
+        } catch (e) {
+          console.warn("Failed to force refresh token during approved transition:", e);
+        }
+        // Force fully fresh page reload
+        window.location.reload();
+      }, 2500);
+      return () => clearTimeout(reloadTimer);
+    }
+  }, [onboardingState]);
 
   // Fetch packages when in 'packages' state
   useEffect(() => {
@@ -361,8 +385,30 @@ const AppContent = () => {
     }
   };
 
+  const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+
   return (
     <>
+      {isInIframe && (
+        <div className="bg-amber-500 text-white text-xs font-bold py-3 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right sticky top-0 z-[999999] shadow-md border-b border-amber-600">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">⚠️</span>
+            <span>
+              {isRtl 
+                ? "تنبيه هام للايفون: لتنزيل التطبيق بظغطة زر واحدة وحفظ البيانات بشكل صحيح دون قيود، يرجى فتح المنصة في متصفح خارجي مستقل."
+                : "Important notice: For one-click iOS App installation and flawless data saving without iframe blocks, please open the platform in a standalone window."}
+            </span>
+          </div>
+          <a
+            href={window.location.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white text-amber-600 hover:bg-amber-50 px-4 py-1.5 rounded-lg text-xs font-black transition-all shadow-sm flex items-center justify-center gap-1.5 shrink-0"
+          >
+            <span>{isRtl ? "فتح في نافذة مستقلة" : "Open in New Tab"}</span>
+          </a>
+        </div>
+      )}
       <div
         dir={isRtl ? "rtl" : "ltr"}
         className={isRtl ? "font-sans" : "font-sans"}

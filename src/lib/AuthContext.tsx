@@ -108,13 +108,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               }
             }
 
-            const tokenResult = await authUser.getIdTokenResult();
-            const claims = tokenResult.claims as any;
+            let claims: any = {};
+            try {
+              let tokenResult = await authUser.getIdTokenResult();
+              claims = tokenResult.claims || {};
+              
+              if (data.role && (claims.role !== data.role || claims.schoolId !== data.schoolId)) {
+                console.log("Stale or mismatched claims detected on snapshot. Forcing ID token refresh...");
+                try {
+                  tokenResult = await authUser.getIdTokenResult(true);
+                  claims = tokenResult.claims || {};
+                } catch (refreshErr) {
+                  console.warn("Failed to force refresh token:", refreshErr);
+                }
+              }
+            } catch (tokenError) {
+              console.warn("Failed to get ID token result or session revoked, using firestore backup:", tokenError);
+            }
             
             setProfile({ 
               uid: authUser.uid, 
               ...data,
-              permissions: claims.p || data.permissions 
+              permissions: claims.p || data.permissions || null
             } as UserProfile);
             
             // Register for Push Notifications automatically (only native)
@@ -159,8 +174,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setLoading(false);
           } else {
             // Check claims first - if server already set them, we can trust them
-            const tokenResult = await authUser.getIdTokenResult();
-            const claims = tokenResult.claims as any;
+            let claims: any = {};
+            try {
+              const tokenResult = await authUser.getIdTokenResult();
+              claims = tokenResult.claims || {};
+            } catch (tokenErr) {
+              console.warn("Failed to retrieve ID token before profile load:", tokenErr);
+            }
             
             if (claims.role) {
               setProfile({

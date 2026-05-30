@@ -328,11 +328,14 @@ async function startServer() {
 
   // Admin APIs
   app.post('/api/admin/create-user', verifyAdmin, async (req: any, res: any) => {
-    const { email, password, displayName, role, schoolId, additionalData } = req.body;
-    const emailLower = email.toLowerCase().trim();
-    console.log(`Creating user: ${emailLower}, role: ${role}`);
-    
     try {
+      const { email, password, displayName, role, schoolId, additionalData } = req.body || {};
+      if (!email) {
+        return res.status(400).json({ error: 'EMAIL_REQUIRED', message: 'البريد الإلكتروني مطلوب' });
+      }
+      const emailLower = email.toLowerCase().trim();
+      console.log(`Creating user: ${emailLower}, role: ${role}`);
+      
       const db = getDb();
       let uid = '';
 

@@ -11,7 +11,7 @@ export async function adminCreateUser(userData: {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('No auth token available');
 
-  const response = await fetch('/api/admin/create-user', {
+  const response = await fetch(`/api/admin/create-user?t=${Date.now()}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -42,7 +42,12 @@ export async function adminCreateUser(userData: {
   if (contentType && contentType.includes('application/json')) {
     return response.json();
   } else {
-    throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+    const responseClone = response.clone();
+    let text = '';
+    try {
+      text = await responseClone.text();
+    } catch (_) {}
+    throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
   }
 }
 
@@ -50,7 +55,7 @@ export async function adminDeleteUser(uid: string) {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('No auth token available');
 
-  const response = await fetch('/api/admin/delete-user', {
+  const response = await fetch(`/api/admin/delete-user?t=${Date.now()}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -81,7 +86,12 @@ export async function adminDeleteUser(uid: string) {
   if (contentType && contentType.includes('application/json')) {
     return response.json();
   } else {
-    throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+    const responseClone = response.clone();
+    let text = '';
+    try {
+      text = await responseClone.text();
+    } catch (_) {}
+    throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
   }
 }
 
@@ -89,7 +99,7 @@ export async function adminDeleteStudent(id: string) {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('No auth token available');
 
-  const response = await fetch('/api/admin/delete-student', {
+  const response = await fetch(`/api/admin/delete-student?t=${Date.now()}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -120,6 +130,11 @@ export async function adminDeleteStudent(id: string) {
   if (contentType && contentType.includes('application/json')) {
     return response.json();
   } else {
-    throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+    const responseClone = response.clone();
+    let text = '';
+    try {
+      text = await responseClone.text();
+    } catch (_) {}
+    throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
   }
 }
