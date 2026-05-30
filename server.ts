@@ -857,33 +857,24 @@ async function startServer() {
       process.env.APP_URL.includes('127.0.0.1')
     );
 
-    if (process.env.APP_URL && isProductionEnv && !isDevUrl) {
+    if (process.env.APP_URL) {
       try {
         const db = getDb();
         const appUrlClean = process.env.APP_URL.replace(/\/$/, '');
-        await db.collection('system').doc('config').set({
-          appUrl: appUrlClean
-        }, { merge: true });
-        console.log(`Successfully saved production APP_URL (${appUrlClean}) to system/config.`);
-      } catch (err: any) {
-        console.error('Failed to save APP_URL to system/config:', err.message);
-      }
-    } else {
-      // Self-healing: if database has a contaminated dev URL, delete it so clients fallback to their built-in production URLs safely!
-      try {
-        const db = getDb();
-        const configDoc = await db.collection('system').doc('config').get();
-        if (configDoc.exists) {
-          const currentUrl = configDoc.data()?.appUrl || '';
-          if (currentUrl.includes('-dev-') || currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
-            await db.collection('system').doc('config').update({
-              appUrl: admin.firestore.FieldValue.delete()
-            });
-            console.log('Self-healing: Cleared contaminated development appUrl from system/config.');
-          }
+        if (isProductionEnv && !isDevUrl) {
+          await db.collection('system').doc('config').set({
+            appUrl: appUrlClean,
+            appUrlProd: appUrlClean
+          }, { merge: true });
+          console.log(`Successfully saved production APP_URL (${appUrlClean}) to system/config.`);
+        } else {
+          await db.collection('system').doc('config').set({
+            appUrlDev: appUrlClean
+          }, { merge: true });
+          console.log(`Successfully saved development APP_URL (${appUrlClean}) to system/config (appUrlDev).`);
         }
       } catch (err: any) {
-        console.warn('Failed self-healing check of system/config:', err.message);
+        console.error('Failed to save APP_URL to system/config:', err.message);
       }
     }
   });

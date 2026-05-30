@@ -13,7 +13,6 @@ export function getApiUrl(path: string): string {
   // If on the web browser, relative URL paths always work natively and avoid CORS blocks or stale domains
   if (!isMobileContainer) {
     return path;
-    // Always call original path relative to current domain
   }
 
   // Only for mobile apps, look for dynamic API URL stored in localStorage
@@ -24,20 +23,44 @@ export function getApiUrl(path: string): string {
     } catch (_) {}
   }
 
+  const isDevClient = typeof window !== 'undefined' && (
+    window.location.hostname.includes('-dev-') || 
+    window.location.hostname.includes('localhost') || 
+    window.location.hostname.includes('127.0.0.1')
+  );
+
+  let targetUrl = '';
+
   if (savedUrl) {
-    const cleanSavedUrl = savedUrl.replace(/\/$/, '');
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `${cleanSavedUrl}${cleanPath}`;
+    const isDevSavedUrl = savedUrl.includes('-dev-') || savedUrl.includes('localhost') || savedUrl.includes('127.0.0.1');
+    // Security/Stability Guard: If we are a production build but saved URL is dev, ignore it
+    if (!isDevClient && isDevSavedUrl) {
+      targetUrl = '';
+    } else {
+      targetUrl = savedUrl;
+    }
   }
 
-  // Fallback to process.env.APP_URL defined by Vite configuration
-  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
-
-  if (appUrl) {
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `${appUrl}${cleanPath}`;
+  // Fallback 1: process.env.APP_URL defined by Vite configuration during build
+  if (!targetUrl) {
+    targetUrl = process.env.APP_URL || '';
   }
 
-  // If fallback fails, return path
-  return path;
+  // Fallback 2: Direct hardcoded backup URLs for total stability of native apps
+  if (!targetUrl) {
+    targetUrl = isDevClient
+      ? 'https://ais-dev-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app'
+      : 'https://ais-pre-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app';
+  }
+
+  // Clean trailing slashes
+  let cleanSavedUrl = targetUrl.replace(/\/$/, '');
+
+  // CRITICAL: Force upgrade HTTP to HTTPS for external domains to prevent POST method downgrades from redirects
+  if (cleanSavedUrl && !cleanSavedUrl.startsWith('http://localhost') && !cleanSavedUrl.startsWith('http://127.0.0.1')) {
+    cleanSavedUrl = cleanSavedUrl.replace(/^http:\/\//i, 'https://');
+  }
+
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${cleanSavedUrl}${cleanPath}`;
 }

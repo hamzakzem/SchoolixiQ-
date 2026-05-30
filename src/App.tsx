@@ -121,12 +121,20 @@ const AppContent = () => {
     const unsub = onSnapshot(doc(db, "system", "config"), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        if (data && data.appUrl) {
-          try {
-            localStorage.setItem("schoolix_app_api_url", data.appUrl);
-            console.info("[API CONFIG] Saved dynamic appUrl from Firestore to localStorage:", data.appUrl);
-          } catch (err) {
-            console.warn("localStorage is not writeable:", err);
+        if (data) {
+          const isDevClient = typeof window !== 'undefined' && (
+            window.location.hostname.includes('-dev-') || 
+            window.location.hostname.includes('localhost') || 
+            window.location.hostname.includes('127.0.0.1')
+          );
+          const targetUrl = isDevClient ? (data.appUrlDev || data.appUrl) : (data.appUrl || data.appUrlProd);
+          if (targetUrl) {
+            try {
+              localStorage.setItem("schoolix_app_api_url", targetUrl);
+              console.info("[API CONFIG] Saved environment-matched appUrl from Firestore to localStorage:", targetUrl);
+            } catch (err) {
+              console.warn("localStorage is not writeable:", err);
+            }
           }
         }
       }
