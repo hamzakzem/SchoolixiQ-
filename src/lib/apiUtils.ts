@@ -25,12 +25,9 @@ export function getApiUrl(path: string): string {
   }
 
   if (savedUrl) {
-    const isDevSavedUrl = savedUrl.includes('-dev-') || savedUrl.includes('localhost') || savedUrl.includes('127.0.0.1');
-    if (!isDevSavedUrl) {
-      const cleanSavedUrl = savedUrl.replace(/\/$/, '');
-      const cleanPath = path.startsWith('/') ? path : `/${path}`;
-      return `${cleanSavedUrl}${cleanPath}`;
-    }
+    const cleanSavedUrl = savedUrl.replace(/\/$/, '');
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${cleanSavedUrl}${cleanPath}`;
   }
 
   // Fallback to process.env.APP_URL defined by Vite configuration
