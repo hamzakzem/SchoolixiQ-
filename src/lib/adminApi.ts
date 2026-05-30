@@ -43,7 +43,8 @@ export async function adminCreateUser(userData: {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${token}`,
+      'X-Authorization': `Bearer ${token}`
     },
     body: JSON.stringify(userData)
   });
@@ -101,7 +102,8 @@ export async function adminDeleteUser(uid: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${token}`,
+      'X-Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({ uid })
   });
@@ -159,7 +161,8 @@ export async function adminDeleteStudent(id: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${token}`,
+      'X-Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({ id })
   });

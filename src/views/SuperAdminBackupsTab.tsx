@@ -24,7 +24,8 @@ export function SuperAdminBackupsTab() {
       
       const response = await fetch(getApiUrl('/api/admin/backup'), {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Authorization': `Bearer ${token}`
         }
       });
 

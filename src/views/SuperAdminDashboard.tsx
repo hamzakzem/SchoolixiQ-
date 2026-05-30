@@ -676,7 +676,8 @@ export default function SuperAdminDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ schoolId })
       });
@@ -1007,6 +1008,7 @@ export default function SuperAdminDashboard() {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+              "X-Authorization": `Bearer ${await auth.currentUser?.getIdToken()}`
             },
             body: JSON.stringify({ uid: request.uid }),
           });
@@ -1029,6 +1031,7 @@ export default function SuperAdminDashboard() {
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+                "X-Authorization": `Bearer ${await auth.currentUser?.getIdToken()}`
               },
               body: JSON.stringify({ uid: userResult.uid }),
             });
@@ -1171,6 +1174,7 @@ export default function SuperAdminDashboard() {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
+            "X-Authorization": `Bearer ${token}`
           },
           body: JSON.stringify(pkgData),
         });
@@ -1286,6 +1290,7 @@ export default function SuperAdminDashboard() {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,
+              "X-Authorization": `Bearer ${token}`
             },
           },
         );
@@ -1371,6 +1376,7 @@ export default function SuperAdminDashboard() {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+              "X-Authorization": `Bearer ${await auth.currentUser?.getIdToken()}`
             },
             body: JSON.stringify({ uid: user.id }),
           });
@@ -1456,6 +1462,7 @@ export default function SuperAdminDashboard() {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+            "X-Authorization": `Bearer ${await auth.currentUser?.getIdToken()}`
           },
           body: JSON.stringify({ uid: userResult.uid }),
         });

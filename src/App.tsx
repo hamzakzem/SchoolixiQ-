@@ -209,6 +209,7 @@ const AppContent = () => {
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${await user.getIdToken()}`,
+                "X-Authorization": `Bearer ${await user.getIdToken()}`
               },
               body: JSON.stringify({ uid: user.uid }),
             });

@@ -154,7 +154,11 @@ async function startServer() {
 
   // Middleware to verify Admin using Claims & Multi-tenancy
   const verifyAdmin = async (req: any, res: any, next: any) => {
-    const authHeader = req.headers.authorization;
+    let authHeader = req.headers.authorization;
+    if (!authHeader && req.headers['x-authorization']) {
+      authHeader = req.headers['x-authorization'];
+    }
+    
     if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
