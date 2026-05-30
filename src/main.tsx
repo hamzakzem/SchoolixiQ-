@@ -22,6 +22,12 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 // Handle Vit's HMR websocket errors which are benign in this environment
 if (typeof window !== 'undefined') {
   const checkAndHandleDbError = (errMessage: string) => {
+    const isInIframe = window.self !== window.top;
+    if (isInIframe) {
+      console.log("Suppressed IndexedDB connection error inside iframe since memory/session cache is used instead.");
+      return;
+    }
+
     if (
       errMessage && 
       (errMessage.includes('refusing to open IndexedDB') || 

@@ -62,6 +62,19 @@ export function getApiUrl(path: string): string {
     cleanSavedUrl = cleanSavedUrl.replace(/^http:\/\//i, 'https://');
   }
 
+  // If on standard web browsers: check if the current frontend origin matches the backend destination.
+  // If they are on different origins (e.g., frontend hosted on a static domain and backend on Cloud Run),
+  // we MUST return the absolute URL. If they match, relative path is returned for perfect security and Zero-CORS.
+  if (typeof window !== 'undefined' && !isMobileContainer) {
+    const currentOrigin = window.location.origin.replace(/\/$/, '').toLowerCase();
+    const backendOrigin = cleanSavedUrl.toLowerCase();
+    if (currentOrigin !== backendOrigin && cleanSavedUrl) {
+      const cleanPath = path.startsWith('/') ? path : `/${path}`;
+      return `${cleanSavedUrl}${cleanPath}`;
+    }
+    return path;
+  }
+
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${cleanSavedUrl}${cleanPath}`;
 }
