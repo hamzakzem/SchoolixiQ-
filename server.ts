@@ -146,8 +146,11 @@ async function startServer() {
     if (val === undefined) return null;
     if (val === null) return null;
 
-    // Bypass Firestore special objects
+    // Bypass Firestore special objects, Date objects, and objects that can convert to Date
     if (typeof val === 'object') {
+      if (val instanceof Date) {
+        return val;
+      }
       if (val instanceof admin.firestore.FieldValue || 
           val instanceof admin.firestore.Timestamp || 
           val instanceof admin.firestore.GeoPoint || 
@@ -155,8 +158,11 @@ async function startServer() {
         return val;
       }
       if (val.constructor && [
-        'FieldValue', 'Timestamp', 'GeoPoint', 'DocumentReference', 'FieldValueInside', 'TimestampInside'
+        'FieldValue', 'Timestamp', 'GeoPoint', 'DocumentReference', 'FieldValueInside', 'TimestampInside', 'Date'
       ].includes(val.constructor.name)) {
+        return val;
+      }
+      if (typeof val.toDate === 'function') {
         return val;
       }
     }
@@ -206,12 +212,21 @@ async function startServer() {
   const syncUserClaims = async (uid: string, role: string, schoolId?: string, permissions?: any) => {
     try {
       const securityVersion = 4; 
-      await admin.auth().setCustomUserClaims(uid, { 
+      const claims: any = { 
         role, 
         schoolId: schoolId || '',
         sv: securityVersion,
         p: permissions || null // Optional permissions snapshot
-      });
+      };
+      
+      // Prevent claims size overflow (max 1000 bytes limit in Firebase Auth)
+      const claimsStr = JSON.stringify(claims);
+      if (Buffer.byteLength(claimsStr, 'utf8') > 900) {
+        console.warn(`[SECURITY] Custom claims size (${Buffer.byteLength(claimsStr, 'utf8')} bytes) exceeds limit for UID: ${uid}. Stripping nested permissions 'p' to avoid claims exception.`);
+        claims.p = null;
+      }
+
+      await admin.auth().setCustomUserClaims(uid, claims);
       // Revoke refresh tokens to force new token acquisition
       await admin.auth().revokeRefreshTokens(uid);
       console.log(`Claims synced & tokens revoked for user ${uid}: role=${role}, sv=${securityVersion}`);
@@ -304,8 +319,16 @@ async function startServer() {
         const schoolDoc = await db.collection('schools').doc(schoolId).get();
         if (schoolDoc.exists) {
           const expirationData = schoolDoc.data()?.subscriptionExpiresAt;
-          if (expirationData && new Date(expirationData) < new Date()) {
-            return res.status(402).json({ error: 'SUBSCRIPTION_EXPIRED', message: 'انتهت صلاحية اشتراك المدرسة' });
+          if (expirationData) {
+            let expiryDate: Date;
+            if (typeof expirationData.toDate === 'function') {
+              expiryDate = expirationData.toDate();
+            } else {
+              expiryDate = new Date(expirationData);
+            }
+            if (expiryDate < new Date()) {
+              return res.status(402).json({ error: 'SUBSCRIPTION_EXPIRED', message: 'انتهت صلاحية اشتراك المدرسة' });
+            }
           }
         }
       }
