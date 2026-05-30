@@ -443,8 +443,8 @@ export default function ParentChatTab() {
   );
 
   const sortedContacts = [...schoolContacts].sort((a, b) => {
-    const timeA = lastInteractionTimes[a.id] || (a.id === "admin" ? Number.MAX_SAFE_INTEGER : 0);
-    const timeB = lastInteractionTimes[b.id] || (b.id === "admin" ? Number.MAX_SAFE_INTEGER : 0);
+    const timeA = lastInteractionTimes[a.id] || 0;
+    const timeB = lastInteractionTimes[b.id] || 0;
     if (timeA !== timeB) return timeB - timeA;
     return (a.name || "").localeCompare(b.name || "");
   });

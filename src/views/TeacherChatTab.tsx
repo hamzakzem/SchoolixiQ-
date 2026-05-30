@@ -492,10 +492,23 @@ export default function TeacherChatTab() {
     return "";
   };
 
-  const filteredParents = parents.filter(
-    (p) =>
-      p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.email?.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredContacts = [
+    {
+      id: "admin",
+      name: adminName,
+      type: "admin" as const,
+    },
+    ...parents.map(p => ({
+      id: p.id,
+      name: p.name || "ولي أمر",
+      type: "parent" as const,
+      extra: p,
+      email: p.email
+    }))
+  ].filter(
+    (c) =>
+      c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.email?.toLowerCase().includes(searchTerm.toLowerCase()),
   ).sort((a, b) => {
     const timeA = lastInteractionTimes[a.id] || 0;
     const timeB = lastInteractionTimes[b.id] || 0;
@@ -571,72 +584,72 @@ export default function TeacherChatTab() {
         </div>
 
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar space-y-1 p-2">
-          {/* Admin Contact */}
-          <button
-            onClick={() => {
-              setActiveContact({ id: "admin", name: adminName, type: "admin" });
-              setMobileShowChat(true);
-            }}
-            className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all duration-200 w-full relative ${
-              activeContact?.id === "admin"
-                ? "bg-indigo-50/70 dark:bg-indigo-950/40 shadow-sm border-l-4 border-indigo-600"
-                : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
-            }`}
-          >
-            <div className="relative shrink-0">
-              {schoolInfo?.logoUrl ? (
-                <img 
-                  src={schoolInfo.logoUrl} 
-                  alt="School Logo" 
-                  className="w-12 h-12 rounded-2xl object-cover border-2 border-white dark:border-slate-800 shadow-md"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner font-bold text-lg ${
-                    activeContact?.id === "admin" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+          {filteredContacts.map((contact) => {
+            const isSelected = activeContact?.id === contact.id;
+
+            if (contact.type === "admin") {
+              return (
+                <button
+                  key="admin"
+                  onClick={() => {
+                    setActiveContact({ id: "admin", name: adminName, type: "admin" });
+                    setMobileShowChat(true);
+                  }}
+                  className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all duration-200 w-full relative ${
+                    isSelected
+                      ? "bg-indigo-50/70 dark:bg-indigo-950/40 shadow-sm border-l-4 border-indigo-600"
+                      : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
                   }`}
                 >
-                  <Building2 size={18} />
-                </div>
-              )}
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full animate-pulse" />
-              {unreadCounts["admin"] > 0 && activeContact?.id !== "admin" && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
-                  {unreadCounts["admin"] > 9 ? "9+" : unreadCounts["admin"]}
-                </span>
-              )}
-            </div>
-            
-            <div className="flex-1 text-right min-w-0">
-              <h3 className={`font-bold text-sm truncate ${activeContact?.id === "admin" ? "text-indigo-950 dark:text-white" : "text-slate-700 dark:text-slate-300"}`}>
-                {adminName}
-              </h3>
-              <p className="text-[10px] text-slate-450 dark:text-slate-500 truncate mt-0.5 font-bold">
-                {isRtl ? "إدارة المدرسة" : "School Management"}
-              </p>
-            </div>
-          </button>
+                  <div className="relative shrink-0">
+                    {schoolInfo?.logoUrl ? (
+                      <img 
+                        src={schoolInfo.logoUrl} 
+                        alt="School Logo" 
+                        className="w-12 h-12 rounded-2xl object-cover border-2 border-white dark:border-slate-800 shadow-md"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div
+                        className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner font-bold text-lg ${
+                          isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                        }`}
+                      >
+                        <Building2 size={18} />
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full animate-pulse" />
+                    {unreadCounts["admin"] > 0 && !isSelected && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
+                        {unreadCounts["admin"] > 9 ? "9+" : unreadCounts["admin"]}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 text-right min-w-0">
+                    <h3 className={`font-bold text-sm truncate ${isSelected ? "text-indigo-950 dark:text-white" : "text-slate-700 dark:text-slate-300"}`}>
+                      {adminName}
+                    </h3>
+                    <p className="text-[10px] text-slate-450 dark:text-slate-500 truncate mt-0.5 font-bold">
+                      {isRtl ? "إدارة المدرسة" : "School Management"}
+                    </p>
+                  </div>
+                </button>
+              );
+            }
 
-          <div className="px-4 py-2 mt-3 mb-1">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              {isRtl ? "أولياء أمور الطلاب" : "Parents"}
-            </h4>
-          </div>
-
-          {filteredParents.map((parent) => {
-            const unreadCount = unreadCounts[parent.id] || 0;
-            const isSelected = activeContact?.id === parent.id;
-            const parentStudents = students.filter((s) => s.parentIds?.includes(parent.id));
+            const parent = contact.extra;
+            const unreadCount = unreadCounts[contact.id] || 0;
+            const parentStudents = students.filter((s) => s.parentIds?.includes(contact.id));
             const studentWithPhoto = parentStudents.find(s => s.photoUrl);
 
             return (
               <button
-                key={parent.id}
+                key={contact.id}
                 onClick={() => {
                   setActiveContact({
-                    id: parent.id,
-                    name: parent.name || "ولي أمر",
+                    id: contact.id,
+                    name: contact.name || "ولي أمر",
                     type: "parent",
                     extra: parent,
                   });
@@ -675,7 +688,7 @@ export default function TeacherChatTab() {
 
                 <div className="hidden md:block flex-1 text-right min-w-0">
                   <h3 className={`font-bold text-sm truncate ${isSelected ? "text-indigo-950 dark:text-white" : "text-slate-700 dark:text-slate-300"}`}>
-                    {parent.name || "ولي أمر"}
+                    {contact.name || "ولي أمر"}
                   </h3>
 
                   {parentStudents.length > 0 && (

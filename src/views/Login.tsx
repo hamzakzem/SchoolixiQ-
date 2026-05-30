@@ -531,41 +531,15 @@ export default function Login() {
     }
 
     try {
-      const google = await loadGsiScript();
+      const provider = new GoogleAuthProvider();
+      provider.addScope('profile');
+      provider.addScope('email');
       
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: googleClientId,
-        scope: "openid email profile",
-        callback: async (tokenResponse: any) => {
-          if (tokenResponse && tokenResponse.access_token) {
-            try {
-              const credential = GoogleAuthProvider.credential(null, tokenResponse.access_token);
-              const result = await signInWithCredential(auth, credential);
-              if (result && result.user) {
-                await processGoogleUser(result.user, role, mode);
-              }
-            } catch (authErr: any) {
-              console.error("Firebase auth login error:", authErr);
-              toast.error(
-                isRtl
-                  ? "فشل تسجيل الدخول عبر Google في نظام الأساسي."
-                  : "Google Authentication failed to connect with the server."
-              );
-              setLoading(false);
-            }
-          } else {
-            console.warn("No token response", tokenResponse);
-            setLoading(false);
-          }
-        },
-        error_callback: (err: any) => {
-          console.error("GIS Token Client Error:", err);
-          toast.error(isRtl ? "تم إلغاء أو فشل الاتصال مع جوجل." : "Google Sign-In was cancelled or failed.");
-          setLoading(false);
-        }
-      });
-
-      client.requestAccessToken({ prompt: "select_account" });
+      // Store state before redirect
+      window.sessionStorage.setItem("pendingGoogleRole", role);
+      window.sessionStorage.setItem("pendingGoogleMode", mode);
+      
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
       console.error("Google Auth Error with GSI SDK:", error);
       const errorCode = error.code || "";
