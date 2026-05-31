@@ -1,7 +1,6 @@
-notepad .github\workflows\deploy.yml
 name: Deploy to Cloud Run
 
-on:
+"on":
   push:
     branches: [main]
 
