@@ -39,19 +39,21 @@ export default function InstallAppBanner() {
     }
 
     // 3. Detect Platform
-    const userAgent = window.navigator.userAgent || window.navigator.vendor || (window as any).opera;
+    const userAgent = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || '';
     const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
     const isAndroid = /android/i.test(userAgent);
 
     if (isIOS) {
       setPlatform('ios');
-      // Show iOS banner after a small delay (4 seconds) of first mount
-      const timer = setTimeout(() => {
-        setShowBanner(true);
-      }, 4000);
-      return () => clearTimeout(timer);
+      // Hide banner on iPhone / iPad / iOS completely as per request
+      setShowBanner(false);
+      return;
     } else if (isAndroid) {
       setPlatform('android');
+    } else {
+      // Keep hidden for any non-Android platform
+      setShowBanner(false);
+      return;
     }
 
     // 4. Handle Android / Chromium Install Prompt

@@ -1941,7 +1941,7 @@ export default function SuperAdminDashboard() {
                   }
                 }
               }}
-              className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
+              className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
             >
               <Menu
                 size={20}
@@ -1975,13 +1975,13 @@ export default function SuperAdminDashboard() {
               {isRtl ? "إدارة النظام" : "Super Admin"}
             </h2>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-3 md:gap-6 shrink-0">
+          <div className="flex items-center gap-4 sm:gap-4 md:gap-6 shrink-0">
             <LanguageToggle />
             <ThemeToggle />
 
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
             >
               <Bell size={18} />
               {notifications.filter((n: any) => !n.read).length > 0 && (

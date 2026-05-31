@@ -1,6 +1,6 @@
 import express from 'express';
 import compression from 'compression';
-
+import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
@@ -12,8 +12,8 @@ import crypto from 'crypto';
 
 dotEnv.config();
 
-const __dirname = path.resolve();
-
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin
 const firebaseConfigPath = path.join(__dirname, 'firebase-applet-config.json');

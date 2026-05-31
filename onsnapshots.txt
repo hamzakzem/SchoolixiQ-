@@ -1,0 +1,79 @@
+src/lib/AuthContext.tsx:75:        unsubscribeProfile = onSnapshot(docRef, async (docSnap) => {
+src/lib/AuthContext.tsx:90:               unsubscribeSchool = onSnapshot(doc(db, 'schools', data.schoolId), (s) => {
+src/lib/AuthContext.tsx:97:                     unsubscribePackage = onSnapshot(doc(db, 'packages', schoolInfo.planId), (pkgSnap) => {
+src/lib/SystemConfigContext.tsx:105:    const unsub = onSnapshot(configRef, (snap) => {
+src/views/admin/Classes.tsx:39:      unsubs.push(onSnapshot(classesQ, snap => {
+src/views/admin/Classes.tsx:44:      unsubs.push(onSnapshot(studentsQ, snap => {
+src/views/admin/Overview.tsx:51:      const unsubscribeSchool = onSnapshot(schoolRef, (doc) => {
+src/views/admin/StaffList.tsx:64:      const unsub = onSnapshot(q, snap => {
+src/views/admin/IdCards.tsx:154:    const unsubscribe = onSnapshot(
+src/views/admin/IdCards.tsx:181:    const unsubscribe = onSnapshot(
+src/views/admin/IdCards.tsx:203:    const unsubscribe = onSnapshot(
+src/views/admin/AdvancedReports.tsx:35:    const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/admin/AdvancedReports.tsx:54:    const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/admin/AdvancedReports.tsx:70:    const unsubscribe = onSnapshot(reportsQ, (snapshot) => {
+src/views/admin/Tuition.tsx:44:      unsubs.push(onSnapshot(classesQ, snap => {
+src/views/admin/Tuition.tsx:49:      unsubs.push(onSnapshot(studentsQ, snap => {
+src/views/admin/Tuition.tsx:54:      unsubs.push(onSnapshot(paymentsQ, snap => {
+src/views/admin/Tuition.tsx:59:      unsubs.push(onSnapshot(installmentsQ, snap => {
+src/views/admin/Homework.tsx:33:    const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/admin/Homework.tsx:52:    const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/admin/Homework.tsx:68:    const unsubscribe = onSnapshot(hq, (snapshot) => {
+src/views/admin/ParentsList.tsx:39:      const unsub = onSnapshot(studentsQ, snap => {
+src/views/admin/ParentsList.tsx:105:      const unsub = onSnapshot(q, snap => {
+src/views/admin/Schedules.tsx:35:    const unsubscribeClasses = onSnapshot(classesQ, (snapshot) => {
+src/views/admin/SuperAdminChatTab.tsx:39:    const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/admin/SuperAdminChatTab.tsx:53:    const unsubUnread = onSnapshot(qUnread, (snapshot) => {
+src/views/admin/SuperAdminChatTab.tsx:77:    const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/admin/Payroll.tsx:165:    const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/admin/Payroll.tsx:176:    const unsubscribe = onSnapshot(doc(db, 'schools', profile.schoolId), (doc) => {
+src/views/admin/AdminChatTab.tsx:45:      const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/admin/AdminChatTab.tsx:62:      const unsubStudents = onSnapshot(qStudents, (snapshot) => {
+src/views/admin/AdminChatTab.tsx:73:      const unsubUnread = onSnapshot(qUnread, (snapshot) => {
+src/views/admin/AdminChatTab.tsx:101:    const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/admin/Grades.tsx:232:    const unsubscribe = onSnapshot(q, (snap) => {
+src/views/ParentDashboard.tsx:339:    const unsubscribe = onSnapshot(
+src/views/ParentDashboard.tsx:404:    const unsubscribe = onSnapshot(
+src/views/ParentDashboard.tsx:452:    const unsubscribe = onSnapshot(
+src/views/ParentDashboard.tsx:513:      unsubs.push(onSnapshot(gradesQ, snap => {
+src/views/ParentDashboard.tsx:538:      unsubs.push(onSnapshot(attendanceQ, snap => {
+src/views/ParentDashboard.tsx:571:      unsubs.push(onSnapshot(annQ, snap => {
+src/views/ParentDashboard.tsx:575:      unsubs.push(onSnapshot(indQ, snap => {
+src/views/ParentDashboard.tsx:585:      unsubs.push(onSnapshot(paymentsQ, snap => {
+src/views/ParentDashboard.tsx:594:      unsubs.push(onSnapshot(installmentsQ, snap => {
+src/views/ParentDashboard.tsx:604:      unsubs.push(onSnapshot(marketQ, snap => {
+src/views/ParentDashboard.tsx:615:      unsubs.push(onSnapshot(notificationsQ, snap => {
+src/views/ParentDashboard.tsx:627:        unsubs.push(onSnapshot(hwQ, snap => {
+src/views/ParentDashboard.tsx:643:      unsubs.push(onSnapshot(repQ, snap => {
+src/views/ParentDashboard.tsx:654:      unsubs.push(onSnapshot(advRepQ, snap => {
+src/views/ParentDashboard.tsx:666:      unsubs.push(onSnapshot(idCardsQ, snap => {
+src/views/TeacherChatTab.tsx:115:      const unsubParents = onSnapshot(qParents, (snapshot) => {
+src/views/TeacherChatTab.tsx:127:      const unsubStudents = onSnapshot(qStudents, (snapshot) => {
+src/views/TeacherChatTab.tsx:142:      const unsubUnread = onSnapshot(qUnread, (snapshot) => {
+src/views/TeacherChatTab.tsx:249:    const unsubscribe = onSnapshot(
+src/views/ParentChatTab.tsx:91:      const unsub = onSnapshot(qStudents, (snap) => {
+src/views/ParentChatTab.tsx:108:    const unsubscribe = onSnapshot(q, (snapshot) => {
+src/views/ParentChatTab.tsx:145:    const unsubUnread = onSnapshot(qUnread, (snapshot) => {
+src/views/ParentChatTab.tsx:181:    const unsubscribe = onSnapshot(
+src/views/parent/ParentSchedules.tsx:36:        const unsubscribe = onSnapshot(classesQ, (snapshot) => {
+src/views/parent/ParentSchedules.tsx:64:    const unsubscribe = onSnapshot(classesQ, (snapshot) => {
+src/views/SuperAdminDashboard.tsx:303:    const unsub = onSnapshot(
+src/views/SuperAdminDashboard.tsx:751:        onSnapshot(schoolsQ, (snap) =>
+src/views/SuperAdminDashboard.tsx:756:        onSnapshot(
+src/views/SuperAdminDashboard.tsx:774:        onSnapshot(usersQ, (snap) =>
+src/views/SuperAdminDashboard.tsx:779:        onSnapshot(studentsQ, (snap) =>
+src/views/SuperAdminDashboard.tsx:785:        onSnapshot(regQ, (snap) => {
+src/views/SuperAdminDashboard.tsx:795:        onSnapshot(subReqQ, (snap) => {
+src/views/SuperAdminDashboard.tsx:805:        onSnapshot(ordersQ, (snap) => {
+src/views/AdminDashboard.tsx:427:          unsubscribe = onSnapshot(
+src/views/TeacherDashboard.tsx:154:    const unsubscribe = onSnapshot(
+src/views/TeacherDashboard.tsx:253:      unsubs.push(onSnapshot(schoolRef, (docSnap) => {
+src/views/TeacherDashboard.tsx:264:      unsubs.push(onSnapshot(subjectsQ, (snap) => {
+src/views/TeacherDashboard.tsx:291:      unsubs.push(onSnapshot(classesQ, (snap) => {
+src/views/TeacherDashboard.tsx:307:      unsubs.push(onSnapshot(studentsQ, (snap) => {
+src/views/TeacherDashboard.tsx:317:      unsubs.push(onSnapshot(homeworkQ, (snap) => {
+src/views/TeacherDashboard.tsx:334:      unsubs.push(onSnapshot(reportsQ, (snap) => {
+src/views/TeacherDashboard.tsx:350:      unsubs.push(onSnapshot(notificationsQ, (snap) => {
+src/views/Login.tsx:146:    const unsub = onSnapshot(
+src/App.tsx:210:          const unsub = onSnapshot(
+src/App.tsx:249:        onSnapshot(

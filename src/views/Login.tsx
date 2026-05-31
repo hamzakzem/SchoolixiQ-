@@ -211,8 +211,12 @@ export default function Login() {
   const [installingPlatform, setInstallingPlatform] = useState<"android" | "ios" | null>(null);
   const [installProgress, setInstallProgress] = useState(0);
   const [showInstallSuccess, setShowInstallSuccess] = useState(false);
+  const [isAndroidUser, setIsAndroidUser] = useState(false);
 
   useEffect(() => {
+    const userAgent = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || "";
+    setIsAndroidUser(/android/i.test(userAgent));
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredInstallPrompt(e);
@@ -1411,13 +1415,14 @@ export default function Login() {
         </div>
       </motion.div>
 
-      {/* Dynamic Direct-Installer Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white w-full max-w-lg rounded-[2rem] sm:rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden mb-8 sm:mb-12 text-center"
-      >
+      {/* Dynamic Direct-Installer Card - Visible only on Android */}
+      {isAndroidUser && (
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white w-full max-w-lg rounded-[2rem] sm:rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden mb-8 sm:mb-12 text-center"
+        >
         <div className="p-6 sm:p-10">
           <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto mb-4">
             <Smartphone className="w-6 h-6" />
@@ -1614,6 +1619,7 @@ export default function Login() {
           )}
         </div>
       </motion.div>
+      )}
 
       {/* Subscription Plans Section */}
       <div className="w-full max-w-6xl mt-12 sm:mt-20">
