@@ -1250,8 +1250,9 @@ async function startServer() {
       } catch (err: any) {
         console.error('Failed to save APP_URL to system/config:', err.message);
       }
-    }
+     }
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
   });
 }
-
 startServer();
