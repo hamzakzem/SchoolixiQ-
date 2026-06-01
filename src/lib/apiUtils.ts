@@ -45,7 +45,7 @@ export function getApiUrl(path: string): string {
   if (!targetUrl) {
     targetUrl = isDevClient
       ? 'https://ais-dev-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app'
-      : 'https://https://schoolixiq-backend-377979165565.europe-west2.run.app/-99877674137.europe-west2.run.app';
+      : 'https://schoolixiq-backend-377979165565.europe-west2.run.app';
   }
 
   // Clean trailing slashes
