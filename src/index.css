@@ -617,3 +617,46 @@ body {
   border: 1pt solid #000 !important;
   padding: 6pt !important;
 }
+/* SchoolixiQ Button System */
+.btn-primary {
+  background-color: #0B2345;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary:hover {
+  background-color: #1a3a6b;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: #0B2345;
+  border: 2px solid #0B2345;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-secondary:hover {
+  background-color: #0B2345;
+  color: #ffffff;
+}
+
+.btn-gold {
+  background-color: #D4A64A;
+  color: #0B2345;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-gold:hover {
+  background-color: #e8c06e;
+}
