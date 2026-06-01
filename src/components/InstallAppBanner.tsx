@@ -5,14 +5,14 @@ import { useLanguage } from '../lib/LanguageContext';
 import { toast } from 'react-hot-toast';
 
 export default function InstallAppBanner() {
-  const { isRtl } = useLanguage();
+  const { t, isRtl } = useLanguage();
   const [showBanner, setShowBanner] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [platform, setPlatform] = useState<'android' | 'ios' | 'other'>('other');
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
 
   const downloadMobileConfig = () => {
-    toast.success(isRtl ? "جاري تحضير ملف التعريف وتنزيله بنجاح..." : "Preparing and downloading configuration profile...");
+    toast.success(t('preparingProfileSuccess'));
     window.location.href = "/api/download/schoolixiq.mobileconfig";
   };
 
@@ -39,19 +39,21 @@ export default function InstallAppBanner() {
     }
 
     // 3. Detect Platform
-    const userAgent = window.navigator.userAgent || window.navigator.vendor || (window as any).opera;
+    const userAgent = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || '';
     const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
     const isAndroid = /android/i.test(userAgent);
 
     if (isIOS) {
       setPlatform('ios');
-      // Show iOS banner after a small delay (4 seconds) of first mount
-      const timer = setTimeout(() => {
-        setShowBanner(true);
-      }, 4000);
-      return () => clearTimeout(timer);
+      // Hide banner on iPhone / iPad / iOS completely as per request
+      setShowBanner(false);
+      return;
     } else if (isAndroid) {
       setPlatform('android');
+    } else {
+      // Keep hidden for any non-Android platform
+      setShowBanner(false);
+      return;
     }
 
     // 4. Handle Android / Chromium Install Prompt
@@ -89,7 +91,7 @@ export default function InstallAppBanner() {
 
     if (!deferredPrompt) {
       // Fallback instruction for browsers where deferredPrompt isn't loaded yet
-      alert(isRtl ? 'يرجى النقر على النقاط الثلاث العلوية في المتصفح واختيار "تثبيت التطبيق" أو "الإضافة للشاشة الرئيسية"' : 'Please click on the browse menu and choose "Add to Home screen" or "Install App".');
+      alert(t('pwaInstallBrowserInstruction'));
       return;
     }
 
@@ -146,7 +148,7 @@ export default function InstallAppBanner() {
               <div className="flex-1 pr-1 pl-3 text-right">
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    {isRtl ? 'نسخة التطبيق' : 'Native App'}
+                    {t('nativeAppLabel')}
                   </span>
                   <div className="flex items-center text-amber-400">
                     <Star size={11} fill="currentColor" />
@@ -157,12 +159,10 @@ export default function InstallAppBanner() {
                   </div>
                 </div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white mb-1">
-                  {isRtl ? 'تثبيت منصة SchoolixiQ كـتطبيق' : 'Install SchoolixiQ Web App'}
+                  {t('installBannerTitle')}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-bold font-sans">
-                  {isRtl 
-                    ? 'احصل على تجربة اتصال فائقة السرعة، تصفح أسرع، وتنبيهات فورية (الحضور، الواجبات، الدرجات، المحادثات) مباشرة على هاتفك دون متصفح.'
-                    : 'Install the native-feel app on your device for lightning-fast speeds and instant real-time alerts.'}
+                  {t('installBannerDesc')}
                 </p>
 
                 {/* Actions */}
@@ -172,13 +172,13 @@ export default function InstallAppBanner() {
                     className="flex-1 py-3 px-5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <Download size={14} />
-                    {isRtl ? 'تثبيت التطبيق الآن' : 'Install App Now'}
+                    {t('installAppNow')}
                   </button>
                   <button
                     onClick={handleDismiss}
                     className="py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-2xl text-xs transition-all cursor-pointer"
                   >
-                    {isRtl ? 'لاحقاً' : 'Later'}
+                    {t('later')}
                   </button>
                 </div>
               </div>
@@ -193,45 +193,43 @@ export default function InstallAppBanner() {
               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
                 <Info className="text-indigo-600 dark:text-indigo-400" size={18} />
                 <h3 className="font-black text-slate-900 dark:text-white text-base">
-                  {isRtl ? 'خطوات التثبيت على نظام iOS (آيفون وايباد)' : 'Step-by-Step iOS Installation'}
+                  {t('iosInstallSteps')}
                 </h3>
               </div>
 
               <div className="space-y-4 text-xs font-bold text-slate-800 dark:text-slate-100 leading-relaxed text-right">
                 <p className="text-emerald-600 dark:text-emerald-400 font-extrabold text-center text-sm md:text-base mb-1 flex items-center justify-center gap-1">
                   <span>✨</span>
-                  {isRtl ? "تم تحضير طريقتين ميسّرتين لتثبيت التطبيق على الآيفون" : "Two easy ways prepared for iOS Installation!"}
+                  {t('iosInstallTwoWays')}
                 </p>
 
                 {/* Method 1: The Official Safari App Store Method (Add to Home Screen) - Safe, built-in, trusted, 100% sign status */}
                 <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/10 p-4 rounded-3xl border border-emerald-100/60 dark:border-emerald-900/40 text-right">
-                  <div className="flex items-center gap-2 mb-2 font-black text-emerald-900 dark:text-emerald-200">
+                  <div className="flex items-center gap-2 mb-2 font-black text-emerald-950 dark:text-emerald-200">
                     <span className="w-5 h-5 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">١</span>
-                    <span className="text-xs sm:text-sm font-black">{isRtl ? "طريقة سفاري الفورية (موصى بها جداً - آمنة وموثوقة 100٪)" : "Official Safari Method (Highly Recommended - 100% Secure)"}</span>
+                    <span className="text-xs sm:text-sm font-black">{t('iosMethodSafari')}</span>
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-6">
-                    {isRtl 
-                      ? "طريقة آبل الرسمية المعتمدة التي تضمن لك تثبيت فوري آمن وموثوق تماماً، بدون ظهور أي رسائل تحذيرية أو حاجة للدخول في إعدادات الهاتف."
-                      : "Apple's native secure method. Guarantees a fully trusted install directly, with no system configuration warning screens."}
+                    {t('iosMethodSafariDesc')}
                   </p>
 
                   <div className="space-y-2 pr-6 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
                     <div className="flex items-start gap-1.5">
                       <span className="text-emerald-600">•</span>
                       <p>
-                        {isRtl ? "اضغط على زر المشاركة (Share) في شريط متصفح Safari بالأسفل." : "Tap the Share icon in iOS Safari (bottom bar)."}
+                        {t('iosSafariStep1')}
                       </p>
                     </div>
                     <div className="flex items-start gap-1.5">
                       <span className="text-emerald-600">•</span>
                       <p>
-                        {isRtl ? "اختر إضافة للشاشة الرئيسية (Add to Home Screen)." : "Select 'Add to Home Screen'."}
+                        {t('iosSafariStep2')}
                       </p>
                     </div>
                     <div className="flex items-start gap-1.5">
                       <span className="text-emerald-600">•</span>
                       <p>
-                        {isRtl ? "انقر على إضافة (Add) في أعلى اليسار لبدء استخدام التطبيق فوراً وبشكل كامل." : "Tap 'Add' at the top right to launch instantly."}
+                        {t('iosSafariStep3')}
                       </p>
                     </div>
                   </div>
@@ -241,28 +239,26 @@ export default function InstallAppBanner() {
                 <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/50 dark:from-indigo-950/10 dark:to-violet-950/10 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-right">
                   <div className="flex items-center gap-2 mb-2 font-black text-slate-800 dark:text-slate-200">
                     <span className="w-5 h-5 rounded-lg bg-indigo-500 text-white flex items-center justify-center text-xs font-bold">٢</span>
-                    <span className="text-xs sm:text-sm font-black">{isRtl ? "طريقة ملف التعريف التلقائي بنقرة واحدة" : "Or Download Secure iOS Configuration Profile"}</span>
+                    <span className="text-xs sm:text-sm font-black">{t('iosMethodProfile')}</span>
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-6">
-                    {isRtl 
-                      ? "يتيح لك تثبيت فوري بنقرة واحدة. عند تنزيل ملف التعريف، من الطبيعي تماماً لجميع التطبيقات والمنصات الخارجية المستقلة أن يظهر لك نظام iOS عبارة (لم يتم التوقيع - Unsigned) باللون الأحمر لأنها لا تعتمد على حساب مطور تجاري مدفوع، وهي آمنة تماماً ومضمونة 100% ولا تسبب أي مشاكل."
-                      : "Download custom shortcut profile. Note that iOS naturally labels local profiles as 'Unsigned' (Not Signed), which is standard for custom clips, but perfectly safe."}
+                    {t('iosMethodProfileDesc')}
                   </p>
 
                   <div className="pr-6 space-y-3">
                     <a
                       href="/api/download/schoolixiq.mobileconfig"
                       onClick={() => {
-                        toast.success(isRtl ? "جاري تحضير ملف التعريف وتنزيله بنجاح..." : "Preparing and downloading configuration profile...");
+                        toast.success(t('preparingProfileSuccess'));
                       }}
                       className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer text-center"
                     >
                       <Download size={13} />
-                      {isRtl ? "تنزيل وتثبيت الملف بنقرة واحدة" : "Download Configuration Profile"}
+                      {t('iosDownloadProfile')}
                     </a>
 
                     <div className="text-[10px] bg-white/70 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100/80 dark:border-slate-800/80 leading-normal text-slate-500 font-medium">
-                      {isRtl ? "طريقة التشغيل بعد التحميل: اضغط 'سماح' للتنزيل، ثم افتح تطبيق (الإعدادات بجهازك Settings) واضغط على (تم تنزيل ملف التعريف) بالأعلى، ثم اضغط على تثبيت." : "Activation context: tap Allow, then go to Settings on your device, tap (Profile Downloaded) at the top and select Install."}
+                      {t('iosProfileInstructions')}
                     </div>
                   </div>
                 </div>
@@ -273,13 +269,13 @@ export default function InstallAppBanner() {
                   onClick={() => setShowIOSInstructions(false)}
                   className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl text-xs transition-all shadow-md cursor-pointer hover:shadow-indigo-500/15"
                 >
-                  {isRtl ? 'موافق، سأقوم بالتثبيت' : 'Got it, thanks'}
+                  {t('gotItThanks')}
                 </button>
                 <button
                   onClick={handleDismiss}
                   className="py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300 font-bold rounded-2xl text-xs transition-all cursor-pointer"
                 >
-                  {isRtl ? 'إغلاق الإشعار' : 'Close Notification'}
+                  {t('closeNotification')}
                 </button>
               </div>
             </motion.div>

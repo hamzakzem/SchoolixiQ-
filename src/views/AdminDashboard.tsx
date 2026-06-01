@@ -1332,7 +1332,7 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-colors duration-300 print:overflow-visible print:h-auto">
-        <header className="h-14 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-8 shrink-0 sticky top-0 z-40 transition-colors print:hidden">
+        <header className="h-16 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-8 shrink-0 sticky top-0 z-40 transition-colors print:hidden">
           <div className="flex items-center gap-2 md:gap-6">
             <button
               onClick={() => {
@@ -1346,7 +1346,7 @@ export default function AdminDashboard() {
                   }
                 }
               }}
-              className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm"
+              className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
             >
               <Menu
                 size={20}
@@ -1380,18 +1380,18 @@ export default function AdminDashboard() {
             </h2>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-6">
-            <div className="scale-90 md:scale-100">
+          <div className="flex items-center gap-4 md:gap-6">
+            <div>
               <LanguageToggle />
             </div>
 
-            <div className="scale-90 md:scale-100 font-bold select-none">
+            <div className="font-bold select-none">
               <ThemeToggle />
             </div>
 
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
             >
               <Bell size={18} />
               {notifications.filter((n: any) => !n.read).length > 0 && (

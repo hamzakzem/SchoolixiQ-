@@ -512,37 +512,37 @@ export default function SuperAdminDashboard() {
   });
 
   const SYSTEM_PERMISSIONS: Record<string, string> = {
-    manage_schools: "إدارة المدارس",
-    manage_packages: "إدارة الباقات",
-    view_requests: "مشاهدة طلبات الاشتراك",
-    manage_users: "إدارة المستخدمين",
-    system_settings: "إعدادات النظام",
+    manage_schools: t('sidebar_schools'),
+    manage_packages: t('sidebar_packages'),
+    view_requests: t('sidebar_requests'),
+    manage_users: t('sidebar_users'),
+    system_settings: t('sidebar_settings'),
   };
 
   const PERMISSION_LABELS: Record<string, string> = {
-    overview: "نظرة عامة",
-    chat: "chat",
-    students_view: "عرض قائمة الطلاب",
-    students_edit: "إضافة / تعديل الطلاب",
-    staff_manage: "إدارة حسابات الكادر",
-    attendance_track: "الحضور والغياب",
-    exams_and_results: "الدرجات والشهادات",
-    student_archive: "أرشيف الطالب",
-    tuition_fees: "الأقساط المدرسية",
-    staff_payroll: "الرواتب",
-    inventory_and_assets: "المخزن",
-    behavior_management: "السلوك",
-    student_evaluation_reports: "التقييمات",
-    homework_and_tasks: "الواجبات البيتية",
-    classes: "صفوف",
-    automated_schedules: "الجداول الأسبوعية",
-    announcements: "الإعلانات والتبليغات",
-    parent_app_access: "تطبيق ولي الأمر والمتابعة",
-    advanced_reports: "تقارير متقدمة",
-    marketplace_ordering: "المتجر المدرسي",
-    id_card_generation: "هويات الطلاب",
-    assistants_manage: "المساعدين",
-    settings: "الإعدادات",
+    overview: t('overview'),
+    chat: t('chat'),
+    students_view: t('viewStudents'),
+    students_edit: t('manageStudents'),
+    staff_manage: t('manageStaff'),
+    attendance_track: t('attendance'),
+    exams_and_results: t('grades'),
+    student_archive: isRtl ? "أرشيف الطالب" : "Student Archive",
+    tuition_fees: t('tuition'),
+    staff_payroll: t('payroll'),
+    inventory_and_assets: t('inventory'),
+    behavior_management: t('behavior'),
+    student_evaluation_reports: t('evaluations'),
+    homework_and_tasks: t('homework'),
+    classes: t('classes') || (isRtl ? "الصفوف" : "Classes"),
+    automated_schedules: t('schedules'),
+    announcements: t('announcements'),
+    parent_app_access: t('parentApp'),
+    advanced_reports: t('advancedReports'),
+    marketplace_ordering: t('marketplace'),
+    id_card_generation: t('idCards'),
+    assistants_manage: t('assistants'),
+    settings: t('settings'),
   };
 
   const filteredSchools = schools.filter((s) => {
@@ -1559,9 +1559,7 @@ export default function SuperAdminDashboard() {
                     className="text-lg md:text-xl font-bold font-display tracking-tight leading-none min-w-0"
                   >
                     <span className="truncate block w-full">
-                      {isRtl
-                        ? `منصة ${config.appName} التعليمية`
-                        : `${config.appName} Educational Platform`}
+                      {t('sidebar_platform_title').replace('{appName}', config.appName)}
                     </span>
                   </motion.h1>
                 )}
@@ -1573,7 +1571,7 @@ export default function SuperAdminDashboard() {
                       navigateToTab("schools");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "إدارة المدارس" : undefined}
+                    title={isSidebarCollapsed ? t('sidebar_schools') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "schools" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <Building
@@ -1581,13 +1579,13 @@ export default function SuperAdminDashboard() {
                       className="shrink-0"
                     />
                     {!isSidebarCollapsed && (
-                      <span className="truncate">إدارة المدارس</span>
+                      <span className="truncate">{t('sidebar_schools')}</span>
                     )}
                     {isSidebarCollapsed && (
                       <div
                         className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                       >
-                        إدارة المدارس
+                        {t('sidebar_schools')}
                       </div>
                     )}
                   </button>
@@ -1598,7 +1596,7 @@ export default function SuperAdminDashboard() {
                       navigateToTab("accounts");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "حسابات المدارس" : undefined}
+                    title={isSidebarCollapsed ? t('sidebar_accounts') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "accounts" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <Lock
@@ -1606,13 +1604,13 @@ export default function SuperAdminDashboard() {
                       className="shrink-0"
                     />
                     {!isSidebarCollapsed && (
-                      <span className="truncate">حسابات المدارس</span>
+                      <span className="truncate">{t('sidebar_accounts')}</span>
                     )}
                     {isSidebarCollapsed && (
                       <div
                         className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                       >
-                        حسابات المدارس
+                        {t('sidebar_accounts')}
                       </div>
                     )}
                   </button>
@@ -1625,7 +1623,7 @@ export default function SuperAdminDashboard() {
                     }}
                     title={
                       isSidebarCollapsed
-                        ? "فريق العمل (System Team)"
+                        ? t('sidebar_team')
                         : undefined
                     }
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "team" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
@@ -1635,13 +1633,13 @@ export default function SuperAdminDashboard() {
                       className="shrink-0"
                     />
                     {!isSidebarCollapsed && (
-                      <span className="truncate">فريق العمل (System Team)</span>
+                      <span className="truncate">{t('sidebar_team')}</span>
                     )}
                     {isSidebarCollapsed && (
                       <div
                         className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                       >
-                        فريق العمل (System Team)
+                        {t('sidebar_team')}
                       </div>
                     )}
                   </button>
@@ -1652,7 +1650,7 @@ export default function SuperAdminDashboard() {
                       navigateToTab("packages");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "إدارة الباقات" : undefined}
+                    title={isSidebarCollapsed ? t('sidebar_packages') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "packages" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <Plus
@@ -1660,13 +1658,13 @@ export default function SuperAdminDashboard() {
                       className="shrink-0"
                     />
                     {!isSidebarCollapsed && (
-                      <span className="truncate">إدارة الباقات</span>
+                      <span className="truncate">{t('sidebar_packages')}</span>
                     )}
                     {isSidebarCollapsed && (
                       <div
                         className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                       >
-                        إدارة الباقات
+                        {t('sidebar_packages')}
                       </div>
                     )}
                   </button>
@@ -1677,7 +1675,7 @@ export default function SuperAdminDashboard() {
                       navigateToTab("requests");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "طلبات الاشتراك" : undefined}
+                    title={isSidebarCollapsed ? t('sidebar_requests') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "requests" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <Mail
@@ -1685,7 +1683,7 @@ export default function SuperAdminDashboard() {
                       className="shrink-0"
                     />
                     {!isSidebarCollapsed && (
-                      <span className="truncate">طلبات الاشتراك</span>
+                      <span className="truncate">{t('sidebar_requests')}</span>
                     )}
                     {subscriptionRequests.length > 0 && !isSidebarCollapsed && (
                       <span className="mr-auto bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-black animate-pulse">
@@ -1701,7 +1699,7 @@ export default function SuperAdminDashboard() {
                       <div
                         className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                       >
-                        طلبات الاشتراك
+                        {t('sidebar_requests')}
                       </div>
                     )}
                   </button>
@@ -1712,7 +1710,7 @@ export default function SuperAdminDashboard() {
                       navigateToTab("chat");
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
-                    title={isSidebarCollapsed ? "مراسلة المدارس" : undefined}
+                    title={isSidebarCollapsed ? t('sidebar_chat') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "chat" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <MessageSquare
@@ -1720,13 +1718,13 @@ export default function SuperAdminDashboard() {
                       className="shrink-0"
                     />
                     {!isSidebarCollapsed && (
-                      <span className="truncate">مراسلة المدارس</span>
+                      <span className="truncate">{t('sidebar_chat')}</span>
                     )}
                     {isSidebarCollapsed && (
                       <div
                         className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                       >
-                        مراسلة المدارس
+                        {t('sidebar_chat')}
                       </div>
                     )}
                   </button>
@@ -1739,7 +1737,7 @@ export default function SuperAdminDashboard() {
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
                       title={
-                        isSidebarCollapsed ? "إدارة المستخدمين" : undefined
+                        isSidebarCollapsed ? t('sidebar_users') : undefined
                       }
                       className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "users" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
@@ -1748,13 +1746,13 @@ export default function SuperAdminDashboard() {
                         className="shrink-0"
                       />
                       {!isSidebarCollapsed && (
-                        <span className="truncate">إدارة المستخدمين</span>
+                        <span className="truncate">{t('sidebar_users')}</span>
                       )}
                       {isSidebarCollapsed && (
                         <div
                           className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                         >
-                          إدارة المستخدمين
+                          {t('sidebar_users')}
                         </div>
                       )}
                     </button>
@@ -1763,7 +1761,7 @@ export default function SuperAdminDashboard() {
                         navigateToTab("parents");
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
-                      title={isSidebarCollapsed ? "أولياء الأمور" : undefined}
+                      title={isSidebarCollapsed ? t('sidebar_parents') : undefined}
                       className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "parents" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <Users
@@ -1771,13 +1769,13 @@ export default function SuperAdminDashboard() {
                         className="shrink-0"
                       />
                       {!isSidebarCollapsed && (
-                        <span className="truncate">أولياء الأمور</span>
+                        <span className="truncate">{t('sidebar_parents')}</span>
                       )}
                       {isSidebarCollapsed && (
                         <div
                           className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                         >
-                          أولياء الأمور
+                          {t('sidebar_parents')}
                         </div>
                       )}
                     </button>
@@ -1790,7 +1788,7 @@ export default function SuperAdminDashboard() {
                         navigateToTab("settings");
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
-                      title={isSidebarCollapsed ? "إعدادات النظام" : undefined}
+                      title={isSidebarCollapsed ? t('sidebar_settings') : undefined}
                       className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "settings" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <SettingsIcon
@@ -1798,13 +1796,13 @@ export default function SuperAdminDashboard() {
                         className="shrink-0"
                       />
                       {!isSidebarCollapsed && (
-                        <span className="truncate">إعدادات النظام</span>
+                        <span className="truncate">{t('sidebar_settings')}</span>
                       )}
                       {isSidebarCollapsed && (
                         <div
                           className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                         >
-                          إعدادات النظام
+                          {t('sidebar_settings')}
                         </div>
                       )}
                     </button>
@@ -1815,7 +1813,7 @@ export default function SuperAdminDashboard() {
                       }}
                       title={
                         isSidebarCollapsed
-                          ? "إعدادات الفوتر (الشركاء)"
+                          ? t('sidebar_footer')
                           : undefined
                       }
                       className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "footer" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
@@ -1826,14 +1824,14 @@ export default function SuperAdminDashboard() {
                       />
                       {!isSidebarCollapsed && (
                         <span className="truncate">
-                          إعدادات الفوتر (الشركاء)
+                          {t('sidebar_footer')}
                         </span>
                       )}
                       {isSidebarCollapsed && (
                         <div
                           className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                         >
-                          إعدادات الفوتر (الشركاء)
+                          {t('sidebar_footer')}
                         </div>
                       )}
                     </button>
@@ -1842,7 +1840,7 @@ export default function SuperAdminDashboard() {
                         navigateToTab("backups");
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
-                      title={isSidebarCollapsed ? "النسخ الاحتياطي" : undefined}
+                      title={isSidebarCollapsed ? t('sidebar_backups') : undefined}
                       className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "backups" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <Save
@@ -1850,13 +1848,13 @@ export default function SuperAdminDashboard() {
                         className="shrink-0"
                       />
                       {!isSidebarCollapsed && (
-                        <span className="truncate">النسخ الاحتياطي</span>
+                        <span className="truncate">{t('sidebar_backups')}</span>
                       )}
                       {isSidebarCollapsed && (
                         <div
                           className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                         >
-                          النسخ الاحتياطي
+                          {t('sidebar_backups')}
                         </div>
                       )}
                     </button>
@@ -1867,7 +1865,7 @@ export default function SuperAdminDashboard() {
                       }}
                       title={
                         isSidebarCollapsed
-                          ? "سجل الأداء (Diagnostics)"
+                          ? t('sidebar_diagnostics')
                           : undefined
                       }
                       className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "diagnostics" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
@@ -1878,14 +1876,14 @@ export default function SuperAdminDashboard() {
                       />
                       {!isSidebarCollapsed && (
                         <span className="truncate">
-                          سجل الأداء (Diagnostics)
+                          {t('sidebar_diagnostics')}
                         </span>
                       )}
                       {isSidebarCollapsed && (
                         <div
                           className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                         >
-                          سجل الأداء (Diagnostics)
+                          {t('sidebar_diagnostics')}
                         </div>
                       )}
                     </button>
@@ -1903,7 +1901,7 @@ export default function SuperAdminDashboard() {
                 ) : (
                   <div className="bg-slate-800/50 p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] mb-3 md:mb-4 border border-slate-700/50 min-w-0">
                     <p className="text-[9px] text-slate-500 mb-1 uppercase tracking-widest font-bold truncate">
-                      المستخدم النشط
+                      {t('sidebar_active_user')}
                     </p>
                     <p className="text-sm font-bold text-white truncate font-display">
                       {profile?.name || "مدير النظام"}
@@ -1912,14 +1910,14 @@ export default function SuperAdminDashboard() {
                 )}
                 <button
                   onClick={() => auth.signOut()}
-                  title={isSidebarCollapsed ? "تسجيل الخروج" : undefined}
+                  title={isSidebarCollapsed ? t('sidebar_logout') : undefined}
                   className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3 px-4 md:px-5"} py-3 md:py-4 bg-slate-800 dark:bg-slate-900 rounded-xl md:rounded-2xl text-red-400 hover:bg-slate-700 dark:hover:bg-slate-800 transition-colors shadow-inner font-bold text-sm`}
                 >
                   <LogOut
                     size={isSidebarCollapsed ? 24 : 18}
                     className="shrink-0"
                   />
-                  {!isSidebarCollapsed && <span>تسجيل الخروج</span>}
+                  {!isSidebarCollapsed && <span>{t('sidebar_logout')}</span>}
                 </button>
               </div>
             </div>
@@ -1941,7 +1939,7 @@ export default function SuperAdminDashboard() {
                   }
                 }
               }}
-              className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
+              className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
             >
               <Menu
                 size={20}
@@ -1965,23 +1963,23 @@ export default function SuperAdminDashboard() {
                   size={14}
                   className="transition-transform group-hover:translate-x-0.5"
                 />
-                <span className="hidden xs:inline">رجوع</span>
+                <span className="hidden xs:inline">{t('back')}</span>
               </motion.button>
             )}
             <h2
               id="super-admin-header"
               className="text-sm sm:text-base md:text-xl font-black text-slate-900 dark:text-white font-display tracking-tight hover:text-blue-600 transition-colors cursor-default truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none"
             >
-              {isRtl ? "إدارة النظام" : "Super Admin"}
+              {t('system_management')}
             </h2>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-3 md:gap-6 shrink-0">
+          <div className="flex items-center gap-4 sm:gap-4 md:gap-6 shrink-0">
             <LanguageToggle />
             <ThemeToggle />
 
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
             >
               <Bell size={18} />
               {notifications.filter((n: any) => !n.read).length > 0 && (
@@ -2000,11 +1998,11 @@ export default function SuperAdminDashboard() {
             )}
             <div className="text-left md:block hidden">
               <p className="text-[10px] text-slate-400 leading-none mb-1 uppercase tracking-widest font-bold">
-                حالة النظام
+                {t('system_status')}
               </p>
               <div className="flex items-center gap-2 font-bold text-green-500 text-sm">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                يعمل بشكل جيد
+                {t('system_status_ok')}
               </div>
             </div>
           </div>
@@ -2087,13 +2085,13 @@ export default function SuperAdminDashboard() {
                         id="overview-title"
                         className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight group-hover:translate-x-1 transition-transform inline-block"
                       >
-                        نظرة عامة على المدارس
+                        {t('overview_schools')}
                       </h3>
                       <p
                         id="overview-subtitle"
                         className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-xs sm:text-sm"
                       >
-                        متابعة الاشتراكات والنشاط عبر النظام
+                        {t('overview_subtitle')}
                       </p>
                     </div>
                     <button
@@ -2109,38 +2107,38 @@ export default function SuperAdminDashboard() {
                         size={18}
                         className="group-hover/btn:rotate-90 transition-transform"
                       />
-                      إضافة مدرسة جديدة
+                      {t('add_new_school')}
                     </button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
                     <AdminStatCard
-                      title="إجمالي المدارس"
+                      title={t('stat_total_schools')}
                       value={stats.total}
-                      hint="عبر النظام"
+                      hint={t('stat_schools_hint')}
                       color="text-slate-800"
                       onClick={() => setSchoolFilter("all")}
                       isActive={schoolFilter === "all"}
                     />
                     <AdminStatCard
-                      title="المدارس النشطة"
+                      title={t('stat_active_schools')}
                       value={stats.active}
-                      hint="مشترك حالي"
+                      hint={t('stat_active_hint')}
                       color="text-green-600"
                       onClick={() => setSchoolFilter("active")}
                       isActive={schoolFilter === "active"}
                     />
                     <AdminStatCard
-                      title="تنتهي قريباً"
+                      title={t('stat_expiring_soon')}
                       value={stats.expiringSoon}
-                      hint="خلال أسبوع"
+                      hint={t('stat_expiring_hint')}
                       color="text-orange-600"
                       onClick={() => setSchoolFilter("expiring")}
                       isActive={schoolFilter === "expiring"}
                     />
                     <AdminStatCard
-                      title="إجمالي المستخدمين"
+                      title={t('stat_total_users')}
                       value={users.length}
-                      hint="نشط للآن"
+                      hint={t('stat_users_hint')}
                       color="text-indigo-600"
                       onClick={() => setActiveTab("users")}
                       isActive={activeTab === "users"}
