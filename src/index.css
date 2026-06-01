@@ -6,41 +6,6 @@
 @theme {
   --font-sans: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --color-primary: #0B2345;
-  --color-secondary: #D4A64A;
-  
-  --color-indigo-50: #F3F4F6;
-  --color-indigo-100: #E1E6EE;
-  --color-indigo-200: #C2D0E4;
-  --color-indigo-300: #95B0D4;
-  --color-indigo-400: #638BC1;
-  --color-indigo-505: #40689E;
-  --color-indigo-600: #0B2345;
-  --color-indigo-700: #081B35;
-  --color-indigo-800: #061427;
-  --color-indigo-900: #040D1A;
-  
-  --color-blue-50: #F3F4F6;
-  --color-blue-100: #E1E6EE;
-  --color-blue-200: #C2D0E4;
-  --color-blue-300: #95B0D4;
-  --color-blue-400: #638BC1;
-  --color-blue-500: #0B2345;
-  --color-blue-600: #0B2345;
-  --color-blue-700: #081B35;
-  --color-blue-800: #061427;
-  --color-blue-900: #040D1A;
-  
-  --color-amber-50: #FFFDF2;
-  --color-amber-100: #FEF7DB;
-  --color-amber-200: #FCECB1;
-  --color-amber-300: #FAD97B;
-  --color-amber-400: #F6C147;
-  --color-amber-500: #D4A64A;
-  --color-amber-600: #D4A64A;
-  --color-amber-700: #B58B39;
-  --color-amber-800: #916E2B;
-  --color-amber-900: #75571F;
 }
 
 html[lang="ar"], html[lang="ar"] *:not(.font-mono):not(code):not(pre) {
@@ -524,22 +489,35 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-o
   }
 }
 
-/* Modern Premium Page Background */
+/* Modern Fluid Animated Surface Background */
 body {
-  background-color: #FFFFFF !important;
-  background-image: none !important;
+  background-color: #FAFAFC;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(0, 123, 255, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(32, 201, 151, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(0, 180, 216, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(79, 70, 229, 0.05) 0px, transparent 50%);
+  background-size: 200% 200%;
+  animation: meshMovement 20s ease-in-out infinite alternate;
   min-height: 100vh;
   overflow-x: hidden;
   position: relative;
 }
 
 .dark body {
-  background-color: #07172E !important;
-  background-image: none !important;
+  background-color: #0f172a;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(0, 123, 255, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(32, 201, 151, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(0, 180, 216, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(79, 70, 229, 0.08) 0px, transparent 50%);
 }
 
 @keyframes meshMovement {
   0% { background-position: 0% 0%; }
+  25% { background-position: 100% 50%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 50% 100%; }
   100% { background-position: 0% 0%; }
 }
 
@@ -626,170 +604,3 @@ body {
   border: 1pt solid #000 !important;
   padding: 6pt !important;
 }
-
-/* ==========================================================================
-   SchoolixiQ - Official Corporate Premium Design System Overrides
-   ========================================================================== */
-
-/* 1. CSS Custom Variables styling for dynamic dark / light states */
-:root {
-  --color-primary: #0B2345;
-  --color-secondary: #D4A64A;
-  --color-bg-main: #FFFFFF;
-  --color-bg-surface: #F3F4F6;
-  --color-bg-card: #FFFFFF;
-  --color-border-line: #E5E7EB;
-  --color-text-main: #0B2345;
-  --color-text-desc: #6B7280;
-}
-
-/* Redefine variables elegantly for dark mode without brutal overriding elements */
-.dark, html.dark {
-  --color-bg-main: #07172E;
-  --color-bg-surface: #0C1A30;
-  --color-bg-card: #0E1F35;
-  --color-border-line: #1E293B;
-  --color-text-main: #F3F4F6;
-  --color-text-desc: #9CA3AF;
-}
-
-/* Now apply variables cleanly to appropriate layout components */
-body {
-  background-color: var(--color-bg-main) !important;
-  color: var(--color-text-main) !important;
-}
-
-/* 2. Header (الشريط العلوي) styling - Premium corporate Navy Blue with gold highlight and high-contrast white content */
-header, [class*="header"]:not(.student-card-print):not([class*="aside"]) {
-  background-color: #0B2345 !important;
-  color: #FFFFFF !important;
-  border-bottom: 2px solid #D4A64A !important;
-}
-
-header *:not(input):not(select):not(textarea):not(button):not(a), 
-[class*="header"] *:not(input):not(select):not(textarea):not(button):not(a) {
-  color: #FFFFFF !important;
-}
-
-header input, header select, 
-[class*="header"] input, [class*="header"] select {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  color: #FFFFFF !important;
-}
-
-header input::placeholder, 
-[class*="header"] input::placeholder {
-  color: rgba(255, 255, 255, 0.5) !important;
-}
-
-header button, header a, 
-[class*="header"] button, [class*="header"] a {
-  background-color: rgba(255, 255, 255, 0.08) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  color: #FFFFFF !important;
-  transition: all 0.2s ease-in-out !important;
-}
-
-header button:hover, header a:hover, 
-[class*="header"] button:hover, [class*="header"] a:hover {
-  background-color: #D4A64A !important;
-  color: #0B2345 !important;
-  border-color: #D4A64A !important;
-}
-
-header button:hover *, header a:hover *, 
-[class*="header"] button:hover *, [class*="header"] a:hover * {
-  color: #0B2345 !important;
-}
-
-/* 3. Sidebar (القائمة الجانبية) styling - Uniform Navy Blue (#0B2345) with Gold (#D4A64A) accents */
-aside, [class*="aside"], [class*="Sidebar"] {
-  background-color: #0B2345 !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-aside *, [class*="aside"] *, [class*="Sidebar"] * {
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-
-/* Gold active state link indicators within sidebars */
-aside [class*="bg-white"], 
-aside [class*="bg-indigo-600"], 
-aside .active-menu-item, 
-[class*="aside"] [class*="bg-white"], 
-[class*="Sidebar"] [class*="bg-white"] {
-  background-color: #D4A64A !important;
-  color: #0B2345 !important;
-  font-weight: 800 !important;
-  box-shadow: 0 4px 12px rgba(212, 166, 74, 0.25) !important;
-}
-
-aside [class*="bg-white"] *, 
-aside [class*="bg-indigo-600"] *, 
-[class*="aside"] [class*="bg-white"] * {
-  color: #0B2345 !important;
-}
-
-/* Hover effect on sidebars */
-aside a:hover, aside button:hover, .sidebar-link:hover {
-  background-color: rgba(212, 166, 74, 0.15) !important;
-  color: #D4A64A !important;
-}
-
-aside a:hover *, aside button:hover * {
-  color: #D4A64A !important;
-}
-
-/* 4. Support responsive grid card & layout surfaces */
-.bg-slate-50, 
-.bg-gray-50, 
-.bg-slate-100, 
-.bg-gray-100,
-.bg-slate-100\/50,
-.bg-slate-50\/40,
-.bg-slate-50\/50,
-.bg-slate-50\/80 {
-  background-color: var(--color-bg-surface) !important;
-}
-
-/* Map standard card styles beautifully */
-.bg-white, .bg-card {
-  background-color: var(--color-bg-card) !important;
-}
-
-/* Border lines override */
-.border-slate-100, 
-.border-slate-200, 
-.border-slate-300, 
-.border-gray-100, 
-.border-gray-200, 
-.border-gray-300 {
-  border-color: var(--color-border-line) !important;
-}
-
-/* Shadows and card containers */
-.shadow-sm, .shadow-md, .shadow, .shadow-lg, .shadow-xl {
-  border-color: var(--color-border-line) !important;
-}
-
-/* Primary texts */
-.text-slate-900, 
-.text-slate-800, 
-.text-gray-900, 
-.text-slate-950,
-.text-black {
-  color: var(--color-text-main) !important;
-}
-
-/* Secondary/muted texts */
-.text-slate-500, 
-.text-slate-400, 
-.text-gray-500, 
-.text-gray-400,
-.text-slate-600,
-.text-gray-600 {
-  color: var(--color-text-desc) !important;
-}
-

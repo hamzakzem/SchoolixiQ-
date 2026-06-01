@@ -1,0 +1,338 @@
+{
+  "entities": {
+    "School": {
+      "title": "School",
+      "description": "Educational institution in the system",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "subscriptionPlan": { "type": "string" },
+        "packageId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "ownerUid": { "type": "string" },
+        "payrollBudget": { "type": "number", "description": "Allocated monthly budget for payroll" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "ownerUid", "status"]
+    },
+    "Package": {
+      "title": "Package",
+      "description": "Pricing plan for schools",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "maxStudents": { "type": "number" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["superadmin", "admin", "assistant", "teacher", "parent", "staff"] },
+        "schoolId": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "subject": { "type": "string" },
+        "permissions": { "type": "array", "items": { "type": "string" } },
+        "salary": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student record linked to a school and parents",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "classId": { "type": "string" },
+        "parentIds": { "type": "array", "items": { "type": "string" } },
+        "registrationNumber": { "type": "string" },
+        "dateOfBirth": { "type": "string", "format": "date" },
+        "tuitionBalance": { "type": "number" },
+        "totalTuition": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["name", "schoolId", "registrationNumber"]
+    },
+    "Class": {
+      "title": "Class",
+      "description": "Academic class or grade level",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "schedule": { "type": "object" }
+      },
+      "required": ["name", "schoolId"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily attendance records",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["present", "absent", "late"] },
+        "schoolId": { "type": "string" }
+      },
+      "required": ["studentId", "date", "status", "schoolId"]
+    },
+    "Grade": {
+      "title": "Grade",
+      "description": "Student academic results",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "subject": { "type": "string" },
+        "score": { "type": "number" },
+        "maxScore": { "type": "number" },
+        "type": { "type": "string", "enum": ["daily", "monthly", "semester", "yearly"] },
+        "date": { "type": "string", "format": "date" },
+        "schoolId": { "type": "string" },
+        "teacherId": { "type": "string" }
+      },
+      "required": ["studentId", "subject", "score", "type", "schoolId"]
+    },
+    "BehaviorReport": {
+      "title": "Behavior Report",
+      "description": "Disciplinary or behavior notes",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "note": { "type": "string" },
+        "category": { "type": "string", "enum": ["positive", "warning", "incident"] },
+        "date": { "type": "string", "format": "date-time" },
+        "schoolId": { "type": "string" }
+      },
+      "required": ["studentId", "note", "schoolId"]
+    },
+    "Payroll": {
+      "title": "Payroll",
+      "description": "Employee salary tracking",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "month": { "type": "number" },
+        "year": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid"] },
+        "schoolId": { "type": "string" }
+      },
+      "required": ["userId", "amount", "month", "year", "schoolId"]
+    },
+    "Inventory": {
+      "title": "Inventory",
+      "description": "School assets and materials",
+      "type": "object",
+      "properties": {
+        "itemName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["جديد", "مستعمل", "بحاجة لصيانة", "تالف"] },
+        "schoolId": { "type": "string" }
+      },
+      "required": ["itemName", "quantity", "schoolId"]
+    },
+    "MarketItem": {
+      "title": "Market Item",
+      "description": "Items for sale in the school marketplace",
+      "type": "object",
+      "properties": {
+        "itemName": { "type": "string" },
+        "price": { "type": "number" },
+        "description": { "type": "string" },
+        "image": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "stock": { "type": "number" }
+      },
+      "required": ["itemName", "price", "schoolId"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Marketplace purchases",
+      "type": "object",
+      "properties": {
+        "parentId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "delivered"] },
+        "schoolId": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "paymentId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["parentId", "total", "schoolId"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "School-wide messages",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "target": { "type": "string", "enum": ["all", "parents", "staff", "individual"] },
+        "targetStudentId": { "type": "string" },
+        "targetStudentName": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "schoolId"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Financial transaction record",
+      "type": "object",
+      "properties": {
+        "schoolId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string" },
+        "authorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schoolId", "studentId", "amount", "type"]
+    },
+    "NotificationPreference": {
+      "title": "Notification Preference",
+      "description": "Parent settings for student-related notifications",
+      "type": "object",
+      "properties": {
+        "parentId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "grades": { "type": "boolean" },
+        "behavior": { "type": "boolean" },
+        "attendance": { "type": "boolean" },
+        "announcements": { "type": "boolean" },
+        "payments": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["parentId", "studentId"]
+    },
+    "BehaviorReport": {
+      "title": "Behavior Report",
+      "description": "Student behavior records and reports",
+      "type": "object",
+      "properties": {
+        "schoolId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "type": { "type": "string", "enum": ["positive", "negative", "neutral"] },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "teacherId": { "type": "string" },
+        "points": { "type": "number" }
+      },
+      "required": ["schoolId", "studentId", "type", "description"]
+    },
+    "SystemConfig": {
+      "title": "System Configuration",
+      "description": "Global settings for the platform",
+      "type": "object",
+      "properties": {
+        "supportPhone": { "type": "string" },
+        "supportEmail": { "type": "string" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Real-time alert for a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["grade", "behavior", "attendance", "announcement", "payment", "homework", "report", "system"] },
+        "read": { "type": "boolean" },
+        "schoolId": { "type": "string" },
+        "metadata": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "message", "schoolId", "createdAt"]
+    },
+    "Homework": {
+      "title": "Homework",
+      "description": "Assignments given by teachers",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "subject": { "type": "string" },
+        "dueDate": { "type": "string", "format": "date" },
+        "classId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "subject", "classId", "teacherId", "schoolId"]
+    },
+    "TeacherReport": {
+      "title": "Teacher Report",
+      "description": "Evaluative reports about students",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "subject": { "type": "string" },
+        "content": { "type": "string" },
+        "target": { "type": "string", "enum": ["school", "parents", "both"] },
+        "schoolId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "teacherId", "content", "schoolId"]
+    },
+    "Installment": {
+      "title": "Installment",
+      "description": "Scheduled payment part of a tuition plan",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "amount": { "type": "number" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "paid", "late"] },
+        "paidAt": { "type": "string", "format": "date-time" },
+        "prediction": { "type": "object", "description": "AI prediction about late payment" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "amount", "dueDate", "status", "schoolId"]
+    }
+  },
+  "firestore": {
+    "schools": { "schema": "School", "description": "Global schools list" },
+    "users": { "schema": "User", "description": "All users across schools" },
+    "packages": { "schema": "Package", "description": "Subscription plans for schools" },
+    "students": { "schema": "Student", "description": "Student records" },
+    "classes": { "schema": "Class", "description": "Class management" },
+    "attendance": { "schema": "Attendance", "description": "Daily attendance" },
+    "grades": { "schema": "Grade", "description": "Academic records" },
+    "behavior": { "schema": "BehaviorReport", "description": "Notes and conduct" },
+    "payroll": { "schema": "Payroll", "description": "Salary tracking" },
+    "inventory": { "schema": "Inventory", "description": "Asset management" },
+    "market": { "schema": "MarketItem", "description": "School shop" },
+    "orders": { "schema": "Order", "description": "Shop sales" },
+    "announcements": { "schema": "Announcement", "description": "Bulletins" },
+    "payments": { "schema": "Payment", "description": "Tuition and other payments" },
+    "notification_preferences": { "schema": "NotificationPreference", "description": "User notification settings per student" },
+    "behavior_reports": { "schema": "BehaviorReport", "description": "Student behavior tracking records" },
+    "system": { "schema": "SystemConfig", "description": "Global system settings" },
+    "notifications": { "schema": "Notification", "description": "Personalized user notifications" },
+    "homework": { "schema": "Homework", "description": "Teacher assignments" },
+    "teacher_reports": { "schema": "TeacherReport", "description": "Formal evaluation reports" },
+    "installments": { "schema": "Installment", "description": "Payment scheduling" }
+  }
+}

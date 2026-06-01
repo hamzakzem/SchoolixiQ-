@@ -66,7 +66,6 @@ import TeacherChatTab from "./TeacherChatTab";
 import Schedules from "./admin/Schedules";
 import AdvancedReports from "./admin/AdvancedReports";
 import IdCards from "./admin/IdCards";
-import SchoolixLogo from "../components/SchoolixLogo";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { GlobalFooter } from "../components/GlobalFooter";
@@ -743,11 +742,11 @@ export default function TeacherDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)]`}
+            className={`bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
-                {schoolData?.logoUrl && schoolData?.logoUrl !== "/icon.svg" ? (
+                {schoolData?.logoUrl ? (
                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
                     <img
                       src={schoolData.logoUrl}
@@ -756,7 +755,9 @@ export default function TeacherDashboard() {
                     />
                   </div>
                 ) : (
-                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 shrink-0">
+                    <ClipboardList size={isSidebarCollapsed ? 24 : 20} />
+                  </div>
                 )}
                 {!isSidebarCollapsed && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0" dir={isRtl ? "rtl" : "ltr"}>
@@ -876,7 +877,7 @@ export default function TeacherDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className="min-h-[3.5rem] md:min-h-[5rem] h-auto pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-2.5 md:pt-[calc(1.25rem+env(safe-area-inset-top,0px))] md:pb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-10 shrink-0 sticky top-0 z-40 print:hidden">
+        <header className="h-14 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-10 shrink-0 sticky top-0 z-40 print:hidden">
           <div className="flex items-center gap-1.5 md:gap-6">
             <button
               onClick={() => {
