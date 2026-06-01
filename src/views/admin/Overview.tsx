@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
 import { useLanguage } from '../../lib/LanguageContext';
+import DailySummary from './DailySummary';
 
 const translateSchoolValue = (value: string, isRtl: boolean): string => {
   if (!value) return isRtl ? 'غير محدد' : 'Not specified';
@@ -283,6 +284,8 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500" dir={isRtl ? 'rtl' : 'ltr'}>
+      <DailySummary />
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title={t('totalStudents')} value={stats.students} icon={Users} color="border-blue-200 bg-blue-50/50" iconColor="text-blue-600" action={() => setActiveTab?.("students_edit")} />
         <StatCard 

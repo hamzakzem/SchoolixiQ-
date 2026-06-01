@@ -29,7 +29,7 @@ interface SystemConfig {
 
 const defaultSystemConfig: SystemConfig = {
   appName: 'SchoolixiQ',
-  appLogo: '',
+  appLogo: '/icon.svg',
   supportPhones: ['+964 770 000 0000'],
   supportEmails: ['support@schoolixiq.iq'],
   successPartners: [],
@@ -143,11 +143,11 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         link.rel = 'icon';
         document.getElementsByTagName('head')[0].appendChild(link);
       }
-      link.href = config.appLogo || "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg";
+      link.href = config.appLogo || "/icon.svg";
       
       let appleLink: HTMLLinkElement | null = document.querySelector("link[rel='apple-touch-icon']");
       if (appleLink) {
-        appleLink.href = config.appLogo || "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg";
+        appleLink.href = config.appLogo || "/icon.svg";
       }
     };
     updateFavicon();

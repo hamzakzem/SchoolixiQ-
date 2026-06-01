@@ -63,6 +63,7 @@ import { Phone, Mail, MapPin, Save, Sparkles, ShieldAlert, ExternalLink } from "
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
+import SchoolixLogo from "../components/SchoolixLogo";
 
 export default function ParentDashboard() {
   const { profile, schoolData } = useAuth();
@@ -934,14 +935,14 @@ export default function ParentDashboard() {
           dir="rtl"
         >
           <div className="w-20 h-20 rounded-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-600 mb-6 shadow-sm overflow-hidden">
-            {config.appLogo ? (
+            {config.appLogo && config.appLogo !== "/icon.svg" ? (
               <img
                 src={config.appLogo}
                 alt={config.appName}
                 className="w-full h-full object-contain p-2"
               />
             ) : (
-              <User size={40} />
+              <SchoolixLogo size={52} />
             )}
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -1014,11 +1015,11 @@ export default function ParentDashboard() {
               animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
               exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className={`bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden`}
+              className={`bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)]`}
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
                 <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
-                  {config.appLogo ? (
+                  {config.appLogo && config.appLogo !== "/icon.svg" ? (
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
                       <img
                         src={config.appLogo}
@@ -1027,9 +1028,7 @@ export default function ParentDashboard() {
                       />
                     </div>
                   ) : (
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 shrink-0">
-                      <User size={isSidebarCollapsed ? 24 : 20} />
-                    </div>
+                    <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
                   )}
                   {!isSidebarCollapsed && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0" dir={isRtl ? "rtl" : "ltr"}>
@@ -1097,7 +1096,7 @@ export default function ParentDashboard() {
         <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
         {/* Engineered Mobile Header */}
         <header className="bg-white dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm transition-colors print:hidden">
-          <div className="px-4 pt-5 pb-3">
+          <div className="px-4 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-3">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <button
@@ -1155,20 +1154,20 @@ export default function ParentDashboard() {
                 
                 <button
                   onClick={handleLogout}
-                  className="w-8 h-8 shrink-0 rounded transition-all flex items-center justify-center bg-white dark:bg-slate-800 text-red-500 hover:text-red-600 border border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-500/10 shadow-sm"
+                  className="w-11 h-11 shrink-0 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center bg-white dark:bg-slate-800 text-red-500 hover:text-red-600 border border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-500/10 shadow-sm active:scale-95"
                   title={t("logout")}
                 >
-                  <LogOut size={16} />
+                  <LogOut size={18} />
                 </button>
 
                 <div className="relative shrink-0">
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
-                    className={`w-8 h-8 shrink-0 rounded transition-all flex items-center justify-center relative shadow-sm ${showNotifications ? "bg-indigo-600 border-indigo-700 text-white" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50"}`}
+                    className={`w-11 h-11 shrink-0 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center relative shadow-sm ${showNotifications ? "bg-indigo-600 border-indigo-700 text-white shadow-lg shadow-indigo-200/50" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50"} active:scale-95`}
                   >
-                    <Bell size={16} />
+                    <Bell size={18} />
                     {notifications.filter((n) => !n.read).length > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[9px] font-black text-white flex items-center justify-center">
+                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[10px] font-black text-white flex items-center justify-center">
                         {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
                       </span>
                     )}

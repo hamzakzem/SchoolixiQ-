@@ -49,6 +49,7 @@ import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
+import SchoolixLogo from "../components/SchoolixLogo";
 
 const DEFAULT_PACKAGES = [
   {
@@ -1215,13 +1216,13 @@ export default function AdminDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`fixed inset-y-0 ${isRtl ? "right-0 rounded-l-[2rem] lg:rounded-none border-l" : "left-0 rounded-r-[2rem] lg:rounded-none border-r"} z-50 bg-slate-900 dark:bg-black text-white flex flex-col pt-safe lg:relative border-slate-800 dark:border-slate-900 print:hidden shadow-2xl lg:shadow-none shrink-0 overflow-visible`}
+            className={`fixed inset-y-0 ${isRtl ? "right-0 rounded-l-[2rem] lg:rounded-none border-l" : "left-0 rounded-r-[2rem] lg:rounded-none border-r"} z-50 bg-slate-900 dark:bg-black text-white flex flex-col pt-[env(safe-area-inset-top,0px)] lg:relative border-slate-800 dark:border-slate-900 print:hidden shadow-2xl lg:shadow-none shrink-0 overflow-visible`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
                 className={`p-6 border-b border-slate-800/50 flex ${isSidebarCollapsed ? "justify-center" : "items-center gap-4"}`}
               >
-                {schoolData?.logoUrl ? (
+                {schoolData?.logoUrl && schoolData?.logoUrl !== "/icon.svg" ? (
                   <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1 shadow-xl shrink-0 overflow-hidden">
                     <img
                       src={schoolData.logoUrl || undefined}
@@ -1229,18 +1230,8 @@ export default function AdminDashboard() {
                       className="w-full h-full object-contain"
                     />
                   </div>
-                ) : config.appLogo ? (
-                  <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1 shadow-xl shrink-0 overflow-hidden">
-                    <img
-                      src={config.appLogo || undefined}
-                      alt={config.appName}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
                 ) : (
-                  <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center text-slate-900 font-bold text-xl md:text-2xl shadow-xl shrink-0 overflow-hidden">
-                    {config.appName[0]}
-                  </div>
+                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
                 )}
                 {!isSidebarCollapsed && (
                   <motion.div
@@ -1332,7 +1323,7 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-colors duration-300 print:overflow-visible print:h-auto">
-        <header className="h-16 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-8 shrink-0 sticky top-0 z-40 transition-colors print:hidden">
+        <header className="min-h-[4rem] md:min-h-[5rem] h-auto pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-3 md:pt-[calc(1.25rem+env(safe-area-inset-top,0px))] md:pb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-8 shrink-0 sticky top-0 z-40 transition-colors print:hidden">
           <div className="flex items-center gap-2 md:gap-6">
             <button
               onClick={() => {

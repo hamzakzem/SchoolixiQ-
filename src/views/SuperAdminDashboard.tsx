@@ -64,6 +64,7 @@ import { useAuth } from "../lib/AuthContext";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
+import SchoolixLogo from "../components/SchoolixLogo";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
@@ -521,6 +522,7 @@ export default function SuperAdminDashboard() {
 
   const PERMISSION_LABELS: Record<string, string> = {
     overview: t('overview'),
+    daily_summary: t('dailySummary') || (isRtl ? "ملخص المدرسة اليومي" : "Daily School Summary"),
     chat: t('chat'),
     students_view: t('viewStudents'),
     students_edit: t('manageStudents'),
@@ -1534,22 +1536,20 @@ export default function SuperAdminDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible`}
+            className={`bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible pt-[env(safe-area-inset-top,0px)]`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
                 className={`p-6 flex ${isSidebarCollapsed ? "justify-center border-b border-transparent" : "items-center gap-4 border-b border-slate-700 dark:border-slate-800"} pb-6`}
               >
-                {config.appLogo ? (
+                {config.appLogo && config.appLogo !== "/icon.svg" ? (
                   <img
                     src={config.appLogo || undefined}
                     alt={config.appName}
                     className="w-10 h-10 md:w-12 md:h-12 object-contain rounded-xl bg-white p-1 shrink-0"
                   />
                 ) : (
-                  <span className="bg-blue-600 w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center font-bold text-xl md:text-2xl shrink-0">
-                    {config.appName[0]}
-                  </span>
+                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
                 )}
                 {!isSidebarCollapsed && (
                   <motion.h1
@@ -1926,7 +1926,7 @@ export default function SuperAdminDashboard() {
       </AnimatePresence>
 
       <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className="h-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-10 print:hidden">
+        <header className="min-h-[5rem] h-auto pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-10 print:hidden">
           <div className="flex items-center gap-1.5 sm:gap-4 min-w-0">
             <button
               onClick={() => {

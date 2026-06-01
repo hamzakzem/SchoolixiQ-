@@ -61,6 +61,7 @@ import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { GlobalFooter } from "../components/GlobalFooter";
+import SchoolixLogo from "../components/SchoolixLogo";
 
 export const getLocalizedPackages = (packagesList: any[], isRtl: boolean) => {
   return packagesList.map(pkg => {
@@ -839,10 +840,10 @@ export default function Login() {
           <div className="flex flex-col items-center mb-6 sm:mb-10 text-center select-none">
             {/* Elegant Technical Logo Container - Fixed Height to prevent any layout shifts */}
             <div className="h-24 sm:h-28 w-full flex items-center justify-center mb-2 relative group">
-              {config.appLogo ? (
+              {config.appLogo && config.appLogo !== "/icon.svg" ? (
                 <div className="relative">
                   {/* Tech Aura Backlight */}
-                  <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 to-sky-500 rounded-full blur-xl opacity-10 group-hover:opacity-25 transition duration-500"></div>
+                  <div className="absolute -inset-2 bg-gradient-to-r from-[#0B2345] to-[#D4A64A] rounded-full blur-xl opacity-10 group-hover:opacity-25 transition duration-500"></div>
                   <img
                     src={config.appLogo || undefined}
                     alt="schoolixiQ Logo"
@@ -851,12 +852,10 @@ export default function Login() {
                   />
                 </div>
               ) : (
-                /* Sleek, minimalist geometric loading skeleton - completely replaces old school-icon fallbacks */
-                <div className="relative w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-2xl border border-dashed border-indigo-500/30 animate-[spin_10s_linear_infinite]"></div>
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500/5 to-sky-500/5 border border-indigo-500/10 flex items-center justify-center">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                  </div>
+                <div className="relative">
+                  {/* Tech Aura Backlight */}
+                  <div className="absolute -inset-4 bg-gradient-to-r from-[#0B2345] to-[#D4A64A] rounded-full blur-2xl opacity-15 group-hover:opacity-30 transition duration-500"></div>
+                  <SchoolixLogo size={90} className="relative z-10" />
                 </div>
               )}
             </div>
