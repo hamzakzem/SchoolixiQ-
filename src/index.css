@@ -6,6 +6,13 @@
 @theme {
   --font-sans: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+/* SchoolixiQ Brand Colors */
+  --color-primary: #0B2345;
+  --color-primary-light: #1a3a6b;
+  --color-secondary: #D4A64A;
+  --color-secondary-light: #e8c06e;
+  --color-surface: #F3F4F6;
+  --color-text-secondary: #6B7280;
 }
 
 html[lang="ar"], html[lang="ar"] *:not(.font-mono):not(code):not(pre) {
