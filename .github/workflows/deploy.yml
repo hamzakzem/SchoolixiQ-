@@ -20,3 +20,4 @@ jobs:
           service: schoolixiq-backend
           region: europe-west2
           source: ./backend
+          flags: --clear-base-image
