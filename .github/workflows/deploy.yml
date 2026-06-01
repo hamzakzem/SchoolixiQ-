@@ -20,4 +20,5 @@ jobs:
           service: schoolixiq-backend
           region: europe-west2
           source: ./backend
-          flags: --clear-base-image
+          flags: --clear-base-image --port=8080
+          env_vars: PORT=8080
