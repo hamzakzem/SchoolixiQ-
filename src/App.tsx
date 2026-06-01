@@ -593,7 +593,7 @@ const AppContent = () => {
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center mb-6"
+                  className="w-20 h-20 bg-[#e8eef5] text-[#0B2345] rounded-3xl flex items-center justify-center mb-6"
                 >
                   <ShieldCheck size={40} />
                 </motion.div>
@@ -787,7 +787,7 @@ const AppContent = () => {
                         className={`bg-white rounded-3xl p-6 border-2 transition-all flex flex-col text-right ${pkg.isPopular ? "border-blue-600 shadow-xl shadow-blue-100" : "border-slate-100 shadow-lg"}`}
                       >
                         {pkg.isPopular && (
-                          <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-4">
+                          <span className="bg-[#0B2345] text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-4">
                             الأكثر طلباً
                           </span>
                         )}
@@ -826,7 +826,7 @@ const AppContent = () => {
                             setSelectedPackage(pkg);
                             setOnboardingState("registration_form");
                           }}
-                          className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
+                          className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-[#0B2345] text-white hover:bg-[#1a3a6b]" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                         >
                           اختيار الباقة
                         </button>
@@ -1127,7 +1127,7 @@ const AppContent = () => {
                   <button
                     type="submit"
                     disabled={isCreatingProfile}
-                    className="w-full py-4 mt-4 bg-blue-600 text-white rounded-xl font-black shadow-lg shadow-blue-600/20 active:scale-95 transition-all text-sm flex justify-center items-center gap-2"
+                    className="w-full py-4 mt-4 bg-[#0B2345] text-white rounded-xl font-black shadow-lg shadow-blue-600/20 active:scale-95 transition-all text-sm flex justify-center items-center gap-2"
                   >
                     {isCreatingProfile ? (
                       <RefreshCw className="animate-spin" size={18} />
