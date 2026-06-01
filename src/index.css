@@ -48,6 +48,12 @@ html[lang="en"], html[lang="en"] *:not(.font-mono):not(code):not(pre) {
   }
   html.dark {
     color-scheme: dark;
+    --color-primary: #1a3a6b;
+    --color-primary-light: #2a4a7b;
+    --color-secondary: #D4A64A;
+    --color-secondary-light: #e8c06e;
+    --color-surface: #1e293b;
+    --color-text-secondary: #94a3b8;
     --chart-grid: #1e293b;
     --chart-text: #94a3b8;
     --chart-tooltip-bg: #0f172a;
