@@ -1096,8 +1096,6 @@ async function startServer() {
     }));
 
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
   }
 
   app.listen(PORT, '0.0.0.0', async () => {
