@@ -712,7 +712,7 @@ const AppContent = () => {
                       type="button"
                       disabled={isCreatingProfile}
                       onClick={() => setOnboardingState("packages")}
-                      className="w-full px-6 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-bold shadow-sm active:scale-95 transition-all outline-none focus:ring-4 focus:ring-blue-100 hover:border-blue-500 hover:text-blue-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                      className="w-full px-6 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-bold shadow-sm active:scale-95 transition-all outline-none focus:ring-4 focus:ring-blue-100 hover:border-blue-500 hover:text-[#0B2345] disabled:opacity-50 text-sm flex items-center justify-center gap-2"
                     >
                       <Building size={18} />
                       {isRtl
@@ -1167,8 +1167,8 @@ const AppContent = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 className="w-full max-w-sm mx-auto bg-white p-8 rounded-[2rem] shadow-xl border border-blue-100 text-center relative overflow-hidden"
               >
-                <div className="absolute top-0 left-0 w-full h-2 bg-blue-500 animate-pulse"></div>
-                <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex justify-center items-center mx-auto mb-6">
+                <div className="absolute top-0 left-0 w-full h-2 bg-[#0B2345] animate-pulse"></div>
+                <div className="w-20 h-20 bg-blue-50 text-[#0B2345] rounded-full flex justify-center items-center mx-auto mb-6">
                   <Clock size={40} className="animate-bounce" />
                 </div>
                 <h3 className="text-xl font-black text-slate-900 mb-2">

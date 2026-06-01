@@ -605,7 +605,7 @@ export default function AdminDashboard() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-white dark:bg-slate-900 rounded-[3rem] p-12 shadow-2xl border border-slate-100 dark:border-slate-800 text-center"
             >
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 w-16 h-16 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto mb-8">
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 w-16 h-16 rounded-2xl flex items-center justify-center text-[#0B2345] dark:text-indigo-400 mx-auto mb-8">
                 <ShieldCheck size={32} />
               </div>
               <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-4 uppercase">
@@ -650,7 +650,7 @@ export default function AdminDashboard() {
 
                       <div className="mb-8">
                         <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
+                          <span className="text-3xl font-black text-[#0B2345] dark:text-indigo-400">
                             {plan.price === 0
                               ? "مجاني"
                               : plan.price.toLocaleString("ar-IQ")}
@@ -669,7 +669,7 @@ export default function AdminDashboard() {
                       <div className="space-y-4 mb-8 flex-1">
                         <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                            <div className="w-8 h-8 bg-[#e8eef5] dark:bg-indigo-900/30 rounded-lg flex items-center justify-center text-[#0B2345] dark:text-indigo-400">
                               <Users size={16} />
                             </div>
                             <div>
@@ -712,7 +712,7 @@ export default function AdminDashboard() {
                         disabled={isSubscribing}
                         className={`w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 shadow-xl ${
                           plan.isPopular
-                            ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/20"
+                            ? "bg-[#0B2345] text-white hover:bg-indigo-700 shadow-indigo-600/20"
                             : "bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600 shadow-slate-600/10"
                         }`}
                       >
@@ -765,7 +765,7 @@ export default function AdminDashboard() {
                       toast.success("يمكنك الآن اختيار باقة جديدة");
                     }
                   }}
-                  className="px-10 py-5 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
+                  className="px-10 py-5 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
                 >
                   إرسال طلب جديد
                 </button>
@@ -790,7 +790,7 @@ export default function AdminDashboard() {
                   : `Thank you for choosing ${config.appName}. Your activation request has been sent`}{" "}
                 مدرستك إلى الإدارة العليا (Super Admin).
                 <br />
-                <span className="text-indigo-600 dark:text-indigo-400">
+                <span className="text-[#0B2345] dark:text-indigo-400">
                   سنقوم بتفعيل حسابك والتواصل معك خلال ساعات قليلة.
                 </span>
               </p>
@@ -820,7 +820,7 @@ export default function AdminDashboard() {
                       if (pkg) setViewingPackage(pkg);
                       else toast.error("تفاصيل الباقة غير متوفرة حالياً");
                     }}
-                    className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 underline decoration-2 underline-offset-4 hover:text-indigo-700 transition-colors"
+                    className="text-[10px] font-black text-[#0B2345] dark:text-indigo-400 underline decoration-2 underline-offset-4 hover:text-indigo-700 transition-colors"
                   >
                     عرض تفاصيل الباقة
                   </button>
@@ -855,7 +855,7 @@ export default function AdminDashboard() {
                       }
                     }
                   }}
-                  className="px-10 py-5 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
+                  className="px-10 py-5 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
                 >
                   تحديث حالة الطلب
                 </button>
@@ -887,7 +887,7 @@ export default function AdminDashboard() {
           className="bg-white dark:bg-slate-900 rounded-[2rem] md:rounded-[3rem] p-6 md:p-12 shadow-2xl w-full max-w-xl border border-slate-100 dark:border-slate-800/80 my-auto"
         >
           <div className="flex justify-between items-start mb-8 gap-4">
-            <div className="bg-blue-50 dark:bg-blue-950/40 w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 shadow-sm shrink-0">
+            <div className="bg-blue-50 dark:bg-blue-950/40 w-16 h-16 rounded-2xl flex items-center justify-center text-[#0B2345] dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 shadow-sm shrink-0">
               <Building size={32} />
             </div>
             <button
@@ -1085,7 +1085,7 @@ export default function AdminDashboard() {
             </div>
             <button
               disabled={isSettingUp}
-              className="w-full py-5 bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-[1.5rem] font-bold text-lg hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="w-full py-5 bg-slate-900 dark:bg-[#0B2345] dark:hover:bg-[#0B2345] text-white rounded-[1.5rem] font-bold text-lg hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               {isSettingUp ? (isRtl ? "جاري الإعداد..." : "Setting up...") : (isRtl ? "حفظ البيانات والبدء" : "Save Record & Start")}
             </button>
@@ -1391,7 +1391,7 @@ export default function AdminDashboard() {
 
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-[#0B2345] border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-[#0B2345]"}`}
             >
               <Bell size={18} />
               {notifications.filter((n: any) => !n.read).length > 0 && (
@@ -1635,7 +1635,7 @@ function PackageDetailsModal({
               <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
                 السعر السنوي
               </p>
-              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+              <p className="text-2xl font-black text-[#0B2345] dark:text-indigo-400">
                 {(pkg.priceYearly !== undefined
                   ? pkg.priceYearly
                   : pkg.price) === 0
@@ -1652,7 +1652,7 @@ function PackageDetailsModal({
               <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
                 السعر الشهري
               </p>
-              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+              <p className="text-2xl font-black text-[#0B2345] dark:text-indigo-400">
                 {(pkg.priceMonthly !== undefined
                   ? pkg.priceMonthly
                   : Math.round((pkg.price || 0) / 12)) === 0
@@ -1702,7 +1702,7 @@ function PackageDetailsModal({
         <div className="p-8 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
           <button
             onClick={onClose}
-            className="px-10 py-4 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
+            className="px-10 py-4 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
           >
             إغلاق
           </button>

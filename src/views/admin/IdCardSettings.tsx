@@ -185,13 +185,13 @@ export default function IdCardSettings() {
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Settings2 size={24} className="text-indigo-600" />
+              <Settings2 size={24} className="text-[#0B2345]" />
               {isRtl ? "تخصيص الهوية المدرسية" : "ID Card Customization"}
             </h2>
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2"
+              className="px-6 py-2 bg-[#0B2345] hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2"
             >
               <Save size={18} />
               {isSaving ? "جاري الحفظ..." : "حفظ القالب"}
@@ -271,7 +271,7 @@ export default function IdCardSettings() {
                           e.target.checked,
                         )
                       }
-                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 transition-all"
+                      className="w-5 h-5 rounded border-slate-300 text-[#0B2345] focus:ring-indigo-600 transition-all"
                     />
                     <span className="font-medium text-slate-700 dark:text-slate-300">
                       {isRtl
@@ -342,7 +342,7 @@ export default function IdCardSettings() {
                                    name="photoShape"
                                    checked={(template.photoSettings?.shape || template.elements.photoShape || 'rounded') === shape.id}
                                    onChange={() => setTemplate(p => ({ ...p, photoSettings: { ...p.photoSettings, shape: shape.id as any } }))}
-                                   className="text-indigo-600 focus:ring-indigo-600"
+                                   className="text-[#0B2345] focus:ring-indigo-600"
                                 />
                                 <span className="text-sm font-medium">{shape.label}</span>
                              </label>
@@ -537,7 +537,7 @@ export default function IdCardSettings() {
                     </label>
                     <div className="flex items-center gap-2">
                       <label className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-300 rounded-lg p-2 cursor-pointer hover:bg-slate-50 transition-colors">
-                        <UploadCloud size={16} className="text-indigo-600" />
+                        <UploadCloud size={16} className="text-[#0B2345]" />
                         <span className="text-sm font-medium">
                           {isRtl ? "اختر صورة..." : "Choose image..."}
                         </span>

@@ -191,7 +191,7 @@ export default function Evaluations() {
                 <button
                   key={cls.id}
                   onClick={() => setSelectedClassId(cls.id)}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? 'bg-[#0B2345] text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                 >
                   {cls.name}
                 </button>
@@ -209,7 +209,7 @@ export default function Evaluations() {
                     className={`w-full text-right px-4 py-3 rounded-xl flex items-center justify-between transition-all ${selectedStudent?.id === student.id ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800/30 border' : 'bg-transparent border border-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'}`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedStudent?.id === student.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedStudent?.id === student.id ? 'bg-[#0B2345] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
                         {student.name[0]}
                       </div>
                       <span className="font-bold text-sm truncate">{student.name}</span>
@@ -226,7 +226,7 @@ export default function Evaluations() {
              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-12rem)] min-h-[600px]">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
                   <div className="flex items-center gap-4">
-                     <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center font-bold text-xl">
+                     <div className="w-12 h-12 bg-[#e8eef5] dark:bg-indigo-900/50 text-[#0B2345] dark:text-indigo-400 rounded-2xl flex items-center justify-center font-bold text-xl">
                        {selectedStudent.name[0]}
                      </div>
                      <div>
@@ -243,7 +243,7 @@ export default function Evaluations() {
                       setReportTarget('parents');
                       setShowAddModal(true);
                     }}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
+                    className="px-4 py-2 bg-[#0B2345] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
                   >
                     <Plus size={18} />
                     <span>{isRtl ? 'تقييم جديد' : 'New Report'}</span>
@@ -276,7 +276,7 @@ export default function Evaluations() {
                                   setReportTarget(report.target || 'parents');
                                   setShowAddModal(true);
                                 }}
-                                className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-700 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                className="p-2 text-slate-400 hover:text-[#0B2345] bg-slate-50 hover:bg-indigo-50 dark:bg-slate-700 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                               >
                                 <Edit2 size={16} />
                               </button>
@@ -290,7 +290,7 @@ export default function Evaluations() {
                         </div>
                         <p className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{report.content}</p>
                         <div className="mt-4 flex items-center gap-2">
-                           <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${report.target === 'parents' || report.target === 'both' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                           <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${report.target === 'parents' || report.target === 'both' ? 'bg-indigo-50 text-[#0B2345]' : 'bg-slate-100 text-slate-500'}`}>
                              {report.target === 'parents' ? (isRtl ? 'لأولياء الأمور فقط' : 'Parents Only') : report.target === 'both' ? (isRtl ? 'لأولياء الأمور والمدرسة' : 'Parents & School') : (isRtl ? 'للإدارة فقط' : 'School Only')}
                            </span>
                         </div>
@@ -362,7 +362,7 @@ export default function Evaluations() {
                        <button
                          key={opt.id}
                          onClick={() => setReportTarget(opt.id as any)}
-                         className={`py-3 rounded-xl border text-sm font-bold transition-all ${reportTarget === opt.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                         className={`py-3 rounded-xl border text-sm font-bold transition-all ${reportTarget === opt.id ? 'bg-[#0B2345] text-white border-indigo-600 shadow-md' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                        >
                          {opt.label}
                        </button>
@@ -380,7 +380,7 @@ export default function Evaluations() {
                   <button
                     onClick={handleSaveReport}
                     disabled={isSaving || !reportContent.trim()}
-                    className="px-6 py-3 rounded-xl font-bold bg-indigo-600 text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    className="px-6 py-3 rounded-xl font-bold bg-[#0B2345] text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50"
                   >
                     {isSaving ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

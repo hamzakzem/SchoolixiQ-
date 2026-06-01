@@ -166,7 +166,7 @@ export default function Homework() {
                 <button
                   key={cls.id}
                   onClick={() => setSelectedClassId(cls.id)}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? 'bg-[#0B2345] text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                 >
                   {cls.name}
                 </button>
@@ -181,7 +181,7 @@ export default function Homework() {
              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-12rem)] min-h-[600px]">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
                   <div className="flex items-center gap-4">
-                     <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center font-bold text-xl">
+                     <div className="w-12 h-12 bg-[#e8eef5] dark:bg-indigo-900/50 text-[#0B2345] dark:text-indigo-400 rounded-2xl flex items-center justify-center font-bold text-xl">
                        <BookOpen size={24} />
                      </div>
                      <div>
@@ -199,7 +199,7 @@ export default function Homework() {
                       setNewHomework({ title: '', content: '', dueDate: '' });
                       setShowAddModal(true);
                     }}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
+                    className="px-4 py-2 bg-[#0B2345] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
                   >
                     <Plus size={18} />
                     <span>{isRtl ? 'واجب جديد' : 'New Homework'}</span>
@@ -231,7 +231,7 @@ export default function Homework() {
                                   setNewHomework({ title: hw.title, content: hw.content, dueDate: hw.dueDate });
                                   setShowAddModal(true);
                                 }}
-                                className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-700 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                className="p-2 text-slate-400 hover:text-[#0B2345] bg-slate-50 hover:bg-indigo-50 dark:bg-slate-700 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                               >
                                 <Edit2 size={16} />
                               </button>
@@ -341,7 +341,7 @@ export default function Homework() {
                   <button
                     onClick={handleSaveHomework}
                     disabled={isSaving || !newHomework.title.trim() || !newHomework.content.trim() || !newHomework.dueDate}
-                    className="px-6 py-3 rounded-xl font-bold bg-indigo-600 text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    className="px-6 py-3 rounded-xl font-bold bg-[#0B2345] text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50"
                   >
                     {isSaving ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

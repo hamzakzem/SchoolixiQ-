@@ -345,7 +345,7 @@ export default function Payroll() {
               onClick={() => setShowBudgetModal(true)}
               className="bg-white border border-slate-200 px-6 py-3 rounded-2xl flex items-center gap-4 shadow-sm hover:border-indigo-300 hover:bg-indigo-50/30 transition-all group"
             >
-               <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+               <div className="w-10 h-10 bg-indigo-50 text-[#0B2345] rounded-xl flex items-center justify-center group-hover:bg-[#0B2345] group-hover:text-white transition-colors">
                  <Wallet size={20} />
                </div>
                <div className="text-right">
@@ -375,7 +375,7 @@ export default function Payroll() {
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm overflow-hidden relative">
           <div className="flex items-center justify-between mb-4">
              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-[#0B2345] animate-pulse" />
                 <span className="text-xs font-bold text-slate-500">حالة استهلاك الميزانية</span>
              </div>
              <span className="text-xs font-black font-mono text-slate-400">
@@ -387,7 +387,7 @@ export default function Payroll() {
                initial={{ width: 0 }}
                animate={{ width: `${Math.min((payrolls.reduce((sum, p) => sum + (p.amount || 0), 0) / schoolBudget) * 100), 100}%` }}
                className={`h-full transition-all duration-1000 ${
-                 (payrolls.reduce((sum, p) => sum + (p.amount || 0), 0) / schoolBudget) > 1 ? 'bg-rose-500' : 'bg-indigo-500'
+                 (payrolls.reduce((sum, p) => sum + (p.amount || 0), 0) / schoolBudget) > 1 ? 'bg-rose-500' : 'bg-[#0B2345]'
                }`}
              />
           </div>
@@ -465,7 +465,7 @@ export default function Payroll() {
                 <td className="p-4">
                   <button 
                     onClick={() => setSelectedPayroll(pay)}
-                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-widest hover:underline decoration-2 underline-offset-4 transition-all"
+                    className="text-[10px] font-bold text-[#0B2345] hover:text-indigo-700 uppercase tracking-widest hover:underline decoration-2 underline-offset-4 transition-all"
                   >
                     عرض الوصل
                   </button>
@@ -599,7 +599,7 @@ export default function Payroll() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
                   <div className="space-y-4">
                     <div className="bg-indigo-50/30 p-4 rounded-2xl border border-indigo-100/50">
-                      <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2 px-1">المكافأة (Bonus)</label>
+                      <label className="block text-[10px] font-black text-[#0B2345] uppercase tracking-widest mb-2 px-1">المكافأة (Bonus)</label>
                       <input 
                         type="number"
                         value={Number.isNaN(editingFinancials.bonus) ? '' : editingFinancials.bonus}
@@ -674,7 +674,7 @@ export default function Payroll() {
               className="bg-white rounded-[3rem] w-full max-w-sm shadow-2xl p-10 border border-slate-200"
             >
               <div className="flex items-center gap-5 mb-8">
-                <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                <div className="w-14 h-14 bg-[#0B2345] text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
                   <Wallet size={28} />
                 </div>
                 <div>
@@ -695,13 +695,13 @@ export default function Payroll() {
                         const val = e.target.value;
                         setBudgetInput(val === '' ? 0 : Number(val) || 0);
                       }}
-                      className="w-full px-6 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-indigo-500 outline-none font-black text-3xl text-indigo-600 font-mono tracking-tighter transition-all bg-slate-50/50"
+                      className="w-full px-6 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-indigo-500 outline-none font-black text-3xl text-[#0B2345] font-mono tracking-tighter transition-all bg-slate-50/50"
                       placeholder="0"
                     />
                     <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm pointer-events-none">د.ع</div>
                   </div>
                   <div className="mt-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-2">
-                    <div className="flex justify-between text-[10px] font-bold text-indigo-600 italic">
+                    <div className="flex justify-between text-[10px] font-bold text-[#0B2345] italic">
                       <span>إجمالي الرواتب الحالية:</span>
                       <span className="font-mono">{payrolls.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()} د.ع</span>
                     </div>
@@ -711,7 +711,7 @@ export default function Payroll() {
                 <div className="flex gap-4">
                   <button 
                     type="submit"
-                    className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900/10 active:scale-95 flex items-center justify-center gap-2"
+                    className="flex-1 py-5 bg-[#0B2345] text-white rounded-[1.5rem] font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900/10 active:scale-95 flex items-center justify-center gap-2"
                   >
                     <Save size={20} />
                     تحديث الميزانية
@@ -780,7 +780,7 @@ export default function Payroll() {
                     <span className="font-mono text-slate-900">{selectedPayroll.amount?.toLocaleString()} د.ع</span>
                   </div>
                   {selectedPayroll.bonus > 0 && (
-                    <div className="flex justify-between items-center text-sm font-bold text-indigo-600">
+                    <div className="flex justify-between items-center text-sm font-bold text-[#0B2345]">
                       <span>مكافآت {selectedPayroll.bonusReason && `(${selectedPayroll.bonusReason})`}</span>
                       <span className="font-mono">+{selectedPayroll.bonus.toLocaleString()} د.ع</span>
                     </div>

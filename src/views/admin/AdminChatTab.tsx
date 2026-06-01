@@ -322,7 +322,7 @@ export default function AdminChatTab() {
       <div className={`w-full md:w-80 border-r dark:border-l border-slate-200/50 dark:border-slate-800/40 flex flex-col bg-white dark:bg-[#0d121f] shrink-0 ${mobileShowChat ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-6 border-b border-slate-100 dark:border-slate-800/50 flex flex-col gap-4">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping" />
+            <span className="w-2.5 h-2.5 bg-[#0B2345] rounded-full animate-ping" />
             <h2 className="text-lg font-black text-slate-900 dark:text-white font-display">
               {isRtl ? 'مراسلات المدرسة' : 'School Messages'}
             </h2>
@@ -387,7 +387,7 @@ export default function AdminChatTab() {
                    />
                  ) : (
                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner font-bold text-lg ${
-                     isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                     isSelected ? 'bg-[#0B2345] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
                    }`}>
                      {contact.role === 'teacher' ? <Users size={18} /> : <User size={18} />}
                    </div>
@@ -465,7 +465,7 @@ export default function AdminChatTab() {
                    referrerPolicy="no-referrer"
                  />
                ) : (
-                 <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100/30">
+                 <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 text-[#0B2345] dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100/30">
                     {activeContact.type === 'teacher' ? <Users size={18} /> : <User size={18} />}
                  </div>
                )}
@@ -484,8 +484,8 @@ export default function AdminChatTab() {
                </div>
             </div>
             {activeContact.extra?.phone && (
-               <div className="flex items-center gap-1 text-indigo-600 shrink-0">
-                 <a href={`tel:${activeContact.extra.phone}`} className="p-2.5 bg-slate-50 dark:bg-slate-800/40 hover:bg-indigo-50 dark:hover:bg-indigo-950 hover:text-indigo-600 rounded-2xl transition-all duration-200">
+               <div className="flex items-center gap-1 text-[#0B2345] shrink-0">
+                 <a href={`tel:${activeContact.extra.phone}`} className="p-2.5 bg-slate-50 dark:bg-slate-800/40 hover:bg-indigo-50 dark:hover:bg-indigo-950 hover:text-[#0B2345] rounded-2xl transition-all duration-200">
                    <Phone size={18} className="dark:text-indigo-400" />
                  </a>
               </div>
@@ -506,7 +506,7 @@ export default function AdminChatTab() {
                      referrerPolicy="no-referrer"
                    />
                  ) : (
-                   <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-950/20 flex items-center justify-center mb-3 text-indigo-600 dark:text-indigo-400 text-3xl font-bold">
+                   <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-950/20 flex items-center justify-center mb-3 text-[#0B2345] dark:text-indigo-400 text-3xl font-bold">
                      <Sparkles size={36} />
                    </div>
                  )
@@ -518,7 +518,7 @@ export default function AdminChatTab() {
                    referrerPolicy="no-referrer"
                  />
                ) : (
-                 <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-slate-800/60 flex items-center justify-center mb-3 text-indigo-600 dark:text-indigo-400 text-3xl font-bold">
+                 <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-slate-800/60 flex items-center justify-center mb-3 text-[#0B2345] dark:text-indigo-400 text-3xl font-bold">
                    {activeContact.type === 'teacher' ? <Users size={32} /> : <User size={32} />}
                  </div>
                )}
@@ -651,7 +651,7 @@ export default function AdminChatTab() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-10 h-10 shrink-0 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded-full transition-colors"
+                className="w-10 h-10 shrink-0 flex items-center justify-center text-slate-400 hover:text-[#0B2345] hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded-full transition-colors"
                 title={isRtl ? 'إرفاق ملف (صورة/فيديو)' : 'Attach file (Image/Video)'}
               >
                 <Paperclip size={18} />
@@ -674,7 +674,7 @@ export default function AdminChatTab() {
             <button
               disabled={isLoading || (!newMessage.trim() && !selectedFile) || !activeContact}
               type="submit"
-              className="w-12 h-12 rounded-[1.25rem] bg-indigo-600 text-white flex items-center justify-center shrink-0 hover:bg-indigo-700 hover:scale-[1.04] active:scale-[0.96] disabled:opacity-40 disabled:hover:scale-100 disabled:bg-slate-250 dark:disabled:bg-slate-800 disabled:text-slate-400 shadow-lg shadow-indigo-600/10 transition-all duration-200"
+              className="w-12 h-12 rounded-[1.25rem] bg-[#0B2345] text-white flex items-center justify-center shrink-0 hover:bg-indigo-700 hover:scale-[1.04] active:scale-[0.96] disabled:opacity-40 disabled:hover:scale-100 disabled:bg-slate-250 dark:disabled:bg-slate-800 disabled:text-slate-400 shadow-lg shadow-indigo-600/10 transition-all duration-200"
             >
               <SendHorizontal size={18} className={isRtl ? 'rotate-180 ml-0.5' : 'mr-0.5'} />
             </button>

@@ -101,7 +101,7 @@ export default function ParentSchedules({ selectedStudent }: ParentSchedulesProp
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display">الجدول الأسبوعي</h2>
-        <div className="bg-blue-50 dark:bg-blue-900/30 px-4 py-2 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 transition-colors">
+        <div className="bg-blue-50 dark:bg-blue-900/30 px-4 py-2 rounded-xl text-xs font-bold text-[#0B2345] dark:text-blue-400 border border-blue-100 dark:border-blue-800 transition-colors">
           صف: {className}
         </div>
       </div>
@@ -123,7 +123,7 @@ export default function ParentSchedules({ selectedStudent }: ParentSchedulesProp
                 return (
                   <tr key={day} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                     <td className="p-5 align-top bg-slate-50/30 dark:bg-slate-800/20">
-                      <div className="font-black text-blue-600 dark:text-blue-400 text-xl flex items-center h-full pt-2">{day}</div>
+                      <div className="font-black text-[#0B2345] dark:text-blue-400 text-xl flex items-center h-full pt-2">{day}</div>
                     </td>
                     <td className="p-5">
                       <div className="flex flex-wrap gap-4">
@@ -135,7 +135,7 @@ export default function ParentSchedules({ selectedStudent }: ParentSchedulesProp
                             key={idx} 
                             className="relative bg-white dark:bg-slate-800/80 rounded-2xl p-5 min-w-[200px] border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all"
                           >
-                            <div className="absolute top-0 right-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-black rounded-bl-2xl rounded-tr-2xl flex items-center justify-center text-sm">
+                            <div className="absolute top-0 right-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/50 text-[#0B2345] dark:text-blue-400 font-black rounded-bl-2xl rounded-tr-2xl flex items-center justify-center text-sm">
                               {idx + 1}
                             </div>
                             <div className="space-y-3 mt-2 pr-2">

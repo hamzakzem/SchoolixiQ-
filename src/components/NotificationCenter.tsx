@@ -398,13 +398,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         {/* Header Section */}
         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/50 to-white dark:from-slate-800/10 dark:to-slate-900">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-[#0B2345] dark:text-indigo-400">
               <Bell className="w-6 h-6 animate-swing" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 {isArabic ? "مركز التنبيهات المتقدم" : "Advanced Notification Hub"}
-                <span className="text-xs font-semibold px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full">
+                <span className="text-xs font-semibold px-2 py-0.5 bg-[#e8eef5] dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-full">
                   Pro v2.0
                 </span>
               </h2>
@@ -426,7 +426,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'all' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'all' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Bell className="w-3.5 h-3.5" />
               {isArabic ? "كل الإشعارات والرسائل" : "All Alerts & Messages"}
@@ -437,7 +437,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
             <button
               onClick={() => setActiveTab('unread')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'unread' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'unread' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Check className="w-3.5 h-3.5" />
               {isArabic ? "غير المقروءة والرسائل" : "Unread Messages & Alerts"}
@@ -448,7 +448,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
             <button
               onClick={() => setActiveTab('settings')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Settings className="w-3.5 h-3.5" />
               {isArabic ? "الأصوات والإعدادات" : "Voice & Audio Profiles"}
@@ -457,7 +457,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             {profile && ['admin', 'superadmin'].includes(profile.role) && (
               <button
                 onClick={() => setActiveTab('logs')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'logs' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'logs' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
               >
                 <Activity className="w-3.5 h-3.5" />
                 {isArabic ? "سجلات التوصيل الـ FCM" : "Delivery Audit Ledger"}
@@ -470,7 +470,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               <>
                 <button
                   onClick={handleMarkAllRead}
-                  className="px-3 py-1.5 text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 border border-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-900/50 rounded-lg hover:bg-indigo-100 transition-all cursor-pointer"
+                  className="px-3 py-1.5 text-xs text-[#0B2345] dark:text-indigo-400 font-bold bg-indigo-50 border border-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-900/50 rounded-lg hover:bg-[#e8eef5] transition-all cursor-pointer"
                 >
                   {isArabic ? "تحديد الكل كمقروء" : "Mark all read"}
                 </button>
@@ -520,7 +520,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   ) : (
                     <button
                       onClick={requestWebPushPermission}
-                      className="px-4 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer"
+                      className="px-4 py-2.5 bg-[#0B2345] text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
                       {isArabic ? "طلب إذن المتصفح" : "Request Permission"}
@@ -560,7 +560,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           <button
                             key={p.id}
                             onClick={() => handleUpdateSoundSettings({ profile: p.id as any })}
-                            className={`p-3.5 rounded-2xl border text-right transition-all flex flex-col items-start ${soundSettings.profile === p.id ? 'border-indigo-600 bg-indigo-50/30 dark:bg-indigo-950/20 text-indigo-600' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-800/10'}`}
+                            className={`p-3.5 rounded-2xl border text-right transition-all flex flex-col items-start ${soundSettings.profile === p.id ? 'border-indigo-600 bg-indigo-50/30 dark:bg-indigo-950/20 text-[#0B2345]' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-800/10'}`}
                           >
                             <span className="text-xs font-bold">{p.label}</span>
                             <span className="text-[10px] text-slate-400 mt-1">{p.desc}</span>
@@ -664,7 +664,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       </div>
                       <button
                         onClick={triggerTestSound}
-                        className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer text-center whitespace-nowrap"
+                        className="px-4 py-2.5 bg-[#0B2345] text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer text-center whitespace-nowrap"
                       >
                         <Volume2 className="w-4 h-4" />
                         {isArabic ? "استمع الآن" : "Play Chime"}
@@ -770,7 +770,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           <td className="p-3">
                             <button
                               onClick={() => triggerSimulationPush(log)}
-                              className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 rounded font-bold transition-all text-[10px]"
+                              className="px-2.5 py-1 bg-[#0B2345]/10 hover:bg-[#0B2345]/20 text-[#0B2345] dark:text-indigo-400 hover:text-indigo-500 rounded font-bold transition-all text-[10px]"
                             >
                               {isArabic ? "أعد التوصيل" : "Resend"}
                             </button>
@@ -805,7 +805,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     <button
                       key={catPill.id}
                       onClick={() => setCategoryFilter(catPill.id)}
-                      className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all whitespace-nowrap cursor-pointer ${categoryFilter === catPill.id ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                      className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all whitespace-nowrap cursor-pointer ${categoryFilter === catPill.id ? 'bg-[#0B2345] text-white' : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                     >
                       {catPill.label}
                     </button>
@@ -854,14 +854,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       )}
 
                       {/* Icon */}
-                      <div className={`p-3 rounded-2xl shrink-0 flex items-center justify-center ${!n.read ? 'bg-white dark:bg-slate-850 shadow-sm text-indigo-600' : 'bg-slate-50 dark:bg-slate-900 text-slate-400'}`}>
+                      <div className={`p-3 rounded-2xl shrink-0 flex items-center justify-center ${!n.read ? 'bg-white dark:bg-slate-850 shadow-sm text-[#0B2345]' : 'bg-slate-50 dark:bg-slate-900 text-slate-400'}`}>
                         {getCategoryIcon(n.type)}
                       </div>
 
                       {/* Msg */}
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300 select-none">
+                          <span className="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-[#0B2345] dark:bg-indigo-950/40 dark:text-indigo-300 select-none">
                             {getCategoryLabel(n.type)}
                           </span>
                           <span className="text-[10px] text-slate-400 flex items-center gap-1">

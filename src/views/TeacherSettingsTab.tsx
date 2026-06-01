@@ -86,7 +86,7 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+            <div className="p-3 bg-blue-50 text-[#0B2345] rounded-xl">
               <AtSign size={24} />
             </div>
             <div>

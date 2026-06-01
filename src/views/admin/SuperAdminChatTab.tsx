@@ -278,7 +278,7 @@ export default function SuperAdminChatTab() {
       <div className={`w-full md:w-80 border-r dark:border-l border-slate-200/50 dark:border-slate-800/40 flex flex-col bg-white dark:bg-slate-900/40 shrink-0 ${mobileShowChat ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-6 border-b border-slate-100 dark:border-slate-800/50 flex flex-col gap-4">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping" />
+            <span className="w-2.5 h-2.5 bg-[#0B2345] rounded-full animate-ping" />
             <h2 className="text-lg font-black text-slate-900 dark:text-white font-display">
               {isRtl ? 'المحادثات والمدارس' : 'School Chats'}
             </h2>
@@ -323,7 +323,7 @@ export default function SuperAdminChatTab() {
                    />
                  ) : (
                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner font-bold text-lg ${
-                     isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                     isSelected ? 'bg-[#0B2345] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
                    }`}>
                      <Building2 size={20} />
                    </div>
@@ -372,7 +372,7 @@ export default function SuperAdminChatTab() {
                    referrerPolicy="no-referrer"
                  />
                ) : (
-                 <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100/30">
+                 <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100/30">
                     <Building2 size={20} />
                  </div>
                )}
@@ -406,7 +406,7 @@ export default function SuperAdminChatTab() {
                    referrerPolicy="no-referrer"
                  />
                ) : (
-                 <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-950/20 flex items-center justify-center mb-3 text-indigo-600 dark:text-indigo-400 text-3xl font-bold ring-4 ring-indigo-500/5">
+                 <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-950/20 flex items-center justify-center mb-3 text-[#0B2345] dark:text-indigo-400 text-3xl font-bold ring-4 ring-indigo-500/5">
                    <Building2 size={36} />
                  </div>
                )}
@@ -532,7 +532,7 @@ export default function SuperAdminChatTab() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-10 h-10 shrink-0 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded-full transition-colors"
+                className="w-10 h-10 shrink-0 flex items-center justify-center text-slate-400 hover:text-[#0B2345] hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded-full transition-colors"
                 title={isRtl ? 'إرفاق ملف (صورة/فيديو)' : 'Attach file (Image/Video)'}
               >
                 <Paperclip size={18} />
@@ -555,7 +555,7 @@ export default function SuperAdminChatTab() {
             <button
               disabled={isLoading || (!newMessage.trim() && !selectedFile) || !activeContact}
               type="submit"
-              className="w-12 h-12 rounded-[1.25rem] bg-indigo-600 text-white flex items-center justify-center shrink-0 hover:bg-indigo-700 hover:scale-[1.04] active:scale-[0.96] disabled:opacity-40 disabled:hover:scale-100 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none shadow-lg shadow-indigo-600/10 transition-all duration-200"
+              className="w-12 h-12 rounded-[1.25rem] bg-[#0B2345] text-white flex items-center justify-center shrink-0 hover:bg-indigo-700 hover:scale-[1.04] active:scale-[0.96] disabled:opacity-40 disabled:hover:scale-100 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none shadow-lg shadow-indigo-600/10 transition-all duration-200"
             >
               <SendHorizontal size={18} className={isRtl ? 'rotate-180 ml-0.5' : 'mr-0.5'} />
             </button>

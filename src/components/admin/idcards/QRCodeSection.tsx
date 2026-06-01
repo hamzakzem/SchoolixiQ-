@@ -77,7 +77,7 @@ export default function QRCodeSection({
               }} />
 
               {/* Glowing gradients */}
-              <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500 rounded-full filter blur-[100px] opacity-30 pointer-events-none" />
+              <div className="absolute -top-24 -left-24 w-48 h-48 bg-[#0B2345] rounded-full filter blur-[100px] opacity-30 pointer-events-none" />
               <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500 rounded-full filter blur-[100px] opacity-20 pointer-events-none" />
 
               {/* Close button */}
@@ -110,7 +110,7 @@ export default function QRCodeSection({
                 {/* Phone Card */}
                 <div className="group bg-white/[0.04] hover:bg-white/[0.07] border border-white/5 p-4 rounded-3xl flex items-center justify-between transition-all duration-300">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center border border-indigo-500/20">
+                    <div className="w-10 h-10 bg-[#0B2345]/10 text-indigo-400 rounded-xl flex items-center justify-center border border-indigo-500/20">
                       <Phone size={18} />
                     </div>
                     <div>
@@ -125,7 +125,7 @@ export default function QRCodeSection({
                   {parentPhone && parentPhone !== '-' && (
                     <a
                       href={`tel:${parentPhone}`}
-                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold rounded-xl flex items-center gap-1 transition-all hover:scale-105"
+                      className="px-3 py-1.5 bg-[#0B2345] hover:bg-[#0B2345] text-xs font-bold rounded-xl flex items-center gap-1 transition-all hover:scale-105"
                     >
                       <ExternalLink size={12} />
                       {isRtl ? "اتصال" : "Call"}

@@ -1176,7 +1176,7 @@ export const PremiumLayouts = ({
           {/* Group 1: Student Primary Identifiers */ }
           <div className="grid grid-cols-2 gap-[2cqi]">
             <div className="flex flex-col bg-slate-50/50 dark:bg-slate-800/30 p-[1.5cqi] rounded-[1.5cqi] border border-slate-100 dark:border-slate-800/50 relative overflow-hidden">
-              <div className="absolute left-0 top-0 bottom-0 w-[0.75cqi] bg-indigo-500 rounded-l-[1.5cqi]"></div>
+              <div className="absolute left-0 top-0 bottom-0 w-[0.75cqi] bg-[#0B2345] rounded-l-[1.5cqi]"></div>
               <span className="opacity-60 font-semibold text-[2.8cqi] tracking-wider mb-[0.25cqi] pl-[1.5cqi] rtl:pl-0 rtl:pr-[1.5cqi]">
                 {isRtl ? "رقم الطالب" : "ID NUMBER"}
               </span>

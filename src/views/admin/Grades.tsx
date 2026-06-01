@@ -462,13 +462,13 @@ export default function Grades() {
                     <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
                       <button 
                          onClick={() => setViewMode('cards')}
-                         className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}
+                         className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-[#0B2345]' : 'text-slate-400'}`}
                       >
                          {t("cards")}
                       </button>
                       <button 
                          onClick={() => setViewMode('grid')}
-                         className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}
+                         className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-[#0B2345]' : 'text-slate-400'}`}
                       >
                          {t("generalRecord")}
                       </button>
@@ -543,13 +543,13 @@ export default function Grades() {
 
             <div className="flex gap-2 pb-2 overflow-x-auto scrolling-touch">
               {subjects.map(subj => (
-                <div key={subj} className={`px-3 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all ${subjectFilter === subj ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white border border-slate-200 text-slate-400'}`}>
+                <div key={subj} className={`px-3 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all ${subjectFilter === subj ? 'bg-[#0B2345] text-white shadow-lg shadow-indigo-200' : 'bg-white border border-slate-200 text-slate-400'}`}>
                   {subj}
                 </div>
               ))}
               <button 
                 onClick={() => setShowAddSubject(true)}
-                className="px-3 py-1 bg-white border border-dashed border-indigo-200 text-indigo-600 rounded-lg text-[10px] font-bold hover:bg-indigo-50 transition-all"
+                className="px-3 py-1 bg-white border border-dashed border-indigo-200 text-[#0B2345] rounded-lg text-[10px] font-bold hover:bg-indigo-50 transition-all"
               >
                 + مادة جديدة
               </button>
@@ -573,7 +573,7 @@ export default function Grades() {
                           {subjects.filter(s => subjectFilter === 'all' || s === subjectFilter).map(subj => (
                             <th key={subj} className="p-4 text-center border-l border-slate-100 min-w-[100px]">{subj}</th>
                           ))}
-                          <th className="p-4 text-center bg-indigo-50 text-indigo-600 border-r border-indigo-100 font-black">المعدل</th>
+                          <th className="p-4 text-center bg-indigo-50 text-[#0B2345] border-r border-indigo-100 font-black">المعدل</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -624,7 +624,7 @@ export default function Grades() {
                                         </div>
                                         <button 
                                           onClick={handleUpdateGrade}
-                                          className="w-full h-6 bg-indigo-600 text-white rounded-md text-[8px] font-bold"
+                                          className="w-full h-6 bg-[#0B2345] text-white rounded-md text-[8px] font-bold"
                                         >
                                           حفظ
                                         </button>
@@ -636,7 +636,7 @@ export default function Grades() {
                                       >
                                         {data !== null ? (
                                           <div className="flex flex-col items-center">
-                                            <span className={`text-xs font-black ${data.percentage >= 50 ? 'text-indigo-600' : 'text-rose-500'}`}>
+                                            <span className={`text-xs font-black ${data.percentage >= 50 ? 'text-[#0B2345]' : 'text-rose-500'}`}>
                                               {data.maxScore === 100 ? `${data.percentage}%` : `${data.score} من ${data.maxScore}`}
                                             </span>
                                             {data.maxScore === 100 && (
@@ -687,13 +687,13 @@ export default function Grades() {
                                     {student.name[0]}
                                  </div>
                                  <div>
-                                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate max-w-[120px]">{student.name}</h4>
+                                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-[#0B2345] transition-colors truncate max-w-[120px]">{student.name}</h4>
                                     <p className="text-[9px] text-slate-400 font-bold tracking-tight">ID: {student.registrationNumber}</p>
                                  </div>
                               </div>
                               {average !== null && (
                                  <div className="text-left bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
-                                    <div className="text-base font-black text-indigo-600 leading-none">{average}%</div>
+                                    <div className="text-base font-black text-[#0B2345] leading-none">{average}%</div>
                                  </div>
                               )}
                            </div>
@@ -716,7 +716,7 @@ export default function Grades() {
                                                    onKeyDown={e => { if (e.key === 'Enter') handleUpdateGrade(); }}
                                                    className="w-full h-8 bg-white border border-indigo-200 rounded-lg text-center font-bold text-xs"
                                                 />
-                                                <button onClick={handleUpdateGrade} className="p-2 bg-indigo-600 text-white rounded-lg">
+                                                <button onClick={handleUpdateGrade} className="p-2 bg-[#0B2345] text-white rounded-lg">
                                                    <Save size={12} />
                                                 </button>
                                              </div>
@@ -736,7 +736,7 @@ export default function Grades() {
                                              </div>
                                              {data ? (
                                                 <div className="flex flex-col">
-                                                   <span className={`text-sm font-black ${data.percentage >= 50 ? 'text-indigo-600' : 'text-rose-500'}`}>
+                                                   <span className={`text-sm font-black ${data.percentage >= 50 ? 'text-[#0B2345]' : 'text-rose-500'}`}>
                                                       {data.maxScore === 100 ? `${data.percentage}%` : `${data.score} من ${data.maxScore}`}
                                                    </span>
                                                    {data.maxScore === 100 && (
@@ -756,14 +756,14 @@ export default function Grades() {
                            <div className="flex gap-2 pt-4 border-t border-slate-50 mt-auto">
                               <button 
                                 onClick={() => handlePrintIndividual(student)}
-                                className="flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-bold hover:bg-indigo-600 transition-all flex items-center justify-center gap-2"
+                                className="flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-bold hover:bg-[#0B2345] transition-all flex items-center justify-center gap-2"
                               >
                                  <Printer size={12} />
                                  شهادة
                               </button>
                               <button 
                                 onClick={() => {/* Detail view */}}
-                                className="w-10 h-10 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                                className="w-10 h-10 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-[#0B2345] hover:bg-indigo-50 rounded-xl transition-all"
                               >
                                  <FileText size={14} />
                               </button>
@@ -809,7 +809,7 @@ export default function Grades() {
                 className="w-full px-5 py-4 rounded-xl border border-slate-200 bg-slate-50 mb-6 outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <div className="flex gap-3">
-                <button onClick={handleAddSubject} className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold">إضافة المادة</button>
+                <button onClick={handleAddSubject} className="flex-1 py-4 bg-[#0B2345] text-white rounded-xl font-bold">إضافة المادة</button>
                 <button onClick={() => setShowAddSubject(false)} className="px-6 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold">إلغاء</button>
               </div>
             </motion.div>

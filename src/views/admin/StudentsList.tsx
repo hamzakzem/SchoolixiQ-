@@ -577,13 +577,13 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           <div className="hidden md:flex bg-slate-100 p-1 rounded-xl border border-slate-200">
             <button 
               onClick={() => setViewMode('table')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-[#0B2345]' : 'text-slate-500'}`}
             >
               جدول
             </button>
             <button 
               onClick={() => setViewMode('cards')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-[#0B2345]' : 'text-slate-500'}`}
             >
               بطاقات
             </button>
@@ -661,7 +661,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                setParentPhone(student.parentPhone || '');
                                setParentPassword(student.parentPassword || '');
                              }}
-                             className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
+                             className="p-2.5 bg-blue-50 text-[#0B2345] rounded-xl hover:bg-blue-100 transition-all"
                              title="ربط بولي أمر"
                           >
                             <UserPlus size={18} />
@@ -814,7 +814,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   {!isViewOnly && (
                     <button 
                       onClick={() => setShowLinkParentModal(student)}
-                      className="w-10 h-10 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl flex items-center justify-center"
+                      className="w-10 h-10 bg-blue-50 text-[#0B2345] border border-blue-100 rounded-xl flex items-center justify-center"
                     >
                       <UserPlus size={16} />
                     </button>
@@ -1374,7 +1374,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       <button
                         disabled={isLinking}
                         type="submit"
-                        className="flex-1 px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                        className="flex-1 px-8 py-4 bg-[#0B2345] text-white rounded-2xl font-bold hover:bg-[#1a3a6b] transition-all shadow-lg active:scale-95 disabled:opacity-50"
                       >
                         {isLinking ? 'جاري الربط...' : 'إتمام عملية الربط'}
                       </button>

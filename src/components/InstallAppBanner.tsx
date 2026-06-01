@@ -147,7 +147,7 @@ export default function InstallAppBanner() {
               {/* Text content */}
               <div className="flex-1 pr-1 pl-3 text-right">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="bg-indigo-50 dark:bg-indigo-950/40 text-[#0B2345] dark:text-indigo-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
                     {t('nativeAppLabel')}
                   </span>
                   <div className="flex items-center text-amber-400">
@@ -169,7 +169,7 @@ export default function InstallAppBanner() {
                 <div className="flex items-center gap-3 mt-4">
                   <button
                     onClick={handleInstallClick}
-                    className="flex-1 py-3 px-5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                    className="flex-1 py-3 px-5 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-2xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <Download size={14} />
                     {t('installAppNow')}
@@ -191,7 +191,7 @@ export default function InstallAppBanner() {
               className="text-right"
             >
               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
-                <Info className="text-indigo-600 dark:text-indigo-400" size={18} />
+                <Info className="text-[#0B2345] dark:text-indigo-400" size={18} />
                 <h3 className="font-black text-slate-900 dark:text-white text-base">
                   {t('iosInstallSteps')}
                 </h3>
@@ -238,7 +238,7 @@ export default function InstallAppBanner() {
                 {/* Method 2: Config Profile File */}
                 <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/50 dark:from-indigo-950/10 dark:to-violet-950/10 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-right">
                   <div className="flex items-center gap-2 mb-2 font-black text-slate-800 dark:text-slate-200">
-                    <span className="w-5 h-5 rounded-lg bg-indigo-500 text-white flex items-center justify-center text-xs font-bold">٢</span>
+                    <span className="w-5 h-5 rounded-lg bg-[#0B2345] text-white flex items-center justify-center text-xs font-bold">٢</span>
                     <span className="text-xs sm:text-sm font-black">{t('iosMethodProfile')}</span>
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-6">
@@ -251,7 +251,7 @@ export default function InstallAppBanner() {
                       onClick={() => {
                         toast.success(t('preparingProfileSuccess'));
                       }}
-                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer text-center"
+                      className="w-full py-2 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer text-center"
                     >
                       <Download size={13} />
                       {t('iosDownloadProfile')}
@@ -267,7 +267,7 @@ export default function InstallAppBanner() {
               <div className="mt-5 flex items-center gap-3">
                 <button
                   onClick={() => setShowIOSInstructions(false)}
-                  className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl text-xs transition-all shadow-md cursor-pointer hover:shadow-indigo-500/15"
+                  className="flex-1 py-3 px-4 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-2xl text-xs transition-all shadow-md cursor-pointer hover:shadow-indigo-500/15"
                 >
                   {t('gotItThanks')}
                 </button>

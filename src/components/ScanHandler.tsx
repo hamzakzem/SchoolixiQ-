@@ -144,7 +144,7 @@ export default function ScanHandler() {
           dir={isRtl ? "rtl" : "ltr"}
         >
           {/* Header */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-[#0B2345] text-white">
             <h3 className="font-bold flex items-center gap-2">
               <User size={20} />
               {isRtl ? "بيانات الطالب" : "Student Data"}
@@ -168,7 +168,7 @@ export default function ScanHandler() {
             ) : student ? (
               <div className="space-y-6">
                 <div className="text-center">
-                  <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full mx-auto flex items-center justify-center mb-4">
+                  <div className="w-24 h-24 bg-[#e8eef5] text-[#0B2345] rounded-full mx-auto flex items-center justify-center mb-4">
                     {student.imageUrl ? (
                       <img
                         src={student.imageUrl || undefined}

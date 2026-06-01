@@ -249,7 +249,7 @@ export default function Marketplace() {
                   <p className="text-[10px] md:text-xs text-slate-500 mt-1 line-clamp-1 md:line-clamp-2 md:leading-relaxed">{item.description}</p>
                </div>
                <div className="mt-3 md:mt-5 flex flex-col md:flex-row md:items-center justify-between gap-1">
-                 <span className="text-indigo-600 font-bold text-sm md:text-lg">{item.price.toLocaleString()} د.ع</span>
+                 <span className="text-[#0B2345] font-bold text-sm md:text-lg">{item.price.toLocaleString()} د.ع</span>
                  <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400 w-fit">متبقي: {item.stock}</span>
                </div>
             </div>
@@ -285,7 +285,7 @@ export default function Marketplace() {
                        <td className="p-4 font-bold text-slate-900 dark:text-white">{order.items?.[0]?.name || 'منتج'}</td>
                        <td className="p-4 text-slate-600 dark:text-slate-400">{order.parentName || '--'}</td>
                        <td className="p-4 text-slate-600 dark:text-slate-400">{order.studentName || '--'}</td>
-                       <td className="p-4 font-bold text-indigo-600 dark:text-indigo-400">{order.total?.toLocaleString()} د.ع</td>
+                       <td className="p-4 font-bold text-[#0B2345] dark:text-indigo-400">{order.total?.toLocaleString()} د.ع</td>
                        <td className="p-4">
                           <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap transition-all duration-300 ${
                             order.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm shadow-emerald-100/50' :
@@ -372,7 +372,7 @@ export default function Marketplace() {
                 </div>
 
                 <div className="flex items-center justify-between pt-2">
-                   <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">{order.total?.toLocaleString()} د.ع</span>
+                   <span className="text-xs font-black text-[#0B2345] dark:text-indigo-400">{order.total?.toLocaleString()} د.ع</span>
                    <div className="flex items-center gap-1">
                       {order.status === 'pending' && (
                         <>

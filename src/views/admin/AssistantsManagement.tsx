@@ -175,7 +175,7 @@ export default function AssistantsManagement() {
               setEditingAssistant(null);
               setShowModal(true);
             }}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
           >
              <UserPlus size={20} />
              إضافة مساعد جديد
@@ -191,7 +191,7 @@ export default function AssistantsManagement() {
             className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl transition-all"
           >
             <div className="flex items-start gap-4 text-right">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xl shadow-lg">
+              <div className="w-16 h-16 rounded-2xl bg-[#0B2345] text-white flex items-center justify-center font-bold text-xl shadow-lg">
                  {assistant.name?.[0]}
               </div>
               <div className="flex-1">
@@ -203,7 +203,7 @@ export default function AssistantsManagement() {
                 
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {assistant.permissions?.map((pId: string) => (
-                    <span key={pId} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-md border border-indigo-100">
+                    <span key={pId} className="px-2 py-0.5 bg-indigo-50 text-[#0B2345] text-[10px] font-bold rounded-md border border-indigo-100">
                       {PERMISSION_OPTIONS.find(opt => opt.id === pId)?.label || pId}
                     </span>
                   ))}
@@ -325,7 +325,7 @@ export default function AssistantsManagement() {
                             onClick={() => togglePermission(opt.id)}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all border text-right ${
                               formData.permissions.includes(opt.id)
-                                ? 'bg-indigo-600 text-white border-transparent shadow-md'
+                                ? 'bg-[#0B2345] text-white border-transparent shadow-md'
                                 : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
                             }`}
                           >
@@ -346,7 +346,7 @@ export default function AssistantsManagement() {
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                    className="flex-1 py-4 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
                   >
                     <Save size={20} />
                     {isSaving ? 'جاري الحفظ...' : 'حفظ بيانات المساعد'}

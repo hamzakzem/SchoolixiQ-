@@ -172,7 +172,7 @@ export default function Behavior() {
                       setSelectedStudent(student);
                       setShowAddModal(true);
                     }}
-                    className="p-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 transition-all active:scale-95"
+                    className="p-2 bg-slate-900 text-white rounded-lg hover:bg-[#0B2345] transition-all active:scale-95"
                   >
                     <Plus size={18} />
                   </button>

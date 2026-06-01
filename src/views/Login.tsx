@@ -855,7 +855,7 @@ export default function Login() {
                 <div className="relative w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center">
                   <div className="absolute inset-0 rounded-2xl border border-dashed border-indigo-500/30 animate-[spin_10s_linear_infinite]"></div>
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500/5 to-sky-500/5 border border-indigo-500/10 flex items-center justify-center">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                    <span className="w-2 h-2 rounded-full bg-[#0B2345] animate-pulse"></span>
                   </div>
                 </div>
               )}
@@ -866,7 +866,7 @@ export default function Login() {
               {/* Elegant Geometric Accents around the main brand */}
               <div className="flex items-center gap-3">
                 <span className="h-[2px] w-8 bg-gradient-to-r from-transparent to-slate-200 rounded-full"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#0B2345]"></span>
                 <span className="h-[2px] w-8 bg-gradient-to-l from-transparent to-slate-200 rounded-full"></span>
               </div>
 
@@ -874,7 +874,7 @@ export default function Login() {
                 <span className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 bg-clip-text text-transparent">
                   schoolix
                 </span>
-                <span className="text-indigo-600 font-extrabold relative">
+                <span className="text-[#0B2345] font-extrabold relative">
                   iQ
                   <span className="absolute -top-0.5 -right-2.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 </span>
@@ -1035,7 +1035,7 @@ export default function Login() {
               <div className="flex items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="bg-white p-1.5 sm:p-2 rounded-lg border border-slate-200 hidden sm:block">
-                    <ShieldCheck size={20} className="text-blue-600" />
+                    <ShieldCheck size={20} className="text-[#0B2345]" />
                   </div>
                   <div>
                     <span className="block font-bold text-slate-600 text-xs sm:text-sm">
@@ -1060,7 +1060,7 @@ export default function Login() {
 
             <button
               disabled={loading}
-              className={`w-full py-4 sm:py-5 rounded-xl sm:rounded-[1.5rem] font-bold text-base sm:text-lg flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 disabled:opacity-50 ${mode === "signup" ? "bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200" : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100"}`}
+              className={`w-full py-4 sm:py-5 rounded-xl sm:rounded-[1.5rem] font-bold text-base sm:text-lg flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 disabled:opacity-50 ${mode === "signup" ? "bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200" : "bg-[#0B2345] text-white hover:bg-[#1a3a6b] shadow-blue-100"}`}
             >
               {loading ? (
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -1155,7 +1155,7 @@ export default function Login() {
                           : "Domain copied successfully!",
                       );
                     }}
-                    className="flex items-center gap-1.5 hover:bg-slate-100 px-2.5 py-1.5 rounded-md font-bold transition-all text-[11px] text-blue-600 shrink-0 active:scale-95 border border-slate-200 bg-white shadow-sm"
+                    className="flex items-center gap-1.5 hover:bg-slate-100 px-2.5 py-1.5 rounded-md font-bold transition-all text-[11px] text-[#0B2345] shrink-0 active:scale-95 border border-slate-200 bg-white shadow-sm"
                   >
                     <Copy size={13} />
                     <span>{isRtl ? "نسخ" : "Copy"}</span>
@@ -1258,7 +1258,7 @@ export default function Login() {
                         localStorage.setItem("override_google_client_id", googleClientId);
                         toast.success(isRtl ? "تم الحفظ محلياً! اضغط على أيقونة جوجل بالأعلى لإعادة المحاولة" : "Saved locally! Tap Google Sign-In above to retry.");
                       }}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded transition-colors active:scale-95 duration-100 shrink-0"
+                      className="px-3 py-1.5 bg-[#0B2345] hover:bg-[#1a3a6b] text-white font-medium text-xs rounded transition-colors active:scale-95 duration-100 shrink-0"
                     >
                       {isRtl ? "حفظ" : "Save"}
                     </button>
@@ -1344,7 +1344,7 @@ export default function Login() {
               >
                 <div className="flex items-start gap-2.5 mb-2.5 rtl:flex-row-reverse">
                   <ShieldAlert
-                    className="text-indigo-600 shrink-0 mt-0.5"
+                    className="text-[#0B2345] shrink-0 mt-0.5"
                     size={18}
                   />
                   <div>
@@ -1372,7 +1372,7 @@ export default function Login() {
                     onClick={() => {
                       window.open(window.location.href, "_blank");
                     }}
-                    className="w-full flex items-center justify-center gap-2 hover:bg-indigo-600 hover:text-white bg-indigo-500 text-white px-3 py-2 sm:py-2.5 rounded-lg font-bold transition-all text-xs sm:text-sm active:scale-95 shadow"
+                    className="w-full flex items-center justify-center gap-2 hover:bg-[#0B2345] hover:text-white bg-[#0B2345] text-white px-3 py-2 sm:py-2.5 rounded-lg font-bold transition-all text-xs sm:text-sm active:scale-95 shadow"
                   >
                     <ExternalLink size={14} />
                     <span>
@@ -1424,7 +1424,7 @@ export default function Login() {
           className="bg-white w-full max-w-lg rounded-[2rem] sm:rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden mb-8 sm:mb-12 text-center"
         >
         <div className="p-6 sm:p-10">
-          <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto mb-4">
+          <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-50 text-[#0B2345] mx-auto mb-4">
             <Smartphone className="w-6 h-6" />
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2">
@@ -1456,7 +1456,7 @@ export default function Login() {
                 onClick={() => startDirectInstall("ios")}
                 className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-slate-100/80 hover:border-indigo-500/30 hover:bg-indigo-50/10 transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98]"
               >
-                <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2.5 transition-colors group-hover:bg-indigo-500 group-hover:text-white">
+                <div className="w-12 h-12 rounded-xl bg-indigo-50 text-[#0B2345] flex items-center justify-center mb-2.5 transition-colors group-hover:bg-[#0B2345] group-hover:text-white">
                   <Smartphone className="w-5 h-5" />
                 </div>
                 <span className="font-extrabold text-xs sm:text-sm text-slate-800">آيفون / iOS</span>
@@ -1470,7 +1470,7 @@ export default function Login() {
                 <span className="text-xs font-bold text-slate-400">
                   {installingPlatform === "android" ? "Google Android Package" : "Apple iOS Profile"}
                 </span>
-                <span className="text-sm font-black text-indigo-600 font-mono">
+                <span className="text-sm font-black text-[#0B2345] font-mono">
                   {installProgress}%
                 </span>
               </div>
@@ -1577,7 +1577,7 @@ export default function Login() {
                       {/* Method 2: Config Profile File */}
                       <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/50 dark:from-indigo-950/10 dark:to-violet-950/10 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-right">
                         <div className="flex items-center gap-2 mb-2 font-black text-slate-800 dark:text-slate-200">
-                          <span className="w-6 h-6 rounded-lg bg-indigo-500 text-white flex items-center justify-center text-xs">٢</span>
+                          <span className="w-6 h-6 rounded-lg bg-[#0B2345] text-white flex items-center justify-center text-xs">٢</span>
                           <span className="text-xs sm:text-sm font-black">{isRtl ? "طريقة ملف التعريف التلقائي بنقرة واحدة" : "Or Download Secure iOS Configuration Profile"}</span>
                         </div>
                         <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-8">
@@ -1592,7 +1592,7 @@ export default function Login() {
                             onClick={() => {
                               toast.success(isRtl ? "جاري تحضير ملف التعريف وتنزيله بنجاح..." : "Preparing and downloading configuration profile...");
                             }}
-                            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer text-center hover:scale-[1.01] active:scale-[0.99]"
+                            className="w-full py-2.5 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer text-center hover:scale-[1.01] active:scale-[0.99]"
                           >
                             <Download size={13} />
                             {isRtl ? "تنزيل وتثبيت الملف بنقرة واحدة" : "Download Configuration Profile"}
@@ -1668,7 +1668,7 @@ export default function Login() {
                 className={`bg-white rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 border-2 transition-all flex flex-col ${pkg.isPopular ? "border-blue-600 shadow-2xl shadow-blue-100 ring-4 ring-blue-50" : "border-slate-100 shadow-xl"}`}
               >
                 {pkg.isPopular && (
-                  <span className="bg-blue-600 text-white px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-6">
+                  <span className="bg-[#0B2345] text-white px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-6">
                     {t("mostPopular")}
                   </span>
                 )}
@@ -1703,7 +1703,7 @@ export default function Login() {
 
                 <button
                   onClick={() => setShowSubscriptionModal(pkg)}
-                  className={`w-full py-4 rounded-2xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
+                  className={`w-full py-4 rounded-2xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-[#0B2345] text-white hover:bg-[#1a3a6b]" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                 >
                   {t("subscribeNow")}
                 </button>
@@ -1722,7 +1722,7 @@ export default function Login() {
         className="w-full mt-24 sm:mt-32 pt-20 pb-12 relative overflow-hidden"
       >
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-800 to-transparent"></div>
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[500px] bg-blue-500/10 dark:bg-blue-500/5 blur-[120px] rounded-full pointer-events-none"></div>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[500px] bg-[#0B2345]/10 dark:bg-[#0B2345]/5 blur-[120px] rounded-full pointer-events-none"></div>
 
         <div className="w-full max-w-7xl mx-auto px-4 z-10 relative">
           <div className="text-center max-w-3xl mx-auto mb-20">
@@ -1835,7 +1835,7 @@ export default function Login() {
                 ]
             ).map((feat, idx) => {
               const bgColors = [
-                "from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 text-blue-600 dark:text-blue-400 group-hover:from-blue-500 group-hover:to-indigo-600",
+                "from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 text-[#0B2345] dark:text-blue-400 group-hover:from-blue-500 group-hover:to-indigo-600",
                 "from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 text-emerald-600 dark:text-emerald-400 group-hover:from-emerald-500 group-hover:to-teal-600",
                 "from-orange-500/10 to-amber-500/10 dark:from-orange-500/20 dark:to-amber-500/20 text-orange-600 dark:text-orange-400 group-hover:from-orange-500 group-hover:to-amber-600",
                 "from-purple-500/10 to-fuchsia-500/10 dark:from-purple-500/20 dark:to-fuchsia-500/20 text-purple-600 dark:text-purple-400 group-hover:from-purple-500 group-hover:to-fuchsia-600",
@@ -2170,7 +2170,7 @@ export default function Login() {
 
                     <button
                       disabled={isSubmitting}
-                      className="w-full py-4 md:py-5 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black text-base md:text-lg shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 mt-2"
+                      className="w-full py-4 md:py-5 bg-[#0B2345] text-white rounded-xl md:rounded-2xl font-black text-base md:text-lg shadow-xl shadow-blue-600/20 hover:bg-[#1a3a6b] transition-all active:scale-95 disabled:opacity-50 mt-2"
                     >
                       {isSubmitting ? (
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto"></div>

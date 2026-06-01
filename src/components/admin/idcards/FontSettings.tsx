@@ -123,26 +123,26 @@ export default function IdCardFontSettings({ template, setTemplate, isRtl }: Fon
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden mt-4">
       <h3 className="text-lg font-black mb-4 flex items-center gap-2">
-        <Type className="text-indigo-600" />
+        <Type className="text-[#0B2345]" />
         {isRtl ? "إعدادات الخطوط والطباعة" : "Advanced Typography System"}
       </h3>
 
       <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
         <button
           onClick={() => setActiveTab('global')}
-          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'global' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'global' ? 'border-indigo-600 text-[#0B2345]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           {isRtl ? "الخط الأساسي" : "Global Font"}
         </button>
         <button
           onClick={() => setActiveTab('elements')}
-          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'elements' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'elements' ? 'border-indigo-600 text-[#0B2345]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           {isRtl ? "خطوط العناصر" : "Element Fonts"}
         </button>
         <button
           onClick={() => setActiveTab('custom')}
-          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'custom' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'custom' ? 'border-indigo-600 text-[#0B2345]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           {isRtl ? "رفع خط مخصص" : "Custom Fonts"}
         </button>

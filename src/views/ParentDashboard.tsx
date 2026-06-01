@@ -933,7 +933,7 @@ export default function ParentDashboard() {
           className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8 text-center"
           dir="rtl"
         >
-          <div className="w-20 h-20 rounded-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-600 mb-6 shadow-sm overflow-hidden">
+          <div className="w-20 h-20 rounded-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-[#0B2345] mb-6 shadow-sm overflow-hidden">
             {config.appLogo ? (
               <img
                 src={config.appLogo}
@@ -972,7 +972,7 @@ export default function ParentDashboard() {
                   }
                 }
               }}
-              className="px-6 py-4 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 shadow-sm font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
+              className="px-6 py-4 bg-blue-50 text-[#0B2345] hover:bg-blue-100 border border-blue-100 shadow-sm font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
             >
               <Building size={20} />
               {isRtl ? "التحول لحساب مدرسة / إدارة" : "Switch to School Admin"}
@@ -1027,7 +1027,7 @@ export default function ParentDashboard() {
                       />
                     </div>
                   ) : (
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 shrink-0">
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-[#0B2345] rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 shrink-0">
                       <User size={isSidebarCollapsed ? 24 : 20} />
                     </div>
                   )}
@@ -1037,7 +1037,7 @@ export default function ParentDashboard() {
                          {t("parentWelcome")}
                       </h2>
                       <div className="flex flex-col">
-                        <p className="text-[10px] uppercase tracking-widest text-indigo-600 font-bold truncate">
+                        <p className="text-[10px] uppercase tracking-widest text-[#0B2345] font-bold truncate">
                           {profile?.name}
                         </p>
                       </div>
@@ -1164,7 +1164,7 @@ export default function ParentDashboard() {
                 <div className="relative shrink-0">
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
-                    className={`w-8 h-8 shrink-0 rounded transition-all flex items-center justify-center relative shadow-sm ${showNotifications ? "bg-indigo-600 border-indigo-700 text-white" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50"}`}
+                    className={`w-8 h-8 shrink-0 rounded transition-all flex items-center justify-center relative shadow-sm ${showNotifications ? "bg-[#0B2345] border-indigo-700 text-white" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50"}`}
                   >
                     <Bell size={16} />
                     {notifications.filter((n) => !n.read).length > 0 && (
@@ -1196,7 +1196,7 @@ export default function ParentDashboard() {
                 onClick={() => setSelectedStudent(s)}
                 className={`py-1.5 px-3 rounded text-xs font-mono font-bold whitespace-nowrap transition-all flex items-center gap-2.5 shrink-0 border ${
                   selectedStudent?.id === s.id
-                    ? "bg-indigo-600 text-white border-indigo-700 shadow-md translate-y-[-1px]"
+                    ? "bg-[#0B2345] text-white border-indigo-700 shadow-md translate-y-[-1px]"
                     : "bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
                 }`}
               >
@@ -1211,7 +1211,7 @@ export default function ParentDashboard() {
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <span className={`text-[9px] font-black uppercase ${selectedStudent?.id === s.id ? "text-white" : "text-indigo-600"}`}>
+                    <span className={`text-[9px] font-black uppercase ${selectedStudent?.id === s.id ? "text-white" : "text-[#0B2345]"}`}>
                       {s.name[0]}
                     </span>
                   )}
@@ -1221,7 +1221,7 @@ export default function ParentDashboard() {
             ))}
             <button
               onClick={() => setShowAddStudentModal(true)}
-              className="px-3 py-1.5 rounded text-xs font-mono font-bold bg-white dark:bg-slate-800 text-indigo-600 border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 transition-all flex items-center gap-2 shrink-0 border-dashed"
+              className="px-3 py-1.5 rounded text-xs font-mono font-bold bg-white dark:bg-slate-800 text-[#0B2345] border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 transition-all flex items-center gap-2 shrink-0 border-dashed"
             >
               <Users size={12} />
               {t("linkStudent")}
@@ -1249,11 +1249,11 @@ export default function ParentDashboard() {
                       className="p-5 md:p-6 rounded-[2rem] bg-gradient-to-br from-indigo-50/70 via-white to-blue-50/50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800/80 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-5 transition-all text-right"
                     >
                       <div className="flex items-start gap-4 w-full md:w-auto">
-                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-600/20">
+                        <div className="w-12 h-12 bg-[#0B2345] rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-600/20">
                           <MapPin size={24} className="animate-bounce" style={{ animationDuration: '3s' }} />
                         </div>
                         <div>
-                          <p className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{isRtl ? 'الموقع الجغرافي للمدرسة' : 'Detailed School Location & Address'}</p>
+                          <p className="text-[10px] font-mono font-bold text-[#0B2345] dark:text-indigo-400 uppercase tracking-widest">{isRtl ? 'الموقع الجغرافي للمدرسة' : 'Detailed School Location & Address'}</p>
                           <h3 className="text-lg font-black text-slate-950 dark:text-white mt-1 leading-snug">{schoolInfo.name}</h3>
                           <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
                             <p className="flex items-center gap-1.5">
@@ -1267,7 +1267,7 @@ export default function ParentDashboard() {
                                   href={schoolInfo.googleMapsUrl} 
                                   target="_blank" 
                                   rel="noopener noreferrer" 
-                                  className="text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1 font-bold"
+                                  className="text-[#0B2345] dark:text-indigo-400 hover:underline inline-flex items-center gap-1 font-bold"
                                 >
                                   {isRtl ? 'خرائط جوجل (Google Maps)' : 'Google Maps'}
                                   <ExternalLink size={11} />
@@ -1283,7 +1283,7 @@ export default function ParentDashboard() {
                           href={schoolInfo.googleMapsUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-full md:w-auto px-5 py-3 bg-indigo-600 hover:bg-indigo-505 text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-indigo-600/10 cursor-pointer"
+                          className="w-full md:w-auto px-5 py-3 bg-[#0B2345] hover:bg-indigo-505 text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-indigo-600/10 cursor-pointer"
                         >
                           <MapPin size={14} />
                           <span>{isRtl ? 'الذهاب إلى خريطة المدرسة التفصيلية' : 'Open Detailed School Google Map'}</span>
@@ -1388,7 +1388,7 @@ export default function ParentDashboard() {
                       </h2>
                       <button
                         onClick={() => setActiveTab("homework")}
-                        className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 uppercase tracking-wider flex items-center gap-1"
+                        className="text-[10px] font-mono font-bold text-[#0B2345] dark:text-indigo-400 hover:text-indigo-700 uppercase tracking-wider flex items-center gap-1"
                       >
                         {t("seeAll")} <ArrowRight size={10} className={isRtl ? "rotate-180" : ""} />
                       </button>
@@ -1403,7 +1403,7 @@ export default function ParentDashboard() {
                           >
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors border border-slate-200 dark:border-slate-700">
+                                <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-[#0B2345] transition-colors border border-slate-200 dark:border-slate-700">
                                   <BookOpen size={16} />
                                 </div>
                                 <div className="flex-1">
@@ -1411,7 +1411,7 @@ export default function ParentDashboard() {
                                     {hw.title}
                                   </h4>
                                   <div className="text-right">
-                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider inline-block">
+                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider inline-block">
                                       {hw.subject}
                                     </span>
                                   </div>
@@ -1420,7 +1420,7 @@ export default function ParentDashboard() {
                             </div>
                             <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3 mt-auto">
                               <p className="text-[10px] font-mono font-bold text-slate-400">
-                                {t("deliveryDate")}: <span className="text-indigo-600 dark:text-indigo-400">{hw.dueDate}</span>
+                                {t("deliveryDate")}: <span className="text-[#0B2345] dark:text-indigo-400">{hw.dueDate}</span>
                               </p>
                               <button
                                 onClick={(e) => {
@@ -1672,7 +1672,7 @@ export default function ParentDashboard() {
                         >
                           <div>
                             <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/50">
-                              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider">
+                              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider">
                                 {hw.subject}
                               </span>
                               <div className="flex items-center gap-3">
@@ -1793,7 +1793,7 @@ export default function ParentDashboard() {
                     {/* Right Column: Contact Details Form Editor */}
                     <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 md:p-8 rounded-[2.5rem] shadow-sm space-y-6">
                       <div className="flex items-start gap-3 p-4 bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-3xl text-right">
-                        <div className="w-10 h-10 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 bg-[#0B2345]/10 text-[#0B2345] dark:text-indigo-400 rounded-2xl flex items-center justify-center shrink-0">
                           <Sparkles size={18} className="animate-pulse" />
                         </div>
                         <div>
@@ -1905,7 +1905,7 @@ export default function ParentDashboard() {
                           className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right border-l-4 border-l-indigo-600"
                         >
                           <div className="flex items-center justify-between mb-4">
-                            <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                            <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
                               {isRtl ? "تقرير متقدم" : "Advanced Report"}
                             </span>
                             <div className="flex items-center gap-2">
@@ -1969,7 +1969,7 @@ export default function ParentDashboard() {
                           className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right border-l-4 border-l-indigo-600"
                         >
                           <div className="flex items-center justify-between mb-4">
-                            <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                            <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
                               {report.subject}
                             </span>
                             <div className="flex items-center gap-2">
@@ -2054,7 +2054,7 @@ export default function ParentDashboard() {
                           </div>
                           <div className="mt-auto space-y-3">
                             <div className="flex items-center justify-between">
-                              <p className="text-indigo-600 dark:text-indigo-400 font-black text-sm">
+                              <p className="text-[#0B2345] dark:text-indigo-400 font-black text-sm">
                                 {item.price?.toLocaleString()} د.ع
                               </p>
                               <span className="text-[9px] font-bold text-slate-400">
@@ -2092,7 +2092,7 @@ export default function ParentDashboard() {
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display">
                       {t("resultsFor")} {selectedStudent?.name}
                     </h2>
-                    <div className="bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full text-[10px] font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 transition-colors uppercase tracking-widest">
+                    <div className="bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full text-[10px] font-bold text-[#0B2345] dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 transition-colors uppercase tracking-widest">
                       {t("firstSemester")}
                     </div>
                   </div>
@@ -2156,7 +2156,7 @@ export default function ParentDashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right flex flex-col justify-between">
                         <div className="flex items-center gap-3 mb-2">
-                          <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center">
+                          <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-lg flex items-center justify-center">
                             <Wallet size={16} />
                           </div>
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
@@ -2366,7 +2366,7 @@ export default function ParentDashboard() {
                             className={`bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors ${isRtl ? "border-r-4 border-r-indigo-600 text-right" : "border-l-4 border-l-indigo-600 text-left"}`}
                           >
                             <div className="flex items-center justify-between mb-4">
-                              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
                                 {t("privateMessage")}
                               </span>
                               <span className="text-xs text-slate-400 font-bold">
@@ -2551,7 +2551,7 @@ export default function ParentDashboard() {
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative border border-slate-200 dark:border-slate-800"
             >
-              <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto mb-6 overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
+              <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-[#0B2345] dark:text-indigo-400 mx-auto mb-6 overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
                 {purchaseModal.image ? (
                   <img
                     src={purchaseModal.image || undefined}
@@ -2586,7 +2586,7 @@ export default function ParentDashboard() {
                   <span className="text-slate-900 dark:text-white">1</span>
                 </div>
                 <div className="h-px bg-slate-200 dark:border-slate-700 my-2"></div>
-                <div className="flex justify-between text-lg font-black tracking-tight text-indigo-600 dark:text-indigo-400">
+                <div className="flex justify-between text-lg font-black tracking-tight text-[#0B2345] dark:text-indigo-400">
                   <span>{t("total")}</span>
                   <span>{purchaseModal.price?.toLocaleString()} د.ع</span>
                 </div>
@@ -2626,7 +2626,7 @@ export default function ParentDashboard() {
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative border border-slate-200 dark:border-slate-800"
             >
-              <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-6">
+              <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-[#0B2345] dark:text-blue-400 mx-auto mb-6">
                 <Users size={32} />
               </div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 text-center font-display">

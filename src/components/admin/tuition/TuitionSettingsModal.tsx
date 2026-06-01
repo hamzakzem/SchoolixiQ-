@@ -221,13 +221,13 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">كيفية التوزيع التلقائي للأقساط؟</label>
                 <div className="grid grid-cols-3 gap-2 mb-3">
-                  <button type="button" onClick={() => handleScheduleChange('monthly')} className={`py-2 rounded-xl font-bold text-xs transition-all ${scheduleType === 'monthly' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
+                  <button type="button" onClick={() => handleScheduleChange('monthly')} className={`py-2 rounded-xl font-bold text-xs transition-all ${scheduleType === 'monthly' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
                     شهري (9 اشهر)
                   </button>
-                  <button type="button" onClick={() => handleScheduleChange('quarterly')} className={`py-2 rounded-xl font-bold text-xs transition-all ${scheduleType === 'quarterly' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
+                  <button type="button" onClick={() => handleScheduleChange('quarterly')} className={`py-2 rounded-xl font-bold text-xs transition-all ${scheduleType === 'quarterly' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
                     فصلي (4 فصول)
                   </button>
-                  <button type="button" onClick={() => handleScheduleChange('custom')} className={`py-2 rounded-xl font-bold text-xs transition-all ${scheduleType === 'custom' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
+                  <button type="button" onClick={() => handleScheduleChange('custom')} className={`py-2 rounded-xl font-bold text-xs transition-all ${scheduleType === 'custom' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
                     مخصص
                   </button>
                 </div>

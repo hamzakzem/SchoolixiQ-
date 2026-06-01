@@ -206,7 +206,7 @@ export default function Schedules() {
             <button
               onClick={handleSave}
               disabled={isSaving || !selectedClassId}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white text-blue-600 px-6 py-3.5 rounded-xl hover:bg-blue-50 transition-all disabled:opacity-50 font-black shadow-lg shadow-white/10 hover:scale-[1.02] active:scale-95"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white text-[#0B2345] px-6 py-3.5 rounded-xl hover:bg-blue-50 transition-all disabled:opacity-50 font-black shadow-lg shadow-white/10 hover:scale-[1.02] active:scale-95"
             >
               <Save size={18} />
               <span>حفظ</span>
@@ -255,7 +255,7 @@ export default function Schedules() {
                 {DAYS_OF_WEEK.slice(0, 5).map((day) => ( // Sunday to Thursday
                   <tr key={day} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors print:hover:bg-transparent group">
                     <td className="p-5 align-top bg-slate-50/30 dark:bg-slate-800/20">
-                      <div className="font-black text-blue-600 dark:text-blue-400 text-xl flex items-center h-full pt-4">{day}</div>
+                      <div className="font-black text-[#0B2345] dark:text-blue-400 text-xl flex items-center h-full pt-4">{day}</div>
                     </td>
                     <td className="p-5">
                       <div className="flex flex-wrap gap-4">
@@ -266,7 +266,7 @@ export default function Schedules() {
                             key={idx} 
                             className="relative bg-white dark:bg-slate-800/80 rounded-2xl p-5 min-w-[220px] max-w-[220px] shadow-sm border border-slate-200 dark:border-slate-700 group/item hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all"
                           >
-                            <div className="absolute top-0 right-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-black rounded-bl-2xl rounded-tr-2xl flex items-center justify-center text-sm">
+                            <div className="absolute top-0 right-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/50 text-[#0B2345] dark:text-blue-400 font-black rounded-bl-2xl rounded-tr-2xl flex items-center justify-center text-sm">
                               {idx + 1}
                             </div>
                             <button 
@@ -306,9 +306,9 @@ export default function Schedules() {
                         
                         <button 
                           onClick={() => handleAddPeriod(day)}
-                          className="flex flex-col items-center justify-center gap-3 min-w-[220px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-400 hover:text-blue-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all p-6 print:hidden opacity-70 hover:opacity-100 group/add"
+                          className="flex flex-col items-center justify-center gap-3 min-w-[220px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-400 hover:text-[#0B2345] hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all p-6 print:hidden opacity-70 hover:opacity-100 group/add"
                         >
-                          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover/add:bg-blue-100 dark:group-hover/add:bg-blue-900/50 group-hover/add:text-blue-600 transition-colors">
+                          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover/add:bg-blue-100 dark:group-hover/add:bg-blue-900/50 group-hover/add:text-[#0B2345] transition-colors">
                             <Plus size={24} />
                           </div>
                           <span className="font-bold">إضافة حصة جديدة</span>
@@ -327,12 +327,12 @@ export default function Schedules() {
               <div key={day} className="space-y-3">
                 <div className="flex items-center justify-between px-2">
                    <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
+                      <div className="w-1 h-6 bg-[#0B2345] rounded-full"></div>
                       {day}
                    </h3>
                    <button 
                      onClick={() => handleAddPeriod(day)}
-                     className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg"
+                     className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-[#0B2345] dark:text-blue-400 rounded-lg"
                    >
                      <Plus size={20} />
                    </button>
@@ -342,7 +342,7 @@ export default function Schedules() {
                    {(schedule[day] || []).map((period: any, idx: number) => (
                       <div key={idx} className="bg-white dark:bg-slate-900 rounded-[1.5rem] p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative space-y-4">
                          <div className="flex items-center justify-between">
-                            <span className="w-6 h-6 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-black rounded-lg flex items-center justify-center">
+                            <span className="w-6 h-6 bg-blue-100 dark:bg-blue-900/40 text-[#0B2345] dark:text-blue-400 text-xs font-black rounded-lg flex items-center justify-center">
                                {idx + 1}
                             </span>
                             <button 

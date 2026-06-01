@@ -355,7 +355,7 @@ export default function Attendance() {
                           <button 
                             onClick={() => handleStatusChange(student.id, 'leave')}
                             className={`py-2 rounded-xl text-[10px] font-bold border transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
-                              attendance[student.id] === 'leave' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100'
+                              attendance[student.id] === 'leave' ? 'bg-[#0B2345] text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100'
                             }`}
                           >
                              <ClipboardCheck size={12} /> {isRtl ? 'إجازة' : 'Leave'}

@@ -202,9 +202,9 @@ export default function ParentsList() {
     <div className="space-y-6" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Header */}
       <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#0B2345]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
         <div className="flex items-center gap-5 relative z-10">
-           <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center border border-indigo-100 shadow-inner">
+           <div className="w-16 h-16 bg-indigo-50 text-[#0B2345] rounded-2xl flex items-center justify-center border border-indigo-100 shadow-inner">
              <Users size={32} />
            </div>
            <div>
@@ -230,7 +230,7 @@ export default function ParentsList() {
               setNewParent({ name: '', email: '', password: '', phoneNumber: '' });
               setShowAddModal(true);
             }}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-500/20 active:scale-95"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-500/20 active:scale-95"
           >
             <Plus size={20} />
             إضافة ولي أمر
@@ -274,11 +274,11 @@ export default function ParentsList() {
                     <tr key={parent.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="py-5 px-6 align-top border-l border-slate-50">
                         <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center border border-indigo-100 shrink-0">
+                          <div className="w-12 h-12 bg-indigo-50 text-[#0B2345] rounded-2xl flex items-center justify-center border border-indigo-100 shrink-0">
                             <User size={24} />
                           </div>
                           <div>
-                            <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{parent.name || 'ولي أمر'}</h3>
+                            <h3 className="font-bold text-slate-900 group-hover:text-[#0B2345] transition-colors">{parent.name || 'ولي أمر'}</h3>
                             <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full mt-1.5 inline-block">حساب ولي أمر</span>
                           </div>
                         </div>
@@ -317,7 +317,7 @@ export default function ParentsList() {
                           ))}
                           <button 
                             onClick={() => setShowLinkModal(parent)}
-                            className="flex items-center gap-1.5 text-xs font-bold bg-white text-slate-500 border border-slate-200 border-dashed rounded-xl px-3 hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm"
+                            className="flex items-center gap-1.5 text-xs font-bold bg-white text-slate-500 border border-slate-200 border-dashed rounded-xl px-3 hover:bg-slate-50 hover:text-[#0B2345] hover:border-indigo-300 transition-all shadow-sm"
                           >
                             <Plus size={14} /> ربط طالب
                           </button>
@@ -327,7 +327,7 @@ export default function ParentsList() {
                         <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
                             onClick={() => setShowEditModal(parent)}
-                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                            className="p-2 text-slate-400 hover:text-[#0B2345] hover:bg-indigo-50 rounded-xl transition-all"
                             title="تعديل البيانات"
                           >
                             <Edit2 size={18} />
@@ -356,7 +356,7 @@ export default function ParentsList() {
                 <div key={parent.id} className="p-5 space-y-4 bg-white hover:bg-slate-50/50 transition-colors">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center border border-indigo-100 shrink-0">
+                      <div className="w-12 h-12 bg-indigo-50 text-[#0B2345] rounded-2xl flex items-center justify-center border border-indigo-100 shrink-0">
                         <User size={24} />
                       </div>
                       <div>
@@ -367,7 +367,7 @@ export default function ParentsList() {
                     <div className="flex items-center gap-1 bg-slate-50 border border-slate-100/80 rounded-xl p-1">
                        <button 
                          onClick={() => setShowEditModal(parent)}
-                         className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all shadow-sm"
+                         className="p-1.5 text-slate-400 hover:text-[#0B2345] hover:bg-white rounded-lg transition-all shadow-sm"
                        >
                          <Edit2 size={14} />
                        </button>
@@ -398,7 +398,7 @@ export default function ParentsList() {
                       <span className="text-xs font-black text-slate-700">الطلاب المربوطون</span>
                       <button 
                         onClick={() => setShowLinkModal(parent)}
-                        className="text-[10px] font-bold bg-white text-indigo-600 border border-indigo-200 rounded-lg px-2.5 py-1.5 shadow-sm pointer-events-auto active:scale-95 transition-transform"
+                        className="text-[10px] font-bold bg-white text-[#0B2345] border border-indigo-200 rounded-lg px-2.5 py-1.5 shadow-sm pointer-events-auto active:scale-95 transition-transform"
                       >
                         <Plus size={10} className="inline mr-1" /> ربط طالب
                       </button>
@@ -543,7 +543,7 @@ export default function ParentsList() {
               </button>
 
               <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
+                <div className="w-16 h-16 bg-indigo-50 text-[#0B2345] rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
                   <User size={32} />
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 font-display">إضافة ولي أمر جديد</h2>
@@ -601,7 +601,7 @@ export default function ParentsList() {
                   <button 
                     type="submit"
                     disabled={isAdding}
-                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                    className="w-full py-4 bg-[#0B2345] text-white rounded-2xl font-bold shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
                   >
                     {isAdding ? 'جاري الإضافة...' : 'إنشاء الحساب'}
                   </button>
@@ -630,7 +630,7 @@ export default function ParentsList() {
               </button>
 
               <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
+                <div className="w-16 h-16 bg-indigo-50 text-[#0B2345] rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
                   <Edit2 size={32} />
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 font-display">تعديل بيانات ولي الأمر</h2>
@@ -674,7 +674,7 @@ export default function ParentsList() {
                 <div className="pt-4">
                   <button 
                     type="submit"
-                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold font-display shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95"
+                    className="w-full py-4 bg-[#0B2345] text-white rounded-2xl font-bold font-display shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95"
                   >
                     حفظ التغييرات
                   </button>
@@ -710,7 +710,7 @@ export default function ParentsList() {
                   <GraduationCap size={32} />
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 font-display">ربط طالب جديد</h2>
-                <p className="text-slate-500 text-sm mt-1">اختر الطالب الذي تريد ربطه بحساب <span className="text-indigo-600 font-bold">{showLinkModal.name || showLinkModal.email}</span></p>
+                <p className="text-slate-500 text-sm mt-1">اختر الطالب الذي تريد ربطه بحساب <span className="text-[#0B2345] font-bold">{showLinkModal.name || showLinkModal.email}</span></p>
               </div>
 
               <div className="relative mb-6 shrink-0">

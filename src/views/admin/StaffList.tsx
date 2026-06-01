@@ -353,14 +353,14 @@ export default function StaffList() {
               <div className="flex-1">
                 <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-black transition-colors">{member.name}</h3>
                 <div className="flex items-center gap-2 mt-1.5 leading-none flex-wrap">
-                  <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50/50 px-2.5 py-1 rounded-full border border-blue-100">
+                  <div className="flex items-center gap-1.5 text-[#0B2345] bg-blue-50/50 px-2.5 py-1 rounded-full border border-blue-100">
                     <ShieldCheck size={12} className="opacity-80" />
                     <span className="text-[10px] font-black uppercase tracking-widest">
                       {member.role === 'teacher' ? 'معلم' : (member.role === 'admin' ? 'مدير' : 'موظف')}
                     </span>
                   </div>
                   {member.role === 'teacher' && member.subject && (
-                    <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full border border-indigo-100">
+                    <span className="text-[10px] font-bold bg-indigo-50 text-[#0B2345] px-2.5 py-1 rounded-full border border-indigo-100">
                       {member.subject}
                     </span>
                   )}

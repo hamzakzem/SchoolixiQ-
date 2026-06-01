@@ -755,7 +755,7 @@ export default function TeacherDashboard() {
                     />
                   </div>
                 ) : (
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 shrink-0">
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-[#0B2345] rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 shrink-0">
                     <ClipboardList size={isSidebarCollapsed ? 24 : 20} />
                   </div>
                 )}
@@ -765,7 +765,7 @@ export default function TeacherDashboard() {
                       {t("teacherPortal")}
                     </h2>
                     <div className="flex flex-col">
-                      <p className="text-[10px] uppercase tracking-widest text-indigo-600 font-bold truncate">
+                      <p className="text-[10px] uppercase tracking-widest text-[#0B2345] font-bold truncate">
                         {profile?.subject}
                       </p>
                     </div>
@@ -906,7 +906,7 @@ export default function TeacherDashboard() {
 
             <div className="flex flex-col">
               <div className="flex items-center gap-1 md:gap-2">
-                <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-wider text-indigo-600 truncate">
+                <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-wider text-[#0B2345] truncate">
                   {t("dashboard")}
                 </span>
                 {schoolName && (
@@ -948,7 +948,7 @@ export default function TeacherDashboard() {
               <LanguageToggle />
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white border-slate-200 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+                className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-[#0B2345] border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white border-slate-200 text-slate-400 hover:border-indigo-200 hover:text-[#0B2345]"}`}
               >
                 <Bell size={18} />
                 {notifications.filter((n) => !n.read).length > 0 && (
@@ -1060,7 +1060,7 @@ export default function TeacherDashboard() {
                             className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
                               selectedClassId === c.id
                                 ? "bg-white/10 text-white"
-                                : "bg-white text-indigo-600 shadow-sm"
+                                : "bg-white text-[#0B2345] shadow-sm"
                             }`}
                           >
                             <LayoutDashboard size={24} />
@@ -1121,7 +1121,7 @@ export default function TeacherDashboard() {
                         >
                           <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
                             <div className="flex items-center gap-3">
-                              <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                              <div className="w-1.5 h-6 bg-[#0B2345] rounded-full"></div>
                               <h4 className="font-bold text-slate-900">
                                 {t("studentList")}:{" "}
                                 {
@@ -1134,7 +1134,7 @@ export default function TeacherDashboard() {
                               onClick={() =>
                                 handleSetPreferredClass(selectedClassId)
                               }
-                              className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-bold hover:bg-indigo-100 transition-all flex items-center gap-2"
+                              className="px-4 py-2 bg-indigo-50 text-[#0B2345] rounded-xl text-[10px] font-bold hover:bg-[#e8eef5] transition-all flex items-center gap-2"
                             >
                               <Star
                                 size={14}
@@ -1161,7 +1161,7 @@ export default function TeacherDashboard() {
                                   }}
                                   className="p-4 bg-slate-50 border border-slate-100 rounded-3xl hover:border-indigo-200 hover:bg-white hover:shadow-xl hover:shadow-indigo-50 transition-all cursor-pointer group text-center"
                                 >
-                                  <div className="w-16 h-16 rounded-[1.5rem] bg-white mx-auto flex items-center justify-center text-slate-400 group-hover:text-indigo-600 shadow-sm border border-slate-50 transition-all group-hover:scale-110 mb-4">
+                                  <div className="w-16 h-16 rounded-[1.5rem] bg-white mx-auto flex items-center justify-center text-slate-400 group-hover:text-[#0B2345] shadow-sm border border-slate-50 transition-all group-hover:scale-110 mb-4">
                                     <User size={28} />
                                   </div>
                                   <p className="text-[11px] font-bold text-slate-900 truncate px-2">
@@ -1171,7 +1171,7 @@ export default function TeacherDashboard() {
                                     {student.registrationNumber || t("noId")}
                                   </p>
                                   <div className="mt-4 pt-4 border-t border-slate-100/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <span className="text-[9px] font-bold text-indigo-600">
+                                    <span className="text-[9px] font-bold text-[#0B2345]">
                                       {t("sendReport")}
                                     </span>
                                   </div>
@@ -1208,7 +1208,7 @@ export default function TeacherDashboard() {
                               key={hw.id}
                               className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:border-slate-200 transition-all cursor-pointer group relative"
                             >
-                              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-indigo-600 shadow-sm">
+                              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#0B2345] shadow-sm">
                                 <BookOpen size={18} />
                               </div>
                               <div className="flex-1">
@@ -1233,7 +1233,7 @@ export default function TeacherDashboard() {
                                 </button>
                                 <ChevronRight
                                   size={16}
-                                  className="text-slate-300 group-hover:text-indigo-600 transition-colors"
+                                  className="text-slate-300 group-hover:text-[#0B2345] transition-colors"
                                 />
                               </div>
                             </div>
@@ -1253,7 +1253,7 @@ export default function TeacherDashboard() {
                       <div className="grid grid-cols-2 gap-4">
                         <button
                           onClick={() => setShowAddHomework(true)}
-                          className="p-6 rounded-3xl bg-indigo-600 hover:bg-indigo-500 transition-colors text-right relative overflow-hidden group"
+                          className="p-6 rounded-3xl bg-[#0B2345] hover:bg-[#0B2345] transition-colors text-right relative overflow-hidden group"
                         >
                           <Plus
                             size={32}
@@ -1326,7 +1326,7 @@ export default function TeacherDashboard() {
                         className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative group hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300"
                       >
                         <div className="flex items-center justify-between mb-4">
-                          <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
+                          <span className="text-[10px] font-bold bg-indigo-50 text-[#0B2345] px-3 py-1 rounded-full">
                             {hw.subject}
                           </span>
                           <div className="flex items-center gap-3">
@@ -1384,7 +1384,7 @@ export default function TeacherDashboard() {
                                 onClick={() =>
                                   handleSetPreferredClass(selectedClassId)
                                 }
-                                className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
+                                className="text-xs font-bold text-[#0B2345] hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
                               >
                                 تعيين هذا الصف كصف دائم
                               </button>
@@ -1446,7 +1446,7 @@ export default function TeacherDashboard() {
                                         "تم تعيين المادة كمادة افتراضية",
                                       );
                                     }}
-                                    className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 transition-all"
+                                    className="p-4 bg-indigo-50 text-[#0B2345] rounded-2xl hover:bg-[#e8eef5] transition-all"
                                     title="تعيين كمادة افتراضية"
                                   >
                                     <Star size={18} fill="currentColor" />
@@ -1495,7 +1495,7 @@ export default function TeacherDashboard() {
 
                     {loadingGrades ? (
                       <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent shadow-lg text-indigo-600 font-bold"></div>
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent shadow-lg text-[#0B2345] font-bold"></div>
                       </div>
                     ) : selectedClassId ? (
                       <div className="space-y-4">
@@ -1571,7 +1571,7 @@ export default function TeacherDashboard() {
                                 </div>
                               </div>
                               <div className="col-span-4 flex flex-col items-center gap-1">
-                                <span className="text-xl font-black text-indigo-600">
+                                <span className="text-xl font-black text-[#0B2345]">
                                   {studentGrades[student.id] !== undefined
                                     ? maxScore === 100
                                       ? `${Math.round((studentGrades[student.id] / maxScore) * 100)}%`
@@ -1580,7 +1580,7 @@ export default function TeacherDashboard() {
                                 </span>
                                 <div className="w-16 h-1 bg-slate-200 rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-indigo-500 transition-all"
+                                    className="h-full bg-[#0B2345] transition-all"
                                     style={{
                                       width: `${studentGrades[student.id] !== undefined ? Math.min(100, Math.round((studentGrades[student.id] / maxScore) * 100)) : 0}%`,
                                     }}
@@ -1594,7 +1594,7 @@ export default function TeacherDashboard() {
                             <label className="flex items-center gap-3 cursor-pointer group hover:opacity-80 transition-opacity">
                               <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
                                 shareTeacherOnlyGrades 
-                                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" 
+                                  ? "bg-[#0B2345] text-white shadow-md shadow-indigo-200" 
                                   : "bg-slate-100 text-transparent border border-slate-200 group-hover:border-indigo-300"
                               }`}>
                                 <Check size={14} strokeWidth={3} />
@@ -1631,7 +1631,7 @@ export default function TeacherDashboard() {
                               !selectedSubject ||
                               Object.keys(studentGrades).length === 0
                                 ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
-                                : "bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95"
+                                : "bg-[#0B2345] text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95"
                             }`}
                           >
                             {(isSavingGrades || loadingGrades) && (
@@ -1733,7 +1733,7 @@ export default function TeacherDashboard() {
                                   setSelectedStudent(student);
                                   setShowAddReport(true);
                                 }}
-                                className="flex-1 py-3 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold text-xs hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                                className="flex-1 py-3 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold text-xs hover:border-indigo-200 hover:text-[#0B2345] transition-all"
                               >
                                 {t("evaluationReportShort")}
                               </button>
@@ -1742,7 +1742,7 @@ export default function TeacherDashboard() {
                                   setSelectedStudent(student);
                                   setShowAddBehavior(true);
                                 }}
-                                className="flex-1 py-3 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold text-xs hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                                className="flex-1 py-3 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold text-xs hover:border-indigo-200 hover:text-[#0B2345] transition-all"
                               >
                                 {t("behaviorReport")}
                               </button>
@@ -1777,7 +1777,7 @@ export default function TeacherDashboard() {
                     </h2>
                     <button
                       onClick={() => setShowAddReport(true)}
-                      className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                      className="flex items-center gap-2 px-6 py-3 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
                     >
                       <Plus size={20} />
                       {t("sendNewReport")}
@@ -1793,7 +1793,7 @@ export default function TeacherDashboard() {
                         >
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
-                              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm">
+                              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-[#0B2345] shadow-sm">
                                 <User size={18} />
                               </div>
                               <div>
@@ -1832,7 +1832,7 @@ export default function TeacherDashboard() {
                                 report.target === "parents"
                                   ? "bg-orange-50 text-orange-600"
                                   : report.target === "school"
-                                    ? "bg-blue-50 text-blue-600"
+                                    ? "bg-blue-50 text-[#0B2345]"
                                     : "bg-emerald-50 text-emerald-600"
                               }`}
                             >
@@ -1889,7 +1889,7 @@ export default function TeacherDashboard() {
                 setShowMoreMenu(false);
               }}
               className={`flex flex-col items-center justify-center gap-1 min-w-[64px] transition-all relative ${
-                activeTab === item.id ? "text-indigo-600" : "text-slate-400"
+                activeTab === item.id ? "text-[#0B2345]" : "text-slate-400"
               }`}
             >
               <div
@@ -1907,7 +1907,7 @@ export default function TeacherDashboard() {
               {activeTab === item.id && (
                 <motion.div
                   layoutId="activeTabUnderline"
-                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-600 rounded-full"
+                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-[#0B2345] rounded-full"
                 />
               )}
             </button>
@@ -1915,7 +1915,7 @@ export default function TeacherDashboard() {
           <button
             onClick={() => setShowMoreMenu(!showMoreMenu)}
             className={`flex flex-col items-center justify-center gap-1 min-w-[64px] transition-all ${
-              showMoreMenu ? "text-indigo-600" : "text-slate-400"
+              showMoreMenu ? "text-[#0B2345]" : "text-slate-400"
             }`}
           >
             <div
@@ -1960,7 +1960,7 @@ export default function TeacherDashboard() {
                       }}
                       className={`flex flex-col items-center gap-3 p-4 rounded-3xl transition-all ${
                         activeTab === item.id
-                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                          ? "bg-[#0B2345] text-white shadow-lg shadow-indigo-100"
                           : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
                       }`}
                     >
@@ -2065,7 +2065,7 @@ export default function TeacherDashboard() {
                             onClick={() =>
                               handleSetPreferredClass(newHomework.classId)
                             }
-                            className="text-[10px] font-bold text-indigo-600 hover:underline"
+                            className="text-[10px] font-bold text-[#0B2345] hover:underline"
                           >
                             {t("setPermanentClass")}
                           </button>
@@ -2115,7 +2115,7 @@ export default function TeacherDashboard() {
 
                   <button
                     type="submit"
-                    className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-5 bg-[#0B2345] text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
                   >
                     <Send size={18} />
                     {t("publishHomeworkNow")}
@@ -2301,7 +2301,7 @@ export default function TeacherDashboard() {
                     </div>
                     <button
                       onClick={() => setSelectedStudent(null)}
-                      className="text-[10px] font-bold text-indigo-600 hover:underline"
+                      className="text-[10px] font-bold text-[#0B2345] hover:underline"
                     >
                       {t("change")}
                     </button>
@@ -2323,7 +2323,7 @@ export default function TeacherDashboard() {
                           key={opt.id}
                           type="button"
                           onClick={() => setReportTarget(opt.id as any)}
-                          className={`py-3 rounded-xl border text-[10px] font-bold transition-all ${reportTarget === opt.id ? "bg-indigo-600 text-white border-indigo-600 shadow-md" : "bg-white text-slate-500 border-slate-200"}`}
+                          className={`py-3 rounded-xl border text-[10px] font-bold transition-all ${reportTarget === opt.id ? "bg-[#0B2345] text-white border-indigo-600 shadow-md" : "bg-white text-slate-500 border-slate-200"}`}
                         >
                           {opt.label}
                         </button>

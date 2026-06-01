@@ -54,7 +54,7 @@ export function SubscriptionTimer({ expiryDate, variant = 'banner' }: Subscripti
 
   if (variant === 'compact') {
     return (
-      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black font-sans transition-colors ${timeLeft.isWarning ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`} dir="rtl">
+      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black font-sans transition-colors ${timeLeft.isWarning ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 text-[#0B2345] dark:text-indigo-400'}`} dir="rtl">
         <Clock size={12} className={timeLeft.isWarning ? 'animate-pulse' : ''} />
         <span>{timeLeft.days}ي {timeLeft.hours}سا {timeLeft.minutes}د</span>
       </div>
@@ -103,7 +103,7 @@ export function SubscriptionTimer({ expiryDate, variant = 'banner' }: Subscripti
       dir="rtl"
     >
       <div className="flex items-center gap-4">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${timeLeft.isWarning ? 'bg-red-500 text-white animate-pulse' : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'}`}>
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${timeLeft.isWarning ? 'bg-red-500 text-white animate-pulse' : 'bg-indigo-50 dark:bg-indigo-900/20 text-[#0B2345] dark:text-indigo-400'}`}>
           <Clock size={24} />
         </div>
         <div>

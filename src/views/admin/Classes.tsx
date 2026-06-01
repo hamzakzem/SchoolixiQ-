@@ -227,7 +227,7 @@ export default function Classes() {
                             }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all group/item"
                           >
-                            <Edit2 size={16} className="text-slate-400 group-hover/item:text-indigo-600" />
+                            <Edit2 size={16} className="text-slate-400 group-hover/item:text-[#0B2345]" />
                             تعديل الاسم
                           </button>
                           <button
@@ -313,7 +313,7 @@ export default function Classes() {
                     <h3 className="font-bold text-slate-900">قائمة الطلاب</h3>
                     <button 
                       onClick={() => setShowQuickAdd(!showQuickAdd)}
-                      className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all flex items-center gap-2"
+                      className="px-4 py-2 bg-indigo-50 text-[#0B2345] rounded-xl text-xs font-bold hover:bg-[#e8eef5] transition-all flex items-center gap-2"
                     >
                       {showQuickAdd ? <X size={16} /> : <UserPlus size={16} />}
                       {showQuickAdd ? 'إلغاء' : 'إضافة طالب سريع'}
@@ -355,7 +355,7 @@ export default function Classes() {
                         </div>
                         <button 
                           disabled={isProcessing}
-                          className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 active:scale-95 disabled:opacity-50"
+                          className="w-full py-3 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 active:scale-95 disabled:opacity-50"
                         >
                           {isProcessing ? 'جاري الحفظ...' : 'إضافة الطالب للصف'}
                         </button>
@@ -367,7 +367,7 @@ export default function Classes() {
                     {students.filter(s => s.classId === selectedClassForStudents.id).map(student => (
                       <div key={student.id} className="p-5 bg-white border border-slate-100 rounded-3xl flex items-center justify-between hover:border-slate-300 transition-all group">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                          <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-[#0B2345] transition-colors">
                             <User size={20} />
                           </div>
                           <div>

@@ -188,7 +188,7 @@ export default function SettingsView() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-blue-700 transition-all shadow-xl shadow-slate-200 dark:shadow-blue-900/20 active:scale-95 disabled:opacity-50"
+          className="flex items-center gap-2 px-8 py-4 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-[#1a3a6b] transition-all shadow-xl shadow-slate-200 dark:shadow-blue-900/20 active:scale-95 disabled:opacity-50"
         >
           {saving ? 'جاري الحفظ...' : (
             <>
@@ -399,7 +399,7 @@ export default function SettingsView() {
                 className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-xl transition-colors ${formData.showSubscriptionTimer ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <div className={`p-3 rounded-xl transition-colors ${formData.showSubscriptionTimer ? 'bg-blue-50 dark:bg-blue-900/30 text-[#0B2345]' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                     {formData.showSubscriptionTimer ? <Eye size={20} /> : <EyeOff size={20} />}
                   </div>
                   <div>
@@ -408,7 +408,7 @@ export default function SettingsView() {
                   </div>
                 </div>
                 <div 
-                  className={`w-12 h-6 rounded-full relative transition-all ${formData.showSubscriptionTimer ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  className={`w-12 h-6 rounded-full relative transition-all ${formData.showSubscriptionTimer ? 'bg-[#0B2345]' : 'bg-slate-300 dark:bg-slate-700'}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.showSubscriptionTimer ? 'right-7' : 'right-1'}`} />
                 </div>
@@ -419,7 +419,7 @@ export default function SettingsView() {
                 className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-xl transition-colors ${formData.notificationsEnabled ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <div className={`p-3 rounded-xl transition-colors ${formData.notificationsEnabled ? 'bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345]' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                     <Bell size={20} />
                   </div>
                   <div>
@@ -428,7 +428,7 @@ export default function SettingsView() {
                   </div>
                 </div>
                 <div 
-                   className={`w-12 h-6 rounded-full relative transition-all ${formData.notificationsEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                   className={`w-12 h-6 rounded-full relative transition-all ${formData.notificationsEnabled ? 'bg-[#0B2345]' : 'bg-slate-300 dark:bg-slate-700'}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.notificationsEnabled ? 'right-7' : 'right-1'}`} />
                 </div>
@@ -464,7 +464,7 @@ export default function SettingsView() {
                    </div>
                 </div>
              </div>
-             <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px]"></div>
+             <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-[#0B2345]/10 rounded-full blur-[80px]"></div>
           </section>
 
           {/* Help Card */}
@@ -486,7 +486,7 @@ export default function SettingsView() {
                   className="space-y-6 bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900/30"
                 >
                   <div className="space-y-4">
-                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 px-1">أرقام التواصل (WhatsApp)</p>
+                    <p className="text-[10px] font-bold text-[#0B2345] dark:text-blue-400 uppercase tracking-widest mb-1 px-1">أرقام التواصل (WhatsApp)</p>
                     <div className="space-y-2">
                        {supportInfo.supportPhones.map((phone, i) => (
                          <div key={i} className="flex items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30">
@@ -497,7 +497,7 @@ export default function SettingsView() {
                     </div>
                   </div>
                   <div className="pt-6 border-t border-blue-100 dark:border-blue-900/30 space-y-4">
-                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 px-1">البريد الإلكتروني الرسمي</p>
+                    <p className="text-[10px] font-bold text-[#0B2345] dark:text-blue-400 uppercase tracking-widest mb-1 px-1">البريد الإلكتروني الرسمي</p>
                     <div className="space-y-2">
                        {supportInfo.supportEmails.map((email, i) => (
                          <div key={i} className="flex items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30">
