@@ -1092,34 +1092,6 @@ async function startServer() {
     });
   });
 
-  // Vite transformation
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    
-    // Serve Vite hashed assets (/assets/*) with maximum client-side caching (1 year, immutable)
-    app.use('/assets', express.static(path.join(distPath, 'assets'), {
-      maxAge: '1y',
-      immutable: true,
-      fallthrough: false
-    }));
-
-    // Serve other static resources with smart cache controls
-    app.use(express.static(distPath, {
-      maxAge: '1d',
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.html')) {
-          // Never cache index.html so users always get the latest version immediately
-          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        } else if (filePath.match(/\.(js|css|woff2?|ico|png|jpe?g|gif|svg)$/)) {
-          // Cache non-asset bundle static files as standard browser optimization
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        }
       }
     }));
 
