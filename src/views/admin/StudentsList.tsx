@@ -391,6 +391,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         }
         
         toast.success('تم تحديث بيانات الطالب بنجاح');
+        fetchStudents();
       } else {
         const studentId = doc(collection(db, 'students')).id;
         
@@ -466,6 +467,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         }
         
         toast.success('تمت إضافة الطالب بنجاح');
+        fetchStudents();
       }
       setNewStudent({ 
         name: '', 
