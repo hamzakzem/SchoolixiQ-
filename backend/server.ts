@@ -376,7 +376,7 @@ async function startServer() {
       }
 
       // 2. MIME Type / File Extension Validation
-      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.mp3', '.m4a', '.wav', '.json', '.mobileconfig'];
+      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.mp3', '.m4a', '.wav', '.json', '.mobileconfig', '.avif', '.gif', '.heic', '.heif'];
       const ext = path.extname(storagePath).toLowerCase();
       if (!allowedExtensions.includes(ext)) {
         return res.status(400).json({
