@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, deleteDoc, setDoc, runTransaction, increment, arrayUnion, arrayRemove, getDoc, limit, startAfter, orderBy } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { Search, Plus, UserPlus, Filter, MoreVertical, GraduationCap, Copy, Check, Trash2, AlertTriangle, X, Users, ArrowRightLeft, Upload, Edit2 } from 'lucide-react';
+import { Search, Plus, UserPlus, Filter, MoreVertical, GraduationCap, Copy, Check, Trash2, AlertTriangle, X, Users, ArrowRightLeft, Upload, Edit2, User, Hash, Phone, Mail, Key, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -391,7 +391,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         }
         
         toast.success('تم تحديث بيانات الطالب بنجاح');
-        fetchStudents();
       } else {
         const studentId = doc(collection(db, 'students')).id;
         
@@ -467,7 +466,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         }
         
         toast.success('تمت إضافة الطالب بنجاح');
-        fetchStudents();
       }
       setNewStudent({ 
         name: '', 
@@ -564,8 +562,8 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
               </button>
             )}
             <button
-              onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-              className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-600 hover:bg-slate-50 transition-all shadow-sm md:hidden"
+               onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
+               className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-600 hover:bg-slate-50 transition-all shadow-sm md:hidden"
             >
               {viewMode === 'table' ? <Users size={20} /> : <Filter size={20} />}
             </button>
@@ -579,13 +577,13 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           <div className="hidden md:flex bg-slate-100 p-1 rounded-xl border border-slate-200">
             <button 
               onClick={() => setViewMode('table')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-[#0B2345]' : 'text-slate-500'}`}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
             >
               جدول
             </button>
             <button 
               onClick={() => setViewMode('cards')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-[#0B2345]' : 'text-slate-500'}`}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
             >
               بطاقات
             </button>
@@ -613,19 +611,19 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                            {student.photoUrl ? <img src={student.photoUrl || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <GraduationCap size={20} />}
                         </div>
                         <div className="min-w-0">
-                          <span className="font-bold text-slate-900 block font-display leading-none truncate">{student.name}</span>
-                          <div className="flex flex-wrap items-center gap-2 mt-1">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block whitespace-nowrap">سجل: {new Date(student.createdAt?.seconds * 1000).toLocaleDateString('ar-IQ')}</span>
-                            {student.parentIds?.length > 0 && (
-                              <button 
-                                onClick={() => setShowLinkedParentsModal(student)}
-                                className="text-[9px] bg-slate-900 text-white px-2 py-0.5 rounded-md font-bold hover:bg-slate-800 transition-all shadow-sm flex items-center gap-1"
-                              >
-                                <Users size={10} />
-                                {student.parentIds.length} حساب
-                              </button>
-                            )}
-                          </div>
+                           <span className="font-bold text-slate-900 block font-display leading-none truncate">{student.name}</span>
+                           <div className="flex flex-wrap items-center gap-2 mt-1">
+                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block whitespace-nowrap">سجل: {new Date(student.createdAt?.seconds * 1000).toLocaleDateString('ar-IQ')}</span>
+                             {student.parentIds?.length > 0 && (
+                               <button 
+                                 onClick={() => setShowLinkedParentsModal(student)}
+                                 className="text-[9px] bg-slate-900 text-white px-2 py-0.5 rounded-md font-bold hover:bg-slate-800 transition-all shadow-sm flex items-center gap-1"
+                               >
+                                 <Users size={10} />
+                                 {student.parentIds.length} حساب
+                               </button>
+                             )}
+                           </div>
                         </div>
                       </div>
                     </td>
@@ -663,7 +661,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                setParentPhone(student.parentPhone || '');
                                setParentPassword(student.parentPassword || '');
                              }}
-                             className="p-2.5 bg-blue-50 text-[#0B2345] rounded-xl hover:bg-blue-100 transition-all"
+                             className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
                              title="ربط بولي أمر"
                           >
                             <UserPlus size={18} />
@@ -816,7 +814,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   {!isViewOnly && (
                     <button 
                       onClick={() => setShowLinkParentModal(student)}
-                      className="w-10 h-10 bg-blue-50 text-[#0B2345] border border-blue-100 rounded-xl flex items-center justify-center"
+                      className="w-10 h-10 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl flex items-center justify-center"
                     >
                       <UserPlus size={16} />
                     </button>
@@ -1139,24 +1137,36 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                animate={{ scale: 1, opacity: 1, y: 0 }} 
                exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-               className="bg-white rounded-[2.5rem] w-full max-w-xl p-12 shadow-2xl relative border border-slate-200 overflow-hidden"
+               className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 overflow-y-auto max-h-[90vh] flex flex-col custom-scrollbar text-right"
              >
-               <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full -translate-y-32 translate-x-32 shadow-inner"></div>
+               <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 dark:bg-slate-800/40 rounded-full -translate-y-32 translate-x-32 shadow-inner pointer-events-none"></div>
                <div className="relative z-10">
-                 <h2 className="text-3xl font-bold mb-2 text-slate-900 font-display">{editingStudent ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}</h2>
-                 <p className="text-slate-500 text-sm mb-10 leading-relaxed italic">يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.</p>
+                 <div className="flex items-center justify-between mb-2">
+                     <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display flex items-center gap-2">
+                       <GraduationCap className="text-[#0B2345] dark:text-[#D4A64A]" size={28} />
+                       <span>{editingStudent ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}</span>
+                     </h2>
+                     <button 
+                       type="button" 
+                       onClick={() => setShowAddModal(false)}
+                       className="p-1 px-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
+                     >
+                       <X size={18} />
+                     </button>
+                   </div>
+                 <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm mb-6 leading-relaxed italic text-right">يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.</p>
                  
                  <form onSubmit={handleAdd} className="space-y-6">
 
-                   <div className="flex flex-col md:flex-row gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60">
                      <div className="flex-1 space-y-2">
                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الصورة الشخصية (اختياري)</label>
                        <div className="flex items-center gap-4">
-                         <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
+                         <div className="w-14 h-14 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
                            {newStudent.photoUrl ? (
                              <img src={newStudent.photoUrl || undefined} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                            ) : (
-                             <GraduationCap size={24} className="text-slate-400" />
+                             <GraduationCap size={22} className="text-slate-400" />
                            )}
                          </div>
                          <div className="flex-1 relative">
@@ -1169,10 +1179,10 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                            />
                            <label
                              htmlFor="student-photo-upload"
-                             className="cursor-pointer flex items-center justify-center gap-2 w-full px-4 py-3 bg-white border border-slate-200 border-dashed rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400 transition-all font-bold text-sm"
+                             className="cursor-pointer flex items-center justify-center gap-1.5 w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-dashed rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-[#0B2345] dark:hover:text-white transition-all font-bold text-xs"
                            >
-                             <Upload size={16} />
-                             {isUploadingPhoto ? 'جاري الرفع...' : 'رفع صورة من الجهاز'}
+                             <Upload size={14} />
+                             {isUploadingPhoto ? 'جاري الرفع...' : 'رفع صورة'}
                            </label>
                          </div>
                        </div>
@@ -1184,125 +1194,151 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                          dir="ltr"
                          value={newStudent.photoUrl}
                          onChange={e => setNewStudent({...newStudent, photoUrl: e.target.value})}
-                         className="w-full px-6 py-4 rounded-xl border border-slate-200 bg-white focus:bg-slate-50 focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-mono"
+                         className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:bg-slate-50 dark:focus:bg-slate-700 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-mono text-slate-900 dark:text-white text-left"
                          placeholder="https://..."
                        />
                      </div>
                    </div>
 
-                   <div className="space-y-2">
-                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الاسم الكامل للطالب</label>
-                     <input
-                       required
-                       type="text"
-                       value={newStudent.name}
-                       onChange={e => setNewStudent({...newStudent, name: e.target.value})}
-                       className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold text-slate-900"
-                       placeholder="الاسم الرباعي واللقب..."
-                     />
-                   </div>
-                   
-                   <div className="grid grid-cols-2 gap-6">
-                     <div className="space-y-2">
-                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">رقم السجل الدراسي</label>
-                       <input
-                         required
-                         type="text"
-                         value={newStudent.registrationNumber}
-                         onChange={e => setNewStudent({...newStudent, registrationNumber: e.target.value})}
-                         className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-mono"
-                         placeholder="2024/001"
-                        />
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 text-right">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">الاسم الكامل للطالب</label>
+                        <div className="relative">
+                          <User className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                          <input
+                            required
+                            type="text"
+                            value={newStudent.name}
+                            onChange={e => setNewStudent({...newStudent, name: e.target.value})}
+                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
+                            placeholder="الاسم الرباعي واللقب..."
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">واتساب ولي الأمر</label>
-                        <input
-                          type="text"
-                          value={newStudent.parentPhone}
-                          onChange={e => setNewStudent({...newStudent, parentPhone: e.target.value})}
-                          className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold"
-                          placeholder="07XXXXXXXXX"
-                        />
+                      
+                      <div className="space-y-1.5 text-right">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">رقم السجل الدراسي</label>
+                        <div className="relative">
+                          <Hash className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                          <input
+                            required
+                            type="text"
+                            value={newStudent.registrationNumber}
+                            onChange={e => setNewStudent({...newStudent, registrationNumber: e.target.value})}
+                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-mono font-bold text-slate-900 dark:text-white text-left"
+                            placeholder="2024/001"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 text-right">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">واتساب ولي الأمر</label>
+                        <div className="relative">
+                          <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                          <input
+                            type="text"
+                            value={newStudent.parentPhone}
+                            onChange={e => setNewStudent({...newStudent, parentPhone: e.target.value})}
+                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
+                            placeholder="07XXXXXXXXX"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5 text-right">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">رقم السائق (اختياري - للبطاقة)</label>
+                        <div className="relative">
+                          <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                          <input
+                            type="text"
+                            value={newStudent.driverPhone}
+                            onChange={e => setNewStudent({...newStudent, driverPhone: e.target.value})}
+                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
+                            placeholder="07XXXXXXXXX"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">رقم السائق (اختياري - للبطاقة)</label>
-                      <input
-                        type="text"
-                        value={newStudent.driverPhone}
-                        onChange={e => setNewStudent({...newStudent, driverPhone: e.target.value})}
-                        className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold"
-                        placeholder="07XXXXXXXXX"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">إيميل ولي الأمر (للدخول)</label>
-                        <input
-                          type="email"
-                          value={newStudent.parentEmail}
-                          onChange={e => setNewStudent({...newStudent, parentEmail: e.target.value})}
-                          className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-mono"
-                          placeholder="parent@school.com"
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 text-right">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">إيميل ولي الأمر (للدخول)</label>
+                        <div className="relative">
+                          <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                          <input
+                            type="email"
+                            value={newStudent.parentEmail || ''}
+                            onChange={e => setNewStudent({...newStudent, parentEmail: e.target.value})}
+                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-mono text-slate-900 dark:text-white text-left"
+                            placeholder="parent@school.com"
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">كلمة السر لولي الأمر</label>
-                        <input
-                          type="text"
-                          value={newStudent.parentPassword}
-                          onChange={e => setNewStudent({...newStudent, parentPassword: e.target.value})}
-                          className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-mono"
-                          placeholder="P@ssw0rd123"
-                        />
+                      <div className="space-y-1.5 text-right">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">كلمة السر لولي الأمر</label>
+                        <div className="relative">
+                          <Key className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                          <input
+                            type="text"
+                            value={newStudent.parentPassword || ''}
+                            onChange={e => setNewStudent({...newStudent, parentPassword: e.target.value})}
+                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-mono text-slate-900 dark:text-white"
+                            placeholder="P@ssw0rd123"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الصف الحالي</label>
-                       <select
-                         required
-                         value={newStudent.classId}
-                         onChange={e => setNewStudent({...newStudent, classId: e.target.value})}
-                         className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold appearance-none"
-                       >
-                         <option value="">جميع الصفوف المدرسية...</option>
-                         {classes.map(c => (
-                           <option key={c.id} value={c.id}>{c.name}</option>
-                         ))}
-                       </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 text-right">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">الصف الحالي</label>
+                        <div className="relative">
+                          <GraduationCap className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                          <select
+                            required
+                            value={newStudent.classId}
+                            onChange={e => setNewStudent({...newStudent, classId: e.target.value})}
+                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white appearance-none"
+                          >
+                            <option value="">جميع الصفوف المدرسية...</option>
+                            {classes.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">عنوان السكن</label>
-                        <input
-                          type="text"
-                          value={newStudent.address}
-                          onChange={e => setNewStudent({...newStudent, address: e.target.value})}
-                          className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold"
-                          placeholder="المحافظة - القضاء - الحي"
-                        />
+                      <div className="space-y-1.5 text-right">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">عنوان السكن</label>
+                        <div className="relative">
+                          <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                          <input
+                            type="text"
+                            value={newStudent.address}
+                            onChange={e => setNewStudent({...newStudent, address: e.target.value})}
+                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
+                            placeholder="المحافظة - القضاء - الحي"
+                          />
+                        </div>
                       </div>
-                   </div>
+                    </div>
 
-                   <div className="flex gap-4 pt-6">
-                     <button
-                       type="submit"
-                       className="flex-1 px-8 py-5 bg-slate-900 text-white rounded-[1.5rem] font-bold hover:bg-slate-800 transition-all shadow-xl active:scale-95"
-                     >
-                       تأكيد وإضافة السجل
-                     </button>
-                     <button
-                       type="button"
-                       onClick={() => setShowAddModal(false)}
-                       className="px-8 py-5 bg-slate-100 text-slate-500 rounded-[1.5rem] font-bold hover:bg-slate-200 transition-all active:scale-95"
-                     >
-                       إلغاء الأمر
-                     </button>
-                   </div>
-                 </form>
+                    <div className="sticky bottom-0 bg-white dark:bg-slate-900 pt-4 pb-6 md:pb-8 border-t border-slate-100 dark:border-slate-800 z-20 flex gap-4 mt-6 -mx-6 md:-mx-10 px-6 md:px-10">
+                      <button
+                        type="submit"
+                        className="flex-1 px-8 py-3.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-[#071830] transition-all shadow-xl active:scale-95 text-sm md:text-base border border-transparent"
+                      >
+                        {editingStudent ? 'حفظ التغييرات' : 'تأكيد وإضافة السجل'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddModal(false)}
+                        className="px-6 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 text-sm md:text-base"
+                      >
+                        إلغاء الأمر
+                      </button>
+                    </div>
+                  </form>
                </div>
              </motion.div>
           </div>
@@ -1376,7 +1412,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       <button
                         disabled={isLinking}
                         type="submit"
-                        className="flex-1 px-8 py-4 bg-[#0B2345] text-white rounded-2xl font-bold hover:bg-[#1a3a6b] transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                        className="flex-1 px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                       >
                         {isLinking ? 'جاري الربط...' : 'إتمام عملية الربط'}
                       </button>
@@ -1394,7 +1430,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         إلغاء
                       </button>
                     </div>
-                 </form>
+                  </form>
                </div>
              </motion.div>
           </div>
