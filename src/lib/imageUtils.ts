@@ -40,8 +40,7 @@ export const uploadImageToServer = async (file: File, storagePath: string, maxWi
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': Bearer ${token}
-    },
+      'Authorization': Bearer ${token}    },
     body: JSON.stringify({ path: storagePath, base64 })
   });
   if (!response.ok) {
