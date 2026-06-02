@@ -717,6 +717,44 @@ export default function Login() {
         toast.success(t("signupSuccess"));
       } else {
         try {
+          // Self-healing school document block on login
+          try {
+            const userDocSnap = await getDoc(doc(db, "users", result.user.uid));
+            if (userDocSnap.exists()) {
+              const userData = userDocSnap.data();
+              if (userData?.role === "admin" && userData?.schoolId) {
+                const schoolDocRef = doc(db, "schools", userData.schoolId);
+                const schoolDocSnap = await getDoc(schoolDocRef);
+                if (schoolDocSnap.exists()) {
+                  const schoolData = schoolDocSnap.data();
+                  if (!schoolData.governorate || !schoolData.directorate || schoolData.estimatedStudents === undefined) {
+                    const registrationsRef = collection(db, "registrations");
+                    const regQuery = query(registrationsRef, where("customerInfo.email", "==", emailTrimmed));
+                    const regDocs = await getDocs(regQuery);
+                    let regData = regDocs.empty ? null : regDocs.docs[0].data();
+                    if (!regData) {
+                      const regQuery2 = query(registrationsRef, where("email", "==", emailTrimmed));
+                      const regDocs2 = await getDocs(regQuery2);
+                      if (!regDocs2.empty) regData = regDocs2.docs[0].data();
+                    }
+                    if (regData) {
+                      const regFields = regData.customerInfo || regData;
+                      const updatePayload: Record<string, any> = {};
+                      if (regFields.governorate && !schoolData.governorate) updatePayload.governorate = regFields.governorate;
+                      if (regFields.directorate && !schoolData.directorate) updatePayload.directorate = regFields.directorate;
+                      if (regFields.estimatedStudents !== undefined && schoolData.estimatedStudents === undefined) {
+                        updatePayload.estimatedStudents = Number(regFields.estimatedStudents) || 0;
+                      }
+                      if (Object.keys(updatePayload).length > 0) await updateDoc(schoolDocRef, updatePayload);
+                    }
+                  }
+                }
+              }
+            }
+          } catch (healErr) {
+            console.error("Heal school data error:", healErr);
+          }
+          toast.success(t("welcomeBack"));
           // Attempt standard sign in
           await signInWithEmailAndPassword(auth, emailTrimmed, passwordValue);
           toast.success(t("welcomeBack"));
