@@ -3148,10 +3148,69 @@ export default function SuperAdminDashboard() {
                                 }
                               />
                             </div>
-                            {request.customerInfo?.address && (
+                            {(request.customerInfo?.address || request.address) && (
                               <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
                                 <MapPin size={14} className="text-slate-400" />
-                                <span>{request.customerInfo?.address}</span>
+                                <span>{request.customerInfo?.address || request.address}</span>
+                              </div>
+                            )}
+                            {(request.customerInfo?.governorate || request.governorate) && (
+                              <div className="flex flex-wrap gap-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                                  المحافظة: {request.customerInfo?.governorate || request.governorate}
+                                </span>
+                                {(request.customerInfo?.directorate || request.directorate) && (
+                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                                    المديرية: {request.customerInfo?.directorate || request.directorate}
+                                  </span>
+                                )}
+                                {(request.customerInfo?.educationLevel ||
+                                  request.educationLevel ||
+                                  request.customerInfo?.stage ||
+                                  request.stage) && (
+                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                                    المرحلة:{" "}
+                                    {request.customerInfo?.educationLevel ||
+                                      request.educationLevel ||
+                                      request.customerInfo?.stage ||
+                                      request.stage}
+                                  </span>
+                                )}
+                                {(request.customerInfo?.workingHours ||
+                                  request.workingHours ||
+                                  request.customerInfo?.shift ||
+                                  request.shift) && (
+                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                                    الدوام:{" "}
+                                    {request.customerInfo?.workingHours ||
+                                      request.workingHours ||
+                                      request.customerInfo?.shift ||
+                                      request.shift}
+                                  </span>
+                                )}
+                                {(request.customerInfo?.studyType ||
+                                  request.studyType ||
+                                  request.customerInfo?.genderType ||
+                                  request.genderType) && (
+                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                                    نوع الدراسة:{" "}
+                                    {request.customerInfo?.studyType ||
+                                      request.studyType ||
+                                      request.customerInfo?.genderType ||
+                                      request.genderType}
+                                  </span>
+                                )}
+                                {((request.customerInfo?.estimatedStudents !== undefined &&
+                                  request.customerInfo?.estimatedStudents !== "") ||
+                                  request.estimatedStudents !== undefined ||
+                                  request.approximateStudents) && (
+                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                                    عدد الطلاب:{" "}
+                                    {request.customerInfo?.estimatedStudents ??
+                                      request.estimatedStudents ??
+                                      request.approximateStudents}
+                                  </span>
+                                )}
                               </div>
                             )}
                             <button

@@ -172,6 +172,7 @@ const AppContent = () => {
     stage: "",
     shift: "",
     genderType: "",
+    estimatedStudents: "",
   });
 
   // Automatic School Admin & Parent Provisioning with Student Link
@@ -870,18 +871,43 @@ const AppContent = () => {
                           ? selectedPackage.priceYearly
                           : selectedPackage.price;
 
-                      await addDoc(collection(db, "registrations"), {
-                        type: "direct_school_signup",
-                        uid: user.uid,
-                        email: user.email,
+                      const schoolFields = {
+                        address: subscriptionForm.address,
+                        governorate: subscriptionForm.governorate,
+                        directorate: subscriptionForm.directorate,
+                        educationLevel: subscriptionForm.stage,
+                        workingHours: subscriptionForm.shift,
+                        studyType: subscriptionForm.genderType,
+                        estimatedStudents: Number(subscriptionForm.estimatedStudents) || 0,
+                        stage: subscriptionForm.stage,
+                        shift: subscriptionForm.shift,
+                        genderType: subscriptionForm.genderType,
+                        approximateStudents: subscriptionForm.estimatedStudents,
+                      };
+                      const customerInfo = {
                         name: subscriptionForm.name,
+                        email: user.email,
                         phone: subscriptionForm.phone,
                         address: subscriptionForm.address,
                         governorate: subscriptionForm.governorate,
                         directorate: subscriptionForm.directorate,
-                        stage: subscriptionForm.stage,
-                        shift: subscriptionForm.shift,
-                        genderType: subscriptionForm.genderType,
+                        educationLevel: subscriptionForm.stage,
+                        workingHours: subscriptionForm.shift,
+                        studyType: subscriptionForm.genderType,
+                        estimatedStudents: subscriptionForm.estimatedStudents,
+                        ...schoolFields,
+                      };
+                      await addDoc(collection(db, "registrations"), {
+                        type: "direct_school_signup",
+                        uid: user.uid,
+                        email: user.email,
+                        schoolName: subscriptionForm.name,
+                        name: subscriptionForm.name,
+                        phone: subscriptionForm.phone,
+                        adminEmail: user.email,
+                        adminPhone: subscriptionForm.phone,
+                        customerInfo,
+                        ...schoolFields,
                         packageName: selectedPackage.name,
                         packageId: selectedPackage.id,
                         price: actualPrice,
@@ -1116,11 +1142,30 @@ const AppContent = () => {
                           <option value="" disabled>
                             اختر نوع الدراسة...
                           </option>
-                          <option value="للبنين">للبنين</option>
-                          <option value="للبنات">للبنات</option>
-                          <option value="مختلط">مختلط</option>
+                          <option value="مختلطة">مختلطة</option>
+                          <option value="بنات فقط">بنات فقط</option>
+                          <option value="اولاد فقط">اولاد فقط</option>
                         </select>
                       </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        عدد الطلاب المقدر
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min={1}
+                        value={subscriptionForm.estimatedStudents}
+                        onChange={(e) =>
+                          setSubscriptionForm({
+                            ...subscriptionForm,
+                            estimatedStudents: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all"
+                        placeholder="مثال: 500"
+                      />
                     </div>
                   </div>
 

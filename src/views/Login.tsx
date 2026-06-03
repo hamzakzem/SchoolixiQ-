@@ -61,6 +61,11 @@ import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { GlobalFooter } from "../components/GlobalFooter";
+import SchoolRegistrationFields, {
+  buildRegistrationCustomerInfo,
+  buildSchoolFirestoreFields,
+  type SchoolRegistrationFormValues,
+} from "../components/auth/SchoolRegistrationFields";
 
 export const getLocalizedPackages = (packagesList: any[], isRtl: boolean) => {
   return packagesList.map(pkg => {
@@ -183,6 +188,15 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [schoolRegistration, setSchoolRegistration] = useState<SchoolRegistrationFormValues>({
+    address: "",
+    governorate: "",
+    directorate: "",
+    educationLevel: "",
+    workingHours: "",
+    studyType: "",
+    estimatedStudents: "",
+  });
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaChallenge, setCaptchaChallenge] = useState({ a: 0, b: 0 });
 
@@ -430,6 +444,30 @@ export default function Login() {
           : showSubscriptionModal.price;
 
       const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const schoolFields = buildSchoolFirestoreFields({
+        address: subscriptionForm.address,
+        governorate: subscriptionForm.governorate,
+        directorate: subscriptionForm.directorate,
+        educationLevel: subscriptionForm.educationLevel,
+        workingHours: subscriptionForm.workingHours,
+        studyType: subscriptionForm.studyType,
+        estimatedStudents: subscriptionForm.estimatedStudents,
+      });
+      const customerInfo = buildRegistrationCustomerInfo(
+        subscriptionForm.name,
+        subscriptionForm.email,
+        subscriptionForm.phone,
+        subscriptionForm.password,
+        {
+          address: subscriptionForm.address,
+          governorate: subscriptionForm.governorate,
+          directorate: subscriptionForm.directorate,
+          educationLevel: subscriptionForm.educationLevel,
+          workingHours: subscriptionForm.workingHours,
+          studyType: subscriptionForm.studyType,
+          estimatedStudents: subscriptionForm.estimatedStudents,
+        },
+      );
       await addDoc(collection(db, "registrations"), {
         type: "subscription_request",
         packageId: showSubscriptionModal.id,
@@ -437,13 +475,12 @@ export default function Login() {
         price: actualPrice,
         billingCycle: billingCycle,
         durationDays: isMonthly ? 30 : 365,
-        customerInfo: subscriptionForm,
-        governorate: subscriptionForm.governorate || "",
-        directorate: subscriptionForm.directorate || "",
-        stage: subscriptionForm.educationLevel || "",
-        shift: subscriptionForm.workingHours || "",
-        genderType: subscriptionForm.studyType || "",
-        approximateStudents: subscriptionForm.estimatedStudents || "",
+        customerInfo,
+        schoolName: subscriptionForm.name,
+        adminEmail: subscriptionForm.email,
+        adminPhone: subscriptionForm.phone,
+        adminPassword: subscriptionForm.password,
+        ...schoolFields,
         status: "pending",
         subscriberCode: code,
         createdAt: serverTimestamp(),
@@ -457,6 +494,12 @@ export default function Login() {
         phone: "",
         address: "",
         password: "",
+        governorate: "",
+        directorate: "",
+        educationLevel: "",
+        workingHours: "",
+        studyType: "",
+        estimatedStudents: "",
       });
     } catch (error) {
       console.error(error);
@@ -625,6 +668,27 @@ export default function Login() {
       return;
     }
 
+    if (
+      mode === "signup" &&
+      role === UserRole.ADMIN &&
+      (!name.trim() ||
+        !phone.trim() ||
+        !schoolRegistration.address.trim() ||
+        !schoolRegistration.governorate ||
+        !schoolRegistration.directorate ||
+        !schoolRegistration.educationLevel ||
+        !schoolRegistration.workingHours ||
+        !schoolRegistration.studyType ||
+        !schoolRegistration.estimatedStudents)
+    ) {
+      toast.error(
+        isRtl
+          ? "يرجى إكمال جميع بيانات المدرسة قبل إنشاء الحساب"
+          : "Please complete all school details before creating your account",
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       if (mode === "signup") {
@@ -696,13 +760,57 @@ export default function Login() {
           return;
         }
 
+        let schoolId = provisionedData?.schoolId || "";
+
+        if (
+          finalRole === UserRole.ADMIN &&
+          !schoolId &&
+          !isFirstUser
+        ) {
+          const schoolFields = buildSchoolFirestoreFields(schoolRegistration);
+          const schoolRef = await addDoc(collection(db, "schools"), {
+            name: name.trim(),
+            ...schoolFields,
+            status: "pending_subscription",
+            planId: "basic",
+            studentCount: 0,
+            ownerUid: user.uid,
+            adminEmail: emailTrimmed,
+            adminName: name.trim(),
+            adminPhone: phone.trim(),
+            createdAt: serverTimestamp(),
+          });
+          schoolId = schoolRef.id;
+
+          const customerInfo = buildRegistrationCustomerInfo(
+            name.trim(),
+            emailTrimmed,
+            phone.trim(),
+            passwordValue,
+            schoolRegistration,
+          );
+          await addDoc(collection(db, "registrations"), {
+            type: "direct_school_signup",
+            uid: user.uid,
+            email: emailTrimmed,
+            schoolName: name.trim(),
+            adminEmail: emailTrimmed,
+            adminPhone: phone.trim(),
+            adminPassword: passwordValue,
+            customerInfo,
+            ...schoolFields,
+            status: "pending",
+            createdAt: serverTimestamp(),
+          });
+        }
+
         // 1. Create permanent profile
         await setDoc(doc(db, "users", user.uid), {
           name: name || provisionedData?.name || "مستخدم جديد",
           email: emailTrimmed,
           role: finalRole,
-          phone: phone, // Added phone to profile
-          schoolId: provisionedData?.schoolId || "",
+          phone: phone,
+          schoolId,
           createdAt: new Date().toISOString(),
           uid: user.uid,
         });
@@ -758,10 +866,29 @@ export default function Login() {
                     if (regData) {
                       const regFields = regData.customerInfo || regData;
                       const updatePayload: Record<string, any> = {};
+                      if (regFields.address && !schoolData.address) updatePayload.address = regFields.address;
                       if (regFields.governorate && !schoolData.governorate) updatePayload.governorate = regFields.governorate;
                       if (regFields.directorate && !schoolData.directorate) updatePayload.directorate = regFields.directorate;
-                      if (regFields.estimatedStudents !== undefined && schoolData.estimatedStudents === undefined) {
-                        updatePayload.estimatedStudents = Number(regFields.estimatedStudents) || 0;
+                      const level = regFields.educationLevel || regFields.stage;
+                      if (level && !schoolData.educationLevel && !schoolData.stage) {
+                        updatePayload.educationLevel = level;
+                        updatePayload.stage = level;
+                      }
+                      const hours = regFields.workingHours || regFields.shift;
+                      if (hours && !schoolData.workingHours && !schoolData.shift) {
+                        updatePayload.workingHours = hours;
+                        updatePayload.shift = hours;
+                      }
+                      const study = regFields.studyType || regFields.genderType;
+                      if (study && !schoolData.studyType && !schoolData.genderType) {
+                        updatePayload.studyType = study;
+                        updatePayload.genderType = study;
+                      }
+                      const est =
+                        regFields.estimatedStudents ?? regFields.approximateStudents;
+                      if (est !== undefined && est !== "" && schoolData.estimatedStudents === undefined) {
+                        updatePayload.estimatedStudents = Number(est) || 0;
+                        updatePayload.approximateStudents = String(est);
                       }
                       if (Object.keys(updatePayload).length > 0) await updateDoc(schoolDocRef, updatePayload);
                     }
@@ -1005,7 +1132,13 @@ export default function Login() {
                     <input
                       required
                       type="text"
-                      placeholder={t("name")}
+                      placeholder={
+                        role === UserRole.ADMIN
+                          ? isRtl
+                            ? "اسم المدرسة (مثال: التميز الأهلية)"
+                            : "School name (e.g. Al-Tamayuz School)"
+                          : t("name")
+                      }
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base`}
@@ -1016,26 +1149,35 @@ export default function Login() {
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="relative"
+                      className="space-y-4"
                     >
-                      {isRtl ? (
-                        <Phone
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                          size={18}
+                      <div className="relative">
+                        {isRtl ? (
+                          <Phone
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                            size={18}
+                          />
+                        ) : (
+                          <Phone
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                            size={18}
+                          />
+                        )}
+                        <input
+                          required
+                          type="tel"
+                          placeholder={t("phone")}
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base`}
                         />
-                      ) : (
-                        <Phone
-                          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                          size={18}
-                        />
-                      )}
-                      <input
-                        required
-                        type="tel"
-                        placeholder={t("phone")}
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base`}
+                      </div>
+                      <SchoolRegistrationFields
+                        isRtl={isRtl}
+                        values={schoolRegistration}
+                        onChange={(patch) =>
+                          setSchoolRegistration((prev) => ({ ...prev, ...patch }))
+                        }
                       />
                     </motion.div>
                   )}
@@ -2126,41 +2268,21 @@ export default function Login() {
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
-                        {t("detailedAddress")}
-                      </label>
-                      <div className="relative">
-                        {isRtl ? (
-                          <MapPin
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={16}
-                          />
-                        ) : (
-                          <MapPin
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={16}
-                          />
-                        )}
-                        <input
-                          required
-                          type="text"
-                          value={subscriptionForm.address}
-                          onChange={(e) =>
-                            setSubscriptionForm({
-                              ...subscriptionForm,
-                              address: e.target.value,
-                            })
-                          }
-                          className={`w-full ${isRtl ? "pr-11 pl-4 text-right" : "pl-11 pr-4 text-left"} py-3 md:py-4 rounded-xl md:rounded-2xl border border-slate-200 focus:border-blue-600 outline-none font-bold bg-slate-50/50 transition-colors text-sm md:text-base`}
-                          placeholder={
-                            isRtl
-                              ? "المحافظة - القضاء - الحي"
-                              : "Province - District - Neighborhood"
-                          }
-                        />
-                      </div>
-                    </div>
+                    <SchoolRegistrationFields
+                      isRtl={isRtl}
+                      values={{
+                        address: subscriptionForm.address,
+                        governorate: subscriptionForm.governorate,
+                        directorate: subscriptionForm.directorate,
+                        educationLevel: subscriptionForm.educationLevel,
+                        workingHours: subscriptionForm.workingHours,
+                        studyType: subscriptionForm.studyType,
+                        estimatedStudents: subscriptionForm.estimatedStudents,
+                      }}
+                      onChange={(patch) =>
+                        setSubscriptionForm({ ...subscriptionForm, ...patch })
+                      }
+                    />
 
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
