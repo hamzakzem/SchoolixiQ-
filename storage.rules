@@ -1,59 +1,28 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // 1. Default Deny
-    match /{allPaths=**} {
-      allow read, write: if false;
+    match /chat_attachments/{allPaths=**} {
+      allow read, write: if request.auth != null;
     }
-
-    // 2. Auth Helper
-    function isSignedIn() {
-      return request.auth != null;
+    match /market/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
-
-    // 3. Profiles: Authenticated users can read all user profile images, but only owners can upload
     match /users/{userId}/{allPaths=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
-
-    // 4. Schools: Admins can manage school-related images (logos, etc.)
-    match /schools/{schoolId}/{allPaths=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId == schoolId || 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
-      );
+    match /schools/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
-
-    // 5. Students: Teachers and Admins can manage student photos
-    match /students/{schoolId}/{studentId}/{allPaths=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId == schoolId || 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
-      );
+    match /students/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
-    
-    // Legacy generic path
-    match /students/{studentId}/{allPaths=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
-    }
-
-    // Attachments
-    match /chat_attachments/{messageId}/{allPaths=**} {
-       allow read, write: if isSignedIn();
-    }
-    
-    match /market/{itemId}/{allPaths=**} {
-       allow read: if isSignedIn();
-       allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
-    }
-
     match /system/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
+      allow write: if request.auth != null;
     }
   }
 }
