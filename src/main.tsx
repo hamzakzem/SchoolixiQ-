@@ -2,6 +2,7 @@ import {StrictMode, useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import './styles/macbook-loading.css';
 import { initSentry } from './lib/sentryWrapper';
 
 if (import.meta.env.VITE_SENTRY_DSN) {
