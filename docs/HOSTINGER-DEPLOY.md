@@ -6,7 +6,8 @@
 
 | Secret | مثال | ملاحظة |
 |--------|------|--------|
-| `HOSTINGER_FTP_SERVER` | `ftp.hostinger.com` أو IP من hPanel | نفس Host في FTP/SFTP |
+| `HOSTINGER_FTP_SERVER` | `ftp.hostinger.com` أو IP من hPanel | Host من FTP Accounts |
+| `HOSTINGER_SFTP_HOST` | `srv2063.hstgr.io` (اختياري) | إن فشل `ftp.hostinger.com` — من رابط File Manager (`srvXXXX.hstgr.io`) |
 | `HOSTINGER_FTP_USERNAME` | `u758392104` | من FTP Accounts — ليس كلمة `FTP` |
 | `HOSTINGER_FTP_PASSWORD` | كلمة FTP | |
 | `HOSTINGER_FTP_REMOTE_DIR` | `/home/u758392104/domains/schoolixiq.com/public_html` | **مسار SFTP على السيرفر** — ليس رابط المتصفح |
