@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IdCardTemplate, TextStyle, CustomFont } from '../../../types/idCardTemplate';
-import { Type, UploadCloud, Plus, Trash2 } from 'lucide-react';
-import { uploadImageToServer } from '../../../lib/imageUtils'; // We can use it for fonts too since it returns a server URL, or a base64, but wait. imageUtils does compressImageToBase64, maybe we shouldn't use it for fonts.
+import { Type, UploadCloud, Trash2 } from 'lucide-react';
+import { GOOGLE_FONT_FAMILIES } from '../../../lib/idCardPresets';
 
 interface FontSettingsProps {
   template: IdCardTemplate;
@@ -10,14 +10,33 @@ interface FontSettingsProps {
 }
 
 const ARABIC_FONTS = [
-  "Cairo", "Tajawal", "IBM Plex Sans Arabic", "Noto Sans Arabic", "Almarai", "Changa"
+  'Cairo', 'Tajawal', 'Almarai', 'Changa', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Amiri', 'Rubik',
 ];
-const ENGLISH_FONTS = [
-  "Inter", "Poppins", "Roboto", "Open Sans", "Montserrat", "Noto Sans"
-];
+const ENGLISH_FONTS = GOOGLE_FONT_FAMILIES.filter((f) => !ARABIC_FONTS.includes(f));
+
+function ensureGoogleFontLoaded(family: string) {
+  const id = `gfont-${family.replace(/\s+/g, '-')}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement('link');
+  link.id = id;
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;500;600;700;800&display=swap`;
+  document.head.appendChild(link);
+}
 
 export default function IdCardFontSettings({ template, setTemplate, isRtl }: FontSettingsProps) {
   const [activeTab, setActiveTab] = useState<'global' | 'elements' | 'custom'>('global');
+
+  useEffect(() => {
+    const families = new Set<string>([
+      template.fonts.family,
+      template.fonts.schoolName?.family,
+      template.fonts.studentName?.family,
+      template.fonts.cardTitle?.family,
+      template.fonts.contactInfo?.family,
+    ].filter(Boolean) as string[]);
+    families.forEach(ensureGoogleFontLoaded);
+  }, [template.fonts]);
 
   const updateGlobalFont = (field: keyof IdCardTemplate['fonts'], value: any) => {
     setTemplate(prev => ({

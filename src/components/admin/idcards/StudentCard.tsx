@@ -95,16 +95,34 @@ export default function StudentCard({
 
       {/* Background Layer (Watermark) */}
       {template?.background?.type === "watermark" &&
-        template?.background?.imageUrl && (
+        (template?.background?.imageUrl || template?.background?.watermarkText) && (
           <div
             className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center overflow-hidden"
-            style={{ opacity: template?.background?.watermarkOpacity ?? 0.1 }}
+            style={{ opacity: template?.background?.watermarkOpacity ?? 0.12 }}
           >
-            <img
-              src={template.background.imageUrl}
-              alt="Watermark"
-              className="w-[80%] h-[80%] object-contain"
-            />
+            {template.background.imageUrl ? (
+              <img
+                src={template.background.imageUrl}
+                alt=""
+                className="object-contain max-w-none"
+                style={{
+                  width: `${template.background.watermarkScale ?? 80}%`,
+                  height: `${template.background.watermarkScale ?? 80}%`,
+                }}
+              />
+            ) : (
+              <span
+                className="font-black uppercase tracking-[0.35em] select-none whitespace-nowrap"
+                style={{
+                  fontFamily: template.fonts?.family || "Cairo, sans-serif",
+                  fontSize: "min(12cqi, 28px)",
+                  color: template.colors?.primary || "#0B2345",
+                  transform: "rotate(-24deg)",
+                }}
+              >
+                {template.background.watermarkText}
+              </span>
+            )}
           </div>
         )}
 
