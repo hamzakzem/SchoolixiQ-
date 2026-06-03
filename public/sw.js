@@ -1,5 +1,5 @@
 // Cache name with versioning
-const CACHE_NAME = 'schoolix-cache-v8';
+const CACHE_NAME = 'schoolix-cache-v9';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -72,23 +72,39 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Stale-While-Revalidate strategy for other assets (images, fonts, scripts, css)
+  // Vite hashed bundles: network-first (avoid stale JS after deploy)
+  const isHashedAsset =
+    event.request.url.includes('/assets/') ||
+    event.request.url.includes('.js') ||
+    event.request.url.includes('.css');
+
+  if (isHashedAsset) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Images/fonts: stale-while-revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
           }
           return networkResponse;
         })
-        .catch((error) => {
-          console.warn('Network request failed inside Service Worker:', error);
-          return cachedResponse;
-        });
+        .catch(() => cachedResponse);
 
       return cachedResponse || fetchPromise;
     })

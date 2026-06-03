@@ -48,8 +48,13 @@ const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 import ScanHandler from "./components/ScanHandler";
 import SolarLoading from "./components/SolarLoading";
 import { LanguageToggle } from "./components/LanguageToggle";
-import InstallAppBanner from "./components/InstallAppBanner";
-import { AudioNotificationManager } from "./components/AudioNotificationManager";
+
+const InstallAppBanner = lazy(() => import("./components/InstallAppBanner"));
+const AudioNotificationManager = lazy(() =>
+  import("./components/AudioNotificationManager").then((m) => ({
+    default: m.AudioNotificationManager,
+  })),
+);
 
 const DEFAULT_PACKAGES = [
   {
@@ -1412,8 +1417,10 @@ export default function App() {
                 </Routes>
               </Suspense>
               <Toaster position="top-right" />
-              <InstallAppBanner />
-              <AudioNotificationManager />
+              <Suspense fallback={null}>
+                <InstallAppBanner />
+                <AudioNotificationManager />
+              </Suspense>
             </BrowserRouter>
           </AuthProvider>
         </LanguageProvider>

@@ -170,29 +170,6 @@ const DEFAULT_PACKAGES = [
   },
 ];
 
-const loadGsiScript = (): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    if ((window as any).google?.accounts?.oauth2) {
-      resolve((window as any).google);
-      return;
-    }
-    const existingScript = document.getElementById("gsi-sdk-script");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve((window as any).google));
-      existingScript.addEventListener("error", (e) => reject(e));
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.id = "gsi-sdk-script";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve((window as any).google);
-    script.onerror = (e) => reject(e);
-    document.head.appendChild(script);
-  });
-};
-
 export default function Login() {
   const { t, isRtl } = useLanguage();
   const { config } = useSystemConfig();

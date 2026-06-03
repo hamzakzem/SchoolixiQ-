@@ -130,34 +130,38 @@ createRoot(document.getElementById('root')!).render(
   </SystemConfigProvider>
 );
 
-// PWA Service Worker Registration with strict cache-busting & update-forcing for mobile/iPad compatibility
+// Defer PWA registration so first paint is not blocked
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    // Append a unique build version query to force update detection on all mobile/tablet browsers
-    const buildVersion = '2026-05-29-v8';
-    navigator.serviceWorker.register(`/sw.js?build=${buildVersion}`)
+  const registerSw = () => {
+    const buildVersion = '2026-06-03-v9';
+    navigator.serviceWorker
+      .register(`/sw.js?build=${buildVersion}`)
       .then((registration) => {
-        console.log('Schoolix PWA ServiceWorker successfully registered with scope: ', registration.scope);
-        
-        // Force checking for updates immediately on load
         registration.update();
-
-        // Listen for new service worker installations and reload automatically to apply changes
         registration.addEventListener('updatefound', () => {
           const installingWorker = registration.installing;
-          if (installingWorker) {
-            installingWorker.addEventListener('statechange', () => {
-              if (installingWorker.state === 'activated') {
-                console.log('New Schoolix version activated! Reloading application to apply brand updates...');
-                window.location.reload();
-              }
-            });
-          }
+          if (!installingWorker) return;
+          installingWorker.addEventListener('statechange', () => {
+            if (
+              installingWorker.state === 'activated' &&
+              navigator.serviceWorker.controller
+            ) {
+              window.location.reload();
+            }
+          });
         });
       })
       .catch((error) => {
-        console.error('Schoolix PWA ServiceWorker registration failed: ', error);
+        console.error('Schoolix PWA ServiceWorker registration failed:', error);
       });
-  });
+  };
+
+  const defer = (window as Window & { requestIdleCallback?: (cb: () => void) => void })
+    .requestIdleCallback;
+  if (typeof defer === 'function') {
+    defer(registerSw);
+  } else {
+    window.setTimeout(registerSw, 2000);
+  }
 }
 
