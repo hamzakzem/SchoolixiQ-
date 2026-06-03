@@ -66,7 +66,7 @@ jobs:
         uses: wangyucode/sftp-upload-action@v3
         with:
           host: ${{ secrets.HOSTINGER_FTP_SERVER }}
-          port: ${{ secrets.HOSTINGER_SFTP_PORT || '22' }}
+          port: 22
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           localDir: dist
