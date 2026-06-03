@@ -3,7 +3,14 @@ import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, memoryLocalCache } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import type { Messaging } from 'firebase/messaging';
-import firebaseConfig from '../../firebase-applet-config.json';
+import firebaseConfigJson from '../../firebase-applet-config.json';
+
+const firebaseConfig = {
+  ...firebaseConfigJson,
+  authDomain:
+    (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined)?.trim() ||
+    firebaseConfigJson.authDomain,
+};
 
 // Global error interrupter for unhandled IndexedDB / Connection Lost errors
 if (typeof window !== 'undefined') {
@@ -38,7 +45,7 @@ if (typeof window !== 'undefined') {
   }, true);
 }
 
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig as typeof firebaseConfigJson);
 
 // Avoid persistentMultipleTabManager in iframes to prevent BroadcastChannel/lock assertion errors
 const isInIframe = typeof window !== 'undefined' && window.self !== window.top;

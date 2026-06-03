@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { auth, db } from "../lib/firebase";
 import {
+  signInWithGoogleRedirectWeb,
+  signInWithGoogleWeb,
+} from "../lib/googleAuthWeb";
+import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   sendEmailVerification,
@@ -575,6 +578,7 @@ export default function Login() {
       "377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com";
   });
   const [showClientIdConfig, setShowClientIdConfig] = useState<boolean>(false);
+  const [googlePopupBlocked, setGooglePopupBlocked] = useState(false);
 
   const isNativeApp =
     typeof (window as any).Capacitor !== "undefined" &&
@@ -588,9 +592,23 @@ export default function Login() {
     window.sessionStorage.setItem("pendingGoogleMode", mode);
   };
 
-  const shouldUseRedirect = () =>
-    inIframe ||
-    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const handleGoogleRedirectAuth = async () => {
+    if (googleAuthLock.current || loading) return;
+    googleAuthLock.current = true;
+    setGooglePopupBlocked(false);
+    setLoading(true);
+    persistGoogleAuthContext();
+    try {
+      await signInWithGoogleRedirectWeb(auth);
+    } catch (error: unknown) {
+      console.error("Google redirect error:", error);
+      const message =
+        error instanceof Error ? error.message : t("failedConnection");
+      toast.error(message);
+      googleAuthLock.current = false;
+      setLoading(false);
+    }
+  };
 
   const handleGoogleAuth = async () => {
     if (googleAuthLock.current || loading) return;
@@ -605,11 +623,9 @@ export default function Login() {
     setShowIframeHint(false);
     setFirebaseProviderError(null);
     setNativePlatformNotice(false);
+    setGooglePopupBlocked(false);
     setLoading(true);
 
-    const provider = new GoogleAuthProvider();
-    provider.addScope("profile");
-    provider.addScope("email");
     persistGoogleAuthContext();
     let redirecting = false;
 
@@ -642,29 +658,38 @@ export default function Login() {
         return;
       }
 
-      if (shouldUseRedirect()) {
+      if (inIframe) {
         redirecting = true;
+        const provider = new GoogleAuthProvider();
+        provider.addScope("profile");
+        provider.addScope("email");
         await signInWithRedirect(auth, provider);
         return;
       }
 
-      try {
-        const result = await signInWithPopup(auth, provider);
-        if (result?.user) {
-          await processGoogleUser(result.user, role, mode);
-        }
-      } catch (popupError: any) {
-        const popupCode = popupError?.code || "";
-        if (
-          popupCode === "auth/popup-blocked" ||
-          popupCode === "auth/cancelled-popup-request"
-        ) {
-          redirecting = true;
-          await signInWithRedirect(auth, provider);
-          return;
-        }
-        throw popupError;
+      auth.languageCode = isRtl ? "ar" : "en";
+
+      const webResult = await signInWithGoogleWeb(auth);
+      if (webResult.ok) {
+        await processGoogleUser(webResult.user, role, mode);
+        return;
       }
+      if (webResult.cancelled) {
+        toast.error(
+          isRtl ? "تم إلغاء تسجيل الدخول." : "Sign-in was cancelled.",
+        );
+        return;
+      }
+      if (webResult.popupBlocked) {
+        setGooglePopupBlocked(true);
+        toast.error(
+          isRtl
+            ? "المتصفح منع نافذة Google. فعّل النوافذ المنبثقة لهذا الموقع أو استخدم الخيار البديل أدناه."
+            : "Your browser blocked the Google window. Allow pop-ups for this site or use the alternative below.",
+        );
+        return;
+      }
+      throw webResult.error;
     } catch (error: any) {
       console.error("Google Auth Error:", error);
       const errorCode = error.code || "";
@@ -679,8 +704,8 @@ export default function Login() {
         setUnauthorizedDomainError(window.location.hostname);
         toast.error(
           isRtl
-            ? "النطاق غير مصرح به في Firebase (Authentication → Authorized domains)."
-            : "Domain not authorized in Firebase (Authentication → Authorized domains).",
+            ? "هذا النطاق غير مفعّل لتسجيل الدخول بـ Google. تواصل مع مسؤول المنصة."
+            : "This domain is not enabled for Google sign-in. Contact your platform administrator.",
         );
       } else if (
         errorCode === "auth/operation-not-allowed" ||
@@ -690,19 +715,19 @@ export default function Login() {
         setFirebaseProviderError("google-disabled");
         toast.error(
           isRtl
-            ? "فعّل Google من Firebase → Authentication → Sign-in method."
-            : "Enable Google in Firebase → Authentication → Sign-in method.",
+            ? "تسجيل الدخول بـ Google غير مفعّل حالياً. تواصل مع مسؤول المنصة."
+            : "Google sign-in is not enabled. Contact your platform administrator.",
         );
       } else if (errorCode === "auth/popup-closed-by-user") {
         toast.error(
-          isRtl ? "تم إغلاق نافذة Google." : "Google sign-in window was closed.",
+          isRtl ? "تم إلغاء تسجيل الدخول." : "Sign-in was cancelled.",
         );
       } else if (inIframe) {
         setShowIframeHint(true);
         toast.error(
           isRtl
-            ? "المتصفح يمنع نافذة Google. استخدم إعادة التوجيه أو البريد وكلمة المرور."
-            : "Browser blocked Google popup. Use redirect or email/password.",
+            ? "تسجيل Google غير متاح داخل الإطار الحالي. افتح الموقع في تبويب كامل أو استخدم البريد وكلمة المرور."
+            : "Google sign-in is not available in this embedded view. Open the site in a full tab or use email/password.",
         );
       } else {
         toast.error(errorMessage || t("failedConnection"));
@@ -1462,6 +1487,25 @@ export default function Login() {
               </span>
             </button>
 
+            {googlePopupBlocked && !inIframe && (
+              <div className="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-600 space-y-2">
+                <p className="leading-relaxed">
+                  {isRtl
+                    ? "لتجنب ظهور صفحة خارجية، يُفضّل السماح بالنوافذ المنبثقة ثم الضغط على Google مرة أخرى."
+                    : "To stay on this site, allow pop-ups and tap Google again."}
+                </p>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleGoogleRedirectAuth}
+                  className="w-full py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-bold text-slate-700 text-xs sm:text-sm transition-colors disabled:opacity-50"
+                >
+                  {isRtl
+                    ? "متابعة عبر صفحة تسجيل Google (بديل)"
+                    : "Continue via full-page Google sign-in (fallback)"}
+                </button>
+              </div>
+            )}
 
             {unauthorizedDomainError && (
               <div
@@ -1480,9 +1524,13 @@ export default function Login() {
                         : "Enable Google Sign-in (Action Required)"}
                     </h4>
                     <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
-                      {isRtl
-                        ? "نظراً لأن التطبيق يعمل في بيئة معاينة آمنة، يجب عليك إضافة هذا النطاق يدوياً كمجال مصرح به في لوحة تحكم Firebase الخاص بمشروعك (Authentication -> Settings -> Authorized domains)."
-                        : "Because this preview runs in a sandboxed environment, you must manually add this domain into your Firebase project settings (Authentication -> Settings -> Authorized domains)."}
+                      {import.meta.env.DEV
+                        ? isRtl
+                          ? "أضف هذا النطاق ضمن المجالات المصرّحة في إعدادات المصادقة للمشروع (Authorized domains)."
+                          : "Add this domain to your auth project's Authorized domains list."
+                        : isRtl
+                          ? "هذا النطاق غير مفعّل لتسجيل الدخول بـ Google. يرجى إبلاغ مسؤول المنصة باسم النطاق أدناه."
+                          : "This domain is not enabled for Google sign-in. Share the domain below with your platform administrator."}
                     </p>
                   </div>
                 </div>
@@ -1511,30 +1559,26 @@ export default function Login() {
                   </button>
                 </div>
 
-                <div className="mt-2 text-[10px] sm:text-[11px] text-slate-500 list-decimal pl-4 space-y-0.5 rtl:pr-4 rtl:pl-0 font-medium leading-relaxed">
-                  <p>
-                    1.{" "}
-                    {isRtl
-                      ? "اذهب لـ Firebase Console وافتح مشروعك."
-                      : "Go to Firebase Console and open your project."}
-                  </p>
-                  <p>
-                    2.{" "}
-                    {isRtl
-                      ? "اختر Build ثم Authentication ثم تبويب Settings."
-                      : "Click on Build, then Authentication, then Settings tab."}
-                  </p>
-                  <p>
-                    3.{" "}
-                    {isRtl
-                      ? "تحت Authorized domains، اضغط على Add domain وألصق النطاق المنسوخ أعلاه."
-                      : "Under Authorized domains, click Add domain and paste the copied domain."}
-                  </p>
-                </div>
+                {import.meta.env.DEV && (
+                  <div className="mt-2 text-[10px] sm:text-[11px] text-slate-500 list-decimal pl-4 space-y-0.5 rtl:pr-4 rtl:pl-0 font-medium leading-relaxed">
+                    <p>
+                      1.{" "}
+                      {isRtl
+                        ? "افتح إعدادات المصادقة للمشروع."
+                        : "Open your project's authentication settings."}
+                    </p>
+                    <p>
+                      2.{" "}
+                      {isRtl
+                        ? "من تبويب Settings أضف النطاق ضمن Authorized domains."
+                        : "Under Settings, add the domain under Authorized domains."}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
-            {nativePlatformNotice && (
+            {nativePlatformNotice && (import.meta.env.DEV || showClientIdConfig) && (
               <div
                 id="native-platform-notice-card"
                 className="mt-4 p-4 rounded-xl border-2 border-amber-200 bg-amber-50/50 text-slate-800 text-xs sm:text-sm shadow-sm"
@@ -1633,14 +1677,14 @@ export default function Login() {
                           ? "تفعيل دخول Google (خطأ إعدادات)"
                           : "Enable Google Auth (Configuration Error)"
                         : isRtl
-                          ? "تفاصيل الخطأ الفني (Firebase Exception)"
-                          : "Technical Error Details (Firebase Exception)"}
+                          ? "تفاصيل الخطأ الفني"
+                          : "Technical error details"}
                     </h4>
                     <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
                       {firebaseProviderError === "google-disabled"
                         ? isRtl
-                          ? "لم يتم تفعيل موفر تسجيل الدخول Google في لوحة تحكم عتاد Firebase. يرجى تفعيله من Firebase Console لتشغيل الخدمة."
-                          : "Google Authentication Sign-In is not activated in the Firebase Project Console."
+                          ? "تسجيل الدخول بـ Google غير مفعّل على المنصة. تواصل مع مسؤول النظام."
+                          : "Google sign-in is not enabled on this platform. Contact your administrator."
                         : isRtl
                           ? "لقد أطلق نظام المصادقة استثناءاً فنياً محدداً. التفاصيل معروضة أدناه للتحقق والإصلاح:"
                           : "The auth system threw an explicit technical exception. See details below to resolve: "}
@@ -1654,35 +1698,20 @@ export default function Login() {
                       {firebaseProviderError}
                     </code>
                   </div>
-                ) : (
+                ) : import.meta.env.DEV ? (
                   <div className="mt-3 bg-white p-3 rounded-lg border border-slate-200 flex flex-col gap-2.5 shadow-sm text-center">
                     <p className="font-bold text-slate-900 text-xs">
                       {isRtl
-                        ? "طريقة الحل وتفعيل موفر تسجيل الخدمة:"
-                        : "Steps to Activate and Resolve:"}
+                        ? "للمطورين: تفعيل موفر Google"
+                        : "For developers: enable Google provider"}
                     </p>
-                    <div className="text-[10px] sm:text-[11px] text-slate-500 list-decimal pr-4 pl-0 rtl:pl-4 space-y-1 font-medium leading-relaxed text-right">
-                      <p>
-                        1.{" "}
-                        {isRtl
-                          ? "ادخل على حساب Firebase Console وافتح مشروعك."
-                          : "Open Firebase Console and pick your project."}
-                      </p>
-                      <p>
-                        2.{" "}
-                        {isRtl
-                          ? "اذهب إلى قائمة Build ثم Authentication ثم تبويب Sign-in method."
-                          : "Click on Build -> Authentication -> Sign-in method tab."}
-                      </p>
-                      <p>
-                        3.{" "}
-                        {isRtl
-                          ? "اضغط على Add provider واختر Google وقم بتفعيله ثم حفظ."
-                          : "Click Add provider -> Google -> Enable and save the changes."}
-                      </p>
-                    </div>
+                    <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium leading-relaxed">
+                      {isRtl
+                        ? "من إعدادات المصادقة → Sign-in method → فعّل Google واحفظ."
+                        : "Authentication → Sign-in method → enable Google and save."}
+                    </p>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
 
