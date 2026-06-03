@@ -11,43 +11,47 @@ $SA_EMAIL = "$SA_ID@$PROJECT_ID.iam.gserviceaccount.com"
 $POOL_ID = if ($env:WIF_POOL_ID) { $env:WIF_POOL_ID } else { "github-actions-pool" }
 $PROVIDER_ID = if ($env:WIF_PROVIDER_ID) { $env:WIF_PROVIDER_ID } else { "github-provider" }
 
+# Do not use $Args — it is a reserved automatic variable in PowerShell.
 function Invoke-Gcloud {
-    param([string[]]$Args)
-    & gcloud @Args
+    param(
+        [Parameter(Mandatory, ValueFromRemainingArguments = $true)]
+        [string[]]$GcloudArguments
+    )
+    $output = & gcloud @GcloudArguments 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "gcloud failed: gcloud $($Args -join ' ')"
+        throw "gcloud failed: gcloud $($GcloudArguments -join ' ')`n$output"
     }
+    return $output
 }
 
 function Test-GcloudOk {
-    param([string[]]$Args)
-    & gcloud @Args 2>$null | Out-Null
+    param(
+        [Parameter(Mandatory, ValueFromRemainingArguments = $true)]
+        [string[]]$GcloudArguments
+    )
+    & gcloud @GcloudArguments 2>$null | Out-Null
     return ($LASTEXITCODE -eq 0)
 }
 
 Write-Host "==> Project: $PROJECT_ID"
-$PROJECT_NUMBER = (Invoke-Gcloud @("projects", "describe", $PROJECT_ID, "--format=value(projectNumber)") | Out-String).Trim()
+$PROJECT_NUMBER = (Invoke-Gcloud projects describe $PROJECT_ID --format=value(projectNumber) | Out-String).Trim()
 Write-Host "==> Project number: $PROJECT_NUMBER"
 
 Write-Host "==> Enabling required APIs..."
-Invoke-Gcloud @(
-    "services", "enable",
-    "iam.googleapis.com",
-    "iamcredentials.googleapis.com",
-    "sts.googleapis.com",
-    "run.googleapis.com",
-    "cloudbuild.googleapis.com",
-    "artifactregistry.googleapis.com",
-    "--project=$PROJECT_ID"
-)
+Invoke-Gcloud services enable `
+    iam.googleapis.com `
+    iamcredentials.googleapis.com `
+    sts.googleapis.com `
+    run.googleapis.com `
+    cloudbuild.googleapis.com `
+    artifactregistry.googleapis.com `
+    --project=$PROJECT_ID | Out-Null
 
 Write-Host "==> Service account: $SA_EMAIL"
-if (-not (Test-GcloudOk @("iam", "service-accounts", "describe", $SA_EMAIL, "--project=$PROJECT_ID"))) {
-    Invoke-Gcloud @(
-        "iam", "service-accounts", "create", $SA_ID,
-        "--project=$PROJECT_ID",
-        "--display-name=GitHub Actions Cloud Run Deployer"
-    )
+if (-not (Test-GcloudOk iam service-accounts describe $SA_EMAIL --project=$PROJECT_ID)) {
+    Invoke-Gcloud iam service-accounts create $SA_ID `
+        --project=$PROJECT_ID `
+        --display-name="GitHub Actions Cloud Run Deployer" | Out-Null
 }
 
 Write-Host "==> IAM roles for deploy (source-based Cloud Run)..."
@@ -59,53 +63,43 @@ $roles = @(
     "roles/storage.admin"
 )
 foreach ($role in $roles) {
-    Invoke-Gcloud @(
-        "projects", "add-iam-policy-binding", $PROJECT_ID,
-        "--member=serviceAccount:$SA_EMAIL",
-        "--role=$role",
-        "--quiet"
-    ) | Out-Null
+    Invoke-Gcloud projects add-iam-policy-binding $PROJECT_ID `
+        --member="serviceAccount:$SA_EMAIL" `
+        --role=$role `
+        --quiet | Out-Null
 }
 
 Write-Host "==> Workload Identity Pool..."
-if (-not (Test-GcloudOk @("iam", "workload-identity-pools", "describe", $POOL_ID, "--project=$PROJECT_ID", "--location=global"))) {
-    Invoke-Gcloud @(
-        "iam", "workload-identity-pools", "create", $POOL_ID,
-        "--project=$PROJECT_ID",
-        "--location=global",
-        "--display-name=GitHub Actions"
-    )
+if (-not (Test-GcloudOk iam workload-identity-pools describe $POOL_ID --project=$PROJECT_ID --location=global)) {
+    Invoke-Gcloud iam workload-identity-pools create $POOL_ID `
+        --project=$PROJECT_ID `
+        --location=global `
+        --display-name="GitHub Actions" | Out-Null
 }
 
 Write-Host "==> OIDC provider (GitHub)..."
-$providerExists = Test-GcloudOk @(
-    "iam", "workload-identity-pools", "providers", "describe", $PROVIDER_ID,
-    "--project=$PROJECT_ID",
-    "--location=global",
-    "--workload-identity-pool=$POOL_ID"
-)
+$providerExists = Test-GcloudOk iam workload-identity-pools providers describe $PROVIDER_ID `
+    --project=$PROJECT_ID `
+    --location=global `
+    --workload-identity-pool=$POOL_ID
 if (-not $providerExists) {
-    Invoke-Gcloud @(
-        "iam", "workload-identity-pools", "providers", "create-oidc", $PROVIDER_ID,
-        "--project=$PROJECT_ID",
-        "--location=global",
-        "--workload-identity-pool=$POOL_ID",
-        "--display-name=GitHub OIDC",
-        "--issuer-uri=https://token.actions.githubusercontent.com",
-        "--attribute-mapping=google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.ref=assertion.ref",
-        "--attribute-condition=assertion.repository=='$GITHUB_REPO'"
-    )
+    Invoke-Gcloud iam workload-identity-pools providers create-oidc $PROVIDER_ID `
+        --project=$PROJECT_ID `
+        --location=global `
+        --workload-identity-pool=$POOL_ID `
+        --display-name="GitHub OIDC" `
+        --issuer-uri=https://token.actions.githubusercontent.com `
+        --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.ref=assertion.ref" `
+        --attribute-condition="assertion.repository=='$GITHUB_REPO'" | Out-Null
 }
 
 Write-Host "==> Allow GitHub repo to impersonate service account..."
 $MEMBER = "principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/attribute.repository/$GITHUB_REPO"
-Invoke-Gcloud @(
-    "iam", "service-accounts", "add-iam-policy-binding", $SA_EMAIL,
-    "--project=$PROJECT_ID",
-    "--role=roles/iam.workloadIdentityUser",
-    "--member=$MEMBER",
-    "--quiet"
-) | Out-Null
+Invoke-Gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL `
+    --project=$PROJECT_ID `
+    --role=roles/iam.workloadIdentityUser `
+    --member=$MEMBER `
+    --quiet | Out-Null
 
 $PROVIDER_RESOURCE = "projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/providers/$PROVIDER_ID"
 
