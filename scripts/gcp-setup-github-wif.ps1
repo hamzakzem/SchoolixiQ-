@@ -12,11 +12,17 @@ $POOL_ID = if ($env:WIF_POOL_ID) { $env:WIF_POOL_ID } else { "github-actions-poo
 $PROVIDER_ID = if ($env:WIF_PROVIDER_ID) { $env:WIF_PROVIDER_ID } else { "github-provider" }
 
 function Resolve-GcloudExe {
-    $candidates = @(
-        (Join-Path ${env:ProgramFiles(x86)} "Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd"),
-        (Join-Path $env:ProgramFiles "Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd"),
-        (Join-Path $env:CLOUDSDK_ROOT "bin\gcloud.cmd")
-    ) | Where-Object { $_ -and (Test-Path $_) }
+    $candidates = @()
+    if (${env:ProgramFiles(x86)}) {
+        $candidates += Join-Path ${env:ProgramFiles(x86)} "Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd"
+    }
+    if ($env:ProgramFiles) {
+        $candidates += Join-Path $env:ProgramFiles "Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd"
+    }
+    if ($env:CLOUDSDK_ROOT) {
+        $candidates += Join-Path $env:CLOUDSDK_ROOT "bin\gcloud.cmd"
+    }
+    $candidates = $candidates | Where-Object { $_ -and (Test-Path $_) }
 
     if ($candidates.Count -gt 0) {
         return $candidates[0]
