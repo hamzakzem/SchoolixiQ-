@@ -11,6 +11,7 @@ name: Deploy Frontend to Hostinger
       - "vite.config.ts"
       - "package.json"
       - "package-lock.json"
+      - ".github/workflows/deploy-hostinger.yml"
 
 concurrency:
   group: hostinger-deploy-${{ github.ref }}
@@ -30,10 +31,14 @@ jobs:
             fi
           done
           if [ -n "$missing" ]; then
-            echo "::error title=Missing Hostinger secrets::Add GitHub secrets:$missing"
-            echo "HOSTINGER_FTP_REMOTE_DIR must be the FULL path to public_html (from hPanel File Manager)."
-            echo "Example: /home/u123456789/domains/yourdomain.com/public_html"
-            echo "See docs/HOSTINGER-DEPLOY.md"
+            echo "::error title=Missing Hostinger secrets::Add GitHub repository secrets:$missing"
+            exit 1
+          fi
+          remote="${HOSTINGER_FTP_REMOTE_DIR}"
+          if [[ "$remote" == ./* ]] || [[ "$remote" == "./"* ]] || [[ "$remote" == "public_html"* ]]; then
+            echo "::error title=Invalid HOSTINGER_FTP_REMOTE_DIR::Use the FULL absolute path from hPanel File Manager."
+            echo "Wrong: ./public_html/ or public_html"
+            echo "Right: /home/u758392104/domains/schoolixiq.com/public_html"
             exit 1
           fi
         env:
@@ -52,29 +57,43 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build frontend
-        run: npm run build
+      - name: Build frontend (static only)
+        run: npm run build:web
 
       - name: Verify dist output
         run: |
           test -f dist/index.html
           test -f dist/.htaccess
+          rm -f dist/server.cjs dist/server.cjs.map 2>/dev/null || true
           ls -la dist/
 
-      # Hostinger: GitHub runners often timeout on FTP:21 — use SFTP:22
-      - name: Deploy to Hostinger (SFTP)
-        uses: wangyucode/sftp-upload-action@v3
+      - name: Package dist zip (manual fallback)
+        run: |
+          cd dist && zip -r ../schoolixiq-dist.zip . && cd ..
+          ls -la schoolixiq-dist.zip
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
         with:
-          host: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          name: schoolixiq-dist
+          path: schoolixiq-dist.zip
+          retention-days: 7
+
+      - name: Deploy to Hostinger (SFTP)
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
           port: 22
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          localDir: dist
-          remoteDir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
-          forceUpload: true
-          concurrency: 8
+          local_path: "./dist/*"
+          remote_path: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
+          sftp_only: true
+          sftpArgs: "-o ConnectTimeout=30 -o StrictHostKeyChecking=no"
+          rsyncArgs: "--exclude=server.cjs --exclude=server.cjs.map"
 
       - name: Deployment summary
         run: |
-          echo "### Hostinger deploy (SFTP)" >> "$GITHUB_STEP_SUMMARY"
-          echo "Uploaded \`dist/\` to \`${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Hostinger deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "Uploaded contents of \`dist/\` into \`${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "If the site looks old: hPanel → Cache Manager → Purge, then hard-refresh the browser (Ctrl+Shift+R)." >> "$GITHUB_STEP_SUMMARY"
