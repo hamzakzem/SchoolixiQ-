@@ -121,7 +121,7 @@ export default function AdvancedReports() {
           message: reportContent.substring(0, 100) + '...',
           type: 'report',
           schoolId: profile.schoolId,
-          metadata: { sourceId: reportRef.id }
+          metadata: { sourceId: reportRef.id, reportKind: 'advanced', tab: 'advanced_reports' }
         });
 
         toast.success(isRtl ? 'تم إضافة التقرير بنجاح' : 'Report added successfully');

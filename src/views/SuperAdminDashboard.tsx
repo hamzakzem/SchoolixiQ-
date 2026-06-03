@@ -56,6 +56,7 @@ import {
   Bell,
 } from "lucide-react";
 import { NotificationBell } from "../components/NotificationBell";
+import BrandLogo from "../components/BrandLogo";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
@@ -1553,17 +1554,9 @@ export default function SuperAdminDashboard() {
               <div
                 className={`p-6 flex ${isSidebarCollapsed ? "justify-center border-b border-transparent" : "items-center gap-4 border-b border-slate-700 dark:border-slate-800"} pb-6`}
               >
-                {config.appLogo ? (
-                  <img
-                    src={config.appLogo || undefined}
-                    alt={config.appName}
-                    className="w-10 h-10 md:w-12 md:h-12 object-contain rounded-xl bg-white p-1 shrink-0"
-                  />
-                ) : (
-                  <span className="bg-[#0B2345] w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center font-bold text-xl md:text-2xl shrink-0">
-                    {config.appName[0]}
-                  </span>
-                )}
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0">
+                  <BrandLogo size="sm" className="max-h-full max-w-full" alt={config.appName} />
+                </div>
                 {!isSidebarCollapsed && (
                   <motion.h1
                     initial={{ opacity: 0 }}
@@ -1991,7 +1984,7 @@ export default function SuperAdminDashboard() {
             <ThemeToggle />
 
             <NotificationBell
-              activeTabSetter={setActiveTab}
+              activeTabSetter={navigateToTab}
               userRole="superadmin"
             />
             <div className="text-left md:block hidden">

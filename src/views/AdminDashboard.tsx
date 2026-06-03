@@ -29,6 +29,7 @@ import { useAuth } from "../lib/AuthContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { NotificationBell } from "../components/NotificationBell";
+import BrandLogo from "../components/BrandLogo";
 import { motion, AnimatePresence } from "motion/react";
 import {
   collection,
@@ -418,6 +419,7 @@ export default function AdminDashboard() {
           schoolId: profile.schoolId,
           schoolName: schoolData.name,
           requestType: "renewal",
+          tab: "requests",
         },
       });
 
@@ -1215,17 +1217,9 @@ export default function AdminDashboard() {
                       className="w-full h-full object-contain"
                     />
                   </div>
-                ) : config.appLogo ? (
-                  <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1 shadow-xl shrink-0 overflow-hidden">
-                    <img
-                      src={config.appLogo || undefined}
-                      alt={config.appName}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
                 ) : (
-                  <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center text-slate-900 font-bold text-xl md:text-2xl shadow-xl shrink-0 overflow-hidden">
-                    {config.appName[0]}
+                  <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1.5 shadow-xl shrink-0 overflow-hidden">
+                    <BrandLogo size="sm" className="max-h-full max-w-full" alt={config.appName} />
                   </div>
                 )}
                 {!isSidebarCollapsed && (
@@ -1376,7 +1370,7 @@ export default function AdminDashboard() {
             </div>
 
             <NotificationBell
-              activeTabSetter={setActiveTab}
+              activeTabSetter={navigateToTab}
               userRole={profile?.role || "admin"}
             />
 

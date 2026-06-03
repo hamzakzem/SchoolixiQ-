@@ -1,23 +1,25 @@
 {
-  "name": "Schoolix IQ - Educational Platform",
-  "short_name": "Schoolix",
+  "name": "SchoolixiQ - Educational Platform",
+  "short_name": "SchoolixiQ",
   "description": "Premium School & Learning Management System",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4f46e5",
+  "theme_color": "#0B2345",
   "orientation": "any",
   "categories": ["education", "productivity"],
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icon.svg",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
   "prefer_related_applications": false,

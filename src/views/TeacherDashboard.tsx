@@ -606,7 +606,7 @@ export default function TeacherDashboard() {
           message: reportContent,
           type: "report",
           schoolId: profile.schoolId,
-          metadata: { sourceId: reportRef.id },
+          metadata: { sourceId: reportRef.id, tab: "reports" },
         });
       }
 

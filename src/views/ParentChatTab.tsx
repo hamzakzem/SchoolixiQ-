@@ -365,7 +365,7 @@ export default function ParentChatTab() {
             (messageText.length > 50 ? "..." : ""),
           type: "system",
           schoolId: profile.schoolId,
-          metadata: { senderId: profile.uid, conversationId: convId },
+          metadata: { senderId: profile.uid, conversationId: convId, tab: "chat" },
         });
       } else if (activeContact.type === "admin") {
         const { getDocs, query, collection, where } =
@@ -385,7 +385,7 @@ export default function ParentChatTab() {
               (messageText.length > 50 ? "..." : ""),
             type: "system",
             schoolId: profile.schoolId,
-            metadata: { senderId: profile.uid, conversationId: convId },
+            metadata: { senderId: profile.uid, conversationId: convId, tab: "chat" },
           });
         }
       }

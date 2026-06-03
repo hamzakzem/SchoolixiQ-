@@ -63,6 +63,7 @@ import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { GlobalFooter } from "../components/GlobalFooter";
 import AuthBootScreen from "../components/AuthBootScreen";
+import BrandLogo from "../components/BrandLogo";
 import SchoolRegistrationFields, {
   buildRegistrationCustomerInfo,
   buildSchoolFirestoreFields,
@@ -1040,26 +1041,10 @@ export default function Login() {
           <div className="flex flex-col items-center mb-6 sm:mb-10 text-center select-none">
             {/* Elegant Technical Logo Container - Fixed Height to prevent any layout shifts */}
             <div className="h-24 sm:h-28 w-full flex items-center justify-center mb-2 relative group">
-              {config.appLogo ? (
-                <div className="relative">
-                  {/* Tech Aura Backlight */}
-                  <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 to-sky-500 rounded-full blur-xl opacity-10 group-hover:opacity-25 transition duration-500"></div>
-                  <img
-                    src={config.appLogo || undefined}
-                    alt="schoolixiQ Logo"
-                    className="max-h-20 sm:max-h-24 w-auto object-contain drop-shadow-sm transition-all duration-500 hover:scale-105 relative z-10"
-                    loading="eager"
-                  />
-                </div>
-              ) : (
-                /* Sleek, minimalist geometric loading skeleton - completely replaces old school-icon fallbacks */
-                <div className="relative w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-2xl border border-dashed border-indigo-500/30 animate-[spin_10s_linear_infinite]"></div>
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500/5 to-sky-500/5 border border-indigo-500/10 flex items-center justify-center">
-                    <span className="w-2 h-2 rounded-full bg-[#0B2345] animate-pulse"></span>
-                  </div>
-                </div>
-              )}
+              <div className="relative">
+                <div className="absolute -inset-3 bg-gradient-to-r from-[#0B2345]/10 to-[#D4A64A]/15 rounded-full blur-xl opacity-60 group-hover:opacity-90 transition duration-500" />
+                <BrandLogo size="lg" className="relative z-10 transition-transform duration-500 group-hover:scale-105" />
+              </div>
             </div>
 
             {/* Platform Brand Title styled geometrically/technically */}

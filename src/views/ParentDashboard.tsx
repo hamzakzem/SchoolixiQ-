@@ -1151,7 +1151,7 @@ export default function ParentDashboard() {
 
                 <NotificationBell
                   variant="compact"
-                  activeTabSetter={setActiveTab}
+                  activeTabSetter={navigateToTab}
                   userRole="parent"
                 />
             </div>

@@ -22,7 +22,7 @@ export const NotificationBell: React.FC<Props> = ({
   const { unreadCount } = useNotifications();
   const [open, setOpen] = useState(false);
 
-  const role = userRole || profile?.role || 'parent';
+  const role = (userRole || profile?.role || 'parent').toLowerCase();
 
   const buttonClass =
     variant === 'compact'

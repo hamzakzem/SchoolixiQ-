@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from './firebase';
 import { doc, onSnapshot, getDocFromServer } from 'firebase/firestore';
+import { BRAND_LOGO_PATH, BRAND_THEME_COLOR } from './brandAssets';
 
 interface MarketingFeature {
   title: string;
@@ -29,7 +30,7 @@ interface SystemConfig {
 
 const defaultSystemConfig: SystemConfig = {
   appName: 'SchoolixiQ',
-  appLogo: '',
+  appLogo: BRAND_LOGO_PATH,
   supportPhones: ['+964 770 000 0000'],
   supportEmails: ['support@schoolixiq.iq'],
   successPartners: [],
@@ -85,7 +86,10 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
       if (snap.exists()) {
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
-        const appLogo = typeof data.appLogo !== 'undefined' ? data.appLogo : '';
+        const appLogo =
+          typeof data.appLogo === 'string' && data.appLogo.trim()
+            ? data.appLogo
+            : BRAND_LOGO_PATH;
         const updatedConfig = {
           ...defaultSystemConfig,
           ...data,
@@ -106,7 +110,10 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
       if (snap.exists()) {
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
-        const appLogo = typeof data.appLogo !== 'undefined' ? data.appLogo : '';
+        const appLogo =
+          typeof data.appLogo === 'string' && data.appLogo.trim()
+            ? data.appLogo
+            : BRAND_LOGO_PATH;
         const newConfig = {
           appName: appName,
           appLogo: appLogo,
@@ -143,12 +150,27 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         link.rel = 'icon';
         document.getElementsByTagName('head')[0].appendChild(link);
       }
-      link.href = config.appLogo || "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg";
-      
+      const faviconSrc = config.appLogo?.trim() || BRAND_LOGO_PATH;
+      link.type = 'image/png';
+      link.href = faviconSrc;
+
       let appleLink: HTMLLinkElement | null = document.querySelector("link[rel='apple-touch-icon']");
-      if (appleLink) {
-        appleLink.href = config.appLogo || "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg";
+      if (!appleLink) {
+        appleLink = document.createElement('link');
+        appleLink.rel = 'apple-touch-icon';
+        document.getElementsByTagName('head')[0].appendChild(appleLink);
       }
+      appleLink.href = faviconSrc;
+
+      const themeMeta =
+        document.querySelector('meta[name="theme-color"]') ||
+        (() => {
+          const m = document.createElement('meta');
+          m.setAttribute('name', 'theme-color');
+          document.head.appendChild(m);
+          return m;
+        })();
+      themeMeta.setAttribute('content', BRAND_THEME_COLOR);
     };
     updateFavicon();
   }, [config.appLogo, config.appName]);

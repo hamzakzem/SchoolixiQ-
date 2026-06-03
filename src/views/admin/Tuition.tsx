@@ -163,7 +163,8 @@ export default function Tuition() {
         title: 'تأكيد استلام دفعة',
         message: `تم استلام مبلغ ${amountNum.toLocaleString()} د.ع (${installmentLabel}) للأقساط الدراسية.`,
         type: 'payment',
-        schoolId: profile.schoolId
+        schoolId: profile.schoolId,
+        metadata: { tab: 'tuition' },
       });
 
       toast.success(`تم تسجيل ${installmentLabel} بنجاح`);
@@ -373,7 +374,8 @@ export default function Tuition() {
         title: 'تنبيه: قسط مستحق',
         message: `نود تذكيركم بموعد القسط الدراسي للطالب ${student.name} بمبلغ ${installment.amount?.toLocaleString()} د.ع المستحق بتاريخ ${new Date(installment.dueDate).toLocaleDateString()}. يرجى تسديد المبلغ لتجنب المتأخرات.`,
         type: 'payment',
-        schoolId: profile.schoolId
+        schoolId: profile.schoolId,
+        metadata: { tab: 'tuition' },
       });
       toast.success('تم إرسال تذكير أوتوماتيكي لولي الأمر');
     } catch (err) {
@@ -420,7 +422,8 @@ export default function Tuition() {
             title: 'تنبيه: دفعة متأخرة',
             message: `نود تذكيركم بتأخر سداد قسط الطالب ${late.student.name} بمبلغ ${late.amount?.toLocaleString()} د.ع وكان مستحقاً بتاريخ ${new Date(late.dueDate).toLocaleDateString()}.`,
             type: 'payment',
-            schoolId: profile.schoolId
+            schoolId: profile.schoolId,
+            metadata: { tab: 'tuition' },
           });
           count++;
         }

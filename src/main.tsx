@@ -133,7 +133,7 @@ createRoot(document.getElementById('root')!).render(
 // Defer PWA registration so first paint is not blocked
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   const registerSw = () => {
-    const buildVersion = '2026-06-03-v9';
+    const buildVersion = '2026-06-03-v10';
     navigator.serviceWorker
       .register(`/sw.js?build=${buildVersion}`)
       .then((registration) => {

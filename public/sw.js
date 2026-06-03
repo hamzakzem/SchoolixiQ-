@@ -1,9 +1,10 @@
 // Cache name with versioning
-const CACHE_NAME = 'schoolix-cache-v9';
+const CACHE_NAME = 'schoolix-cache-v10';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/logo.png',
 ];
 
 self.addEventListener('install', (event) => {

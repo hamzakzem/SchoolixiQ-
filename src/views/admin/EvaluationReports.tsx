@@ -139,7 +139,7 @@ export default function Evaluations() {
             message: reportContent.substring(0, 100) + '...',
             type: 'report',
             schoolId: profile.schoolId,
-            metadata: { sourceId: reportRef.id }
+            metadata: { sourceId: reportRef.id, reportKind: 'evaluation', tab: 'reports' }
           });
         }
         toast.success(isRtl ? 'تم إضافة التقييم بنجاح' : 'Evaluation added successfully');

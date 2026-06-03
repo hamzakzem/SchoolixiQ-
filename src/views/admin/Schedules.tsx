@@ -138,7 +138,7 @@ export default function Schedules() {
         message: `تم تحديث الجدول الأسبوعي الخاص بـ ${cls.name}. يرجى من المعلمين وأولياء الأمور مراجعة الجدول الجديد.`,
         type: 'announcement',
         schoolId: profile.schoolId,
-        metadata: { sourceId: annRef.id }
+        metadata: { sourceId: annRef.id, tab: 'schedules' }
       });
       
       toast.success('تم إرسال إشعار للجميع بتحديث الجدول');

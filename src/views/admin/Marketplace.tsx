@@ -112,7 +112,7 @@ export default function Marketplace() {
             ? `تم تأكيد استلام طلبك (${itemName}) بنجاح.` 
             : `نعتذر، لقد تم إلغاء طلبك لـ (${itemName}). يرجى مراجعة الإدارة.`,
           type: 'payment',
-          metadata: { orderId, status }
+          metadata: { orderId, status, tab: 'market' }
         });
       }
 

@@ -21,8 +21,8 @@ messaging.onBackgroundMessage((payload) => {
 
   self.registration.showNotification(title, {
     body,
-    icon: '/icon.svg',
-    badge: '/icon.svg',
+    icon: '/logo.png',
+    badge: '/logo.png',
     tag: payload.data?.type || 'schoolix-notification',
     data: { url },
     vibrate: [120, 60, 120],

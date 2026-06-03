@@ -59,6 +59,10 @@ import { toast } from "react-hot-toast";
 import { useNotifications } from "../hooks/useNotifications";
 import { getNotificationInboxUserIdsFromProfile } from "../lib/notificationTargets";
 import { registerWebPushNotifications } from "../lib/webPushService";
+import {
+  getNotificationTabLabel,
+  resolveNotificationTab,
+} from "../lib/notificationDeepLink";
 
 interface NotificationCenterProps {
   onClose: () => void;
@@ -278,53 +282,27 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   // Deep Link Trigger
   const handleNotificationClick = async (n: any) => {
-    // Mark as read first
     await handleMarkOneRead(n.id, n.read);
 
-    // Deep link redirect
+    const role = userRole || profile?.role || 'parent';
+    const targetTab = resolveNotificationTab(n, role);
+
     if (activeTabSetter) {
-      // Decode related page based on notification type
-      switch (n.type) {
-        case 'homework':
-          activeTabSetter('homework');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: الواجبات المدرسية" : "Deep Linking: Navigating to Homework");
-          break;
-        case 'grade':
-        case 'grades':
-          activeTabSetter('grades');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: لوحة العلامات والنتائج" : "Deep Linking: Navigating to Academic Grades");
-          break;
-        case 'payment':
-        case 'tuition':
-          activeTabSetter('tuition');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: الحسابات والرسوم الدراسية" : "Deep Linking: Navigating to Tuition & Fees");
-          break;
-        case 'behavior':
-          activeTabSetter('behavior');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: تقارير السلوك والملاحظات" : "Deep Linking: Navigating to Behavior Conduct");
-          break;
-        case 'announcement':
-          activeTabSetter(userRole === 'admin' ? 'announcements' : 'home');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: الإعلانات والمستجدات" : "Deep Linking: Navigating to Announcements board");
-          break;
-        case 'message':
-          activeTabSetter('chat');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: غرف المحادثات" : "Deep Linking: Navigating to Chats");
-          break;
-        case 'attendance':
-          activeTabSetter(userRole === 'admin' ? 'attendance' : 'home');
-          toast.success(isArabic ? "جاري تحويلك للمتابعة" : "Deep Linking: Navigating");
-          break;
-        case 'report':
-          activeTabSetter(userRole === 'admin' ? 'evaluation_reports' : 'reports');
-          toast.success(isArabic ? "جاري تحويلك لصفحة التقارير" : "Deep Linking: Navigating to Reports");
-          break;
-        default:
-          activeTabSetter(userRole === 'parent' || userRole === 'teacher' ? 'home' : 'overview');
-          break;
-      }
-      onClose(); // Close the modal
+      activeTabSetter(targetTab);
+      const label = getNotificationTabLabel(targetTab, isArabic);
+      toast.success(
+        isArabic ? `تم فتح: ${label}` : `Opened: ${label}`,
+        { duration: 2500 },
+      );
+      onClose();
+      return;
     }
+
+    toast.error(
+      isArabic
+        ? 'تعذّر فتح الصفحة من هذه الشاشة'
+        : 'Cannot navigate from this screen',
+    );
   };
 
   // Admin delivery simulation tool

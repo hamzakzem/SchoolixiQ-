@@ -224,7 +224,7 @@ export default function SuperAdminChatTab() {
           message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
           type: 'system',
           schoolId: activeContact.id,
-          metadata: { senderId: profile.uid, conversationId: convId }
+          metadata: { senderId: profile.uid, conversationId: convId, tab: 'chat' }
         });
       }
 

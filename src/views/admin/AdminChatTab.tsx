@@ -256,7 +256,7 @@ export default function AdminChatTab() {
           title: 'رسالة جديدة من إدارة مدرسة',
           message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
           type: 'system',
-          metadata: { senderId: profile.uid, conversationId: convId, schoolId: profile.schoolId }
+          metadata: { senderId: profile.uid, conversationId: convId, schoolId: profile.schoolId, tab: 'chat' }
         });
       } else {
         await notificationService.send({
@@ -265,7 +265,7 @@ export default function AdminChatTab() {
           message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
           type: 'system',
           schoolId: profile.schoolId,
-          metadata: { senderId: profile.uid, conversationId: convId }
+          metadata: { senderId: profile.uid, conversationId: convId, tab: 'chat' }
         });
       }
 
