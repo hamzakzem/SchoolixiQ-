@@ -1,8 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MoreVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { IconButton } from './IconButton';
 import { cn } from '../../lib/cn';
+
+const MENU_WIDTH = 224;
+const MENU_MAX_HEIGHT = 320;
 
 export interface ActionMenuProps {
   menuId: string;
@@ -10,7 +14,6 @@ export interface ActionMenuProps {
   onToggle: (id: string | null) => void;
   children: React.ReactNode;
   align?: 'start' | 'end';
-  placement?: 'below' | 'overlay';
   className?: string;
   menuClassName?: string;
 }
@@ -21,19 +24,51 @@ export function ActionMenu({
   onToggle,
   children,
   align = 'end',
-  placement = 'below',
   className,
   menuClassName,
 }: ActionMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const isOpen = activeId === menuId;
+  const [coords, setCoords] = useState<{ top: number; left: number; openUp: boolean } | null>(null);
+
+  const updatePosition = () => {
+    if (!rootRef.current) return;
+    const rect = rootRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp = spaceBelow < MENU_MAX_HEIGHT && rect.top > MENU_MAX_HEIGHT;
+
+    let left =
+      align === 'end'
+        ? rect.right - MENU_WIDTH
+        : rect.left;
+    left = Math.max(8, Math.min(left, window.innerWidth - MENU_WIDTH - 8));
+
+    const top = openUp ? rect.top : rect.bottom + 8;
+    setCoords({ top, left, openUp });
+  };
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setCoords(null);
+      return;
+    }
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen, align]);
 
   useEffect(() => {
     if (!isOpen) return;
     const onPointerDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        onToggle(null);
-      }
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      const portal = document.getElementById(`sq-menu-${menuId}`);
+      if (portal?.contains(target)) return;
+      onToggle(null);
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onToggle(null);
@@ -44,10 +79,43 @@ export function ActionMenu({
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [isOpen, onToggle]);
+  }, [isOpen, menuId, onToggle]);
+
+  const menuPortal =
+    isOpen &&
+    coords &&
+    createPortal(
+      <AnimatePresence>
+        <motion.div
+          id={`sq-menu-${menuId}`}
+          role="menu"
+          initial={{ opacity: 0, y: align === 'end' ? -4 : 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.12 }}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: coords.top,
+            left: coords.left,
+            width: MENU_WIDTH,
+            maxHeight: MENU_MAX_HEIGHT,
+            zIndex: 9999,
+            transform: coords.openUp ? 'translateY(calc(-100% - 8px))' : undefined,
+          }}
+          className={cn(
+            'sq-action-menu-portal overflow-y-auto custom-scrollbar',
+            menuClassName
+          )}
+        >
+          <div className="p-1.5">{children}</div>
+        </motion.div>
+      </AnimatePresence>,
+      document.body
+    );
 
   return (
-    <div ref={rootRef} className={cn('relative', className)}>
+    <div ref={rootRef} className={cn('relative shrink-0', className)}>
       <IconButton
         active={isOpen}
         aria-expanded={isOpen}
@@ -60,27 +128,7 @@ export function ActionMenu({
       >
         <MoreVertical size={18} />
       </IconButton>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            role="menu"
-            initial={{ opacity: 0, scale: 0.96, y: -6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -6 }}
-            transition={{ duration: 0.15 }}
-            onClick={(e) => e.stopPropagation()}
-            className={cn(
-              'sq-action-menu',
-              align === 'start' ? 'left-0' : 'right-0',
-              placement === 'below' ? 'top-full mt-2' : 'top-12',
-              menuClassName
-            )}
-          >
-            <div className="p-1.5">{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {menuPortal}
     </div>
   );
 }

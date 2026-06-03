@@ -722,7 +722,11 @@ body {
 }
 
 .sq-panel {
-  @apply bg-white dark:bg-slate-900 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700;
+  @apply bg-white dark:bg-slate-900 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-visible;
+}
+
+.sq-panel-body {
+  @apply overflow-visible;
 }
 
 .sq-panel-toolbar {
@@ -734,7 +738,7 @@ body {
 }
 
 .sq-table {
-  @apply w-full min-w-[960px] text-right border-collapse;
+  @apply w-full min-w-[880px] text-right border-collapse;
 }
 
 .sq-table thead {
@@ -813,6 +817,52 @@ body {
 
 .sq-action-menu {
   @apply absolute z-[80] min-w-[13.5rem] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700;
+}
+
+.sq-action-menu-portal {
+  @apply bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700;
+}
+
+.sq-table-sticky-actions {
+  position: sticky;
+  left: 0;
+  z-index: 25;
+  background-color: #ffffff;
+  box-shadow: 6px 0 16px -8px rgba(11, 35, 69, 0.12);
+  min-width: 11rem;
+}
+
+html.dark .sq-table-sticky-actions {
+  background-color: #0f172a;
+  box-shadow: 6px 0 16px -8px rgba(0, 0, 0, 0.45);
+}
+
+.sq-table tbody tr:hover .sq-table-sticky-actions {
+  background-color: #f8fafc;
+}
+
+html.dark .sq-table tbody tr:hover .sq-table-sticky-actions {
+  background-color: #1e293b;
+}
+
+.sq-icon-btn-edit {
+  @apply text-[#0B2345] bg-[#0B2345]/5 border-[#0B2345]/15 hover:bg-[#0B2345]/10 dark:text-[#D4A64A] dark:bg-[#D4A64A]/10 dark:border-[#D4A64A]/30;
+}
+
+.sq-student-actions-bar {
+  @apply flex gap-2 w-full;
+}
+
+.sq-student-action-btn {
+  @apply flex-1 inline-flex items-center justify-center gap-2 h-10 rounded-xl text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-50;
+}
+
+.sq-student-action-edit {
+  @apply bg-[#0B2345]/8 text-[#0B2345] border border-[#0B2345]/15 hover:bg-[#0B2345]/12 dark:bg-[#D4A64A]/15 dark:text-[#D4A64A] dark:border-[#D4A64A]/25;
+}
+
+.sq-student-action-delete {
+  @apply bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 dark:bg-red-900/25 dark:text-red-400 dark:border-red-800/40;
 }
 
 .sq-action-menu-item {

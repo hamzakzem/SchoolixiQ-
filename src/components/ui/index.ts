@@ -7,3 +7,4 @@ export { Panel, PanelToolbar } from './Panel';
 export { DataTable, DataTableElement } from './DataTable';
 export { ViewToggle } from './ViewToggle';
 export { ActionMenu, ActionMenuItem, ActionMenuDivider } from './ActionMenu';
+export { StudentPrimaryActions } from './StudentPrimaryActions';

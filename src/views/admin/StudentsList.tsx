@@ -15,8 +15,9 @@ import {
   IconButton,
   ActionMenu,
   ActionMenuItem,
-  ActionMenuDivider,
+  StudentPrimaryActions,
 } from '../../components/ui';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -511,8 +512,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     }
   };
 
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>(window.innerWidth < 768 ? 'cards' : 'table');
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'table' : 'cards'
+  );
   const [searchTerm, setSearchTerm] = useState('');
+  const effectiveView: 'table' | 'cards' = isDesktop ? viewMode : 'cards';
 
   const filteredStudents = students.filter(student => 
     (student.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
@@ -577,18 +582,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             <ArrowRightLeft size={16} className="text-slate-400 shrink-0" />
             نقل لصف آخر
           </ActionMenuItem>
-          <ActionMenuItem onClick={() => openEditStudent(student)}>
-            <GraduationCap size={16} className="text-slate-400 shrink-0" />
-            تعديل البيانات
-          </ActionMenuItem>
-          <ActionMenuDivider />
-          <ActionMenuItem
-            onClick={() => { setConfirmDeleteId(student.id); closeMenu(); }}
-            className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-          >
-            <Trash2 size={16} className="text-red-400 shrink-0" />
-            حذف الطالب
-          </ActionMenuItem>
         </>
       )}
     </>
@@ -634,15 +627,17 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   <span>طالب جديد</span>
                 </Button>
               )}
-              <ViewToggle
-                className="md:hidden flex-1 justify-center"
-                value={viewMode}
-                onChange={setViewMode}
-                options={[
-                  { value: 'table', label: 'جدول' },
-                  { value: 'cards', label: 'بطاقات' },
-                ]}
-              />
+              {isDesktop && (
+                <ViewToggle
+                  className="lg:hidden flex-1 justify-center"
+                  value={viewMode}
+                  onChange={setViewMode}
+                  options={[
+                    { value: 'table', label: 'جدول' },
+                    { value: 'cards', label: 'بطاقات' },
+                  ]}
+                />
+              )}
             </div>
           </>
         }
@@ -653,19 +648,22 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           <span className="text-[10px] md:text-xs font-extrabold text-slate-400 uppercase tracking-[0.15em]">
             النتائج: {filteredStudents.length}
           </span>
-          <ViewToggle
-            className="hidden md:inline-flex"
-            value={viewMode}
-            onChange={setViewMode}
-            options={[
-              { value: 'table', label: 'جدول' },
-              { value: 'cards', label: 'بطاقات' },
-            ]}
-          />
+          {isDesktop && (
+            <ViewToggle
+              className="hidden lg:inline-flex"
+              value={viewMode}
+              onChange={setViewMode}
+              options={[
+                { value: 'table', label: 'جدول' },
+                { value: 'cards', label: 'بطاقات' },
+              ]}
+            />
+          )}
         </PanelToolbar>
 
-        {viewMode === 'table' ? (
-          <DataTable maxHeight="calc(100dvh - 13.5rem)" minHeight="min(58vh, 480px)">
+        <div className="sq-panel-body">
+        {effectiveView === 'table' ? (
+          <DataTable maxHeight="calc(100dvh - 14rem)" minHeight="min(50vh, 400px)">
             <DataTableElement>
               <thead>
                 <tr>
@@ -673,9 +671,8 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   <th>رقم الربط</th>
                   <th>الصف</th>
                   <th>ولي الأمر</th>
-                  <th>تاريخ التسجيل</th>
                   <th>الحالة المالية</th>
-                  <th className="text-center">الإجراءات</th>
+                  <th className="sq-table-sticky-actions text-center">الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
@@ -736,30 +733,33 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       </div>
                     </td>
                     <td>
-                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatStudentDate(student)}</span>
-                    </td>
-                    <td>
-                      <span className={`font-bold text-sm md:text-base ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'} font-display`}>
+                      <span className={`font-bold text-sm md:text-base ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
                         {(student.tuitionBalance || 0).toLocaleString()}{' '}
                         <span className="text-[10px] font-normal text-slate-400">د.ع</span>
                       </span>
                     </td>
-                    <td>
-                      <div className="flex justify-center items-center gap-2">
+                    <td className="sq-table-sticky-actions">
+                      <div className="flex justify-center items-center gap-1.5 flex-wrap">
                         {!isViewOnly && (
-                          <IconButton
-                            tone="primary"
-                            title="ربط بولي أمر"
-                            onClick={() => {
-                              setShowLinkParentModal(student);
-                              setParentEmail(student.parentEmail || '');
-                              setParentName(student.parentName || '');
-                              setParentPhone(student.parentPhone || '');
-                              setParentPassword(student.parentPassword || '');
-                            }}
-                          >
-                            <UserPlus size={18} />
-                          </IconButton>
+                          <>
+                            <StudentPrimaryActions
+                              onEdit={() => openEditStudent(student)}
+                              onDelete={() => setConfirmDeleteId(student.id)}
+                            />
+                            <IconButton
+                              tone="primary"
+                              title="ربط بولي أمر"
+                              onClick={() => {
+                                setShowLinkParentModal(student);
+                                setParentEmail(student.parentEmail || '');
+                                setParentName(student.parentName || '');
+                                setParentPhone(student.parentPhone || '');
+                                setParentPassword(student.parentPassword || '');
+                              }}
+                            >
+                              <UserPlus size={18} />
+                            </IconButton>
+                          </>
                         )}
                         <ActionMenu
                           menuId={student.id}
@@ -778,68 +778,66 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           </DataTable>
         ) : null}
 
-        {viewMode === 'cards' && (
+        {effectiveView === 'cards' && (
           <div className="sq-student-card-grid">
             {filteredStudents.map(student => (
-              <div key={student.id} className="sq-student-card">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0">
-                    {student.photoUrl ? <img src={student.photoUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <GraduationCap size={20} />}
+              <article key={student.id} className="sq-student-card">
+                <div className="flex items-start gap-3">
+                  <div className="w-14 h-14 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0">
+                    {student.photoUrl ? (
+                      <img src={student.photoUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <GraduationCap size={22} />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-slate-900 dark:text-white truncate font-display">{student.name}</h3>
-                    <p className="text-[10px] text-slate-500 font-bold">{classes.find(c => c.id === student.classId)?.name || 'غير محدد'}</p>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base leading-snug">{student.name}</h3>
+                    <p className="text-xs text-[#0B2345] dark:text-[#D4A64A] font-bold mt-0.5">
+                      {classes.find(c => c.id === student.classId)?.name || 'غير محدد'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-1">تسجيل: {formatStudentDate(student)}</p>
                   </div>
-                  <ActionMenu
-                    menuId={student.id}
-                    activeId={activeMenu}
-                    onToggle={setActiveMenu}
-                    align="end"
-                    placement="below"
-                  >
-                    {renderStudentMenuActions(student)}
-                  </ActionMenu>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-right">
                   <div className="sq-badge-muted flex flex-col items-start gap-1 p-3 rounded-xl">
                     <span className="text-[9px] font-black text-slate-400 uppercase">رقم الربط</span>
-                    <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200">{student.registrationNumber || '—'}</span>
+                    <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 break-all">
+                      {student.registrationNumber || '—'}
+                    </span>
                   </div>
                   <div className="sq-badge-muted flex flex-col items-start gap-1 p-3 rounded-xl">
                     <span className="text-[9px] font-black text-slate-400 uppercase">الرصيد</span>
-                    <span className={`text-[11px] font-black ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                    <span className={`text-xs font-black ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
                       {(student.tuitionBalance || 0).toLocaleString()} د.ع
                     </span>
                   </div>
                   <div className="sq-badge-muted flex flex-col items-start gap-1 p-3 rounded-xl col-span-2">
                     <span className="text-[9px] font-black text-slate-400 uppercase">ولي الأمر</span>
-                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{student.parentPhone || student.parentEmail || '—'}</span>
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 break-all">
+                      {student.parentPhone || student.parentEmail || '—'}
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
-                  <Button size="sm" fullWidth onClick={() => setShowLinkedParentsModal(student)}>
+                  <Button size="sm" variant="secondary" fullWidth onClick={() => setShowLinkedParentsModal(student)}>
                     <Users size={14} />
                     الحسابات ({student.parentIds?.length || 0})
                   </Button>
-                  {!isViewOnly && (
-                    <IconButton
-                      tone="primary"
-                      title="ربط بولي أمر"
-                      onClick={() => {
-                        setShowLinkParentModal(student);
-                        setParentEmail(student.parentEmail || '');
-                        setParentName(student.parentName || '');
-                        setParentPhone(student.parentPhone || '');
-                        setParentPassword(student.parentPassword || '');
-                      }}
-                    >
-                      <UserPlus size={16} />
-                    </IconButton>
-                  )}
+                  <ActionMenu menuId={`card-${student.id}`} activeId={activeMenu} onToggle={setActiveMenu} align="end">
+                    {renderStudentMenuActions(student)}
+                  </ActionMenu>
                 </div>
-              </div>
+
+                {!isViewOnly && (
+                  <StudentPrimaryActions
+                    showLabels
+                    onEdit={() => openEditStudent(student)}
+                    onDelete={() => setConfirmDeleteId(student.id)}
+                  />
+                )}
+              </article>
             ))}
           </div>
         )}
@@ -895,6 +893,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             </Button>
           </div>
         )}
+        </div>
       </Panel>
 
 
@@ -1112,10 +1111,11 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                animate={{ scale: 1, opacity: 1, y: 0 }} 
                exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-               className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 overflow-y-auto max-h-[90vh] flex flex-col custom-scrollbar text-right"
+               className="bg-white dark:bg-slate-900 rounded-2xl md:rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 flex flex-col max-h-[min(90dvh,720px)] text-right"
+               dir="rtl"
              >
                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 dark:bg-slate-800/40 rounded-full -translate-y-32 translate-x-32 shadow-inner pointer-events-none"></div>
-               <div className="relative z-10">
+               <div className="relative z-10 flex flex-col min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 md:p-8">
                  <div className="flex items-center justify-between mb-2">
                      <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display flex items-center gap-2">
                        <GraduationCap className="text-[#0B2345] dark:text-[#D4A64A]" size={28} />
@@ -1298,7 +1298,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       </div>
                     </div>
 
-                    <div className="sticky bottom-0 bg-white dark:bg-slate-900 pt-4 pb-6 md:pb-8 border-t border-slate-100 dark:border-slate-800 z-20 flex gap-4 mt-6 -mx-6 md:-mx-10 px-6 md:px-10">
+                    <div className="sticky bottom-0 bg-white dark:bg-slate-900 pt-4 pb-2 border-t border-slate-100 dark:border-slate-800 z-20 flex flex-col-reverse sm:flex-row gap-3 mt-6 -mx-5 md:-mx-8 px-5 md:px-8">
                       <button
                         type="submit"
                         className="flex-1 px-8 py-3.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-[#071830] transition-all shadow-xl active:scale-95 text-sm md:text-base border border-transparent"
