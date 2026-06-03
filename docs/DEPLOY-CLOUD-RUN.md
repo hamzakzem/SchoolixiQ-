@@ -1,65 +1,100 @@
 # Deploy backend to Cloud Run (GitHub Actions)
 
-Workflow: `.github/workflows/deploy.yml`  
-Service: `schoolixiq-backend` · Region: `europe-west2` · Project: `yala-safari-iq`
+| Item | Value |
+|------|--------|
+| Workflow | `.github/workflows/deploy.yml` |
+| Service | `schoolixiq-backend` |
+| Region | `europe-west2` |
+| Project | `yala-safari-iq` |
+| Deploy SA | `github-deployer@yala-safari-iq.iam.gserviceaccount.com` |
 
-## Error: `invalid_grant: Invalid JWT Signature`
+## Why `Invalid JWT Signature` keeps happening
 
-This means the JSON in GitHub secret **`GCP_SA_KEY`** is invalid for Google auth. Common causes:
+Long-lived **JSON service account keys** in GitHub (`GCP_SA_KEY`) often break because:
 
-1. Key was **deleted or rotated** in GCP but the secret was not updated.
-2. Secret was **truncated** or edited (extra spaces, missing `{`, broken `private_key` newlines).
-3. Wrong key uploaded (e.g. Firebase Admin SDK key instead of the deploy service account).
+- Keys are rotated/deleted in GCP but not updated in GitHub
+- JSON is corrupted when pasted (newlines in `private_key`, truncation, wrong account)
+- Wrong key file (e.g. `firebase-adminsdk-*` instead of `github-deployer`)
 
-The workflow must use a key for:
+**Professional fix:** [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) — GitHub OIDC → short-lived tokens → no JSON key in secrets.
 
-`github-deployer@yala-safari-iq.iam.gserviceaccount.com`
+---
 
-Do **not** use `firebase-adminsdk-*@...` for Cloud Run deploy unless you grant that account deploy roles and update the workflow accordingly.
+## One-time setup (recommended)
 
-## Fix (recommended)
+### Option A: Cloud Shell (easiest)
 
-### 1. Create or open the deploy service account
-
-1. [Google Cloud Console](https://console.cloud.google.com/) → project **yala-safari-iq**
-2. **IAM & Admin** → **Service accounts**
-3. Open **github-deployer@yala-safari-iq.iam.gserviceaccount.com** (or create it)
-
-Required roles (minimum):
-
-- `Cloud Run Admin`
-- `Service Account User`
-- `Artifact Registry Writer` (if using source deploy)
-- `Cloud Build Editor` / `Cloud Build Service Account` (for `--source` builds)
-
-### 2. New JSON key
-
-1. Service account → **Keys** → **Add key** → **Create new key** → **JSON**
-2. Download the file once (you cannot download it again).
-
-### 3. Update GitHub secret
-
-1. Repo → **Settings** → **Secrets and variables** → **Actions**
-2. Edit **`GCP_SA_KEY`**
-3. Paste the **entire** JSON file (starts with `{`, includes `"type": "service_account"`).
-4. Verify `client_email` is `github-deployer@yala-safari-iq.iam.gserviceaccount.com`.
-
-### 4. Re-run deploy
-
-**Actions** → failed workflow → **Re-run all jobs**.
-
-## Local check (optional)
+1. Open [Google Cloud Shell](https://shell.cloud.google.com/) with project **yala-safari-iq**.
+2. Clone the repo or upload `scripts/gcp-setup-github-wif.sh`.
+3. Run:
 
 ```bash
-gcloud auth activate-service-account --key-file=path/to/github-deployer.json
-gcloud config set project yala-safari-iq
-gcloud run services describe schoolixiq-backend --region europe-west2
+chmod +x scripts/gcp-setup-github-wif.sh
+# If your GitHub repo path differs (case-sensitive):
+# export GITHUB_REPO="your-user/Your-Repo-Name"
+./scripts/gcp-setup-github-wif.sh
 ```
 
-If this fails locally, the key or IAM roles are wrong before fixing GitHub.
+4. Copy the printed **`GCP_WORKLOAD_IDENTITY_PROVIDER`** value into GitHub:
+   - Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+
+5. (Optional) Delete old JSON keys for `github-deployer` in GCP → **Service account keys**.
+
+6. Remove obsolete secret **`GCP_SA_KEY`** from GitHub if it exists.
+
+7. **Actions** → **Deploy to Cloud Run** → **Run workflow** (or push to `main`).
+
+### Option B: Manual gcloud
+
+See `scripts/gcp-setup-github-wif.sh` for the exact commands (pool, OIDC provider, IAM binding).
+
+Repository attribute must match exactly: `hamzakzem/SchoolixiQ-` (case-sensitive).
+
+---
+
+## What the workflow does
+
+1. Requires secret `GCP_WORKLOAD_IDENTITY_PROVIDER`
+2. `google-github-actions/auth@v2` — OIDC token from GitHub → impersonate `github-deployer`
+3. Preflight: validates access token
+4. `deploy-cloudrun@v2` — `gcloud run deploy --source ./backend`
+
+Permissions on the workflow job:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write   # required for WIF
+```
+
+---
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Missing `GCP_WORKLOAD_IDENTITY_PROVIDER` | Run setup script, add secret |
+| `permission denied` on deploy | Re-run script (IAM roles) or check SA exists |
+| `repository` assertion mismatch | Set `GITHUB_REPO` to exact `owner/name` in script |
+| WIF works but build fails | Enable Cloud Build API; check `roles/cloudbuild.builds.editor` |
+
+### Local test (after WIF is configured)
+
+You cannot test WIF locally without a GitHub OIDC token. For local deploy use your user account:
+
+```bash
+gcloud config set project yala-safari-iq
+gcloud run deploy schoolixiq-backend --source ./backend --region europe-west2 --port 8080
+```
+
+### Legacy JSON key (not recommended)
+
+If you must use `GCP_SA_KEY`, the email in the JSON must be `github-deployer@...` and the file must be valid JSON. Prefer migrating to WIF instead.
+
+---
 
 ## Security
 
-- Never commit `*.json` service account keys to the repo.
-- Add `key.json`, `key.json.json`, and `*-sa-key.json` to `.gitignore` if needed.
-- After a key leak, **delete the old key** in GCP and create a new one.
+- Do not commit `key.json`, `*-sa-key.json`, or service account JSON.
+- Prefer **zero** long-lived keys for CI.
+- Restrict WIF with `attribute-condition` to your repo (already in the setup script).
