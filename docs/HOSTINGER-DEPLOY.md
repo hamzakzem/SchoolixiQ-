@@ -9,16 +9,36 @@
 | `HOSTINGER_FTP_SERVER` | `ftp.hostinger.com` أو IP من hPanel | نفس Host في FTP/SFTP |
 | `HOSTINGER_FTP_USERNAME` | `u758392104` | من FTP Accounts — ليس كلمة `FTP` |
 | `HOSTINGER_FTP_PASSWORD` | كلمة FTP | |
-| `HOSTINGER_FTP_REMOTE_DIR` | `/home/u758392104/domains/schoolixiq.com/public_html` | **مسار مطلق كامل** — لا تستخدم `./public_html/` |
+| `HOSTINGER_FTP_REMOTE_DIR` | `/home/u758392104/domains/schoolixiq.com/public_html` | **مسار SFTP على السيرفر** — ليس رابط المتصفح |
+| `HOSTINGER_SFTP_PORT` | `65002` | **إلزامي منطقياً** — لا تضع `21` أو `22` (ستفشل بـ Operation timed out) |
+
+### رابط File Manager ≠ مسار الرفع
+
+رابط مثل:
+
+`https://srv2063-files.hstgr.io/ba479487c9581762/files/public_html/`
+
+هذا **واجهة ويب فقط**. لا تضعه في GitHub.
 
 ### كيف تجد `HOSTINGER_FTP_REMOTE_DIR`
 
-1. hPanel → **File Manager**
-2. افتح مجلد **`public_html`**
-3. انظر المسار في الأعلى أو Properties — انسخه كاملاً  
-   غالباً: `/home/USERNAME/domains/DOMAIN/public_html`
+1. hPanel → **Websites** → **schoolixiq.com** → **FTP Accounts**
+2. انسخ **FTP Username** (مثل `u758392104`)
+3. المسار للنشر غالباً:
 
-اختياري: `HOSTINGER_SFTP_PORT` = `22`
+```text
+/home/USERNAME/domains/schoolixiq.com/public_html
+```
+
+استبدل `USERNAME` باسم FTP الحقيقي.
+
+**إذا** في FTP Accounts يظهر **Directory: `public_html`** فقط (حساب مربوط بالموقع)، جرّب:
+
+```text
+/
+```
+
+(جذر حساب FTP = نفس `public_html`)
 
 ## لماذا لا يظهر التعديل على الموقع؟
 

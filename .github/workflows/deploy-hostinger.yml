@@ -41,11 +41,19 @@ jobs:
             echo "Right: /home/u758392104/domains/schoolixiq.com/public_html"
             exit 1
           fi
+          port="${HOSTINGER_SFTP_PORT:-65002}"
+          if [[ "$port" == "21" || "$port" == "22" ]]; then
+            echo "::error title=Wrong SFTP port::Hostinger shared hosting uses port 65002 for SFTP, not $port."
+            echo "Delete secret HOSTINGER_SFTP_PORT or set it to 65002."
+            exit 1
+          fi
+          echo "SFTP port: $port"
         env:
           HOSTINGER_FTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}
           HOSTINGER_FTP_USERNAME: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           HOSTINGER_FTP_PASSWORD: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           HOSTINGER_FTP_REMOTE_DIR: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
+          HOSTINGER_SFTP_PORT: ${{ secrets.HOSTINGER_SFTP_PORT }}
 
       - uses: actions/checkout@v4
 
@@ -79,11 +87,17 @@ jobs:
           path: schoolixiq-dist.zip
           retention-days: 7
 
+      - name: Resolve SFTP port
+        id: sftp
+        run: echo "port=${HOSTINGER_SFTP_PORT:-65002}" >> "$GITHUB_OUTPUT"
+        env:
+          HOSTINGER_SFTP_PORT: ${{ secrets.HOSTINGER_SFTP_PORT }}
+
       - name: Deploy to Hostinger (SFTP)
         uses: wlixcc/SFTP-Deploy-Action@v1.2.6
         with:
           server: ${{ secrets.HOSTINGER_FTP_SERVER }}
-          port: 22
+          port: ${{ steps.sftp.outputs.port }}
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           local_path: "./dist/*"
