@@ -61,7 +61,7 @@ import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { GlobalFooter } from "../components/GlobalFooter";
-import SolarLoading from "../components/SolarLoading";
+import AuthBootScreen from "../components/AuthBootScreen";
 import SchoolRegistrationFields, {
   buildRegistrationCustomerInfo,
   buildSchoolFirestoreFields,
@@ -980,7 +980,7 @@ export default function Login() {
     >
       {loading && auth.currentUser && (
         <div className="fixed inset-0 z-[200] bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm">
-          <SolarLoading />
+          <AuthBootScreen />
         </div>
       )}
       <motion.div

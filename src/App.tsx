@@ -47,6 +47,7 @@ const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 
 import ScanHandler from "./components/ScanHandler";
 import SolarLoading from "./components/SolarLoading";
+import AuthBootScreen from "./components/AuthBootScreen";
 import { LanguageToggle } from "./components/LanguageToggle";
 
 const InstallAppBanner = lazy(() => import("./components/InstallAppBanner"));
@@ -179,6 +180,13 @@ const AppContent = () => {
     genderType: "",
     estimatedStudents: "",
   });
+
+  // Reset link check when signed out
+  useEffect(() => {
+    if (!user) {
+      setAutoLinkChecked(false);
+    }
+  }, [user]);
 
   // Automatic School Admin & Parent Provisioning with Student Link
   useEffect(() => {
@@ -425,7 +433,7 @@ const AppContent = () => {
   }, [onboardingState]);
 
   if (loading) {
-    return <SolarLoading />;
+    return <AuthBootScreen />;
   }
 
   if (!user) {
@@ -439,15 +447,22 @@ const AppContent = () => {
     );
   }
 
-  // Authenticated: wait for profile bootstrap (no dashboard flash)
-  if (!profile || !autoLinkChecked || isCreatingProfile) {
-    return <SolarLoading />;
+  // No profile yet: wait for auto-provision, then show onboarding (not dashboard)
+  if (!profile) {
+    if (isCreatingProfile || !autoLinkChecked) {
+      return <AuthBootScreen />;
+    }
+  } else if (isCreatingProfile) {
+    return <AuthBootScreen />;
   }
 
   const needsSchoolOnboarding =
-    profile.role === UserRole.ADMIN && !profile.schoolId;
+    profile?.role === UserRole.ADMIN && !profile?.schoolId;
+
+  const showOnboarding = !profile || needsSchoolOnboarding;
 
   const renderDashboard = () => {
+    if (!profile) return null;
     // Dedicated recovery/error screen if profile has school role but schoolId or schoolData is missing or inaccessible in Firestore
     const isSchoolRole = profile?.role && [
       UserRole.ADMIN,
@@ -455,7 +470,7 @@ const AppContent = () => {
       UserRole.ASSISTANT
     ].includes(profile.role);
 
-    if (isSchoolRole && (!profile?.schoolId || (!schoolData && !loading))) {
+    if (isSchoolRole && !profile?.schoolId) {
       return (
         <div
           className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6"
@@ -587,7 +602,7 @@ const AppContent = () => {
         dir={isRtl ? "rtl" : "ltr"}
         className={isRtl ? "font-sans" : "font-sans"}
       >
-        {!needsSchoolOnboarding ? (
+        {!showOnboarding ? (
           <>
             <ScanHandler />
             {renderDashboard()}
