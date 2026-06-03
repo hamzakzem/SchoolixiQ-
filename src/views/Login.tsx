@@ -77,6 +77,11 @@ import {
   createSchoolSubscriptionRegistration,
   packageDisplayPrice,
 } from "../lib/schoolSubscriptionRequest";
+import {
+  markSchoolRegistrationInProgress,
+  clearSchoolRegistrationInProgress,
+  isSchoolRegistrationInProgress,
+} from "../lib/schoolRegistrationSession";
 
 const EMPTY_SCHOOL_REGISTRATION: SchoolRegistrationFormValues = {
   address: "",
@@ -944,6 +949,7 @@ export default function Login() {
     authSubmitLock.current = true;
     setLoading(true);
     const emailTrimmed = email.toLowerCase().trim();
+    markSchoolRegistrationInProgress();
 
     try {
       const result = await createUserWithEmailAndPassword(
@@ -974,6 +980,7 @@ export default function Login() {
       });
 
       await signOut(auth);
+      clearSchoolRegistrationInProgress();
       setAdminSignupStep("done");
       setMode("login");
       setName("");
@@ -983,6 +990,7 @@ export default function Login() {
       setSchoolRegistration(EMPTY_SCHOOL_REGISTRATION);
       toast.success(t("adminSignupPendingApproval"), { duration: 10000 });
     } catch (error: unknown) {
+      clearSchoolRegistrationInProgress();
       const err = error as { code?: string; message?: string };
       if (err.code === "auth/email-already-in-use") {
         toast.error(t("emailInUse"));
@@ -1015,7 +1023,9 @@ export default function Login() {
       className="min-h-[100dvh] bg-slate-50 font-sans flex flex-col items-center py-6 sm:py-12 px-4 sm:px-6 relative"
       dir={isRtl ? "rtl" : "ltr"}
     >
-      {loading && auth.currentUser && (
+      {loading &&
+        auth.currentUser &&
+        !isSchoolRegistrationInProgress() && (
         <div className="fixed inset-0 z-[200] bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm">
           <AuthBootScreen />
         </div>

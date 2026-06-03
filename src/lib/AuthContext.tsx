@@ -17,6 +17,7 @@ import {
 import { UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from './firestore-errors';
 import { useLanguage } from './LanguageContext';
+import { isSchoolRegistrationInProgress } from './schoolRegistrationSession';
 
 interface AuthContextType {
   user: User | null;
@@ -96,6 +97,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       setUser(authUser);
+
+      if (authUser && isSchoolRegistrationInProgress()) {
+        setProfile(null);
+        setSchoolData(null);
+        finishLoading();
+        return;
+      }
 
       if (!authUser) {
         if (previousUid) {

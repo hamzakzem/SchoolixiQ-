@@ -49,6 +49,10 @@ import ScanHandler from "./components/ScanHandler";
 import SolarLoading from "./components/SolarLoading";
 import AuthBootScreen from "./components/AuthBootScreen";
 import { createSchoolSubscriptionRegistration } from "./lib/schoolSubscriptionRequest";
+import {
+  isSchoolRegistrationInProgress,
+  userHasPendingSchoolRegistration,
+} from "./lib/schoolRegistrationSession";
 import { LanguageToggle } from "./components/LanguageToggle";
 
 const InstallAppBanner = lazy(() => import("./components/InstallAppBanner"));
@@ -114,6 +118,8 @@ const AppContent = () => {
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [autoLinkChecked, setAutoLinkChecked] = useState(false);
+  const [pendingRegResolved, setPendingRegResolved] = useState(true);
+  const [hasPendingSchoolReg, setHasPendingSchoolReg] = useState(false);
 
   // Reset chunk error reload and IndexedDb reload counters on successful render/mount
   useEffect(() => {
@@ -186,8 +192,26 @@ const AppContent = () => {
   useEffect(() => {
     if (!user) {
       setAutoLinkChecked(false);
+      setPendingRegResolved(true);
+      setHasPendingSchoolReg(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user || profile) {
+      setPendingRegResolved(true);
+      setHasPendingSchoolReg(false);
+      return;
+    }
+    setPendingRegResolved(false);
+    void userHasPendingSchoolRegistration(user.uid, user.email).then((pending) => {
+      setHasPendingSchoolReg(pending);
+      if (pending) {
+        setOnboardingState("waiting_approval");
+      }
+      setPendingRegResolved(true);
+    });
+  }, [user?.uid, user?.email, profile]);
 
   // Automatic School Admin & Parent Provisioning with Student Link
   useEffect(() => {
@@ -196,6 +220,16 @@ const AppContent = () => {
     const performAutoProvision = async () => {
       const email = user.email?.toLowerCase();
       if (!email) {
+        setAutoLinkChecked(true);
+        return;
+      }
+
+      if (isSchoolRegistrationInProgress()) {
+        setAutoLinkChecked(true);
+        return;
+      }
+
+      if (await userHasPendingSchoolRegistration(user.uid, email)) {
         setAutoLinkChecked(true);
         return;
       }
@@ -363,13 +397,18 @@ const AppContent = () => {
             setOnboardingState("waiting_approval");
           }
         } else {
-          setOnboardingState((prev) => {
-            if (prev === "approved") return "approved";
-            if (profile?.role === "admin") {
-              return "packages";
-            }
-            return "options";
-          });
+          void (async () => {
+            const pending = await userHasPendingSchoolRegistration(
+              user?.uid || "",
+              user?.email,
+            );
+            setOnboardingState((prev) => {
+              if (prev === "approved") return "approved";
+              if (pending) return "waiting_approval";
+              if (profile?.role === "admin") return "packages";
+              return "options";
+            });
+          })();
         }
       };
 
@@ -439,6 +478,17 @@ const AppContent = () => {
     };
   }, [onboardingState]);
 
+  if (isSchoolRegistrationInProgress()) {
+    return (
+      <>
+        <Login />
+        <div className="fixed top-4 right-4 md:top-6 md:right-6 z-[9999]">
+          <LanguageToggle />
+        </div>
+      </>
+    );
+  }
+
   if (loading) {
     return <AuthBootScreen />;
   }
@@ -456,7 +506,12 @@ const AppContent = () => {
 
   // No profile yet: wait for auto-provision, then show onboarding (not dashboard)
   if (!profile) {
-    if (isCreatingProfile || !autoLinkChecked) {
+    const booting =
+      isCreatingProfile ||
+      !autoLinkChecked ||
+      !pendingRegResolved ||
+      isSchoolRegistrationInProgress();
+    if (booting && !hasPendingSchoolReg) {
       return <AuthBootScreen />;
     }
   } else if (isCreatingProfile) {
