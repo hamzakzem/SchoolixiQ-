@@ -22,7 +22,22 @@ Long-lived **JSON service account keys** in GitHub (`GCP_SA_KEY`) often break be
 
 ## One-time setup (recommended)
 
-### Option A: Cloud Shell (easiest)
+### Option A: Windows (PowerShell)
+
+Prerequisites: [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`gcloud` in PATH), logged in:
+
+```powershell
+gcloud auth login
+gcloud config set project yala-safari-iq
+cd C:\Users\hamza\schoolixiQ-\SchoolixiQ-
+# If repo name on GitHub differs (case-sensitive):
+# $env:GITHUB_REPO = "hamzakzem/SchoolixiQ-"
+.\scripts\gcp-setup-github-wif.ps1
+```
+
+`chmod` is not used on Windows — run the `.ps1` script directly.
+
+### Option B: Cloud Shell (Linux)
 
 1. Open [Google Cloud Shell](https://shell.cloud.google.com/) with project **yala-safari-iq**.
 2. Clone the repo or upload `scripts/gcp-setup-github-wif.sh`.
@@ -44,7 +59,7 @@ chmod +x scripts/gcp-setup-github-wif.sh
 
 7. **Actions** → **Deploy to Cloud Run** → **Run workflow** (or push to `main`).
 
-### Option B: Manual gcloud
+### Option C: Manual gcloud
 
 See `scripts/gcp-setup-github-wif.sh` for the exact commands (pool, OIDC provider, IAM binding).
 
