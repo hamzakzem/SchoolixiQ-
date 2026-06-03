@@ -3,6 +3,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Download, X, Smartphone, ArrowUp, Share, PlusSquare, Info, Star } from 'lucide-react';
 import { useLanguage } from '../lib/LanguageContext';
 import { toast } from 'react-hot-toast';
+import { Capacitor } from '@capacitor/core';
+import {
+  shouldPromoteAndroidApp,
+  triggerAndroidApkDownload,
+  dismissAndroidApkPrompt,
+  isAndroidApkPromptDismissed,
+} from '../lib/androidAppDownload';
 
 export default function InstallAppBanner() {
   const { t, isRtl } = useLanguage();
@@ -17,64 +24,55 @@ export default function InstallAppBanner() {
   };
 
   useEffect(() => {
-    // 1. Detect if the app is already running in standalone mode (i.e., installed)
-    const isStandalone = 
-      window.matchMedia('(display-mode: standalone)').matches || 
+    if (Capacitor.isNativePlatform()) return;
+
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone === true;
+    if (isStandalone) return;
 
-    if (isStandalone) {
-      console.log('App is already running in PWA standalone mode');
-      return;
-    }
-
-    // 2. Check dismissal state
     const dismissedTime = localStorage.getItem('schoolix_pwa_dismissed_time');
-    const now = Date.now();
     if (dismissedTime) {
-      const daysSinceDismissal = (now - parseInt(dismissedTime, 10)) / (1000 * 60 * 60 * 24);
-      // Suppress showing the prompt for 3 days after a manual dismissal to preserve user experience
-      if (daysSinceDismissal < 3) {
-        return;
-      }
+      const daysSinceDismissal =
+        (Date.now() - parseInt(dismissedTime, 10)) / (1000 * 60 * 60 * 24);
+      if (daysSinceDismissal < 3) return;
     }
 
-    // 3. Detect Platform
-    const userAgent = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || '';
+    const userAgent =
+      window.navigator.userAgent || window.navigator.vendor || (window as any).opera || '';
     const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
     const isAndroid = /android/i.test(userAgent);
 
     if (isIOS) {
       setPlatform('ios');
-      // Hide banner on iPhone / iPad / iOS completely as per request
-      setShowBanner(false);
-      return;
-    } else if (isAndroid) {
-      setPlatform('android');
-    } else {
-      // Keep hidden for any non-Android platform
       setShowBanner(false);
       return;
     }
 
-    // 4. Handle Android / Chromium Install Prompt
+    if (!isAndroid) {
+      setShowBanner(false);
+      return;
+    }
+
+    setPlatform('android');
+
+    // Android: promote official APK (not PWA)
+    if (shouldPromoteAndroidApp() && !isAndroidApkPromptDismissed()) {
+      const timer = window.setTimeout(() => setShowBanner(true), 2200);
+      return () => window.clearTimeout(timer);
+    }
+
     const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent the default browser-driven mini-bar from showing
       e.preventDefault();
-      // Store the event so it can be triggered later
       setDeferredPrompt(e);
-      // Show the install prompt banner after a short delay
       setShowBanner(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // If already installed, hide prompt
     const handleAppInstalled = () => {
-      console.log('SchoolixiQ was installed successfully');
       setShowBanner(false);
       setDeferredPrompt(null);
     };
-
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
@@ -89,26 +87,28 @@ export default function InstallAppBanner() {
       return;
     }
 
+    if (platform === 'android') {
+      triggerAndroidApkDownload();
+      toast.success(t('androidAppDownloadStarted'));
+      toast(t('androidAppDownloadHint'), { icon: '📲', duration: 8000 });
+      setShowBanner(false);
+      return;
+    }
+
     if (!deferredPrompt) {
-      // Fallback instruction for browsers where deferredPrompt isn't loaded yet
       alert(t('pwaInstallBrowserInstruction'));
       return;
     }
 
-    // Show the browser install prompt
     deferredPrompt.prompt();
-
-    // Wait for the user to respond to the prompt
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response to install prompt: ${outcome}`);
-
-    // We no longer need the prompt, clear it
+    await deferredPrompt.userChoice;
     setDeferredPrompt(null);
     setShowBanner(false);
   };
 
   const handleDismiss = () => {
     localStorage.setItem('schoolix_pwa_dismissed_time', Date.now().toString());
+    dismissAndroidApkPrompt();
     setShowBanner(false);
   };
 
@@ -159,10 +159,10 @@ export default function InstallAppBanner() {
                   </div>
                 </div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white mb-1">
-                  {t('installBannerTitle')}
+                  {platform === 'android' ? t('androidAppDownloadTitle') : t('installBannerTitle')}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-bold font-sans">
-                  {t('installBannerDesc')}
+                  {platform === 'android' ? t('androidAppDownloadDesc') : t('installBannerDesc')}
                 </p>
 
                 {/* Actions */}
@@ -172,7 +172,7 @@ export default function InstallAppBanner() {
                     className="flex-1 py-3 px-5 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-2xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <Download size={14} />
-                    {t('installAppNow')}
+                    {platform === 'android' ? t('androidAppDownloadBtn') : t('installAppNow')}
                   </button>
                   <button
                     onClick={handleDismiss}

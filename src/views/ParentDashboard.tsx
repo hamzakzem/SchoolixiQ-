@@ -63,6 +63,7 @@ import { Phone, Mail, MapPin, Save, Sparkles, ShieldAlert, ExternalLink } from "
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
+import { usePushTabNavigation } from "../lib/pushNavigation";
 
 export default function ParentDashboard() {
   const { profile, schoolData } = useAuth();
@@ -78,6 +79,7 @@ export default function ParentDashboard() {
     setNavigationHistory((prev) => [...prev, activeTab]);
     setActiveTab(tabId);
   };
+  usePushTabNavigation(navigateToTab, profile?.role);
 
   const handleBack = () => {
     if (navigationHistory.length > 0) {

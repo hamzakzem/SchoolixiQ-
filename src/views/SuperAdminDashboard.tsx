@@ -63,6 +63,7 @@ import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { useAuth } from "../lib/AuthContext";
+import { usePushTabNavigation } from "../lib/pushNavigation";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
@@ -263,6 +264,7 @@ export default function SuperAdminDashboard() {
     setNavigationHistory((prev) => [...prev, activeTab]);
     setActiveTab(tabId);
   };
+  usePushTabNavigation((tab) => navigateToTab(tab), profile?.role);
 
   const handleBack = () => {
     if (navigationHistory.length > 0) {

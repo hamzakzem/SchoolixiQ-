@@ -124,6 +124,22 @@ if (typeof window !== 'undefined') {
 }
 
 import { SystemConfigProvider } from './lib/SystemConfigContext.tsx';
+import { migrateBrandLogoCache } from './lib/resolveBrandLogo';
+
+declare const __SQ_BUILD_ID__: string;
+
+migrateBrandLogoCache();
+
+function hideAppBootSplash() {
+  const el = document.getElementById('app-boot-splash');
+  if (!el) return;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      el.classList.add('sq-boot-hidden');
+      window.setTimeout(() => el.remove(), 280);
+    });
+  });
+}
 
 createRoot(document.getElementById('root')!).render(
   <SystemConfigProvider>
@@ -131,14 +147,22 @@ createRoot(document.getElementById('root')!).render(
   </SystemConfigProvider>
 );
 
+hideAppBootSplash();
+
 // Defer PWA registration so first paint is not blocked
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   const registerSw = () => {
-    const buildVersion = '2026-06-03-v10';
+    const buildVersion =
+      typeof __SQ_BUILD_ID__ !== 'undefined' ? __SQ_BUILD_ID__ : 'dev';
     navigator.serviceWorker
-      .register(`/sw.js?build=${buildVersion}`)
+      .register(`/sw.js?build=${encodeURIComponent(buildVersion)}`)
       .then((registration) => {
         registration.update();
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data?.type === 'SCHOOLIX_SW_UPDATED') {
+            window.location.reload();
+          }
+        });
         registration.addEventListener('updatefound', () => {
           const installingWorker = registration.installing;
           if (!installingWorker) return;

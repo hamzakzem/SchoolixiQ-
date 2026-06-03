@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSystemConfig } from '../lib/SystemConfigContext';
-import { BRAND_LOGO_PATH } from '../lib/brandAssets';
+import { BRAND_LOGO_URL, resolveAppLogo } from '../lib/resolveBrandLogo';
 
 type Props = {
   className?: string;
@@ -21,7 +21,7 @@ export const BrandLogo: React.FC<Props> = ({
   size = 'md',
 }) => {
   const { config } = useSystemConfig();
-  const src = config.appLogo?.trim() || BRAND_LOGO_PATH;
+  const src = resolveAppLogo(config.appLogo) || BRAND_LOGO_URL;
 
   return (
     <img

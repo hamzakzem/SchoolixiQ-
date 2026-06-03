@@ -77,12 +77,45 @@
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
     <link rel="dns-prefetch" href="https://www.googleapis.com">
     <meta name="theme-color" content="#0B2345" />
-    <link rel="icon" type="image/png" href="/logo.png" />
-    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="icon" type="image/png" href="/logo.png?v=20250603" />
+    <link rel="apple-touch-icon" href="/logo.png?v=20250603" />
+    <style>
+      #app-boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        background: #f8fafc;
+      }
+      #app-boot-splash img {
+        width: 88px;
+        height: 88px;
+        object-fit: contain;
+      }
+      #app-boot-splash span {
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #475569;
+      }
+      #app-boot-splash.sq-boot-hidden {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+    </style>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   </head>
   <body>
+    <div id="app-boot-splash" aria-hidden="true">
+      <img src="/logo.png?v=20250603" alt="" width="88" height="88" decoding="sync" />
+      <span>SchoolixiQ</span>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

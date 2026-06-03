@@ -56,6 +56,7 @@ import {
 import { LanguageToggle } from "./components/LanguageToggle";
 
 const InstallAppBanner = lazy(() => import("./components/InstallAppBanner"));
+const AndroidAppVisitPrompt = lazy(() => import("./components/AndroidAppVisitPrompt"));
 const AudioNotificationManager = lazy(() =>
   import("./components/AudioNotificationManager").then((m) => ({
     default: m.AudioNotificationManager,
@@ -1462,6 +1463,7 @@ export default function App() {
               <Toaster position="top-right" />
               <Suspense fallback={null}>
                 <InstallAppBanner />
+                <AndroidAppVisitPrompt />
                 <AudioNotificationManager />
               </Suspense>
             </BrowserRouter>

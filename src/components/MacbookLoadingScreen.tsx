@@ -1,5 +1,5 @@
 import React from 'react';
-import { BRAND_LOGO_PATH } from '../lib/brandAssets';
+import { BRAND_LOGO_URL } from '../lib/resolveBrandLogo';
 const KEY_IDS = Array.from({ length: 13 }, (_, i) =>
   String(i + 1).padStart(2, '0'),
 );
@@ -32,7 +32,7 @@ export const MacbookLoadingScreen: React.FC<Props> = ({
             <div className="macbook__display">
               <div className="macbook__load">
                 <img
-                  src={BRAND_LOGO_PATH}
+                  src={BRAND_LOGO_URL}
                   alt=""
                   className="macbook__load-logo"
                   aria-hidden

@@ -1,4 +1,6 @@
 /** Official SchoolixiQ brand mark (hexagon + S) — static assets in /public */
+export const BRAND_ASSET_VERSION =
+  typeof __SQ_BUILD_ID__ !== 'undefined' ? __SQ_BUILD_ID__ : '20250603';
 export const BRAND_LOGO_PATH = '/logo.png';
 export const BRAND_ICON_192 = '/icon-192.png';
 export const BRAND_ICON_512 = '/icon-512.png';

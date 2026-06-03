@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from './firebase';
 import { doc, onSnapshot, getDocFromServer } from 'firebase/firestore';
-import { BRAND_LOGO_PATH, BRAND_THEME_COLOR } from './brandAssets';
+import { BRAND_THEME_COLOR } from './brandAssets';
+import { BRAND_LOGO_URL, resolveAppLogo } from './resolveBrandLogo';
 
 interface MarketingFeature {
   title: string;
@@ -30,7 +31,7 @@ interface SystemConfig {
 
 const defaultSystemConfig: SystemConfig = {
   appName: 'SchoolixiQ',
-  appLogo: BRAND_LOGO_PATH,
+  appLogo: BRAND_LOGO_URL,
   supportPhones: ['+964 770 000 0000'],
   supportEmails: ['support@schoolixiq.iq'],
   successPartners: [],
@@ -70,7 +71,12 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
     try {
       const cached = localStorage.getItem('schoolixiq_system_config');
       if (cached) {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached) as SystemConfig;
+        return {
+          ...defaultSystemConfig,
+          ...parsed,
+          appLogo: resolveAppLogo(parsed.appLogo),
+        };
       }
     } catch (e) {
       console.warn("Error reading cached system config:", e);
@@ -86,10 +92,9 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
       if (snap.exists()) {
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
-        const appLogo =
-          typeof data.appLogo === 'string' && data.appLogo.trim()
-            ? data.appLogo
-            : BRAND_LOGO_PATH;
+        const appLogo = resolveAppLogo(
+          typeof data.appLogo === 'string' ? data.appLogo : undefined,
+        );
         const updatedConfig = {
           ...defaultSystemConfig,
           ...data,
@@ -110,10 +115,9 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
       if (snap.exists()) {
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
-        const appLogo =
-          typeof data.appLogo === 'string' && data.appLogo.trim()
-            ? data.appLogo
-            : BRAND_LOGO_PATH;
+        const appLogo = resolveAppLogo(
+          typeof data.appLogo === 'string' ? data.appLogo : undefined,
+        );
         const newConfig = {
           appName: appName,
           appLogo: appLogo,
@@ -150,7 +154,7 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         link.rel = 'icon';
         document.getElementsByTagName('head')[0].appendChild(link);
       }
-      const faviconSrc = config.appLogo?.trim() || BRAND_LOGO_PATH;
+      const faviconSrc = resolveAppLogo(config.appLogo);
       link.type = 'image/png';
       link.href = faviconSrc;
 

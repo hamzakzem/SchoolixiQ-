@@ -453,6 +453,20 @@ async function startServer() {
     }
   });
 
+  app.get('/api/download/schoolixiq.apk', (req, res) => {
+    const apkPath = path.join(process.cwd(), 'public', 'downloads', 'schoolixiq.apk');
+    if (!fs.existsSync(apkPath)) {
+      return res.status(404).json({
+        error: 'APK_NOT_FOUND',
+        message: 'Place schoolixiq.apk in public/downloads/ or set VITE_ANDROID_APK_URL',
+      });
+    }
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="schoolixiq.apk"');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(apkPath);
+  });
+
   // iOS Configuration Profile Download API
   app.get('/api/download/schoolixiq.mobileconfig', (req, res) => {
     const host = req.get('host') || 'schoolixiq.com';
@@ -1171,13 +1185,16 @@ async function startServer() {
                   userId: String(userId),
                   notificationId: change.doc.id,
                   url: deepLink,
+                  tab: String(notif.metadata?.tab || notif.metadata?.targetTab || ''),
+                  conversationId: String(notif.metadata?.conversationId || ''),
+                  orderId: String(notif.metadata?.orderId || ''),
                 },
                 webpush: {
                   fcmOptions: { link: deepLink },
                   notification: {
                     title: String(title),
                     body: String(message),
-                    icon: appUrl ? `${appUrl}/icon.svg` : '/icon.svg',
+                    icon: appUrl ? `${appUrl}/icon-192.png` : '/icon-192.png',
                   },
                 },
                 android: {

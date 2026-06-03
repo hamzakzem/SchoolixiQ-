@@ -68,6 +68,7 @@ import AdvancedReports from "./admin/AdvancedReports";
 import IdCards from "./admin/IdCards";
 
 import { useLanguage } from "../lib/LanguageContext";
+import { usePushTabNavigation } from "../lib/pushNavigation";
 import { GlobalFooter } from "../components/GlobalFooter";
 
 export const getGradeTypeLabel = (val: string, isRtl: boolean) => {
@@ -92,6 +93,7 @@ export default function TeacherDashboard() {
   const { profile, schoolData } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>("home");
+  usePushTabNavigation((tab) => setActiveTab(tab as Tab), profile?.role);
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [schoolName, setSchoolName] = useState<string>("");

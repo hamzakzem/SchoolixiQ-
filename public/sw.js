@@ -1,34 +1,36 @@
 // Cache name with versioning
-const CACHE_NAME = 'schoolix-cache-v10';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/logo.png',
-];
+const CACHE_NAME = 'schoolix-cache-v12-deploy';
+const BRAND_ASSETS = ['/logo.png', '/icon-192.png', '/icon-512.png', '/favicon.png'];
+
+const isBrandAsset = (url) =>
+  BRAND_ASSETS.some((path) => {
+    try {
+      const u = new URL(url);
+      return u.pathname === path || u.pathname.endsWith(path);
+    } catch {
+      return url.includes(path);
+    }
+  });
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    caches.open(CACHE_NAME).then((cache) =>
+      cache.addAll(['/', '/index.html', '/manifest.json']),
+    ),
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    })
+    caches.keys().then((keys) =>
+      Promise.all(keys.map((key) => caches.delete(key))),
+    ).then(() => self.clients.matchAll({ type: 'window' })).then((clients) => {
+      clients.forEach((client) => {
+        client.postMessage({ type: 'SCHOOLIX_SW_UPDATED' });
+      });
+    }).then(() => self.clients.claim()),
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -94,7 +96,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Images/fonts: stale-while-revalidate
+  // Brand images: network-first so new logo reaches phones after deploy
+  if (isBrandAsset(event.request.url)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request)),
+    );
+    return;
+  }
+
+  // Other images/fonts: stale-while-revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)
@@ -108,7 +126,7 @@ self.addEventListener('fetch', (event) => {
         .catch(() => cachedResponse);
 
       return cachedResponse || fetchPromise;
-    })
+    }),
   );
 });
 
@@ -118,8 +136,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Schoolix IQ Notification';
   const options = {
     body: data.body || 'You received a new message or update on Schoolix.',
-    icon: 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg',
-    badge: 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     vibrate: [100, 50, 100],
     data: { url: data.url || '/' }
   };

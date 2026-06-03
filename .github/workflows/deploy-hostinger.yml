@@ -63,6 +63,11 @@ jobs:
         run: npm ci
 
       - name: Build frontend (static only)
+        env:
+          VITE_APP_URL: https://schoolixiq.com
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_ANDROID_APK_URL: ${{ secrets.VITE_ANDROID_APK_URL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: npm run build:web
 
       - name: Verify dist output
@@ -91,7 +96,7 @@ jobs:
           port: 65002
           username: ${{ env.HOSTINGER_FTP_USERNAME }}
           password: ${{ env.HOSTINGER_FTP_PASSWORD }}
-          local_path: ./dist/*
+          local_path: ./dist/
           remote_path: ${{ env.HOSTINGER_FTP_REMOTE_DIR }}
           sftp_only: true
           sftpArgs: "-o ConnectTimeout=30 -o StrictHostKeyChecking=no"

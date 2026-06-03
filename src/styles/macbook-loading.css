@@ -97,8 +97,17 @@
   z-index: 6;
   width: 52px;
   height: 52px;
+  max-width: 72%;
+  max-height: 72%;
   object-fit: contain;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35));
+}
+
+@media (max-width: 480px) {
+  .sq-macbook-loader .macbook__load-logo {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 .sq-macbook-loader .macbook__load::before {

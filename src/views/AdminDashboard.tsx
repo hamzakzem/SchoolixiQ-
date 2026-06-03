@@ -128,6 +128,7 @@ import AdminChatTab from "./admin/AdminChatTab";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
+import { usePushTabNavigation } from "../lib/pushNavigation";
 
 export default function AdminDashboard() {
   const { t, isRtl, language, setLanguage } = useLanguage();
@@ -175,6 +176,7 @@ export default function AdminDashboard() {
   };
   // Filter menu items based on assistant or plan permissions
   const { profile, schoolData: authSchoolData } = useAuth();
+  usePushTabNavigation(navigateToTab, profile?.role);
 
   // Package permissions are controlled by the Super Admin via the package properties
   const perms = authSchoolData?.packagePermissions || profile?.permissions; // fallback to profile if not loaded yet

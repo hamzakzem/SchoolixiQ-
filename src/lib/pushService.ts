@@ -2,82 +2,119 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { db } from './firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { toast } from 'react-hot-toast';
 import { registerWebPushNotifications, unregisterWebPushToken } from './webPushService';
+import { showPlatformNotificationToast } from './platformNotificationToast';
+import {
+  dispatchPushNavigation,
+  resolveTabFromPushData,
+} from './pushNavigation';
 
-// Store current token in memory to remove it during logout
 let currentPushToken: string | null = null;
+let nativeListenersAttached = false;
 
-export const registerForPushNotifications = async (userId: string, userRole: string, schoolId: string = '') => {
+async function ensureAndroidNotificationChannel(): Promise<void> {
+  if (Capacitor.getPlatform() !== 'android') return;
+  try {
+    await PushNotifications.createChannel({
+      id: 'schoolix_alerts',
+      name: 'تنبيهات schoolixiQ',
+      description: 'إشعارات المنصة — رسائل، درجات، رسوم، وإعلانات',
+      importance: 5,
+      visibility: 1,
+      sound: 'default',
+      vibration: true,
+      lights: true,
+      lightColor: '#0B2345',
+    });
+  } catch (e) {
+    console.warn('[Push] Android channel setup:', e);
+  }
+}
+
+function attachNativePushListeners(userId: string, userRole: string): void {
+  if (nativeListenersAttached) return;
+  nativeListenersAttached = true;
+
+  PushNotifications.addListener('registration', async (token) => {
+    console.log('[Push] Native registration OK');
+    currentPushToken = token.value;
+    if (!userId) return;
+    try {
+      const platform = Capacitor.getPlatform();
+      await updateDoc(doc(db, 'users', userId), {
+        fcmTokens: arrayUnion(token.value),
+        pushPlatforms: arrayUnion(platform),
+        lastNativePushAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error('[Push] Failed to save native token:', e);
+    }
+  });
+
+  PushNotifications.addListener('registrationError', (error: unknown) => {
+    console.error('[Push] Registration error:', JSON.stringify(error));
+  });
+
+  PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    const title =
+      notification.title ||
+      (notification.data?.title as string | undefined) ||
+      'schoolixiQ';
+    const body =
+      notification.body ||
+      (notification.data?.body as string | undefined) ||
+      (notification.data?.message as string | undefined) ||
+      '';
+
+    showPlatformNotificationToast(title, body, {
+      onClick: () => {
+        const data = (notification.data || {}) as Record<string, string | undefined>;
+        const tab = resolveTabFromPushData(data, userRole);
+        dispatchPushNavigation({ tab, type: data.type, notificationId: data.notificationId });
+      },
+    });
+  });
+
+  PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+    const data = (action.notification?.data || {}) as Record<string, string | undefined>;
+    const tab = resolveTabFromPushData(data, userRole);
+    dispatchPushNavigation({
+      tab,
+      url: data.url,
+      type: data.type,
+      notificationId: data.notificationId,
+    });
+  });
+}
+
+export const registerForPushNotifications = async (
+  userId: string,
+  userRole: string,
+  _schoolId: string = '',
+) => {
   if (!Capacitor.isNativePlatform()) {
     await registerWebPushNotifications(userId);
     return;
   }
 
   try {
-    // Request permission to use push notifications
-    let permStatus = await PushNotifications.checkPermissions();
+    await ensureAndroidNotificationChannel();
 
+    let permStatus = await PushNotifications.checkPermissions();
     if (permStatus.receive === 'prompt') {
       permStatus = await PushNotifications.requestPermissions();
     }
-
     if (permStatus.receive !== 'granted') {
-      console.warn('User denied push notification permission');
+      console.warn('[Push] Permission denied');
       return;
     }
 
-    // Register with Apple / Google to receive push via APNS/FCM
-    await PushNotifications.register();
-
-    // Listeners for registration success/error
-    let isRegistrationListenerAdded = false;
-    
-    // Remove all previous listeners to prevent duplicates if register is called multiple times
     await PushNotifications.removeAllListeners();
-
-    PushNotifications.addListener('registration', async (token) => {
-      console.log('Push registration success, token: ' + token.value);
-      currentPushToken = token.value;
-      // Save the token to Firestore so we can send pushes to this user
-      // arrayUnion prevents storing the exact same string twice in the array.
-      if (userId) {
-        try {
-          const userRef = doc(db, 'users', userId);
-          await updateDoc(userRef, {
-            fcmTokens: arrayUnion(token.value)
-          });
-        } catch (e) {
-          console.error('Failed to save push token to user doc: ', e);
-        }
-      }
-    });
-
-    PushNotifications.addListener('registrationError', (error: any) => {
-      console.error('Error on registration: ' + JSON.stringify(error));
-    });
-
-    // Listen for notification received while app is running
-    PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('Push received: ' + JSON.stringify(notification));
-      toast.success(notification.title || 'إشعار جديد', {
-        icon: '🔔',
-        style: {
-          border: '1px solid #e2e8f0',
-          padding: '16px',
-          color: '#1e293b',
-        }
-      });
-    });
-
-    // Listen for notification tapped by the user
-    PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-      console.log('Push action performed: ' + JSON.stringify(notification));
-      // Could route the user to a specific tab/page based on notification data
-    });
-
+    nativeListenersAttached = false;
+    attachNativePushListeners(userId, userRole);
+    await PushNotifications.register();
   } catch (error) {
-    console.error('Error setting up push notifications:', error);
+    console.error('[Push] Setup failed:', error);
   }
 };
 
@@ -87,18 +124,14 @@ export const unregisterPushToken = async (userId: string) => {
     return;
   }
 
-  if (!currentPushToken || !userId) {
-    return;
-  }
-  
+  if (!currentPushToken || !userId) return;
+
   try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      fcmTokens: arrayRemove(currentPushToken)
+    await updateDoc(doc(db, 'users', userId), {
+      fcmTokens: arrayRemove(currentPushToken),
     });
-    console.log('Push token removed successfully on logout.');
     currentPushToken = null;
   } catch (error) {
-    console.error('Error removing push token:', error);
+    console.error('[Push] Token removal failed:', error);
   }
 };

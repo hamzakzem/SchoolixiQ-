@@ -1,6 +1,9 @@
 import { getToken, isSupported, onMessage, type Messaging } from 'firebase/messaging';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db, getFirebaseMessaging } from './firebase';
+import { BRAND_ICON_192_URL } from './resolveBrandLogo';
+import { showPlatformNotificationToast } from './platformNotificationToast';
+import { dispatchPushNavigation, resolveTabFromPushData } from './pushNavigation';
 
 let webFcmToken: string | null = null;
 let foregroundHandlerAttached = false;
@@ -41,14 +44,27 @@ function attachForegroundHandler(messaging: Messaging) {
   if (foregroundHandlerAttached) return;
   foregroundHandlerAttached = true;
   onMessage(messaging, (payload) => {
-    const title = payload.notification?.title || 'schoolixiQ';
-    const body = payload.notification?.body || '';
+    const title = payload.notification?.title || payload.data?.title || 'schoolixiQ';
+    const body =
+      payload.notification?.body ||
+      payload.data?.body ||
+      payload.data?.message ||
+      '';
+    const data = (payload.data || {}) as Record<string, string | undefined>;
+
+    showPlatformNotificationToast(String(title), String(body), {
+      onClick: () => {
+        const tab = resolveTabFromPushData(data);
+        dispatchPushNavigation({ tab, type: data.type, notificationId: data.notificationId });
+      },
+    });
+
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       try {
-        new Notification(title, {
-          body,
-          icon: '/icon.svg',
-          tag: payload.data?.type || 'schoolix-fcm',
+        new Notification(String(title), {
+          body: String(body),
+          icon: BRAND_ICON_192_URL,
+          tag: data.type || 'schoolix-fcm',
         });
       } catch {
         /* ignore */

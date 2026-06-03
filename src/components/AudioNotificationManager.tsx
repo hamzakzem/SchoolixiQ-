@@ -40,7 +40,7 @@ export const AudioNotificationManager: React.FC = () => {
       try {
         const notif = new Notification(title, {
           body,
-          icon: "/logo.png",
+          icon: "/icon-192.png",
           tag,
           requireInteraction: false,
         });

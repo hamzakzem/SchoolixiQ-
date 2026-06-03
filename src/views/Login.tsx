@@ -67,6 +67,7 @@ import { useSystemConfig } from "../lib/SystemConfigContext";
 import { GlobalFooter } from "../components/GlobalFooter";
 import AuthBootScreen from "../components/AuthBootScreen";
 import BrandLogo from "../components/BrandLogo";
+import AndroidAppDownloadCard from "../components/AndroidAppDownloadCard";
 import SchoolRegistrationFields, {
   buildRegistrationCustomerInfo,
   buildSchoolFirestoreFields,
@@ -1097,6 +1098,8 @@ export default function Login() {
               </p>
             </div>
           </div>
+
+          <AndroidAppDownloadCard className="mb-5 sm:mb-6" />
 
           <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6 sm:mb-8">
             <button
@@ -2274,6 +2277,11 @@ export default function Login() {
       </motion.div>
 
       <div className="-mx-6 -mb-12 mt-20 w-[calc(100%+3rem)]">
+        {import.meta.env.PROD && typeof __SQ_BUILD_ID__ !== 'undefined' && (
+          <p className="text-center text-[9px] text-slate-300 font-mono mt-2 select-all" title="Build ID — للتحقق من النشر">
+            v:{__SQ_BUILD_ID__.slice(-12)}
+          </p>
+        )}
         <GlobalFooter />
       </div>
 
