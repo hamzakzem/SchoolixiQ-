@@ -7,6 +7,7 @@ import { Save, Building, MapPin, Bell, Eye, EyeOff, ShieldCheck, Settings, Phone
 import { motion } from 'motion/react';
 import { School } from '../../types';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+import { formatArIqDate } from '../../lib/firestoreDates';
 
 export default function SettingsView() {
   const { profile } = useAuth();
@@ -458,11 +459,7 @@ export default function SettingsView() {
                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
                       <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">صالح لغاية</p>
                       <p className="text-lg font-bold font-mono">
-                        {schoolData?.subscriptionExpiresAt ? new Date(schoolData.subscriptionExpiresAt).toLocaleDateString('ar-IQ', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        }) : 'غير محدد'}
+                        {formatArIqDate(schoolData?.subscriptionExpiresAt) || 'غير محدد'}
                       </p>
                    </div>
                    <div className="flex items-center justify-between px-2">

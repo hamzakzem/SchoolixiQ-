@@ -341,6 +341,16 @@ export default function Login() {
           oldDocId = found.id;
         }
 
+        if (
+          pendingMode === "signup" &&
+          pendingRole === UserRole.ADMIN &&
+          !provisionedData?.schoolId
+        ) {
+          toast.error(t("googleAdminSignupBlocked"));
+          setLoading(false);
+          return;
+        }
+
         let isFirstUser = false;
         try {
           const metadataSnap = await getDoc(doc(db, "users", "metadata"));
@@ -542,6 +552,10 @@ export default function Login() {
   const inIframe = typeof window !== "undefined" && window.self !== window.top;
 
   const handleGoogleAuth = async () => {
+    if (mode === "signup" && role === UserRole.ADMIN) {
+      toast.error(t("googleAdminSignupBlocked"));
+      return;
+    }
     setUnauthorizedDomainError(null);
     setShowIframeHint(false);
     setFirebaseProviderError(null);
@@ -840,7 +854,16 @@ export default function Login() {
         if (isFirstUser) {
           await setDoc(doc(db, "users", "metadata"), { initialized: true });
         }
-        toast.success(t("signupSuccess"));
+
+        if (
+          finalRole === UserRole.ADMIN &&
+          schoolId &&
+          !isFirstUser
+        ) {
+          toast.success(t("adminSignupSuccess"), { duration: 8000 });
+        } else {
+          toast.success(t("signupSuccess"));
+        }
       } else {
         try {
           // Self-healing school document block on login
@@ -1101,7 +1124,9 @@ export default function Login() {
                   <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
                     <button
                       type="button"
-                      onClick={() => setRole(UserRole.PARENT)}
+                      onClick={() => {
+                        setRole(UserRole.PARENT);
+                      }}
                       className={`flex flex-col items-center p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all ${role === UserRole.PARENT ? "border-blue-600 bg-blue-50 text-blue-700 shadow-lg shadow-blue-100" : "border-slate-100 text-slate-400 hover:border-slate-200"}`}
                     >
                       <Users size={20} className="mb-1 sm:mb-2 sm:w-6 sm:h-6" />
@@ -1109,7 +1134,9 @@ export default function Login() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setRole(UserRole.ADMIN)}
+                      onClick={() => {
+                        setRole(UserRole.ADMIN);
+                      }}
                       className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all ${role === UserRole.ADMIN ? "border-slate-900 bg-slate-50 text-slate-900 shadow-lg shadow-slate-100" : "border-slate-100 text-slate-400 hover:border-slate-200"}`}
                     >
                       <Building2 size={24} className="mb-2" />
@@ -1117,32 +1144,49 @@ export default function Login() {
                     </button>
                   </div>
 
-                  <div className="relative">
-                    {isRtl ? (
-                      <Users
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                        size={18}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 text-center block">
+                      {role === UserRole.ADMIN ? t("schoolNameLabel") : t("name")}
+                    </label>
+                    <div className="relative">
+                      {isRtl ? (
+                        role === UserRole.ADMIN ? (
+                          <Building2
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                            size={18}
+                          />
+                        ) : (
+                          <Users
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                            size={18}
+                          />
+                        )
+                      ) : role === UserRole.ADMIN ? (
+                        <Building2
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                          size={18}
+                        />
+                      ) : (
+                        <Users
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                          size={18}
+                        />
+                      )}
+                      <input
+                        required
+                        type="text"
+                        placeholder={
+                          role === UserRole.ADMIN
+                            ? isRtl
+                              ? "مثال: التميز الأهلية"
+                              : "e.g. Al-Tamayuz School"
+                            : t("name")
+                        }
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base`}
                       />
-                    ) : (
-                      <Users
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                        size={18}
-                      />
-                    )}
-                    <input
-                      required
-                      type="text"
-                      placeholder={
-                        role === UserRole.ADMIN
-                          ? isRtl
-                            ? "اسم المدرسة (مثال: التميز الأهلية)"
-                            : "School name (e.g. Al-Tamayuz School)"
-                          : t("name")
-                      }
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base`}
-                    />
+                    </div>
                   </div>
 
                   {role === UserRole.ADMIN && (
@@ -1151,6 +1195,10 @@ export default function Login() {
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-4"
                     >
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                          {t("phone")}
+                        </label>
                       <div className="relative">
                         {isRtl ? (
                           <Phone
@@ -1172,6 +1220,7 @@ export default function Login() {
                           className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base`}
                         />
                       </div>
+                      </div>
                       <SchoolRegistrationFields
                         isRtl={isRtl}
                         values={schoolRegistration}
@@ -1185,6 +1234,10 @@ export default function Login() {
               )}
             </AnimatePresence>
 
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                {t("email")}
+              </label>
             <div className="relative">
               {isRtl ? (
                 <Mail
@@ -1206,7 +1259,12 @@ export default function Login() {
                 className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 shadow-inner text-sm sm:text-base`}
               />
             </div>
+            </div>
 
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                {t("password")}
+              </label>
             <div className="relative">
               {isRtl ? (
                 <Lock
@@ -1227,6 +1285,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 shadow-inner text-sm sm:text-base`}
               />
+            </div>
             </div>
 
             <div className="bg-slate-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-100 shadow-inner">
