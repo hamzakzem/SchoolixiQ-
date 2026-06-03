@@ -162,6 +162,10 @@ export default function SettingsView() {
         shift: formData.shift,
         genderType: formData.genderType,
         approximateStudents: formData.approximateStudents,
+        educationLevel: formData.stage,
+        workingHours: formData.shift,
+        studyType: formData.genderType,
+        estimatedStudents: Number(formData.approximateStudents) || 0,
       });
       toast.success('تم حفظ الإعدادات بنجاح');
     } catch (error) {
