@@ -61,6 +61,7 @@ import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { GlobalFooter } from "../components/GlobalFooter";
+import SolarLoading from "../components/SolarLoading";
 import SchoolRegistrationFields, {
   buildRegistrationCustomerInfo,
   buildSchoolFirestoreFields,
@@ -421,7 +422,9 @@ export default function Login() {
       console.error("Profile creation error:", error);
       toast.error(error.message || t("failedConnection"));
     } finally {
-      setLoading(false);
+      if (!auth.currentUser) {
+        setLoading(false);
+      }
     }
   };
 
@@ -687,7 +690,9 @@ export default function Login() {
     } finally {
       if (!redirecting) {
         googleAuthLock.current = false;
-        setLoading(false);
+        if (!auth.currentUser) {
+          setLoading(false);
+        }
       }
     }
   };
@@ -947,7 +952,9 @@ export default function Login() {
       }
     } finally {
       authSubmitLock.current = false;
-      setLoading(false);
+      if (!auth.currentUser) {
+        setLoading(false);
+      }
     }
   };
 
@@ -968,9 +975,14 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-[100dvh] bg-slate-50 font-sans flex flex-col items-center py-6 sm:py-12 px-4 sm:px-6"
+      className="min-h-[100dvh] bg-slate-50 font-sans flex flex-col items-center py-6 sm:py-12 px-4 sm:px-6 relative"
       dir={isRtl ? "rtl" : "ltr"}
     >
+      {loading && auth.currentUser && (
+        <div className="fixed inset-0 z-[200] bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm">
+          <SolarLoading />
+        </div>
+      )}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

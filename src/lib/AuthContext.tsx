@@ -64,8 +64,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let unsubscribePackage: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (authUser) => {
+      setLoading(true);
       setUser(authUser);
-      
+      setProfile(null);
+      setSchoolData(null);
+
       if (authUser) {
         lastUserIdRef.current = authUser.uid;
       } else {
@@ -140,15 +143,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               console.error('Failed to init push notifications', err);
             }
 
-            // Listen to school data if schoolId exists
-            if (data.schoolId && (!schoolData || schoolData.id !== data.schoolId)) {
+            // Listen to school data if schoolId exists — keep loading until school snapshot resolves
+            if (data.schoolId) {
                if (unsubscribeSchool) unsubscribeSchool();
                unsubscribeSchool = onSnapshot(doc(db, 'schools', data.schoolId), (s) => {
                  if (s.exists()) {
                    const schoolInfo = { id: s.id, ...s.data() } as any;
                    setSchoolData(schoolInfo);
                    
-                   // Listen to active active package for the school
                    if (schoolInfo.planId && unsubscribePackage === null) {
                      unsubscribePackage = onSnapshot(doc(db, 'packages', schoolInfo.planId), (pkgSnap) => {
                         if (pkgSnap.exists()) {
@@ -167,13 +169,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                  } else {
                    setSchoolData(null);
                  }
+                 setLoading(false);
                }, (error) => {
                  handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${data.schoolId}`);
                  setLoading(false);
                });
+            } else {
+              setLoading(false);
             }
-
-            setLoading(false);
           } else {
             // Check claims first - if server already set them, we can trust them
             let claims: any = {};

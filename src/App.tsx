@@ -310,7 +310,7 @@ const AppContent = () => {
     let timer: NodeJS.Timeout;
     let unsubs: (() => void)[] = [];
     
-    if (!loading && user && (!profile || (profile.role === "admin" && !profile.schoolId)) && autoLinkChecked) {
+    if (user && (!profile || (profile.role === "admin" && !profile.schoolId)) && autoLinkChecked) {
       // Create three queries to locate registrations
       const qUid = query(
         collection(db, "registrations"),
@@ -348,17 +348,12 @@ const AppContent = () => {
             setOnboardingState("waiting_approval");
           }
         } else {
-          // If no pending request, check if we should show options (with a short delay to avoid flicker)
           setOnboardingState((prev) => {
             if (prev === "approved") return "approved";
-            timer = setTimeout(() => {
-              if (profile?.role === "admin") {
-                setOnboardingState("packages");
-              } else {
-                setOnboardingState("options");
-              }
-            }, 1000);
-            return prev;
+            if (profile?.role === "admin") {
+              return "packages";
+            }
+            return "options";
           });
         }
       };
@@ -443,6 +438,14 @@ const AppContent = () => {
       </>
     );
   }
+
+  // Authenticated: wait for profile bootstrap (no dashboard flash)
+  if (!profile || !autoLinkChecked || isCreatingProfile) {
+    return <SolarLoading />;
+  }
+
+  const needsSchoolOnboarding =
+    profile.role === UserRole.ADMIN && !profile.schoolId;
 
   const renderDashboard = () => {
     // Dedicated recovery/error screen if profile has school role but schoolId or schoolData is missing or inaccessible in Firestore
@@ -584,7 +587,7 @@ const AppContent = () => {
         dir={isRtl ? "rtl" : "ltr"}
         className={isRtl ? "font-sans" : "font-sans"}
       >
-        {profile && !(profile.role === "admin" && !profile.schoolId) ? (
+        {!needsSchoolOnboarding ? (
           <>
             <ScanHandler />
             {renderDashboard()}
