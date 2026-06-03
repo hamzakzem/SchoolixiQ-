@@ -72,10 +72,10 @@ export default function SettingsView() {
             notificationsEnabled: data.notificationsEnabled !== false,
             governorate: data.governorate || '',
             directorate: data.directorate || '',
-            stage: data.stage || '',
-            shift: data.shift || '',
-            genderType: data.genderType || '',
-            approximateStudents: data.approximateStudents || '',
+            stage: data.educationLevel || data.stage || '',
+            shift: data.workingHours || data.shift || '',
+            genderType: data.studyType || data.genderType || '',
+            approximateStudents: data.estimatedStudents?.toString() || data.approximateStudents || '',
           });
         }
       } catch (error) {
