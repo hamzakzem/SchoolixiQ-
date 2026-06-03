@@ -333,9 +333,12 @@ export default function Login() {
           isFirstUser = !metadataSnap.exists();
         } catch (err) {}
 
-        const finalRole = isFirstUser
+        let finalRole = isFirstUser
           ? UserRole.SUPERADMIN
           : provisionedData?.role || pendingRole;
+
+        // Security: prevent superadmin role on public signup
+        if (finalRole === "superadmin" && !isFirstUser) finalRole = UserRole.ADMIN;
 
         // Create permanent profile
         await setDoc(doc(db, "users", user.uid), {
@@ -668,9 +671,12 @@ export default function Login() {
           console.warn("Metadata check error", err);
         }
 
-        const finalRole = isFirstUser
+        let finalRole = isFirstUser
           ? UserRole.SUPERADMIN
           : provisionedData?.role || role;
+
+        // Security: prevent superadmin role on public signup
+        if (finalRole === "superadmin" && !isFirstUser) finalRole = UserRole.ADMIN;
 
         // Role conflict check: management cannot be teacher or parent
         const isManagement = [
