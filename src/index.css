@@ -660,3 +660,157 @@ body {
 .btn-gold:hover {
   background-color: #e8c06e;
 }
+
+/* ─── SchoolixiQ Platform UI (sq-*) ─── */
+.sq-page {
+  @apply space-y-5 md:space-y-8 animate-in fade-in duration-500;
+}
+
+.sq-page-header {
+  @apply flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6;
+}
+
+.sq-page-title {
+  @apply text-xl md:text-3xl font-bold text-[#0B2345] dark:text-white font-display;
+}
+
+.sq-page-desc {
+  @apply text-slate-500 dark:text-slate-400 text-xs md:text-sm mt-1;
+}
+
+.sq-page-actions {
+  @apply flex flex-col sm:flex-row gap-3 w-full lg:w-auto;
+}
+
+.sq-search {
+  @apply relative flex-1 min-w-0;
+}
+
+.sq-search-icon {
+  @apply absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none;
+}
+
+.sq-search-input {
+  @apply w-full pr-11 pl-4 py-2.5 md:py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl
+    text-sm md:text-base font-medium text-slate-900 dark:text-slate-100
+    outline-none transition-all focus:ring-2 focus:ring-[#0B2345]/15 focus:border-[#0B2345] dark:focus:border-[#D4A64A];
+}
+
+.sq-panel {
+  @apply bg-white dark:bg-slate-900 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700;
+}
+
+.sq-panel-toolbar {
+  @apply p-4 md:p-5 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-800/40;
+}
+
+.sq-table-wrap {
+  @apply overflow-x-auto overflow-y-auto w-full;
+}
+
+.sq-table {
+  @apply w-full min-w-[960px] text-right border-collapse;
+}
+
+.sq-table thead {
+  @apply sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 shadow-[0_1px_0_0_rgba(148,163,184,0.35)];
+}
+
+.sq-table thead th {
+  @apply px-4 md:px-6 py-3.5 text-[10px] md:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap;
+}
+
+.sq-table tbody td {
+  @apply px-4 md:px-6 py-4 align-middle;
+}
+
+.sq-table tbody tr {
+  @apply border-b border-slate-100 dark:border-slate-800 transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50;
+}
+
+.sq-view-toggle {
+  @apply inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700;
+}
+
+.sq-view-toggle-btn {
+  @apply px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 transition-all;
+}
+
+.sq-view-toggle-btn-active {
+  @apply bg-white dark:bg-slate-900 text-[#0B2345] dark:text-[#D4A64A] shadow-sm;
+}
+
+.sq-btn {
+  @apply inline-flex items-center justify-center gap-2 font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap;
+}
+
+.sq-btn-sm { @apply h-9 px-3.5 text-xs; }
+.sq-btn-md { @apply h-10 px-4 text-sm; }
+.sq-btn-lg { @apply h-11 px-5 md:px-6 text-sm md:text-base; }
+.sq-btn-icon { @apply h-10 w-10 p-0; }
+
+.sq-btn-primary {
+  @apply bg-[#0B2345] text-white hover:bg-[#1a3a6b] shadow-md shadow-[#0B2345]/20;
+}
+
+.sq-btn-secondary {
+  @apply bg-white dark:bg-slate-900 text-[#0B2345] dark:text-slate-100 border-2 border-[#0B2345]/20 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800;
+}
+
+.sq-btn-ghost {
+  @apply bg-transparent text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800;
+}
+
+.sq-btn-danger {
+  @apply bg-red-600 text-white hover:bg-red-700;
+}
+
+.sq-btn-accent {
+  @apply bg-[#D4A64A] text-[#0B2345] hover:bg-[#e8c06e];
+}
+
+.sq-icon-btn {
+  @apply inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 dark:border-slate-700
+    text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#0B2345] dark:hover:text-white;
+}
+
+.sq-icon-btn-primary {
+  @apply text-blue-600 bg-blue-50 border-blue-100 hover:bg-blue-100 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300;
+}
+
+.sq-icon-btn-danger {
+  @apply text-red-600 bg-red-50 border-red-100 hover:bg-red-100;
+}
+
+.sq-icon-btn-active {
+  @apply bg-[#0B2345] text-white border-[#0B2345] shadow-md;
+}
+
+.sq-action-menu {
+  @apply absolute z-[80] min-w-[13.5rem] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700;
+}
+
+.sq-action-menu-item {
+  @apply w-full flex items-center gap-3 px-3.5 py-2.5 text-right text-sm font-semibold text-slate-700 dark:text-slate-200
+    rounded-lg transition-colors hover:bg-slate-50 dark:hover:bg-slate-800;
+}
+
+.sq-student-card {
+  @apply p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col gap-3 relative shadow-sm;
+}
+
+.sq-student-card-grid {
+  @apply p-4 md:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 bg-slate-50/50 dark:bg-slate-950/40;
+}
+
+.sq-badge {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold tracking-wide whitespace-nowrap;
+}
+
+.sq-badge-primary {
+  @apply bg-[#0B2345] text-white;
+}
+
+.sq-badge-muted {
+  @apply bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700;
+}

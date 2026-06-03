@@ -2076,7 +2076,7 @@ export default function SuperAdminDashboard() {
               className={
                 activeTab === "chat"
                   ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden"
-                  : "w-full p-4 md:p-8 flex flex-col"
+                  : "w-full p-4 md:p-8 flex flex-col sq-page"
               }
               initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
               animate={{ opacity: 1, y: 0 }}

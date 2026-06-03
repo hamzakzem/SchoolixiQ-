@@ -1233,7 +1233,7 @@ export default function ParentDashboard() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-4 md:p-8 space-y-4 md:space-y-6 flex flex-col max-w-7xl mx-auto"}
+              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-4 md:p-8 flex flex-col max-w-7xl mx-auto sq-page"}
               initial={{ opacity: 0, y: activeTab === 'chat' ? 0 : 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: activeTab === 'chat' ? 0 : -10 }}

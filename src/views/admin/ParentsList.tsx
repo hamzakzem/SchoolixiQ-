@@ -257,7 +257,7 @@ export default function ParentsList() {
       ) : filteredParents.length > 0 ? (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block sq-table-wrap" style={{ maxHeight: 'calc(100dvh - 13.5rem)', minHeight: 'min(52vh, 420px)' }}>
             <table className="w-full text-right border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100/80">

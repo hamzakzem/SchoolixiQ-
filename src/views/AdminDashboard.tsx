@@ -1504,7 +1504,7 @@ export default function AdminDashboard() {
                 className={
                   activeTab === "chat"
                     ? "flex-1 flex flex-col min-h-0"
-                    : "w-full flex flex-col"
+                    : "w-full flex flex-col sq-page"
                 }
                 initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
                 animate={{ opacity: 1, y: 0 }}

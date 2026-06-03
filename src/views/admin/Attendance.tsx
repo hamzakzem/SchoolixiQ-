@@ -261,7 +261,7 @@ export default function Attendance() {
             </div>
             <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
                {/* Desktop View */}
-               <div className="hidden md:block overflow-x-auto custom-scrollbar">
+               <div className="hidden md:block sq-table-wrap custom-scrollbar" style={{ maxHeight: 'calc(100dvh - 13.5rem)', minHeight: 'min(52vh, 420px)' }}>
                  <table className={`w-full ${isRtl ? 'text-right' : 'text-left'}`}>
                     <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
                        <tr>

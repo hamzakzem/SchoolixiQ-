@@ -2,7 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, deleteDoc, setDoc, runTransaction, increment, arrayUnion, arrayRemove, getDoc, limit, startAfter, orderBy } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { Search, Plus, UserPlus, Filter, MoreVertical, GraduationCap, Copy, Check, Trash2, AlertTriangle, X, Users, ArrowRightLeft, Upload, Edit2, User, Hash, Phone, Mail, Key, MapPin } from 'lucide-react';
+import { Plus, UserPlus, GraduationCap, Copy, Check, Trash2, AlertTriangle, X, Users, ArrowRightLeft, Upload, User, Hash, Phone, Mail, Key, MapPin } from 'lucide-react';
+import {
+  PageHeader,
+  SearchField,
+  Panel,
+  PanelToolbar,
+  DataTable,
+  DataTableElement,
+  ViewToggle,
+  Button,
+  IconButton,
+  ActionMenu,
+  ActionMenuItem,
+  ActionMenuDivider,
+} from '../../components/ui';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -112,12 +126,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     return () => { isMounted = false; };
   }, [profile]);
 
-  useEffect(() => {
-    const handleClickOutside = () => setActiveMenu(null);
-    window.addEventListener('click', handleClickOutside);
-    return () => window.removeEventListener('click', handleClickOutside);
-  }, []);
-
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -130,22 +138,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     setIsDeleting(id);
     const loadingToast = toast.loading('جاري حذف سجل الطالب...');
     try {
-      // Use transaction to ensure counter is decremented atomically
-      await runTransaction(db, async (transaction) => {
-        const studentRef = doc(db, 'students', id);
-        const schoolRef = doc(db, 'schools', profile.schoolId!);
-        
-        transaction.delete(studentRef);
-        transaction.update(schoolRef, {
-          studentCount: increment(-1)
-        });
-      });
-
-      // Also delete from Auth if applicable (Admin API)
-      await adminDeleteStudent(id);
-      
+      const result = await adminDeleteStudent(id);
+      if (!result.success) {
+        throw new Error(result.message || 'فشل في حذف الطالب');
+      }
       toast.dismiss(loadingToast);
-      toast.success('تم حذف الطالب نهائياً من النظام');
+      toast.success(result.message || 'تم حذف الطالب نهائياً من النظام');
       setConfirmDeleteId(null);
     } catch (error: any) {
       toast.dismiss(loadingToast);
@@ -521,91 +519,169 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     (student.registrationNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
-  return (
-    <div className="space-y-4 md:space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6">
-        <div>
-          <h1 className="text-xl md:text-3xl font-bold text-slate-900 font-display">إدارة الطلاب</h1>
-          <p className="text-slate-500 text-xs md:text-sm mt-1">قائمة الطلاب المسجلين رسمياً في نظام المدرسة</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-               type="text" 
-               placeholder="بحث عن طالب..." 
-               value={searchTerm}
-               onChange={(e) => setSearchTerm(e.target.value)}
-               className="pr-12 pl-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none w-full lg:w-80 transition-all font-medium text-sm md:text-base"
-            />
-          </div>
-          <div className="flex gap-2">
-            {!isViewOnly && (
-              <button
-                onClick={() => {
-                  setEditingStudent(null);
-                  setNewStudent({
-                    name: '',
-                    classId: '',
-                    parentEmail: '',
-                    parentPhone: '',
-                    address: '',
-                    parentPassword: '',
-                    photoUrl: ''
-                  });
-                  setShowAddModal(true);
-                }}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 md:px-8 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all font-bold shadow-lg active:scale-95 whitespace-nowrap text-sm"
-              >
-                <Plus size={20} />
-                <span>طالب جديد</span>
-              </button>
-            )}
-            <button
-               onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-               className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-600 hover:bg-slate-50 transition-all shadow-sm md:hidden"
-            >
-              {viewMode === 'table' ? <Users size={20} /> : <Filter size={20} />}
-            </button>
-          </div>
-        </div>
-      </div>
+  const closeMenu = () => setActiveMenu(null);
 
-      <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 md:p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
-          <span className="text-[10px] md:text-xs font-extrabold text-slate-400 uppercase tracking-[0.2em]">النتائج: {filteredStudents.length}</span>
-          <div className="hidden md:flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-            <button 
-              onClick={() => setViewMode('table')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-            >
-              جدول
-            </button>
-            <button 
-              onClick={() => setViewMode('cards')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-            >
-              بطاقات
-            </button>
-          </div>
-        </div>
+  const openEditStudent = (student: any) => {
+    setEditingStudent(student);
+    setNewStudent({
+      name: student.name,
+      registrationNumber: student.registrationNumber,
+      classId: student.classId || '',
+      parentPhone: student.parentPhone || '',
+      driverPhone: student.driverPhone || '',
+      parentEmail: student.parentEmail || '',
+      parentPassword: student.parentPassword || '',
+      photoUrl: student.photoUrl || '',
+      address: student.address || '',
+      email: '',
+      password: '',
+    });
+    setShowAddModal(true);
+    closeMenu();
+  };
+
+  const formatStudentDate = (student: any) => {
+    if (!student.createdAt?.seconds) return '—';
+    return new Date(student.createdAt.seconds * 1000).toLocaleDateString('ar-IQ');
+  };
+
+  const renderStudentMenuActions = (student: any) => (
+    <>
+      <ActionMenuItem onClick={() => { setShowLinkedParentsModal(student); closeMenu(); }}>
+        <Users size={16} className="text-slate-400 shrink-0" />
+        عرض الحسابات المربوطة
+      </ActionMenuItem>
+      {!isViewOnly && (
+        <>
+          <ActionMenuItem
+            onClick={() => {
+              setShowLinkParentModal(student);
+              setParentEmail(student.parentEmail || '');
+              setParentName(student.parentName || '');
+              setParentPhone(student.parentPhone || '');
+              setParentPassword(student.parentPassword || '');
+              closeMenu();
+            }}
+            className="hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700"
+          >
+            <UserPlus size={16} className="text-slate-400 shrink-0" />
+            ربط بولي أمر جديد
+          </ActionMenuItem>
+          <ActionMenuItem
+            onClick={() => {
+              setShowMoveModal(student);
+              setTargetClassId(student.classId || '');
+              closeMenu();
+            }}
+          >
+            <ArrowRightLeft size={16} className="text-slate-400 shrink-0" />
+            نقل لصف آخر
+          </ActionMenuItem>
+          <ActionMenuItem onClick={() => openEditStudent(student)}>
+            <GraduationCap size={16} className="text-slate-400 shrink-0" />
+            تعديل البيانات
+          </ActionMenuItem>
+          <ActionMenuDivider />
+          <ActionMenuItem
+            onClick={() => { setConfirmDeleteId(student.id); closeMenu(); }}
+            className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+          >
+            <Trash2 size={16} className="text-red-400 shrink-0" />
+            حذف الطالب
+          </ActionMenuItem>
+        </>
+      )}
+    </>
+  );
+
+  return (
+    <div className="sq-page">
+      <PageHeader
+        title="إدارة الطلاب"
+        description="قائمة الطلاب المسجلين رسمياً في نظام المدرسة"
+        actions={
+          <>
+            <SearchField
+              placeholder="بحث عن طالب..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              containerClassName="w-full lg:w-80"
+            />
+            <div className="flex gap-2 w-full sm:w-auto">
+              {!isViewOnly && (
+                <Button
+                  size="lg"
+                  className="flex-1 sm:flex-none"
+                  onClick={() => {
+                    setEditingStudent(null);
+                    setNewStudent({
+                      name: '',
+                      classId: '',
+                      parentEmail: '',
+                      parentPhone: '',
+                      address: '',
+                      parentPassword: '',
+                      photoUrl: '',
+                      registrationNumber: '',
+                      email: '',
+                      password: '',
+                      driverPhone: '',
+                    });
+                    setShowAddModal(true);
+                  }}
+                >
+                  <Plus size={18} />
+                  <span>طالب جديد</span>
+                </Button>
+              )}
+              <ViewToggle
+                className="md:hidden flex-1 justify-center"
+                value={viewMode}
+                onChange={setViewMode}
+                options={[
+                  { value: 'table', label: 'جدول' },
+                  { value: 'cards', label: 'بطاقات' },
+                ]}
+              />
+            </div>
+          </>
+        }
+      />
+
+      <Panel>
+        <PanelToolbar>
+          <span className="text-[10px] md:text-xs font-extrabold text-slate-400 uppercase tracking-[0.15em]">
+            النتائج: {filteredStudents.length}
+          </span>
+          <ViewToggle
+            className="hidden md:inline-flex"
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { value: 'table', label: 'جدول' },
+              { value: 'cards', label: 'بطاقات' },
+            ]}
+          />
+        </PanelToolbar>
 
         {viewMode === 'table' ? (
-          <div className="overflow-x-auto overflow-y-hidden custom-scrollbar">
-            <table className="w-full text-right border-collapse">
+          <DataTable maxHeight="calc(100dvh - 13.5rem)" minHeight="min(58vh, 480px)">
+            <DataTableElement>
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-200">
-                  <th className="px-8 py-5">اسم الطالب</th>
-                  <th className="px-8 py-5">رقم الربط (السجل)</th>
-                  <th className="px-8 py-5">الصف</th>
-                  <th className="px-8 py-5">الحالة المالية</th>
-                  <th className="px-8 py-5 text-center">الإجراءات</th>
+                <tr>
+                  <th>اسم الطالب</th>
+                  <th>رقم الربط</th>
+                  <th>الصف</th>
+                  <th>ولي الأمر</th>
+                  <th>تاريخ التسجيل</th>
+                  <th>الحالة المالية</th>
+                  <th className="text-center">الإجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {filteredStudents.map(student => (
-                  <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-8 py-5">
+                  <tr key={student.id} className="group">
+                    <td>
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 border border-slate-200 group-hover:border-slate-900 transition-colors shadow-sm overflow-hidden shrink-0">
                            {student.photoUrl ? <img src={student.photoUrl || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <GraduationCap size={20} />}
@@ -613,7 +689,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         <div className="min-w-0">
                            <span className="font-bold text-slate-900 block font-display leading-none truncate">{student.name}</span>
                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block whitespace-nowrap">سجل: {new Date(student.createdAt?.seconds * 1000).toLocaleDateString('ar-IQ')}</span>
+                             <span className="text-[10px] text-slate-400 font-bold block whitespace-nowrap">تسجيل: {formatStudentDate(student)}</span>
                              {student.parentIds?.length > 0 && (
                                <button 
                                  onClick={() => setShowLinkedParentsModal(student)}
@@ -627,254 +703,142 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         </div>
                       </div>
                     </td>
-                    <td className="px-8 py-5">
+                    <td>
                       <div className="flex items-center gap-2 group/copy">
-                        <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                          {student.registrationNumber}
+                        <span className="font-mono text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                          {student.registrationNumber || '—'}
                         </span>
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => handleCopy(student.registrationNumber, student.id)}
-                          className={`p-2 rounded-lg transition-all ${copiedId === student.id ? 'bg-emerald-50 text-emerald-600' : 'bg-white text-slate-400 hover:text-slate-900 border border-slate-200 opacity-0 group-hover/copy:opacity-100 shadow-sm'}`}
+                          className={`sq-icon-btn h-8 w-8 ${copiedId === student.id ? 'text-emerald-600 border-emerald-200' : 'opacity-70 md:opacity-0 md:group-hover/copy:opacity-100'}`}
+                          aria-label="نسخ رقم الربط"
                         >
                           {copiedId === student.id ? <Check size={14} /> : <Copy size={14} />}
                         </button>
                       </div>
                     </td>
-                    <td className="px-8 py-5">
-                      <span className="px-4 py-1.5 bg-slate-900 text-white rounded-full text-[10px] font-bold tracking-widest shadow-lg whitespace-nowrap">
+                    <td>
+                      <span className="sq-badge sq-badge-primary">
                         {classes.find(c => c.id === student.classId)?.name || 'غير محدد'}
                       </span>
                     </td>
-                    <td className="px-8 py-5">
-                      <span className={`font-bold text-base ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'} font-display`}>
-                        {(student.tuitionBalance || 0).toLocaleString()} <span className="text-[10px] font-normal text-slate-400">د.ع</span>
+                    <td>
+                      <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 space-y-0.5">
+                        {student.parentPhone ? (
+                          <span className="flex items-center gap-1"><Phone size={12} className="text-slate-400" />{student.parentPhone}</span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                        {student.parentEmail && (
+                          <span className="block text-[10px] text-slate-500 truncate max-w-[140px]" title={student.parentEmail}>{student.parentEmail}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatStudentDate(student)}</span>
+                    </td>
+                    <td>
+                      <span className={`font-bold text-sm md:text-base ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'} font-display`}>
+                        {(student.tuitionBalance || 0).toLocaleString()}{' '}
+                        <span className="text-[10px] font-normal text-slate-400">د.ع</span>
                       </span>
                     </td>
-                    <td className="px-8 py-5 text-center">
-                      <div className="flex justify-center gap-2 relative">
+                    <td>
+                      <div className="flex justify-center items-center gap-2">
                         {!isViewOnly && (
-                          <button 
-                             onClick={() => {
-                               setShowLinkParentModal(student);
-                               setParentEmail(student.parentEmail || '');
-                               setParentName(student.parentName || '');
-                               setParentPhone(student.parentPhone || '');
-                               setParentPassword(student.parentPassword || '');
-                             }}
-                             className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
-                             title="ربط بولي أمر"
+                          <IconButton
+                            tone="primary"
+                            title="ربط بولي أمر"
+                            onClick={() => {
+                              setShowLinkParentModal(student);
+                              setParentEmail(student.parentEmail || '');
+                              setParentName(student.parentName || '');
+                              setParentPhone(student.parentPhone || '');
+                              setParentPassword(student.parentPassword || '');
+                            }}
                           >
                             <UserPlus size={18} />
-                          </button>
+                          </IconButton>
                         )}
-                        <div className="relative">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenu(activeMenu === student.id ? null : student.id);
-                            }}
-                            className={`${activeMenu === student.id ? 'bg-slate-900 text-white shadow-lg' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-900'} p-2.5 rounded-xl transition-all active:scale-95`}
-                          >
-                            <MoreVertical size={18} />
-                          </button>
-                          
-                          <AnimatePresence>
-                            {activeMenu === student.id && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute left-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] overflow-hidden backdrop-blur-xl bg-white/95"
-                              >
-                                <div className="p-2.5">
-                                    <button
-                                      onClick={() => { setShowLinkedParentsModal(student); setActiveMenu(null); }}
-                                      className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
-                                    >
-                                      <Users size={16} className="text-slate-400" />
-                                      عرض الحسابات المربوطة
-                                    </button>
-                                    {!isViewOnly && (
-                                      <>
-                                        <button
-                                          onClick={() => {
-                                            setShowLinkParentModal(student);
-                                            setParentEmail(student.parentEmail || '');
-                                            setParentName(student.parentName || '');
-                                            setParentPhone(student.parentPhone || '');
-                                            setParentPassword(student.parentPassword || '');
-                                            setActiveMenu(null);
-                                          }}
-                                          className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all"
-                                        >
-                                          <UserPlus size={16} className="text-slate-400" />
-                                          ربط بولي أمر جديد
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setShowMoveModal(student);
-                                            setTargetClassId(student.classId || '');
-                                            setActiveMenu(null);
-                                          }}
-                                          className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
-                                        >
-                                          <ArrowRightLeft size={16} className="text-slate-400" />
-                                          نقل لصف آخر
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setEditingStudent(student);
-                                            setNewStudent({
-                                              name: student.name,
-                                              registrationNumber: student.registrationNumber,
-                                              classId: student.classId || '',
-                                              parentPhone: student.parentPhone || '',
-                                              driverPhone: student.driverPhone || '',
-                                              parentEmail: student.parentEmail || '',
-                                              parentPassword: student.parentPassword || '',
-                                              photoUrl: student.photoUrl || '',
-                                              email: '',
-                                              password: ''
-                                            });
-                                            setShowAddModal(true);
-                                            setActiveMenu(null);
-                                          }}
-                                          className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
-                                        >
-                                          <GraduationCap size={16} className="text-slate-400" />
-                                          تعديل البيانات
-                                        </button>
-                                        <div className="h-px bg-slate-100 my-2 mx-2" />
-                                        <button
-                                          onClick={() => { setConfirmDeleteId(student.id); setActiveMenu(null); }}
-                                          className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                        >
-                                          <Trash2 size={16} className="text-red-400" />
-                                          حذف الطالب
-                                        </button>
-                                      </>
-                                    )}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
+                        <ActionMenu
+                          menuId={student.id}
+                          activeId={activeMenu}
+                          onToggle={setActiveMenu}
+                          align="end"
+                        >
+                          {renderStudentMenuActions(student)}
+                        </ActionMenu>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </DataTableElement>
+          </DataTable>
         ) : null}
 
-        {/* Card View / Responsive Grid */}
         {viewMode === 'cards' && (
-          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 bg-slate-50">
+          <div className="sq-student-card-grid">
             {filteredStudents.map(student => (
-              <div key={student.id} className="p-4 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col gap-4 relative group">
+              <div key={student.id} className="sq-student-card">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 border border-slate-200 overflow-hidden shrink-0 shadow-sm">
-                    {student.photoUrl ? <img src={student.photoUrl || undefined} className="w-full h-full object-cover" /> : <GraduationCap size={20} />}
+                  <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0">
+                    {student.photoUrl ? <img src={student.photoUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <GraduationCap size={20} />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-slate-900 truncate font-display">{student.name}</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{classes.find(c => c.id === student.classId)?.name || 'غير محدد'}</p>
+                    <h3 className="font-bold text-slate-900 dark:text-white truncate font-display">{student.name}</h3>
+                    <p className="text-[10px] text-slate-500 font-bold">{classes.find(c => c.id === student.classId)?.name || 'غير محدد'}</p>
                   </div>
-                  <button 
-                    onClick={() => setActiveMenu(activeMenu === student.id ? null : student.id)}
-                    className="p-2 text-slate-400 bg-white border border-slate-200 rounded-xl shadow-sm"
+                  <ActionMenu
+                    menuId={student.id}
+                    activeId={activeMenu}
+                    onToggle={setActiveMenu}
+                    align="end"
+                    placement="below"
                   >
-                    <MoreVertical size={16} />
-                  </button>
+                    {renderStudentMenuActions(student)}
+                  </ActionMenu>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
-                    <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">رقم الربط</span>
-                    <span className="text-[10px] font-mono font-bold text-slate-600">{student.registrationNumber}</span>
+                <div className="grid grid-cols-2 gap-2 text-right">
+                  <div className="sq-badge-muted flex flex-col items-start gap-1 p-3 rounded-xl">
+                    <span className="text-[9px] font-black text-slate-400 uppercase">رقم الربط</span>
+                    <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200">{student.registrationNumber || '—'}</span>
                   </div>
-                  <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
-                    <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">الرصيد المالي</span>
-                    <span className={`text-[10px] font-black ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                  <div className="sq-badge-muted flex flex-col items-start gap-1 p-3 rounded-xl">
+                    <span className="text-[9px] font-black text-slate-400 uppercase">الرصيد</span>
+                    <span className={`text-[11px] font-black ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
                       {(student.tuitionBalance || 0).toLocaleString()} د.ع
                     </span>
+                  </div>
+                  <div className="sq-badge-muted flex flex-col items-start gap-1 p-3 rounded-xl col-span-2">
+                    <span className="text-[9px] font-black text-slate-400 uppercase">ولي الأمر</span>
+                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{student.parentPhone || student.parentEmail || '—'}</span>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
-                  <button 
-                    onClick={() => setShowLinkedParentsModal(student)}
-                    className="flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-bold shadow-sm flex items-center justify-center gap-1.5"
-                  >
-                    <Users size={12} />
-                    <span>الحسابات ({student.parentIds?.length || 0})</span>
-                  </button>
+                  <Button size="sm" fullWidth onClick={() => setShowLinkedParentsModal(student)}>
+                    <Users size={14} />
+                    الحسابات ({student.parentIds?.length || 0})
+                  </Button>
                   {!isViewOnly && (
-                    <button 
-                      onClick={() => setShowLinkParentModal(student)}
-                      className="w-10 h-10 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl flex items-center justify-center"
+                    <IconButton
+                      tone="primary"
+                      title="ربط بولي أمر"
+                      onClick={() => {
+                        setShowLinkParentModal(student);
+                        setParentEmail(student.parentEmail || '');
+                        setParentName(student.parentName || '');
+                        setParentPhone(student.parentPhone || '');
+                        setParentPassword(student.parentPassword || '');
+                      }}
                     >
                       <UserPlus size={16} />
-                    </button>
+                    </IconButton>
                   )}
                 </div>
-
-                {/* Mobile Menu Dropdown View */}
-                <AnimatePresence>
-                  {activeMenu === student.id && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute left-4 top-14 right-4 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 p-2"
-                    >
-                      <button
-                        onClick={() => {
-                          setEditingStudent(student);
-                          setNewStudent({
-                            name: student.name,
-                            registrationNumber: student.registrationNumber,
-                            classId: student.classId || '',
-                            parentPhone: student.parentPhone || '',
-                            driverPhone: student.driverPhone || '',
-                            parentEmail: student.parentEmail || '',
-                            address: student.address || '',
-                            parentPassword: student.parentPassword || '',
-                            photoUrl: student.photoUrl || '',
-                            email: '',
-                            password: ''
-                          });
-                          setShowAddModal(true);
-                          setActiveMenu(null);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl"
-                      >
-                        <Edit2 size={16} className="text-slate-400" />
-                        تعديل البيانات
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowMoveModal(student);
-                          setTargetClassId(student.classId || '');
-                          setActiveMenu(null);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl"
-                      >
-                        <ArrowRightLeft size={16} className="text-slate-400" />
-                        نقل لصف آخر
-                      </button>
-                      <button
-                        onClick={() => { setConfirmDeleteId(student.id); setActiveMenu(null); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl"
-                      >
-                        <Trash2 size={16} className="text-red-400" />
-                        حذف الطالب
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
             ))}
           </div>
@@ -891,36 +855,47 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   <p className="text-slate-400 text-xs md:text-sm italic">جرب البحث بكلمات أخرى أو أضف طالب جديد</p>
                 </div>
                 {!isViewOnly && (
-                  <button onClick={() => {
-                    setEditingStudent(null);
-                    setNewStudent({
-                      name: '',
-                      classId: '',
-                      parentEmail: '',
-                      parentPhone: '',
-                      address: '',
-                      parentPassword: '',
-                      photoUrl: ''
-                    });
-                    setShowAddModal(true);
-                  }} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-800 transition-all text-sm">أضف طالب</button>
+                  <Button
+                    size="lg"
+                    onClick={() => {
+                      setEditingStudent(null);
+                      setNewStudent({
+                        name: '',
+                        classId: '',
+                        parentEmail: '',
+                        parentPhone: '',
+                        address: '',
+                        parentPassword: '',
+                        photoUrl: '',
+                        registrationNumber: '',
+                        email: '',
+                        password: '',
+                        driverPhone: '',
+                      });
+                      setShowAddModal(true);
+                    }}
+                  >
+                    أضف طالب
+                  </Button>
                 )}
              </div>
           </div>
         )}
         
         {hasMore && (
-          <div className="flex justify-center p-4 md:p-6 border-t border-slate-100">
-            <button
+          <div className="flex justify-center p-4 md:p-6 border-t border-slate-200 dark:border-slate-700">
+            <Button
+              variant="secondary"
+              size="lg"
+              className="w-full md:w-auto"
               onClick={() => fetchStudents(true)}
               disabled={isLoadingMore}
-              className="w-full md:w-auto px-10 py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-2xl transition-all disabled:opacity-50 text-xs md:text-sm shadow-sm"
             >
               {isLoadingMore ? 'جاري التحميل...' : 'تحميل المزيد'}
-            </button>
+            </Button>
           </div>
         )}
-      </div>
+      </Panel>
 
 
       <AnimatePresence>
