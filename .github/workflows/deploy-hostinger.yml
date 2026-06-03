@@ -1,6 +1,6 @@
 name: Deploy Frontend to Hostinger
 
-"on":
+on:
   workflow_dispatch:
   push:
     branches: [main]
@@ -21,7 +21,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+
+    env:
+      HOSTINGER_FTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}
+      HOSTINGER_FTP_USERNAME: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+      HOSTINGER_FTP_PASSWORD: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+      HOSTINGER_FTP_REMOTE_DIR: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
+
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Require Hostinger deploy secrets
         run: |
           missing=""
@@ -35,30 +45,14 @@ jobs:
             exit 1
           fi
           remote="${HOSTINGER_FTP_REMOTE_DIR}"
-          if [[ "$remote" == ./* ]] || [[ "$remote" == "./"* ]] || [[ "$remote" == "public_html"* ]]; then
-            echo "::error title=Invalid HOSTINGER_FTP_REMOTE_DIR::Use the FULL absolute path from hPanel."
-            echo "Wrong: ./public_html/ or public_html"
-            echo "Right: /home/USERNAME/domains/schoolixiq.com/public_html"
-            echo "Or try: / (if FTP account root is already public_html)"
+          if [[ "$remote" != /* ]]; then
+            echo "::error title=Invalid HOSTINGER_FTP_REMOTE_DIR::Use full path like /home/USERNAME/domains/schoolixiq.com/public_html"
             exit 1
           fi
-          port="${HOSTINGER_SFTP_PORT:-65002}"
-          if [[ "$port" == "21" || "$port" == "22" ]]; then
-            echo "::error title=Wrong SFTP port::Use 65002 on Hostinger shared hosting, not $port."
-            exit 1
-          fi
-          host="${HOSTINGER_SFTP_HOST:-$HOSTINGER_FTP_SERVER}"
-          echo "SFTP target: ${host}:${port}"
-          echo "SFTP remote dir: ${remote}"
-        env:
-          HOSTINGER_FTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}
-          HOSTINGER_SFTP_HOST: ${{ secrets.HOSTINGER_SFTP_HOST }}
-          HOSTINGER_FTP_USERNAME: ${{ secrets.HOSTINGER_FTP_USERNAME }}
-          HOSTINGER_FTP_PASSWORD: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          HOSTINGER_FTP_REMOTE_DIR: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
-          HOSTINGER_SFTP_PORT: ${{ secrets.HOSTINGER_SFTP_PORT }}
-
-      - uses: actions/checkout@v4
+          echo "SFTP server: ${HOSTINGER_FTP_SERVER}"
+          echo "SFTP user: ${HOSTINGER_FTP_USERNAME}"
+          echo "SFTP remote: ${HOSTINGER_FTP_REMOTE_DIR}"
+          echo "SFTP port: 65002"
 
       - uses: actions/setup-node@v4
         with:
@@ -90,33 +84,21 @@ jobs:
           path: schoolixiq-dist.zip
           retention-days: 7
 
-      - name: Deploy to Hostinger (SFTP via lftp)
-        env:
-          SFTP_HOST: ${{ secrets.HOSTINGER_SFTP_HOST }}
-          SFTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}
-          SFTP_USER: ${{ secrets.HOSTINGER_FTP_USERNAME }}
-          SFTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          SFTP_PORT: ${{ secrets.HOSTINGER_SFTP_PORT }}
-          SFTP_REMOTE: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq lftp
-          HOST="${SFTP_HOST:-$SFTP_SERVER}"
-          PORT="${SFTP_PORT:-65002}"
-          echo "Connecting to sftp://${HOST}:${PORT} ..."
-          lftp -e "
-            set sftp:auto-confirm yes;
-            set net:timeout 30;
-            set net:max-retries 2;
-            open -u ${SFTP_USER},${SFTP_PASS} sftp://${HOST}:${PORT};
-            cd ${SFTP_REMOTE} || { echo 'cd failed — check HOSTINGER_FTP_REMOTE_DIR'; exit 1; };
-            mirror -Rnev dist/ . --parallel=4 --exclude-glob server.cjs*;
-            bye
-          "
+      - name: Deploy to Hostinger (SFTP)
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
+        with:
+          server: ${{ env.HOSTINGER_FTP_SERVER }}
+          port: 65002
+          username: ${{ env.HOSTINGER_FTP_USERNAME }}
+          password: ${{ env.HOSTINGER_FTP_PASSWORD }}
+          local_path: ./dist/*
+          remote_path: ${{ env.HOSTINGER_FTP_REMOTE_DIR }}
+          sftp_only: true
+          sftpArgs: "-o ConnectTimeout=30 -o StrictHostKeyChecking=no"
+          rsyncArgs: "--exclude=server.cjs --exclude=server.cjs.map"
 
       - name: Deployment summary
         run: |
           echo "### Hostinger deploy" >> "$GITHUB_STEP_SUMMARY"
-          echo "Uploaded \`dist/\` via SFTP (port 65002)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Uploaded \`dist/\` to \`${HOSTINGER_FTP_REMOTE_DIR}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "If the site looks old: hPanel → Cache Manager → Purge, then Ctrl+Shift+R." >> "$GITHUB_STEP_SUMMARY"
