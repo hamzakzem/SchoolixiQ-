@@ -975,6 +975,12 @@ export default function SuperAdminDashboard() {
       const schoolRef = await addDoc(collection(db, "schools"), {
         name: name,
         address: address,
+        governorate: (request.customerInfo?.governorate || request.governorate || ""),
+        directorate: (request.customerInfo?.directorate || request.directorate || ""),
+        educationLevel: (request.customerInfo?.educationLevel || request.educationLevel || ""),
+        workingHours: (request.customerInfo?.workingHours || request.workingHours || ""),
+        studyType: (request.customerInfo?.studyType || request.studyType || ""),
+        estimatedStudents: Number(request.customerInfo?.estimatedStudents || request.estimatedStudents || 0),
         status: "active",
         planId: planId,
         studentCount: 0,
