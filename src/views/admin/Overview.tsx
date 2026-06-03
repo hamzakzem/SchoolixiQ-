@@ -132,15 +132,29 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
       const unsubscribeSchool = onSnapshot(schoolRef, (doc) => {
         if (doc.exists()) {
           const data = doc.data();
-          setSchoolInfo({ id: doc.id, ...data });
+          const stage = data.educationLevel || data.stage || '';
+          const shift = data.workingHours || data.shift || '';
+          const genderType = data.studyType || data.genderType || '';
+          const approximateStudents =
+            data.estimatedStudents != null
+              ? data.estimatedStudents.toString()
+              : data.approximateStudents ?? '';
+          setSchoolInfo({
+            id: doc.id,
+            ...data,
+            stage,
+            shift,
+            genderType,
+            approximateStudents,
+          });
           setNewAddress(data.address || '');
           setNewMapsUrl(data.googleMapsUrl || '');
           setNewGovernorate(data.governorate || '');
           setNewDirectorate(data.directorate || '');
-          setNewStage(data.stage || '');
-          setNewShift(data.shift || '');
-          setNewGenderType(data.genderType || '');
-          setNewApproximateStudents(data.approximateStudents || '');
+          setNewStage(stage);
+          setNewShift(shift);
+          setNewGenderType(genderType);
+          setNewApproximateStudents(String(approximateStudents));
           setStats(prev => ({ 
             ...prev, 
             adjustment: data.salesAdjustment || 0,

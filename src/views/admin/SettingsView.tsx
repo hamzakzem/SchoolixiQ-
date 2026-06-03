@@ -75,7 +75,10 @@ export default function SettingsView() {
             stage: data.educationLevel || data.stage || '',
             shift: data.workingHours || data.shift || '',
             genderType: data.studyType || data.genderType || '',
-            approximateStudents: data.estimatedStudents?.toString() || data.approximateStudents || '',
+            approximateStudents:
+              data.estimatedStudents != null
+                ? data.estimatedStudents.toString()
+                : data.approximateStudents ?? '',
           });
         }
       } catch (error) {
