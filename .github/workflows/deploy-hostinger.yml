@@ -76,6 +76,12 @@ jobs:
           test -f dist/.htaccess
           rm -f dist/server.cjs dist/server.cjs.map 2>/dev/null || true
           ls -la dist/
+          if test -f dist/downloads/schoolixiq.apk; then
+            echo "APK present in dist/downloads/schoolixiq.apk"
+            ls -lh dist/downloads/schoolixiq.apk
+          else
+            echo "::warning::No APK at public/downloads/schoolixiq.apk — download link will 404 until you upload the file or set VITE_ANDROID_APK_URL / Firestore system/config.androidApkUrl"
+          fi
 
       - name: Package dist zip (manual fallback)
         run: |

@@ -283,6 +283,7 @@ export default function SuperAdminDashboard() {
     successPartners: { name: string; logoUrl: string }[];
     appName: string;
     appLogo: string;
+    androidApkUrl: string;
     marketingTitle?: string;
     marketingSubtitle?: string;
     marketingFeatures?: { title: string; description: string }[];
@@ -298,6 +299,7 @@ export default function SuperAdminDashboard() {
     successPartners: [],
     appName: "SchoolixiQ",
     appLogo: "",
+    androidApkUrl: "https://schoolixiq.com/downloads/schoolixiq.apk",
     marketingTitle: "",
     marketingSubtitle: "",
     marketingFeatures: [],
@@ -325,6 +327,9 @@ export default function SuperAdminDashboard() {
             successPartners: data.successPartners || [],
             appName: data.appName || "SchoolixiQ",
             appLogo: data.appLogo || "",
+            androidApkUrl:
+              data.androidApkUrl ||
+              "https://schoolixiq.com/downloads/schoolixiq.apk",
             marketingTitle: data.marketingTitle || "",
             marketingSubtitle: data.marketingSubtitle || "",
             marketingFeatures: data.marketingFeatures || [],
@@ -3935,6 +3940,29 @@ export default function SuperAdminDashboard() {
                             />
                           </div>
                         )}
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                          رابط تحميل تطبيق Android (APK)
+                        </label>
+                        <input
+                          type="url"
+                          value={systemConfig.androidApkUrl}
+                          onChange={(e) =>
+                            setSystemConfig({
+                              ...systemConfig,
+                              androidApkUrl: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-mono text-sm"
+                          placeholder="https://schoolixiq.com/downloads/schoolixiq.apk"
+                          dir="ltr"
+                        />
+                        <p className="text-[10px] text-slate-500 mt-2 font-medium">
+                          يظهر في Footer الموقع. ارفع الملف عبر FTP إلى
+                          public_html/downloads/schoolixiq.apk أو ضع رابط
+                          Firebase Storage / Google Drive مباشر.
+                        </p>
                       </div>
                     </div>
 

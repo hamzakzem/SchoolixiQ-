@@ -1,6 +1,14 @@
 # Android APK
 
-Place the signed release file here as **`schoolixiq.apk`**.
+Place the signed release file here as **`schoolixiq.apk`** (required for download to work).
+
+**PowerShell (after building APK in Android Studio):**
+```powershell
+.\scripts\prepare-apk-release.ps1 -ApkPath "C:\path\to\app-release.apk"
+npm run deploy
+```
+
+**Or hPanel:** File Manager → `public_html/downloads/` → upload `schoolixiq.apk`
 
 After building the native app:
 

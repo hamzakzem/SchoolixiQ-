@@ -31,8 +31,11 @@ export function getAndroidApkDownloadUrl(): string {
     ''
   ).trim();
 
+  if (import.meta.env.PROD) {
+    return 'https://schoolixiq.com/downloads/schoolixiq.apk';
+  }
+
   const base = appUrl || (typeof window !== 'undefined' ? window.location.origin : '');
-  // Hostinger serves static files only — APK must live in public/downloads/
   return `${base.replace(/\/$/, '')}/downloads/schoolixiq.apk`;
 }
 

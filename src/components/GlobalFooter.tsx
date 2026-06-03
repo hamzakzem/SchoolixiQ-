@@ -12,6 +12,7 @@ import { db } from "../lib/firebase";
 import { School } from "../types";
 import { ArrowLeft } from "lucide-react";
 import { useSystemConfig } from "../lib/SystemConfigContext";
+import { FooterAndroidDownload } from "./FooterAndroidDownload";
 
 interface DisplayPartner {
   id: string;
@@ -125,6 +126,9 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
       <footer className="mt-auto shrink-0 relative w-full py-3 bg-transparent print:hidden select-none">
         <div className="max-w-7xl mx-auto px-6">
           <div className="w-full h-px bg-slate-200/20 dark:bg-slate-800/25 mb-3" />
+          <div className="flex flex-col items-center gap-4 mb-3">
+            <FooterAndroidDownload appName={config.appName} compact />
+          </div>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
             <span className="text-[10px] md:text-xs font-semibold text-slate-400 dark:text-slate-500 select-none">
               &copy; {new Date().getFullYear()} {config.appName}. جميع الحقوق
@@ -274,6 +278,11 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
               </div>
             </div>
           )}
+
+        {/* ANDROID APP DOWNLOAD */}
+        <div className="w-full flex justify-center mb-10 md:mb-12 px-2">
+          <FooterAndroidDownload appName={config.appName} />
+        </div>
 
         {/* BOTTOM FOOTER */}
         <div className="w-full flex flex-col items-center pt-8 border-t border-slate-200/60 dark:border-slate-800/60">

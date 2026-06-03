@@ -2277,11 +2277,6 @@ export default function Login() {
       </motion.div>
 
       <div className="-mx-6 -mb-12 mt-20 w-[calc(100%+3rem)]">
-        {import.meta.env.PROD && typeof __SQ_BUILD_ID__ !== 'undefined' && (
-          <p className="text-center text-[9px] text-slate-300 font-mono mt-2 select-all" title="Build ID — للتحقق من النشر">
-            v:{__SQ_BUILD_ID__.slice(-12)}
-          </p>
-        )}
         <GlobalFooter />
       </div>
 

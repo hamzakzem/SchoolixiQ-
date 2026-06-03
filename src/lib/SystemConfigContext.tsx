@@ -19,6 +19,8 @@ interface SocialLinks {
 interface SystemConfig {
   appName: string;
   appLogo?: string;
+  /** Direct link to Android APK (Firebase Storage, CDN, or /downloads/schoolixiq.apk) */
+  androidApkUrl?: string;
   supportPhones: string[];
   supportEmails: string[];
   successPartners: {name: string, logoUrl: string}[];
@@ -32,6 +34,7 @@ interface SystemConfig {
 const defaultSystemConfig: SystemConfig = {
   appName: 'SchoolixiQ',
   appLogo: BRAND_LOGO_URL,
+  androidApkUrl: 'https://schoolixiq.com/downloads/schoolixiq.apk',
   supportPhones: ['+964 770 000 0000'],
   supportEmails: ['support@schoolixiq.iq'],
   successPartners: [],
@@ -99,7 +102,11 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
           ...defaultSystemConfig,
           ...data,
           appName: appName,
-          appLogo: appLogo
+          appLogo: appLogo,
+          androidApkUrl:
+            typeof data.androidApkUrl === 'string' && data.androidApkUrl.trim()
+              ? data.androidApkUrl.trim()
+              : defaultSystemConfig.androidApkUrl,
         };
         setConfig(updatedConfig);
         try {
@@ -121,6 +128,10 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         const newConfig = {
           appName: appName,
           appLogo: appLogo,
+          androidApkUrl:
+            typeof data.androidApkUrl === 'string' && data.androidApkUrl.trim()
+              ? data.androidApkUrl.trim()
+              : defaultSystemConfig.androidApkUrl,
           supportPhones: data.supportPhones || (data.supportPhone ? [data.supportPhone] : ['+964 770 000 0000']),
           supportEmails: data.supportEmails || (data.supportEmail ? [data.supportEmail] : ['support@schoolixiq.iq']),
           successPartners: data.successPartners || [],
