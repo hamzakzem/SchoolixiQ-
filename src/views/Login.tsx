@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { auth, db } from "../lib/firebase";
 import {
   signInWithEmailAndPassword,
@@ -191,6 +191,9 @@ export default function Login() {
   });
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaChallenge, setCaptchaChallenge] = useState({ a: 0, b: 0 });
+  const googleAuthLock = useRef(false);
+  const authSubmitLock = useRef(false);
+  const redirectHandled = useRef(false);
 
   // ... (rest of the states) ...
 
@@ -422,27 +425,30 @@ export default function Login() {
     }
   };
 
-  // Check for Redirect Result (Fallback if previous redirect was initiated)
+  // Complete Google sign-in after redirect (runs once per page load)
   useEffect(() => {
-    const checkRedirectFlow = async () => {
+    if (redirectHandled.current) return;
+    redirectHandled.current = true;
+
+    const completeRedirectSignIn = async () => {
       try {
         const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          const pendingRole =
-            window.sessionStorage.getItem("pendingGoogleRole") ||
-            UserRole.PARENT;
-          const pendingMode =
-            window.sessionStorage.getItem("pendingGoogleMode") || "login";
-          window.sessionStorage.removeItem("pendingGoogleRole");
-          window.sessionStorage.removeItem("pendingGoogleMode");
-          await processGoogleUser(result.user, pendingRole, pendingMode);
-        }
+        if (!result?.user) return;
+
+        const pendingRole =
+          window.sessionStorage.getItem("pendingGoogleRole") || UserRole.PARENT;
+        const pendingMode =
+          window.sessionStorage.getItem("pendingGoogleMode") || "login";
+        window.sessionStorage.removeItem("pendingGoogleRole");
+        window.sessionStorage.removeItem("pendingGoogleMode");
+        await processGoogleUser(result.user, pendingRole, pendingMode);
       } catch (error: any) {
-        console.error("Redirect check error:", error);
+        console.error("Redirect sign-in error:", error);
         toast.error(error.message || t("failedConnection"));
       }
     };
-    checkRedirectFlow();
+
+    completeRedirectSignIn();
   }, []);
 
   const handleSubscribeRequest = async (e: React.FormEvent) => {
@@ -547,30 +553,48 @@ export default function Login() {
   });
   const [showClientIdConfig, setShowClientIdConfig] = useState<boolean>(false);
 
-  // Check if running as native Capacitor app on Android/iOS
-  const isNativeApp = 
-    window.location.hostname === "localhost" || 
-    window.location.protocol.startsWith("capacitor") || 
-    window.location.protocol.startsWith("file");
+  const isNativeApp =
+    typeof (window as any).Capacitor !== "undefined" &&
+    (window as any).Capacitor?.isNativePlatform?.() === true;
 
-  // Check if running in a third-party iframe (e.g. AI Studio development/shared preview)
-  const inIframe = typeof window !== "undefined" && window.self !== window.top;
+  const inIframe =
+    typeof window !== "undefined" && window.self !== window.top;
+
+  const persistGoogleAuthContext = () => {
+    window.sessionStorage.setItem("pendingGoogleRole", role);
+    window.sessionStorage.setItem("pendingGoogleMode", mode);
+  };
+
+  const shouldUseRedirect = () =>
+    inIframe ||
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   const handleGoogleAuth = async () => {
+    if (googleAuthLock.current || loading) return;
+
     if (mode === "signup" && role === UserRole.ADMIN) {
       toast.error(t("googleAdminSignupBlocked"));
       return;
     }
+
+    googleAuthLock.current = true;
     setUnauthorizedDomainError(null);
     setShowIframeHint(false);
     setFirebaseProviderError(null);
     setNativePlatformNotice(false);
     setLoading(true);
 
-    if (isNativeApp) {
-      try {
-        const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
-        
+    const provider = new GoogleAuthProvider();
+    provider.addScope("profile");
+    provider.addScope("email");
+    persistGoogleAuthContext();
+    let redirecting = false;
+
+    try {
+      if (isNativeApp) {
+        const { GoogleAuth } = await import(
+          "@codetrix-studio/capacitor-google-auth"
+        );
         try {
           await GoogleAuth.initialize({
             clientId: googleClientId,
@@ -578,55 +602,48 @@ export default function Login() {
             grantOfflineAccess: true,
           });
         } catch (initErr) {
-          console.warn("GoogleAuth already initialized or failed to init:", initErr);
+          console.warn("GoogleAuth init:", initErr);
         }
 
         const googleUser = await GoogleAuth.signIn();
-        if (googleUser && googleUser.authentication?.idToken) {
-          const idToken = googleUser.authentication.idToken;
-          
-          const { GoogleAuthProvider, signInWithCredential } = await import("firebase/auth");
-          const credential = GoogleAuthProvider.credential(idToken);
-          const result = await signInWithCredential(auth, credential);
-          
-          if (result && result.user) {
-            await processGoogleUser(result.user, role, mode);
-            toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
-          }
-        } else {
+        const idToken = googleUser?.authentication?.idToken;
+        if (!idToken) {
           throw new Error("Missing ID Token from Google Auth native plugin.");
         }
-      } catch (error: any) {
-        console.error("Native Google Auth Error:", error);
-        setNativePlatformNotice(true);
-        setShowClientIdConfig(true);
-        setLoading(false);
-        
-        toast.error(
-          isRtl
-            ? `فشل تسجيل الدخول الأصلي. يرجى تهيئة الـ Client ID وبصمات SHA-1`
-            : `Native login failed. Please configure Web Client ID and SHA-1 fingerprint.`
-        );
-      }
-      return;
-    }
 
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('profile');
-      provider.addScope('email');
-      
-      // Store state before redirect
-      window.sessionStorage.setItem("pendingGoogleRole", role);
-      window.sessionStorage.setItem("pendingGoogleMode", mode);
-      
-      const result = await signInWithPopup(auth, provider);
-      if (result && result.user) {
-        await processGoogleUser(result.user, role, mode);
-        toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
+        const credential = GoogleAuthProvider.credential(idToken);
+        const result = await signInWithCredential(auth, credential);
+        if (result?.user) {
+          await processGoogleUser(result.user, role, mode);
+        }
+        return;
+      }
+
+      if (shouldUseRedirect()) {
+        redirecting = true;
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      try {
+        const result = await signInWithPopup(auth, provider);
+        if (result?.user) {
+          await processGoogleUser(result.user, role, mode);
+        }
+      } catch (popupError: any) {
+        const popupCode = popupError?.code || "";
+        if (
+          popupCode === "auth/popup-blocked" ||
+          popupCode === "auth/cancelled-popup-request"
+        ) {
+          redirecting = true;
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupError;
       }
     } catch (error: any) {
-      console.error("Google Auth Error with GSI SDK:", error);
+      console.error("Google Auth Error:", error);
       const errorCode = error.code || "";
       const errorMessage = error.message || "";
 
@@ -634,43 +651,51 @@ export default function Login() {
         errorCode === "auth/unauthorized-domain" ||
         errorCode === "auth/unauthorized-client" ||
         errorMessage.includes("unauthorized-domain") ||
-        errorMessage.includes("unauthorized_domain") ||
         errorMessage.toLowerCase().includes("unauthorized domain")
       ) {
         setUnauthorizedDomainError(window.location.hostname);
         toast.error(
           isRtl
-            ? "خطأ: النطاق الحالي غير مصرح به في إعدادات Firebase Console الخاصة بـ Google Auth."
-            : "Error: The current domain is not authorized in Firebase Console settings for Google Auth.",
+            ? "النطاق غير مصرح به في Firebase (Authentication → Authorized domains)."
+            : "Domain not authorized in Firebase (Authentication → Authorized domains).",
         );
       } else if (
         errorCode === "auth/operation-not-allowed" ||
-        errorMessage.includes("operation-not-allowed") ||
         errorMessage.toLowerCase().includes("operation not allowed") ||
-        errorMessage
-          .toLowerCase()
-          .includes("disabled for this firebase project") ||
         errorMessage.toLowerCase().includes("provider is disabled")
       ) {
         setFirebaseProviderError("google-disabled");
         toast.error(
           isRtl
-            ? "خطأ: لم يتم تفعيل تسجيل دخول Google في لوحة تحكم Firebase لمشروعك!"
-            : "Error: Google Sign-In is not enabled in your Firebase Authentication Console!",
+            ? "فعّل Google من Firebase → Authentication → Sign-in method."
+            : "Enable Google in Firebase → Authentication → Sign-in method.",
+        );
+      } else if (errorCode === "auth/popup-closed-by-user") {
+        toast.error(
+          isRtl ? "تم إغلاق نافذة Google." : "Google sign-in window was closed.",
+        );
+      } else if (inIframe) {
+        setShowIframeHint(true);
+        toast.error(
+          isRtl
+            ? "المتصفح يمنع نافذة Google. استخدم إعادة التوجيه أو البريد وكلمة المرور."
+            : "Browser blocked Google popup. Use redirect or email/password.",
         );
       } else {
-        setShowIframeHint(true);
-        setFirebaseProviderError(
-          `${errorCode || "Exception"}: ${errorMessage || String(error)}`,
-        );
-        toast.error(t("failedConnection"));
+        toast.error(errorMessage || t("failedConnection"));
       }
-      setLoading(false);
+    } finally {
+      if (!redirecting) {
+        googleAuthLock.current = false;
+        setLoading(false);
+      }
     }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (authSubmitLock.current || loading) return;
 
     if (mode === "signup") {
       if (parseInt(captchaAnswer, 10) !== captchaChallenge.a + captchaChallenge.b) {
@@ -718,6 +743,7 @@ export default function Login() {
       return;
     }
 
+    authSubmitLock.current = true;
     setLoading(true);
     try {
       if (mode === "signup") {
@@ -920,6 +946,7 @@ export default function Login() {
         toast.error(errorMessage || t("authFailed"));
       }
     } finally {
+      authSubmitLock.current = false;
       setLoading(false);
     }
   };
@@ -1236,7 +1263,8 @@ export default function Login() {
             )}
 
             <button
-              disabled={loading}
+              type="submit"
+              disabled={loading || authSubmitLock.current}
               className={`w-full py-4 sm:py-5 rounded-xl sm:rounded-[1.5rem] font-bold text-base sm:text-lg flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 disabled:opacity-50 ${mode === "signup" ? "bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200" : "bg-[#0B2345] text-white hover:bg-[#1a3a6b] shadow-blue-100"}`}
             >
               {loading ? (
@@ -1274,7 +1302,7 @@ export default function Login() {
 
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || googleAuthLock.current}
               onClick={handleGoogleAuth}
               className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border-2 border-slate-100 bg-white hover:bg-slate-50 transition-all font-bold text-slate-600 flex items-center justify-center gap-3 shadow-sm hover:border-slate-200 active:scale-95 disabled:opacity-50 text-sm sm:text-base"
             >
