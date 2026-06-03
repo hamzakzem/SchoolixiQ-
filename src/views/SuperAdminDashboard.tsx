@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { adminCreateUser, adminDeleteUser } from "../lib/adminApi";
+import { rejectSchoolRegistrationRequest } from "../lib/rejectSchoolRegistration";
 import { getApiUrl } from "../lib/apiUtils";
 import {
   collection,
@@ -888,21 +889,40 @@ export default function SuperAdminDashboard() {
       return;
     }
 
-    const loadingToast = toast.loading("جاري إلغاء الطلب...");
+    const loadingToast = toast.loading("جاري رفض الطلب وحذف الحساب...");
     try {
-      // If it's a subscription request and has a schoolId, update school status to 'rejected'
-      if (request && typeof request !== "string" && request.schoolId) {
-        await updateDoc(doc(db, "schools", request.schoolId), {
-          status: "rejected",
-          updatedAt: serverTimestamp(),
+      const isSchoolRegistration =
+        source === "registrations" ||
+        request?.type === "direct_school_signup" ||
+        request?.type === "subscription_request";
+
+      if (
+        isSchoolRegistration &&
+        request &&
+        typeof request !== "string"
+      ) {
+        await rejectSchoolRegistrationRequest({
+          id,
+          _source: source,
+          uid: request.uid,
+          schoolId: request.schoolId,
         });
+      } else {
+        if (request && typeof request !== "string" && request.schoolId) {
+          await updateDoc(doc(db, "schools", request.schoolId), {
+            status: "rejected",
+            updatedAt: serverTimestamp(),
+          });
+        }
+        await deleteDoc(doc(db, source, id));
       }
 
-      const requestRef = doc(db, source, id);
-      await deleteDoc(requestRef);
-
       toast.dismiss(loadingToast);
-      toast.success("تم إلغاء الطلب وتحويل حالة المدرسة إلى مرفوض");
+      toast.success(
+        isSchoolRegistration
+          ? "تم رفض الطلب وحذف حساب المدير نهائياً"
+          : "تم إلغاء الطلب بنجاح",
+      );
       setDeleteConfirmId(null);
     } catch (error: any) {
       toast.dismiss(loadingToast);

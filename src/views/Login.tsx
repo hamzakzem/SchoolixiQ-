@@ -10,6 +10,7 @@ import {
   getRedirectResult,
   sendEmailVerification,
   signInWithCredential,
+  signOut,
 } from "firebase/auth";
 import {
   doc,
@@ -72,6 +73,10 @@ import {
   resolveSignupRole,
   signupRoleConflict,
 } from "../lib/authLoginHelpers";
+import {
+  createSchoolSubscriptionRegistration,
+  packageDisplayPrice,
+} from "../lib/schoolSubscriptionRequest";
 
 const EMPTY_SCHOOL_REGISTRATION: SchoolRegistrationFormValues = {
   address: "",
@@ -221,6 +226,9 @@ export default function Login() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successCode, setSuccessCode] = useState<string | null>(null);
+  const [adminSignupStep, setAdminSignupStep] = useState<
+    "form" | "packages" | "done"
+  >("form");
 
   // PWA Direct Installer States
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
@@ -271,6 +279,12 @@ export default function Login() {
     setCaptchaAnswer("");
     if (mode === "signup") generateCaptcha();
   }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "signup" || role !== UserRole.ADMIN) {
+      setAdminSignupStep("form");
+    }
+  }, [mode, role]);
 
   const downloadMobileConfig = () => {
     toast.success(isRtl ? "جاري تحضير ملف التعريف وتنزيله بنجاح..." : "Preparing and downloading configuration profile...");
@@ -752,41 +766,20 @@ export default function Login() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const result = await createUserWithEmailAndPassword(
-          auth,
-          emailTrimmed,
-          passwordValue,
-        );
-        const user = result.user;
-
-        await updateProfile(user, { displayName: name });
-
-        // Send Email Verification
-        try {
-          auth.languageCode = isRtl ? "ar" : "en";
-          await sendEmailVerification(user);
-          toast.success(t("verificationSent"));
-        } catch (verifErr) {
-          console.warn("Verification email failed", verifErr);
-          toast.error(t("verificationFailed"));
-        }
-
-        // Check for provisioned user by email
         const q = query(
           collection(db, "users"),
           where("email", "==", emailTrimmed),
         );
         const querySnap = await getDocs(q);
-        let provisionedData = null;
+        let provisionedData: Record<string, unknown> | null = null;
         let oldDocId = "";
 
         if (!querySnap.empty) {
           const found = querySnap.docs[0];
-          provisionedData = found.data();
+          provisionedData = found.data() as Record<string, unknown>;
           oldDocId = found.id;
         }
 
-        // Check if first user for SuperAdmin
         let isFirstUser = false;
         try {
           const metadataSnap = await getDoc(doc(db, "users", "metadata"));
@@ -796,65 +789,55 @@ export default function Login() {
         }
 
         const roleConflictMsg = signupRoleConflict(
-          provisionedData?.role,
+          provisionedData?.role as string | undefined,
           role,
           isRtl,
         );
         if (roleConflictMsg) {
           toast.error(roleConflictMsg);
-          setLoading(false);
           return;
+        }
+
+        const provisionedSchoolId = (provisionedData?.schoolId as string) || "";
+        const pendingSchoolAdmin =
+          role === UserRole.ADMIN && !isFirstUser && !provisionedSchoolId;
+
+        if (pendingSchoolAdmin) {
+          setAdminSignupStep("packages");
+          toast.success(
+            isRtl
+              ? "اختر الباقة (شهري أو سنوي) لإرسال طلب الاشتراك"
+              : "Choose a monthly or yearly package to submit your subscription request",
+          );
+          return;
+        }
+
+        const result = await createUserWithEmailAndPassword(
+          auth,
+          emailTrimmed,
+          passwordValue,
+        );
+        const user = result.user;
+
+        await updateProfile(user, { displayName: name });
+
+        try {
+          auth.languageCode = isRtl ? "ar" : "en";
+          await sendEmailVerification(user);
+          toast.success(t("verificationSent"));
+        } catch (verifErr) {
+          console.warn("Verification email failed", verifErr);
+          toast.error(t("verificationFailed"));
         }
 
         let finalRole = resolveSignupRole(
           isFirstUser,
-          provisionedData?.role,
+          provisionedData?.role as string | undefined,
           role,
         );
 
-        let schoolId = provisionedData?.schoolId || "";
+        const schoolId = provisionedSchoolId;
 
-        if (
-          finalRole === UserRole.ADMIN &&
-          !schoolId &&
-          !isFirstUser
-        ) {
-          const schoolFields = buildSchoolFirestoreFields(schoolRegistration);
-          const schoolRef = await addDoc(collection(db, "schools"), {
-            name: name.trim(),
-            ...schoolFields,
-            status: "pending_subscription",
-            planId: "basic",
-            studentCount: 0,
-            ownerUid: user.uid,
-            adminEmail: emailTrimmed,
-            adminName: name.trim(),
-            adminPhone: phone.trim(),
-            createdAt: serverTimestamp(),
-          });
-          schoolId = schoolRef.id;
-
-          const customerInfo = buildRegistrationCustomerInfo(
-            name.trim(),
-            emailTrimmed,
-            phone.trim(),
-            schoolRegistration,
-          );
-          await addDoc(collection(db, "registrations"), {
-            type: "direct_school_signup",
-            uid: user.uid,
-            email: emailTrimmed,
-            schoolName: name.trim(),
-            adminEmail: emailTrimmed,
-            adminPhone: phone.trim(),
-            customerInfo,
-            ...schoolFields,
-            status: "pending",
-            createdAt: serverTimestamp(),
-          });
-        }
-
-        // 1. Create permanent profile
         await setDoc(doc(db, "users", user.uid), {
           name: name || provisionedData?.name || "مستخدم جديد",
           email: emailTrimmed,
@@ -865,7 +848,6 @@ export default function Login() {
           uid: user.uid,
         });
 
-        // 2. Migrate students
         if (oldDocId && oldDocId !== user.uid) {
           const studentsQ = query(
             collection(db, "students"),
@@ -891,15 +873,7 @@ export default function Login() {
           await setDoc(doc(db, "users", "metadata"), { initialized: true });
         }
 
-        if (
-          finalRole === UserRole.ADMIN &&
-          schoolId &&
-          !isFirstUser
-        ) {
-          toast.success(t("adminSignupSuccess"), { duration: 8000 });
-        } else {
-          toast.success(t("signupSuccess"));
-        }
+        toast.success(t("signupSuccess"));
       } else {
         let signedIn = false;
         try {
@@ -955,6 +929,69 @@ export default function Login() {
       if (!auth.currentUser) {
         setLoading(false);
       }
+    }
+  };
+
+  const handleAdminPackageSelect = async (pkg: {
+    id: string;
+    name: string;
+    price?: number;
+    priceMonthly?: number;
+    priceYearly?: number;
+  }) => {
+    if (authSubmitLock.current || loading) return;
+
+    authSubmitLock.current = true;
+    setLoading(true);
+    const emailTrimmed = email.toLowerCase().trim();
+
+    try {
+      const result = await createUserWithEmailAndPassword(
+        auth,
+        emailTrimmed,
+        password,
+      );
+      const user = result.user;
+      await updateProfile(user, { displayName: name.trim() });
+
+      try {
+        auth.languageCode = isRtl ? "ar" : "en";
+        await sendEmailVerification(user);
+      } catch (verifErr) {
+        console.warn("Verification email failed", verifErr);
+      }
+
+      await createSchoolSubscriptionRegistration({
+        uid: user.uid,
+        email: emailTrimmed,
+        adminPassword: password,
+        schoolName: name.trim(),
+        adminName: name.trim(),
+        phone: phone.trim(),
+        schoolRegistration,
+        package: { id: pkg.id, name: pkg.name },
+        billingCycle,
+      });
+
+      await signOut(auth);
+      setAdminSignupStep("done");
+      setMode("login");
+      setName("");
+      setEmail("");
+      setPassword("");
+      setPhone("");
+      setSchoolRegistration(EMPTY_SCHOOL_REGISTRATION);
+      toast.success(t("adminSignupPendingApproval"), { duration: 10000 });
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      if (err.code === "auth/email-already-in-use") {
+        toast.error(t("emailInUse"));
+      } else {
+        toast.error(err.message || t("authFailed"));
+      }
+    } finally {
+      authSubmitLock.current = false;
+      setLoading(false);
     }
   };
 
@@ -1064,6 +1101,98 @@ export default function Login() {
             </button>
           </div>
 
+          {adminSignupStep === "done" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center space-y-4 py-4"
+            >
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                <Check size={32} />
+              </div>
+              <h3 className="text-lg font-black text-slate-900">
+                {t("adminSignupPendingApproval")}
+              </h3>
+              <p className="text-slate-500 text-sm font-bold leading-relaxed">
+                {isRtl
+                  ? "تم إرسال طلب الاشتراك. سيُنشأ حسابك بعد موافقة السوبر أدمن. يمكنك تسجيل الدخول لاحقاً لمتابعة حالة الطلب."
+                  : "Your subscription request was sent. Your account will be created after super admin approval. You may sign in later to check status."}
+              </p>
+              <button
+                type="button"
+                onClick={() => setAdminSignupStep("form")}
+                className="w-full py-3.5 rounded-xl bg-[#0B2345] text-white font-bold"
+              >
+                {t("login")}
+              </button>
+            </motion.div>
+          )}
+
+          {adminSignupStep === "packages" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              <div className="flex flex-col gap-3">
+                <h3 className="text-lg font-black text-slate-900 text-center">
+                  {isRtl ? "اختر باقة الاشتراك" : "Choose subscription package"}
+                </h3>
+                <div className="inline-flex bg-slate-100 p-1 rounded-full items-center justify-center shadow-inner mx-auto">
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle("monthly")}
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                  >
+                    {isRtl ? "شهرياً" : "Monthly"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle("annually")}
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${billingCycle === "annually" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                  >
+                    {isRtl ? "سنوياً" : "Yearly"}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {getLocalizedPackages(
+                  packages.filter((p) => p.showInRegistration !== false),
+                  isRtl,
+                ).map((pkg) => (
+                  <div
+                    key={pkg.id}
+                    className={`rounded-2xl border-2 p-4 ${pkg.isPopular ? "border-[#0B2345] bg-slate-50" : "border-slate-100"}`}
+                  >
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <h4 className="font-black text-slate-900">{pkg.name}</h4>
+                      <span className="font-black text-slate-900 text-sm whitespace-nowrap">
+                        {packageDisplayPrice(pkg, billingCycle).toLocaleString()}{" "}
+                        {isRtl ? "د.ع" : "IQD"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleAdminPackageSelect(pkg)}
+                      className="w-full py-2.5 rounded-xl bg-[#0B2345] text-white font-bold text-sm disabled:opacity-50"
+                    >
+                      {isRtl ? "إرسال طلب الاشتراك" : "Submit subscription request"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminSignupStep("form")}
+                className="w-full py-3 text-slate-500 font-bold text-sm"
+              >
+                {isRtl ? "رجوع لتعديل البيانات" : "Back to edit details"}
+              </button>
+            </motion.div>
+          )}
+
+          {(adminSignupStep === "form" || mode === "login") && (
           <form onSubmit={handleAuth} className="space-y-4 sm:space-y-5">
             <AnimatePresence mode="wait">
               {mode === "signup" && (
@@ -1283,7 +1412,15 @@ export default function Login() {
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
                 <>
-                  <span>{mode === "login" ? t("login") : t("signup")}</span>
+                  <span>
+                    {mode === "login"
+                      ? t("login")
+                      : mode === "signup" && role === UserRole.ADMIN
+                        ? isRtl
+                          ? "التالي: اختيار الباقة"
+                          : "Next: choose package"
+                        : t("signup")}
+                  </span>
                   <ArrowRight size={20} className={isRtl ? "rotate-180" : ""} />
                 </>
               )}
@@ -1623,6 +1760,7 @@ export default function Login() {
               </div>
             )}
           </form>
+          )}
 
           <p className="mt-6 sm:mt-8 text-center text-slate-400 text-xs sm:text-sm font-medium">
             {isRtl

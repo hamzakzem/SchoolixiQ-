@@ -48,6 +48,7 @@ const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 import ScanHandler from "./components/ScanHandler";
 import SolarLoading from "./components/SolarLoading";
 import AuthBootScreen from "./components/AuthBootScreen";
+import { createSchoolSubscriptionRegistration } from "./lib/schoolSubscriptionRequest";
 import { LanguageToggle } from "./components/LanguageToggle";
 
 const InstallAppBanner = lazy(() => import("./components/InstallAppBanner"));
@@ -208,10 +209,16 @@ const AppContent = () => {
         const schoolSnap = await getDocs(schoolQuery);
 
         if (!schoolSnap.empty) {
-          setIsCreatingProfile(true);
           const schoolDoc = schoolSnap.docs[0];
           const schoolId = schoolDoc.id;
           const schoolData = schoolDoc.data();
+
+          if (schoolData.status && schoolData.status !== "active") {
+            setAutoLinkChecked(true);
+            return;
+          }
+
+          setIsCreatingProfile(true);
 
           // Auto-provision their "admin" user profile in the users collection
           await setDoc(doc(db, "users", user.uid), {
@@ -885,59 +892,25 @@ const AppContent = () => {
                     if (!user) return;
                     setIsCreatingProfile(true);
                     try {
-                      const isMonthly = billingCycle === "monthly";
-                      const actualPrice = isMonthly
-                        ? selectedPackage.priceMonthly !== undefined
-                          ? selectedPackage.priceMonthly
-                          : Math.round((selectedPackage.price || 0) / 12)
-                        : selectedPackage.priceYearly !== undefined
-                          ? selectedPackage.priceYearly
-                          : selectedPackage.price;
-
-                      const schoolFields = {
-                        address: subscriptionForm.address,
-                        governorate: subscriptionForm.governorate,
-                        directorate: subscriptionForm.directorate,
-                        educationLevel: subscriptionForm.stage,
-                        workingHours: subscriptionForm.shift,
-                        studyType: subscriptionForm.genderType,
-                        estimatedStudents: Number(subscriptionForm.estimatedStudents) || 0,
-                        stage: subscriptionForm.stage,
-                        shift: subscriptionForm.shift,
-                        genderType: subscriptionForm.genderType,
-                        approximateStudents: subscriptionForm.estimatedStudents,
-                      };
-                      const customerInfo = {
-                        name: subscriptionForm.name,
-                        email: user.email,
-                        phone: subscriptionForm.phone,
-                        address: subscriptionForm.address,
-                        governorate: subscriptionForm.governorate,
-                        directorate: subscriptionForm.directorate,
-                        educationLevel: subscriptionForm.stage,
-                        workingHours: subscriptionForm.shift,
-                        studyType: subscriptionForm.genderType,
-                        estimatedStudents: subscriptionForm.estimatedStudents,
-                        ...schoolFields,
-                      };
-                      await addDoc(collection(db, "registrations"), {
-                        type: "direct_school_signup",
+                      await createSchoolSubscriptionRegistration({
                         uid: user.uid,
-                        email: user.email,
+                        email: user.email || "",
                         schoolName: subscriptionForm.name,
-                        name: subscriptionForm.name,
                         phone: subscriptionForm.phone,
-                        adminEmail: user.email,
-                        adminPhone: subscriptionForm.phone,
-                        customerInfo,
-                        ...schoolFields,
-                        packageName: selectedPackage.name,
-                        packageId: selectedPackage.id,
-                        price: actualPrice,
-                        billingCycle: billingCycle,
-                        durationDays: isMonthly ? 30 : 365,
-                        status: "pending",
-                        createdAt: serverTimestamp(),
+                        schoolRegistration: {
+                          address: subscriptionForm.address,
+                          governorate: subscriptionForm.governorate,
+                          directorate: subscriptionForm.directorate,
+                          educationLevel: subscriptionForm.stage,
+                          workingHours: subscriptionForm.shift,
+                          studyType: subscriptionForm.genderType,
+                          estimatedStudents: subscriptionForm.estimatedStudents,
+                        },
+                        package: {
+                          id: selectedPackage.id,
+                          name: selectedPackage.name,
+                        },
+                        billingCycle,
                       });
                       setOnboardingState("waiting_approval");
                     } catch (err) {
@@ -1269,25 +1242,22 @@ const AppContent = () => {
                   تم الغاء طلبك
                 </h3>
                 <p className="text-slate-500 text-sm font-bold leading-relaxed mb-6">
-                  نأسف، لقد تم رفض أو إلغاء طلب اشتراك مدرستك من قبل الإدارة.
+                  تم رفض طلب اشتراك مدرستك وحذف الحساب. يمكنك التسجيل من جديد
+                  ببريد آخر أو نفس البريد بعد إعادة التسجيل.
                 </p>
                 <div className="flex flex-col gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (myRequest?.id) {
-                        deleteDoc(
-                          doc(db, "registrations", myRequest.id),
-                        ).then(() => {
-                           setOnboardingState("options");
-                        });
-                      } else {
+                    onClick={async () => {
+                      try {
+                        await auth.signOut();
+                      } catch {
                         setOnboardingState("options");
                       }
                     }}
                     className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition-all cursor-pointer"
                   >
-                    حاول مرة أخرى
+                    العودة لتسجيل الدخول
                   </button>
                   <button
                     type="button"
