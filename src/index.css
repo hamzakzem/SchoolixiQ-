@@ -678,6 +678,19 @@ body {
   }
 }
 
+/* Animation utilities used across views (replaces tailwindcss-animate plugin) */
+@utility fade-in {
+  animation: sq-page-in 0.45s ease-out both;
+}
+
+@utility animate-in {
+  animation-fill-mode: both;
+}
+
+@utility font-display {
+  font-family: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
 .sq-page-header {
   @apply flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6;
 }
