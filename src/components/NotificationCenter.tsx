@@ -56,6 +56,9 @@ import {
 } from "../lib/notificationSound";
 import { notificationService } from "../lib/notificationService";
 import { toast } from "react-hot-toast";
+import { useNotifications } from "../hooks/useNotifications";
+import { getNotificationInboxUserIdsFromProfile } from "../lib/notificationTargets";
+import { registerWebPushNotifications } from "../lib/webPushService";
 
 interface NotificationCenterProps {
   onClose: () => void;
@@ -69,8 +72,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   userRole 
 }) => {
   const { user, profile } = useAuth();
+  const { notifications: inboxNotifications, inboxUserIds } = useNotifications();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [filteredNotifs, setFilteredNotifs] = useState<any[]>([]);
+
+  useEffect(() => {
+    setNotifications(inboxNotifications);
+  }, [inboxNotifications]);
   
   // Tab/Filter states
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'settings' | 'logs'>('all');
@@ -108,66 +116,49 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       return;
     }
 
+    if (!import.meta.env.VITE_FIREBASE_VAPID_KEY) {
+      toast.error(
+        isArabic
+          ? "مفتاح Web Push غير مُعدّ على الخادم (VITE_FIREBASE_VAPID_KEY)"
+          : "Web Push VAPID key is not configured on the server",
+      );
+      return;
+    }
+
     try {
       const permission = await Notification.requestPermission();
       setWebPushStatus(permission);
-      
-      if (permission === 'granted') {
-        // Mock FCM Web Token generation and database sync
-        const mockToken = "fcm_web_" + Math.random().toString(36).substr(2, 16).toUpperCase();
-        setDeviceToken(mockToken);
-        localStorage.setItem('schoolix_fcm_token_web', mockToken);
 
-        // Sync token to Firestore `/users/{userId}` to show real-time persistence
-        if (user?.uid) {
-          const userRef = doc(db, 'users', user.uid);
-          await updateDoc(userRef, {
-            fcmTokens: [mockToken] // Store FCM token array
-          });
-          
-          // Log device token creation for auditing
+      if (permission === 'granted' && user?.uid) {
+        const token = await registerWebPushNotifications(user.uid);
+        if (token) {
+          setDeviceToken(token);
           await addDoc(collection(db, 'audit_logs'), {
             userId: user.uid,
             action: 'fcm_token_register',
             platform: 'web',
-            token: mockToken,
-            createdAt: serverTimestamp()
+            tokenPreview: token.slice(0, 12) + '…',
+            createdAt: serverTimestamp(),
           });
-
-          toast.success(isArabic ? "تم تفعيل الإشعارات الفورية للمتصفح!" : "Web push notifications enabled successfully!");
+          toast.success(
+            isArabic
+              ? "تم تفعيل الإشعارات حتى عند إغلاق الموقع!"
+              : "Background push enabled — you'll get alerts when the site is closed",
+          );
+        } else {
+          toast.error(
+            isArabic
+              ? "تعذّر تسجيل الجهاز. تأكد من السماح بالإشعارات"
+              : "Could not register this device for push",
+          );
         }
-      } else {
+      } else if (permission !== 'granted') {
         toast.error(isArabic ? "تم رفض الإذن. يرجى تفعيله من إعدادات المتصفح" : "Permission denied. Enable it in browser settings.");
       }
     } catch (err) {
       console.error("Error asking Web Push permissions:", err);
     }
   };
-
-  // 1. Listen to user notifications
-  useEffect(() => {
-    if (!user) return;
-
-    // Standard notification user query
-    const notifQuery = query(
-      collection(db, "notifications"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsub = onSnapshot(notifQuery, (snap) => {
-      const items = snap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
-      }));
-      setNotifications(items);
-    }, (err) => {
-      console.error("Notification listener failed: ", err);
-    });
-
-    return () => unsub();
-  }, [user]);
 
   // 2. Fetch Administration Delivery Analytics inside 'logs' tab (Admins only)
   useEffect(() => {
@@ -225,7 +216,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const handleMarkAllRead = async () => {
     if (!user) return;
     try {
-      await notificationService.markAllAsRead(user.uid);
+      const ids =
+        inboxUserIds.length > 0
+          ? inboxUserIds
+          : getNotificationInboxUserIdsFromProfile(profile);
+      await notificationService.markAllAsReadForInbox(ids);
       toast.success(isArabic ? "تم تحديد الكل كمقروء" : "All marked as read");
     } catch (e) {
       toast.error("Error setting stats");

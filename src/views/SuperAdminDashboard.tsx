@@ -55,7 +55,7 @@ import {
   CreditCard,
   Bell,
 } from "lucide-react";
-import { NotificationCenter } from "../components/NotificationCenter";
+import { NotificationBell } from "../components/NotificationBell";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
@@ -181,19 +181,6 @@ export default function SuperAdminDashboard() {
     "management",
   );
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!profile?.uid) return;
-    const qNotifications = query(
-      collection(db, "notifications"),
-      where("userId", "==", profile.uid)
-    );
-    return onSnapshot(qNotifications, (snap) => {
-      setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-  }, [profile?.uid]);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [activeRequestSource, setActiveRequestSource] = useState<string | null>(
     null,
@@ -2003,25 +1990,10 @@ export default function SuperAdminDashboard() {
             <LanguageToggle />
             <ThemeToggle />
 
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-[#0B2345] border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-[#0B2345]"}`}
-            >
-              <Bell size={18} />
-              {notifications.filter((n: any) => !n.read).length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                  {notifications.filter((n: any) => !n.read).length > 9 ? '9+' : notifications.filter((n: any) => !n.read).length}
-                </span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <NotificationCenter
-                onClose={() => setShowNotifications(false)}
-                activeTabSetter={setActiveTab}
-                userRole="super_admin"
-              />
-            )}
+            <NotificationBell
+              activeTabSetter={setActiveTab}
+              userRole="superadmin"
+            />
             <div className="text-left md:block hidden">
               <p className="text-[10px] text-slate-400 leading-none mb-1 uppercase tracking-widest font-bold">
                 {t('system_status')}

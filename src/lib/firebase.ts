@@ -1,7 +1,8 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, memoryLocalCache } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import type { Messaging } from 'firebase/messaging';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Global error interrupter for unhandled IndexedDB / Connection Lost errors
@@ -78,6 +79,30 @@ export const db = initializeFirestore(app, {
 
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+let messagingInstance: Messaging | null = null;
+let messagingInitPromise: Promise<Messaging | null> | null = null;
+
+/** Lazy Firebase Cloud Messaging (web push) — browser only. */
+export async function getFirebaseMessaging(): Promise<Messaging | null> {
+  if (typeof window === 'undefined') return null;
+  if (messagingInstance) return messagingInstance;
+  if (messagingInitPromise) return messagingInitPromise;
+
+  messagingInitPromise = (async () => {
+    try {
+      const { isSupported, getMessaging } = await import('firebase/messaging');
+      if (!(await isSupported())) return null;
+      messagingInstance = getMessaging(app as FirebaseApp);
+      return messagingInstance;
+    } catch (err) {
+      console.warn('[Firebase] Messaging unavailable:', err);
+      return null;
+    }
+  })();
+
+  return messagingInitPromise;
+}
 
 // Disable Performance Monitoring to prevent "Attribute value is invalid" crashes
 // when auto-tracing clicks on elements with long Tailwind class strings.

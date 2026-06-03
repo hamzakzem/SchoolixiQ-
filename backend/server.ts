@@ -1096,93 +1096,137 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
     
     // START FCM BACKGROUND PUSH DISPATCH LISTENER
+    const isValidFcmDeviceToken = (token: string) => {
+      const t = token.trim();
+      if (!t || t.startsWith('fcm_web_')) return false;
+      return t.length >= 80;
+    };
+
+    const collectTokensFromUserDoc = (data: Record<string, unknown> | undefined): string[] => {
+      const tokens = data?.fcmTokens;
+      if (!Array.isArray(tokens)) return [];
+      return tokens.filter((t): t is string => typeof t === 'string' && isValidFcmDeviceToken(t));
+    };
+
     try {
       const db = getDb();
       const bootTime = admin.firestore.Timestamp.now();
-      console.log('[FCM RUNTIME] Active notification-to-push FCM gateway initialized. Listening for school events...');
-      
+      const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+      console.log('[FCM RUNTIME] Push gateway listening for new notifications...');
+
       db.collection('notifications')
         .where('createdAt', '>=', bootTime)
         .onSnapshot(snapshot => {
           if (!snapshot) return;
           snapshot.docChanges().forEach(async change => {
-            if (change.type === 'added') {
-              const notif = change.doc.data();
-              const userId = notif.userId;
-              const title = notif.title || '╪Ñ╪┤╪╣╪º╪▒ ╪¼╪»┘è╪»';
-              const message = notif.message || notif.content || '';
-              const type = notif.type || 'system';
-              
-              if (!userId) return;
-              
-              try {
-                let userTokens: string[] = [];
-                if (userId === 'super_admin') {
-                  // Notify all super admins
-                  const superAdminsSnap = await db.collection('users').where('role', '==', 'superadmin').get();
-                  superAdminsSnap.docs.forEach(doc => {
-                    const tokens = doc.data().fcmTokens;
-                    if (Array.isArray(tokens)) {
-                      userTokens.push(...tokens);
-                    }
-                  });
-                } else {
-                  // Fetch targeted user tokens
-                  const userDoc = await db.collection('users').doc(userId).get();
-                  if (userDoc.exists) {
-                    const tokens = userDoc.data()?.fcmTokens;
-                    if (Array.isArray(tokens)) {
-                      userTokens.push(...tokens);
-                    }
-                  }
+            if (change.type !== 'added') return;
+
+            const notifRef = change.doc.ref;
+            const notif = change.doc.data();
+            const userId = notif.userId;
+            const title = notif.title || 'إشعار جديد';
+            const message = notif.message || notif.content || '';
+            const type = notif.type || 'system';
+
+            if (!userId) return;
+
+            try {
+              let userTokens: string[] = [];
+              if (userId === 'super_admin') {
+                const superAdminsSnap = await db.collection('users').where('role', '==', 'superadmin').get();
+                superAdminsSnap.docs.forEach((docSnap) => {
+                  userTokens.push(...collectTokensFromUserDoc(docSnap.data()));
+                });
+              } else {
+                const userDoc = await db.collection('users').doc(userId).get();
+                if (userDoc.exists) {
+                  userTokens.push(...collectTokensFromUserDoc(userDoc.data()));
                 }
-                
-                userTokens = Array.from(new Set(userTokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
-                
-                if (userTokens.length > 0) {
-                  console.log(`[FCM PUSH] Event "${title}" matched for user "${userId}". Dispatching to ${userTokens.length} active devices...`);
-                  
-                  // Build payloads for each token
-                  const messages = userTokens.map(token => ({
-                    token,
-                    notification: {
-                      title: String(title),
-                      body: String(message),
-                    },
-                    data: {
-                      type: String(type),
-                      schoolId: String(notif.schoolId || ''),
-                      userId: String(userId)
-                    },
-                    android: {
-                      priority: 'high' as const,
-                      notification: {
-                        sound: 'default'
-                      }
-                    },
-                    apns: {
-                      payload: {
-                        aps: {
-                          sound: 'default',
-                          badge: 1
-                        }
-                      }
-                    }
-                  }));
-                  
-                  const response = await admin.messaging().sendEach(messages);
-                  console.log(`[FCM SUCCESS] Delivered push successfully. Succeeded: ${response.successCount}, Failed: ${response.failureCount}`);
-                }
-              } catch (fcmErr: any) {
-                console.error('[FCM TRANSMIT ERROR] Failed to dispatch Firebase cloud messages:', fcmErr.message);
               }
+
+              userTokens = Array.from(new Set(userTokens));
+
+              if (userTokens.length === 0) {
+                await notifRef.set(
+                  {
+                    pushDelivery: { status: 'no_tokens', at: admin.firestore.FieldValue.serverTimestamp() },
+                  },
+                  { merge: true },
+                );
+                return;
+              }
+
+              console.log(`[FCM PUSH] "${title}" → ${userId} (${userTokens.length} devices)`);
+
+              const deepLink = appUrl ? `${appUrl}/` : '/';
+              const messages = userTokens.map((token) => ({
+                token,
+                notification: {
+                  title: String(title),
+                  body: String(message),
+                },
+                data: {
+                  type: String(type),
+                  schoolId: String(notif.schoolId || ''),
+                  userId: String(userId),
+                  notificationId: change.doc.id,
+                  url: deepLink,
+                },
+                webpush: {
+                  fcmOptions: { link: deepLink },
+                  notification: {
+                    title: String(title),
+                    body: String(message),
+                    icon: appUrl ? `${appUrl}/icon.svg` : '/icon.svg',
+                  },
+                },
+                android: {
+                  priority: 'high' as const,
+                  notification: { sound: 'default', channelId: 'schoolix_alerts' },
+                },
+                apns: {
+                  payload: {
+                    aps: { sound: 'default', badge: 1 },
+                  },
+                },
+              }));
+
+              const response = await admin.messaging().sendEach(messages);
+              await notifRef.set(
+                {
+                  pushDelivery: {
+                    status: response.failureCount === 0 ? 'sent' : 'partial',
+                    successCount: response.successCount,
+                    failureCount: response.failureCount,
+                    at: admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                },
+                { merge: true },
+              );
+              console.log(
+                `[FCM SUCCESS] ${response.successCount} ok, ${response.failureCount} failed`,
+              );
+            } catch (fcmErr: any) {
+              console.error('[FCM TRANSMIT ERROR]', fcmErr.message);
+              await notifRef
+                .set(
+                  {
+                    pushDelivery: {
+                      status: 'error',
+                      error: String(fcmErr.message || fcmErr),
+                      at: admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                  },
+                  { merge: true },
+                )
+                .catch(() => {});
             }
           });
         }, err => {
-          console.error('[FCM LISTENER ERROR] Active Firestore listener caught exception:', err.message);
+          console.error('[FCM LISTENER ERROR]', err.message);
         });
     } catch (e: any) {
-      console.error('[FCM SYSTEM FAILED] Could not initialize Firebase messaging gateway:', e.message);
+      console.error('[FCM SYSTEM FAILED]', e.message);
     }
 
     // Save APP_URL dynamically to Firestore system config so all clients (including Mobile Apps) have access to the actual server URL

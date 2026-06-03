@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 import { LanguageToggle } from "../components/LanguageToggle";
-import { NotificationCenter } from "../components/NotificationCenter";
+import { NotificationBell } from "../components/NotificationBell";
 import {
   Users,
   BookOpen,
@@ -118,10 +118,6 @@ export default function TeacherDashboard() {
 
   // Package permissions are controlled by the Super Admin via the package properties
   const perms = schoolData?.packagePermissions || profile?.permissions; // fallback to profile if not loaded yet
-
-  // Notifications state
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
 
   // Homework state
   const [homework, setHomework] = useState<any[]>([]);
@@ -361,20 +357,6 @@ export default function TeacherDashboard() {
         );
       }));
 
-      const notificationsQ = query(
-        collection(db, "notifications"),
-        where("userId", "==", profile.uid),
-        limit(50),
-      );
-      unsubs.push(onSnapshot(notificationsQ, (snap) => {
-        const notifData = snap.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .sort(
-            (a: any, b: any) =>
-              (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
-          );
-        setNotifications(notifData as any);
-      }));
 
       setLoading(false);
     } catch (error) {
@@ -946,26 +928,10 @@ export default function TeacherDashboard() {
 
             <div className="flex items-center gap-1.5 md:gap-3">
               <LanguageToggle />
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-[#0B2345] border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white border-slate-200 text-slate-400 hover:border-indigo-200 hover:text-[#0B2345]"}`}
-              >
-                <Bell size={18} />
-                {notifications.filter((n) => !n.read).length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                    {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
-                  </span>
-                )}
-              </button>
-
-              {/* Redesigned Notification Center Modal */}
-              {showNotifications && (
-                <NotificationCenter
-                  onClose={() => setShowNotifications(false)}
-                  activeTabSetter={(tabName) => setActiveTab(tabName as any)}
-                  userRole="teacher"
-                />
-              )}
+              <NotificationBell
+                activeTabSetter={(tabName) => setActiveTab(tabName as any)}
+                userRole="teacher"
+              />
             </div>
           </div>
         </header>

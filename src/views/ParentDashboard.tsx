@@ -22,7 +22,7 @@ import { useAuth } from "../lib/AuthContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { GlobalFooter } from "../components/GlobalFooter";
-import { NotificationCenter } from "../components/NotificationCenter";
+import { NotificationBell } from "../components/NotificationBell";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { toast } from "react-hot-toast";
 import {
@@ -99,8 +99,6 @@ export default function ParentDashboard() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [installments, setInstallments] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [marketItems, setMarketItems] = useState<any[]>([]);
   const [marketLoading, setMarketLoading] = useState(true);
   const [purchaseModal, setPurchaseModal] = useState<any>(null);
@@ -628,17 +626,7 @@ export default function ParentDashboard() {
         setMarketLoading(false);
       }));
 
-      // 7. Notifications
-      const notificationsQ = query(
-        collection(db, "notifications"),
-        where("userId", "==", profile.uid),
-        limit(50)
-      );
-      unsubs.push(onSnapshot(notificationsQ, snap => {
-        setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
-      }));
-
-      // 8. Homework
+      // 7. Homework
       if (currentClassId) {
         const hwQ = query(
           collection(db, "homework"),
@@ -1161,29 +1149,11 @@ export default function ParentDashboard() {
                   <LogOut size={16} />
                 </button>
 
-                <div className="relative shrink-0">
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className={`w-8 h-8 shrink-0 rounded transition-all flex items-center justify-center relative shadow-sm ${showNotifications ? "bg-[#0B2345] border-indigo-700 text-white" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50"}`}
-                  >
-                    <Bell size={16} />
-                    {notifications.filter((n) => !n.read).length > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[9px] font-black text-white flex items-center justify-center">
-                        {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
-                      </span>
-                    )}
-                  </button>
-
-
-                {/* Notifications Center Modal */}
-                {showNotifications && (
-                  <NotificationCenter
-                    onClose={() => setShowNotifications(false)}
-                    activeTabSetter={setActiveTab}
-                    userRole="parent"
-                  />
-                )}
-              </div>
+                <NotificationBell
+                  variant="compact"
+                  activeTabSetter={setActiveTab}
+                  userRole="parent"
+                />
             </div>
           </div>
           {/* Close the px-4 pt-5 pb-3 div */}

@@ -3,13 +3,14 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { db } from './firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
+import { registerWebPushNotifications, unregisterWebPushToken } from './webPushService';
 
 // Store current token in memory to remove it during logout
 let currentPushToken: string | null = null;
 
 export const registerForPushNotifications = async (userId: string, userRole: string, schoolId: string = '') => {
   if (!Capacitor.isNativePlatform()) {
-    console.log('Push notifications are only available on native platforms using Capacitor.');
+    await registerWebPushNotifications(userId);
     return;
   }
 
@@ -81,7 +82,12 @@ export const registerForPushNotifications = async (userId: string, userRole: str
 };
 
 export const unregisterPushToken = async (userId: string) => {
-  if (!Capacitor.isNativePlatform() || !currentPushToken || !userId) {
+  if (!Capacitor.isNativePlatform()) {
+    await unregisterWebPushToken(userId);
+    return;
+  }
+
+  if (!currentPushToken || !userId) {
     return;
   }
   

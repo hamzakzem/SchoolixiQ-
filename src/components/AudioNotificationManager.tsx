@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { db } from "../lib/firebase";
 import { collection, query, where, onSnapshot, limit, orderBy } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
+import { getNotificationInboxUserIdsFromProfile } from "../lib/notificationTargets";
 import {
   playPremiumNotificationSound,
   playGradeNotificationSound,
@@ -95,31 +96,24 @@ export const AudioNotificationManager: React.FC = () => {
       });
     };
 
-    // User's specific notifications
-    const notificationsQ = query(
-      collection(db, "notifications"),
-      where("userId", "==", user.uid)
-    );
-    const unsubNotif = onSnapshot(
-      notificationsQ,
-      (snap) => handleNotificationsSnapshot(snap, false),
-      (err) => console.log("AudioNotificationManager Error:", err)
-    );
-    unsubs.push(unsubNotif);
-
-    // If super admin, listen to system-wide notifications too
-    if (profile.role === "superadmin") {
-      const superNotificationsQ = query(
+    const inboxIds = getNotificationInboxUserIdsFromProfile(profile);
+    inboxIds.forEach((inboxUserId) => {
+      const notificationsQ = query(
         collection(db, "notifications"),
-        where("userId", "==", "super_admin")
+        where("userId", "==", inboxUserId),
+        limit(30),
       );
-      const unsubSuperNotif = onSnapshot(
-        superNotificationsQ,
-        (snap) => handleNotificationsSnapshot(snap, true),
-        (err) => console.log("AudioNotificationManager Super Error:", err)
+      const isSuperChannel = inboxUserId === "super_admin";
+      unsubs.push(
+        onSnapshot(
+          notificationsQ,
+          (snap) => handleNotificationsSnapshot(snap, isSuperChannel),
+          (err) => console.log("AudioNotificationManager Error:", err),
+        ),
       );
-      unsubs.push(unsubSuperNotif);
+    });
 
+    if (profile.role === "superadmin") {
       // --- 1B. Super Admin direct Registration Requests Listener ---
       const registrationsQ = query(
         collection(db, "registrations"),

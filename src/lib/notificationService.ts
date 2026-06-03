@@ -1,7 +1,44 @@
 import { db } from './firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, writeBatch, deleteDoc, getDoc } from 'firebase/firestore';
 
-export type NotificationType = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'homework' | 'report' | 'system';
+export type NotificationType = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'homework' | 'report' | 'system' | 'message';
+
+const PARENT_PREF_KEY: Partial<Record<NotificationType, string>> = {
+  grade: 'grades',
+  behavior: 'behavior',
+  attendance: 'attendance',
+  announcement: 'announcements',
+  payment: 'payments',
+};
+
+async function parentAllowsNotificationType(
+  parentId: string,
+  studentId: string,
+  type: NotificationType,
+): Promise<boolean> {
+  const prefField = PARENT_PREF_KEY[type];
+  if (!prefField) return true;
+
+  try {
+    const prefId = `${parentId}_${studentId}`;
+    const prefSnap = await getDoc(doc(db, 'notification_preferences', prefId));
+    if (!prefSnap.exists()) {
+      const q = query(
+        collection(db, 'notification_preferences'),
+        where('parentId', '==', parentId),
+        where('studentId', '==', studentId),
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) return true;
+      const data = snap.docs[0].data();
+      return data[prefField] !== false;
+    }
+    const data = prefSnap.data();
+    return data[prefField] !== false;
+  } catch {
+    return true;
+  }
+}
 
 export interface NotificationPayload {
   userId: string;
@@ -71,7 +108,16 @@ export const notificationService = {
         return true;
       }
 
-      return await this.sendToMultiple(parentIds, payload);
+      const allowedParentIds: string[] = [];
+      await Promise.all(
+        parentIds.map(async (parentId: string) => {
+          const ok = await parentAllowsNotificationType(parentId, studentId, payload.type);
+          if (ok) allowedParentIds.push(parentId);
+        }),
+      );
+
+      if (allowedParentIds.length === 0) return true;
+      return await this.sendToMultiple(allowedParentIds, payload);
     } catch (error) {
       console.error('Error notifying student parents:', error);
       return false;
@@ -97,18 +143,26 @@ export const notificationService = {
    * Mark all notifications as read for a user
    */
   async markAllAsRead(userId: string) {
+    return this.markAllAsReadForInbox([userId]);
+  },
+
+  async markAllAsReadForInbox(userIds: string[]) {
     try {
-      const q = query(
-        collection(db, 'notifications'), 
-        where('userId', '==', userId), 
-        where('read', '==', false)
-      );
-      const snap = await getDocs(q);
-      const batch = writeBatch(db);
-      snap.docs.forEach(d => {
-        batch.update(d.ref, { read: true });
-      });
-      await batch.commit();
+      const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+      for (const inboxUserId of uniqueIds) {
+        const q = query(
+          collection(db, 'notifications'),
+          where('userId', '==', inboxUserId),
+          where('read', '==', false),
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) continue;
+        const batch = writeBatch(db);
+        snap.docs.forEach((d) => {
+          batch.update(d.ref, { read: true, readAt: serverTimestamp() });
+        });
+        await batch.commit();
+      }
       return true;
     } catch (error) {
       console.error('Error marking all as read:', error);
@@ -183,7 +237,11 @@ export const notificationService = {
    */
   async notifyAllStaff(schoolId: string, payload: Omit<NotificationPayload, 'userId'>) {
     try {
-      const q = query(collection(db, 'users'), where('schoolId', '==', schoolId), where('role', 'in', ['staff', 'teacher']));
+      const q = query(
+        collection(db, 'users'),
+        where('schoolId', '==', schoolId),
+        where('role', 'in', ['staff', 'teacher', 'admin', 'assistant']),
+      );
       const snap = await getDocs(q);
       const userIds = snap.docs.map((doc: any) => doc.id);
       
@@ -211,7 +269,7 @@ export const notificationService = {
     try {
       await Promise.all([
         this.notifyAllParents(schoolId, payload),
-        this.notifyAllStaff(schoolId, payload)
+        this.notifyAllStaff(schoolId, payload),
       ]);
       return true;
     } catch (error) {
