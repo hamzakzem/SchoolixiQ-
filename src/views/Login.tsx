@@ -202,6 +202,12 @@ export default function Login() {
     phone: "",
     address: "",
     password: "",
+    governorate: "",
+    directorate: "",
+    educationLevel: "",
+    workingHours: "",
+    studyType: "",
+    estimatedStudents: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successCode, setSuccessCode] = useState<string | null>(null);
