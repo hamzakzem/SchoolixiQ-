@@ -8,3 +8,5 @@ export { DataTable, DataTableElement } from './DataTable';
 export { ViewToggle } from './ViewToggle';
 export { ActionMenu, ActionMenuItem, ActionMenuDivider } from './ActionMenu';
 export { StudentPrimaryActions } from './StudentPrimaryActions';
+export { Modal } from './Modal';
+export { FormSection, FormInput, FormSelect, LabeledField } from './FormField';

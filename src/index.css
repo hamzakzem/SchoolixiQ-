@@ -889,3 +889,104 @@ html.dark .sq-table tbody tr:hover .sq-table-sticky-actions {
 .sq-badge-muted {
   @apply bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700;
 }
+
+/* ─── Modal & Form (sq-modal / sq-form) ─── */
+.sq-modal-backdrop {
+  @apply fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm;
+}
+
+.sq-modal {
+  @apply w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl
+    flex flex-col max-h-[min(92dvh,760px)] rounded-t-2xl sm:rounded-2xl;
+}
+
+.sq-modal-header {
+  @apply flex items-start justify-between gap-3 p-5 md:p-6 border-b border-slate-200 dark:border-slate-700 shrink-0;
+}
+
+.sq-modal-icon {
+  @apply w-11 h-11 rounded-xl bg-[#0B2345]/8 dark:bg-[#D4A64A]/15 flex items-center justify-center;
+}
+
+.sq-modal-title {
+  @apply text-lg md:text-xl font-bold text-[#0B2345] dark:text-white leading-tight;
+}
+
+.sq-modal-desc {
+  @apply text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed;
+}
+
+.sq-modal-body {
+  @apply flex-1 min-h-0 overflow-y-auto p-5 md:p-6;
+}
+
+.sq-modal-footer {
+  @apply shrink-0 flex flex-col sm:flex-row gap-3 p-5 md:p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-800/50;
+}
+
+.sq-form-section {
+  @apply rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 p-4 md:p-5 space-y-4;
+}
+
+.sq-form-section-head {
+  @apply border-b border-slate-200/80 dark:border-slate-700/80 pb-3 mb-1;
+}
+
+.sq-form-section-title {
+  @apply text-sm font-bold text-[#0B2345] dark:text-[#D4A64A];
+}
+
+.sq-form-section-desc {
+  @apply text-[11px] text-slate-500 dark:text-slate-400 mt-0.5;
+}
+
+.sq-form-grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+}
+
+.sq-form-span-2 {
+  grid-column: 1 / -1;
+}
+
+.sq-form-field {
+  @apply flex flex-col gap-1.5 min-w-0;
+}
+
+.sq-form-label {
+  @apply text-xs font-bold text-slate-600 dark:text-slate-300;
+}
+
+.sq-form-hint {
+  @apply text-[10px] text-slate-400 -mt-0.5;
+}
+
+.sq-form-input-wrap {
+  @apply relative w-full;
+}
+
+.sq-form-input-icon {
+  @apply absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none;
+}
+
+.sq-form-control {
+  @apply w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-600
+    bg-white dark:bg-slate-900 text-sm font-semibold text-slate-900 dark:text-slate-100
+    outline-none transition-all
+    focus:ring-2 focus:ring-[#0B2345]/15 focus:border-[#0B2345] dark:focus:border-[#D4A64A];
+}
+
+.sq-form-control-with-icon {
+  @apply pr-11;
+}
+
+.sq-form-photo-preview {
+  @apply w-20 h-20 rounded-xl border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900
+    flex items-center justify-center overflow-hidden;
+}
+
+.sq-form-upload-btn {
+  @apply cursor-pointer flex items-center justify-center gap-2 w-full h-11 px-4
+    bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-600
+    rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300
+    hover:border-[#0B2345] hover:text-[#0B2345] dark:hover:border-[#D4A64A] dark:hover:text-[#D4A64A] transition-all;
+}

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, deleteDoc, setDoc, runTransaction, increment, arrayUnion, arrayRemove, getDoc, limit, startAfter, orderBy } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { Plus, UserPlus, GraduationCap, Copy, Check, Trash2, AlertTriangle, X, Users, ArrowRightLeft, Upload, User, Hash, Phone, Mail, Key, MapPin } from 'lucide-react';
+import { Plus, UserPlus, GraduationCap, Copy, Check, Trash2, AlertTriangle, X, Users, ArrowRightLeft, Phone } from 'lucide-react';
+import { StudentFormModal } from '../../components/admin/StudentFormModal';
 import {
   PageHeader,
   SearchField,
@@ -1104,221 +1105,17 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-             <motion.div 
-               initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-               animate={{ scale: 1, opacity: 1, y: 0 }} 
-               exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-               className="bg-white dark:bg-slate-900 rounded-2xl md:rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 flex flex-col max-h-[min(90dvh,720px)] text-right"
-               dir="rtl"
-             >
-               <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 dark:bg-slate-800/40 rounded-full -translate-y-32 translate-x-32 shadow-inner pointer-events-none"></div>
-               <div className="relative z-10 flex flex-col min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 md:p-8">
-                 <div className="flex items-center justify-between mb-2">
-                     <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display flex items-center gap-2">
-                       <GraduationCap className="text-[#0B2345] dark:text-[#D4A64A]" size={28} />
-                       <span>{editingStudent ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}</span>
-                     </h2>
-                     <button 
-                       type="button" 
-                       onClick={() => setShowAddModal(false)}
-                       className="p-1 px-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
-                     >
-                       <X size={18} />
-                     </button>
-                   </div>
-                 <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm mb-6 leading-relaxed italic text-right">يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.</p>
-                 
-                 <form onSubmit={handleAdd} className="space-y-6">
-
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60">
-                     <div className="flex-1 space-y-2">
-                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الصورة الشخصية (اختياري)</label>
-                       <div className="flex items-center gap-4">
-                         <div className="w-14 h-14 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
-                           {newStudent.photoUrl ? (
-                             <img src={newStudent.photoUrl || undefined} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                           ) : (
-                             <GraduationCap size={22} className="text-slate-400" />
-                           )}
-                         </div>
-                         <div className="flex-1 relative">
-                           <input
-                             type="file"
-                             accept="image/*"
-                             onChange={handlePhotoUpload}
-                             className="hidden"
-                             id="student-photo-upload"
-                           />
-                           <label
-                             htmlFor="student-photo-upload"
-                             className="cursor-pointer flex items-center justify-center gap-1.5 w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-dashed rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-[#0B2345] dark:hover:text-white transition-all font-bold text-xs"
-                           >
-                             <Upload size={14} />
-                             {isUploadingPhoto ? 'جاري الرفع...' : 'رفع صورة'}
-                           </label>
-                         </div>
-                       </div>
-                     </div>
-                     <div className="flex-1 space-y-2">
-                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">أو رابط الصورة</label>
-                       <input
-                         type="url"
-                         dir="ltr"
-                         value={newStudent.photoUrl}
-                         onChange={e => setNewStudent({...newStudent, photoUrl: e.target.value})}
-                         className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:bg-slate-50 dark:focus:bg-slate-700 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-mono text-slate-900 dark:text-white text-left"
-                         placeholder="https://..."
-                       />
-                     </div>
-                   </div>
-
-                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">الاسم الكامل للطالب</label>
-                        <div className="relative">
-                          <User className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                          <input
-                            required
-                            type="text"
-                            value={newStudent.name}
-                            onChange={e => setNewStudent({...newStudent, name: e.target.value})}
-                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
-                            placeholder="الاسم الرباعي واللقب..."
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">رقم السجل الدراسي</label>
-                        <div className="relative">
-                          <Hash className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                          <input
-                            required
-                            type="text"
-                            value={newStudent.registrationNumber}
-                            onChange={e => setNewStudent({...newStudent, registrationNumber: e.target.value})}
-                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-mono font-bold text-slate-900 dark:text-white text-left"
-                            placeholder="2024/001"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">واتساب ولي الأمر</label>
-                        <div className="relative">
-                          <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                          <input
-                            type="text"
-                            value={newStudent.parentPhone}
-                            onChange={e => setNewStudent({...newStudent, parentPhone: e.target.value})}
-                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
-                            placeholder="07XXXXXXXXX"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">رقم السائق (اختياري - للبطاقة)</label>
-                        <div className="relative">
-                          <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                          <input
-                            type="text"
-                            value={newStudent.driverPhone}
-                            onChange={e => setNewStudent({...newStudent, driverPhone: e.target.value})}
-                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
-                            placeholder="07XXXXXXXXX"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">إيميل ولي الأمر (للدخول)</label>
-                        <div className="relative">
-                          <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                          <input
-                            type="email"
-                            value={newStudent.parentEmail || ''}
-                            onChange={e => setNewStudent({...newStudent, parentEmail: e.target.value})}
-                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-mono text-slate-900 dark:text-white text-left"
-                            placeholder="parent@school.com"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">كلمة السر لولي الأمر</label>
-                        <div className="relative">
-                          <Key className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                          <input
-                            type="text"
-                            value={newStudent.parentPassword || ''}
-                            onChange={e => setNewStudent({...newStudent, parentPassword: e.target.value})}
-                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-mono text-slate-900 dark:text-white"
-                            placeholder="P@ssw0rd123"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">الصف الحالي</label>
-                        <div className="relative">
-                          <GraduationCap className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                          <select
-                            required
-                            value={newStudent.classId}
-                            onChange={e => setNewStudent({...newStudent, classId: e.target.value})}
-                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white appearance-none"
-                          >
-                            <option value="">جميع الصفوف المدرسية...</option>
-                            {classes.map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">عنوان السكن</label>
-                        <div className="relative">
-                          <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                          <input
-                            type="text"
-                            value={newStudent.address}
-                            onChange={e => setNewStudent({...newStudent, address: e.target.value})}
-                            className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
-                            placeholder="المحافظة - القضاء - الحي"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="sticky bottom-0 bg-white dark:bg-slate-900 pt-4 pb-2 border-t border-slate-100 dark:border-slate-800 z-20 flex flex-col-reverse sm:flex-row gap-3 mt-6 -mx-5 md:-mx-8 px-5 md:px-8">
-                      <button
-                        type="submit"
-                        className="flex-1 px-8 py-3.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-[#071830] transition-all shadow-xl active:scale-95 text-sm md:text-base border border-transparent"
-                      >
-                        {editingStudent ? 'حفظ التغييرات' : 'تأكيد وإضافة السجل'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddModal(false)}
-                        className="px-6 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 text-sm md:text-base"
-                      >
-                        إلغاء الأمر
-                      </button>
-                    </div>
-                  </form>
-               </div>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <StudentFormModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        isEdit={!!editingStudent}
+        value={newStudent}
+        onChange={(patch) => setNewStudent((prev) => ({ ...prev, ...patch }))}
+        classes={classes}
+        isUploadingPhoto={isUploadingPhoto}
+        onPhotoUpload={handlePhotoUpload}
+        onSubmit={handleAdd}
+      />
 
       <AnimatePresence>
         {showLinkParentModal && (
