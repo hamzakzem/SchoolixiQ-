@@ -87,17 +87,11 @@ jobs:
           path: schoolixiq-dist.zip
           retention-days: 7
 
-      - name: Resolve SFTP port
-        id: sftp
-        run: echo "port=${HOSTINGER_SFTP_PORT:-65002}" >> "$GITHUB_OUTPUT"
-        env:
-          HOSTINGER_SFTP_PORT: ${{ secrets.HOSTINGER_SFTP_PORT }}
-
       - name: Deploy to Hostinger (SFTP)
         uses: wlixcc/SFTP-Deploy-Action@v1.2.6
         with:
           server: ${{ secrets.HOSTINGER_FTP_SERVER }}
-          port: ${{ steps.sftp.outputs.port }}
+          port: "65002"
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           local_path: "./dist/*"
