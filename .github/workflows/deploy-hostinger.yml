@@ -21,17 +21,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Require Hostinger FTP secrets
+      - name: Require Hostinger deploy secrets
         run: |
           missing=""
-          for key in HOSTINGER_FTP_SERVER HOSTINGER_FTP_USERNAME HOSTINGER_FTP_PASSWORD; do
+          for key in HOSTINGER_FTP_SERVER HOSTINGER_FTP_USERNAME HOSTINGER_FTP_PASSWORD HOSTINGER_FTP_REMOTE_DIR; do
             if [ -z "${!key}" ]; then
               missing="$missing $key"
             fi
           done
           if [ -n "$missing" ]; then
-            echo "::error title=Missing Hostinger FTP secrets::Add GitHub repository secrets:$missing"
-            echo "hPanel -> Websites -> FTP Accounts, then Settings -> Secrets -> Actions"
+            echo "::error title=Missing Hostinger secrets::Add GitHub secrets:$missing"
+            echo "HOSTINGER_FTP_REMOTE_DIR must be the FULL path to public_html (from hPanel File Manager)."
+            echo "Example: /home/u123456789/domains/yourdomain.com/public_html"
             echo "See docs/HOSTINGER-DEPLOY.md"
             exit 1
           fi
@@ -39,6 +40,7 @@ jobs:
           HOSTINGER_FTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}
           HOSTINGER_FTP_USERNAME: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           HOSTINGER_FTP_PASSWORD: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          HOSTINGER_FTP_REMOTE_DIR: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
 
       - uses: actions/checkout@v4
 
@@ -59,20 +61,20 @@ jobs:
           test -f dist/.htaccess
           ls -la dist/
 
-      - name: Deploy to Hostinger (FTP)
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+      # Hostinger: GitHub runners often timeout on FTP:21 — use SFTP:22
+      - name: Deploy to Hostinger (SFTP)
+        uses: wangyucode/sftp-upload-action@v3
         with:
-          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          host: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          port: ${{ secrets.HOSTINGER_SFTP_PORT || '22' }}
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          port: ${{ secrets.HOSTINGER_FTP_PORT }}
-          protocol: ftp
-          local-dir: ./dist/
-          server-dir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
-          dangerous-clean-slate: false
-          log-level: minimal
+          localDir: dist
+          remoteDir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
+          forceUpload: true
+          concurrency: 8
 
       - name: Deployment summary
         run: |
-          echo "### Hostinger deploy" >> "$GITHUB_STEP_SUMMARY"
-          echo "Frontend uploaded from dist/ to Hostinger public_html." >> "$GITHUB_STEP_SUMMARY"
+          echo "### Hostinger deploy (SFTP)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Uploaded \`dist/\` to \`${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}\`" >> "$GITHUB_STEP_SUMMARY"

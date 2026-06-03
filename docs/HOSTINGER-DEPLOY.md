@@ -1,38 +1,33 @@
 # نشر الواجهة على Hostinger
 
-الـ backend على Cloud Run (`deploy.yml`). هذا الدليل للواجهة (`dist/`).
+الـ backend على Cloud Run. الواجهة تُرفع بـ **SFTP** (منفذ 22) — FTP من GitHub Actions غالباً يعطي `Timeout (control socket)`.
 
-## نشر تلقائي
+## أسرار GitHub (إلزامية)
 
-### بيانات FTP (hPanel)
+| Secret | مثال | ملاحظة |
+|--------|------|--------|
+| `HOSTINGER_FTP_SERVER` | `ftp.hostinger.com` أو IP من hPanel | نفس Host في FTP/SFTP |
+| `HOSTINGER_FTP_USERNAME` | `u758392104` | من FTP Accounts — ليس كلمة `FTP` |
+| `HOSTINGER_FTP_PASSWORD` | كلمة FTP | |
+| `HOSTINGER_FTP_REMOTE_DIR` | `/home/u758392104/domains/schoolixiq.com/public_html` | **مسار كامل** لمجلد الموقع |
 
-**hPanel** → **Websites** → موقعك → **FTP Accounts** (أو **Files** → FTP details)
+### كيف تجد `HOSTINGER_FTP_REMOTE_DIR`
 
-أضف **ثلاثة أسرار إلزامية** في GitHub → **Settings** → **Secrets and variables** → **Actions**:
+1. hPanel → **File Manager**
+2. افتح مجلد **`public_html`**
+3. انظر المسار في الأعلى أو Properties — انسخه كاملاً  
+   غالباً: `/home/USERNAME/domains/DOMAIN/public_html`
 
-| Secret (اسم مطابق) | ماذا تضع |
-|--------------------|----------|
-| `HOSTINGER_FTP_SERVER` | `ftp.hostinger.com` (أو Host من اللوحة) |
-| `HOSTINGER_FTP_USERNAME` | اسم المستخدم FTP (مثل `u123456789`) |
-| `HOSTINGER_FTP_PASSWORD` | كلمة مرور FTP |
+اختياري: `HOSTINGER_SFTP_PORT` = `22`
 
-اختياري:
-
-| Secret | القيمة |
-|--------|--------|
-| `HOSTINGER_FTP_REMOTE_DIR` | `./public_html/` |
-| `HOSTINGER_FTP_PORT` | `21` |
-
-إذا ظهر `Input required and not supplied: server` فالسر **`HOSTINGER_FTP_SERVER`** غير موجود أو اسمه مختلف.
-
-### تشغيل
+## تشغيل النشر
 
 **Actions** → **Deploy Frontend to Hostinger** → **Run workflow**
 
-## يدوي
+## يدوي (ZIP)
 
 ```powershell
-npm run build
+.\scripts\package-dist-zip.ps1
 ```
 
-ارفع محتويات `dist/` إلى `public_html` (مع `.htaccess`).
+ارفع `schoolixiq-dist.zip` إلى `public_html` من File Manager.
