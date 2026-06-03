@@ -34,7 +34,7 @@ function Test-GcloudOk {
 }
 
 Write-Host "==> Project: $PROJECT_ID"
-$PROJECT_NUMBER = (Invoke-Gcloud projects describe $PROJECT_ID --format=value(projectNumber) | Out-String).Trim()
+$PROJECT_NUMBER = (Invoke-Gcloud projects describe $PROJECT_ID '--format=value(projectNumber)' | Out-String).Trim()
 Write-Host "==> Project number: $PROJECT_NUMBER"
 
 Write-Host "==> Enabling required APIs..."
