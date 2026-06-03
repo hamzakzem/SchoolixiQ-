@@ -66,6 +66,21 @@ import SchoolRegistrationFields, {
   buildSchoolFirestoreFields,
   type SchoolRegistrationFormValues,
 } from "../components/auth/SchoolRegistrationFields";
+import {
+  healSchoolDataOnLogin,
+  resolveSignupRole,
+  signupRoleConflict,
+} from "../lib/authLoginHelpers";
+
+const EMPTY_SCHOOL_REGISTRATION: SchoolRegistrationFormValues = {
+  address: "",
+  governorate: "",
+  directorate: "",
+  educationLevel: "",
+  workingHours: "",
+  studyType: "",
+  estimatedStudents: "",
+};
 
 export const getLocalizedPackages = (packagesList: any[], isRtl: boolean) => {
   return packagesList.map(pkg => {
@@ -271,6 +286,11 @@ export default function Login() {
     return () => unsub();
   }, [mode]);
 
+  useEffect(() => {
+    setCaptchaAnswer("");
+    if (mode === "signup") generateCaptcha();
+  }, [mode]);
+
   const downloadMobileConfig = () => {
     toast.success(isRtl ? "جاري تحضير ملف التعريف وتنزيله بنجاح..." : "Preparing and downloading configuration profile...");
     window.location.href = "/api/download/schoolixiq.mobileconfig";
@@ -357,12 +377,22 @@ export default function Login() {
           isFirstUser = !metadataSnap.exists();
         } catch (err) {}
 
-        let finalRole = isFirstUser
-          ? UserRole.SUPERADMIN
-          : provisionedData?.role || pendingRole;
+        const conflict = signupRoleConflict(
+          provisionedData?.role,
+          pendingRole as UserRole,
+          isRtl,
+        );
+        if (conflict) {
+          toast.error(conflict);
+          setLoading(false);
+          return;
+        }
 
-        // Security: prevent superadmin role on public signup
-        if (finalRole === "superadmin" && !isFirstUser) finalRole = UserRole.ADMIN;
+        let finalRole = resolveSignupRole(
+          isFirstUser,
+          provisionedData?.role,
+          pendingRole as UserRole,
+        );
 
         // Create permanent profile
         await setDoc(doc(db, "users", user.uid), {
@@ -467,7 +497,6 @@ export default function Login() {
         subscriptionForm.name,
         subscriptionForm.email,
         subscriptionForm.phone,
-        subscriptionForm.password,
         {
           address: subscriptionForm.address,
           governorate: subscriptionForm.governorate,
@@ -489,7 +518,6 @@ export default function Login() {
         schoolName: subscriptionForm.name,
         adminEmail: subscriptionForm.email,
         adminPhone: subscriptionForm.phone,
-        adminPassword: subscriptionForm.password,
         ...schoolFields,
         status: "pending",
         subscriberCode: code,
@@ -667,11 +695,12 @@ export default function Login() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Verify Captcha
-    if (parseInt(captchaAnswer) !== captchaChallenge.a + captchaChallenge.b) {
-      toast.error(t("captchaError"));
-      generateCaptcha();
-      return;
+    if (mode === "signup") {
+      if (parseInt(captchaAnswer, 10) !== captchaChallenge.a + captchaChallenge.b) {
+        toast.error(t("captchaError"));
+        generateCaptcha();
+        return;
+      }
     }
 
     const emailTrimmed = email.toLowerCase().trim();
@@ -682,24 +711,33 @@ export default function Login() {
       return;
     }
 
-    if (
-      mode === "signup" &&
-      role === UserRole.ADMIN &&
-      (!name.trim() ||
+    if (mode === "signup" && role === UserRole.ADMIN) {
+      const est = Number(schoolRegistration.estimatedStudents);
+      if (
+        !name.trim() ||
         !phone.trim() ||
+        phone.trim().length < 8 ||
         !schoolRegistration.address.trim() ||
         !schoolRegistration.governorate ||
         !schoolRegistration.directorate ||
         !schoolRegistration.educationLevel ||
         !schoolRegistration.workingHours ||
         !schoolRegistration.studyType ||
-        !schoolRegistration.estimatedStudents)
-    ) {
-      toast.error(
-        isRtl
-          ? "يرجى إكمال جميع بيانات المدرسة قبل إنشاء الحساب"
-          : "Please complete all school details before creating your account",
-      );
+        !schoolRegistration.estimatedStudents ||
+        !Number.isFinite(est) ||
+        est < 1
+      ) {
+        toast.error(
+          isRtl
+            ? "يرجى إكمال جميع بيانات المدرسة (رقم هاتف صحيح وعدد طلاب ≥ 1)"
+            : "Complete all school fields (valid phone and student count ≥ 1)",
+        );
+        return;
+      }
+    }
+
+    if (mode === "signup" && role === UserRole.PARENT && !name.trim()) {
+      toast.error(isRtl ? "يرجى إدخال الاسم الكامل" : "Please enter your full name");
       return;
     }
 
@@ -749,30 +787,22 @@ export default function Login() {
           console.warn("Metadata check error", err);
         }
 
-        let finalRole = isFirstUser
-          ? UserRole.SUPERADMIN
-          : provisionedData?.role || role;
-
-        // Security: prevent superadmin role on public signup
-        if (finalRole === "superadmin" && !isFirstUser) finalRole = UserRole.ADMIN;
-
-        // Role conflict check: management cannot be teacher or parent
-        const isManagement = [
-          "admin",
-          "staff",
-          "assistant",
-          "superadmin",
-        ].includes(provisionedData?.role);
-        if (
-          isManagement &&
-          (role === UserRole.PARENT || role === UserRole.TEACHER)
-        ) {
-          toast.error(
-            "هذا الحساب مسجل كإدارة مدرسة ولا يمكن استخدامه كمعلم أو ولي أمر بنفس البريد",
-          );
+        const roleConflictMsg = signupRoleConflict(
+          provisionedData?.role,
+          role,
+          isRtl,
+        );
+        if (roleConflictMsg) {
+          toast.error(roleConflictMsg);
           setLoading(false);
           return;
         }
+
+        let finalRole = resolveSignupRole(
+          isFirstUser,
+          provisionedData?.role,
+          role,
+        );
 
         let schoolId = provisionedData?.schoolId || "";
 
@@ -800,7 +830,6 @@ export default function Login() {
             name.trim(),
             emailTrimmed,
             phone.trim(),
-            passwordValue,
             schoolRegistration,
           );
           await addDoc(collection(db, "registrations"), {
@@ -810,7 +839,6 @@ export default function Login() {
             schoolName: name.trim(),
             adminEmail: emailTrimmed,
             adminPhone: phone.trim(),
-            adminPassword: passwordValue,
             customerInfo,
             ...schoolFields,
             status: "pending",
@@ -865,124 +893,29 @@ export default function Login() {
           toast.success(t("signupSuccess"));
         }
       } else {
+        let signedIn = false;
         try {
-          // Self-healing school document block on login
-          try {
-            const userDocSnap = await getDoc(doc(db, "users", result.user.uid));
-            if (userDocSnap.exists()) {
-              const userData = userDocSnap.data();
-              if (userData?.role === "admin" && userData?.schoolId) {
-                const schoolDocRef = doc(db, "schools", userData.schoolId);
-                const schoolDocSnap = await getDoc(schoolDocRef);
-                if (schoolDocSnap.exists()) {
-                  const schoolData = schoolDocSnap.data();
-                  if (!schoolData.governorate || !schoolData.directorate || schoolData.estimatedStudents === undefined) {
-                    const registrationsRef = collection(db, "registrations");
-                    const regQuery = query(registrationsRef, where("customerInfo.email", "==", emailTrimmed));
-                    const regDocs = await getDocs(regQuery);
-                    let regData = regDocs.empty ? null : regDocs.docs[0].data();
-                    if (!regData) {
-                      const regQuery2 = query(registrationsRef, where("email", "==", emailTrimmed));
-                      const regDocs2 = await getDocs(regQuery2);
-                      if (!regDocs2.empty) regData = regDocs2.docs[0].data();
-                    }
-                    if (regData) {
-                      const regFields = regData.customerInfo || regData;
-                      const updatePayload: Record<string, any> = {};
-                      if (regFields.address && !schoolData.address) updatePayload.address = regFields.address;
-                      if (regFields.governorate && !schoolData.governorate) updatePayload.governorate = regFields.governorate;
-                      if (regFields.directorate && !schoolData.directorate) updatePayload.directorate = regFields.directorate;
-                      const level = regFields.educationLevel || regFields.stage;
-                      if (level && !schoolData.educationLevel && !schoolData.stage) {
-                        updatePayload.educationLevel = level;
-                        updatePayload.stage = level;
-                      }
-                      const hours = regFields.workingHours || regFields.shift;
-                      if (hours && !schoolData.workingHours && !schoolData.shift) {
-                        updatePayload.workingHours = hours;
-                        updatePayload.shift = hours;
-                      }
-                      const study = regFields.studyType || regFields.genderType;
-                      if (study && !schoolData.studyType && !schoolData.genderType) {
-                        updatePayload.studyType = study;
-                        updatePayload.genderType = study;
-                      }
-                      const est =
-                        regFields.estimatedStudents ?? regFields.approximateStudents;
-                      if (est !== undefined && est !== "" && schoolData.estimatedStudents === undefined) {
-                        updatePayload.estimatedStudents = Number(est) || 0;
-                        updatePayload.approximateStudents = String(est);
-                      }
-                      if (Object.keys(updatePayload).length > 0) await updateDoc(schoolDocRef, updatePayload);
-                    }
-                  }
-                }
-              }
-            }
-          } catch (healErr) {
-            console.error("Heal school data error:", healErr);
-          }
-          toast.success(t("welcomeBack"));
-          // Attempt standard sign in
           await signInWithEmailAndPassword(auth, emailTrimmed, passwordValue);
-          toast.success(t("welcomeBack"));
-        } catch (signInErr: any) {
-          // Dynamic Fallback 1: Try with password trimmed (handles accidental spaces on mobile/copy-paste)
+          signedIn = true;
+        } catch (signInErr: unknown) {
+          const err = signInErr as { code?: string };
           if (passwordValue.trim() !== passwordValue) {
             try {
               await signInWithEmailAndPassword(auth, emailTrimmed, passwordValue.trim());
-              toast.success(t("welcomeBack"));
-              return;
-            } catch (trimErr) {
-              // Ignore trim error, continue to next fallback
+              signedIn = true;
+            } catch {
+              // fall through
             }
           }
-
-          // Dynamic Fallback 2: Check if they are a pre-registered/pre-created user in Firestore who has no Auth account yet.
-          // In Firebase v9+, any bad login or user-not-found returns 'auth/invalid-credential'
-          const errCode = signInErr.code || "";
-          const errMsg = signInErr.message || "";
-          const isInvalid =
-            errCode === "auth/user-not-found" ||
-            errCode === "auth/wrong-password" ||
-            errCode === "auth/invalid-credential" ||
-            errCode === "INVALID_CREDENTIAL" ||
-            errMsg.includes("invalid-credential") ||
-            errMsg.toLowerCase().includes("invalid credential");
-
-          if (isInvalid) {
-            try {
-              // If we do an anonymous or direct signup check:
-              // Since rules prevent public users query without sign-in, we try to create an account for them.
-              // If they do not exist in Auth, this will succeed and create their Auth account, 
-              // which then gets automatically claimed by AuthContext claiming logic using their email!
-              // But if they already exist in Auth, this will throw "auth/email-already-in-use", 
-              // meaning they just typed the wrong password, so we safely present the original invalidCredential error!
-              const signUpResult = await createUserWithEmailAndPassword(
-                auth,
-                emailTrimmed,
-                passwordValue
-              );
-              
-              if (signUpResult.user) {
-                // Account created and linked successfully automatically!
-                toast.success(
-                  isRtl 
-                    ? "تم تفعيل حسابك بنجاح والدخول للوحة التحكم!" 
-                    : "Account activated and logged in successfully!"
-                );
-                return;
-              }
-            } catch (signUpErr: any) {
-              if (signUpErr.code !== "auth/email-already-in-use") {
-                console.warn("Auto activation signUp failed:", signUpErr);
-              }
-            }
-          }
-
-          // Inner catch to distinguish between different auth failures if needed
-          throw signInErr;
+          if (!signedIn) throw signInErr;
         }
+
+        try {
+          await healSchoolDataOnLogin(emailTrimmed, auth.currentUser!.uid);
+        } catch (healErr) {
+          console.error("Heal school data error:", healErr);
+        }
+        toast.success(t("welcomeBack"));
       }
     } catch (error: any) {
       const errorCode = error.code || "";
@@ -1015,18 +948,17 @@ export default function Login() {
   };
 
   const handleForgotPassword = async () => {
-    if (!email) {
-      toast.error("يرجى إدخال البريد الإلكتروني أولاً");
+    if (!email.trim()) {
+      toast.error(t("forgotPasswordNeedEmail"));
       return;
     }
     try {
       const { sendPasswordResetEmail } = await import("firebase/auth");
+      auth.languageCode = isRtl ? "ar" : "en";
       await sendPasswordResetEmail(auth, email.trim().toLowerCase());
-      toast.success(
-        "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني",
-      );
+      toast.success(t("forgotPasswordSent"));
     } catch (error: any) {
-      toast.error("فشل إرسال البريد: " + (error.message || "حدث خطأ"));
+      toast.error(error.message || t("forgotPasswordFailed"));
     }
   };
 
@@ -1095,13 +1027,21 @@ export default function Login() {
 
           <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6 sm:mb-8">
             <button
-              onClick={() => setMode("login")}
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setCaptchaAnswer("");
+              }}
               className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${mode === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
               {t("login")}
             </button>
             <button
-              onClick={() => setMode("signup")}
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                generateCaptcha();
+              }}
               className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${mode === "signup" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
               {t("signup")}
@@ -1126,6 +1066,7 @@ export default function Login() {
                       type="button"
                       onClick={() => {
                         setRole(UserRole.PARENT);
+                        setSchoolRegistration(EMPTY_SCHOOL_REGISTRATION);
                       }}
                       className={`flex flex-col items-center p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all ${role === UserRole.PARENT ? "border-blue-600 bg-blue-50 text-blue-700 shadow-lg shadow-blue-100" : "border-slate-100 text-slate-400 hover:border-slate-200"}`}
                     >
@@ -1288,32 +1229,34 @@ export default function Login() {
             </div>
             </div>
 
-            <div className="bg-slate-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-100 shadow-inner">
-              <div className="flex items-center justify-between gap-3 sm:gap-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="bg-white p-1.5 sm:p-2 rounded-lg border border-slate-200 hidden sm:block">
-                    <ShieldCheck size={20} className="text-[#0B2345]" />
+            {mode === "signup" && (
+              <div className="bg-slate-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-100 shadow-inner">
+                <div className="flex items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="bg-white p-1.5 sm:p-2 rounded-lg border border-slate-200 hidden sm:block">
+                      <ShieldCheck size={20} className="text-[#0B2345]" />
+                    </div>
+                    <div>
+                      <span className="block font-bold text-slate-600 text-xs sm:text-sm">
+                        {t("checkIfRobot")}
+                      </span>
+                      <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
+                        {t("captchaSolve")}: {captchaChallenge.a} +{" "}
+                        {captchaChallenge.b} ؟
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="block font-bold text-slate-600 text-xs sm:text-sm">
-                      {t("checkIfRobot")}
-                    </span>
-                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
-                      {t("captchaSolve")}: {captchaChallenge.a} +{" "}
-                      {captchaChallenge.b} ؟
-                    </span>
-                  </div>
+                  <input
+                    required
+                    type="number"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value)}
+                    className="w-16 sm:w-20 px-2 sm:px-3 py-2 sm:py-3 rounded-lg sm:rounded-xl border border-slate-200 text-center font-bold focus:border-blue-500 outline-none shadow-sm text-sm sm:text-base"
+                    placeholder="?"
+                  />
                 </div>
-                <input
-                  required
-                  type="number"
-                  value={captchaAnswer}
-                  onChange={(e) => setCaptchaAnswer(e.target.value)}
-                  className="w-16 sm:w-20 px-2 sm:px-3 py-2 sm:py-3 rounded-lg sm:rounded-xl border border-slate-200 text-center font-bold focus:border-blue-500 outline-none shadow-sm text-sm sm:text-base"
-                  placeholder="?"
-                />
               </div>
-            </div>
+            )}
 
             <button
               disabled={loading}
@@ -1364,9 +1307,9 @@ export default function Login() {
                 className="w-4 h-4 sm:w-5 sm:h-5"
               />
               <span>
-                {isRtl
-                  ? "دخول سريع باستخدام Google"
-                  : "Quick Sign-in with Google"}
+                {mode === "signup"
+                  ? t("googleSignup")
+                  : t("googleLogin")}
               </span>
             </button>
 

@@ -39,7 +39,6 @@ export function buildRegistrationCustomerInfo(
   schoolName: string,
   email: string,
   phone: string,
-  password: string,
   values: SchoolRegistrationFormValues,
 ) {
   const schoolFields = buildSchoolFirestoreFields(values);
@@ -47,7 +46,6 @@ export function buildRegistrationCustomerInfo(
     name: schoolName,
     email,
     phone,
-    password,
     ...values,
     ...schoolFields,
   };
