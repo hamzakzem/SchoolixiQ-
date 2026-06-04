@@ -72,6 +72,10 @@ import { GlobalFooter } from "../components/GlobalFooter";
 import AuthBootScreen from "../components/AuthBootScreen";
 import BrandLogo from "../components/BrandLogo";
 import AndroidAppDownloadCard from "../components/AndroidAppDownloadCard";
+import {
+  hasIosOfficialDownload,
+  openIosInstall,
+} from "../lib/iosAppDownload";
 import SchoolRegistrationFields, {
   buildRegistrationCustomerInfo,
   buildSchoolFirestoreFields,
@@ -1994,13 +1998,69 @@ export default function Login() {
                     <div className="space-y-4 font-bold text-xs text-slate-800 dark:text-slate-100 leading-relaxed text-right">
                       <p className="text-emerald-600 dark:text-emerald-400 font-extrabold text-center text-sm md:text-base mb-1 flex items-center justify-center gap-1">
                         <span>✨</span>
-                        {isRtl ? "تم تحضير طريقتين ميسّرتين لتثبيت التطبيق على الآيفون" : "Two easy ways prepared for iOS Installation!"}
+                        {hasIosOfficialDownload(config)
+                          ? (isRtl ? "ثلاث طرق لتثبيت التطبيق على iPhone" : "Three ways to install on iPhone")
+                          : (isRtl ? "طريقتان لتثبيت التطبيق على الآيفون" : "Two ways to install on iPhone")}
                       </p>
 
-                      {/* Method 1: The Official Safari App Store Method (Add to Home Screen) - Safe, built-in, trusted, 100% sign status */}
+                      {hasIosOfficialDownload(config) ? (
+                        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-4 rounded-3xl border border-slate-700 text-white text-right">
+                          <div className="flex items-center gap-2 mb-2 font-black">
+                            <span className="w-6 h-6 rounded-lg bg-white text-slate-900 flex items-center justify-center text-xs">١</span>
+                            <span className="text-xs sm:text-sm font-black">
+                              {isRtl ? "App Store (موصى به — متوافق مع Apple)" : "App Store (recommended — Apple compliant)"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-white/75 font-medium leading-relaxed mb-3 pr-8">
+                            {isRtl
+                              ? "افتح صفحة التطبيق الرسمية في App Store ثم اضغط «الحصول» أو «تحميل»."
+                              : "Open the official App Store page and tap Get or Download."}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openIosInstall(config);
+                              toast.success(isRtl ? "جاري فتح App Store…" : "Opening App Store…");
+                            }}
+                            className="w-full py-2.5 bg-white text-slate-900 font-black rounded-xl text-xs flex items-center justify-center gap-1.5"
+                          >
+                            <Download size={13} />
+                            {isRtl ? "فتح App Store" : "Open App Store"}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-4 rounded-3xl border border-slate-700 text-white text-right">
+                          <div className="flex items-center gap-2 mb-2 font-black">
+                            <span className="w-6 h-6 rounded-lg bg-white text-slate-900 flex items-center justify-center text-xs">١</span>
+                            <span className="text-xs sm:text-sm font-black">
+                              {isRtl ? "تحميل بنقرة واحدة (موصى به)" : "One-tap install (recommended)"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-white/75 font-medium leading-relaxed mb-3 pr-8">
+                            {isRtl
+                              ? "اضغط الزر ثم «سماح»، ثم من الإعدادات ثبّت ملف التعريف لإضافة التطبيق إلى الشاشة الرئيسية."
+                              : "Tap the button, Allow, then install the profile in Settings to add the app to your Home Screen."}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openIosInstall(config);
+                              toast.success(isRtl ? "جاري تحضير التثبيت…" : "Preparing install…");
+                            }}
+                            className="w-full py-2.5 bg-white text-slate-900 font-black rounded-xl text-xs flex items-center justify-center gap-1.5"
+                          >
+                            <Download size={13} />
+                            {isRtl ? "تحميل الآن" : "Download now"}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Safari — Add to Home Screen */}
                       <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/10 p-4 rounded-3xl border border-emerald-100/60 dark:border-emerald-900/40 text-right">
                         <div className="flex items-center gap-2 mb-2 font-black text-emerald-900 dark:text-emerald-200">
-                          <span className="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs">١</span>
+                          <span className="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs">
+                            {hasIosOfficialDownload(config) ? "٢" : "١"}
+                          </span>
                           <span className="text-xs sm:text-sm font-black">{isRtl ? "طريقة سفاري الفورية (موصى بها جداً - آمنة وموثوقة 100٪)" : "Official Safari Method (Highly Recommended - 100% Secure)"}</span>
                         </div>
                         <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-8">
@@ -2031,10 +2091,12 @@ export default function Login() {
                         </div>
                       </div>
 
-                      {/* Method 2: Config Profile File */}
+                      {/* Config Profile File */}
                       <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/50 dark:from-indigo-950/10 dark:to-violet-950/10 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-right">
                         <div className="flex items-center gap-2 mb-2 font-black text-slate-800 dark:text-slate-200">
-                          <span className="w-6 h-6 rounded-lg bg-[#0B2345] text-white flex items-center justify-center text-xs">٢</span>
+                          <span className="w-6 h-6 rounded-lg bg-[#0B2345] text-white flex items-center justify-center text-xs">
+                            {hasIosOfficialDownload(config) ? "٣" : "٢"}
+                          </span>
                           <span className="text-xs sm:text-sm font-black">{isRtl ? "طريقة ملف التعريف التلقائي بنقرة واحدة" : "Or Download Secure iOS Configuration Profile"}</span>
                         </div>
                         <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-8">

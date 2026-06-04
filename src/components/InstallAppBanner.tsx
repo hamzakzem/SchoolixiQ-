@@ -9,10 +9,18 @@ import {
   triggerAndroidApkDownload,
   dismissAndroidApkPrompt,
   isAndroidApkPromptDismissed,
+  shouldHideAppDownloadPromo,
 } from '../lib/androidAppDownload';
+import {
+  shouldPromoteIosApp,
+  openIosInstall,
+  hasIosOfficialDownload,
+  dismissIosPrompt,
+  isIosPromptDismissed,
+  isIosInstallDeepLink,
+} from '../lib/iosAppDownload';
 import { useSystemConfig } from '../lib/SystemConfigContext';
 import { useAuth } from '../lib/AuthContext';
-import { shouldHideAppDownloadPromo } from '../lib/androidAppDownload';
 
 export default function InstallAppBanner() {
   const { t, isRtl, language } = useLanguage();
@@ -51,8 +59,25 @@ export default function InstallAppBanner() {
 
     if (isIOS) {
       setPlatform('ios');
-      setShowBanner(false);
-      return;
+      const fromDeepLink = isIosInstallDeepLink();
+      if (fromDeepLink) {
+        setShowBanner(true);
+        setShowIOSInstructions(true);
+        return;
+      }
+      const onPrompt = () => {
+        setShowBanner(true);
+        setShowIOSInstructions(true);
+      };
+      window.addEventListener('schoolix:ios-install-prompt', onPrompt);
+      if (shouldPromoteIosApp() && !isIosPromptDismissed()) {
+        const timer = window.setTimeout(() => setShowBanner(true), 2200);
+        return () => {
+          window.clearTimeout(timer);
+          window.removeEventListener('schoolix:ios-install-prompt', onPrompt);
+        };
+      }
+      return () => window.removeEventListener('schoolix:ios-install-prompt', onPrompt);
     }
 
     if (!isAndroid) {
@@ -89,7 +114,15 @@ export default function InstallAppBanner() {
 
   const handleInstallClick = async () => {
     if (platform === 'ios') {
-      setShowIOSInstructions(true);
+      if (hasIosOfficialDownload(config)) {
+        openIosInstall(config);
+        toast.success(t('iosAppStoreOpening'));
+        setShowBanner(false);
+        return;
+      }
+      openIosInstall(config);
+      toast.success(t('iosWebInstallStarting'));
+      setShowBanner(false);
       return;
     }
 
@@ -118,6 +151,7 @@ export default function InstallAppBanner() {
   const handleDismiss = () => {
     localStorage.setItem('schoolix_pwa_dismissed_time', Date.now().toString());
     dismissAndroidApkPrompt();
+    dismissIosPrompt();
     setShowBanner(false);
   };
 
@@ -169,10 +203,18 @@ export default function InstallAppBanner() {
                   </div>
                 </div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white mb-1">
-                  {platform === 'android' ? t('androidAppDownloadTitle') : t('installBannerTitle')}
+                  {platform === 'android'
+                    ? t('androidAppDownloadTitle')
+                    : hasIosOfficialDownload(config)
+                      ? t('iosAppStoreDownloadTitle')
+                      : t('iosWebInstallTitle')}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-bold font-sans">
-                  {platform === 'android' ? t('androidAppDownloadDesc') : t('installBannerDesc')}
+                  {platform === 'android'
+                    ? t('androidAppDownloadDesc')
+                    : hasIosOfficialDownload(config)
+                      ? t('iosAppStoreDownloadDesc')
+                      : t('iosWebInstallDesc')}
                 </p>
 
                 {/* Actions */}
@@ -182,7 +224,11 @@ export default function InstallAppBanner() {
                     className="flex-1 py-3 px-5 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-2xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <Download size={14} />
-                    {platform === 'android' ? t('androidAppDownloadBtn') : t('installAppNow')}
+                    {platform === 'android'
+                      ? t('androidAppDownloadBtn')
+                      : hasIosOfficialDownload(config)
+                        ? t('iosAppStoreDownloadBtn')
+                        : t('iosWebInstallBtn')}
                   </button>
                   <button
                     onClick={handleDismiss}
@@ -210,13 +256,42 @@ export default function InstallAppBanner() {
               <div className="space-y-4 text-xs font-bold text-slate-800 dark:text-slate-100 leading-relaxed text-right">
                 <p className="text-emerald-600 dark:text-emerald-400 font-extrabold text-center text-sm md:text-base mb-1 flex items-center justify-center gap-1">
                   <span>✨</span>
-                  {t('iosInstallTwoWays')}
+                  {hasIosOfficialDownload(config)
+                    ? t('iosInstallThreeWays')
+                    : t('iosInstallTwoWays')}
                 </p>
 
-                {/* Method 1: The Official Safari App Store Method (Add to Home Screen) - Safe, built-in, trusted, 100% sign status */}
+                {hasIosOfficialDownload(config) ? (
+                  <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-4 rounded-3xl border border-slate-700 text-white text-right">
+                    <div className="flex items-center gap-2 mb-2 font-black">
+                      <span className="w-5 h-5 rounded-lg bg-white text-slate-900 flex items-center justify-center text-xs font-bold">
+                        ١
+                      </span>
+                      <span className="text-xs sm:text-sm">{t('iosMethodAppStore')}</span>
+                    </div>
+                    <p className="text-[11px] text-white/75 font-medium leading-relaxed mb-3 pr-6">
+                      {t('iosMethodAppStoreDesc')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openIosInstall(config);
+                        toast.success(t('iosAppStoreOpening'));
+                      }}
+                      className="w-full py-2.5 bg-white text-slate-900 font-black rounded-xl text-xs flex items-center justify-center gap-1.5"
+                    >
+                      <Download size={13} />
+                      {t('iosAppStoreDownloadBtn')}
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* Safari — Add to Home Screen (Apple web app guideline) */}
                 <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/10 p-4 rounded-3xl border border-emerald-100/60 dark:border-emerald-900/40 text-right">
                   <div className="flex items-center gap-2 mb-2 font-black text-emerald-950 dark:text-emerald-200">
-                    <span className="w-5 h-5 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">١</span>
+                    <span className="w-5 h-5 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">
+                      {hasIosOfficialDownload(config) ? '٢' : '١'}
+                    </span>
                     <span className="text-xs sm:text-sm font-black">{t('iosMethodSafari')}</span>
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-6">
@@ -248,7 +323,9 @@ export default function InstallAppBanner() {
                 {/* Method 2: Config Profile File */}
                 <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/50 dark:from-indigo-950/10 dark:to-violet-950/10 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-right">
                   <div className="flex items-center gap-2 mb-2 font-black text-slate-800 dark:text-slate-200">
-                    <span className="w-5 h-5 rounded-lg bg-[#0B2345] text-white flex items-center justify-center text-xs font-bold">٢</span>
+                    <span className="w-5 h-5 rounded-lg bg-[#0B2345] text-white flex items-center justify-center text-xs font-bold">
+                      {hasIosOfficialDownload(config) ? '٣' : '٢'}
+                    </span>
                     <span className="text-xs sm:text-sm font-black">{t('iosMethodProfile')}</span>
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-6">

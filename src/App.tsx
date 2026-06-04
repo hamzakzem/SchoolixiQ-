@@ -47,6 +47,7 @@ const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 
 import ScanHandler from "./components/ScanHandler";
 import NativeAppShellMarker from "./components/mobile/NativeAppShellMarker";
+import IosInstallDeepLink from "./components/IosInstallDeepLink";
 import SolarLoading from "./components/SolarLoading";
 import AuthBootScreen from "./components/AuthBootScreen";
 import { createSchoolSubscriptionRegistration } from "./lib/schoolSubscriptionRequest";
@@ -1458,6 +1459,7 @@ export default function App() {
         <LanguageProvider>
           <AuthProvider>
             <NativeAppShellMarker />
+            <IosInstallDeepLink />
             <BrowserRouter>
               <Suspense fallback={<SolarLoading />}>
                 <Routes>

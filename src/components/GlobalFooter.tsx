@@ -13,7 +13,7 @@ import { School } from "../types";
 import { ArrowLeft } from "lucide-react";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { Capacitor } from "@capacitor/core";
-import { FooterAndroidDownload } from "./FooterAndroidDownload";
+import { FooterAppDownloads } from "./FooterAppDownloads";
 
 interface DisplayPartner {
   id: string;
@@ -137,7 +137,7 @@ export function GlobalFooter({
           <div className="w-full h-px bg-slate-200/20 dark:bg-slate-800/25 mb-3" />
           {!suppressDownload ? (
             <div className="flex flex-col items-center gap-4 mb-3">
-              <FooterAndroidDownload appName={config.appName} compact />
+              <FooterAppDownloads appName={config.appName} compact />
             </div>
           ) : null}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
@@ -292,7 +292,7 @@ export function GlobalFooter({
 
         {/* ANDROID APP DOWNLOAD */}
         <div className="w-full flex justify-center mb-10 md:mb-12 px-2">
-          <FooterAndroidDownload appName={config.appName} />
+          <FooterAppDownloads appName={config.appName} />
         </div>
 
         {/* BOTTOM FOOTER */}

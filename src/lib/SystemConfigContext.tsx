@@ -21,6 +21,14 @@ interface SystemConfig {
   appLogo?: string;
   /** Direct link to Android APK (Firebase Storage, CDN, or /downloads/schoolixiq.apk) */
   androidApkUrl?: string;
+  /** App Store link (https://apps.apple.com/app/id…) — الطريقة المعتمدة من Apple */
+  iosAppStoreUrl?: string;
+  /** TestFlight join link (اختياري قبل النشر على المتجر) */
+  iosTestFlightUrl?: string;
+  /** رابط الموقع لتثبيت التطبيق على iPhone (Safari / ملف تعريف) */
+  iosWebInstallUrl?: string;
+  /** تفعيل زر تحميل iPhone على الموقع */
+  iosInstallEnabled?: boolean;
   supportPhones: string[];
   supportEmails: string[];
   successPartners: {name: string, logoUrl: string}[];
@@ -35,6 +43,10 @@ const defaultSystemConfig: SystemConfig = {
   appName: 'SchoolixiQ',
   appLogo: BRAND_LOGO_URL,
   androidApkUrl: 'https://schoolixiq.com/downloads/schoolixiq.apk',
+  iosAppStoreUrl: '',
+  iosTestFlightUrl: '',
+  iosWebInstallUrl: 'https://schoolixiq.com',
+  iosInstallEnabled: true,
   supportPhones: ['+964 770 000 0000'],
   supportEmails: ['support@schoolixiq.iq'],
   successPartners: [],
@@ -125,19 +137,32 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         const appLogo = resolveAppLogo(
           typeof data.appLogo === 'string' ? data.appLogo : undefined,
         );
-        const newConfig = {
-          appName: appName,
-          appLogo: appLogo,
+        const newConfig: SystemConfig = {
+          ...defaultSystemConfig,
+          ...data,
+          appName,
+          appLogo,
           androidApkUrl:
             typeof data.androidApkUrl === 'string' && data.androidApkUrl.trim()
               ? data.androidApkUrl.trim()
               : defaultSystemConfig.androidApkUrl,
+          iosAppStoreUrl:
+            typeof data.iosAppStoreUrl === 'string' ? data.iosAppStoreUrl.trim() : '',
+          iosTestFlightUrl:
+            typeof data.iosTestFlightUrl === 'string' ? data.iosTestFlightUrl.trim() : '',
+          iosWebInstallUrl:
+            typeof data.iosWebInstallUrl === 'string' && data.iosWebInstallUrl.trim()
+              ? data.iosWebInstallUrl.trim()
+              : defaultSystemConfig.iosWebInstallUrl,
+          iosInstallEnabled: data.iosInstallEnabled !== false,
           supportPhones: data.supportPhones || (data.supportPhone ? [data.supportPhone] : ['+964 770 000 0000']),
           supportEmails: data.supportEmails || (data.supportEmail ? [data.supportEmail] : ['support@schoolixiq.iq']),
           successPartners: data.successPartners || [],
           marketingTitle: data.marketingTitle || defaultSystemConfig.marketingTitle,
           marketingSubtitle: data.marketingSubtitle || defaultSystemConfig.marketingSubtitle,
-          marketingFeatures: data.marketingFeatures || defaultSystemConfig.marketingFeatures
+          marketingFeatures: data.marketingFeatures || defaultSystemConfig.marketingFeatures,
+          socialLinks: data.socialLinks || defaultSystemConfig.socialLinks,
+          promotionalBanners: data.promotionalBanners || defaultSystemConfig.promotionalBanners,
         };
         setConfig(newConfig);
         try {

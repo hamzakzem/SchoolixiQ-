@@ -292,6 +292,8 @@ export default function SuperAdminDashboard() {
     appName: string;
     appLogo: string;
     androidApkUrl: string;
+    iosAppStoreUrl: string;
+    iosTestFlightUrl: string;
     marketingTitle?: string;
     marketingSubtitle?: string;
     marketingFeatures?: { title: string; description: string }[];
@@ -308,6 +310,8 @@ export default function SuperAdminDashboard() {
     appName: "SchoolixiQ",
     appLogo: "",
     androidApkUrl: "https://schoolixiq.com/downloads/schoolixiq.apk",
+    iosAppStoreUrl: "",
+    iosTestFlightUrl: "",
     marketingTitle: "",
     marketingSubtitle: "",
     marketingFeatures: [],
@@ -338,6 +342,8 @@ export default function SuperAdminDashboard() {
             androidApkUrl:
               data.androidApkUrl ||
               "https://schoolixiq.com/downloads/schoolixiq.apk",
+            iosAppStoreUrl: data.iosAppStoreUrl || "",
+            iosTestFlightUrl: data.iosTestFlightUrl || "",
             marketingTitle: data.marketingTitle || "",
             marketingSubtitle: data.marketingSubtitle || "",
             marketingFeatures: data.marketingFeatures || [],
@@ -4017,6 +4023,47 @@ export default function SuperAdminDashboard() {
                           public_html/downloads/schoolixiq.apk أو ضع رابط
                           Firebase Storage / Google Drive مباشر.
                         </p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                          رابط App Store (iPhone) — مطلوب لسياسات Apple
+                        </label>
+                        <input
+                          type="url"
+                          value={systemConfig.iosAppStoreUrl}
+                          onChange={(e) =>
+                            setSystemConfig({
+                              ...systemConfig,
+                              iosAppStoreUrl: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-mono text-sm"
+                          placeholder="https://apps.apple.com/app/id1234567890"
+                          dir="ltr"
+                        />
+                        <p className="text-[10px] text-slate-500 mt-2 font-medium">
+                          من App Store Connect → App Information → رابط
+                          Apple ID. يفتح مباشرة في App Store على الآيفون (متوافق
+                          مع Apple).
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                          رابط TestFlight (اختياري — قبل النشر)
+                        </label>
+                        <input
+                          type="url"
+                          value={systemConfig.iosTestFlightUrl}
+                          onChange={(e) =>
+                            setSystemConfig({
+                              ...systemConfig,
+                              iosTestFlightUrl: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-mono text-sm"
+                          placeholder="https://testflight.apple.com/join/XXXXXXXX"
+                          dir="ltr"
+                        />
                       </div>
                     </div>
 

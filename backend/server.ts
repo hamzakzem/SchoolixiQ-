@@ -1263,7 +1263,9 @@ async function startServer() {
         if (isProductionEnv && !isDevUrl) {
           await db.collection('system').doc('config').set({
             appUrl: appUrlClean,
-            appUrlProd: appUrlClean
+            appUrlProd: appUrlClean,
+            iosInstallEnabled: true,
+            iosWebInstallUrl: appUrlClean,
           }, { merge: true });
           console.log(`Successfully saved production APP_URL (${appUrlClean}) to system/config.`);
         } else {
