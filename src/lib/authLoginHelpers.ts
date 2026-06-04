@@ -16,6 +16,31 @@ export function isManagementRole(role?: string): boolean {
   return !!role && MANAGEMENT_ROLES.has(role);
 }
 
+/** Requires signed-in user (Firestore rules allow list when email matches). */
+export async function findProvisionedUserByEmail(
+  emailTrimmed: string,
+  excludeUid?: string,
+): Promise<{ data: Record<string, unknown> | null; oldDocId: string }> {
+  const q = query(collection(db, 'users'), where('email', '==', emailTrimmed));
+  const snap = await getDocs(q);
+
+  for (const found of snap.docs) {
+    if (excludeUid && found.id === excludeUid) continue;
+    return { data: found.data() as Record<string, unknown>, oldDocId: found.id };
+  }
+
+  return { data: null, oldDocId: '' };
+}
+
+export async function isPlatformUninitialized(): Promise<boolean> {
+  try {
+    const metadataSnap = await getDoc(doc(db, 'users', 'metadata'));
+    return !metadataSnap.exists();
+  } catch {
+    return false;
+  }
+}
+
 /** After successful login: copy missing school fields from registrations. */
 export async function healSchoolDataOnLogin(emailTrimmed: string, uid: string): Promise<void> {
   const userDocSnap = await getDoc(doc(db, 'users', uid));

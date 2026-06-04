@@ -85,6 +85,8 @@ import {
   healSchoolDataOnLogin,
   resolveSignupRole,
   signupRoleConflict,
+  findProvisionedUserByEmail,
+  isPlatformUninitialized,
 } from "../lib/authLoginHelpers";
 import {
   createSchoolSubscriptionRegistration,
@@ -830,27 +832,17 @@ export default function Login() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const q = query(
-          collection(db, "users"),
-          where("email", "==", emailTrimmed),
+        const result = await createUserWithEmailAndPassword(
+          auth,
+          emailTrimmed,
+          passwordValue,
         );
-        const querySnap = await getDocs(q);
-        let provisionedData: Record<string, unknown> | null = null;
-        let oldDocId = "";
+        const user = result.user;
 
-        if (!querySnap.empty) {
-          const found = querySnap.docs[0];
-          provisionedData = found.data() as Record<string, unknown>;
-          oldDocId = found.id;
-        }
+        const { data: provisionedData, oldDocId } =
+          await findProvisionedUserByEmail(emailTrimmed, user.uid);
 
-        let isFirstUser = false;
-        try {
-          const metadataSnap = await getDoc(doc(db, "users", "metadata"));
-          isFirstUser = !metadataSnap.exists();
-        } catch (err) {
-          console.warn("Metadata check error", err);
-        }
+        const isFirstUser = await isPlatformUninitialized();
 
         const roleConflictMsg = signupRoleConflict(
           provisionedData?.role as string | undefined,
@@ -858,6 +850,7 @@ export default function Login() {
           isRtl,
         );
         if (roleConflictMsg) {
+          await signOut(auth);
           toast.error(roleConflictMsg);
           return;
         }
@@ -865,6 +858,8 @@ export default function Login() {
         const provisionedSchoolId = (provisionedData?.schoolId as string) || "";
         const pendingSchoolAdmin =
           role === UserRole.ADMIN && !isFirstUser && !provisionedSchoolId;
+
+        await updateProfile(user, { displayName: name });
 
         if (pendingSchoolAdmin) {
           setAdminSignupStep("packages");
@@ -875,15 +870,6 @@ export default function Login() {
           );
           return;
         }
-
-        const result = await createUserWithEmailAndPassword(
-          auth,
-          emailTrimmed,
-          passwordValue,
-        );
-        const user = result.user;
-
-        await updateProfile(user, { displayName: name });
 
         try {
           auth.languageCode = isRtl ? "ar" : "en";
@@ -985,14 +971,24 @@ export default function Login() {
         toast.error(t("tooManyRequests"));
       } else if (errorCode === "auth/user-disabled") {
         toast.error(t("userDisabled"));
+      } else if (
+        errorCode === "permission-denied" ||
+        errorMessage.includes("Missing or insufficient permissions")
+      ) {
+        toast.error(
+          isRtl
+            ? "صلاحيات قاعدة البيانات تمنع العملية. جرّب مرة أخرى أو تواصل مع الدعم."
+            : "Database permissions blocked this action. Try again or contact support.",
+        );
+        if (auth.currentUser && mode === "signup") {
+          await signOut(auth).catch(() => {});
+        }
       } else {
         toast.error(errorMessage || t("authFailed"));
       }
     } finally {
       authSubmitLock.current = false;
-      if (!auth.currentUser) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
@@ -1011,13 +1007,16 @@ export default function Login() {
     markSchoolRegistrationInProgress();
 
     try {
-      const result = await createUserWithEmailAndPassword(
-        auth,
-        emailTrimmed,
-        password,
-      );
-      const user = result.user;
-      await updateProfile(user, { displayName: name.trim() });
+      let user = auth.currentUser;
+      if (!user || user.email?.toLowerCase() !== emailTrimmed) {
+        const result = await createUserWithEmailAndPassword(
+          auth,
+          emailTrimmed,
+          password,
+        );
+        user = result.user;
+        await updateProfile(user, { displayName: name.trim() });
+      }
 
       try {
         auth.languageCode = isRtl ? "ar" : "en";
