@@ -5,6 +5,8 @@ const DISMISS_DAYS = 2;
 const IOS_INSTALL_QUERY = 'install=ios';
 /** Static file on Hostinger (SPA /api/* returns index.html and causes refresh loop). */
 export const IOS_MOBILECONFIG_PATH = '/downloads/schoolixiq.mobileconfig';
+/** صفحة تعليمات التثبيت (خارج SPA) — الطريقة الصحيحة لإضافة أيقونة على الشاشة الرئيسية */
+export const IOS_INSTALL_GUIDE_PATH = '/install-iphone.html';
 
 /** Production site — تثبيت iPhone عبر Safari / ملف التعريف (متوافق مع Apple) */
 export const DEFAULT_IOS_WEB_INSTALL_URL = 'https://schoolixiq.com';
@@ -25,6 +27,23 @@ export function isIosDevice(): boolean {
   if (typeof window === 'undefined') return false;
   const ua = window.navigator.userAgent || '';
   return /iPad|iPhone|iPod/i.test(ua) && !(window as Window & { MSStream?: unknown }).MSStream;
+}
+
+/** ملف التعريف و«إضافة للشاشة الرئيسية» يعملان من Safari فقط على iOS */
+export function isIosSafari(): boolean {
+  if (!isIosDevice()) return false;
+  const ua = window.navigator.userAgent || '';
+  return (
+    /Safari/i.test(ua) &&
+    !/CriOS|FxiOS|EdgiOS|OPiOS|mercury|FBAN|FBAV|Instagram|Line\//i.test(ua)
+  );
+}
+
+export function getIosInstallGuideUrl(config?: IosDownloadConfig | null): string {
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return `${window.location.origin}${IOS_INSTALL_GUIDE_PATH}`;
+  }
+  return `${getIosWebInstallUrl(config)}${IOS_INSTALL_GUIDE_PATH}`;
 }
 
 export function shouldPromoteIosApp(): boolean {
@@ -132,7 +151,12 @@ export function hasIosDownloadAvailable(config?: IosDownloadConfig | null): bool
 /** ملف تعريف iOS — اختصار إلى الشاشة الرئيسية (Apple Web Clip). */
 export function triggerIosWebClipInstall(): void {
   if (typeof window === 'undefined') return;
-  window.location.assign(getIosMobileConfigUrl());
+  if (!isIosSafari()) {
+    window.location.assign(getIosInstallGuideUrl());
+    return;
+  }
+  const url = getIosMobileConfigUrl();
+  window.location.assign(`${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`);
 }
 
 /** Opens App Store / TestFlight. Returns false if no URL configured. */
@@ -174,11 +198,11 @@ export function openIosInstall(config?: IosDownloadConfig | null): boolean {
   }
 
   if (isIosDevice()) {
-    triggerIosWebClipInstall();
+    window.location.assign(getIosInstallGuideUrl(config));
     return true;
   }
 
-  window.open(getIosInstallLandingUrl(config), '_blank', 'noopener,noreferrer');
+  window.open(getIosInstallGuideUrl(config), '_blank', 'noopener,noreferrer');
   return true;
 }
 

@@ -88,6 +88,7 @@ jobs:
             echo "::error::Missing public/downloads/schoolixiq.mobileconfig — iPhone install will fail"
             exit 1
           fi
+          test -f dist/install-iphone.html || (echo "::error::Missing public/install-iphone.html" && exit 1)
 
       - name: Package dist zip (manual fallback)
         run: |

@@ -7,15 +7,9 @@
     <dict>
       <key>FullScreen</key>
       <true/>
-      <key>Icon</key>
-      <data>
-        iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAABXklEQVR4nO2WsU4CMRRFb8EILg6OJsYBB3+Co4Oji/8g
-        /of7MjoZsDo6EAcX6XW6pVAeF7pG03uS9gXb0pS778vLqyAiIiIiIiIiIiIiIiIiIiIiIiIiIiIievX09DzMv063BvABrIEtQAfoA8cAtG2fM9K1XpE+sKst
-        q2Fq+77nZf66bY7AIn9dFfV6O1/Zz6B0U+6y5W0H2AKX6iX6p9rZ9oT153uI5yv6U8gYI5+v9KdyqZ5yZ+Q3mOepbE7kK9YpZ0be6m9b6BGrv23r78/S9Zlz
-        9S7lXN9D4Gv+2m/Tfshb6Anb0FfM0f6v+Xv0XbO8beXFfA9GvsIcsU5nzDbyjP31U3O8Tfvk7DlyzH6asV72/99039/Zf39Xvv5PcsR+GvscEWevWe6/XofY
-        DWe6mUfsp/Fj9G+YyZfR/SMyrYn92N8RERERERERERERERERERERERERERERkR79AdA9W8G957+9AAAAAElFTkSuQmCC
-      </data>
       <key>IsRemovable</key>
+      <true/>
+      <key>Precomposed</key>
       <true/>
       <key>Label</key>
       <string>SchoolixiQ</string>
@@ -24,7 +18,7 @@
       <key>PayloadDisplayName</key>
       <string>SchoolixiQ</string>
       <key>PayloadIdentifier</key>
-      <string>com.schoolixiq.app</string>
+      <string>com.schoolixiq.webclip</string>
       <key>PayloadType</key>
       <string>com.apple.webclip.managed</string>
       <key>PayloadUUID</key>
@@ -32,11 +26,11 @@
       <key>PayloadVersion</key>
       <integer>1</integer>
       <key>URL</key>
-      <string>https://schoolixiq.com</string>
+      <string>https://schoolixiq.com/</string>
     </dict>
   </array>
   <key>PayloadDisplayName</key>
-  <string>منصة SchoolixiQ</string>
+  <string>SchoolixiQ</string>
   <key>PayloadIdentifier</key>
   <string>com.schoolixiq.profile</string>
   <key>PayloadOrganization</key>

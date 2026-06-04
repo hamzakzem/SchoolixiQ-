@@ -4,10 +4,10 @@ import {
   isIosInstallDeepLink,
   isIosDevice,
   clearIosInstallQueryFromUrl,
-  getIosMobileConfigUrl,
+  getIosInstallGuideUrl,
 } from '../lib/iosAppDownload';
 
-/** يعرض بانر التثبيت على سطح المكتب؛ على iPhone يفتح ملف التعريف مباشرة */
+/** على iPhone يفتح صفحة تعليمات التثبيت (Safari → الشاشة الرئيسية) */
 export function dispatchIosInstallPrompt(): void {
   if (typeof window === 'undefined' || Capacitor.isNativePlatform()) return;
   window.dispatchEvent(new CustomEvent('schoolix:ios-install-prompt'));
@@ -19,7 +19,7 @@ export default function IosInstallDeepLink() {
 
     if (isIosDevice()) {
       clearIosInstallQueryFromUrl();
-      window.location.assign(getIosMobileConfigUrl());
+      window.location.assign(getIosInstallGuideUrl());
       return;
     }
 

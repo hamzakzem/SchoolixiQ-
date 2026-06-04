@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SchoolixiQ" />
+  <link rel="apple-touch-icon" href="/logo.png" />
+  <title>تثبيت SchoolixiQ على iPhone</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(165deg, #f8fafc 0%, #e2e8f0 100%);
+      color: #0f172a;
+      min-height: 100dvh;
+      padding: 1.25rem 1rem 2rem;
+      line-height: 1.6;
+    }
+    .wrap { max-width: 420px; margin: 0 auto; }
+    .logo { display: block; width: 72px; height: 72px; margin: 0 auto 0.75rem; border-radius: 18px; }
+    h1 { text-align: center; font-size: 1.35rem; margin: 0 0 0.35rem; }
+    .sub { text-align: center; color: #64748b; font-size: 0.85rem; margin-bottom: 1.25rem; }
+    .warn {
+      display: none;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      color: #92400e;
+      padding: 0.75rem 1rem;
+      border-radius: 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    .warn.show { display: block; }
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 1.1rem 1.15rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 8px 30px rgba(11, 35, 69, 0.08);
+      border: 1px solid #e2e8f0;
+    }
+    .badge {
+      display: inline-block;
+      background: #0B2345;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      margin-bottom: 0.5rem;
+    }
+    .card h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+    ol { margin: 0; padding-right: 1.2rem; font-size: 0.88rem; color: #334155; }
+    ol li { margin-bottom: 0.45rem; }
+    .btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 0.9rem;
+      padding: 0.85rem 1rem;
+      border-radius: 14px;
+      margin-top: 0.85rem;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary { background: #0B2345; color: #fff; }
+    .btn-secondary { background: #f1f5f9; color: #0B2345; border: 1px solid #cbd5e1; }
+    .note { font-size: 0.75rem; color: #64748b; margin-top: 0.65rem; }
+    .foot { text-align: center; font-size: 0.75rem; color: #94a3b8; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="logo" src="/logo.png" alt="SchoolixiQ" width="72" height="72" />
+    <h1>تثبيت SchoolixiQ على iPhone</h1>
+    <p class="sub">لإضافة أيقونة التطبيق على الشاشة الرئيسية — وليس حفظ ملف في «الملفات»</p>
+
+    <div id="safari-warn" class="warn">
+      افتح هذه الصفحة من <strong>Safari</strong> (متصفح آيفون الأزرق). Chrome وتطبيقات التواصل تحفظ الملف فقط ولا تثبّت التطبيق.
+    </div>
+
+    <div class="card">
+      <span class="badge">موصى به — الطريقة الرسمية</span>
+      <h2>إضافة إلى الشاشة الرئيسية (Safari)</h2>
+      <ol>
+        <li>اضغط الزر أدناه لفتح الموقع في Safari.</li>
+        <li>اضغط زر <strong>المشاركة</strong> (مربع وسهم للأعلى) في الأسفل.</li>
+        <li>اختر <strong>إضافة إلى الشاشة الرئيسية</strong>.</li>
+        <li>اضغط <strong>إضافة</strong> — ستظهر أيقونة التطبيق.</li>
+      </ol>
+      <a class="btn btn-primary" href="https://schoolixiq.com/" id="open-site">فتح schoolixiq.com</a>
+      <p class="note">بعد الإضافة، افتح التطبيق من الأيقونة على الشاشة الرئيسية.</p>
+    </div>
+
+    <div class="card">
+      <span class="badge" style="background:#475569">بديل</span>
+      <h2>تثبيت بملف التعريف</h2>
+      <p class="note" style="margin-top:0">يعمل فقط من Safari. إذا ظهر «تنزيل» اضغط <strong>سماح</strong> ثم:</p>
+      <ol>
+        <li>افتح تطبيق <strong>الإعدادات</strong>.</li>
+        <li>اضغط <strong>تم تنزيل ملف التعريف</strong> في الأعلى.</li>
+        <li>اضغط <strong>تثبيت</strong> وأدخل رمز القفل.</li>
+      </ol>
+      <button type="button" class="btn btn-secondary" id="profile-btn">تثبيت ملف التعريف</button>
+      <p class="note">إذا حُفظ الملف في «الملفات» فقط، ارجع للطريقة الأولى أعلاه.</p>
+    </div>
+
+    <p class="foot"><a href="/" style="color:#0B2345">العودة للموقع</a></p>
+  </div>
+  <script>
+    (function () {
+      var ua = navigator.userAgent || '';
+      var isIOS = /iPad|iPhone|iPod/i.test(ua) && !window.MSStream;
+      var isSafari = isIOS && /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|mercury|FBAN|FBAV|Instagram/i.test(ua);
+      if (isIOS && !isSafari) {
+        document.getElementById('safari-warn').classList.add('show');
+      }
+      document.getElementById('profile-btn').addEventListener('click', function () {
+        if (!isSafari) {
+          alert('افتح هذه الصفحة من Safari لتثبيت ملف التعريف، أو استخدم «إضافة إلى الشاشة الرئيسية».');
+          return;
+        }
+        window.location.href = '/downloads/schoolixiq.mobileconfig?v=' + Date.now();
+      });
+    })();
+  </script>
+</body>
+</html>

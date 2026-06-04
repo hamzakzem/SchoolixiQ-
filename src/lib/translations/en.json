@@ -400,7 +400,7 @@
   "iosAppStoreDownloadBtn": "Open App Store",
   "iosAppStoreOpening": "Opening App Store…",
   "iosWebInstallTitle": "Install SchoolixiQ on iPhone",
-  "iosWebInstallDesc": "Secure install via Safari — tap Download Now, Allow, then follow Settings",
+  "iosWebInstallDesc": "Use Safari: Add to Home Screen — app icon, not a file in Files",
   "iosWebInstallBtn": "Download now",
   "iosWebInstallStarting": "Preparing iPhone install…",
   "iosMethodAppStore": "App Store (recommended — Apple compliant)",

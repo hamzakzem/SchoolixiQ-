@@ -1,5 +1,8 @@
 DirectoryIndex index.html index.php
 
+# iOS configuration profiles (must not be served as generic download)
+AddType application/x-apple-aspen-config .mobileconfig
+
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType text/css "access plus 1 year"
@@ -28,8 +31,12 @@ DirectoryIndex index.html index.php
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
   <FilesMatch "\.mobileconfig$">
-    Header set Content-Type "application/x-apple-aspen-config"
-    Header set Content-Disposition "inline; filename=schoolixiq.mobileconfig"
+    Header always set Content-Type "application/x-apple-aspen-config; charset=utf-8"
+    Header always set Content-Disposition "inline"
+    Header always set X-Content-Type-Options "nosniff"
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "install-iphone\.html$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
   </FilesMatch>
 </IfModule>
