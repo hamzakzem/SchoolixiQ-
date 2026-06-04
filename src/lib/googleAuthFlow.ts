@@ -197,18 +197,27 @@ export async function runGoogleSignInFlow(
     return { status: 'webview-blocked' };
   }
 
-  try {
-    await signInWithGoogleRedirectWeb(auth);
-    return { status: 'redirecting' };
-  } catch (redirectErr) {
-    const mapped = mapGoogleAuthError(redirectErr, isRtl);
-    if (mapped.cancelled) return { status: 'cancelled' };
-    if (mapped.webViewBlocked) return { status: 'webview-blocked' };
-    return {
-      status: 'error',
-      error: new Error(mapped.message),
-    };
+  // Popup keeps the same tab — avoids full reload that breaks getRedirectResult
+  const webResult = await signInWithGoogleWeb(auth);
+  if (webResult.ok) {
+    return { status: 'success', user: webResult.user };
   }
+  if (webResult.cancelled) {
+    return { status: 'cancelled' };
+  }
+  if (webResult.popupBlocked) {
+    try {
+      await signInWithGoogleRedirectWeb(auth);
+      return { status: 'redirecting' };
+    } catch (redirectErr) {
+      const mapped = mapGoogleAuthError(redirectErr, isRtl);
+      if (mapped.cancelled) return { status: 'cancelled' };
+      return { status: 'error', error: new Error(mapped.message) };
+    }
+  }
+
+  const mapped = mapGoogleAuthError(webResult.error, isRtl);
+  return { status: 'error', error: new Error(mapped.message) };
 }
 
 /** Optional popup path (desktop browsers with pop-ups allowed) */

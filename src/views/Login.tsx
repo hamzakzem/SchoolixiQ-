@@ -379,7 +379,7 @@ export default function Login() {
     }
   };
 
-  // Show Google redirect errors (redirect is completed in googleRedirectBootstrap before React)
+  // Google redirect completed in googleRedirectBootstrap before React mounts
   useEffect(() => {
     void waitForGoogleRedirectBootstrap().then((result) => {
       if (result.urlError) {
@@ -404,9 +404,7 @@ export default function Login() {
         if (mapped.webViewBlocked) {
           setGoogleWebViewBlocked(true);
         }
-        if (!mapped.cancelled && mapped.message) {
-          toast.error(mapped.message);
-        }
+        toast.error(mapped.message || result.profileError.message || t("failedConnection"));
       }
     });
   }, [isRtl, t]);

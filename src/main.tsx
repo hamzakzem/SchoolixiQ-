@@ -1,13 +1,12 @@
-import {StrictMode, useEffect} from 'react';
-import {createRoot} from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import './styles/macbook-loading.css';
 import { initSentry } from './lib/sentryWrapper';
 import { initNativeLiveSync } from './lib/nativeLiveSync';
 import { initNativeGoogleAuth } from './lib/initNativeGoogleAuth';
-// Must run before React — completes Firebase OAuth redirect (Google sign-in return)
-import './lib/googleRedirectBootstrap';
+import { googleRedirectBootstrapPromise } from './lib/googleRedirectBootstrap';
+import { isOAuthSensitiveNavigation } from './lib/oauthReturnGuard';
 
 initNativeLiveSync();
 void initNativeGoogleAuth();
@@ -21,28 +20,31 @@ if (import.meta.env.VITE_SENTRY_DSN) {
   try {
     initSentry(dsn);
   } catch (error) {
-    console.error("Failed to call initSentry:", error);
+    console.error('Failed to call initSentry:', error);
   }
 } else {
-  console.warn("Sentry error tracking is disabled: VITE_SENTRY_DSN is not set.");
+  console.warn('Sentry error tracking is disabled: VITE_SENTRY_DSN is not set.');
 }
 
-// Handle Vit's HMR websocket errors which are benign in this environment
 if (typeof window !== 'undefined') {
   const checkAndHandleDbError = (errMessage: string) => {
+    if (isOAuthSensitiveNavigation()) return;
+
     const isInIframe = window.self !== window.top;
     if (isInIframe) {
-      console.log("Suppressed IndexedDB connection error inside iframe since memory/session cache is used instead.");
+      console.log(
+        'Suppressed IndexedDB connection error inside iframe since memory/session cache is used instead.',
+      );
       return;
     }
 
     if (
-      errMessage && 
-      (errMessage.includes('refusing to open IndexedDB') || 
-       errMessage.includes('corruption of the IndexedDB') || 
-       errMessage.includes('IndexedDB database data') || 
-       errMessage.includes('Connection to Indexed Database') || 
-       errMessage.includes('Database server lost'))
+      errMessage &&
+      (errMessage.includes('refusing to open IndexedDB') ||
+        errMessage.includes('corruption of the IndexedDB') ||
+        errMessage.includes('IndexedDB database data') ||
+        errMessage.includes('Connection to Indexed Database') ||
+        errMessage.includes('Database server lost'))
     ) {
       const reloadCount = parseInt(sessionStorage.getItem('db_error_reload_count') || '0', 10);
       if (reloadCount < 3) {
@@ -69,25 +71,29 @@ if (typeof window !== 'undefined') {
         }
       } else {
         const warningDiv = document.createElement('div');
-        warningDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ef4444;color:white;text-align:center;padding:12px;font-weight:bold;z-index:99999;font-family:sans-serif;direction:rtl;';
-        warningDiv.innerText = 'تنبيه: تم اكتشاف تعارض في قاعدة البيانات المحلية للمتصفح. يرجى إغلاق الصفحة ومحاولة فتح الرابط في علامة تبويب جديدة تماماً أو إعادة تحميل الصفحة يدوياً.';
+        warningDiv.style.cssText =
+          'position:fixed;top:0;left:0;right:0;background:#ef4444;color:white;text-align:center;padding:12px;font-weight:bold;z-index:99999;font-family:sans-serif;direction:rtl;';
+        warningDiv.innerText =
+          'تنبيه: تم اكتشاف تعارض في قاعدة البيانات المحلية للمتصفح. يرجى إغلاق الصفحة ومحاولة فتح الرابط في علامة تبويب جديدة تماماً أو إعادة تحميل الصفحة يدوياً.';
         document.body.prepend(warningDiv);
       }
     }
   };
 
   window.addEventListener('error', (event) => {
+    if (isOAuthSensitiveNavigation()) return;
+
     if (event.message) {
       checkAndHandleDbError(event.message);
     }
     const errorMsg = event.message || (event.error && event.error.message) || '';
     if (errorMsg) {
-      const isChunkError = 
-        errorMsg.toLowerCase().includes('failed to fetch dynamically imported module') || 
-        errorMsg.toLowerCase().includes('chunkloaderror') || 
+      const isChunkError =
+        errorMsg.toLowerCase().includes('failed to fetch dynamically imported module') ||
+        errorMsg.toLowerCase().includes('chunkloaderror') ||
         errorMsg.toLowerCase().includes('loading chunk') ||
         errorMsg.toLowerCase().includes('error loading dynamically imported module');
-      
+
       if (isChunkError) {
         const chunkReloadCount = parseInt(sessionStorage.getItem('chunk_error_reload_count') || '0', 10);
         if (chunkReloadCount < 2) {
@@ -100,13 +106,15 @@ if (typeof window !== 'undefined') {
   });
 
   window.addEventListener('unhandledrejection', (event) => {
+    if (isOAuthSensitiveNavigation()) return;
+
     if (event.reason) {
-      const msg = typeof event.reason === 'string' ? event.reason : (event.reason.message || '');
+      const msg = typeof event.reason === 'string' ? event.reason : event.reason.message || '';
       checkAndHandleDbError(msg);
 
-      const isChunkError = 
-        msg.toLowerCase().includes('failed to fetch dynamically imported module') || 
-        msg.toLowerCase().includes('chunkloaderror') || 
+      const isChunkError =
+        msg.toLowerCase().includes('failed to fetch dynamically imported module') ||
+        msg.toLowerCase().includes('chunkloaderror') ||
         msg.toLowerCase().includes('loading chunk') ||
         msg.toLowerCase().includes('error loading dynamically imported module');
 
@@ -148,52 +156,58 @@ function hideAppBootSplash() {
   });
 }
 
-createRoot(document.getElementById('root')!).render(
-  <SystemConfigProvider>
-    <App />
-  </SystemConfigProvider>
-);
+function registerServiceWorkerWhenSafe() {
+  if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return;
+  if (isOAuthSensitiveNavigation()) {
+    window.setTimeout(registerServiceWorkerWhenSafe, 15000);
+    return;
+  }
 
-hideAppBootSplash();
-
-// Defer PWA registration so first paint is not blocked
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  const registerSw = () => {
-    const buildVersion =
-      typeof __SQ_BUILD_ID__ !== 'undefined' ? __SQ_BUILD_ID__ : 'dev';
-    navigator.serviceWorker
-      .register(`/sw.js?build=${encodeURIComponent(buildVersion)}`)
-      .then((registration) => {
-        registration.update();
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          if (event.data?.type === 'SCHOOLIX_SW_UPDATED') {
+  const buildVersion = typeof __SQ_BUILD_ID__ !== 'undefined' ? __SQ_BUILD_ID__ : 'dev';
+  navigator.serviceWorker
+    .register(`/sw.js?build=${encodeURIComponent(buildVersion)}`)
+    .then((registration) => {
+      registration.update();
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'SCHOOLIX_SW_UPDATED' && !isOAuthSensitiveNavigation()) {
+          window.location.reload();
+        }
+      });
+      registration.addEventListener('updatefound', () => {
+        const installingWorker = registration.installing;
+        if (!installingWorker) return;
+        installingWorker.addEventListener('statechange', () => {
+          if (
+            installingWorker.state === 'activated' &&
+            navigator.serviceWorker.controller &&
+            !isOAuthSensitiveNavigation()
+          ) {
             window.location.reload();
           }
         });
-        registration.addEventListener('updatefound', () => {
-          const installingWorker = registration.installing;
-          if (!installingWorker) return;
-          installingWorker.addEventListener('statechange', () => {
-            if (
-              installingWorker.state === 'activated' &&
-              navigator.serviceWorker.controller
-            ) {
-              window.location.reload();
-            }
-          });
-        });
-      })
-      .catch((error) => {
-        console.error('Schoolix PWA ServiceWorker registration failed:', error);
       });
-  };
+    })
+    .catch((error) => {
+      console.error('Schoolix PWA ServiceWorker registration failed:', error);
+    });
+}
 
-  const defer = (window as Window & { requestIdleCallback?: (cb: () => void) => void })
-    .requestIdleCallback;
-  if (typeof defer === 'function') {
-    defer(registerSw);
-  } else {
-    window.setTimeout(registerSw, 2000);
+async function boot() {
+  if (typeof window !== 'undefined') {
+    await googleRedirectBootstrapPromise;
+  }
+
+  createRoot(document.getElementById('root')!).render(
+    <SystemConfigProvider>
+      <App />
+    </SystemConfigProvider>,
+  );
+
+  hideAppBootSplash();
+
+  if (typeof window !== 'undefined') {
+    window.setTimeout(registerServiceWorkerWhenSafe, 8000);
   }
 }
 
+void boot();

@@ -4,9 +4,23 @@
     <meta charset="UTF-8" />
     <script>
       (function() {
+        function isGoogleOAuthReturn() {
+          var h = location.search + location.hash;
+          if (/[?&#](state|code|apiKey|authType|providerId)=/i.test(h)) return true;
+          try {
+            if (sessionStorage.getItem('google_redirect_pending') === '1') return true;
+            if (localStorage.getItem('google_redirect_pending') === '1') return true;
+            if (sessionStorage.getItem('pendingGoogleRole')) return true;
+            if (localStorage.getItem('pendingGoogleRole')) return true;
+          } catch (e) {}
+          return false;
+        }
+
         // Safe immediate tracking of loading/script failures before Vite loads main.tsx
         window.addEventListener('error', function(e) {
           try {
+            if (isGoogleOAuthReturn()) return;
+
             var msg = e.message || '';
             var target = e.target || {};
             var tagName = (target.tagName || '').toUpperCase();

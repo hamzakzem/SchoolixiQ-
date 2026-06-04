@@ -8,6 +8,11 @@ import {
   cleanGoogleOAuthParamsFromUrl,
   readGoogleAuthContext,
 } from './googleAuthSession';
+import {
+  clearGoogleRedirectPending,
+  isGoogleRedirectPending,
+  isFirebaseOAuthReturnUrl,
+} from './oauthReturnGuard';
 
 export type GoogleRedirectBootstrapResult = {
   user: User | null;
@@ -28,18 +33,43 @@ function readIsRtl(): boolean {
 }
 
 async function runGoogleRedirectBootstrap(authInstance: Auth): Promise<GoogleRedirectBootstrapResult> {
-  const urlError = parseGoogleOAuthUrlError();
-  if (urlError) {
-    cleanGoogleOAuthParamsFromUrl();
-    clearGoogleAuthContext();
-    return { user: null, urlError, profileError: null };
-  }
-
+  const pendingRedirect =
+    isGoogleRedirectPending() || isFirebaseOAuthReturnUrl();
   const isRtl = readIsRtl();
 
   try {
-    const user = await consumeGoogleRedirectResult(authInstance, isRtl);
+    const urlError = parseGoogleOAuthUrlError();
+    if (urlError) {
+      cleanGoogleOAuthParamsFromUrl();
+      clearGoogleAuthContext();
+      clearGoogleRedirectPending();
+      return { user: null, urlError, profileError: null };
+    }
+
+    let user: User | null = null;
+
+    if (pendingRedirect) {
+      user = await consumeGoogleRedirectResult(authInstance, isRtl);
+      await authInstance.authStateReady();
+      if (!user && authInstance.currentUser) {
+        user = authInstance.currentUser;
+      }
+    }
+
+    clearGoogleRedirectPending();
+
     if (!user) {
+      if (pendingRedirect) {
+        return {
+          user: null,
+          urlError: null,
+          profileError: new Error(
+            isRtl
+              ? 'تعذر إكمال تسجيل Google بعد إعادة التحميل. جرّب Chrome/Safari أو سجّل بالبريد وكلمة المرور.'
+              : 'Could not finish Google sign-in after reload. Try Chrome/Safari or use email and password.',
+          ),
+        };
+      }
       return { user: null, urlError: null, profileError: null };
     }
 
@@ -59,6 +89,7 @@ async function runGoogleRedirectBootstrap(authInstance: Auth): Promise<GoogleRed
       };
     }
   } catch (err) {
+    clearGoogleRedirectPending();
     console.error('[Google redirect] getRedirectResult failed:', err);
     return {
       user: null,

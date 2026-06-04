@@ -5,6 +5,7 @@ import {
   type Auth,
   type User,
 } from 'firebase/auth';
+import { markGoogleRedirectPending } from './oauthReturnGuard';
 
 export type GoogleWebSignInResult =
   | { ok: true; user: User; method: 'popup' }
@@ -51,5 +52,6 @@ export async function signInWithGoogleRedirectWeb(auth: Auth): Promise<void> {
   provider.addScope('profile');
   provider.addScope('email');
   provider.setCustomParameters({ prompt: 'select_account' });
+  markGoogleRedirectPending();
   await signInWithRedirect(auth, provider);
 }
