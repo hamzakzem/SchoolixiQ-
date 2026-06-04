@@ -35,6 +35,8 @@ import {
   Building2,
   Mail,
   Lock,
+  Eye,
+  EyeOff,
   ShieldCheck,
   ArrowRight,
   Check,
@@ -193,6 +195,8 @@ export default function Login() {
   const [role, setRole] = useState<UserRole>(UserRole.PARENT);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showSubscriptionPassword, setShowSubscriptionPassword] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [schoolRegistration, setSchoolRegistration] = useState<SchoolRegistrationFormValues>({
@@ -1360,12 +1364,30 @@ export default function Login() {
               )}
               <input
                 required
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder={t("password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 shadow-inner text-sm sm:text-base`}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                className={`w-full ${isRtl ? "pr-12 pl-12 text-right" : "pl-12 pr-12 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 shadow-inner text-sm sm:text-base`}
               />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword((v) => !v)}
+                className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ${isRtl ? "left-3" : "right-3"}`}
+                aria-label={
+                  showPassword
+                    ? isRtl
+                      ? "إخفاء كلمة المرور"
+                      : "Hide password"
+                    : isRtl
+                      ? "إظهار كلمة المرور"
+                      : "Show password"
+                }
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
             </div>
 
@@ -2462,7 +2484,7 @@ export default function Login() {
                         )}
                         <input
                           required
-                          type="password"
+                          type={showSubscriptionPassword ? "text" : "password"}
                           value={subscriptionForm.password}
                           onChange={(e) =>
                             setSubscriptionForm({
@@ -2470,9 +2492,31 @@ export default function Login() {
                               password: e.target.value,
                             })
                           }
-                          className={`w-full ${isRtl ? "pr-11 pl-4 text-right" : "pl-11 pr-4 text-left"} py-3 md:py-4 rounded-xl md:rounded-2xl border border-slate-200 focus:border-blue-600 outline-none font-bold bg-slate-50/50 transition-colors text-sm md:text-base`}
+                          autoComplete="new-password"
+                          className={`w-full ${isRtl ? "pr-11 pl-11 text-right" : "pl-11 pr-11 text-left"} py-3 md:py-4 rounded-xl md:rounded-2xl border border-slate-200 focus:border-blue-600 outline-none font-bold bg-slate-50/50 transition-colors text-sm md:text-base`}
                           placeholder={t("strongPassword")}
                         />
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          onClick={() => setShowSubscriptionPassword((v) => !v)}
+                          className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ${isRtl ? "left-3" : "right-3"}`}
+                          aria-label={
+                            showSubscriptionPassword
+                              ? isRtl
+                                ? "إخفاء كلمة المرور"
+                                : "Hide password"
+                              : isRtl
+                                ? "إظهار كلمة المرور"
+                                : "Show password"
+                          }
+                        >
+                          {showSubscriptionPassword ? (
+                            <EyeOff size={16} />
+                          ) : (
+                            <Eye size={16} />
+                          )}
+                        </button>
                       </div>
                     </div>
 
