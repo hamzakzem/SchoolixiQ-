@@ -1854,8 +1854,8 @@ export default function TeacherDashboard() {
           {activeTab !== "chat" && <GlobalFooter compact hideDownload={mobileUi} />}
         </div>
 
-        {/* Mobile Tab Bar */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-around z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] transition-colors h-[72px]">
+        {/* Mobile Tab Bar (browser only — native app uses MobileMockupBottomNav) */}
+        <nav className={`${mobileUi ? "hidden" : "lg:hidden"} fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-around z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] transition-colors h-[72px]`}>
           {primaryItems.map((item: any) => (
             <button
               key={item.id}
@@ -1908,7 +1908,7 @@ export default function TeacherDashboard() {
 
         {/* More Menu Modal */}
         <AnimatePresence>
-          {showMoreMenu && (
+          {showMoreMenu && !mobileUi && (
             <>
               <motion.div
                 initial={{ opacity: 0 }}

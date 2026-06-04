@@ -70,6 +70,7 @@ import { emailVerificationHint } from "../lib/displayIdentity";
 import { useMobileMockupShell } from "../lib/useMobileMockupShell";
 import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
 import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
+import MobileLogoutButton from "../components/mobile/MobileLogoutButton";
 import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
 import SuperAdminMockupHome from "../components/mobile/homes/SuperAdminMockupHome";
 import { useSystemConfig } from "../lib/SystemConfigContext";
@@ -4734,6 +4735,7 @@ export default function SuperAdminDashboard() {
                       <Save size={20} />
                       {isSavingConfig ? "جاري الحفظ..." : "حفظ الإعدادات"}
                     </button>
+                    {mobileUi ? <MobileLogoutButton className="px-0" /> : null}
                   </div>
                 </motion.div>
               ) : activeTab === "backups" ? (

@@ -67,6 +67,7 @@ import { usePushTabNavigation } from "../lib/pushNavigation";
 import { useMobileMockupShell } from "../lib/useMobileMockupShell";
 import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
 import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
+import MobileLogoutButton from "../components/mobile/MobileLogoutButton";
 import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
 import ParentMockupHome from "../components/mobile/homes/ParentMockupHome";
 
@@ -2461,6 +2462,7 @@ export default function ParentDashboard() {
                       );
                     })}
                   </div>
+                  {mobileUi ? <MobileLogoutButton /> : null}
                 </div>
               )}
             </motion.div>

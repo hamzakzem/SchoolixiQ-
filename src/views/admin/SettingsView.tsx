@@ -9,6 +9,7 @@ import { School } from '../../types';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { formatArIqDate } from '../../lib/firestoreDates';
 import { useMobileMockupShell } from '../../lib/useMobileMockupShell';
+import MobileLogoutButton from '../../components/mobile/MobileLogoutButton';
 
 export default function SettingsView() {
   const { profile } = useAuth();
@@ -526,6 +527,7 @@ export default function SettingsView() {
           </section>
         </div>
       </div>
+      {inApp ? <MobileLogoutButton /> : null}
     </motion.div>
   );
 }

@@ -8,10 +8,13 @@ import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useLanguage } from '../lib/LanguageContext';
 import { getLinkedAccountLabel } from '../lib/displayIdentity';
 import { AtSign, Lock, LayoutDashboard, MessageSquare, Send } from 'lucide-react';
+import { useMobileMockupShell } from '../lib/useMobileMockupShell';
+import MobileLogoutButton from '../components/mobile/MobileLogoutButton';
 
 export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
   const { profile } = useAuth();
   const { t, isRtl } = useLanguage();
+  const inApp = useMobileMockupShell();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedClass, setSelectedClass] = useState((profile as any)?.preferredClassId || '');
@@ -177,6 +180,7 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
           </form>
         </div>
       </div>
+      {inApp ? <MobileLogoutButton /> : null}
     </div>
   );
 }
