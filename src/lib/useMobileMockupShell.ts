@@ -1,19 +1,11 @@
-import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 
-/** Mockup UI from design reference — native app + mobile viewport. */
+/**
+ * Premium in-app shell (header, bottom nav, mockup homes) — **Capacitor native only**.
+ * Mobile browser / website keeps the classic dashboard UI.
+ * Set VITE_MOBILE_MOCKUP_UI=true in dev to preview the app UI in a desktop browser.
+ */
 export function useMobileMockupShell(): boolean {
-  const [narrow, setNarrow] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 1024 : false,
-  );
-
-  useEffect(() => {
-    const onResize = () => setNarrow(window.innerWidth < 1024);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  const native = Capacitor.isNativePlatform();
   const forced =
     import.meta.env.VITE_MOBILE_MOCKUP_UI === '1' ||
     import.meta.env.VITE_MOBILE_MOCKUP_UI === 'true';
@@ -23,5 +15,5 @@ export function useMobileMockupShell(): boolean {
 
   if (disabled) return false;
   if (forced) return true;
-  return native || narrow;
+  return Capacitor.isNativePlatform();
 }

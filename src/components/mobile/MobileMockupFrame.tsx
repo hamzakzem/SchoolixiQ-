@@ -12,7 +12,8 @@ type Props = {
   role: DashboardRole;
   activeTab: string;
   onTabChange: (tabId: string) => void;
-  headerSubtitle?: string;
+  schoolName?: string;
+  schoolLogoUrl?: string | null;
   onNotifications?: () => void;
   children: ReactNode;
 };
@@ -22,7 +23,8 @@ export default function MobileMockupFrame({
   role,
   activeTab,
   onTabChange,
-  headerSubtitle,
+  schoolName,
+  schoolLogoUrl,
   onNotifications,
   children,
 }: Props) {
@@ -30,8 +32,12 @@ export default function MobileMockupFrame({
 
   return (
     <>
-      <MobileMockupHeader subtitle={headerSubtitle} onNotifications={onNotifications} />
-      <div className="lg:hidden pt-[52px] pb-[72px] min-h-[100dvh] bg-[#eef1f6]">
+      <MobileMockupHeader
+        schoolName={schoolName}
+        schoolLogoUrl={schoolLogoUrl}
+        onNotifications={onNotifications}
+      />
+      <div className="pt-[64px] pb-[80px] min-h-[100dvh] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]">
         {children}
       </div>
       <MobileMockupBottomNav

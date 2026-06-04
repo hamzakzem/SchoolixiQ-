@@ -1010,7 +1010,7 @@ export default function ParentDashboard() {
               animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
               exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className={`${mobileUi ? "max-lg:hidden " : ""}bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden`}
+              className={`${mobileUi ? "hidden " : ""}bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden`}
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
                 <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
@@ -1092,7 +1092,7 @@ export default function ParentDashboard() {
 
         <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
         {/* Engineered Mobile Header */}
-        <header className={`${mobileUi ? "max-lg:hidden " : ""}bg-white dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm transition-colors print:hidden`}>
+        <header className={`${mobileUi ? "hidden " : ""}bg-white dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm transition-colors print:hidden`}>
           <div className="px-4 pt-5 pb-3">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -1207,11 +1207,12 @@ export default function ParentDashboard() {
           </div>
         </header>
 
-        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0' : 'overflow-y-auto custom-scrollbar pb-10'} ${mobileUi ? 'max-lg:pt-[52px] max-lg:pb-[72px] max-lg:bg-[#eef1f6]' : ''}`}>
+        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0' : 'overflow-y-auto custom-scrollbar pb-10'} ${mobileUi ? 'pt-[64px] pb-[80px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]' : ''}`}>
           {mobileUi ? (
             <>
               <MobileMockupHeader
-                subtitle={schoolInfo?.name || config.appName}
+                schoolName={schoolInfo?.name || config.appName}
+                schoolLogoUrl={schoolInfo?.logoUrl}
                 onNotifications={() => navigateToTab('inbox')}
               />
               <MobileMockupBottomNav
@@ -1224,7 +1225,7 @@ export default function ParentDashboard() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : `w-full flex flex-col max-w-7xl mx-auto sq-page ${mobileUi ? 'p-0 lg:p-4 md:lg:p-8' : 'p-4 md:p-8'}`}
+              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : `w-full flex flex-col max-w-7xl mx-auto sq-page ${mobileUi ? 'p-0' : 'p-4 md:p-8'}`}
               initial={{ opacity: 0, y: activeTab === 'chat' ? 0 : 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: activeTab === 'chat' ? 0 : -10 }}
@@ -1251,6 +1252,8 @@ export default function ParentDashboard() {
                         )
                       : 100
                   }
+                  schoolName={schoolInfo?.name}
+                  schoolLogoUrl={schoolInfo?.logoUrl}
                   onTabChange={navigateToTab}
                 />
               ) : null}
@@ -2545,7 +2548,7 @@ export default function ParentDashboard() {
               )}
             </motion.div>
           </AnimatePresence>
-          {activeTab !== "chat" && <GlobalFooter compact />}
+          {activeTab !== "chat" && <GlobalFooter compact hideDownload={mobileUi} />}
         </main>
       </div>
       </div>

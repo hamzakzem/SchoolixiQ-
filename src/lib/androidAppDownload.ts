@@ -4,6 +4,11 @@ const DISMISS_KEY = 'schoolix_android_apk_prompt_dismissed';
 const DISMISS_DAYS = 2;
 const APK_FILENAME = 'schoolixiq.apk';
 
+/** Hide APK / install prompts inside the installed native app. */
+export function shouldHideAppDownloadPromo(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
 /** True when user is on Android mobile browser (not the installed native app). */
 export function shouldPromoteAndroidApp(): boolean {
   if (typeof window === 'undefined') return false;

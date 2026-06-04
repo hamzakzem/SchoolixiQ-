@@ -1,5 +1,14 @@
 import { BookOpen, Calendar, CheckSquare, MessageSquare } from 'lucide-react';
 import { useLanguage } from '../../../lib/LanguageContext';
+import { useAuth } from '../../../lib/AuthContext';
+import {
+  MobileBtnPrimary,
+  MobileCard,
+  MobileIconAction,
+  MobilePage,
+  MobileSchoolHero,
+  MobileSectionTitle,
+} from '../mobileUiKit';
 
 type Props = {
   classLabel?: string;
@@ -13,6 +22,7 @@ export default function TeacherMockupHome({
   onTabChange,
 }: Props) {
   const { isRtl } = useLanguage();
+  const { schoolData } = useAuth();
 
   const quick = [
     { id: 'attendance', icon: CheckSquare, ar: 'الحضور', en: 'Attendance' },
@@ -21,73 +31,85 @@ export default function TeacherMockupHome({
   ];
 
   return (
-    <div className="px-4 py-4 space-y-4" dir={isRtl ? 'rtl' : 'ltr'}>
-      <h1 className="text-lg font-black text-[#0B2345]">
-        {isRtl ? 'جدول المعلم' : "Teacher's schedule"}
-      </h1>
+    <MobilePage>
+      <MobileSchoolHero
+        schoolName={schoolData?.name || 'SchoolixiQ'}
+        logoUrl={schoolData?.logoUrl}
+        badge={isRtl ? 'المعلم' : 'Teacher'}
+        isRtl={isRtl}
+      />
 
-      <div className="flex justify-center gap-6">
+      <MobileSectionTitle
+        title={isRtl ? 'اختصارات سريعة' : 'Quick actions'}
+        icon={CheckSquare}
+      />
+      <div className="flex justify-around gap-2 py-1">
         {quick.map((q) => (
-          <button
+          <MobileIconAction
             key={q.id}
-            type="button"
+            icon={q.icon}
+            label={isRtl ? q.ar : q.en}
             onClick={() => onTabChange(q.id)}
-            className="flex flex-col items-center gap-1"
-          >
-            <div className="w-14 h-14 rounded-full bg-white border-2 border-slate-100 shadow-sm flex items-center justify-center text-[#0B2345]">
-              <q.icon size={22} />
-            </div>
-            <span className="text-[10px] font-bold text-slate-600">
-              {isRtl ? q.ar : q.en}
-            </span>
-          </button>
+          />
         ))}
       </div>
 
-      <div className="bg-[#0B2345] text-white rounded-2xl p-4">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="text-[10px] text-white/70 font-bold">
+      <MobileCard className="p-4 bg-gradient-to-br from-[#0B2345] to-[#163a6b] border-0 text-white shadow-[0_12px_36px_rgba(11,35,69,0.35)]">
+        <div className="flex justify-between items-start gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] text-white/70 font-bold uppercase tracking-wide">
               {isRtl ? 'الفصل الحالي' : 'Current class'}
             </p>
-            <p className="text-lg font-black mt-1">{classLabel || '—'}</p>
+            <p className="text-xl font-black mt-1 truncate">{classLabel || '—'}</p>
           </div>
-          <span className="text-[10px] font-bold bg-emerald-500/90 px-2 py-1 rounded-lg">
+          <span className="text-[10px] font-bold bg-emerald-500 text-white px-2.5 py-1 rounded-lg shadow-sm shrink-0">
             {isRtl ? 'نشط' : 'Active'}
           </span>
         </div>
-      </div>
+      </MobileCard>
 
-      <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-2 mb-3">
-          <Calendar size={16} className="text-[#0B2345]" />
-          <h2 className="text-sm font-black">{isRtl ? 'جدول اليوم' : "Today's schedule"}</h2>
-        </div>
-        <ul className="space-y-2 text-xs text-slate-600">
-          {['08:00', '09:30', '11:00'].map((t) => (
-            <li key={t} className="flex justify-between border-b border-slate-50 pb-2">
-              <span className="font-mono font-bold">{t}</span>
-              <span>{isRtl ? 'حصة' : 'Period'}</span>
-            </li>
-          ))}
-        </ul>
+      <section>
+        <MobileSectionTitle
+          title={isRtl ? 'جدول اليوم' : "Today's schedule"}
+          icon={Calendar}
+        />
+        <MobileCard className="p-4 mt-3">
+          <ul className="space-y-3">
+            {['08:00', '09:30', '11:00'].map((t) => (
+              <li
+                key={t}
+                className="flex justify-between items-center text-sm border-b border-slate-100 pb-3 last:border-0 last:pb-0"
+              >
+                <span className="font-mono font-bold text-[#0B2345] tabular-nums">
+                  {t}
+                </span>
+                <span className="text-slate-600 font-medium">
+                  {isRtl ? 'حصة دراسية' : 'Class period'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </MobileCard>
       </section>
 
-      <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-        <h2 className="text-sm font-black mb-2">{isRtl ? 'المهام' : 'Tasks'}</h2>
-        <p className="text-xs text-slate-500 font-bold">
-          {isRtl
-            ? `${homeworkCount} واجبات منشورة`
-            : `${homeworkCount} homework posted`}
-        </p>
-        <button
-          type="button"
-          onClick={() => onTabChange('homework')}
-          className="mt-3 w-full py-2.5 rounded-xl bg-slate-100 text-[#0B2345] text-xs font-bold"
-        >
-          {isRtl ? 'عرض الواجبات' : 'View homework'}
-        </button>
+      <section>
+        <MobileSectionTitle
+          title={isRtl ? 'المهام' : 'Tasks'}
+          icon={BookOpen}
+        />
+        <MobileCard className="p-4 mt-3">
+          <p className="text-sm text-slate-600 font-medium">
+            {isRtl
+              ? `${homeworkCount} واجبات منشورة`
+              : `${homeworkCount} homework items posted`}
+          </p>
+          <div className="mt-4">
+            <MobileBtnPrimary onClick={() => onTabChange('homework')}>
+              {isRtl ? 'عرض الواجبات' : 'View homework'}
+            </MobileBtnPrimary>
+          </div>
+        </MobileCard>
       </section>
-    </div>
+    </MobilePage>
   );
 }

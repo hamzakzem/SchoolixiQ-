@@ -1,5 +1,14 @@
-import { Building2, Globe2, Users } from 'lucide-react';
+import { Building2, Globe2, Search, Users } from 'lucide-react';
 import { useLanguage } from '../../../lib/LanguageContext';
+import { useSystemConfig } from '../../../lib/SystemConfigContext';
+import {
+  MobileBtnPrimary,
+  MobileCard,
+  MobilePage,
+  MobileSchoolHero,
+  MobileSectionTitle,
+  MobileStatCard,
+} from '../mobileUiKit';
 
 type Props = {
   schoolCount?: number;
@@ -17,6 +26,7 @@ export default function SuperAdminMockupHome({
   onTabChange,
 }: Props) {
   const { isRtl } = useLanguage();
+  const { config } = useSystemConfig();
 
   const stats = [
     { v: schoolCount, ar: 'المدارس', en: 'Schools', icon: Building2 },
@@ -26,53 +36,64 @@ export default function SuperAdminMockupHome({
   ];
 
   return (
-    <div className="px-4 py-4 space-y-4" dir={isRtl ? 'rtl' : 'ltr'}>
-      <div className="bg-white rounded-2xl px-3 py-2 border border-slate-100 flex items-center gap-2">
-        <span className="text-slate-400 text-sm">🔍</span>
-        <span className="text-xs text-slate-400 font-bold flex-1">
-          {isRtl ? 'بحث...' : 'Search...'}
+    <MobilePage>
+      <MobileSchoolHero
+        schoolName={config.appName}
+        logoUrl={config.appLogo}
+        badge={isRtl ? 'إدارة المنصة' : 'Platform admin'}
+        isRtl={isRtl}
+      />
+
+      <MobileCard className="p-3 flex items-center gap-3">
+        <span className="w-9 h-9 rounded-xl bg-[#0B2345]/8 flex items-center justify-center text-[#0B2345]">
+          <Search size={18} strokeWidth={2.25} />
         </span>
-      </div>
+        <span className="text-sm text-slate-400 font-medium flex-1">
+          {isRtl ? 'بحث في المدارس والحسابات...' : 'Search schools & accounts...'}
+        </span>
+      </MobileCard>
 
       <div className="grid grid-cols-2 gap-3">
         {stats.map((s, i) => (
-          <div
+          <MobileStatCard
             key={i}
-            className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm"
-          >
-            <s.icon size={18} className="text-[#0B2345] mb-1" />
-            <p className="text-[10px] font-bold text-slate-400">
-              {isRtl ? s.ar : s.en}
-            </p>
-            <p className="text-xl font-black text-slate-900">{s.v}</p>
-          </div>
+            label={isRtl ? s.ar : s.en}
+            value={s.v}
+            icon={s.icon}
+          />
         ))}
       </div>
 
-      <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-        <h2 className="text-sm font-black text-[#0B2345] mb-2">
-          {isRtl ? 'توزيع المدارس' : 'School distribution'}
-        </h2>
-        <div className="h-32 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
-          {isRtl ? 'خريطة العراق (قريباً)' : 'Iraq map (coming soon)'}
-        </div>
+      <section>
+        <MobileSectionTitle
+          title={isRtl ? 'توزيع المدارس' : 'School distribution'}
+          icon={Globe2}
+        />
+        <MobileCard className="p-4 mt-3">
+          <div className="h-36 rounded-2xl bg-gradient-to-br from-slate-100 via-slate-50 to-[#0B2345]/5 border border-slate-200/80 flex items-center justify-center">
+            <p className="text-xs font-bold text-slate-500 text-center px-4">
+              {isRtl ? 'خريطة العراق — قريباً' : 'Iraq map — coming soon'}
+            </p>
+          </div>
+        </MobileCard>
       </section>
 
-      <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-        <h2 className="text-sm font-black mb-2">
-          {isRtl ? 'نشاط المدارس الأخير' : 'Recent school activity'}
-        </h2>
-        <p className="text-xs text-slate-500 font-bold mb-3">
-          {isRtl ? 'آخر التحديثات على المنصة' : 'Latest platform updates'}
-        </p>
-        <button
-          type="button"
-          onClick={() => onTabChange('schools')}
-          className="w-full py-2.5 rounded-xl bg-[#0B2345] text-white text-xs font-bold"
-        >
-          {isRtl ? 'عرض كل المدارس' : 'View all schools'}
-        </button>
+      <section>
+        <MobileSectionTitle
+          title={isRtl ? 'نشاط المدارس' : 'School activity'}
+          icon={Building2}
+        />
+        <MobileCard className="p-4 mt-3 space-y-3">
+          <p className="text-xs text-slate-500 font-medium leading-relaxed">
+            {isRtl
+              ? 'آخر التحديثات والمدارس المسجّلة على المنصة'
+              : 'Latest updates and schools on the platform'}
+          </p>
+          <MobileBtnPrimary onClick={() => onTabChange('schools')}>
+            {isRtl ? 'عرض كل المدارس' : 'View all schools'}
+          </MobileBtnPrimary>
+        </MobileCard>
       </section>
-    </div>
+    </MobilePage>
   );
 }

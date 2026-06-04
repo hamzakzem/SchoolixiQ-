@@ -11,10 +11,13 @@ import {
   isAndroidApkPromptDismissed,
 } from '../lib/androidAppDownload';
 import { useSystemConfig } from '../lib/SystemConfigContext';
+import { useAuth } from '../lib/AuthContext';
+import { shouldHideAppDownloadPromo } from '../lib/androidAppDownload';
 
 export default function InstallAppBanner() {
   const { t, isRtl, language } = useLanguage();
   const { config } = useSystemConfig();
+  const { user } = useAuth();
   const [showBanner, setShowBanner] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [platform, setPlatform] = useState<'android' | 'ios' | 'other'>('other');
@@ -26,6 +29,7 @@ export default function InstallAppBanner() {
   };
 
   useEffect(() => {
+    if (user || shouldHideAppDownloadPromo() || Capacitor.isNativePlatform()) return;
     if (Capacitor.isNativePlatform()) return;
 
     const isStandalone =
@@ -81,7 +85,7 @@ export default function InstallAppBanner() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, []);
+  }, [user]);
 
   const handleInstallClick = async () => {
     if (platform === 'ios') {
@@ -117,6 +121,7 @@ export default function InstallAppBanner() {
     setShowBanner(false);
   };
 
+  if (user || shouldHideAppDownloadPromo() || Capacitor.isNativePlatform()) return null;
   if (!showBanner) return null;
 
   return (
