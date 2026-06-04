@@ -11,6 +11,7 @@
     "prepare-apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/prepare-apk-release.ps1 -AutoFind",
     "prepare-apk:build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/prepare-apk-release.ps1 -BuildDebug",
     "cap:sync": "npx cap sync android",
+    "cap:sync:retry": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cap-sync-retry.ps1",
     "cap:sync:live": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cap-sync-live.ps1",
     "cap:sync:bundle": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cap-sync-bundle.ps1",
     "install:google-services": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-google-services.ps1",

@@ -458,7 +458,13 @@ export default function Login() {
     } catch (error: any) {
       console.error("Profile creation error:", error);
       toast.error(error.message || t("failedConnection"));
+      try {
+        await signOut(auth);
+      } catch {
+        /* ignore */
+      }
     } finally {
+      googleAuthLock.current = false;
       if (!auth.currentUser) {
         setLoading(false);
       }
@@ -650,6 +656,7 @@ export default function Login() {
     }
 
     googleAuthLock.current = true;
+    setGoogleWebViewBlocked(false);
     setUnauthorizedDomainError(null);
     setShowIframeHint(false);
     setFirebaseProviderError(null);
@@ -1515,57 +1522,57 @@ export default function Login() {
               type="button"
               disabled={loading || googleAuthLock.current}
               onClick={handleGoogleAuth}
-              className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border-2 border-slate-100 bg-white hover:bg-slate-50 transition-all font-bold text-slate-600 flex items-center justify-center gap-3 shadow-sm hover:border-slate-200 active:scale-95 disabled:opacity-50 text-sm sm:text-base"
+              className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border-2 border-slate-200 bg-white hover:bg-slate-50 transition-all font-bold text-slate-700 flex items-center justify-center gap-3 shadow-sm hover:border-[#D4A64A]/40 active:scale-[0.98] disabled:opacity-50 text-sm sm:text-base"
             >
               <img
                 src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
                 alt="Google"
-                className="w-4 h-4 sm:w-5 sm:h-5"
+                className="w-5 h-5 sm:w-6 sm:h-6"
               />
-              <span>
-                {mode === "signup"
-                  ? t("googleSignup")
-                  : t("googleLogin")}
-              </span>
+              <span>{t("googleOneTap")}</span>
             </button>
+
+            {nativePlatformNotice && (
+              <div className="mt-3 p-4 rounded-xl border-2 border-rose-200 bg-rose-50 text-xs sm:text-sm text-rose-950 space-y-2">
+                <p className="font-bold">
+                  {isRtl ? "إعداد التطبيق مطلوب" : "App setup required"}
+                </p>
+                <ol className="leading-relaxed list-decimal list-inside space-y-1">
+                  <li>
+                    {isRtl
+                      ? "Firebase → إعدادات المشروع → Android → أضف SHA-1 (من gradlew signingReport)"
+                      : "Firebase → Project settings → Android → add SHA-1 from signingReport"}
+                  </li>
+                  <li>
+                    {isRtl
+                      ? "من جذر المشروع: npm run prepare-apk:build ثم ثبّت APK الجديد"
+                      : "From project root: npm run prepare-apk:build, then reinstall APK"}
+                  </li>
+                </ol>
+              </div>
+            )}
 
             {googleWebViewBlocked && (
               <div className="mt-3 p-4 rounded-xl border-2 border-amber-200 bg-amber-50 text-xs sm:text-sm text-amber-950 space-y-2">
                 <p className="font-bold">
-                  {isRtl ? "خطأ 403: disallowed_useragent" : "Error 403: disallowed_useragent"}
+                  {isRtl ? "افتح الموقع في Chrome" : "Open in Chrome"}
                 </p>
                 <p className="leading-relaxed text-amber-900/90">
                   {isRtl
-                    ? "Google يمنع تسجيل الدخول داخل WebView (متصفح مدمج). لا تستخدم «صفحة Google الكاملة» داخل التطبيق — استخدم زر Google الرئيسي (يفتح حساب Android) أو افتح schoolixiq.com في Chrome."
-                    : "Google blocks OAuth inside embedded WebViews. Do not use full-page sign-in inside the app — use the main Google button (native Android account picker) or open schoolixiq.com in Chrome."}
+                    ? "هذا المتصفح المدمج لا يدعم Google. افتح https://schoolixiq.com في Chrome أو ثبّت تطبيق SchoolixiQ واضغط زر Google أعلاه."
+                    : "This in-app browser blocks Google. Open https://schoolixiq.com in Chrome or install the SchoolixiQ app."}
                 </p>
               </div>
             )}
 
-            {isNativeApp && !googleWebViewBlocked && (
+            {(googlePopupBlocked || inIframe) &&
+              !isNativeApp &&
+              !insecureOAuthWebView && (
               <div className="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-600 space-y-2">
                 <p className="leading-relaxed">
                   {isRtl
-                    ? "في التطبيق: يفتح Google عبر نظام Android (آمن). إذا لم يظهر اختيار الحساب، أعد المحاولة أو استخدم البريد وكلمة المرور."
-                    : "In the app, Google opens via the Android system picker (secure). If it fails, retry or use email and password."}
-                </p>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={handleGoogleAuth}
-                  className="w-full py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-bold text-slate-700 text-xs sm:text-sm transition-colors disabled:opacity-50"
-                >
-                  {isRtl ? "إعادة محاولة Google" : "Retry Google sign-in"}
-                </button>
-              </div>
-            )}
-
-            {(googlePopupBlocked || inIframe) && !isNativeApp && !insecureOAuthWebView && (
-              <div className="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-600 space-y-2">
-                <p className="leading-relaxed">
-                  {isRtl
-                    ? "إذا لم يعمل الزر أعلاه، تابع عبر صفحة Google الكاملة (موصى به على الهاتف)."
-                    : "If the button above failed, use full-page Google sign-in (recommended on mobile)."}
+                    ? "إذا لم يفتح نافذة Google، استخدم الزر التالي."
+                    : "If the popup did not open, use the button below."}
                 </p>
                 <button
                   type="button"
@@ -1573,9 +1580,7 @@ export default function Login() {
                   onClick={handleGoogleRedirectAuth}
                   className="w-full py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-bold text-slate-700 text-xs sm:text-sm transition-colors disabled:opacity-50"
                 >
-                  {isRtl
-                    ? "متابعة عبر Google (صفحة كاملة)"
-                    : "Continue with Google (full page)"}
+                  {isRtl ? "متابعة عبر Google" : "Continue with Google"}
                 </button>
               </div>
             )}

@@ -5,8 +5,10 @@ import './index.css';
 import './styles/macbook-loading.css';
 import { initSentry } from './lib/sentryWrapper';
 import { initNativeLiveSync } from './lib/nativeLiveSync';
+import { initNativeGoogleAuth } from './lib/initNativeGoogleAuth';
 
 initNativeLiveSync();
+void initNativeGoogleAuth();
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   let dsn = import.meta.env.VITE_SENTRY_DSN;

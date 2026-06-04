@@ -16,6 +16,7 @@
   "googleAdminSignupBlocked": "To register a new school, use email and password and complete all school fields (Google is available after signup).",
   "googleLogin": "Quick sign-in with Google",
   "googleSignup": "Sign up with Google",
+  "googleOneTap": "Sign in or sign up with Google",
   "forgotPasswordNeedEmail": "Please enter your email first",
   "forgotPasswordSent": "Password reset link sent to your email",
   "forgotPasswordFailed": "Could not send password reset email",

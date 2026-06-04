@@ -16,6 +16,7 @@
   "googleAdminSignupBlocked": "لتسجيل مدرسة جديدة استخدم البريد وكلمة المرور واملأ جميع بيانات المدرسة (Google متاح بعد إنشاء الحساب).",
   "googleLogin": "دخول سريع باستخدام Google",
   "googleSignup": "إنشاء حساب باستخدام Google",
+  "googleOneTap": "دخول أو تسجيل بضغطة واحدة — Google",
   "forgotPasswordNeedEmail": "يرجى إدخال البريد الإلكتروني أولاً",
   "forgotPasswordSent": "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك",
   "forgotPasswordFailed": "تعذر إرسال رابط إعادة التعيين",

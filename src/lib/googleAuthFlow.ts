@@ -5,6 +5,7 @@ import {
   type Auth,
   type User,
 } from 'firebase/auth';
+import { initNativeGoogleAuth } from './initNativeGoogleAuth';
 import { signInWithGoogleRedirectWeb, signInWithGoogleWeb } from './googleAuthWeb';
 
 export function getGoogleWebClientId(): string {
@@ -49,7 +50,7 @@ export function isGoogleDisallowedUserAgentError(message: string): boolean {
     m.includes('403') ||
     m.includes('secure browsers') ||
     m.includes('متصفحات آمنة') ||
-    m.includes('doesn\'t comply with google\'s policies')
+    m.includes("doesn't comply with google's policies")
   );
 }
 
@@ -63,6 +64,13 @@ export function detectGoogleOAuthUrlError(): string | null {
   return null;
 }
 
+export class GoogleSignInCancelledError extends Error {
+  constructor() {
+    super('cancelled');
+    this.name = 'GoogleSignInCancelledError';
+  }
+}
+
 export type GoogleSignInFlowResult =
   | { status: 'success'; user: User }
   | { status: 'cancelled' }
@@ -71,19 +79,29 @@ export type GoogleSignInFlowResult =
   | { status: 'webview-blocked' }
   | { status: 'error'; error: Error; nativeSetupRequired?: boolean };
 
-export async function signInWithGoogleNative(auth: Auth, clientId: string): Promise<User> {
+function isGoogleCancelledError(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  return /cancel|12501|user closed|user denied|sign in cancelled|aborted/i.test(raw);
+}
+
+function isNativeSetupError(raw: string): boolean {
+  return /developer_error|10:|12500|DEVELOPER|idtoken|null|invalid_audience/i.test(raw);
+}
+
+export async function signInWithGoogleNative(auth: Auth): Promise<User> {
+  await initNativeGoogleAuth();
   const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+
+  let googleUser;
   try {
-    await GoogleAuth.initialize({
-      clientId,
-      scopes: ['profile', 'email'],
-      grantOfflineAccess: true,
-    });
-  } catch (initErr) {
-    console.warn('GoogleAuth.initialize:', initErr);
+    googleUser = await GoogleAuth.signIn();
+  } catch (err) {
+    if (isGoogleCancelledError(err)) {
+      throw new GoogleSignInCancelledError();
+    }
+    throw err;
   }
 
-  const googleUser = await GoogleAuth.signIn();
   const idToken = googleUser?.authentication?.idToken;
   if (!idToken) {
     throw new Error('Missing Google ID token from native sign-in');
@@ -99,49 +117,54 @@ export async function signInWithGoogleNative(auth: Auth, clientId: string): Prom
 
 function nativeGoogleErrorMessage(err: unknown, isRtl: boolean): Error {
   const raw = err instanceof Error ? err.message : String(err);
-  const needsSetup =
-    /developer_error|10:|12500|idtoken|null/i.test(raw) ||
-    raw.includes('DEVELOPER');
 
-  if (needsSetup) {
+  if (isNativeSetupError(raw)) {
     return new Error(
       isRtl
-        ? 'إعداد Google للتطبيق غير مكتمل (SHA-1 / google-services.json). أعد بناء APK بعد إضافة تطبيق Android في Firebase.'
-        : 'Google app setup incomplete (SHA-1 / google-services.json). Rebuild APK after adding the Android app in Firebase.',
+        ? 'إعداد Google للتطبيق غير مكتمل. في Firebase أضف بصمة SHA-1 ثم أعد بناء APK (npm run prepare-apk:build) وثبّت النسخة الجديدة.'
+        : 'Google app setup incomplete. Add SHA-1 in Firebase, rebuild APK, and reinstall.',
+    );
+  }
+
+  if (/auth\/invalid-credential|invalid-credential|invalid id token/i.test(raw)) {
+    return new Error(
+      isRtl
+        ? 'رمز Google غير صالح. تأكد من تفعيل تسجيل Google في Firebase Authentication وأن SHA-1 مضاف لتطبيق Android.'
+        : 'Invalid Google token. Enable Google in Firebase Auth and add Android SHA-1.',
     );
   }
 
   return new Error(
-    isRtl
-      ? `فشل تسجيل Google عبر التطبيق: ${raw}`
-      : `Native Google sign-in failed: ${raw}`,
+    isRtl ? `تعذر الدخول بـ Google: ${raw}` : `Google sign-in failed: ${raw}`,
   );
 }
 
 /**
- * Unified Google sign-in.
- * - Native app: ONLY native plugin (never redirect inside WebView — causes 403).
- * - Real mobile browser: redirect.
- * - Desktop: popup, then redirect if blocked.
+ * Unified Google sign-in — one button.
+ * - Native app: Android account picker (never redirect in WebView).
+ * - Desktop browser: popup.
+ * - Mobile browser: redirect.
  */
 export async function runGoogleSignInFlow(
   auth: Auth,
   isRtl: boolean,
 ): Promise<GoogleSignInFlowResult> {
   auth.languageCode = isRtl ? 'ar' : 'en';
-  const clientId = getGoogleWebClientId();
 
   if (isCapacitorNative()) {
     try {
-      const user = await signInWithGoogleNative(auth, clientId);
+      const user = await signInWithGoogleNative(auth);
       return { status: 'success', user };
     } catch (nativeErr) {
-      const err = nativeGoogleErrorMessage(nativeErr, isRtl);
+      if (nativeErr instanceof GoogleSignInCancelledError) {
+        return { status: 'cancelled' };
+      }
       const raw = nativeErr instanceof Error ? nativeErr.message : String(nativeErr);
+      const err = nativeGoogleErrorMessage(nativeErr, isRtl);
       return {
         status: 'error',
         error: err,
-        nativeSetupRequired: /developer_error|10:|12500|DEVELOPER/i.test(raw),
+        nativeSetupRequired: isNativeSetupError(raw),
       };
     }
   }
@@ -183,7 +206,7 @@ export async function runGoogleSignInFlow(
   return { status: 'error', error: webResult.error };
 }
 
-/** Mobile browsers and iframes — but NOT embedded WebViews. */
+/** Mobile browsers (not WebView) — redirect is more reliable than popup. */
 export function shouldPreferGoogleRedirect(): boolean {
   if (typeof window === 'undefined') return false;
   if (isCapacitorNative() || isInsecureOAuthWebView()) return false;
