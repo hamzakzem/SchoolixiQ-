@@ -19,6 +19,8 @@ import { handleFirestoreError, OperationType } from './firestore-errors';
 import { useLanguage } from './LanguageContext';
 import { isSchoolRegistrationInProgress } from './schoolRegistrationSession';
 import { waitForGoogleRedirectBootstrap } from './googleRedirectBootstrap';
+import { syncUserClaims } from './adminApi';
+import { healSchoolDataOnLogin } from './authLoginHelpers';
 
 interface AuthContextType {
   user: User | null;
@@ -43,6 +45,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const lastUserIdRef = useRef<string | null>(null);
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const claimsSyncedForUidRef = useRef<string | null>(null);
+  const schoolHealForUidRef = useRef<string | null>(null);
   
   const { language, setLanguage } = useLanguage();
   const languageRef = useRef(language);
@@ -171,7 +175,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 let tokenResult = await authUser.getIdTokenResult();
                 claims = tokenResult.claims || {};
 
-                if (data.role && (claims.role !== data.role || claims.schoolId !== data.schoolId)) {
+                const claimsRole = (claims.role as string) || '';
+                const claimsSchool = (claims.schoolId as string) || '';
+                const docSchool = (data.schoolId as string) || '';
+                const claimsDrift =
+                  data.role &&
+                  (claimsRole !== data.role || claimsSchool !== docSchool);
+
+                if (claimsDrift) {
                   try {
                     tokenResult = await authUser.getIdTokenResult(true);
                     claims = tokenResult.claims || {};
@@ -179,8 +190,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     /* use existing claims */
                   }
                 }
+
+                if (
+                  claimsDrift &&
+                  claimsSyncedForUidRef.current !== authUser.uid &&
+                  ['admin', 'assistant', 'staff', 'superadmin'].includes(data.role)
+                ) {
+                  claimsSyncedForUidRef.current = authUser.uid;
+                  void syncUserClaims(authUser.uid).then(async (ok) => {
+                    if (!ok) return;
+                    try {
+                      const refreshed = await authUser.getIdTokenResult(true);
+                      claims = refreshed.claims || {};
+                      setProfile((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              permissions:
+                                (refreshed.claims?.p as UserProfile['permissions']) ||
+                                prev.permissions ||
+                                null,
+                            }
+                          : prev,
+                      );
+                    } catch {
+                      /* ignore */
+                    }
+                  });
+                }
               } catch {
                 /* firestore profile is source of truth */
+              }
+
+              if (
+                data.role === 'admin' &&
+                data.schoolId &&
+                authUser.email &&
+                schoolHealForUidRef.current !== authUser.uid
+              ) {
+                schoolHealForUidRef.current = authUser.uid;
+                void healSchoolDataOnLogin(
+                  authUser.email.toLowerCase(),
+                  authUser.uid,
+                ).catch((err) => console.warn('[Auth] healSchoolDataOnLogin:', err));
               }
 
               setProfile({

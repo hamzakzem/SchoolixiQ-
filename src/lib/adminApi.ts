@@ -208,3 +208,29 @@ export async function adminDeleteStudent(id: string) {
     throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
   }
 }
+
+/** Sync Firebase custom claims (role, schoolId, package permissions) after profile changes */
+export async function syncUserClaims(uid?: string): Promise<boolean> {
+  const user = auth.currentUser;
+  if (!user) return false;
+
+  const targetUid = uid || user.uid;
+  const token = await user.getIdToken();
+  const absoluteUrl = getApiUrl(`/api/admin/sync-claims?t=${Date.now()}`);
+
+  const response = await fetch(absoluteUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'X-Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ uid: targetUid }),
+  });
+
+  if (!response.ok) {
+    await logApiDebug(absoluteUrl, response);
+    return false;
+  }
+  return true;
+}

@@ -60,6 +60,7 @@ import {
   getSchoolixPublicId,
   schoolixAccountIdLabel,
 } from "./lib/displayIdentity";
+import { syncUserClaims } from "./lib/adminApi";
 
 const InstallAppBanner = lazy(() => import("./components/InstallAppBanner"));
 const AndroidAppVisitPrompt = lazy(() => import("./components/AndroidAppVisitPrompt"));
@@ -272,20 +273,16 @@ const AppContent = () => {
             updatedAt: serverTimestamp(),
           });
 
-          // Sync custom claims over our admin API securely
           try {
-            await fetch("/api/admin/sync-claims", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${await user.getIdToken()}`,
-                "X-Authorization": `Bearer ${await user.getIdToken()}`
-              },
-              body: JSON.stringify({ uid: user.uid }),
-            });
-            console.info("[AUTO PROVISION] Claims sync triggered for school admin:", email);
+            const synced = await syncUserClaims(user.uid);
+            if (synced) {
+              await user.getIdToken(true);
+              console.info("[AUTO PROVISION] Claims synced for school admin:", email);
+            } else {
+              console.warn("[AUTO PROVISION] Claims sync returned non-OK for:", email);
+            }
           } catch (syncErr) {
-            console.warn("[AUTO PROVISION] Failed to sync claims over API, falling back to local snapshot matching:", syncErr);
+            console.warn("[AUTO PROVISION] Failed to sync claims:", syncErr);
           }
 
           toast.success(
