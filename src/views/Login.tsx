@@ -301,10 +301,36 @@ export default function Login() {
     window.location.href = "/api/download/schoolixiq.mobileconfig";
   };
 
-  const startDirectInstall = (platform: "android" | "ios") => {
+  const startDirectInstall = async (platform: "android" | "ios") => {
     setInstallingPlatform(platform);
     setInstallProgress(0);
     setShowInstallSuccess(false);
+
+    if (platform === "android") {
+      setInstallProgress(30);
+      const { triggerAndroidApkDownload } = await import("../lib/androidAppDownload");
+      const apkStarted = triggerAndroidApkDownload({ isRtl });
+      setInstallProgress(70);
+
+      if (!apkStarted && deferredInstallPrompt) {
+        try {
+          await deferredInstallPrompt.prompt();
+          const choiceResult = await deferredInstallPrompt.userChoice;
+          if (choiceResult.outcome === "accepted") {
+            toast.success(
+              isRtl ? "تم بدء تثبيت التطبيق بنجاح!" : "App installation started successfully!",
+            );
+          }
+          setDeferredInstallPrompt(null);
+        } catch {
+          /* PWA prompt unavailable */
+        }
+      }
+
+      setInstallProgress(100);
+      setTimeout(() => setShowInstallSuccess(true), 200);
+      return;
+    }
 
     let progress = 0;
     const interval = setInterval(() => {
@@ -313,26 +339,7 @@ export default function Login() {
         progress = 100;
         clearInterval(interval);
         setInstallProgress(100);
-        
-        // Trigger actual native installation if available on Android
-        if (platform === "android" && deferredInstallPrompt) {
-          setTimeout(() => {
-            deferredInstallPrompt.prompt();
-            deferredInstallPrompt.userChoice.then((choiceResult: any) => {
-              if (choiceResult.outcome === "accepted") {
-                setShowInstallSuccess(true);
-                toast.success(isRtl ? "تم بدء تثبيت التطبيق بنجاح!" : "App installation started successfully!");
-              } else {
-                setShowInstallSuccess(true); // show guide as fallback
-              }
-              setDeferredInstallPrompt(null);
-            });
-          }, 300);
-        } else {
-          setTimeout(() => {
-            setShowInstallSuccess(true);
-          }, 200);
-        }
+        setTimeout(() => setShowInstallSuccess(true), 200);
       } else {
         setInstallProgress(progress);
       }

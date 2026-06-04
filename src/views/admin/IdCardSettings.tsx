@@ -11,6 +11,7 @@ import { toast } from "react-hot-toast";
 import IdCardCustomizer from "../../components/admin/idcards/IdCardCustomizer";
 import { IdCardTemplate } from "../../types/idCardTemplate";
 import { DEFAULT_ID_CARD_TEMPLATE } from "../../lib/idCardPresets";
+import { mergeIdCardTemplate } from "../../lib/idCardTemplateUtils";
 
 export default function IdCardSettings() {
   const { profile } = useAuth();
@@ -34,22 +35,7 @@ export default function IdCardSettings() {
         );
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setTemplate((prev) => ({
-            ...DEFAULT_ID_CARD_TEMPLATE,
-            ...prev,
-            ...docSnap.data(),
-            colors: { ...DEFAULT_ID_CARD_TEMPLATE.colors, ...docSnap.data()?.colors },
-            elements: { ...DEFAULT_ID_CARD_TEMPLATE.elements, ...docSnap.data()?.elements },
-            fonts: { ...DEFAULT_ID_CARD_TEMPLATE.fonts, ...docSnap.data()?.fonts },
-            photoSettings: {
-              ...DEFAULT_ID_CARD_TEMPLATE.photoSettings,
-              ...docSnap.data()?.photoSettings,
-            },
-            background: {
-              ...DEFAULT_ID_CARD_TEMPLATE.background,
-              ...docSnap.data()?.background,
-            },
-          }));
+          setTemplate(mergeIdCardTemplate(docSnap.data() as IdCardTemplate));
         }
       } catch (error) {
         handleFirestoreError(error, OperationType.GET, "settings");

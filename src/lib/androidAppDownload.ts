@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 
 const DISMISS_KEY = 'schoolix_android_apk_prompt_dismissed';
 const DISMISS_DAYS = 2;
+const APK_FILENAME = 'schoolixiq.apk';
 
 /** True when user is on Android mobile browser (not the installed native app). */
 export function shouldPromoteAndroidApp(): boolean {
@@ -9,7 +10,6 @@ export function shouldPromoteAndroidApp(): boolean {
   if (Capacitor.isNativePlatform()) return false;
   const ua = navigator.userAgent || '';
   if (/Android/i.test(ua)) return true;
-  // Some Android WebViews report as Linux + Mobile
   if (/Mobile/i.test(ua) && /Linux/i.test(ua) && !/iPhone|iPad/i.test(ua)) return true;
   try {
     const uaData = (navigator as Navigator & { userAgentData?: { platform?: string } })
@@ -21,22 +21,44 @@ export function shouldPromoteAndroidApp(): boolean {
   return false;
 }
 
-export function getAndroidApkDownloadUrl(): string {
-  const fromEnv = (import.meta.env.VITE_ANDROID_APK_URL as string | undefined)?.trim();
-  if (fromEnv) return fromEnv;
-
+function originBase(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin.replace(/\/$/, '');
+  }
   const appUrl = (
     (import.meta.env.VITE_APP_URL as string | undefined) ||
     (import.meta.env.APP_URL as string | undefined) ||
     ''
   ).trim();
+  return appUrl.replace(/\/$/, '') || 'https://schoolixiq.com';
+}
 
+/**
+ * Direct one-click download URL (static file on Hostinger).
+ * API route is fallback for Node server only.
+ */
+export function getAndroidApkDownloadUrl(configUrl?: string | null): string {
+  const configured = configUrl?.trim();
+  if (configured) return configured;
+
+  const fromEnv = (import.meta.env.VITE_ANDROID_APK_URL as string | undefined)?.trim();
+  if (fromEnv) return fromEnv;
+
+  return `${originBase()}/downloads/${APK_FILENAME}`;
+}
+
+export function getAndroidApkDownloadCandidates(configUrl?: string | null): string[] {
+  const base = originBase();
+  const primary = getAndroidApkDownloadUrl(configUrl);
+  const list = [
+    primary,
+    `${base}/downloads/${APK_FILENAME}`,
+    `${base}/api/download/${APK_FILENAME}`,
+  ];
   if (import.meta.env.PROD) {
-    return 'https://schoolixiq.com/downloads/schoolixiq.apk';
+    list.push(`https://schoolixiq.com/downloads/${APK_FILENAME}`);
   }
-
-  const base = appUrl || (typeof window !== 'undefined' ? window.location.origin : '');
-  return `${base.replace(/\/$/, '')}/downloads/schoolixiq.apk`;
+  return [...new Set(list.filter(Boolean))];
 }
 
 export function isAndroidApkPromptDismissed(): boolean {
@@ -58,18 +80,29 @@ export function dismissAndroidApkPrompt(): void {
   }
 }
 
-/** Starts APK download (same-origin or CDN URL). */
-export function triggerAndroidApkDownload(): void {
-  const url = getAndroidApkDownloadUrl();
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'schoolixiq.apk';
-  anchor.rel = 'noopener';
-  anchor.style.display = 'none';
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  setTimeout(() => {
-    window.open(url, '_blank', 'noopener,noreferrer');
+/** Starts APK download immediately (one tap — no HEAD pre-check). */
+export function triggerAndroidApkDownload(
+  _options: { configUrl?: string | null; isRtl?: boolean } = {},
+): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const url = getAndroidApkDownloadUrl(_options.configUrl);
+
+  // Same-origin static file: full navigation triggers download on Android Chrome
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = APK_FILENAME;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // Fallback for browsers that ignore programmatic download
+  window.setTimeout(() => {
+    if (document.visibilityState !== 'hidden') {
+      window.location.assign(url);
+    }
   }, 400);
+
+  return true;
 }

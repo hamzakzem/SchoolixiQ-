@@ -589,12 +589,29 @@ export default function IdCardCustomizer({
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             {isRtl ? 'معاينة حية' : 'Live preview'}
           </span>
-          <StudentCard
-            student={mockStudent}
-            cardData={mockCardData}
-            isRtl={isRtl}
-            template={template}
-          />
+          <div
+            className="id-card-preview-host shrink-0"
+            style={{
+              width: Math.round((template.size === 'custom' ? template.customSize?.width ?? 54 : 54) * 3.78),
+              height: Math.round(
+                (template.size === 'hanging'
+                  ? 100
+                  : template.size === 'pocket'
+                    ? 90
+                    : template.size === 'custom'
+                      ? template.customSize?.height ?? 86
+                      : 85.6) * 3.78,
+              ),
+            }}
+          >
+            <StudentCard
+              student={mockStudent}
+              cardData={mockCardData}
+              isRtl={isRtl}
+              template={template}
+              previewMode
+            />
+          </div>
         </div>
       </div>
     </div>

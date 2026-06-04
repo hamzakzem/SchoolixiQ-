@@ -10,9 +10,11 @@ import {
   dismissAndroidApkPrompt,
   isAndroidApkPromptDismissed,
 } from '../lib/androidAppDownload';
+import { useSystemConfig } from '../lib/SystemConfigContext';
 
 export default function InstallAppBanner() {
-  const { t, isRtl } = useLanguage();
+  const { t, isRtl, language } = useLanguage();
+  const { config } = useSystemConfig();
   const [showBanner, setShowBanner] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [platform, setPlatform] = useState<'android' | 'ios' | 'other'>('other');
@@ -88,7 +90,10 @@ export default function InstallAppBanner() {
     }
 
     if (platform === 'android') {
-      triggerAndroidApkDownload();
+      triggerAndroidApkDownload({
+        configUrl: config.androidApkUrl,
+        isRtl: language === 'ar',
+      });
       toast.success(t('androidAppDownloadStarted'));
       toast(t('androidAppDownloadHint'), { icon: '📲', duration: 8000 });
       setShowBanner(false);

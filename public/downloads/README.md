@@ -2,10 +2,28 @@
 
 Place the signed release file here as **`schoolixiq.apk`** (required for download to work).
 
-**PowerShell (after building APK in Android Studio):**
+**PowerShell — build debug APK + copy (needs Android Studio / JDK):**
 ```powershell
-.\scripts\prepare-apk-release.ps1 -ApkPath "C:\path\to\app-release.apk"
-npm run deploy
+npm run prepare-apk:build
+```
+The script auto-uses `C:\Program Files\Android\Android Studio\jbr` if `JAVA_HOME` is unset.
+
+If Gradle still says JAVA_HOME missing:
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:Path = "$env:JAVA_HOME\bin;" + $env:Path
+npm run prepare-apk:build
+```
+
+**After Android Studio (Build → Build APK):**
+```powershell
+.\scripts\prepare-apk-release.ps1 -AutoFind
+# or: npm run prepare-apk
+```
+
+**Manual path (your real file, not a placeholder):**
+```powershell
+.\scripts\prepare-apk-release.ps1 -ApkPath "C:\Users\hamza\Downloads\app-release.apk"
 ```
 
 **Or hPanel:** File Manager → `public_html/downloads/` → upload `schoolixiq.apk`

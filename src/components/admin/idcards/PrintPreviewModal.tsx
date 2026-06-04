@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "motion/react";
 import StudentGridPrint from "./StudentGridPrint";
 import { IdCardTemplate } from "../../../types/idCardTemplate";
 import { printElement } from "../../../lib/printUtils";
+import { toast } from "react-hot-toast";
+import { mergeIdCardTemplate } from "../../../lib/idCardTemplateUtils";
 
 interface PrintPreviewModalProps {
   isOpen: boolean;
@@ -36,12 +38,15 @@ export default function PrintPreviewModal({
   const [isConfirmingPrint, setIsConfirmingPrint] = useState<boolean>(false);
   
   const printContentRef = useRef<HTMLDivElement>(null);
-  const printableStudents = students.filter(s => selectedStudents.has(s.id));
+  const resolvedTemplate = mergeIdCardTemplate(template);
+  const printableStudents = students.filter(
+    (s) => selectedStudents.has(s.id) && idCards[s.id],
+  );
 
-  // Reset selected students when students change
   useEffect(() => {
-    setSelectedStudents(new Set(students.map(s => s.id)));
-  }, [students]);
+    const ids = students.filter((s) => idCards[s.id]).map((s) => s.id);
+    setSelectedStudents(new Set(ids));
+  }, [students, idCards]);
 
   useEffect(() => {
     setPreviewSide(printSides);
@@ -49,19 +54,24 @@ export default function PrintPreviewModal({
 
   const handlePrint = () => {
     if (printableStudents.length === 0) {
-      alert(isRtl ? "لم يتم تحديد طلاب للطباعة" : "No students selected for printing.");
+      toast.error(
+        isRtl ? "لم يتم تحديد طلاب لديهم هوية صادرة" : "No students with issued cards selected.",
+      );
       return;
     }
 
-    if (printContentRef.current) {
-      const success = printElement(printContentRef.current, title);
-      
-      if (!success) {
-        alert(isRtl ? "حدث خطأ أثناء الطباعة أو تم حظر النافذة المنبثقة." : "An error occurred while printing or the popup was blocked.");
-      } else {
-        setIsConfirmingPrint(true);
-      }
+    if (!printContentRef.current) return;
+
+    const success = printElement(printContentRef.current, title);
+    if (!success) {
+      toast.error(
+        isRtl
+          ? "تعذر فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة أو جرّب متصفحاً آخر."
+          : "Could not open print dialog. Allow popups or try another browser.",
+      );
+      return;
     }
+    setIsConfirmingPrint(true);
   };
 
   const toggleStudent = (id: string) => {
@@ -169,7 +179,9 @@ export default function PrintPreviewModal({
                   </div>
                 </div>
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 max-h-[200px] overflow-y-auto custom-scrollbar">
-                  {students.map(student => (
+                  {students
+                    .filter((student) => idCards[student.id])
+                    .map((student) => (
                     <label key={student.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl cursor-pointer transition-colors">
                       <input
                         type="checkbox"
@@ -250,7 +262,7 @@ export default function PrintPreviewModal({
                 students={printableStudents}
                 idCards={idCards}
                 isRtl={isRtl}
-                template={template}
+                template={resolvedTemplate}
                 printSides={previewSide}
                 copies={copies}
                 layoutMode={layoutMode}
@@ -314,7 +326,7 @@ export default function PrintPreviewModal({
             students={printableStudents}
             idCards={idCards}
             isRtl={isRtl}
-            template={template}
+            template={resolvedTemplate}
             printSides={printSides}
             copies={copies}
             layoutMode={layoutMode}

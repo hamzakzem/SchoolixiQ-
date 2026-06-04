@@ -6,13 +6,15 @@ import {
   shouldPromoteAndroidApp,
   triggerAndroidApkDownload,
 } from '../lib/androidAppDownload';
+import { useSystemConfig } from '../lib/SystemConfigContext';
 import { toast } from 'react-hot-toast';
 
 const SESSION_KEY = 'schoolix_android_visit_toast_shown_v2';
 
 /** One-time alert on Android mobile web encouraging APK install + push capability. */
 export default function AndroidAppVisitPrompt() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { config } = useSystemConfig();
   const { user, loading } = useAuth();
   const shown = useRef(false);
 
@@ -36,7 +38,10 @@ export default function AndroidAppVisitPrompt() {
               type="button"
               className="flex-1 py-2 rounded-xl bg-[#0B2345] text-white text-xs font-bold"
               onClick={() => {
-                triggerAndroidApkDownload();
+                triggerAndroidApkDownload({
+                  configUrl: config.androidApkUrl,
+                  isRtl: language === 'ar',
+                });
                 toast.success(t('androidAppDownloadStarted'));
                 toast.dismiss(tInstance.id);
               }}

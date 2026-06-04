@@ -47,6 +47,8 @@ import QRCodeSection from "../../components/admin/idcards/QRCodeSection";
 
 import IdCardSettings from "./IdCardSettings";
 import { IdCardTemplate } from "../../types/idCardTemplate";
+import { mergeIdCardTemplate } from "../../lib/idCardTemplateUtils";
+import { DEFAULT_ID_CARD_TEMPLATE } from "../../lib/idCardPresets";
 
 export default function IdCards() {
   const { profile } = useAuth();
@@ -90,16 +92,39 @@ export default function IdCards() {
   const bulkPrintRef = useRef<HTMLDivElement>(null);
 
   const currentCard = selectedStudent ? idCards[selectedStudent.id] : null;
+  const effectiveTemplate = mergeIdCardTemplate(template);
 
-  const handleSinglePrint = () => {
-    setPrintMode("single");
+  const studentsWithCards = students.filter((s) => idCards[s.id]);
+  const canPrintBulk = studentsWithCards.length > 0;
+
+  const openPrintModal = (mode: "single" | "bulk") => {
+    if (mode === "single") {
+      if (!selectedStudent) {
+        toast.error(isRtl ? "اختر طالباً أولاً" : "Select a student first");
+        return;
+      }
+      if (!currentCard) {
+        toast.error(
+          isRtl
+            ? "أصدر الهوية أولاً ثم اطبعها"
+            : "Issue the ID card before printing",
+        );
+        return;
+      }
+    } else if (!canPrintBulk) {
+      toast.error(
+        isRtl
+          ? "لا توجد هويات صادرة في هذا الصف"
+          : "No issued ID cards in this class",
+      );
+      return;
+    }
+    setPrintMode(mode);
     setShowPrintModal(true);
   };
 
-  const handleBulkPrint = () => {
-    setPrintMode("bulk");
-    setShowPrintModal(true);
-  };
+  const handleSinglePrint = () => openPrintModal("single");
+  const handleBulkPrint = () => openPrintModal("bulk");
   
   const handlePrintComplete = async (printedCount: number) => {
     if (printMode === "single" && selectedStudent) {
@@ -139,7 +164,9 @@ export default function IdCards() {
         );
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setTemplate(docSnap.data() as IdCardTemplate);
+          setTemplate(mergeIdCardTemplate(docSnap.data() as IdCardTemplate));
+        } else {
+          setTemplate(DEFAULT_ID_CARD_TEMPLATE);
         }
       } catch (error) {
         console.error("Error fetching template", error);
@@ -323,8 +350,6 @@ export default function IdCards() {
     }
   };
 
-  const canPrintBulk = students.filter((s) => idCards[s.id]).length > 0;
-
   if (showSettings) {
     return (
       <div className="space-y-6">
@@ -374,24 +399,38 @@ export default function IdCards() {
             </span>
           </button>
 
-          {canPrintBulk && (
-            <button
-              onClick={() => handleBulkPrint()}
-              className="px-4 py-2 bg-[#e8eef5] dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-200 transition-colors"
-            >
-              <Users size={18} />
-              <span>{isRtl ? "طباعة القائمة" : "Print All"}</span>
-            </button>
-          )}
-          {currentCard && (
-            <button
-              onClick={() => handleSinglePrint()}
-              className="px-4 py-2 bg-slate-900 dark:bg-slate-700 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-lg"
-            >
-              <Printer size={18} />
-              <span>{isRtl ? "طباعة الهوية" : "Print Card"}</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => handleBulkPrint()}
+            disabled={!canPrintBulk}
+            title={
+              !canPrintBulk
+                ? isRtl
+                  ? "لا توجد هويات صادرة في الصف"
+                  : "No issued cards in class"
+                : undefined
+            }
+            className="px-4 py-2 bg-[#e8eef5] dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Users size={18} />
+            <span>{isRtl ? "طباعة القائمة" : "Print All"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSinglePrint()}
+            disabled={!currentCard}
+            title={
+              !currentCard
+                ? isRtl
+                  ? "أصدر الهوية أولاً"
+                  : "Issue card first"
+                : undefined
+            }
+            className="px-4 py-2 bg-slate-900 dark:bg-slate-700 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Printer size={18} />
+            <span>{isRtl ? "طباعة الهوية" : "Print Card"}</span>
+          </button>
         </div>
       </div>
 
@@ -544,7 +583,7 @@ export default function IdCards() {
                       student={selectedStudent}
                       cardData={currentCard}
                       isRtl={isRtl}
-                      template={template}
+                      template={effectiveTemplate}
                     />
                   </div>
                 ) : (
@@ -658,22 +697,28 @@ export default function IdCards() {
         </div>
       </div>
       
-      {template && (
-        <AnimatePresence>
-          {showPrintModal && (
-            <PrintPreviewModal
-              isOpen={showPrintModal}
-              onClose={() => setShowPrintModal(false)}
-              students={printMode === "single" && selectedStudent ? [selectedStudent] : students.filter((s) => idCards[s.id])}
-              idCards={idCards}
-              isRtl={isRtl}
-              template={template}
-              title={printMode === "single" ? `Student-ID-${selectedStudent?.name || "Card"}` : `Class-IDs-${classes.find((c) => c.id === selectedClassId)?.name || "Class"}`}
-              onAfterPrint={handlePrintComplete}
-            />
-          )}
-        </AnimatePresence>
-      )}
+      <AnimatePresence>
+        {showPrintModal && (
+          <PrintPreviewModal
+            isOpen={showPrintModal}
+            onClose={() => setShowPrintModal(false)}
+            students={
+              printMode === "single" && selectedStudent
+                ? [selectedStudent]
+                : studentsWithCards
+            }
+            idCards={idCards}
+            isRtl={isRtl}
+            template={effectiveTemplate}
+            title={
+              printMode === "single"
+                ? `Student-ID-${selectedStudent?.name || "Card"}`
+                : `Class-IDs-${classes.find((c) => c.id === selectedClassId)?.name || "Class"}`
+            }
+            onAfterPrint={handlePrintComplete}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showEditModal && (

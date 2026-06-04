@@ -7,6 +7,7 @@ import {
   shouldPromoteAndroidApp,
   triggerAndroidApkDownload,
 } from '../lib/androidAppDownload';
+import { useSystemConfig } from '../lib/SystemConfigContext';
 import { toast } from 'react-hot-toast';
 
 type Props = {
@@ -16,12 +17,13 @@ type Props = {
 /** Compact Android APK promo on login / signup (mobile web only). */
 export default function AndroidAppDownloadCard({ className = '' }: Props) {
   const { t, isRtl } = useLanguage();
+  const { config } = useSystemConfig();
   const [dismissed, setDismissed] = useState(false);
 
   if (!shouldPromoteAndroidApp() || dismissed) return null;
 
   const handleDownload = () => {
-    triggerAndroidApkDownload();
+    triggerAndroidApkDownload({ configUrl: config.androidApkUrl, isRtl });
     toast.success(t('androidAppDownloadStarted'), { duration: 5000 });
     toast(t('androidAppDownloadHint'), {
       icon: '📲',

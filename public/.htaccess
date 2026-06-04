@@ -22,6 +22,11 @@ DirectoryIndex index.html index.php
   <FilesMatch "^downloads/">
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
+  <FilesMatch "\.apk$">
+    Header set Content-Type "application/vnd.android.package-archive"
+    Header set Content-Disposition "attachment; filename=schoolixiq.apk"
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
 </IfModule>
 
 <IfModule mod_rewrite.c>
