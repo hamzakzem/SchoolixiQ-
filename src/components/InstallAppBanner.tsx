@@ -18,6 +18,7 @@ import {
   dismissIosPrompt,
   isIosPromptDismissed,
   isIosInstallDeepLink,
+  getIosMobileConfigUrl,
 } from '../lib/iosAppDownload';
 import { useSystemConfig } from '../lib/SystemConfigContext';
 import { useAuth } from '../lib/AuthContext';
@@ -33,7 +34,7 @@ export default function InstallAppBanner() {
 
   const downloadMobileConfig = () => {
     toast.success(t('preparingProfileSuccess'));
-    window.location.href = "/api/download/schoolixiq.mobileconfig";
+    window.location.assign(getIosMobileConfigUrl());
   };
 
   useEffect(() => {
@@ -334,7 +335,7 @@ export default function InstallAppBanner() {
 
                   <div className="pr-6 space-y-3">
                     <a
-                      href="/api/download/schoolixiq.mobileconfig"
+                      href="/downloads/schoolixiq.mobileconfig"
                       onClick={() => {
                         toast.success(t('preparingProfileSuccess'));
                       }}

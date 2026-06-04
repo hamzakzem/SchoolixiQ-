@@ -1,4 +1,12 @@
-# Android APK
+# Downloads (Hostinger static)
+
+## iPhone — `schoolixiq.mobileconfig`
+
+ملف تثبيت التطبيق على الشاشة الرئيسية (Safari). يُنسخ تلقائياً مع `npm run build:web` إلى `dist/downloads/`.
+
+الرابط المباشر: `https://schoolixiq.com/downloads/schoolixiq.mobileconfig`
+
+## Android APK
 
 Place the signed release file here as **`schoolixiq.apk`** (required for download to work).
 

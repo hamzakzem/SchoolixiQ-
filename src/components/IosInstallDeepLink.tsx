@@ -1,8 +1,13 @@
 import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { isIosInstallDeepLink, isIosDevice } from '../lib/iosAppDownload';
+import {
+  isIosInstallDeepLink,
+  isIosDevice,
+  clearIosInstallQueryFromUrl,
+  getIosMobileConfigUrl,
+} from '../lib/iosAppDownload';
 
-/** يعرض بانر التثبيت فوراً عند فتح /?install=ios من رابط التحميل */
+/** يعرض بانر التثبيت على سطح المكتب؛ على iPhone يفتح ملف التعريف مباشرة */
 export function dispatchIosInstallPrompt(): void {
   if (typeof window === 'undefined' || Capacitor.isNativePlatform()) return;
   window.dispatchEvent(new CustomEvent('schoolix:ios-install-prompt'));
@@ -10,9 +15,14 @@ export function dispatchIosInstallPrompt(): void {
 
 export default function IosInstallDeepLink() {
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) return;
-    if (!isIosInstallDeepLink()) return;
-    if (!isIosDevice()) return;
+    if (Capacitor.isNativePlatform() || !isIosInstallDeepLink()) return;
+
+    if (isIosDevice()) {
+      clearIosInstallQueryFromUrl();
+      window.location.assign(getIosMobileConfigUrl());
+      return;
+    }
+
     const t = window.setTimeout(() => dispatchIosInstallPrompt(), 400);
     return () => window.clearTimeout(t);
   }, []);

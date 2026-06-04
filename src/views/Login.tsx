@@ -75,6 +75,7 @@ import AndroidAppDownloadCard from "../components/AndroidAppDownloadCard";
 import {
   hasIosOfficialDownload,
   openIosInstall,
+  getIosMobileConfigUrl,
 } from "../lib/iosAppDownload";
 import SchoolRegistrationFields, {
   buildRegistrationCustomerInfo,
@@ -310,7 +311,7 @@ export default function Login() {
 
   const downloadMobileConfig = () => {
     toast.success(isRtl ? "جاري تحضير ملف التعريف وتنزيله بنجاح..." : "Preparing and downloading configuration profile...");
-    window.location.href = "/api/download/schoolixiq.mobileconfig";
+    window.location.assign(getIosMobileConfigUrl());
   };
 
   const startDirectInstall = async (platform: "android" | "ios") => {
@@ -2106,7 +2107,7 @@ export default function Login() {
 
                         <div className="pr-8 space-y-3">
                           <a
-                            href="/api/download/schoolixiq.mobileconfig"
+                            href="/downloads/schoolixiq.mobileconfig"
                             onClick={() => {
                               toast.success(isRtl ? "جاري تحضير ملف التعريف وتنزيله بنجاح..." : "Preparing and downloading configuration profile...");
                             }}

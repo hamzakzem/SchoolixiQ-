@@ -82,6 +82,12 @@ jobs:
           else
             echo "::warning::No APK at public/downloads/schoolixiq.apk — download link will 404 until you upload the file or set VITE_ANDROID_APK_URL / Firestore system/config.androidApkUrl"
           fi
+          if test -f dist/downloads/schoolixiq.mobileconfig; then
+            echo "iOS profile present at dist/downloads/schoolixiq.mobileconfig"
+          else
+            echo "::error::Missing public/downloads/schoolixiq.mobileconfig — iPhone install will fail"
+            exit 1
+          fi
 
       - name: Package dist zip (manual fallback)
         run: |
