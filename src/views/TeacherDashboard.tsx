@@ -699,7 +699,7 @@ export default function TeacherDashboard() {
 
   return (
     <div
-      className="h-[100dvh] overflow-hidden bg-transparent flex transition-all duration-300 print:overflow-visible print:h-auto print:block"
+      className={`h-[100dvh] overflow-hidden flex transition-all duration-300 print:overflow-visible print:h-auto print:block ${mobileUi ? "sq-app-native bg-transparent" : "bg-transparent"}`}
       dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Sidebar Overlay for Mobile */}

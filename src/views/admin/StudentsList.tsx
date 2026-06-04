@@ -25,6 +25,8 @@ import { handleFirestoreError, OperationType } from '../../lib/firestore-errors'
 import { uploadImageToServer } from '../../lib/imageUtils';
 
 import { adminCreateUser, adminDeleteUser, adminDeleteStudent } from '../../lib/adminApi';
+import { deleteStudentFirestore } from '../../lib/deleteStudentFirestore';
+import { Modal } from '../../components/ui/Modal';
 
 export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit' }) {
   const { profile } = useAuth();
@@ -174,12 +176,19 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     setIsDeleting(id);
     const loadingToast = toast.loading('جاري حذف سجل الطالب...');
     try {
-      const result = await adminDeleteStudent(id);
-      if (!result.success) {
-        throw new Error(result.message || 'فشل في حذف الطالب');
+      try {
+        const result = await adminDeleteStudent(id);
+        if (!result.success) {
+          throw new Error(result.message || 'فشل في حذف الطالب');
+        }
+        toast.dismiss(loadingToast);
+        toast.success(result.message || 'تم حذف الطالب نهائياً من النظام');
+      } catch (apiError: any) {
+        console.warn('Admin API delete failed, trying Firestore:', apiError);
+        await deleteStudentFirestore(id, profile.schoolId);
+        toast.dismiss(loadingToast);
+        toast.success('تم حذف الطالب من سجل المدرسة');
       }
-      toast.dismiss(loadingToast);
-      toast.success(result.message || 'تم حذف الطالب نهائياً من النظام');
       setStudents((prev) => prev.filter((s) => s.id !== id));
       setConfirmDeleteId(null);
     } catch (error: any) {
@@ -617,6 +626,16 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           >
             <ArrowRightLeft size={16} className="text-slate-400 shrink-0" />
             نقل لصف آخر
+          </ActionMenuItem>
+          <ActionMenuItem
+            onClick={() => {
+              setConfirmDeleteId(student.id);
+              closeMenu();
+            }}
+            className="hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"
+          >
+            <Trash2 size={16} className="text-red-500 shrink-0" />
+            حذف الطالب نهائياً
           </ActionMenuItem>
         </>
       )}
@@ -1244,45 +1263,50 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {confirmDeleteId && (
-          <div className="fixed inset-0 bg-slate-900/60 z-[110] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm pt-[72px] pb-[84px] sm:pt-4 sm:pb-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-md p-8 shadow-2xl border border-slate-200 dark:border-slate-800 text-right"
-              dir="rtl"
-            >
-              <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400 mb-6 mx-auto md:mx-0">
-                <AlertTriangle size={32} />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 font-display">تأكيد حذف الطالب</h2>
-              <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                هل أنت متأكد من حذف سجل الطالب <span className="font-bold text-slate-900 dark:text-white">{students.find(s => s.id === confirmDeleteId)?.name}</span> نهائياً؟ 
-                <span className="block mt-2 text-red-500 font-bold text-xs">هذا الإجراء سيؤدي لحذف كافة البيانات المرتبطة ولا يمكن التراجع عنه.</span>
-              </p>
-              
-              <div className="flex flex-col-reverse md:flex-row-reverse gap-4">
-                <button
-                  disabled={!!isDeleting}
-                  onClick={() => handleDeleteStudent(confirmDeleteId)}
-                  className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 disabled:opacity-50"
-                >
-                  {isDeleting ? 'جاري الحذف...' : 'نعم، احذف السجل'}
-                </button>
-                <button
-                  disabled={!!isDeleting}
-                  onClick={() => setConfirmDeleteId(null)}
-                  className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </motion.div>
+      <Modal
+        open={!!confirmDeleteId}
+        onClose={() => {
+          if (!isDeleting) setConfirmDeleteId(null);
+        }}
+        title="تأكيد حذف الطالب"
+        description="لا يمكن التراجع عن هذا الإجراء"
+        icon={
+          <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-900/30 text-red-600 flex items-center justify-center">
+            <AlertTriangle size={26} />
           </div>
-        )}
-      </AnimatePresence>
+        }
+        maxWidthClass="max-w-md"
+        footer={
+          <div className="flex flex-col-reverse sm:flex-row-reverse gap-2 w-full">
+            <Button
+              variant="danger"
+              size="lg"
+              className="flex-1"
+              disabled={!!isDeleting}
+              onClick={() => confirmDeleteId && handleDeleteStudent(confirmDeleteId)}
+            >
+              {isDeleting ? 'جاري الحذف...' : 'نعم، احذف السجل'}
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="flex-1"
+              disabled={!!isDeleting}
+              onClick={() => setConfirmDeleteId(null)}
+            >
+              إلغاء
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+          هل أنت متأكد من حذف سجل الطالب{' '}
+          <span className="font-bold text-slate-900 dark:text-white">
+            {students.find((s) => s.id === confirmDeleteId)?.name}
+          </span>{' '}
+          نهائياً؟ سيتم حذف البيانات المرتبطة من النظام.
+        </p>
+      </Modal>
     </div>
   );
 }

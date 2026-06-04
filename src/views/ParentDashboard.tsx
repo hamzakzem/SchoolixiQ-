@@ -970,7 +970,7 @@ export default function ParentDashboard() {
 
     return (
       <div
-        className="h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
+        className={`h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0 ${mobileUi ? "sq-app-native bg-transparent" : "bg-transparent"}`}
         dir={isRtl ? "rtl" : "ltr"}
       >
         <AnimatePresence>

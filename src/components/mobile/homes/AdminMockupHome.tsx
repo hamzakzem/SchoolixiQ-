@@ -33,11 +33,13 @@ export type AdminHomeMenuItem = {
 
 type Props = {
   permissions: AdminHomeMenuItem[];
+  studentsTabId?: string;
   onTabChange: (tab: string) => void;
 };
 
 export default function AdminMockupHome({
   permissions,
+  studentsTabId = 'students_edit',
   onTabChange,
 }: Props) {
   const { isRtl, t } = useLanguage();
@@ -83,7 +85,7 @@ export default function AdminMockupHome({
       icon: GraduationCap,
     },
     {
-      id: 'students',
+      id: studentsTabId,
       label: isRtl ? 'الطلاب' : 'Students',
       value: studentCount,
       icon: Users,

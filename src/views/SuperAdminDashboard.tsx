@@ -1539,7 +1539,7 @@ export default function SuperAdminDashboard() {
 
   return (
     <div
-      className="h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
+      className={`h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:h-auto print:block ${mobileUi ? "sq-app-native bg-transparent" : "bg-transparent"}`}
       dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Sidebar Mockup matching theme */}

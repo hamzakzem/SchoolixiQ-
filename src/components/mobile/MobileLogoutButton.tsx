@@ -23,7 +23,7 @@ export default function MobileLogoutButton({ className = '' }: Props) {
       <button
         type="button"
         onClick={onLogout}
-        className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200/80 dark:border-red-900/40 text-red-600 dark:text-red-400 font-bold text-sm shadow-sm active:scale-[0.98] transition-transform"
+        className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-gradient-to-b from-red-50 to-white dark:from-red-950/40 dark:to-slate-900 border border-red-200/90 dark:border-red-800/50 text-red-600 dark:text-red-400 font-bold text-sm shadow-[0_4px_20px_rgba(220,38,38,0.12)] active:scale-[0.98] transition-all duration-200"
       >
         <LogOut size={20} strokeWidth={2.25} />
         {t('logout')}

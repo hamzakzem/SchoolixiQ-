@@ -279,6 +279,15 @@ export default function AdminDashboard() {
     return false;
   });
 
+  const canManageStudents = filteredMenuItems.some(
+    (item) => item.id === "students_edit",
+  );
+  const mobileHomePermissions = filteredMenuItems.filter(
+    (item) =>
+      item.id !== "overview" &&
+      !(item.id === "students" && canManageStudents),
+  );
+
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const primaryItems = filteredMenuItems.filter((item) =>
     ["overview", "students", "tuition", "chat"].includes(item.id),
@@ -1094,7 +1103,8 @@ export default function AdminDashboard() {
       case "overview":
         return mobileUi ? (
           <AdminMockupHome
-            permissions={filteredMenuItems.filter((i) => i.id !== "overview")}
+            permissions={mobileHomePermissions}
+            studentsTabId={canManageStudents ? "students_edit" : "students"}
             onTabChange={navigateToTab}
           />
         ) : (
@@ -1107,7 +1117,11 @@ export default function AdminDashboard() {
       case "schedules":
         return <Schedules />;
       case "students":
-        return <StudentsList mode="view" />;
+        return (
+          <StudentsList
+            mode={mobileUi && canManageStudents ? "edit" : "view"}
+          />
+        );
       case "students_edit":
         return <StudentsList mode="edit" />;
       case "parents":
@@ -1153,7 +1167,7 @@ export default function AdminDashboard() {
 
   return (
     <div
-      className="h-[100dvh] overflow-hidden bg-transparent flex flex-col md:flex-row transition-colors duration-300 print:h-auto print:block"
+      className={`h-[100dvh] overflow-hidden flex flex-col md:flex-row transition-colors duration-300 print:h-auto print:block ${mobileUi ? "sq-app-native bg-transparent" : "bg-transparent"}`}
       dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Expiry Overlay */}

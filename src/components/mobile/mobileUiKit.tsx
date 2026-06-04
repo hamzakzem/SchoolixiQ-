@@ -1,37 +1,64 @@
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
+import { motion } from 'motion/react';
 
-/** Shared mobile shell tokens — navy + soft surfaces */
+/** SchoolixiQ native shell — navy authority + gold accent (SaaS school OS) */
 export const mobileTokens = {
   navy: '#0B2345',
   navyMid: '#163a6b',
-  gold: '#C9A227',
-  pageBg: 'bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]',
+  navyLight: '#1e4d82',
+  gold: '#D4A64A',
+  goldSoft: '#e8c06e',
+  pageBg:
+    'bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(212,166,74,0.12),transparent_50%),linear-gradient(180deg,#f8fafc_0%,#eef2f8_45%,#e4eaf3_100%)]',
   headerH: 'h-[72px]',
   shellPt: 'pt-[72px]',
   shellPb: 'pb-[84px]',
+  cardShadow:
+    'shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_10px_40px_rgba(11,35,69,0.08)]',
+  navShadow: 'shadow-[0_-8px_32px_rgba(11,35,69,0.12)]',
 } as const;
 
 export function MobilePage({ children }: { children: ReactNode }) {
-  return <div className="px-4 py-5 space-y-5">{children}</div>;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: 'easeOut' }}
+      className="px-4 py-5 space-y-5"
+    >
+      {children}
+    </motion.div>
+  );
 }
 
 export function MobileSectionTitle({
   title,
   icon: Icon,
+  subtitle,
 }: {
   title: string;
   icon?: LucideIcon;
+  subtitle?: string;
 }) {
   return (
-    <div className="flex items-center gap-2.5 px-0.5">
-      {Icon ? (
-        <span className="w-8 h-8 rounded-xl bg-[#0B2345]/8 flex items-center justify-center text-[#0B2345]">
-          <Icon size={16} strokeWidth={2.25} />
-        </span>
-      ) : null}
-      <h2 className="text-[15px] font-black text-[#0B2345] tracking-tight">{title}</h2>
+    <div className="px-0.5">
+      <div className="flex items-center gap-2.5">
+        {Icon ? (
+          <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0B2345] to-[#163a6b] text-white flex items-center justify-center shadow-md shadow-[#0B2345]/25">
+            <Icon size={17} strokeWidth={2.35} />
+          </span>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[15px] font-black text-[#0B2345] tracking-tight leading-tight">
+            {title}
+          </h2>
+          {subtitle ? (
+            <p className="text-[11px] text-slate-500 font-medium mt-0.5">{subtitle}</p>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -50,7 +77,7 @@ export function MobileCard({
     <Tag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`bg-white rounded-[1.25rem] border border-slate-200/80 shadow-[0_8px_30px_rgba(11,35,69,0.06)] ${onClick ? 'active:scale-[0.99] transition-transform text-start w-full' : ''} ${className}`}
+      className={`bg-white/95 backdrop-blur-sm rounded-[1.35rem] border border-slate-200/70 ${mobileTokens.cardShadow} ${onClick ? 'active:scale-[0.985] transition-all duration-200 text-start w-full' : ''} ${className}`}
     >
       {children}
     </Tag>
@@ -62,33 +89,46 @@ export function MobileStatCard({
   value,
   icon: Icon,
   onClick,
+  accent = 'navy',
 }: {
   label: string;
   value: string | number;
   icon: LucideIcon;
   onClick?: () => void;
+  accent?: 'navy' | 'gold';
 }) {
   const Tag = onClick ? 'button' : 'div';
+  const accentBg =
+    accent === 'gold'
+      ? 'from-[#D4A64A]/15 to-[#D4A64A]/5 text-[#8a6b1f]'
+      : 'from-[#0B2345]/12 to-[#0B2345]/4 text-[#0B2345]';
+
   return (
     <Tag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`bg-white rounded-xl p-3 border border-slate-200/80 shadow-[0_4px_16px_rgba(11,35,69,0.06)] text-start w-full ${
-        onClick ? 'active:scale-[0.98] transition-transform' : ''
+      className={`relative overflow-hidden bg-white/95 rounded-2xl p-3.5 border border-slate-200/70 ${mobileTokens.cardShadow} text-start w-full ${
+        onClick ? 'active:scale-[0.97] transition-all duration-200' : ''
       }`}
     >
+      <div
+        className={`absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r ${accent === 'gold' ? 'from-transparent via-[#D4A64A] to-transparent' : 'from-transparent via-[#0B2345]/40 to-transparent'}`}
+      />
       <div className="flex items-center gap-2.5 mb-2">
-        <span className="w-8 h-8 rounded-lg bg-[#0B2345]/8 flex items-center justify-center text-[#0B2345]">
-          <Icon size={16} strokeWidth={2.25} />
+        <span
+          className={`w-9 h-9 rounded-xl bg-gradient-to-br ${accentBg} flex items-center justify-center`}
+        >
+          <Icon size={17} strokeWidth={2.35} />
         </span>
-        <p className="text-[10px] font-bold text-slate-500 flex-1">{label}</p>
+        <p className="text-[10px] font-bold text-slate-500 flex-1 leading-snug">{label}</p>
       </div>
-      <p className="text-xl font-black text-slate-900 tabular-nums">{value}</p>
+      <p className="text-[1.35rem] font-black text-slate-900 tabular-nums tracking-tight">
+        {value}
+      </p>
     </Tag>
   );
 }
 
-/** Small permission shortcut — 3 per row on phones */
 export function MobilePermissionChip({
   icon: Icon,
   label,
@@ -99,18 +139,19 @@ export function MobilePermissionChip({
   onClick: () => void;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
+      whileTap={{ scale: 0.96 }}
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl bg-white border border-slate-200/90 shadow-sm active:scale-[0.97] transition-transform min-h-[76px]"
+      className="group flex flex-col items-center gap-2 p-3 rounded-2xl bg-white/90 border border-slate-200/80 shadow-[0_4px_20px_rgba(11,35,69,0.06)] min-h-[84px] transition-shadow hover:shadow-[0_8px_28px_rgba(11,35,69,0.1)]"
     >
-      <span className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#0B2345] to-[#163a6b] text-white flex items-center justify-center">
-        <Icon size={17} strokeWidth={2.25} />
+      <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0B2345] via-[#0f2d52] to-[#163a6b] text-white flex items-center justify-center shadow-md shadow-[#0B2345]/30 group-active:shadow-inner">
+        <Icon size={18} strokeWidth={2.35} />
       </span>
       <span className="text-[10px] font-bold text-slate-700 text-center leading-tight line-clamp-2">
         {label}
       </span>
-    </button>
+    </motion.button>
   );
 }
 
@@ -119,17 +160,20 @@ export function MobileBtnPrimary({
   onClick,
   className = '',
   fullWidth = true,
+  disabled,
 }: {
   children: ReactNode;
   onClick?: () => void;
   className?: string;
   fullWidth?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
-      className={`${fullWidth ? 'w-full' : ''} inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 rounded-xl bg-gradient-to-b from-[#0f2d52] to-[#0B2345] text-white text-xs font-bold shadow-[0_4px_14px_rgba(11,35,69,0.35)] active:scale-[0.98] transition-transform ${className}`}
+      className={`${fullWidth ? 'w-full' : ''} inline-flex items-center justify-center gap-2 min-h-[46px] px-5 py-3 rounded-2xl bg-gradient-to-b from-[#12325c] via-[#0f2d52] to-[#0B2345] text-white text-sm font-bold shadow-[0_6px_20px_rgba(11,35,69,0.4)] border border-white/10 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 ${className}`}
     >
       {children}
     </button>
@@ -149,7 +193,7 @@ export function MobileBtnSecondary({
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 min-h-[44px] px-3 py-2.5 rounded-xl border border-[#0B2345]/15 bg-white text-[#0B2345] text-xs font-bold shadow-sm active:scale-[0.98] transition-transform ${className}`}
+      className={`flex-1 min-h-[46px] px-4 py-3 rounded-2xl border border-[#0B2345]/12 bg-white/90 text-[#0B2345] text-sm font-bold shadow-sm active:scale-[0.98] transition-all duration-200 ${className}`}
     >
       {children}
     </button>
@@ -166,16 +210,17 @@ export function MobileIconAction({
   onClick: () => void;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
+      whileTap={{ scale: 0.94 }}
       onClick={onClick}
-      className="flex flex-col items-center gap-2 min-w-[72px] active:scale-95 transition-transform"
+      className="flex flex-col items-center gap-2 min-w-[76px]"
     >
-      <span className="w-[56px] h-[56px] rounded-2xl bg-white border border-slate-200/90 shadow-[0_6px_20px_rgba(11,35,69,0.08)] flex items-center justify-center text-[#0B2345]">
-        <Icon size={24} strokeWidth={2.25} />
+      <span className="w-14 h-14 rounded-2xl bg-white border border-slate-200/80 shadow-[0_8px_24px_rgba(11,35,69,0.1)] flex items-center justify-center text-[#0B2345] ring-1 ring-[#0B2345]/5">
+        <Icon size={26} strokeWidth={2.2} />
       </span>
       <span className="text-[11px] font-bold text-slate-600">{label}</span>
-    </button>
+    </motion.button>
   );
 }
 
@@ -188,9 +233,7 @@ export function MobileMenuTile({
   label: string;
   onClick: () => void;
 }) {
-  return (
-    <MobilePermissionChip icon={Icon} label={label} onClick={onClick} />
-  );
+  return <MobilePermissionChip icon={Icon} label={label} onClick={onClick} />;
 }
 
 export function MobileSchoolHero({
@@ -206,13 +249,13 @@ export function MobileSchoolHero({
 }) {
   return (
     <div
-      className="relative overflow-hidden rounded-[1.35rem] bg-gradient-to-br from-[#0B2345] via-[#0f2d52] to-[#163a6b] text-white p-4 shadow-[0_12px_40px_rgba(11,35,69,0.35)]"
+      className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-[#0B2345] via-[#0f2d52] to-[#1a3f72] text-white p-4 shadow-[0_16px_48px_rgba(11,35,69,0.4)] ring-1 ring-white/10"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full bg-white/5 blur-2xl pointer-events-none" />
-      <div className="absolute -bottom-10 -right-6 w-40 h-40 rounded-full bg-[#C9A227]/10 blur-2xl pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(212,166,74,0.22),transparent_45%)] pointer-events-none" />
+      <div className="absolute -bottom-12 -left-8 w-36 h-36 rounded-full bg-white/[0.04] blur-2xl pointer-events-none" />
       <div className="relative flex items-center gap-4">
-        <div className="w-[72px] h-[72px] rounded-2xl bg-white p-1.5 shadow-lg ring-2 ring-white/30 shrink-0 flex items-center justify-center overflow-hidden">
+        <div className="w-[76px] h-[76px] rounded-2xl bg-white p-1.5 shadow-xl ring-2 ring-[#D4A64A]/40 shrink-0 flex items-center justify-center overflow-hidden">
           {logoUrl ? (
             <img
               src={logoUrl}
@@ -228,11 +271,12 @@ export function MobileSchoolHero({
         </div>
         <div className="min-w-0 flex-1">
           {badge ? (
-            <p className="text-[10px] font-bold text-white/65 uppercase tracking-widest mb-1">
+            <p className="text-[10px] font-bold text-[#D4A64A] uppercase tracking-[0.2em] mb-1">
               {badge}
             </p>
           ) : null}
           <p className="text-lg font-black leading-tight truncate">{schoolName}</p>
+          <p className="text-[11px] text-white/60 font-semibold mt-1">SchoolixiQ</p>
         </div>
       </div>
     </div>
@@ -287,7 +331,7 @@ export function SchoolLogoAvatar({
     size === 'lg' ? 'w-[72px] h-[72px]' : size === 'sm' ? 'w-11 h-11' : 'w-14 h-14';
   return (
     <div
-      className={`${box} rounded-2xl bg-white border border-slate-200/90 shadow-md flex items-center justify-center overflow-hidden shrink-0 ring-1 ring-[#0B2345]/5`}
+      className={`${box} rounded-2xl bg-white border border-slate-200/90 shadow-md flex items-center justify-center overflow-hidden shrink-0 ring-2 ring-[#D4A64A]/20`}
     >
       {logoUrl ? (
         <img
