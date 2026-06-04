@@ -110,6 +110,14 @@ function Test-GradleWrapperJar {
 
 function Invoke-DebugBuild {
   $skipGradle = $env:SKIP_GRADLE_BUILD -eq '1'
+  $gsJson = Join-Path $androidDir 'app\google-services.json'
+  if (-not (Test-Path $gsJson)) {
+    Write-Warning @"
+google-services.json missing at android/app/google-services.json
+Download from Firebase Console (Android app com.schoolix.app) then:
+  .\scripts\install-google-services.ps1 -JsonPath `"`$env:USERPROFILE\Downloads\google-services.json`"
+"@
+  }
 
   if (-not $skipGradle) {
     Write-Host '==> npm run build:web'

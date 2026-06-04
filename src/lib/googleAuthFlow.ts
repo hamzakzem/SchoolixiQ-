@@ -21,14 +21,46 @@ export function isCapacitorNative(): boolean {
   return typeof window !== 'undefined' && Capacitor.isNativePlatform();
 }
 
-/** Mobile browsers and iframes cannot reliably use signInWithPopup. */
-export function shouldPreferGoogleRedirect(): boolean {
+/**
+ * Google blocks OAuth in embedded WebViews (403 disallowed_useragent).
+ * Capacitor app WebView counts — must use native GoogleAuth plugin only.
+ */
+export function isInsecureOAuthWebView(): boolean {
   if (typeof window === 'undefined') return false;
-  if (isCapacitorNative()) return false;
-  if (window.self !== window.top) return true;
-  return /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent || '',
+  if (isCapacitorNative()) return true;
+
+  const ua = navigator.userAgent || '';
+  if (/Android/i.test(ua) && /; wv\)|\bwv\b/i.test(ua)) return true;
+  if (
+    /iPhone|iPad|iPod/i.test(ua) &&
+    /AppleWebKit/i.test(ua) &&
+    !/Safari|CriOS|FxiOS/i.test(ua)
+  ) {
+    return true;
+  }
+  if (/FBAN|FBAV|Instagram|Line\//i.test(ua)) return true;
+  return false;
+}
+
+export function isGoogleDisallowedUserAgentError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes('disallowed_useragent') ||
+    m.includes('403') ||
+    m.includes('secure browsers') ||
+    m.includes('متصفحات آمنة') ||
+    m.includes('doesn\'t comply with google\'s policies')
   );
+}
+
+/** Read OAuth error returned in URL after a blocked redirect attempt */
+export function detectGoogleOAuthUrlError(): string | null {
+  if (typeof window === 'undefined') return null;
+  const haystack = `${window.location.search}${window.location.hash}`.toLowerCase();
+  if (haystack.includes('disallowed_useragent')) {
+    return 'disallowed_useragent';
+  }
+  return null;
 }
 
 export type GoogleSignInFlowResult =
@@ -36,9 +68,10 @@ export type GoogleSignInFlowResult =
   | { status: 'cancelled' }
   | { status: 'popup-blocked' }
   | { status: 'redirecting' }
-  | { status: 'error'; error: Error };
+  | { status: 'webview-blocked' }
+  | { status: 'error'; error: Error; nativeSetupRequired?: boolean };
 
-async function signInWithGoogleNative(auth: Auth, clientId: string): Promise<User> {
+export async function signInWithGoogleNative(auth: Auth, clientId: string): Promise<User> {
   const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
   try {
     await GoogleAuth.initialize({
@@ -64,8 +97,32 @@ async function signInWithGoogleNative(auth: Auth, clientId: string): Promise<Use
   return result.user;
 }
 
+function nativeGoogleErrorMessage(err: unknown, isRtl: boolean): Error {
+  const raw = err instanceof Error ? err.message : String(err);
+  const needsSetup =
+    /developer_error|10:|12500|idtoken|null/i.test(raw) ||
+    raw.includes('DEVELOPER');
+
+  if (needsSetup) {
+    return new Error(
+      isRtl
+        ? 'إعداد Google للتطبيق غير مكتمل (SHA-1 / google-services.json). أعد بناء APK بعد إضافة تطبيق Android في Firebase.'
+        : 'Google app setup incomplete (SHA-1 / google-services.json). Rebuild APK after adding the Android app in Firebase.',
+    );
+  }
+
+  return new Error(
+    isRtl
+      ? `فشل تسجيل Google عبر التطبيق: ${raw}`
+      : `Native Google sign-in failed: ${raw}`,
+  );
+}
+
 /**
- * Unified Google sign-in: native plugin on app, redirect on mobile web / iframe, popup on desktop.
+ * Unified Google sign-in.
+ * - Native app: ONLY native plugin (never redirect inside WebView — causes 403).
+ * - Real mobile browser: redirect.
+ * - Desktop: popup, then redirect if blocked.
  */
 export async function runGoogleSignInFlow(
   auth: Auth,
@@ -79,20 +136,18 @@ export async function runGoogleSignInFlow(
       const user = await signInWithGoogleNative(auth, clientId);
       return { status: 'success', user };
     } catch (nativeErr) {
-      console.warn('Native Google sign-in failed, using redirect fallback', nativeErr);
-      try {
-        await signInWithGoogleRedirectWeb(auth);
-        return { status: 'redirecting' };
-      } catch (redirectErr) {
-        return {
-          status: 'error',
-          error:
-            redirectErr instanceof Error
-              ? redirectErr
-              : new Error(String(redirectErr)),
-        };
-      }
+      const err = nativeGoogleErrorMessage(nativeErr, isRtl);
+      const raw = nativeErr instanceof Error ? nativeErr.message : String(nativeErr);
+      return {
+        status: 'error',
+        error: err,
+        nativeSetupRequired: /developer_error|10:|12500|DEVELOPER/i.test(raw),
+      };
     }
+  }
+
+  if (isInsecureOAuthWebView()) {
+    return { status: 'webview-blocked' };
   }
 
   if (shouldPreferGoogleRedirect()) {
@@ -108,6 +163,9 @@ export async function runGoogleSignInFlow(
     return { status: 'cancelled' };
   }
   if (webResult.popupBlocked) {
+    if (isInsecureOAuthWebView()) {
+      return { status: 'webview-blocked' };
+    }
     try {
       await signInWithGoogleRedirectWeb(auth);
       return { status: 'redirecting' };
@@ -123,4 +181,14 @@ export async function runGoogleSignInFlow(
   }
 
   return { status: 'error', error: webResult.error };
+}
+
+/** Mobile browsers and iframes — but NOT embedded WebViews. */
+export function shouldPreferGoogleRedirect(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (isCapacitorNative() || isInsecureOAuthWebView()) return false;
+  if (window.self !== window.top) return true;
+  return /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent || '',
+  );
 }

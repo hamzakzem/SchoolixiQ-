@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { auth, db } from "../lib/firebase";
 import { signInWithGoogleRedirectWeb } from "../lib/googleAuthWeb";
 import {
+  detectGoogleOAuthUrlError,
   getGoogleWebClientId,
   isCapacitorNative,
+  isGoogleDisallowedUserAgentError,
+  isInsecureOAuthWebView,
   runGoogleSignInFlow,
 } from "../lib/googleAuthFlow";
 import {
@@ -588,8 +591,12 @@ export default function Login() {
   );
   const [showClientIdConfig, setShowClientIdConfig] = useState<boolean>(false);
   const [googlePopupBlocked, setGooglePopupBlocked] = useState(false);
+  const [googleWebViewBlocked, setGoogleWebViewBlocked] = useState(
+    () => detectGoogleOAuthUrlError() === "disallowed_useragent",
+  );
 
   const isNativeApp = isCapacitorNative();
+  const insecureOAuthWebView = isInsecureOAuthWebView();
 
   const inIframe =
     typeof window !== "undefined" && window.self !== window.top;
@@ -600,6 +607,23 @@ export default function Login() {
   };
 
   const handleGoogleRedirectAuth = async () => {
+    if (googleAuthLock.current || loading) return;
+
+    if (isNativeApp) {
+      await handleGoogleAuth();
+      return;
+    }
+
+    if (insecureOAuthWebView) {
+      setGoogleWebViewBlocked(true);
+      toast.error(
+        isRtl
+          ? "Google لا يسمح بتسجيل الدخول داخل هذا المتصفح. افتح schoolixiq.com في Chrome أو ثبّت تطبيق SchoolixiQ."
+          : "Google blocks sign-in in this in-app browser. Open schoolixiq.com in Chrome or install the SchoolixiQ app.",
+      );
+      return;
+    }
+
     if (googleAuthLock.current || loading) return;
     googleAuthLock.current = true;
     setGooglePopupBlocked(false);
@@ -666,6 +690,19 @@ export default function Login() {
         return;
       }
 
+      if (flowResult.status === "webview-blocked") {
+        setGoogleWebViewBlocked(true);
+        toast.error(
+          isRtl
+            ? "Google يمنع تسجيل الدخول داخل متصفح التطبيق (403). استخدم زر Google الرئيسي في تطبيق SchoolixiQ أو افتح الموقع في Chrome."
+            : "Google blocks sign-in inside this app browser (403). Use the main Google button in the SchoolixiQ app or open the site in Chrome.",
+        );
+        return;
+      }
+
+      if (flowResult.nativeSetupRequired) {
+        setNativePlatformNotice(true);
+      }
       throw flowResult.error;
     } catch (error: any) {
       console.error("Google Auth Error:", error);
@@ -699,12 +736,20 @@ export default function Login() {
         toast.error(
           isRtl ? "تم إلغاء تسجيل الدخول." : "Sign-in was cancelled.",
         );
-      } else if (inIframe) {
-        setShowIframeHint(true);
+      } else if (isGoogleDisallowedUserAgentError(errorMessage)) {
+        setGoogleWebViewBlocked(true);
         toast.error(
           isRtl
-            ? "تسجيل Google غير متاح داخل الإطار الحالي. افتح الموقع في تبويب كامل أو استخدم البريد وكلمة المرور."
-            : "Google sign-in is not available in this embedded view. Open the site in a full tab or use email/password.",
+            ? "Google رفض تسجيل الدخول (403 disallowed_useragent). ثبّت تطبيق SchoolixiQ أو افتح schoolixiq.com في Chrome."
+            : "Google rejected sign-in (403 disallowed_useragent). Install the SchoolixiQ app or open schoolixiq.com in Chrome.",
+        );
+      } else if (inIframe || insecureOAuthWebView) {
+        setShowIframeHint(true);
+        setGoogleWebViewBlocked(insecureOAuthWebView);
+        toast.error(
+          isRtl
+            ? "تسجيل Google غير متاح داخل هذا المتصفح. افتح الموقع في Chrome أو استخدم البريد وكلمة المرور."
+            : "Google sign-in is not available in this browser. Open the site in Chrome or use email/password.",
         );
       } else {
         toast.error(errorMessage || t("failedConnection"));
@@ -1484,16 +1529,43 @@ export default function Login() {
               </span>
             </button>
 
-            {(googlePopupBlocked || isNativeApp || inIframe) && (
+            {googleWebViewBlocked && (
+              <div className="mt-3 p-4 rounded-xl border-2 border-amber-200 bg-amber-50 text-xs sm:text-sm text-amber-950 space-y-2">
+                <p className="font-bold">
+                  {isRtl ? "خطأ 403: disallowed_useragent" : "Error 403: disallowed_useragent"}
+                </p>
+                <p className="leading-relaxed text-amber-900/90">
+                  {isRtl
+                    ? "Google يمنع تسجيل الدخول داخل WebView (متصفح مدمج). لا تستخدم «صفحة Google الكاملة» داخل التطبيق — استخدم زر Google الرئيسي (يفتح حساب Android) أو افتح schoolixiq.com في Chrome."
+                    : "Google blocks OAuth inside embedded WebViews. Do not use full-page sign-in inside the app — use the main Google button (native Android account picker) or open schoolixiq.com in Chrome."}
+                </p>
+              </div>
+            )}
+
+            {isNativeApp && !googleWebViewBlocked && (
               <div className="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-600 space-y-2">
                 <p className="leading-relaxed">
                   {isRtl
-                    ? isNativeApp
-                      ? "إذا لم يفتح اختيار حساب Google، استخدم تسجيل الدخول عبر صفحة Google الكاملة."
-                      : "إذا لم يعمل الزر أعلاه، تابع عبر صفحة Google الكاملة (موصى به على الهاتف)."
-                    : isNativeApp
-                      ? "If the account picker did not open, continue with full-page Google sign-in."
-                      : "If the button above failed, use full-page Google sign-in (recommended on mobile)."}
+                    ? "في التطبيق: يفتح Google عبر نظام Android (آمن). إذا لم يظهر اختيار الحساب، أعد المحاولة أو استخدم البريد وكلمة المرور."
+                    : "In the app, Google opens via the Android system picker (secure). If it fails, retry or use email and password."}
+                </p>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleGoogleAuth}
+                  className="w-full py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-bold text-slate-700 text-xs sm:text-sm transition-colors disabled:opacity-50"
+                >
+                  {isRtl ? "إعادة محاولة Google" : "Retry Google sign-in"}
+                </button>
+              </div>
+            )}
+
+            {(googlePopupBlocked || inIframe) && !isNativeApp && !insecureOAuthWebView && (
+              <div className="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-600 space-y-2">
+                <p className="leading-relaxed">
+                  {isRtl
+                    ? "إذا لم يعمل الزر أعلاه، تابع عبر صفحة Google الكاملة (موصى به على الهاتف)."
+                    : "If the button above failed, use full-page Google sign-in (recommended on mobile)."}
                 </p>
                 <button
                   type="button"
