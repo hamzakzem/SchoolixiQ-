@@ -118,7 +118,10 @@ function Invoke-DebugBuild {
       npm run build:web
       if ($LASTEXITCODE -ne 0) { throw "build:web failed (exit $LASTEXITCODE)" }
 
-      Write-Host '==> npx cap sync android'
+      $env:CAPACITOR_SERVER_URL = if ($env:CAPACITOR_SERVER_URL) { $env:CAPACITOR_SERVER_URL } else { 'https://schoolixiq.com' }
+      Remove-Item Env:CAPACITOR_USE_BUNDLE -ErrorAction SilentlyContinue
+      Write-Host "==> npx cap sync android (live site: $env:CAPACITOR_SERVER_URL)" -ForegroundColor Cyan
+      Write-Host '    App WebView loads the website — web deploys sync without rebuilding APK.' -ForegroundColor DarkGray
       npx cap sync android
       if ($LASTEXITCODE -ne 0) { throw "cap sync failed (exit $LASTEXITCODE)" }
     } finally {

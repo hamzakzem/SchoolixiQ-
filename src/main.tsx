@@ -4,6 +4,9 @@ import App from './App.tsx';
 import './index.css';
 import './styles/macbook-loading.css';
 import { initSentry } from './lib/sentryWrapper';
+import { initNativeLiveSync } from './lib/nativeLiveSync';
+
+initNativeLiveSync();
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   let dsn = import.meta.env.VITE_SENTRY_DSN;
