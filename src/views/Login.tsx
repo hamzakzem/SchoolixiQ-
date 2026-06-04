@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import { auth, db } from "../lib/firebase";
+import { signInWithGoogleRedirectWeb } from "../lib/googleAuthWeb";
 import {
-  signInWithGoogleRedirectWeb,
-  signInWithGoogleWeb,
-} from "../lib/googleAuthWeb";
+  getGoogleWebClientId,
+  isCapacitorNative,
+  runGoogleSignInFlow,
+} from "../lib/googleAuthFlow";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
-  GoogleAuthProvider,
-  signInWithRedirect,
   getRedirectResult,
   sendEmailVerification,
-  signInWithCredential,
   signOut,
 } from "firebase/auth";
 import {
@@ -580,17 +579,13 @@ export default function Login() {
     string | null
   >(null);
   const [nativePlatformNotice, setNativePlatformNotice] = useState<boolean>(false);
-  const [googleClientId, setGoogleClientId] = useState<string>(() => {
-    return localStorage.getItem("override_google_client_id") || 
-      import.meta.env.VITE_GOOGLE_CLIENT_ID || 
-      "377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com";
-  });
+  const [googleClientId, setGoogleClientId] = useState<string>(() =>
+    getGoogleWebClientId(),
+  );
   const [showClientIdConfig, setShowClientIdConfig] = useState<boolean>(false);
   const [googlePopupBlocked, setGooglePopupBlocked] = useState(false);
 
-  const isNativeApp =
-    typeof (window as any).Capacitor !== "undefined" &&
-    (window as any).Capacitor?.isNativePlatform?.() === true;
+  const isNativeApp = isCapacitorNative();
 
   const inIframe =
     typeof window !== "undefined" && window.self !== window.top;
@@ -638,66 +633,36 @@ export default function Login() {
     let redirecting = false;
 
     try {
-      if (isNativeApp) {
-        const { GoogleAuth } = await import(
-          "@codetrix-studio/capacitor-google-auth"
-        );
-        try {
-          await GoogleAuth.initialize({
-            clientId: googleClientId,
-            scopes: ["profile", "email"],
-            grantOfflineAccess: true,
-          });
-        } catch (initErr) {
-          console.warn("GoogleAuth init:", initErr);
-        }
+      const flowResult = await runGoogleSignInFlow(auth, isRtl);
 
-        const googleUser = await GoogleAuth.signIn();
-        const idToken = googleUser?.authentication?.idToken;
-        if (!idToken) {
-          throw new Error("Missing ID Token from Google Auth native plugin.");
-        }
-
-        const credential = GoogleAuthProvider.credential(idToken);
-        const result = await signInWithCredential(auth, credential);
-        if (result?.user) {
-          await processGoogleUser(result.user, role, mode);
-        }
+      if (flowResult.status === "success") {
+        await processGoogleUser(flowResult.user, role, mode);
         return;
       }
 
-      if (inIframe) {
+      if (flowResult.status === "redirecting") {
         redirecting = true;
-        const provider = new GoogleAuthProvider();
-        provider.addScope("profile");
-        provider.addScope("email");
-        await signInWithRedirect(auth, provider);
         return;
       }
 
-      auth.languageCode = isRtl ? "ar" : "en";
-
-      const webResult = await signInWithGoogleWeb(auth);
-      if (webResult.ok) {
-        await processGoogleUser(webResult.user, role, mode);
-        return;
-      }
-      if (webResult.cancelled) {
+      if (flowResult.status === "cancelled") {
         toast.error(
           isRtl ? "تم إلغاء تسجيل الدخول." : "Sign-in was cancelled.",
         );
         return;
       }
-      if (webResult.popupBlocked) {
+
+      if (flowResult.status === "popup-blocked") {
         setGooglePopupBlocked(true);
         toast.error(
           isRtl
-            ? "المتصفح منع نافذة Google. فعّل النوافذ المنبثقة لهذا الموقع أو استخدم الخيار البديل أدناه."
-            : "Your browser blocked the Google window. Allow pop-ups for this site or use the alternative below.",
+            ? "المتصفح منع نافذة Google. استخدم الزر البديل أدناه."
+            : "Pop-up blocked. Use the alternative button below.",
         );
         return;
       }
-      throw webResult.error;
+
+      throw flowResult.error;
     } catch (error: any) {
       console.error("Google Auth Error:", error);
       const errorCode = error.code || "";
@@ -1497,12 +1462,16 @@ export default function Login() {
               </span>
             </button>
 
-            {googlePopupBlocked && !inIframe && (
+            {(googlePopupBlocked || isNativeApp || inIframe) && (
               <div className="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-600 space-y-2">
                 <p className="leading-relaxed">
                   {isRtl
-                    ? "لتجنب ظهور صفحة خارجية، يُفضّل السماح بالنوافذ المنبثقة ثم الضغط على Google مرة أخرى."
-                    : "To stay on this site, allow pop-ups and tap Google again."}
+                    ? isNativeApp
+                      ? "إذا لم يفتح اختيار حساب Google، استخدم تسجيل الدخول عبر صفحة Google الكاملة."
+                      : "إذا لم يعمل الزر أعلاه، تابع عبر صفحة Google الكاملة (موصى به على الهاتف)."
+                    : isNativeApp
+                      ? "If the account picker did not open, continue with full-page Google sign-in."
+                      : "If the button above failed, use full-page Google sign-in (recommended on mobile)."}
                 </p>
                 <button
                   type="button"
@@ -1511,8 +1480,8 @@ export default function Login() {
                   className="w-full py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-bold text-slate-700 text-xs sm:text-sm transition-colors disabled:opacity-50"
                 >
                   {isRtl
-                    ? "متابعة عبر صفحة تسجيل Google (بديل)"
-                    : "Continue via full-page Google sign-in (fallback)"}
+                    ? "متابعة عبر Google (صفحة كاملة)"
+                    : "Continue with Google (full page)"}
                 </button>
               </div>
             )}
