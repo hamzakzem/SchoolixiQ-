@@ -67,6 +67,11 @@ import { usePushTabNavigation } from "../lib/pushNavigation";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { emailVerificationHint } from "../lib/displayIdentity";
+import { useMobileMockupShell } from "../lib/useMobileMockupShell";
+import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
+import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
+import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
+import SuperAdminMockupHome from "../components/mobile/homes/SuperAdminMockupHome";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
@@ -193,6 +198,7 @@ export default function SuperAdminDashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     window.innerWidth >= 768 && window.innerWidth < 1024,
   );
+  const mobileUi = useMobileMockupShell();
 
   useEffect(() => {
     const handleResize = () => {
@@ -1556,7 +1562,7 @@ export default function SuperAdminDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible`}
+            className={`${mobileUi ? "max-lg:hidden " : ""}bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
@@ -1940,7 +1946,7 @@ export default function SuperAdminDashboard() {
       </AnimatePresence>
 
       <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className="h-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-10 print:hidden">
+        <header className={`${mobileUi ? "max-lg:hidden " : ""}h-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-10 print:hidden`}>
           <div className="flex items-center gap-1.5 sm:gap-4 min-w-0">
             <button
               onClick={() => {
@@ -2060,8 +2066,24 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
+        {mobileUi ? (
+          <>
+            <MobileMockupHeader
+              subtitle={config.appName}
+              onNotifications={() => navigateToTab("requests")}
+            />
+            <MobileMockupBottomNav
+              role="superadmin"
+              active={tabToMobileNav("superadmin", activeTab)}
+              onChange={(nav) =>
+                navigateToTab(mobileNavToTab("superadmin", nav))
+              }
+            />
+          </>
+        ) : null}
+
         <div
-          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full" : "overflow-y-auto custom-scrollbar pb-10"}`}
+          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full" : "overflow-y-auto custom-scrollbar pb-10"} ${mobileUi ? "max-lg:pt-[52px] max-lg:pb-[72px] max-lg:bg-[#eef1f6]" : ""}`}
         >
           <AnimatePresence mode="wait">
             <motion.div
@@ -2069,7 +2091,7 @@ export default function SuperAdminDashboard() {
               className={
                 activeTab === "chat"
                   ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden"
-                  : "w-full p-4 md:p-8 flex flex-col sq-page"
+                  : `w-full flex flex-col sq-page ${mobileUi ? "p-0 lg:p-4 md:lg:p-8" : "p-4 md:p-8"}`
               }
               initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -2077,6 +2099,15 @@ export default function SuperAdminDashboard() {
               transition={{ duration: 0.25, ease: "easeOut" }}
             >
               {activeTab === "schools" ? (
+                mobileUi ? (
+                  <SuperAdminMockupHome
+                    schoolCount={schools.length}
+                    adminCount={users.filter((u) => u.role === "admin").length}
+                    teacherCount={users.filter((u) => u.role === "teacher").length}
+                    eventCount={0}
+                    onTabChange={navigateToTab}
+                  />
+                ) : (
                 <>
                   <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md group gap-4">
                     <div id="overview-header-group">
@@ -2541,6 +2572,7 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
                 </>
+                )
               ) : activeTab === "accounts" ? (
                 <>
                   <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">

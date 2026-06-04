@@ -70,6 +70,11 @@ import IdCards from "./admin/IdCards";
 import { useLanguage } from "../lib/LanguageContext";
 import { usePushTabNavigation } from "../lib/pushNavigation";
 import { GlobalFooter } from "../components/GlobalFooter";
+import { useMobileMockupShell } from "../lib/useMobileMockupShell";
+import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
+import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
+import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
+import TeacherMockupHome from "../components/mobile/homes/TeacherMockupHome";
 
 export const getGradeTypeLabel = (val: string, isRtl: boolean) => {
   if (isRtl) return val;
@@ -93,6 +98,7 @@ export default function TeacherDashboard() {
   const { profile, schoolData } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>("home");
+  const mobileUi = useMobileMockupShell();
   usePushTabNavigation((tab) => setActiveTab(tab as Tab), profile?.role);
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -726,7 +732,7 @@ export default function TeacherDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden`}
+            className={`${mobileUi ? "max-lg:hidden " : ""}bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
@@ -861,7 +867,7 @@ export default function TeacherDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className="h-14 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-10 shrink-0 sticky top-0 z-40 print:hidden">
+        <header className={`${mobileUi ? "max-lg:hidden " : ""}h-14 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-10 shrink-0 sticky top-0 z-40 print:hidden`}>
           <div className="flex items-center gap-1.5 md:gap-6">
             <button
               onClick={() => {
@@ -938,17 +944,39 @@ export default function TeacherDashboard() {
           </div>
         </header>
 
-        <div className={`flex-1 flex flex-col min-h-0 print:overflow-visible ${activeTab === 'chat' ? 'overflow-hidden h-full pb-[72px] lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-[90px] lg:pb-10'}`}>
+        {mobileUi ? (
+          <>
+            <MobileMockupHeader
+              subtitle={schoolName || schoolData?.name}
+              onNotifications={() => setActiveTab('chat')}
+            />
+            <MobileMockupBottomNav
+              role="teacher"
+              active={tabToMobileNav('teacher', activeTab)}
+              onChange={(nav) => setActiveTab(mobileNavToTab('teacher', nav) as Tab)}
+            />
+          </>
+        ) : null}
+        <div className={`flex-1 flex flex-col min-h-0 print:overflow-visible ${activeTab === 'chat' ? 'overflow-hidden h-full pb-[72px] lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-[90px] lg:pb-10'} ${mobileUi ? 'max-lg:pt-[52px] max-lg:bg-[#eef1f6]' : ''}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-6 md:p-10 flex flex-col sq-page"}
+              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : `w-full flex flex-col sq-page ${mobileUi ? 'p-0 lg:p-6 md:lg:p-10' : 'p-6 md:p-10'}`}
               initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: activeTab === "chat" ? 0 : -15 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
             >
-              {activeTab === "home" && (
+              {activeTab === "home" && mobileUi ? (
+                <TeacherMockupHome
+                  classLabel={
+                    classes.find((c) => c.id === (profile as any)?.preferredClassId)?.name
+                  }
+                  homeworkCount={homework.length}
+                  onTabChange={(tab) => setActiveTab(tab as Tab)}
+                />
+              ) : null}
+              {activeTab === "home" && !mobileUi ? (
                 <div className="space-y-8 animate-in fade-in duration-500">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {[
@@ -1267,7 +1295,7 @@ export default function TeacherDashboard() {
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {activeTab === "homework" && (
                 <div

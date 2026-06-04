@@ -50,6 +50,11 @@ import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { emailVerificationHint } from "../lib/displayIdentity";
+import { useMobileMockupShell } from "../lib/useMobileMockupShell";
+import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
+import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
+import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
+import AdminMockupHome from "../components/mobile/homes/AdminMockupHome";
 import { notificationService } from "../lib/notificationService";
 
 const DEFAULT_PACKAGES = [
@@ -135,6 +140,7 @@ export default function AdminDashboard() {
   const { t, isRtl, language, setLanguage } = useLanguage();
   const { config } = useSystemConfig();
   const [activeTab, setActiveTab] = useState("overview");
+  const mobileUi = useMobileMockupShell();
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
@@ -1089,7 +1095,11 @@ export default function AdminDashboard() {
   const renderContent = () => {
     switch (activeTab) {
       case "overview":
-        return <Overview setActiveTab={setActiveTab} />;
+        return mobileUi ? (
+          <AdminMockupHome onTabChange={navigateToTab} />
+        ) : (
+          <Overview setActiveTab={setActiveTab} />
+        );
       case "chat":
         return <AdminChatTab />;
       case "classes":
@@ -1206,7 +1216,7 @@ export default function AdminDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`fixed inset-y-0 ${isRtl ? "right-0 rounded-l-[2rem] lg:rounded-none border-l" : "left-0 rounded-r-[2rem] lg:rounded-none border-r"} z-50 bg-slate-900 dark:bg-black text-white flex flex-col pt-safe lg:relative border-slate-800 dark:border-slate-900 print:hidden shadow-2xl lg:shadow-none shrink-0 overflow-visible`}
+            className={`${mobileUi ? "max-lg:hidden " : ""}fixed inset-y-0 ${isRtl ? "right-0 rounded-l-[2rem] lg:rounded-none border-l" : "left-0 rounded-r-[2rem] lg:rounded-none border-r"} z-50 bg-slate-900 dark:bg-black text-white flex flex-col pt-safe lg:relative border-slate-800 dark:border-slate-900 print:hidden shadow-2xl lg:shadow-none shrink-0 overflow-visible`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
@@ -1315,7 +1325,7 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-colors duration-300 print:overflow-visible print:h-auto">
-        <header className="h-16 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-8 shrink-0 sticky top-0 z-40 transition-colors print:hidden">
+        <header className={`${mobileUi ? "max-lg:hidden " : ""}h-16 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-8 shrink-0 sticky top-0 z-40 transition-colors print:hidden`}>
           <div className="flex items-center gap-2 md:gap-6">
             <button
               onClick={() => {
@@ -1456,14 +1466,29 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {mobileUi ? (
+          <>
+            <MobileMockupHeader
+              subtitle={schoolData?.name || config.appName}
+              onNotifications={() => navigateToTab('announcements')}
+            />
+            <MobileMockupBottomNav
+              role="admin"
+              active={tabToMobileNav('admin', activeTab)}
+              onChange={(nav) => navigateToTab(mobileNavToTab('admin', nav))}
+            />
+          </>
+        ) : null}
         <main
-          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0" : "overflow-y-auto pb-10"}`}
+          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0" : "overflow-y-auto pb-10"} ${mobileUi ? "max-lg:pt-[52px] max-lg:pb-[72px] max-lg:bg-[#eef1f6]" : ""}`}
         >
           <div
             className={`w-full mx-auto flex flex-col print:min-h-0 print:pb-0 print:p-0 ${
               activeTab === "chat"
                 ? "h-full max-w-none p-0 flex-1 min-h-0"
-                : "max-w-7xl p-4 md:p-8"
+                : mobileUi
+                  ? "max-w-7xl p-0 lg:p-4 md:lg:p-8"
+                  : "max-w-7xl p-4 md:p-8"
             }`}
           >
             <AnimatePresence mode="wait">
