@@ -5,7 +5,8 @@ import { BRAND_LOGO_URL } from '../lib/resolveBrandLogo';
 import {
   dismissAndroidApkPrompt,
   shouldPromoteAndroidApp,
-  triggerAndroidApkDownload,
+  startAndroidAppInstall,
+  showAndroidInstallGuide,
 } from '../lib/androidAppDownload';
 import { useSystemConfig } from '../lib/SystemConfigContext';
 import { toast } from 'react-hot-toast';
@@ -23,7 +24,7 @@ export default function AndroidAppDownloadCard({ className = '' }: Props) {
   if (!shouldPromoteAndroidApp() || dismissed) return null;
 
   const handleDownload = () => {
-    triggerAndroidApkDownload({ configUrl: config.androidApkUrl, isRtl });
+    startAndroidAppInstall({ configUrl: config.androidApkUrl, isRtl });
     toast.success(t('androidAppDownloadStarted'), { duration: 5000 });
     toast(t('androidAppDownloadHint'), {
       icon: '📲',
@@ -87,6 +88,13 @@ export default function AndroidAppDownloadCard({ className = '' }: Props) {
       >
         <Download size={16} />
         {t('androidAppDownloadBtn')}
+      </button>
+      <button
+        type="button"
+        onClick={() => showAndroidInstallGuide()}
+        className="mt-2 w-full py-2 text-[11px] font-bold text-[#0B2345]/80 hover:text-[#0B2345] underline-offset-2 hover:underline"
+      >
+        {t('androidPlayProtectTitle')}
       </button>
     </div>
   );

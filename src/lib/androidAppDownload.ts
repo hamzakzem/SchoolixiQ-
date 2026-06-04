@@ -85,6 +85,13 @@ export function dismissAndroidApkPrompt(): void {
   }
 }
 
+export const ANDROID_INSTALL_GUIDE_EVENT = 'schoolix:android-install-guide';
+
+export function showAndroidInstallGuide(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(ANDROID_INSTALL_GUIDE_EVENT));
+}
+
 /** Starts APK download immediately (one tap — no HEAD pre-check). */
 export function triggerAndroidApkDownload(
   _options: { configUrl?: string | null; isRtl?: boolean } = {},
@@ -110,4 +117,15 @@ export function triggerAndroidApkDownload(
   }, 400);
 
   return true;
+}
+
+/** Download APK + show Play Protect install steps (sideload is normal for new developers). */
+export function startAndroidAppInstall(
+  options: { configUrl?: string | null; isRtl?: boolean; showGuide?: boolean } = {},
+): boolean {
+  const started = triggerAndroidApkDownload(options);
+  if (started && options.showGuide !== false) {
+    window.setTimeout(() => showAndroidInstallGuide(), 350);
+  }
+  return started;
 }

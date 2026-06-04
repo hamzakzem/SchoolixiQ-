@@ -1,26 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, X, Smartphone, ArrowUp, Share, PlusSquare, Info, Star } from 'lucide-react';
+import { Download, X, Smartphone, Star } from 'lucide-react';
 import { useLanguage } from '../lib/LanguageContext';
 import { toast } from 'react-hot-toast';
 import { Capacitor } from '@capacitor/core';
 import {
   shouldPromoteAndroidApp,
-  triggerAndroidApkDownload,
+  startAndroidAppInstall,
   dismissAndroidApkPrompt,
   isAndroidApkPromptDismissed,
   shouldHideAppDownloadPromo,
 } from '../lib/androidAppDownload';
-import {
-  shouldPromoteIosApp,
-  openIosInstall,
-  hasIosOfficialDownload,
-  dismissIosPrompt,
-  isIosPromptDismissed,
-  isIosInstallDeepLink,
-  isIosSafari,
-  isPwaStandalone,
-} from '../lib/iosAppDownload';
 import { useSystemConfig } from '../lib/SystemConfigContext';
 import { useAuth } from '../lib/AuthContext';
 
@@ -29,15 +19,9 @@ export default function InstallAppBanner() {
   const { config } = useSystemConfig();
   const { user } = useAuth();
   const [showBanner, setShowBanner] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [platform, setPlatform] = useState<'android' | 'ios' | 'other'>('other');
-  const [showIOSInstructions, setShowIOSInstructions] = useState(false);
 
   useEffect(() => {
     if (user || shouldHideAppDownloadPromo() || Capacitor.isNativePlatform()) return;
-    if (Capacitor.isNativePlatform()) return;
-
-    if (isPwaStandalone()) return;
 
     const dismissedTime = localStorage.getItem('schoolix_pwa_dismissed_time');
     if (dismissedTime) {
@@ -46,110 +30,25 @@ export default function InstallAppBanner() {
       if (daysSinceDismissal < 3) return;
     }
 
-    const userAgent =
-      window.navigator.userAgent || window.navigator.vendor || (window as any).opera || '';
-    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
-    const isAndroid = /android/i.test(userAgent);
+    if (!shouldPromoteAndroidApp() || isAndroidApkPromptDismissed()) return;
 
-    if (isIOS) {
-      setPlatform('ios');
-      const onPrompt = () => {
-        setShowBanner(true);
-        setShowIOSInstructions(true);
-      };
-      window.addEventListener('schoolix:ios-install-prompt', onPrompt);
-
-      const fromDeepLink = isIosInstallDeepLink();
-      if (fromDeepLink || (isIosSafari() && shouldPromoteIosApp() && !isIosPromptDismissed())) {
-        setShowBanner(true);
-        setShowIOSInstructions(true);
-      } else if (shouldPromoteIosApp() && !isIosPromptDismissed()) {
-        const timer = window.setTimeout(() => {
-          setShowBanner(true);
-          setShowIOSInstructions(isIosSafari());
-        }, 2200);
-        return () => {
-          window.clearTimeout(timer);
-          window.removeEventListener('schoolix:ios-install-prompt', onPrompt);
-        };
-      }
-
-      return () => window.removeEventListener('schoolix:ios-install-prompt', onPrompt);
-    }
-
-    if (!isAndroid) {
-      setShowBanner(false);
-      return;
-    }
-
-    setPlatform('android');
-
-    // Android: promote official APK (not PWA)
-    if (shouldPromoteAndroidApp() && !isAndroidApkPromptDismissed()) {
-      const timer = window.setTimeout(() => setShowBanner(true), 2200);
-      return () => window.clearTimeout(timer);
-    }
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowBanner(true);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    const handleAppInstalled = () => {
-      setShowBanner(false);
-      setDeferredPrompt(null);
-    };
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
+    const timer = window.setTimeout(() => setShowBanner(true), 2200);
+    return () => window.clearTimeout(timer);
   }, [user]);
 
-  const handleInstallClick = async () => {
-    if (platform === 'ios') {
-      if (hasIosOfficialDownload(config)) {
-        openIosInstall(config);
-        toast.success(t('iosAppStoreOpening'));
-        setShowBanner(false);
-        return;
-      }
-      setShowIOSInstructions(true);
-      if (!isIosSafari()) {
-        toast.error(t('iosSafariRequired'));
-      }
-      return;
-    }
-
-    if (platform === 'android') {
-      triggerAndroidApkDownload({
-        configUrl: config.androidApkUrl,
-        isRtl: language === 'ar',
-      });
-      toast.success(t('androidAppDownloadStarted'));
-      toast(t('androidAppDownloadHint'), { icon: '📲', duration: 8000 });
-      setShowBanner(false);
-      return;
-    }
-
-    if (!deferredPrompt) {
-      alert(t('pwaInstallBrowserInstruction'));
-      return;
-    }
-
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
+  const handleInstallClick = () => {
+    startAndroidAppInstall({
+      configUrl: config.androidApkUrl,
+      isRtl: language === 'ar',
+    });
+    toast.success(t('androidAppDownloadStarted'));
+    toast(t('androidAppDownloadHint'), { icon: '📲', duration: 8000 });
     setShowBanner(false);
   };
 
   const handleDismiss = () => {
     localStorage.setItem('schoolix_pwa_dismissed_time', Date.now().toString());
     dismissAndroidApkPrompt();
-    dismissIosPrompt();
     setShowBanner(false);
   };
 
@@ -167,10 +66,8 @@ export default function InstallAppBanner() {
           className="w-full max-w-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-950/40 rounded-[2.5rem] shadow-2xl shadow-indigo-500/10 pointer-events-auto overflow-hidden p-6 relative"
           dir={isRtl ? 'rtl' : 'ltr'}
         >
-          {/* Top subtle visual accent */}
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-indigo-500 to-sky-500"></div>
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-indigo-500 to-sky-500" />
 
-          {/* Close Button */}
           <button
             onClick={handleDismiss}
             className="absolute top-5 left-5 md:top-6 md:left-6 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer"
@@ -179,168 +76,46 @@ export default function InstallAppBanner() {
             <X size={16} />
           </button>
 
-          {!showIOSInstructions ? (
-            <div className="flex items-start gap-4">
-              {/* App Icon Block */}
-              <div className="flex-shrink-0 w-14 h-14 bg-gradient-to-tr from-indigo-500 to-violet-600 rounded-[1.25rem] flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-                <Smartphone className="w-8 h-8 animate-pulse text-indigo-50" />
-              </div>
-
-              {/* Text content */}
-              <div className="flex-1 pr-1 pl-3 text-right">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="bg-indigo-50 dark:bg-indigo-950/40 text-[#0B2345] dark:text-indigo-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    {t('nativeAppLabel')}
-                  </span>
-                  <div className="flex items-center text-amber-400">
-                    <Star size={11} fill="currentColor" />
-                    <Star size={11} fill="currentColor" />
-                    <Star size={11} fill="currentColor" />
-                    <Star size={11} fill="currentColor" />
-                    <Star size={11} fill="currentColor" />
-                  </div>
-                </div>
-                <h3 className="text-base font-black text-slate-900 dark:text-white mb-1">
-                  {platform === 'android'
-                    ? t('androidAppDownloadTitle')
-                    : hasIosOfficialDownload(config)
-                      ? t('iosAppStoreDownloadTitle')
-                      : t('iosWebInstallTitle')}
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-bold font-sans">
-                  {platform === 'android'
-                    ? t('androidAppDownloadDesc')
-                    : hasIosOfficialDownload(config)
-                      ? t('iosAppStoreDownloadDesc')
-                      : t('iosWebInstallDesc')}
-                </p>
-
-                {/* Actions */}
-                <div className="flex items-center gap-3 mt-4">
-                  <button
-                    onClick={handleInstallClick}
-                    className="flex-1 py-3 px-5 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-2xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-                  >
-                    <Download size={14} />
-                    {platform === 'android'
-                      ? t('androidAppDownloadBtn')
-                      : hasIosOfficialDownload(config)
-                        ? t('iosAppStoreDownloadBtn')
-                        : t('iosWebInstallBtn')}
-                  </button>
-                  <button
-                    onClick={handleDismiss}
-                    className="py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-2xl text-xs transition-all cursor-pointer"
-                  >
-                    {t('later')}
-                  </button>
-                </div>
-              </div>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-14 h-14 bg-gradient-to-tr from-indigo-500 to-violet-600 rounded-[1.25rem] flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+              <Smartphone className="w-8 h-8 animate-pulse text-indigo-50" />
             </div>
-          ) : (
-            <motion.div 
-              style={{ contentVisibility: 'auto' }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-right"
-            >
-              <div className="flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
-                <Info className="text-[#0B2345] dark:text-indigo-400" size={18} />
-                <h3 className="font-black text-slate-900 dark:text-white text-base">
-                  {t('iosInstallSteps')}
-                </h3>
-              </div>
 
-              <div className="space-y-4 text-xs font-bold text-slate-800 dark:text-slate-100 leading-relaxed text-right">
-                <p className="text-emerald-600 dark:text-emerald-400 font-extrabold text-center text-sm md:text-base mb-1 flex items-center justify-center gap-1">
-                  <span>✨</span>
-                  {hasIosOfficialDownload(config)
-                    ? t('iosInstallThreeWays')
-                    : t('iosInstallSafariOnly')}
-                </p>
-
-                {!hasIosOfficialDownload(config) ? (
-                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-3 rounded-2xl text-[11px] text-amber-900 dark:text-amber-200 font-bold leading-relaxed">
-                    {t('iosProfileNoHomeIcon')}
-                  </div>
-                ) : null}
-
-                {hasIosOfficialDownload(config) ? (
-                  <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-4 rounded-3xl border border-slate-700 text-white text-right">
-                    <div className="flex items-center gap-2 mb-2 font-black">
-                      <span className="w-5 h-5 rounded-lg bg-white text-slate-900 flex items-center justify-center text-xs font-bold">
-                        ١
-                      </span>
-                      <span className="text-xs sm:text-sm">{t('iosMethodAppStore')}</span>
-                    </div>
-                    <p className="text-[11px] text-white/75 font-medium leading-relaxed mb-3 pr-6">
-                      {t('iosMethodAppStoreDesc')}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        openIosInstall(config);
-                        toast.success(t('iosAppStoreOpening'));
-                      }}
-                      className="w-full py-2.5 bg-white text-slate-900 font-black rounded-xl text-xs flex items-center justify-center gap-1.5"
-                    >
-                      <Download size={13} />
-                      {t('iosAppStoreDownloadBtn')}
-                    </button>
-                  </div>
-                ) : null}
-
-                {/* Safari — Add to Home Screen (Apple web app guideline) */}
-                <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/10 p-4 rounded-3xl border border-emerald-100/60 dark:border-emerald-900/40 text-right">
-                  <div className="flex items-center gap-2 mb-2 font-black text-emerald-950 dark:text-emerald-200">
-                    <span className="w-5 h-5 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">
-                      {hasIosOfficialDownload(config) ? '٢' : '١'}
-                    </span>
-                    <span className="text-xs sm:text-sm font-black">{t('iosMethodSafari')}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-6">
-                    {t('iosMethodSafariDesc')}
-                  </p>
-
-                  <div className="space-y-2 pr-6 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    <div className="flex items-start gap-1.5">
-                      <span className="text-emerald-600">•</span>
-                      <p>
-                        {t('iosSafariStep1')}
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span className="text-emerald-600">•</span>
-                      <p>
-                        {t('iosSafariStep2')}
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span className="text-emerald-600">•</span>
-                      <p>
-                        {t('iosSafariStep3')}
-                      </p>
-                    </div>
-                  </div>
+            <div className="flex-1 pr-1 pl-3 text-right">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="bg-indigo-50 dark:bg-indigo-950/40 text-[#0B2345] dark:text-indigo-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  {t('nativeAppLabel')}
+                </span>
+                <div className="flex items-center text-amber-400">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Star key={i} size={11} fill="currentColor" />
+                  ))}
                 </div>
               </div>
+              <h3 className="text-base font-black text-slate-900 dark:text-white mb-1">
+                {t('androidAppDownloadTitle')}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-bold font-sans">
+                {t('androidAppDownloadDesc')}
+              </p>
 
-              <div className="mt-5 flex items-center gap-3">
+              <div className="flex items-center gap-3 mt-4">
                 <button
-                  onClick={() => setShowIOSInstructions(false)}
-                  className="flex-1 py-3 px-4 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-2xl text-xs transition-all shadow-md cursor-pointer hover:shadow-indigo-500/15"
+                  onClick={handleInstallClick}
+                  className="flex-1 py-3 px-5 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-2xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  {t('gotItThanks')}
+                  <Download size={14} />
+                  {t('androidAppDownloadBtn')}
                 </button>
                 <button
                   onClick={handleDismiss}
-                  className="py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300 font-bold rounded-2xl text-xs transition-all cursor-pointer"
+                  className="py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-2xl text-xs transition-all cursor-pointer"
                 >
-                  {t('closeNotification')}
+                  {t('later')}
                 </button>
               </div>
-            </motion.div>
-          )}
+            </div>
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

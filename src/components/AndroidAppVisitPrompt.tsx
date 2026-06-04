@@ -4,7 +4,7 @@ import { useAuth } from '../lib/AuthContext';
 import {
   isAndroidApkPromptDismissed,
   shouldPromoteAndroidApp,
-  triggerAndroidApkDownload,
+  startAndroidAppInstall,
 } from '../lib/androidAppDownload';
 import { useSystemConfig } from '../lib/SystemConfigContext';
 import { toast } from 'react-hot-toast';
@@ -38,7 +38,7 @@ export default function AndroidAppVisitPrompt() {
               type="button"
               className="flex-1 py-2 rounded-xl bg-[#0B2345] text-white text-xs font-bold"
               onClick={() => {
-                triggerAndroidApkDownload({
+                startAndroidAppInstall({
                   configUrl: config.androidApkUrl,
                   isRtl: language === 'ar',
                 });

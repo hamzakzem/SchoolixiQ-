@@ -49,6 +49,8 @@ AddType application/x-apple-aspen-config .mobileconfig
   RewriteCond %{HTTP_HOST} ^www\.schoolixiq\.com$ [NC]
   RewriteRule ^(.*)$ https://schoolixiq.com/$1 [L,R=301]
   RewriteRule ^index\.html$ - [L]
+  RewriteRule ^install-iphone\.html$ / [L,R=302]
+  RewriteRule ^downloads/schoolixiq\.mobileconfig$ / [L,R=302]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME} !-l
