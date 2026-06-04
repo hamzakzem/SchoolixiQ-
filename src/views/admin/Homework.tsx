@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { useMobileMockupShell } from '../../lib/useMobileMockupShell';
 import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { BookOpen, Plus, Calendar, Edit2, Trash2, Send, X, Users, MessageSquare } from 'lucide-react';
@@ -25,6 +26,7 @@ export default function Homework() {
   const [newHomework, setNewHomework] = useState({ title: '', content: '', dueDate: '' });
   const [editingHomework, setEditingHomework] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const inApp = useMobileMockupShell();
 
   // Fetch classes
   useEffect(() => {
@@ -62,12 +64,17 @@ export default function Homework() {
     
     const hq = query(
       collection(db, 'homework'),
-      where('schoolId', '==', profile.schoolId)
+      where('schoolId', '==', profile.schoolId),
+      limit(80),
     );
     
     const unsubscribe = onSnapshot(hq, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setHomeworks(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+      setHomeworks(
+        data
+          .sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+          .slice(0, 50),
+      );
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'homework');

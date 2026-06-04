@@ -124,7 +124,6 @@ export default function ParentDashboard() {
   );
   const [homework, setHomework] = useState<any[]>([]);
   const [teacherReports, setTeacherReports] = useState<any[]>([]);
-  const [advancedReports, setAdvancedReports] = useState<any[]>([]);
   const [idCards, setIdCards] = useState<Record<string, any>>({});
   const [idCardTemplate, setIdCardTemplate] = useState<IdCardTemplate | null>(null);
 
@@ -662,18 +661,7 @@ export default function ParentDashboard() {
         setTeacherReports(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
       }));
 
-      const advRepQ = query(
-        collection(db, "advanced_reports"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("studentId", "==", selectedStudent.id),
-        where("parentIds", "array-contains", profile.uid),
-        limit(20)
-      );
-      unsubs.push(onSnapshot(advRepQ, snap => {
-         setAdvancedReports(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
-      }));
-
-      // 10. Id Cards
+      // Id Cards
       const idCardsQ = query(
         collection(db, "id_cards"),
         where("schoolId", "==", selectedStudent.schoolId),
@@ -733,12 +721,6 @@ export default function ParentDashboard() {
       badge: teacherReports.length,
     },
     {
-      id: "advanced_reports",
-      label: isRtl ? "تقارير متقدمة" : "Advanced Reports",
-      icon: BarChart3,
-      badge: advancedReports.length,
-    },
-    {
       id: "id_cards",
       label: isRtl ? "هويات الطالب" : "ID Cards",
       icon: ShieldCheck,
@@ -769,7 +751,6 @@ export default function ParentDashboard() {
       if (item.id === "tuition") return p.tuition_fees !== false;
       if (item.id === "behavior") return p.behavior_management !== false;
       if (item.id === "reports") return p.student_evaluation_reports !== false;
-      if (item.id === "advanced_reports") return p.advanced_reports !== false;
       if (item.id === "id_cards") return p.id_card_generation !== false;
       if (item.id === "market") return p.marketplace_ordering !== false;
     }
@@ -1906,70 +1887,6 @@ export default function ParentDashboard() {
                         </button>
                       </form>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "advanced_reports" && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display px-2 text-right">
-                    {isRtl ? "التقارير المتقدمة" : "Advanced Reports"}
-                  </h2>
-                  <div className="space-y-4">
-                    {advancedReports.length > 0 ? (
-                      advancedReports.map((report) => (
-                        <div
-                          key={report.id}
-                          className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right border-l-4 border-l-indigo-600"
-                        >
-                          <div className="flex items-center justify-between mb-4">
-                            <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                              {isRtl ? "تقرير متقدم" : "Advanced Report"}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold transition-colors">
-                                {report.teacherName?.[0] || "A"}
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xs text-slate-500">
-                                  {t("deliveredBy")}
-                                </p>
-                                <p className="text-sm font-bold text-slate-900 dark:text-white">
-                                  {report.teacherName || t("admin")}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
-                            {report.title}
-                          </h3>
-                          <p className="text-slate-600 dark:text-slate-400 leading-relaxed font-medium whitespace-pre-wrap">
-                            {report.content}
-                          </p>
-                          <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-800 flex justify-between items-center">
-                            <span className="text-[10px] text-slate-400 font-bold">
-                              {report.createdAt?.seconds
-                                ? new Date(
-                                    report.createdAt.seconds * 1000,
-                                  ).toLocaleDateString()
-                                : ""}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="bg-white dark:bg-slate-900 p-12 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm text-center transition-colors">
-                        <BarChart3
-                          size={40}
-                          className="mx-auto mb-3 opacity-20"
-                        />
-                        <p className="text-slate-400 dark:text-slate-500 italic">
-                          {isRtl
-                            ? "لا توجد تقارير متقدمة"
-                            : "No advanced reports"}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}

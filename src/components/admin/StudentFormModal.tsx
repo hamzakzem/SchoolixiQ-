@@ -1,6 +1,7 @@
 import React from 'react';
 import { GraduationCap, Upload, User, Hash, Phone, Mail, Key, MapPin } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { useMobileMockupShell } from '../../lib/useMobileMockupShell';
 import { Button } from '../ui/Button';
 import { FormSection, FormInput, FormSelect, LabeledField } from '../ui/FormField';
 
@@ -42,27 +43,28 @@ export function StudentFormModal({
   onSubmit,
 }: StudentFormModalProps) {
   const set = (patch: Partial<StudentFormState>) => onChange(patch);
+  const inApp = useMobileMockupShell();
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={isEdit ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}
-      description="تأكد من دقة البيانات — تُستخدم في الوثائق الرسمية والنتائج."
-      icon={<GraduationCap size={26} className="text-[#0B2345] dark:text-[#D4A64A]" />}
-      maxWidthClass="max-w-2xl"
+      description={inApp ? undefined : 'تأكد من دقة البيانات — تُستخدم في الوثائق الرسمية والنتائج.'}
+      icon={<GraduationCap size={22} className="text-[#0B2345] dark:text-[#D4A64A]" />}
+      maxWidthClass="max-w-lg"
       footer={
         <>
-          <Button type="submit" form="student-form" size="lg" fullWidth className="sm:flex-1 order-1 sm:order-none">
+          <Button type="submit" form="student-form" size={inApp ? 'md' : 'lg'} fullWidth>
             {isEdit ? 'حفظ التغييرات' : 'تأكيد وإضافة الطالب'}
           </Button>
-          <Button type="button" variant="secondary" size="lg" onClick={onClose} className="w-full sm:w-auto order-2 sm:order-none">
+          <Button type="button" variant="secondary" size={inApp ? 'md' : 'lg'} fullWidth onClick={onClose}>
             إلغاء
           </Button>
         </>
       }
     >
-      <form id="student-form" onSubmit={onSubmit} className="space-y-6">
+      <form id="student-form" onSubmit={onSubmit} className={inApp ? 'space-y-4' : 'space-y-6'}>
         <FormSection title="الصورة الشخصية" description="اختياري — تظهر في البطاقة والقوائم">
           <div className="sq-form-span-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
             <div className="sq-form-photo-preview shrink-0 mx-auto sm:mx-0">

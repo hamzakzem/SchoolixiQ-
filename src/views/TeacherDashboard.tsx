@@ -54,7 +54,6 @@ type Tab =
   | "grades"
   | "behavior"
   | "reports"
-  | "advanced_reports"
   | "id_cards"
   | "settings"
   | "chat"
@@ -64,7 +63,6 @@ import SolarLoading from "../components/SolarLoading";
 import TeacherSettingsTab from "./TeacherSettingsTab";
 import TeacherChatTab from "./TeacherChatTab";
 import Schedules from "./admin/Schedules";
-import AdvancedReports from "./admin/AdvancedReports";
 import IdCards from "./admin/IdCards";
 
 import { useLanguage } from "../lib/LanguageContext";
@@ -672,12 +670,6 @@ export default function TeacherDashboard() {
       permission: "student_evaluation_reports",
     },
     {
-      id: "advanced_reports",
-      label: isRtl ? "تقارير متقدمة" : "Advanced Reports",
-      icon: BarChart3,
-      permission: "advanced_reports",
-    },
-    {
       id: "id_cards",
       label: isRtl ? "هويات الطالب" : "Student ID Cards",
       icon: ShieldCheck,
@@ -691,7 +683,6 @@ export default function TeacherDashboard() {
       if (item.id === "grades") return perms.exams_and_results !== false;
       if (item.id === "behavior") return perms.behavior_management !== false;
       if (item.id === "reports") return perms.student_evaluation_reports !== false;
-      if (item.id === "advanced_reports") return perms.advanced_reports !== false;
       if (item.id === "schedules") return perms.automated_schedules !== false;
       if (item.id === "id_cards") return perms.id_card_generation !== false;
     }
@@ -779,11 +770,6 @@ export default function TeacherDashboard() {
                   icon: FileText,
                 },
                 {
-                  id: "advanced_reports",
-                  label: isRtl ? "تقارير متقدمة" : "Advanced Reports",
-                  icon: BarChart3,
-                },
-                {
                   id: "id_cards",
                   label: isRtl ? "هويات الطالب" : "ID Cards",
                   icon: ShieldCheck,
@@ -817,8 +803,6 @@ export default function TeacherDashboard() {
                       return p.behavior_management !== false;
                     if (item.id === "reports")
                       return p.student_evaluation_reports !== false;
-                    if (item.id === "advanced_reports")
-                      return p.advanced_reports !== false;
                     if (item.id === "schedules") return true;
                     if (item.id === "id_cards") return true;
                   }
@@ -1748,12 +1732,6 @@ export default function TeacherDashboard() {
                         ))}
                     </div>
                   </div>
-                </div>
-              )}
-
-              {activeTab === "advanced_reports" && (
-                <div className="animate-in fade-in duration-500">
-                  <AdvancedReports />
                 </div>
               )}
 

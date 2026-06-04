@@ -1,8 +1,10 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/cn';
 import { IconButton } from './IconButton';
+import { useMobileMockupShell } from '../../lib/useMobileMockupShell';
 
 export interface ModalProps {
   open: boolean;
@@ -25,22 +27,33 @@ export function Modal({
   footer,
   maxWidthClass = 'max-w-xl',
 }: ModalProps) {
-  return (
+  const inApp = useMobileMockupShell();
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div
-          className="sq-modal-backdrop"
+          className={cn(
+            'sq-modal-backdrop',
+            inApp && 'sq-modal-backdrop--app',
+          )}
           role="dialog"
           aria-modal="true"
           aria-labelledby="sq-modal-title"
           onClick={onClose}
         >
           <motion.div
-            initial={{ scale: 0.96, opacity: 0, y: 16 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.96, opacity: 0, y: 16 }}
-            transition={{ duration: 0.2 }}
-            className={cn('sq-modal', maxWidthClass)}
+            initial={{ opacity: 0, y: inApp ? 40 : 16, scale: inApp ? 1 : 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: inApp ? 40 : 16, scale: inApp ? 1 : 0.96 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className={cn(
+              'sq-modal',
+              inApp && 'sq-modal--app',
+              inApp ? 'max-w-none sm:max-w-lg' : maxWidthClass,
+            )}
             dir="rtl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -54,7 +67,12 @@ export function Modal({
                   {description && <p className="sq-modal-desc">{description}</p>}
                 </div>
               </div>
-              <IconButton type="button" aria-label="إغلاق" onClick={onClose} className="shrink-0">
+              <IconButton
+                type="button"
+                aria-label="إغلاق"
+                onClick={onClose}
+                className="shrink-0"
+              >
                 <X size={18} />
               </IconButton>
             </header>
@@ -65,6 +83,7 @@ export function Modal({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

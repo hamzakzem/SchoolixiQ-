@@ -49,11 +49,13 @@ import IdCardSettings from "./IdCardSettings";
 import { IdCardTemplate } from "../../types/idCardTemplate";
 import { mergeIdCardTemplate } from "../../lib/idCardTemplateUtils";
 import { DEFAULT_ID_CARD_TEMPLATE } from "../../lib/idCardPresets";
+import { useMobileMockupShell } from "../../lib/useMobileMockupShell";
 
 export default function IdCards() {
   const { profile } = useAuth();
   const { t, language } = useLanguage();
   const isRtl = language === "ar";
+  const inApp = useMobileMockupShell();
   
   // Printing State
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -458,7 +460,7 @@ export default function IdCards() {
             <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-4 px-2">
               {isRtl ? "اختر الطالب" : "Select Student"}
             </h3>
-            <div className="space-y-2 h-[calc(100vh-180px)] min-h-[600px] overflow-y-auto pl-2 pr-1 custom-scrollbar">
+            <div className={`space-y-2 overflow-y-auto pl-2 pr-1 custom-scrollbar ${inApp ? 'max-h-52' : 'h-[calc(100vh-180px)] min-h-[600px]'}`}>
               {students.map((student) => {
                 const hasCard = !!idCards[student.id];
                 return (
@@ -491,7 +493,7 @@ export default function IdCards() {
         {/* Right content: Card Preview */}
         <div className="lg:col-span-3 space-y-6">
           {selectedStudent ? (
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-100px)] min-h-[800px] print:border-none print:shadow-none print:h-auto print:min-h-0 print:overflow-visible">
+            <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col print:border-none print:shadow-none print:h-auto print:min-h-0 print:overflow-visible ${inApp ? 'min-h-0' : 'h-[calc(100vh-100px)] min-h-[800px]'}`}>
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30 print:hidden">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-[#e8eef5] dark:bg-indigo-900/50 text-[#0B2345] dark:text-indigo-400 rounded-2xl flex items-center justify-center font-bold text-xl">
@@ -563,7 +565,7 @@ export default function IdCards() {
                     className="px-4 py-2 bg-[#0B2345] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
                   >
                     {currentCard ? <Edit2 size={18} /> : <Plus size={18} />}
-                    <span className="hidden sm:inline">
+                    <span>
                       {currentCard
                         ? isRtl
                           ? "تعديل الهوية"
@@ -576,9 +578,9 @@ export default function IdCards() {
                 </div>
               </div>
 
-              <div className="flex-1 p-8 flex items-center justify-center bg-slate-50 dark:bg-slate-900 print:bg-white print:p-0">
+              <div className={`flex-1 flex items-center justify-center bg-slate-50 dark:bg-slate-900 print:bg-white print:p-0 ${inApp ? 'p-4' : 'p-8'}`}>
                 {currentCard ? (
-                  <div className="scale-125 origin-center">
+                  <div className={inApp ? 'scale-100 origin-center max-w-full overflow-x-auto' : 'scale-125 origin-center'}>
                     <StudentCard
                       student={selectedStudent}
                       cardData={currentCard}
@@ -599,7 +601,7 @@ export default function IdCards() {
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-100px)] min-h-[800px] flex items-center justify-center p-8 print:hidden relative overflow-hidden">
+            <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-center print:hidden relative overflow-hidden ${inApp ? 'p-4' : 'h-[calc(100vh-100px)] min-h-[800px] p-8'}`}>
               <div
                 className="absolute top-0 right-0 w-full h-full opacity-[0.02] pointer-events-none"
                 style={{
@@ -608,9 +610,9 @@ export default function IdCards() {
                 }}
               />
 
-              <div className="text-right space-y-8 max-w-2xl text-slate-600 dark:text-slate-300 relative z-10 w-full">
-                <div className="text-center mb-10">
-                  <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner relative">
+              <div className={`text-right text-slate-600 dark:text-slate-300 relative z-10 w-full ${inApp ? 'space-y-4' : 'space-y-8 max-w-2xl'}`}>
+                <div className={`text-center ${inApp ? 'mb-4' : 'mb-10'}`}>
+                  <div className={`${inApp ? 'w-14 h-14 mb-3' : 'w-20 h-20 mb-6'} bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] rounded-full flex items-center justify-center mx-auto shadow-inner relative`}>
                     <div className="absolute inset-0 bg-indigo-400/20 blur-xl rounded-full animate-pulse" />
                     <QrCode size={40} className="relative z-10" />
                   </div>

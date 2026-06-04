@@ -123,10 +123,44 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   };
 
   useEffect(() => {
-    let isMounted = true;
-    if (isMounted) fetchStudents();
-    return () => { isMounted = false; };
-  }, [profile]);
+    if (!profile?.schoolId) return;
+
+    const classesQ = query(
+      collection(db, 'classes'),
+      where('schoolId', '==', profile.schoolId),
+      limit(100),
+    );
+    const unsubClasses = onSnapshot(classesQ, (snap) => {
+      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+
+    const studentsQ = query(
+      collection(db, 'students'),
+      where('schoolId', '==', profile.schoolId),
+      orderBy('createdAt', 'desc'),
+      limit(PAGE_SIZE),
+    );
+    const unsubStudents = onSnapshot(
+      studentsQ,
+      (snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setStudents(docs);
+        setHasMore(snap.docs.length >= PAGE_SIZE);
+        if (snap.docs.length > 0) {
+          setLastDoc(snap.docs[snap.docs.length - 1]);
+        }
+      },
+      (error) => {
+        console.error('Students listener error:', error);
+        fetchStudents();
+      },
+    );
+
+    return () => {
+      unsubClasses();
+      unsubStudents();
+    };
+  }, [profile?.schoolId]);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -146,6 +180,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       }
       toast.dismiss(loadingToast);
       toast.success(result.message || 'تم حذف الطالب نهائياً من النظام');
+      setStudents((prev) => prev.filter((s) => s.id !== id));
       setConfirmDeleteId(null);
     } catch (error: any) {
       toast.dismiss(loadingToast);
@@ -466,6 +501,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         }
         
         toast.success('تمت إضافة الطالب بنجاح');
+        await fetchStudents(false);
       }
       setNewStudent({ 
         name: '', 
@@ -484,7 +520,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     } catch (error: any) {
       console.error('Error adding student:', error);
       toast.error(error.message || 'حدث خطأ أثناء المعالجة');
-      setShowAddModal(false);
       handleFirestoreError(error, isEditing ? OperationType.UPDATE : OperationType.WRITE, isEditing ? `students/${editingStudent.id}` : 'students');
     }
   };
@@ -1211,7 +1246,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
       <AnimatePresence>
         {confirmDeleteId && (
-          <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 bg-slate-900/60 z-[110] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm pt-[72px] pb-[84px] sm:pt-4 sm:pb-4">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

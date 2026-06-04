@@ -115,7 +115,6 @@ import StudentsList from "./admin/StudentsList";
 import StaffList from "./admin/StaffList";
 import Attendance from "./admin/Attendance";
 import EvaluationReports from "./admin/EvaluationReports";
-import AdvancedReports from "./admin/AdvancedReports";
 import Homework from "./admin/Homework";
 import Grades from "./admin/Grades";
 import StudentArchive from "./admin/StudentArchive";
@@ -208,7 +207,6 @@ export default function AdminDashboard() {
     { id: "schedules", label: t("schedules"), icon: Calendar },
     { id: "announcements", label: t("announcements"), icon: MessageSquare },
     { id: "parents", label: t("parentApp"), icon: Users },
-    { id: "advanced_reports", label: t("advancedReports"), icon: BarChart3 },
     { id: "market", label: t("marketplace"), icon: ShoppingBag },
     { id: "id_cards", label: t("idCards"), icon: ShieldCheck },
     {
@@ -249,8 +247,6 @@ export default function AdminDashboard() {
         if (item.id === "classes") return perms.classes !== false;
         if (item.id === "schedules") return perms.automated_schedules !== false;
         if (item.id === "announcements") return perms.announcements !== false;
-        if (item.id === "advanced_reports")
-          return perms.advanced_reports !== false;
         if (item.id === "market") return perms.marketplace_ordering !== false;
         if (item.id === "id_cards") return perms.id_card_generation !== false;
         if (item.id === "assistants")
@@ -1144,8 +1140,6 @@ export default function AdminDashboard() {
         return <EvaluationReports />;
       case "homework":
         return <Homework />;
-      case "advanced_reports":
-        return <AdvancedReports />;
       case "id_cards":
         return <IdCards />;
       default:

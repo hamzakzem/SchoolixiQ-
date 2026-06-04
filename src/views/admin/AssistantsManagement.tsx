@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, serverTimestamp, setDoc, doc, updateDoc, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, serverTimestamp, doc, updateDoc, onSnapshot, limit } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { UserPlus, ShieldCheck, Trash2, Save, X, Search, Lock, CheckSquare, Square } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -8,6 +8,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { UserRole } from '../../types';
+import { useMobileMockupShell } from '../../lib/useMobileMockupShell';
+import { Modal } from '../../components/ui/Modal';
+import { Button } from '../../components/ui/Button';
 
 const PERMISSION_OPTIONS = [
   { id: 'classes', label: 'إدارة الصفوف' },
@@ -27,6 +30,7 @@ const PERMISSION_OPTIONS = [
 
 export default function AssistantsManagement() {
   const { profile } = useAuth();
+  const inApp = useMobileMockupShell();
   const [assistants, setAssistants] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -44,28 +48,19 @@ export default function AssistantsManagement() {
   });
 
   useEffect(() => {
-    let isMounted = true;
     if (!profile?.schoolId) return;
-
-    const fetchAssistants = async () => {
-      try {
-        const q = query(
-          collection(db, 'users'),
-          where('schoolId', '==', profile.schoolId),
-          where('role', '==', UserRole.ASSISTANT),
-          limit(100)
-        );
-        const snap = await getDocs(q);
-        if (!isMounted) return;
-        setAssistants(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'AssistantsManagement:users');
-      }
-    };
-    
-    fetchAssistants();
-    return () => { isMounted = false; };
-  }, [profile]);
+    const q = query(
+      collection(db, 'users'),
+      where('schoolId', '==', profile.schoolId),
+      where('role', '==', UserRole.ASSISTANT),
+      limit(100),
+    );
+    return onSnapshot(
+      q,
+      (snap) => setAssistants(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (error) => handleFirestoreError(error, OperationType.LIST, 'AssistantsManagement:users'),
+    );
+  }, [profile?.schoolId]);
 
   const togglePermission = (permId: string) => {
     setFormData(prev => ({
@@ -126,6 +121,7 @@ export default function AssistantsManagement() {
     try {
       await adminDeleteUser(id);
       toast.success('تم حذف المساعد');
+      setAssistants((prev) => prev.filter((a) => a.id !== id));
       setConfirmDeleteId(null);
     } catch (error: any) {
       console.error('Delete assistant error:', error);
@@ -242,132 +238,101 @@ export default function AssistantsManagement() {
         ))}
       </div>
 
-      <AnimatePresence>
-        {showModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md" dir="rtl">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200"
-            >
-              <div className="p-8 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-slate-900 font-display">
-                  {editingAssistant ? 'تعديل صلاحيات المساعد' : 'إضافة مساعد منصة جديد'}
-                </h2>
-                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
-                  <X size={24} />
-                </button>
-              </div>
-
-              <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">اسم المساعد</label>
-                        <input
-                          required
-                          type="text"
-                          value={formData.name}
-                          onChange={e => setFormData({ ...formData, name: e.target.value })}
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold"
-                          placeholder="الاسم الكامل..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">البريد الإلكتروني</label>
-                        <input
-                          required
-                          type="email"
-                          disabled={!!editingAssistant}
-                          value={formData.email}
-                          onChange={e => setFormData({ ...formData, email: e.target.value })}
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold disabled:bg-slate-50"
-                          placeholder="assistant@school.com"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">الراتب الشهري (د.ع)</label>
-                        <input
-                          type="number"
-                          value={Number.isNaN(formData.salary) ? '' : formData.salary}
-                          onChange={e => setFormData({ ...formData, salary: e.target.value === '' ? 0 : Number(e.target.value) || 0 })}
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold"
-                          placeholder="0"
-                        />
-                      </div>
-                      {!editingAssistant && (
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">كلمة المرور</label>
-                          <div className="relative">
-                            <Lock size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                              required
-                              type="password"
-                              value={formData.password}
-                              onChange={e => setFormData({ ...formData, password: e.target.value })}
-                              className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold"
-                              placeholder="••••••••"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest leading-none">الصلاحيات المتاحة (اختر الأقسام)</label>
-                      <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[300px] overflow-y-auto custom-scrollbar">
-                        {PERMISSION_OPTIONS.map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => togglePermission(opt.id)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all border text-right ${
-                              formData.permissions.includes(opt.id)
-                                ? 'bg-[#0B2345] text-white border-transparent shadow-md'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                            }`}
-                          >
-                            {formData.permissions.includes(opt.id) ? (
-                              <CheckSquare size={18} />
-                            ) : (
-                              <Square size={18} className="opacity-40" />
-                            )}
-                            <span className="text-sm font-bold">{opt.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="flex-1 py-4 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                  >
-                    <Save size={20} />
-                    {isSaving ? 'جاري الحفظ...' : 'حفظ بيانات المساعد'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    className="px-8 py-4 bg-white border border-slate-200 text-slate-500 rounded-xl font-bold hover:bg-slate-100 transition-all active:scale-95"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title={editingAssistant ? 'تعديل صلاحيات المساعد' : 'إضافة مساعد جديد'}
+        icon={<ShieldCheck size={22} className="text-[#0B2345]" />}
+        maxWidthClass="max-w-lg"
+        footer={
+          <>
+            <Button type="submit" form="assistant-form" fullWidth disabled={isSaving}>
+              {isSaving ? 'جاري الحفظ...' : 'حفظ بيانات المساعد'}
+            </Button>
+            <Button type="button" variant="secondary" fullWidth onClick={() => setShowModal(false)}>
+              إلغاء
+            </Button>
+          </>
+        }
+      >
+        <form id="assistant-form" onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">اسم المساعد</label>
+            <input
+              required
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold"
+            />
           </div>
-        )}
-      </AnimatePresence>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">البريد الإلكتروني</label>
+            <input
+              required
+              type="email"
+              disabled={!!editingAssistant}
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold disabled:bg-slate-50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">الراتب الشهري (د.ع)</label>
+            <input
+              type="number"
+              value={Number.isNaN(formData.salary) ? '' : formData.salary}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  salary: e.target.value === '' ? 0 : Number(e.target.value) || 0,
+                })
+              }
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold"
+            />
+          </div>
+          {!editingAssistant && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">كلمة المرور</label>
+              <input
+                required
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-2">الصلاحيات</label>
+            <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto custom-scrollbar">
+              {PERMISSION_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => togglePermission(opt.id)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold border ${
+                    formData.permissions.includes(opt.id)
+                      ? 'bg-[#0B2345] text-white border-transparent'
+                      : 'bg-white text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {formData.permissions.includes(opt.id) ? (
+                    <CheckSquare size={16} />
+                  ) : (
+                    <Square size={16} className="opacity-40" />
+                  )}
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </form>
+      </Modal>
 
       <AnimatePresence>
         {confirmDeleteId && (
-          <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" dir="rtl">
+          <div className={`fixed inset-0 bg-slate-900/60 z-[110] flex justify-center p-4 backdrop-blur-sm ${inApp ? 'items-end pt-[72px] pb-[84px]' : 'items-center'}`} dir="rtl">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

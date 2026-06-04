@@ -417,10 +417,11 @@ export default function ParentsList() {
                               </div>
                             </div>
                             <button 
+                              type="button"
                               onClick={() => setShowDeleteConfirm({ parentId: parent.id, studentId: student.id, studentName: student.name })}
-                              className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                              className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-1 rounded-lg shrink-0"
                             >
-                              <X size={14} />
+                              فك الربط
                             </button>
                           </div>
                          ))
@@ -450,7 +451,7 @@ export default function ParentsList() {
       {/* Delete/Unlink Confirmation Modal */}
       <AnimatePresence>
         {showDeleteConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 pt-[72px] pb-[84px] sm:pt-6 sm:pb-6 bg-slate-900/60 backdrop-blur-md">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -487,7 +488,7 @@ export default function ParentsList() {
       {/* Delete Parent Account Confirmation Modal */}
       <AnimatePresence>
         {showDeleteAccountConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 pt-[72px] pb-[84px] sm:pt-6 sm:pb-6 bg-slate-900/60 backdrop-blur-md">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -528,7 +529,7 @@ export default function ParentsList() {
       {/* Add Parent Modal */}
       <AnimatePresence>
         {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 pt-[72px] pb-[84px] sm:pt-6 sm:pb-6 bg-slate-900/60 backdrop-blur-md">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -615,7 +616,7 @@ export default function ParentsList() {
       {/* Edit Parent Modal */}
       <AnimatePresence>
         {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 pt-[72px] pb-[84px] sm:pt-6 sm:pb-6 bg-slate-900/60 backdrop-blur-md">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -688,7 +689,7 @@ export default function ParentsList() {
       {/* Link Student Modal */}
       <AnimatePresence>
         {showLinkModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 pt-[72px] pb-[84px] sm:pt-6 sm:pb-6 bg-slate-900/60 backdrop-blur-md">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
