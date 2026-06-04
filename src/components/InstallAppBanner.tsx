@@ -18,7 +18,8 @@ import {
   dismissIosPrompt,
   isIosPromptDismissed,
   isIosInstallDeepLink,
-  getIosMobileConfigUrl,
+  isIosSafari,
+  isPwaStandalone,
 } from '../lib/iosAppDownload';
 import { useSystemConfig } from '../lib/SystemConfigContext';
 import { useAuth } from '../lib/AuthContext';
@@ -32,19 +33,11 @@ export default function InstallAppBanner() {
   const [platform, setPlatform] = useState<'android' | 'ios' | 'other'>('other');
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
 
-  const downloadMobileConfig = () => {
-    toast.success(t('preparingProfileSuccess'));
-    window.location.assign(getIosMobileConfigUrl());
-  };
-
   useEffect(() => {
     if (user || shouldHideAppDownloadPromo() || Capacitor.isNativePlatform()) return;
     if (Capacitor.isNativePlatform()) return;
 
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true;
-    if (isStandalone) return;
+    if (isPwaStandalone()) return;
 
     const dismissedTime = localStorage.getItem('schoolix_pwa_dismissed_time');
     if (dismissedTime) {
@@ -60,24 +53,27 @@ export default function InstallAppBanner() {
 
     if (isIOS) {
       setPlatform('ios');
-      const fromDeepLink = isIosInstallDeepLink();
-      if (fromDeepLink) {
-        setShowBanner(true);
-        setShowIOSInstructions(true);
-        return;
-      }
       const onPrompt = () => {
         setShowBanner(true);
         setShowIOSInstructions(true);
       };
       window.addEventListener('schoolix:ios-install-prompt', onPrompt);
-      if (shouldPromoteIosApp() && !isIosPromptDismissed()) {
-        const timer = window.setTimeout(() => setShowBanner(true), 2200);
+
+      const fromDeepLink = isIosInstallDeepLink();
+      if (fromDeepLink || (isIosSafari() && shouldPromoteIosApp() && !isIosPromptDismissed())) {
+        setShowBanner(true);
+        setShowIOSInstructions(true);
+      } else if (shouldPromoteIosApp() && !isIosPromptDismissed()) {
+        const timer = window.setTimeout(() => {
+          setShowBanner(true);
+          setShowIOSInstructions(isIosSafari());
+        }, 2200);
         return () => {
           window.clearTimeout(timer);
           window.removeEventListener('schoolix:ios-install-prompt', onPrompt);
         };
       }
+
       return () => window.removeEventListener('schoolix:ios-install-prompt', onPrompt);
     }
 
@@ -121,9 +117,10 @@ export default function InstallAppBanner() {
         setShowBanner(false);
         return;
       }
-      openIosInstall(config);
-      toast.success(t('iosWebInstallStarting'));
-      setShowBanner(false);
+      setShowIOSInstructions(true);
+      if (!isIosSafari()) {
+        toast.error(t('iosSafariRequired'));
+      }
       return;
     }
 
@@ -259,8 +256,14 @@ export default function InstallAppBanner() {
                   <span>✨</span>
                   {hasIosOfficialDownload(config)
                     ? t('iosInstallThreeWays')
-                    : t('iosInstallTwoWays')}
+                    : t('iosInstallSafariOnly')}
                 </p>
+
+                {!hasIosOfficialDownload(config) ? (
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-3 rounded-2xl text-[11px] text-amber-900 dark:text-amber-200 font-bold leading-relaxed">
+                    {t('iosProfileNoHomeIcon')}
+                  </div>
+                ) : null}
 
                 {hasIosOfficialDownload(config) ? (
                   <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-4 rounded-3xl border border-slate-700 text-white text-right">
@@ -317,36 +320,6 @@ export default function InstallAppBanner() {
                       <p>
                         {t('iosSafariStep3')}
                       </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Method 2: Config Profile File */}
-                <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/50 dark:from-indigo-950/10 dark:to-violet-950/10 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-right">
-                  <div className="flex items-center gap-2 mb-2 font-black text-slate-800 dark:text-slate-200">
-                    <span className="w-5 h-5 rounded-lg bg-[#0B2345] text-white flex items-center justify-center text-xs font-bold">
-                      {hasIosOfficialDownload(config) ? '٣' : '٢'}
-                    </span>
-                    <span className="text-xs sm:text-sm font-black">{t('iosMethodProfile')}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-6">
-                    {t('iosMethodProfileDesc')}
-                  </p>
-
-                  <div className="pr-6 space-y-3">
-                    <a
-                      href="/downloads/schoolixiq.mobileconfig"
-                      onClick={() => {
-                        toast.success(t('preparingProfileSuccess'));
-                      }}
-                      className="w-full py-2 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer text-center"
-                    >
-                      <Download size={13} />
-                      {t('iosDownloadProfile')}
-                    </a>
-
-                    <div className="text-[10px] bg-white/70 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100/80 dark:border-slate-800/80 leading-normal text-slate-500 font-medium">
-                      {t('iosProfileInstructions')}
                     </div>
                   </div>
                 </div>

@@ -1999,9 +1999,17 @@ export default function Login() {
                       <p className="text-emerald-600 dark:text-emerald-400 font-extrabold text-center text-sm md:text-base mb-1 flex items-center justify-center gap-1">
                         <span>✨</span>
                         {hasIosOfficialDownload(config)
-                          ? (isRtl ? "ثلاث طرق لتثبيت التطبيق على iPhone" : "Three ways to install on iPhone")
-                          : (isRtl ? "طريقتان لتثبيت التطبيق على الآيفون" : "Two ways to install on iPhone")}
+                          ? (isRtl ? "طريقتان لتثبيت التطبيق على iPhone" : "Two ways to install on iPhone")
+                          : (isRtl ? "إضافة أيقونة التطبيق على الشاشة الرئيسية" : "Add app icon to Home Screen")}
                       </p>
+
+                      {!hasIosOfficialDownload(config) ? (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-950 p-3 rounded-2xl text-[11px] font-bold leading-relaxed">
+                          {isRtl
+                            ? "ملف التعريف (لم يتم التوقيع) يظهر في الإعدادات فقط ولا يضيف أيقونة على الشاشة الرئيسية. استخدم Safari كما في الخطوات أدناه."
+                            : "Unsigned profiles install in Settings only — they do not add a Home Screen icon. Use Safari steps below."}
+                        </div>
+                      ) : null}
 
                       {hasIosOfficialDownload(config) ? (
                         <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-4 rounded-3xl border border-slate-700 text-white text-right">
@@ -2028,34 +2036,9 @@ export default function Login() {
                             {isRtl ? "فتح App Store" : "Open App Store"}
                           </button>
                         </div>
-                      ) : (
-                        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-4 rounded-3xl border border-slate-700 text-white text-right">
-                          <div className="flex items-center gap-2 mb-2 font-black">
-                            <span className="w-6 h-6 rounded-lg bg-white text-slate-900 flex items-center justify-center text-xs">١</span>
-                            <span className="text-xs sm:text-sm font-black">
-                              {isRtl ? "تحميل بنقرة واحدة (موصى به)" : "One-tap install (recommended)"}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-white/75 font-medium leading-relaxed mb-3 pr-8">
-                            {isRtl
-                              ? "اضغط الزر ثم «سماح»، ثم من الإعدادات ثبّت ملف التعريف لإضافة التطبيق إلى الشاشة الرئيسية."
-                              : "Tap the button, Allow, then install the profile in Settings to add the app to your Home Screen."}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              openIosInstall(config);
-                              toast.success(isRtl ? "جاري تحضير التثبيت…" : "Preparing install…");
-                            }}
-                            className="w-full py-2.5 bg-white text-slate-900 font-black rounded-xl text-xs flex items-center justify-center gap-1.5"
-                          >
-                            <Download size={13} />
-                            {isRtl ? "تحميل الآن" : "Download now"}
-                          </button>
-                        </div>
-                      )}
+                      ) : null}
 
-                      {/* Safari — Add to Home Screen */}
+                      {/* Safari — Add to Home Screen (الطريقة الوحيدة المضمونة بدون App Store) */}
                       <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/10 p-4 rounded-3xl border border-emerald-100/60 dark:border-emerald-900/40 text-right">
                         <div className="flex items-center gap-2 mb-2 font-black text-emerald-900 dark:text-emerald-200">
                           <span className="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs">
@@ -2089,38 +2072,11 @@ export default function Login() {
                             </p>
                           </div>
                         </div>
-                      </div>
-
-                      {/* Config Profile File */}
-                      <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/50 dark:from-indigo-950/10 dark:to-violet-950/10 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-right">
-                        <div className="flex items-center gap-2 mb-2 font-black text-slate-800 dark:text-slate-200">
-                          <span className="w-6 h-6 rounded-lg bg-[#0B2345] text-white flex items-center justify-center text-xs">
-                            {hasIosOfficialDownload(config) ? "٣" : "٢"}
-                          </span>
-                          <span className="text-xs sm:text-sm font-black">{isRtl ? "طريقة ملف التعريف التلقائي بنقرة واحدة" : "Or Download Secure iOS Configuration Profile"}</span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3 pr-8">
-                          {isRtl 
-                            ? "يتيح لك تثبيت فوري بنقرة واحدة. عند تنزيل ملف التعريف، من الطبيعي تماماً لجميع التطبيقات والمنصات الخارجية المستقلة أن يظهر لك نظام iOS عبارة (لم يتم التوقيع - Unsigned) باللون الأحمر لأنها لا تعتمد على حساب مطور تجاري مدفوع، وهي آمنة تماماً ومضمونة 100% ولا تسبب أي مشاكل."
-                            : "Download custom shortcut profile. Note that iOS naturally labels local profiles as 'Unsigned' (Not Signed), which is standard for custom clips, but perfectly safe."}
+                        <p className="text-[10px] text-slate-500 font-bold mt-3 pr-2">
+                          {isRtl
+                            ? "يجب استخدام متصفح Safari الأزرق — وليس Chrome أو فتح الرابط من واتساب."
+                            : "Use the blue Safari browser — not Chrome or in-app browsers."}
                         </p>
-
-                        <div className="pr-8 space-y-3">
-                          <a
-                            href="/downloads/schoolixiq.mobileconfig"
-                            onClick={() => {
-                              toast.success(isRtl ? "جاري تحضير ملف التعريف وتنزيله بنجاح..." : "Preparing and downloading configuration profile...");
-                            }}
-                            className="w-full py-2.5 bg-[#0B2345] hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/10 cursor-pointer text-center hover:scale-[1.01] active:scale-[0.99]"
-                          >
-                            <Download size={13} />
-                            {isRtl ? "تنزيل وتثبيت الملف بنقرة واحدة" : "Download Configuration Profile"}
-                          </a>
-
-                          <div className="text-[10px] bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100/80 dark:border-slate-800/80 leading-normal text-slate-500 font-medium">
-                            {isRtl ? "طريقة التشغيل بعد التحميل: اضغط 'سماح' للتنزيل، ثم افتح تطبيق (الإعدادات بجهازك Settings) واضغط على (تم تنزيل ملف التعريف) بالأعلى، ثم اضغط على تثبيت." : "Activation context: tap Allow, then go to Settings on your device, tap (Profile Downloaded) at the top and select Install."}
-                          </div>
-                        </div>
                       </div>
                     </div>
                   )}

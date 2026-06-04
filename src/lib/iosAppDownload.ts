@@ -30,6 +30,14 @@ export function isIosDevice(): boolean {
 }
 
 /** ملف التعريف و«إضافة للشاشة الرئيسية» يعملان من Safari فقط على iOS */
+export function isPwaStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
 export function isIosSafari(): boolean {
   if (!isIosDevice()) return false;
   const ua = window.navigator.userAgent || '';
@@ -187,8 +195,15 @@ export function openIosAppDownload(
   return true;
 }
 
+/** يعرض تعليمات «إضافة إلى الشاشة الرئيسية» داخل الموقع (Safari فقط). */
+export function promptIosSafariInstallUI(): void {
+  if (typeof window === 'undefined' || Capacitor.isNativePlatform()) return;
+  window.dispatchEvent(new CustomEvent('schoolix:ios-install-prompt'));
+}
+
 /**
- * تحميل/تثبيت على iPhone: App Store إن وُجد، وإلا تثبيت ويب (ملف تعريف على الجهاز).
+ * تحميل/تثبيت على iPhone: App Store إن وُجد، وإلا Safari → الشاشة الرئيسية.
+ * ملف التعريف غير الموقّع لا يضيف أيقونة على iOS الحديث.
  */
 export function openIosInstall(config?: IosDownloadConfig | null): boolean {
   if (typeof window === 'undefined' || !isIosWebInstallEnabled(config)) return false;
@@ -198,6 +213,10 @@ export function openIosInstall(config?: IosDownloadConfig | null): boolean {
   }
 
   if (isIosDevice()) {
+    if (isIosSafari()) {
+      promptIosSafariInstallUI();
+      return true;
+    }
     window.location.assign(getIosInstallGuideUrl(config));
     return true;
   }

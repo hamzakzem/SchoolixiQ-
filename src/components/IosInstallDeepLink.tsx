@@ -3,28 +3,30 @@ import { Capacitor } from '@capacitor/core';
 import {
   isIosInstallDeepLink,
   isIosDevice,
+  isIosSafari,
   clearIosInstallQueryFromUrl,
+  promptIosSafariInstallUI,
   getIosInstallGuideUrl,
 } from '../lib/iosAppDownload';
 
-/** على iPhone يفتح صفحة تعليمات التثبيت (Safari → الشاشة الرئيسية) */
 export function dispatchIosInstallPrompt(): void {
-  if (typeof window === 'undefined' || Capacitor.isNativePlatform()) return;
-  window.dispatchEvent(new CustomEvent('schoolix:ios-install-prompt'));
+  promptIosSafariInstallUI();
 }
 
 export default function IosInstallDeepLink() {
   useEffect(() => {
     if (Capacitor.isNativePlatform() || !isIosInstallDeepLink()) return;
 
-    if (isIosDevice()) {
-      clearIosInstallQueryFromUrl();
-      window.location.assign(getIosInstallGuideUrl());
-      return;
+    clearIosInstallQueryFromUrl();
+
+    if (isIosDevice() && isIosSafari()) {
+      const t = window.setTimeout(() => promptIosSafariInstallUI(), 300);
+      return () => window.clearTimeout(t);
     }
 
-    const t = window.setTimeout(() => dispatchIosInstallPrompt(), 400);
-    return () => window.clearTimeout(t);
+    if (isIosDevice()) {
+      window.location.assign(getIosInstallGuideUrl());
+    }
   }, []);
 
   return null;
