@@ -46,6 +46,7 @@ const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
 const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 
 import ScanHandler from "./components/ScanHandler";
+import NativeAppShellMarker from "./components/mobile/NativeAppShellMarker";
 import SolarLoading from "./components/SolarLoading";
 import AuthBootScreen from "./components/AuthBootScreen";
 import { createSchoolSubscriptionRegistration } from "./lib/schoolSubscriptionRequest";
@@ -1456,6 +1457,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
           <AuthProvider>
+            <NativeAppShellMarker />
             <BrowserRouter>
               <Suspense fallback={<SolarLoading />}>
                 <Routes>

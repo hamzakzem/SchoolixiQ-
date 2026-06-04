@@ -133,22 +133,42 @@ export function MobilePermissionChip({
   icon: Icon,
   label,
   onClick,
+  variant = 'grid',
 }: {
   icon: LucideIcon;
   label: string;
   onClick: () => void;
+  variant?: 'grid' | 'list';
 }) {
+  if (variant === 'list') {
+    return (
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.98 }}
+        onClick={onClick}
+        className="group w-full flex items-center gap-3 p-3.5 rounded-2xl bg-white/95 border border-slate-200/80 shadow-[0_4px_20px_rgba(11,35,69,0.06)] text-start active:shadow-inner transition-shadow"
+      >
+        <span className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#0B2345] via-[#0f2d52] to-[#163a6b] text-white flex items-center justify-center shadow-md shadow-[#0B2345]/25 shrink-0">
+          <Icon size={20} strokeWidth={2.35} />
+        </span>
+        <span className="text-[13px] font-black text-[#0B2345] leading-snug tracking-tight flex-1 min-w-0">
+          {label}
+        </span>
+      </motion.button>
+    );
+  }
+
   return (
     <motion.button
       type="button"
       whileTap={{ scale: 0.96 }}
       onClick={onClick}
-      className="group flex flex-col items-center gap-2 p-3 rounded-2xl bg-white/90 border border-slate-200/80 shadow-[0_4px_20px_rgba(11,35,69,0.06)] min-h-[84px] transition-shadow hover:shadow-[0_8px_28px_rgba(11,35,69,0.1)]"
+      className="group flex flex-col items-center gap-2 p-3 rounded-2xl bg-white/90 border border-slate-200/80 shadow-[0_4px_20px_rgba(11,35,69,0.06)] min-h-[92px] transition-shadow hover:shadow-[0_8px_28px_rgba(11,35,69,0.1)]"
     >
       <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0B2345] via-[#0f2d52] to-[#163a6b] text-white flex items-center justify-center shadow-md shadow-[#0B2345]/30 group-active:shadow-inner">
         <Icon size={18} strokeWidth={2.35} />
       </span>
-      <span className="text-[10px] font-bold text-slate-700 text-center leading-tight line-clamp-2">
+      <span className="text-[11px] font-black text-[#0B2345] text-center leading-tight line-clamp-3 px-0.5">
         {label}
       </span>
     </motion.button>

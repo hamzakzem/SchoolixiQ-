@@ -41,6 +41,7 @@ import {
   BarChart3,
   ShieldCheck,
   Check,
+  CheckSquare,
 } from "lucide-react";
 import { updatePassword, verifyBeforeUpdateEmail } from "firebase/auth";
 import { toast } from "react-hot-toast";
@@ -931,9 +932,35 @@ export default function TeacherDashboard() {
         {mobileUi ? (
           <>
             <MobileMockupHeader
-              schoolName={schoolName || schoolData?.name}
+              sectionTitle={
+                activeTab === "home"
+                  ? isRtl
+                    ? "الرئيسية"
+                    : "Home"
+                  : [
+                      { id: "homework", label: t("dailyHomework") },
+                      { id: "grades", label: t("resultsAndGrades") },
+                      { id: "behavior", label: t("behaviorAndStudents") },
+                      { id: "reports", label: t("evaluationReports") },
+                      { id: "id_cards", label: isRtl ? "هويات الطالب" : "ID Cards" },
+                      { id: "schedules", label: t("schedules") },
+                      { id: "chat", label: t("chat") || (isRtl ? "المراسلة" : "Messages") },
+                      { id: "settings", label: t("settings") },
+                    ].find((x) => x.id === activeTab)?.label ??
+                    (isRtl ? "المعلم" : "Teacher")
+              }
+              schoolName={schoolData?.name}
               schoolLogoUrl={schoolData?.logoUrl}
-              onNotifications={() => setActiveTab('chat')}
+              modules={[
+                { id: "attendance", label: isRtl ? "الحضور" : "Attendance", icon: CheckSquare },
+                { id: "grades", label: t("resultsAndGrades"), icon: Star },
+                { id: "homework", label: t("dailyHomework"), icon: BookOpen },
+                { id: "schedules", label: t("schedules"), icon: Calendar },
+                { id: "behavior", label: t("behaviorAndStudents"), icon: Users },
+                { id: "id_cards", label: isRtl ? "هويات" : "ID cards", icon: ShieldCheck },
+              ]}
+              onNavigateModule={(tab) => setActiveTab(tab as Tab)}
+              onNotifications={() => setActiveTab("chat")}
             />
             <MobileMockupBottomNav
               role="teacher"

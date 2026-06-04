@@ -50,9 +50,12 @@ import { IdCardTemplate } from "../../types/idCardTemplate";
 import { mergeIdCardTemplate } from "../../lib/idCardTemplateUtils";
 import { DEFAULT_ID_CARD_TEMPLATE } from "../../lib/idCardPresets";
 import { useMobileMockupShell } from "../../lib/useMobileMockupShell";
+import IdCardsAppView from "../../components/mobile/IdCardsAppView";
+import { Modal } from "../../components/ui/Modal";
+import { Button } from "../../components/ui/Button";
 
 export default function IdCards() {
-  const { profile } = useAuth();
+  const { profile, schoolData } = useAuth();
   const { t, language } = useLanguage();
   const isRtl = language === "ar";
   const inApp = useMobileMockupShell();
@@ -127,6 +130,42 @@ export default function IdCards() {
 
   const handleSinglePrint = () => openPrintModal("single");
   const handleBulkPrint = () => openPrintModal("bulk");
+
+  const openEditCardForm = () => {
+    if (!selectedStudent) return;
+    if (currentCard) {
+      setPhotoUrl(currentCard.photoUrl || "");
+      setBloodType(currentCard.bloodType || "");
+      setTransportInfo(currentCard.transportInfo || "");
+      setDriverName(currentCard.driverName || "");
+      setDriverPhone(currentCard.driverPhone || "");
+      setCarNumber(currentCard.carNumber || "");
+      setGuardianName(currentCard.guardianName || "");
+      setSchoolPhone(currentCard.schoolPhone || "");
+      setIssueDate(currentCard.issueDate || "");
+      setValidUntil(currentCard.validUntil || "");
+      setExamNumber(currentCard.examNumber || selectedStudent.examNumber || "");
+      setResidenceAddress(
+        currentCard.residenceAddress || selectedStudent.address || "",
+      );
+      setSchoolName(currentCard.schoolName || schoolData?.name || "");
+    } else {
+      setPhotoUrl("");
+      setBloodType("");
+      setTransportInfo("");
+      setDriverName("");
+      setDriverPhone(selectedStudent.driverPhone || "");
+      setCarNumber("");
+      setGuardianName("");
+      setSchoolPhone(profile?.schoolPhone || profile?.phone || "");
+      setExamNumber(selectedStudent.examNumber || "");
+      setIssueDate(new Date().toISOString().split("T")[0]);
+      setValidUntil(String(new Date().getFullYear() + 1));
+      setResidenceAddress(selectedStudent.address || "");
+      setSchoolName(schoolData?.name || "");
+    }
+    setShowEditModal(true);
+  };
   
   const handlePrintComplete = async (printedCount: number) => {
     if (printMode === "single" && selectedStudent) {
@@ -352,6 +391,185 @@ export default function IdCards() {
     }
   };
 
+  if (inApp && !showSettings) {
+    return (
+      <>
+        <IdCardsAppView
+          isRtl={isRtl}
+          classes={classes}
+          selectedClassId={selectedClassId}
+          onClassChange={setSelectedClassId}
+          students={students}
+          selectedStudent={selectedStudent}
+          onSelectStudent={setSelectedStudent}
+          idCards={idCards}
+          template={effectiveTemplate}
+          canPrintBulk={canPrintBulk}
+          onOpenSettings={() => setShowSettings(true)}
+          onEditCard={openEditCardForm}
+          onDeleteCard={() =>
+            selectedStudent && handleDeleteCard(selectedStudent.id)
+          }
+          onPrintSingle={handleSinglePrint}
+          onPrintBulk={handleBulkPrint}
+        />
+        <AnimatePresence>
+          {showPrintModal && (
+            <PrintPreviewModal
+              isOpen={showPrintModal}
+              onClose={() => setShowPrintModal(false)}
+              students={
+                printMode === "single" && selectedStudent
+                  ? [selectedStudent]
+                  : studentsWithCards
+              }
+              idCards={idCards}
+              isRtl={isRtl}
+              template={effectiveTemplate}
+              title={
+                printMode === "single"
+                  ? `Student-ID-${selectedStudent?.name || "Card"}`
+                  : `Class-IDs-${classes.find((c) => c.id === selectedClassId)?.name || "Class"}`
+              }
+              onAfterPrint={handlePrintComplete}
+            />
+          )}
+        </AnimatePresence>
+        <Modal
+          open={showEditModal}
+          onClose={() => !isSaving && setShowEditModal(false)}
+          title={
+            currentCard
+              ? isRtl
+                ? "تعديل الهوية"
+                : "Edit ID card"
+              : isRtl
+                ? "إصدار هوية"
+                : "Issue ID card"
+          }
+          description={selectedStudent?.name}
+          maxWidthClass="max-w-lg"
+          footer={
+            <div className="flex gap-2 w-full">
+              <Button
+                variant="secondary"
+                size="lg"
+                className="flex-1"
+                disabled={isSaving}
+                onClick={() => setShowEditModal(false)}
+              >
+                {isRtl ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                size="lg"
+                className="flex-1"
+                disabled={isSaving}
+                onClick={handleSaveCard}
+              >
+                {isSaving
+                  ? isRtl
+                    ? "جاري الحفظ..."
+                    : "Saving..."
+                  : isRtl
+                    ? "حفظ"
+                    : "Save"}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-right" dir="rtl">
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">
+                {isRtl ? "صورة الطالب" : "Photo"}
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="w-full text-sm"
+              />
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt=""
+                  className="mt-2 w-24 h-24 rounded-xl object-cover border"
+                />
+              ) : null}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  {isRtl ? "فصيلة الدم" : "Blood"}
+                </label>
+                <input
+                  value={bloodType}
+                  onChange={(e) => setBloodType(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  {isRtl ? "الرقم الامتحاني" : "Exam #"}
+                </label>
+                <input
+                  value={examNumber}
+                  onChange={(e) => setExamNumber(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  {isRtl ? "تاريخ الإصدار" : "Issued"}
+                </label>
+                <input
+                  type="date"
+                  value={issueDate}
+                  onChange={(e) => setIssueDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  {isRtl ? "الصلاحية" : "Valid until"}
+                </label>
+                <input
+                  value={validUntil}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">
+                {isRtl ? "ولي الأمر" : "Guardian"}
+              </label>
+              <input
+                value={guardianName}
+                onChange={(e) => setGuardianName(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">
+                {isRtl ? "العنوان" : "Address"}
+              </label>
+              <input
+                value={residenceAddress}
+                onChange={(e) => setResidenceAddress(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold"
+              />
+            </div>
+            <p className="text-[10px] text-slate-400 font-bold">
+              {isRtl
+                ? "اسم المدرسة يُملأ تلقائياً من إعدادات المدرسة"
+                : "School name is filled from school settings"}
+            </p>
+          </div>
+        </Modal>
+      </>
+    );
+  }
+
   if (showSettings) {
     return (
       <div className="space-y-6">
@@ -524,44 +742,7 @@ export default function IdCards() {
                     </button>
                   )}
                   <button
-                    onClick={() => {
-                      if (currentCard) {
-                        setPhotoUrl(currentCard.photoUrl || "");
-                        setBloodType(currentCard.bloodType || "");
-                        setTransportInfo(currentCard.transportInfo || "");
-                        setDriverName(currentCard.driverName || "");
-                        setDriverPhone(currentCard.driverPhone || "");
-                        setCarNumber(currentCard.carNumber || "");
-                        setGuardianName(currentCard.guardianName || "");
-                        setSchoolPhone(currentCard.schoolPhone || "");
-                        setIssueDate(currentCard.issueDate || "");
-                        setValidUntil(currentCard.validUntil || "");
-                        setExamNumber(currentCard.examNumber || selectedStudent.examNumber || "");
-                        setResidenceAddress(
-                          currentCard.residenceAddress ||
-                            selectedStudent.address ||
-                            "",
-                        );
-                        setSchoolName(
-                          currentCard.schoolName || profile.schoolName || "",
-                        );
-                      } else {
-                        setPhotoUrl("");
-                        setBloodType("");
-                        setTransportInfo("");
-                        setDriverName("");
-                        setDriverPhone(selectedStudent.driverPhone || "");
-                        setCarNumber("");
-                        setGuardianName("");
-                        setSchoolPhone(profile.schoolPhone || profile.phone || "");
-                        setExamNumber(selectedStudent.examNumber || "");
-                        setIssueDate(new Date().toISOString().split("T")[0]);
-                        setValidUntil(new Date().getFullYear() + 1 + "");
-                        setResidenceAddress(selectedStudent.address || "");
-                        setSchoolName(profile.schoolName || "");
-                      }
-                      setShowEditModal(true);
-                    }}
+                    onClick={openEditCardForm}
                     className="px-4 py-2 bg-[#0B2345] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
                   >
                     {currentCard ? <Edit2 size={18} /> : <Plus size={18} />}

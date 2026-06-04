@@ -1481,9 +1481,19 @@ export default function AdminDashboard() {
         {mobileUi ? (
           <>
             <MobileMockupHeader
+              sectionTitle={
+                activeTab === "overview"
+                  ? isRtl
+                    ? "الرئيسية"
+                    : "Home"
+                  : menuItems.find((m) => m.id === activeTab)?.label ??
+                    (isRtl ? "المدرسة" : "School")
+              }
               schoolName={schoolData?.name || config.appName}
               schoolLogoUrl={schoolData?.logoUrl}
-              onNotifications={() => navigateToTab('announcements')}
+              modules={mobileHomePermissions}
+              onNavigateModule={navigateToTab}
+              onNotifications={() => navigateToTab("announcements")}
             />
             <MobileMockupBottomNav
               role="admin"

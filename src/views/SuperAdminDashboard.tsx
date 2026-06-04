@@ -2070,8 +2070,27 @@ export default function SuperAdminDashboard() {
         {mobileUi ? (
           <>
             <MobileMockupHeader
+              sectionTitle={
+                activeTab === "schools"
+                  ? t("sidebar_schools") || (isRtl ? "المدارس" : "Schools")
+                  : activeTab === "settings"
+                    ? t("sidebar_settings")
+                    : activeTab === "chat"
+                      ? t("chat")
+                      : activeTab === "requests"
+                        ? isRtl
+                          ? "الطلبات"
+                          : "Requests"
+                        : config.appName
+              }
               schoolName={config.appName}
               schoolLogoUrl={config.appLogo}
+              modules={[
+                { id: "schools", label: t("sidebar_schools"), icon: Building },
+                { id: "requests", label: isRtl ? "الطلبات" : "Requests", icon: Bell },
+                { id: "settings", label: t("sidebar_settings"), icon: SettingsIcon },
+              ]}
+              onNavigateModule={(tab) => navigateToTab(tab as typeof activeTab)}
               onNotifications={() => navigateToTab("requests")}
             />
             <MobileMockupBottomNav

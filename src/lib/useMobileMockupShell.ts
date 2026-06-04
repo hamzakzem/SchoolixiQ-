@@ -1,11 +1,15 @@
 import { Capacitor } from '@capacitor/core';
 
 /**
- * Premium in-app shell (header, bottom nav, mockup homes) — **Capacitor native only**.
- * Mobile browser / website keeps the classic dashboard UI.
- * Set VITE_MOBILE_MOCKUP_UI=true in dev to preview the app UI in a desktop browser.
+ * True only in the **native SchoolixiQ app** (Capacitor Android/iOS).
+ *
+ * - Website (desktop or mobile browser): always `false` → classic sidebar/header UI.
+ * - App: `true` → mobile shell (header, bottom nav, IdCardsAppView, compact admin pages, …).
+ *
+ * Dev preview only: `VITE_MOBILE_MOCKUP_UI=true` simulates the app in a browser.
+ * Production web builds must not set that variable.
  */
-export function useMobileMockupShell(): boolean {
+export function isNativeAppPlatform(): boolean {
   const forced =
     import.meta.env.VITE_MOBILE_MOCKUP_UI === '1' ||
     import.meta.env.VITE_MOBILE_MOCKUP_UI === 'true';
@@ -16,4 +20,9 @@ export function useMobileMockupShell(): boolean {
   if (disabled) return false;
   if (forced) return true;
   return Capacitor.isNativePlatform();
+}
+
+/** React hook — same as {@link isNativeAppPlatform}. */
+export function useMobileMockupShell(): boolean {
+  return isNativeAppPlatform();
 }

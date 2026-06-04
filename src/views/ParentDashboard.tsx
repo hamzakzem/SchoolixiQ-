@@ -1193,9 +1193,25 @@ export default function ParentDashboard() {
           {mobileUi ? (
             <>
               <MobileMockupHeader
+                sectionTitle={
+                  activeTab === "home"
+                    ? isRtl
+                      ? "الرئيسية"
+                      : "Home"
+                    : items.find((i) => i.id === activeTab)?.label ??
+                      (isRtl ? "ولي الأمر" : "Parent")
+                }
                 schoolName={schoolInfo?.name || config.appName}
                 schoolLogoUrl={schoolInfo?.logoUrl}
-                onNotifications={() => navigateToTab('inbox')}
+                modules={items
+                  .filter((i) => i.id !== "home")
+                  .map((i) => ({
+                    id: i.id,
+                    label: i.label,
+                    icon: i.icon,
+                  }))}
+                onNavigateModule={navigateToTab}
+                onNotifications={() => navigateToTab("inbox")}
               />
               <MobileMockupBottomNav
                 role="parent"

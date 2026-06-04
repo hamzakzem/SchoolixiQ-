@@ -242,16 +242,39 @@ export default function Schedules() {
         </div>
       </div>
 
+      {inApp && selectedClassId ? (
+        <div className="fixed bottom-[84px] inset-x-0 z-[55] px-3 pointer-events-none">
+          <div className="pointer-events-auto flex gap-2 p-2 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-lg">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex-1 flex items-center justify-center gap-2 min-h-[46px] rounded-xl bg-gradient-to-b from-[#12325c] to-[#0B2345] text-white text-sm font-black disabled:opacity-50"
+            >
+              <Save size={18} />
+              {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              className="min-h-[46px] px-4 rounded-xl bg-emerald-500 text-white font-black"
+            >
+              <Share2 size={18} />
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* Schedule UI */}
       {selectedClassId ? (
-        <div ref={printRef} className="bg-transparent md:bg-white dark:md:bg-slate-900 rounded-2xl border-none md:border md:border-slate-100 dark:md:border-slate-800 shadow-none md:shadow-sm overflow-hidden print:shadow-none print:border-none print:bg-transparent" dir="rtl">
+        <div ref={printRef} className={`bg-transparent ${inApp ? '' : 'md:bg-white dark:md:bg-slate-900'} rounded-2xl border-none ${inApp ? '' : 'md:border md:border-slate-100 dark:md:border-slate-800'} shadow-none ${inApp ? '' : 'md:shadow-sm'} overflow-hidden print:shadow-none print:border-none print:bg-transparent`} dir="rtl">
           
           <div className="hidden print:block text-center py-6 border-b border-slate-200 dark:border-slate-800 mb-6 font-black text-2xl text-slate-900 dark:text-white">
             الجدول الأسبوعي - {classes.find(c => c.id === selectedClassId)?.name}
           </div>
 
           {/* Desktop View Table */}
-          <div className="hidden md:block overflow-x-auto print:hidden">
+          <div className={`${inApp ? 'hidden' : 'hidden md:block'} overflow-x-auto print:hidden`}>
             <table className="w-full text-right border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/50">
@@ -329,8 +352,8 @@ export default function Schedules() {
             </table>
           </div>
 
-          {/* Mobile View List */}
-          <div className="md:hidden space-y-6 pb-20 print:hidden">
+          {/* Mobile / App View List */}
+          <div className={`${inApp ? 'block' : 'md:hidden'} space-y-6 pb-28 print:hidden`}>
             {DAYS_OF_WEEK.slice(0, 5).map((day) => (
               <div key={day} className="space-y-3">
                 <div className="flex items-center justify-between px-2">

@@ -138,7 +138,7 @@ export default function AdminMockupHome({
             title={isRtl ? 'اختصارات سريعة' : 'Quick access'}
             icon={Calendar}
           />
-          <div className="grid grid-cols-3 gap-2 mt-2">
+          <div className="grid grid-cols-2 gap-2 mt-2">
             {pinned.map((m) => (
               <MobilePermissionChip
                 key={m.id}
@@ -161,10 +161,11 @@ export default function AdminMockupHome({
             ? 'نفس الصلاحيات المعرفة في باقة المدرسة — متزامنة مع الموقع'
             : 'Same package permissions as the website — live sync'}
         </p>
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 gap-2">
           {rest.map((m) => (
             <MobilePermissionChip
               key={m.id}
+              variant="list"
               icon={m.icon}
               label={m.label}
               onClick={() => onTabChange(m.id)}

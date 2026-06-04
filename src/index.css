@@ -1067,14 +1067,25 @@ html.dark .sq-table tbody tr:hover .sq-table-sticky-actions {
   --tw-gradient-to: #163a6b var(--tw-gradient-to-position);
 }
 
-/* ─── SchoolixiQ native app shell (Capacitor) ─── */
+/* ─── SchoolixiQ native app shell (Capacitor only — NOT website) ─── */
+html[data-sq-native-app='true'],
 .sq-app-native {
   --sq-navy: #0b2345;
   --sq-gold: #d4a64a;
 }
 
+html[data-sq-native-app='true'] .sq-page,
 .sq-app-native .sq-page {
   animation: sq-app-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-sq-native-app='true'] button,
+html[data-sq-native-app='true'] a,
+.sq-app-native button,
+.sq-app-native a {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes sq-app-enter {
@@ -1088,6 +1099,7 @@ html.dark .sq-table tbody tr:hover .sq-table-sticky-actions {
   }
 }
 
+html[data-sq-native-app='true'] [class*='bg-gradient-to-b'][class*='from-[#f6f8fc]'],
 .sq-app-native [class*='bg-gradient-to-b'][class*='from-[#f6f8fc]'] {
   background: radial-gradient(
       ellipse 120% 70% at 50% -15%,
@@ -1097,6 +1109,8 @@ html.dark .sq-table tbody tr:hover .sq-table-sticky-actions {
     linear-gradient(180deg, #f8fafc 0%, #eef2f8 48%, #e2e9f2 100%) !important;
 }
 
+html[data-sq-native-app='true'] .sq-mobile-panel .sq-student-action-delete,
+html[data-sq-native-app='true'] .sq-mobile-panel .sq-student-action-edit,
 .sq-mobile-panel .sq-student-action-delete,
 .sq-mobile-panel .sq-student-action-edit {
   min-height: 44px !important;
@@ -1104,12 +1118,14 @@ html.dark .sq-table tbody tr:hover .sq-table-sticky-actions {
   position: relative;
 }
 
+html[data-sq-native-app='true'] .sq-mobile-panel .sq-student-card,
 .sq-mobile-panel .sq-student-card {
   border-radius: 1.15rem !important;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset,
     0 8px 28px rgba(11, 35, 69, 0.07) !important;
 }
 
+html[data-sq-native-app='true'] .sq-mobile-panel .sq-student-card-grid,
 .sq-mobile-panel .sq-student-card-grid {
   gap: 0.75rem !important;
   padding: 0.75rem !important;
