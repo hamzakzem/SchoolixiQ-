@@ -54,6 +54,10 @@ import {
   userHasPendingSchoolRegistration,
 } from "./lib/schoolRegistrationSession";
 import { LanguageToggle } from "./components/LanguageToggle";
+import {
+  getSchoolixPublicId,
+  schoolixAccountIdLabel,
+} from "./lib/displayIdentity";
 
 const InstallAppBanner = lazy(() => import("./components/InstallAppBanner"));
 const AndroidAppVisitPrompt = lazy(() => import("./components/AndroidAppVisitPrompt"));
@@ -554,8 +558,10 @@ const AppContent = () => {
             
             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl text-right mb-8 flex flex-col gap-2 border border-slate-100 dark:border-slate-800 text-xs font-mono">
               <div className="flex justify-between items-center text-right text-[11px]" dir={isRtl ? "rtl" : "ltr"}>
-                <span className="text-slate-400">{isRtl ? "البريد الإلكتروني:" : "Email:"}</span>
-                <span className="text-slate-700 dark:text-slate-300 font-bold">{profile.email}</span>
+                <span className="text-slate-400">{schoolixAccountIdLabel(isRtl)}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-bold font-mono">
+                  {getSchoolixPublicId(profile.uid)}
+                </span>
               </div>
               <div className="flex justify-between items-center text-right text-[11px]" dir={isRtl ? "rtl" : "ltr"}>
                 <span className="text-slate-400">{isRtl ? "معرف المدرسة:" : "School ID:"}</span>

@@ -49,6 +49,7 @@ import { School } from "../types";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
+import { emailVerificationHint } from "../lib/displayIdentity";
 import { notificationService } from "../lib/notificationService";
 
 const DEFAULT_PACKAGES = [
@@ -1419,8 +1420,8 @@ export default function AdminDashboard() {
                 <h4 className="text-xs md:text-sm font-bold text-amber-900 dark:text-amber-400 leading-tight">
                   تأكيد البريد الإلكتروني مطلوب
                 </h4>
-                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 truncate max-w-[220px] md:max-w-[400px]">
-                  يرجى تفعيل بريدك ({auth.currentUser?.email})
+                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 max-w-[220px] md:max-w-[400px]">
+                  {emailVerificationHint(isRtl)}
                 </p>
               </div>
             </div>

@@ -66,6 +66,7 @@ import { useAuth } from "../lib/AuthContext";
 import { usePushTabNavigation } from "../lib/pushNavigation";
 
 import { useLanguage } from "../lib/LanguageContext";
+import { emailVerificationHint } from "../lib/displayIdentity";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
@@ -2023,8 +2024,8 @@ export default function SuperAdminDashboard() {
                 <h4 className="text-xs md:text-sm font-bold text-amber-900 dark:text-amber-400 leading-tight">
                   تأكيد البريد الإلكتروني (Super Admin)
                 </h4>
-                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 truncate max-w-[220px] md:max-w-[400px]">
-                  يرجى تفعيل بريدك ({auth.currentUser?.email})
+                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 max-w-[220px] md:max-w-[400px]">
+                  {emailVerificationHint(isRtl)}
                 </p>
               </div>
             </div>

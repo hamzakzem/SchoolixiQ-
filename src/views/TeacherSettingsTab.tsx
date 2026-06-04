@@ -6,6 +6,7 @@ import { updatePassword, verifyBeforeUpdateEmail } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useLanguage } from '../lib/LanguageContext';
+import { getLinkedAccountLabel } from '../lib/displayIdentity';
 import { AtSign, Lock, LayoutDashboard, MessageSquare, Send } from 'lucide-react';
 
 export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
@@ -91,7 +92,9 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
             </div>
             <div>
               <h3 className="font-bold text-slate-900">{isRtl ? 'تحديث البريد الإلكتروني' : 'Update Email'}</h3>
-              <p className="text-sm text-slate-500">{profile?.email}</p>
+              <p className="text-sm text-slate-500 font-mono">
+                {getLinkedAccountLabel(profile, isRtl)}
+              </p>
             </div>
           </div>
           <form onSubmit={handleUpdateEmail} className="space-y-4">
