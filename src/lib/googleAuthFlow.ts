@@ -1,12 +1,14 @@
 import { Capacitor } from '@capacitor/core';
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   signInWithCredential,
   type Auth,
   type User,
 } from 'firebase/auth';
 import { initNativeGoogleAuth } from './initNativeGoogleAuth';
 import { signInWithGoogleRedirectWeb, signInWithGoogleWeb } from './googleAuthWeb';
+import { mapGoogleAuthError } from './googleAuthErrors';
 
 export function getGoogleWebClientId(): string {
   if (typeof localStorage !== 'undefined') {
@@ -61,7 +63,34 @@ export function detectGoogleOAuthUrlError(): string | null {
   if (haystack.includes('disallowed_useragent')) {
     return 'disallowed_useragent';
   }
+  if (haystack.includes('access_denied') || haystack.includes('error=access_denied')) {
+    return 'access_denied';
+  }
   return null;
+}
+
+/** Single in-flight promise — React Strict Mode mounts twice; must not call getRedirectResult twice */
+let redirectResultPromise: Promise<User | null> | null = null;
+
+/** After signInWithRedirect — call once when the app loads again */
+export async function consumeGoogleRedirectResult(
+  auth: Auth,
+  isRtl = false,
+): Promise<User | null> {
+  if (!redirectResultPromise) {
+    redirectResultPromise = (async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        return result?.user ?? null;
+      } catch (err) {
+        const mapped = mapGoogleAuthError(err, isRtl);
+        throw new Error(mapped.message);
+      } finally {
+        redirectResultPromise = null;
+      }
+    })();
+  }
+  return redirectResultPromise;
 }
 
 export class GoogleSignInCancelledError extends Error {
@@ -141,9 +170,9 @@ function nativeGoogleErrorMessage(err: unknown, isRtl: boolean): Error {
 
 /**
  * Unified Google sign-in — one button.
- * - Native app: Android account picker (never redirect in WebView).
- * - Desktop browser: popup.
- * - Mobile browser: redirect.
+ * - Native app: account picker (Capacitor plugin).
+ * - Web: redirect (أكثر موثوقية من popup مع Safari / حظر الكوكيز).
+ * - Popup: احتياطي عبر signInWithGoogleWebPopup فقط.
  */
 export async function runGoogleSignInFlow(
   auth: Auth,
@@ -173,9 +202,28 @@ export async function runGoogleSignInFlow(
     return { status: 'webview-blocked' };
   }
 
-  if (shouldPreferGoogleRedirect()) {
+  try {
     await signInWithGoogleRedirectWeb(auth);
     return { status: 'redirecting' };
+  } catch (redirectErr) {
+    const mapped = mapGoogleAuthError(redirectErr, isRtl);
+    if (mapped.cancelled) return { status: 'cancelled' };
+    if (mapped.webViewBlocked) return { status: 'webview-blocked' };
+    return {
+      status: 'error',
+      error: new Error(mapped.message),
+    };
+  }
+}
+
+/** Optional popup path (desktop browsers with pop-ups allowed) */
+export async function runGoogleSignInPopupFlow(
+  auth: Auth,
+  isRtl: boolean,
+): Promise<GoogleSignInFlowResult> {
+  auth.languageCode = isRtl ? 'ar' : 'en';
+  if (isCapacitorNative() || isInsecureOAuthWebView()) {
+    return runGoogleSignInFlow(auth, isRtl);
   }
 
   const webResult = await signInWithGoogleWeb(auth);
@@ -186,32 +234,16 @@ export async function runGoogleSignInFlow(
     return { status: 'cancelled' };
   }
   if (webResult.popupBlocked) {
-    if (isInsecureOAuthWebView()) {
-      return { status: 'webview-blocked' };
-    }
-    try {
-      await signInWithGoogleRedirectWeb(auth);
-      return { status: 'redirecting' };
-    } catch (redirectErr) {
-      return {
-        status: 'error',
-        error:
-          redirectErr instanceof Error
-            ? redirectErr
-            : new Error(String(redirectErr)),
-      };
-    }
+    await signInWithGoogleRedirectWeb(auth);
+    return { status: 'redirecting' };
   }
-
-  return { status: 'error', error: webResult.error };
+  const mapped = mapGoogleAuthError(webResult.error, isRtl);
+  return { status: 'error', error: new Error(mapped.message) };
 }
 
-/** Mobile browsers (not WebView) — redirect is more reliable than popup. */
+/** Web: redirect أكثر استقراراً من popup على الجوال و Safari */
 export function shouldPreferGoogleRedirect(): boolean {
   if (typeof window === 'undefined') return false;
   if (isCapacitorNative() || isInsecureOAuthWebView()) return false;
-  if (window.self !== window.top) return true;
-  return /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent || '',
-  );
+  return true;
 }

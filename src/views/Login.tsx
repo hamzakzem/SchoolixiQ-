@@ -1,19 +1,26 @@
 import React, { useState, useEffect, useRef } from "react";
 import { auth, db } from "../lib/firebase";
-import { signInWithGoogleRedirectWeb } from "../lib/googleAuthWeb";
 import {
+  consumeGoogleRedirectResult,
   detectGoogleOAuthUrlError,
   getGoogleWebClientId,
   isCapacitorNative,
-  isGoogleDisallowedUserAgentError,
   isInsecureOAuthWebView,
   runGoogleSignInFlow,
 } from "../lib/googleAuthFlow";
+import { mapGoogleAuthError } from "../lib/googleAuthErrors";
+import {
+  persistGoogleAuthContext,
+  readGoogleAuthContext,
+  clearGoogleAuthContext,
+  parseGoogleOAuthUrlError,
+  cleanGoogleOAuthParamsFromUrl,
+  shouldCompleteGoogleRedirect,
+} from "../lib/googleAuthSession";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
-  getRedirectResult,
   sendEmailVerification,
   signOut,
 } from "firebase/auth";
@@ -88,6 +95,7 @@ import {
   signupRoleConflict,
   findProvisionedUserByEmail,
   isPlatformUninitialized,
+  healSchoolDataOnLogin,
 } from "../lib/authLoginHelpers";
 import {
   createSchoolSubscriptionRegistration,
@@ -222,7 +230,6 @@ export default function Login() {
   const [captchaChallenge, setCaptchaChallenge] = useState({ a: 0, b: 0 });
   const googleAuthLock = useRef(false);
   const authSubmitLock = useRef(false);
-  const redirectHandled = useRef(false);
 
   // ... (rest of the states) ...
 
@@ -372,26 +379,16 @@ export default function Login() {
 
       if (!userDoc.exists()) {
         const emailLower = user.email?.toLowerCase() || "";
-        const q = query(
-          collection(db, "users"),
-          where("email", "==", emailLower),
-        );
-        const querySnap = await getDocs(q);
-        let provisionedData: any = null;
-        let oldDocId = "";
-
-        if (!querySnap.empty) {
-          const found = querySnap.docs[0];
-          provisionedData = found.data();
-          oldDocId = found.id;
-        }
+        const { data: provisionedData, oldDocId } =
+          await findProvisionedUserByEmail(emailLower, user.uid);
 
         if (
           pendingMode === "signup" &&
           pendingRole === UserRole.ADMIN &&
-          !provisionedData?.schoolId
+          !(provisionedData?.schoolId as string)
         ) {
           toast.error(t("googleAdminSignupBlocked"));
+          await signOut(auth);
           setLoading(false);
           return;
         }
@@ -409,6 +406,7 @@ export default function Login() {
         );
         if (conflict) {
           toast.error(conflict);
+          await signOut(auth);
           setLoading(false);
           return;
         }
@@ -460,6 +458,14 @@ export default function Login() {
         }
         toast.success(isRtl ? "تم تسجيل الدخول بنجاح!" : "Login Success!");
       } else {
+        const emailLower = user.email?.toLowerCase() || "";
+        if (emailLower) {
+          try {
+            await healSchoolDataOnLogin(emailLower, user.uid);
+          } catch (healErr) {
+            console.warn("healSchoolDataOnLogin after Google:", healErr);
+          }
+        }
         toast.success(`${t("welcomeLabel") || "Welcome"} ${user.displayName}`);
       }
     } catch (error: any) {
@@ -478,31 +484,70 @@ export default function Login() {
     }
   };
 
-  // Complete Google sign-in after redirect (runs once per page load)
+  // Complete Google sign-in after redirect (must run on every load — no ref guard)
   useEffect(() => {
-    if (redirectHandled.current) return;
-    redirectHandled.current = true;
+    let cancelled = false;
 
     const completeRedirectSignIn = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (!result?.user) return;
+      const urlErr = parseGoogleOAuthUrlError();
+      if (urlErr) {
+        cleanGoogleOAuthParamsFromUrl();
+        clearGoogleAuthContext();
+        if (urlErr.code === "disallowed_useragent") {
+          setGoogleWebViewBlocked(true);
+        }
+        if (urlErr.code === "access_denied") {
+          toast.error(isRtl ? "تم إلغاء تسجيل Google." : "Google sign-in cancelled.");
+        } else {
+          toast.error(urlErr.message || t("failedConnection"));
+        }
+        return;
+      }
 
-        const pendingRole =
-          window.sessionStorage.getItem("pendingGoogleRole") || UserRole.PARENT;
-        const pendingMode =
-          window.sessionStorage.getItem("pendingGoogleMode") || "login";
-        window.sessionStorage.removeItem("pendingGoogleRole");
-        window.sessionStorage.removeItem("pendingGoogleMode");
-        await processGoogleUser(result.user, pendingRole, pendingMode);
-      } catch (error: any) {
+      if (!shouldCompleteGoogleRedirect()) return;
+
+      try {
+        setLoading(true);
+        const user = await consumeGoogleRedirectResult(auth, isRtl);
+        if (cancelled || !user) return;
+
+        const { role: pendingRole, mode: pendingMode } = readGoogleAuthContext();
+        clearGoogleAuthContext();
+        await processGoogleUser(user, pendingRole, pendingMode);
+      } catch (error: unknown) {
+        if (cancelled) return;
         console.error("Redirect sign-in error:", error);
-        toast.error(error.message || t("failedConnection"));
+        const mapped = mapGoogleAuthError(error, isRtl);
+        if (mapped.unauthorizedDomain) {
+          setUnauthorizedDomainError(window.location.hostname);
+        }
+        if (mapped.providerDisabled) {
+          setFirebaseProviderError("google-disabled");
+        }
+        if (mapped.webViewBlocked) {
+          setGoogleWebViewBlocked(true);
+        }
+        if (!mapped.cancelled && mapped.message) {
+          toast.error(mapped.message);
+        }
+        try {
+          await signOut(auth);
+        } catch {
+          /* ignore */
+        }
+      } finally {
+        if (!cancelled && !auth.currentUser) {
+          setLoading(false);
+        }
+        googleAuthLock.current = false;
       }
     };
 
-    completeRedirectSignIn();
-  }, []);
+    void completeRedirectSignIn();
+    return () => {
+      cancelled = true;
+    };
+  }, [isRtl]);
 
   const handleSubscribeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -614,44 +659,8 @@ export default function Login() {
   const inIframe =
     typeof window !== "undefined" && window.self !== window.top;
 
-  const persistGoogleAuthContext = () => {
-    window.sessionStorage.setItem("pendingGoogleRole", role);
-    window.sessionStorage.setItem("pendingGoogleMode", mode);
-  };
-
   const handleGoogleRedirectAuth = async () => {
-    if (googleAuthLock.current || loading) return;
-
-    if (isNativeApp) {
-      await handleGoogleAuth();
-      return;
-    }
-
-    if (insecureOAuthWebView) {
-      setGoogleWebViewBlocked(true);
-      toast.error(
-        isRtl
-          ? "Google لا يسمح بتسجيل الدخول داخل هذا المتصفح. افتح schoolixiq.com في Chrome أو ثبّت تطبيق SchoolixiQ."
-          : "Google blocks sign-in in this in-app browser. Open schoolixiq.com in Chrome or install the SchoolixiQ app.",
-      );
-      return;
-    }
-
-    if (googleAuthLock.current || loading) return;
-    googleAuthLock.current = true;
-    setGooglePopupBlocked(false);
-    setLoading(true);
-    persistGoogleAuthContext();
-    try {
-      await signInWithGoogleRedirectWeb(auth);
-    } catch (error: unknown) {
-      console.error("Google redirect error:", error);
-      const message =
-        error instanceof Error ? error.message : t("failedConnection");
-      toast.error(message);
-      googleAuthLock.current = false;
-      setLoading(false);
-    }
+    await handleGoogleAuth();
   };
 
   const handleGoogleAuth = async () => {
@@ -671,7 +680,7 @@ export default function Login() {
     setGooglePopupBlocked(false);
     setLoading(true);
 
-    persistGoogleAuthContext();
+    persistGoogleAuthContext(role, mode);
     let redirecting = false;
 
     try {
@@ -718,55 +727,29 @@ export default function Login() {
         setNativePlatformNotice(true);
       }
       throw flowResult.error;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Google Auth Error:", error);
-      const errorCode = error.code || "";
-      const errorMessage = error.message || "";
-
-      if (
-        errorCode === "auth/unauthorized-domain" ||
-        errorCode === "auth/unauthorized-client" ||
-        errorMessage.includes("unauthorized-domain") ||
-        errorMessage.toLowerCase().includes("unauthorized domain")
-      ) {
+      const mapped = mapGoogleAuthError(error, isRtl);
+      if (mapped.unauthorizedDomain) {
         setUnauthorizedDomainError(window.location.hostname);
-        toast.error(
-          isRtl
-            ? "هذا النطاق غير مفعّل لتسجيل الدخول بـ Google. تواصل مع مسؤول المنصة."
-            : "This domain is not enabled for Google sign-in. Contact your platform administrator.",
-        );
-      } else if (
-        errorCode === "auth/operation-not-allowed" ||
-        errorMessage.toLowerCase().includes("operation not allowed") ||
-        errorMessage.toLowerCase().includes("provider is disabled")
-      ) {
+      }
+      if (mapped.providerDisabled) {
         setFirebaseProviderError("google-disabled");
-        toast.error(
-          isRtl
-            ? "تسجيل الدخول بـ Google غير مفعّل حالياً. تواصل مع مسؤول المنصة."
-            : "Google sign-in is not enabled. Contact your platform administrator.",
-        );
-      } else if (errorCode === "auth/popup-closed-by-user") {
-        toast.error(
-          isRtl ? "تم إلغاء تسجيل الدخول." : "Sign-in was cancelled.",
-        );
-      } else if (isGoogleDisallowedUserAgentError(errorMessage)) {
-        setGoogleWebViewBlocked(true);
-        toast.error(
-          isRtl
-            ? "Google رفض تسجيل الدخول (403 disallowed_useragent). ثبّت تطبيق SchoolixiQ أو افتح schoolixiq.com في Chrome."
-            : "Google rejected sign-in (403 disallowed_useragent). Install the SchoolixiQ app or open schoolixiq.com in Chrome.",
-        );
-      } else if (inIframe || insecureOAuthWebView) {
+      }
+      if (mapped.popupBlocked) {
+        setGooglePopupBlocked(true);
+      }
+      if (mapped.webViewBlocked || inIframe || insecureOAuthWebView) {
         setShowIframeHint(true);
-        setGoogleWebViewBlocked(insecureOAuthWebView);
-        toast.error(
-          isRtl
-            ? "تسجيل Google غير متاح داخل هذا المتصفح. افتح الموقع في Chrome أو استخدم البريد وكلمة المرور."
-            : "Google sign-in is not available in this browser. Open the site in Chrome or use email/password.",
-        );
-      } else {
-        toast.error(errorMessage || t("failedConnection"));
+        setGoogleWebViewBlocked(true);
+      }
+      if (!mapped.cancelled && mapped.message) {
+        toast.error(mapped.message);
+      }
+      try {
+        await signOut(auth);
+      } catch {
+        /* ignore */
       }
     } finally {
       if (!redirecting) {
