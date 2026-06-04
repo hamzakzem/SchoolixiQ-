@@ -1198,12 +1198,12 @@ export default function ParentDashboard() {
                     ? isRtl
                       ? "الرئيسية"
                       : "Home"
-                    : items.find((i) => i.id === activeTab)?.label ??
+                    : allItems.find((i) => i.id === activeTab)?.label ??
                       (isRtl ? "ولي الأمر" : "Parent")
                 }
                 schoolName={schoolInfo?.name || config.appName}
                 schoolLogoUrl={schoolInfo?.logoUrl}
-                modules={items
+                modules={allItems
                   .filter((i) => i.id !== "home")
                   .map((i) => ({
                     id: i.id,

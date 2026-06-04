@@ -516,6 +516,15 @@ export default function Login() {
   const isNativeApp = isCapacitorNative();
   const insecureOAuthWebView = isInsecureOAuthWebView();
 
+  useEffect(() => {
+    if (
+      detectGoogleOAuthUrlError() === "disallowed_useragent" ||
+      isInsecureOAuthWebView()
+    ) {
+      setGoogleWebViewBlocked(true);
+    }
+  }, []);
+
   const inIframe =
     typeof window !== "undefined" && window.self !== window.top;
 
@@ -1394,16 +1403,27 @@ export default function Login() {
               </div>
             )}
 
-            {googleWebViewBlocked && (
-              <div className="mt-3 p-4 rounded-xl border-2 border-amber-200 bg-amber-50 text-xs sm:text-sm text-amber-950 space-y-2">
+            {(googleWebViewBlocked || insecureOAuthWebView) && !isNativeApp && (
+              <div className="mt-3 p-4 rounded-xl border-2 border-amber-200 bg-amber-50 text-xs sm:text-sm text-amber-950 space-y-3">
                 <p className="font-bold">
-                  {isRtl ? "افتح الموقع في Chrome" : "Open in Chrome"}
+                  {isRtl
+                    ? "Google غير متاح داخل هذا المتصفح (403)"
+                    : "Google unavailable in this browser (403)"}
                 </p>
                 <p className="leading-relaxed text-amber-900/90">
                   {isRtl
-                    ? "هذا المتصفح المدمج لا يدعم Google. افتح https://schoolixiq.com في Chrome أو ثبّت تطبيق SchoolixiQ واضغط زر Google أعلاه."
-                    : "This in-app browser blocks Google. Open https://schoolixiq.com in Chrome or install the SchoolixiQ app."}
+                    ? "واتساب، إنستغرام، وفيسبوك تمنع تسجيل Google. انسخ الرابط وافتحه في Safari أو Chrome، أو ثبّت تطبيق SchoolixiQ."
+                    : "WhatsApp, Instagram, and in-app browsers block Google sign-in. Open the link in Safari or Chrome, or install the SchoolixiQ app."}
                 </p>
+                <a
+                  href="https://schoolixiq.com/login"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center justify-center gap-2 py-3 rounded-xl bg-[#0B2345] text-white font-bold text-sm shadow-md"
+                >
+                  <ExternalLink size={16} />
+                  {isRtl ? "فتح schoolixiq.com في Safari" : "Open schoolixiq.com in Safari"}
+                </a>
               </div>
             )}
 
