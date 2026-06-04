@@ -2,10 +2,41 @@
 export const PENDING_GOOGLE_ROLE_KEY = 'pendingGoogleRole';
 export const PENDING_GOOGLE_MODE_KEY = 'pendingGoogleMode';
 
+function writeStorage(key: string, value: string): void {
+  window.sessionStorage.setItem(key, value);
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* private mode */
+  }
+}
+
+function readStorage(key: string): string | null {
+  return (
+    window.sessionStorage.getItem(key) ||
+    (() => {
+      try {
+        return window.localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    })()
+  );
+}
+
+function removeStorage(key: string): void {
+  window.sessionStorage.removeItem(key);
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function persistGoogleAuthContext(role: string, mode: string): void {
   if (typeof window === 'undefined') return;
-  window.sessionStorage.setItem(PENDING_GOOGLE_ROLE_KEY, role);
-  window.sessionStorage.setItem(PENDING_GOOGLE_MODE_KEY, mode);
+  writeStorage(PENDING_GOOGLE_ROLE_KEY, role);
+  writeStorage(PENDING_GOOGLE_MODE_KEY, mode);
 }
 
 export function readGoogleAuthContext(): { role: string; mode: string } {
@@ -13,29 +44,15 @@ export function readGoogleAuthContext(): { role: string; mode: string } {
     return { role: 'parent', mode: 'login' };
   }
   return {
-    role: window.sessionStorage.getItem(PENDING_GOOGLE_ROLE_KEY) || 'parent',
-    mode: window.sessionStorage.getItem(PENDING_GOOGLE_MODE_KEY) || 'login',
+    role: readStorage(PENDING_GOOGLE_ROLE_KEY) || 'parent',
+    mode: readStorage(PENDING_GOOGLE_MODE_KEY) || 'login',
   };
 }
 
 export function clearGoogleAuthContext(): void {
   if (typeof window === 'undefined') return;
-  window.sessionStorage.removeItem(PENDING_GOOGLE_ROLE_KEY);
-  window.sessionStorage.removeItem(PENDING_GOOGLE_MODE_KEY);
-}
-
-/** True when we should run redirect completion (avoids loading flash on normal visits) */
-export function shouldCompleteGoogleRedirect(): boolean {
-  if (typeof window === 'undefined') return false;
-  if (parseGoogleOAuthUrlError()) return true;
-  if (
-    window.sessionStorage.getItem(PENDING_GOOGLE_ROLE_KEY) ||
-    window.sessionStorage.getItem(PENDING_GOOGLE_MODE_KEY)
-  ) {
-    return true;
-  }
-  const haystack = `${window.location.search}${window.location.hash}`;
-  return /[?&#](state|code)=/i.test(haystack);
+  removeStorage(PENDING_GOOGLE_ROLE_KEY);
+  removeStorage(PENDING_GOOGLE_MODE_KEY);
 }
 
 export type GoogleUrlOAuthError = {

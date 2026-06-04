@@ -69,7 +69,7 @@ export function detectGoogleOAuthUrlError(): string | null {
   return null;
 }
 
-/** Single in-flight promise — React Strict Mode mounts twice; must not call getRedirectResult twice */
+/** Single promise per full page load — never call getRedirectResult twice (invalidates OAuth nonce) */
 let redirectResultPromise: Promise<User | null> | null = null;
 
 /** After signInWithRedirect — call once when the app loads again */
@@ -78,17 +78,12 @@ export async function consumeGoogleRedirectResult(
   isRtl = false,
 ): Promise<User | null> {
   if (!redirectResultPromise) {
-    redirectResultPromise = (async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        return result?.user ?? null;
-      } catch (err) {
+    redirectResultPromise = getRedirectResult(auth)
+      .then((result) => result?.user ?? null)
+      .catch((err) => {
         const mapped = mapGoogleAuthError(err, isRtl);
         throw new Error(mapped.message);
-      } finally {
-        redirectResultPromise = null;
-      }
-    })();
+      });
   }
   return redirectResultPromise;
 }

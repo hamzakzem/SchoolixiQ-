@@ -18,6 +18,7 @@ import { UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from './firestore-errors';
 import { useLanguage } from './LanguageContext';
 import { isSchoolRegistrationInProgress } from './schoolRegistrationSession';
+import { waitForGoogleRedirectBootstrap } from './googleRedirectBootstrap';
 
 interface AuthContextType {
   user: User | null;
@@ -87,6 +88,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let unsubscribePackage: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
+      void (async () => {
+        await waitForGoogleRedirectBootstrap();
+
       const previousUid = lastUserIdRef.current;
       const isNewSession = authUser?.uid !== previousUid;
 
@@ -324,6 +328,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         handleFirestoreError(error, OperationType.GET, `AuthContext:users/${authUser.uid}`);
         finishLoading();
       });
+      })();
     });
 
     return () => {

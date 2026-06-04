@@ -44,6 +44,10 @@ AddType application/x-apple-aspen-config .mobileconfig
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # One canonical host — OAuth sessionStorage is per-origin (www vs non-www breaks Google login)
+  RewriteCond %{HTTP_HOST} ^www\.schoolixiq\.com$ [NC]
+  RewriteRule ^(.*)$ https://schoolixiq.com/$1 [L,R=301]
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

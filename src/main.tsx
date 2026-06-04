@@ -6,6 +6,8 @@ import './styles/macbook-loading.css';
 import { initSentry } from './lib/sentryWrapper';
 import { initNativeLiveSync } from './lib/nativeLiveSync';
 import { initNativeGoogleAuth } from './lib/initNativeGoogleAuth';
+// Must run before React — completes Firebase OAuth redirect (Google sign-in return)
+import './lib/googleRedirectBootstrap';
 
 initNativeLiveSync();
 void initNativeGoogleAuth();

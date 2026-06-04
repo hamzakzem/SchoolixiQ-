@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { auth, db } from "../lib/firebase";
 import {
-  consumeGoogleRedirectResult,
   detectGoogleOAuthUrlError,
   getGoogleWebClientId,
   isCapacitorNative,
@@ -9,14 +8,9 @@ import {
   runGoogleSignInFlow,
 } from "../lib/googleAuthFlow";
 import { mapGoogleAuthError } from "../lib/googleAuthErrors";
-import {
-  persistGoogleAuthContext,
-  readGoogleAuthContext,
-  clearGoogleAuthContext,
-  parseGoogleOAuthUrlError,
-  cleanGoogleOAuthParamsFromUrl,
-  shouldCompleteGoogleRedirect,
-} from "../lib/googleAuthSession";
+import { persistGoogleAuthContext } from "../lib/googleAuthSession";
+import { finalizeGoogleSignIn } from "../lib/googleProfileSetup";
+import { waitForGoogleRedirectBootstrap } from "../lib/googleRedirectBootstrap";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -90,12 +84,10 @@ import SchoolRegistrationFields, {
   type SchoolRegistrationFormValues,
 } from "../components/auth/SchoolRegistrationFields";
 import {
-  healSchoolDataOnLogin,
   resolveSignupRole,
   signupRoleConflict,
   findProvisionedUserByEmail,
   isPlatformUninitialized,
-  healSchoolDataOnLogin,
 } from "../lib/authLoginHelpers";
 import {
   createSchoolSubscriptionRegistration,
@@ -366,116 +358,19 @@ export default function Login() {
     }, 120);
   };
 
-  // Handle post-login logic (used for both redirect result and popup result)
   const processGoogleUser = async (
-    user: any,
+    user: import("firebase/auth").User,
     pendingRole: string,
     pendingMode: string,
   ) => {
     try {
       setLoading(true);
-      // Check if user document exists
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-
-      if (!userDoc.exists()) {
-        const emailLower = user.email?.toLowerCase() || "";
-        const { data: provisionedData, oldDocId } =
-          await findProvisionedUserByEmail(emailLower, user.uid);
-
-        if (
-          pendingMode === "signup" &&
-          pendingRole === UserRole.ADMIN &&
-          !(provisionedData?.schoolId as string)
-        ) {
-          toast.error(t("googleAdminSignupBlocked"));
-          await signOut(auth);
-          setLoading(false);
-          return;
-        }
-
-        let isFirstUser = false;
-        try {
-          const metadataSnap = await getDoc(doc(db, "users", "metadata"));
-          isFirstUser = !metadataSnap.exists();
-        } catch (err) {}
-
-        const conflict = signupRoleConflict(
-          provisionedData?.role,
-          pendingRole as UserRole,
-          isRtl,
-        );
-        if (conflict) {
-          toast.error(conflict);
-          await signOut(auth);
-          setLoading(false);
-          return;
-        }
-
-        let finalRole = resolveSignupRole(
-          isFirstUser,
-          provisionedData?.role,
-          pendingRole as UserRole,
-        );
-
-        // Create permanent profile
-        await setDoc(doc(db, "users", user.uid), {
-          name:
-            user.displayName ||
-            provisionedData?.name ||
-            (isRtl ? "مستخدم جديد" : "New User"),
-          email: user.email,
-          role: finalRole,
-          schoolId: provisionedData?.schoolId || "",
-          createdAt: new Date().toISOString(),
-          uid: user.uid,
-          photoURL: user.photoURL,
-        });
-
-        // Migrate students if needed
-        if (oldDocId && oldDocId !== user.uid) {
-          const studentsQ = query(
-            collection(db, "students"),
-            where("parentIds", "array-contains", oldDocId),
-          );
-          const studentsSnap = await getDocs(studentsQ);
-
-          const migrationPromises = studentsSnap.docs.map((studentDoc) => {
-            const currentIds = studentDoc.data().parentIds || [];
-            const updatedIds = currentIds.map((id: string) =>
-              id === oldDocId ? user.uid : id,
-            );
-            return updateDoc(doc(db, "students", studentDoc.id), {
-              parentIds: updatedIds,
-            });
-          });
-
-          await Promise.all(migrationPromises);
-          await deleteDoc(doc(db, "users", oldDocId));
-        }
-
-        if (isFirstUser) {
-          await setDoc(doc(db, "users", "metadata"), { initialized: true });
-        }
-        toast.success(isRtl ? "تم تسجيل الدخول بنجاح!" : "Login Success!");
-      } else {
-        const emailLower = user.email?.toLowerCase() || "";
-        if (emailLower) {
-          try {
-            await healSchoolDataOnLogin(emailLower, user.uid);
-          } catch (healErr) {
-            console.warn("healSchoolDataOnLogin after Google:", healErr);
-          }
-        }
-        toast.success(`${t("welcomeLabel") || "Welcome"} ${user.displayName}`);
-      }
-    } catch (error: any) {
+      await finalizeGoogleSignIn(user, pendingRole, pendingMode, isRtl);
+    } catch (error: unknown) {
       console.error("Profile creation error:", error);
-      toast.error(error.message || t("failedConnection"));
-      try {
-        await signOut(auth);
-      } catch {
-        /* ignore */
-      }
+      const message =
+        error instanceof Error ? error.message : t("failedConnection");
+      toast.error(message);
     } finally {
       googleAuthLock.current = false;
       if (!auth.currentUser) {
@@ -484,40 +379,22 @@ export default function Login() {
     }
   };
 
-  // Complete Google sign-in after redirect (must run on every load — no ref guard)
+  // Show Google redirect errors (redirect is completed in googleRedirectBootstrap before React)
   useEffect(() => {
-    let cancelled = false;
-
-    const completeRedirectSignIn = async () => {
-      const urlErr = parseGoogleOAuthUrlError();
-      if (urlErr) {
-        cleanGoogleOAuthParamsFromUrl();
-        clearGoogleAuthContext();
-        if (urlErr.code === "disallowed_useragent") {
+    void waitForGoogleRedirectBootstrap().then((result) => {
+      if (result.urlError) {
+        if (result.urlError.code === "disallowed_useragent") {
           setGoogleWebViewBlocked(true);
         }
-        if (urlErr.code === "access_denied") {
+        if (result.urlError.code === "access_denied") {
           toast.error(isRtl ? "تم إلغاء تسجيل Google." : "Google sign-in cancelled.");
         } else {
-          toast.error(urlErr.message || t("failedConnection"));
+          toast.error(result.urlError.message || t("failedConnection"));
         }
         return;
       }
-
-      if (!shouldCompleteGoogleRedirect()) return;
-
-      try {
-        setLoading(true);
-        const user = await consumeGoogleRedirectResult(auth, isRtl);
-        if (cancelled || !user) return;
-
-        const { role: pendingRole, mode: pendingMode } = readGoogleAuthContext();
-        clearGoogleAuthContext();
-        await processGoogleUser(user, pendingRole, pendingMode);
-      } catch (error: unknown) {
-        if (cancelled) return;
-        console.error("Redirect sign-in error:", error);
-        const mapped = mapGoogleAuthError(error, isRtl);
+      if (result.profileError) {
+        const mapped = mapGoogleAuthError(result.profileError, isRtl);
         if (mapped.unauthorizedDomain) {
           setUnauthorizedDomainError(window.location.hostname);
         }
@@ -530,24 +407,9 @@ export default function Login() {
         if (!mapped.cancelled && mapped.message) {
           toast.error(mapped.message);
         }
-        try {
-          await signOut(auth);
-        } catch {
-          /* ignore */
-        }
-      } finally {
-        if (!cancelled && !auth.currentUser) {
-          setLoading(false);
-        }
-        googleAuthLock.current = false;
       }
-    };
-
-    void completeRedirectSignIn();
-    return () => {
-      cancelled = true;
-    };
-  }, [isRtl]);
+    });
+  }, [isRtl, t]);
 
   const handleSubscribeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -745,11 +607,6 @@ export default function Login() {
       }
       if (!mapped.cancelled && mapped.message) {
         toast.error(mapped.message);
-      }
-      try {
-        await signOut(auth);
-      } catch {
-        /* ignore */
       }
     } finally {
       if (!redirecting) {
