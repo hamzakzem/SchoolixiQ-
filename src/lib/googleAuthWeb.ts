@@ -40,6 +40,15 @@ export async function signInWithGoogleWeb(auth: Auth): Promise<GoogleWebSignInRe
       return { ok: false, popupBlocked: true };
     }
 
+    if (code === 'auth/account-exists-with-different-credential') {
+      return {
+        ok: false,
+        error: new Error(
+          'ACCOUNT_EXISTS_USE_PASSWORD',
+        ),
+      };
+    }
+
     return {
       ok: false,
       error: err instanceof Error ? err : new Error(error.message || 'Google sign-in failed'),

@@ -33,7 +33,7 @@ function readIsRtl(): boolean {
 }
 
 async function runGoogleRedirectBootstrap(authInstance: Auth): Promise<GoogleRedirectBootstrapResult> {
-  const pendingRedirect =
+  const hadRedirectHint =
     isGoogleRedirectPending() || isFirebaseOAuthReturnUrl();
   const isRtl = readIsRtl();
 
@@ -46,20 +46,17 @@ async function runGoogleRedirectBootstrap(authInstance: Auth): Promise<GoogleRed
       return { user: null, urlError, profileError: null };
     }
 
-    let user: User | null = null;
-
-    if (pendingRedirect) {
-      user = await consumeGoogleRedirectResult(authInstance, isRtl);
-      await authInstance.authStateReady();
-      if (!user && authInstance.currentUser) {
-        user = authInstance.currentUser;
-      }
+    // Firebase: call getRedirectResult on every load (cheap no-op when not returning from OAuth)
+    let user: User | null = await consumeGoogleRedirectResult(authInstance, isRtl);
+    await authInstance.authStateReady();
+    if (!user && authInstance.currentUser) {
+      user = authInstance.currentUser;
     }
 
     clearGoogleRedirectPending();
 
     if (!user) {
-      if (pendingRedirect) {
+      if (hadRedirectHint) {
         return {
           user: null,
           urlError: null,

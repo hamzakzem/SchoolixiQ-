@@ -30,7 +30,8 @@ export function isCapacitorNative(): boolean {
  */
 export function isInsecureOAuthWebView(): boolean {
   if (typeof window === 'undefined') return false;
-  if (isCapacitorNative()) return true;
+  // Native app uses @codetrix-studio/capacitor-google-auth — not embedded OAuth WebView
+  if (isCapacitorNative()) return false;
 
   const ua = navigator.userAgent || '';
   if (/Android/i.test(ua) && /; wv\)|\bwv\b/i.test(ua)) return true;

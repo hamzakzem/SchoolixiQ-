@@ -83,12 +83,7 @@ import SchoolRegistrationFields, {
   buildSchoolFirestoreFields,
   type SchoolRegistrationFormValues,
 } from "../components/auth/SchoolRegistrationFields";
-import {
-  resolveSignupRole,
-  signupRoleConflict,
-  findProvisionedUserByEmail,
-  isPlatformUninitialized,
-} from "../lib/authLoginHelpers";
+import { healSchoolDataOnLogin } from "../lib/authLoginHelpers";
 import {
   createSchoolSubscriptionRegistration,
   packageDisplayPrice,
@@ -96,8 +91,12 @@ import {
 import {
   markSchoolRegistrationInProgress,
   clearSchoolRegistrationInProgress,
+  clearAdminSignupSession,
   isSchoolRegistrationInProgress,
+  persistAdminSignupStep,
+  readAdminSignupStep,
 } from "../lib/schoolRegistrationSession";
+import { completeFirestoreProfile } from "../lib/completeAuthProfile";
 
 const EMPTY_SCHOOL_REGISTRATION: SchoolRegistrationFormValues = {
   address: "",
@@ -250,7 +249,11 @@ export default function Login() {
   const [successCode, setSuccessCode] = useState<string | null>(null);
   const [adminSignupStep, setAdminSignupStep] = useState<
     "form" | "packages" | "done"
-  >("form");
+  >(() =>
+    isSchoolRegistrationInProgress() && readAdminSignupStep() === "packages"
+      ? "packages"
+      : "form",
+  );
 
   // PWA Direct Installer States
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
@@ -519,9 +522,17 @@ export default function Login() {
   useEffect(() => {
     if (
       detectGoogleOAuthUrlError() === "disallowed_useragent" ||
-      isInsecureOAuthWebView()
+      (!isCapacitorNative() && isInsecureOAuthWebView())
     ) {
       setGoogleWebViewBlocked(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (auth.currentUser && readAdminSignupStep() === "packages") {
+      setAdminSignupStep("packages");
+      setMode("signup");
+      setRole(UserRole.ADMIN);
     }
   }, []);
 
@@ -537,6 +548,16 @@ export default function Login() {
 
     if (mode === "signup" && role === UserRole.ADMIN) {
       toast.error(t("googleAdminSignupBlocked"));
+      return;
+    }
+
+    if (!isNativeApp && insecureOAuthWebView) {
+      setGoogleWebViewBlocked(true);
+      toast.error(
+        isRtl
+          ? "افتح schoolixiq.com في Safari أو Chrome — لا تستخدم Google من داخل واتساب أو إنستغرام."
+          : "Open schoolixiq.com in Safari or Chrome — not from WhatsApp or Instagram.",
+      );
       return;
     }
 
@@ -686,30 +707,25 @@ export default function Login() {
           passwordValue,
         );
         const user = result.user;
+        await updateProfile(user, { displayName: name.trim() });
 
-        const { data: provisionedData, oldDocId } =
-          await findProvisionedUserByEmail(emailTrimmed, user.uid);
-
-        const isFirstUser = await isPlatformUninitialized();
-
-        const roleConflictMsg = signupRoleConflict(
-          provisionedData?.role as string | undefined,
-          role,
+        const profileResult = await completeFirestoreProfile({
+          user,
+          emailTrimmed,
+          displayName: name.trim(),
+          selectedRole: role,
+          phone: phone.trim(),
           isRtl,
-        );
-        if (roleConflictMsg) {
-          await signOut(auth);
-          toast.error(roleConflictMsg);
+        });
+
+        if (!profileResult.ok) {
+          await signOut(auth).catch(() => {});
+          toast.error(profileResult.message);
           return;
         }
 
-        const provisionedSchoolId = (provisionedData?.schoolId as string) || "";
-        const pendingSchoolAdmin =
-          role === UserRole.ADMIN && !isFirstUser && !provisionedSchoolId;
-
-        await updateProfile(user, { displayName: name });
-
-        if (pendingSchoolAdmin) {
+        if (profileResult.pendingSchoolAdmin) {
+          persistAdminSignupStep("packages");
           setAdminSignupStep("packages");
           toast.success(
             isRtl
@@ -725,50 +741,6 @@ export default function Login() {
           toast.success(t("verificationSent"));
         } catch (verifErr) {
           console.warn("Verification email failed", verifErr);
-          toast.error(t("verificationFailed"));
-        }
-
-        let finalRole = resolveSignupRole(
-          isFirstUser,
-          provisionedData?.role as string | undefined,
-          role,
-        );
-
-        const schoolId = provisionedSchoolId;
-
-        await setDoc(doc(db, "users", user.uid), {
-          name: name || provisionedData?.name || "مستخدم جديد",
-          email: emailTrimmed,
-          role: finalRole,
-          phone: phone,
-          schoolId,
-          createdAt: new Date().toISOString(),
-          uid: user.uid,
-        });
-
-        if (oldDocId && oldDocId !== user.uid) {
-          const studentsQ = query(
-            collection(db, "students"),
-            where("parentIds", "array-contains", oldDocId),
-          );
-          const studentsSnap = await getDocs(studentsQ);
-
-          const migrationPromises = studentsSnap.docs.map((studentDoc) => {
-            const currentIds = studentDoc.data().parentIds || [];
-            const updatedIds = currentIds.map((id: string) =>
-              id === oldDocId ? user.uid : id,
-            );
-            return updateDoc(doc(db, "students", studentDoc.id), {
-              parentIds: updatedIds,
-            });
-          });
-
-          await Promise.all(migrationPromises);
-          await deleteDoc(doc(db, "users", oldDocId));
-        }
-
-        if (isFirstUser) {
-          await setDoc(doc(db, "users", "metadata"), { initialized: true });
         }
 
         toast.success(t("signupSuccess"));
@@ -812,7 +784,11 @@ export default function Login() {
       ) {
         toast.error(t("invalidCredential"));
       } else if (errorCode === "auth/email-already-in-use") {
-        toast.error(t("emailInUse"));
+        toast.error(
+          isRtl
+            ? "البريد مستخدم مسبقاً. جرّب تسجيل الدخول أو استخدم بريداً آخر."
+            : "Email already in use. Try signing in or use another email.",
+        );
       } else if (errorCode === "auth/weak-password") {
         toast.error(t("weakPassword"));
       } else if (errorCode === "auth/too-many-requests") {
@@ -836,7 +812,9 @@ export default function Login() {
       }
     } finally {
       authSubmitLock.current = false;
-      setLoading(false);
+      if (!auth.currentUser || isSchoolRegistrationInProgress()) {
+        setLoading(false);
+      }
     }
   };
 
@@ -886,7 +864,7 @@ export default function Login() {
       });
 
       await signOut(auth);
-      clearSchoolRegistrationInProgress();
+      clearAdminSignupSession();
       setAdminSignupStep("done");
       setMode("login");
       setName("");

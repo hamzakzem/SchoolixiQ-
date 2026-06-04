@@ -3,6 +3,7 @@ import { db } from './firebase';
 
 /** Prevents App shell / school boot UI while Firebase Auth is created during school signup. */
 export const SCHOOL_REGISTRATION_SESSION_KEY = 'schoolix_completing_registration';
+export const ADMIN_SIGNUP_STEP_KEY = 'schoolix_admin_signup_step';
 
 export function markSchoolRegistrationInProgress(): void {
   if (typeof sessionStorage === 'undefined') return;
@@ -17,6 +18,31 @@ export function clearSchoolRegistrationInProgress(): void {
 export function isSchoolRegistrationInProgress(): boolean {
   if (typeof sessionStorage === 'undefined') return false;
   return sessionStorage.getItem(SCHOOL_REGISTRATION_SESSION_KEY) === '1';
+}
+
+export function persistAdminSignupStep(step: 'form' | 'packages' | 'done'): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(ADMIN_SIGNUP_STEP_KEY, step);
+  if (step === 'packages') {
+    markSchoolRegistrationInProgress();
+  }
+  if (step === 'form' || step === 'done') {
+    sessionStorage.removeItem(ADMIN_SIGNUP_STEP_KEY);
+  }
+}
+
+export function readAdminSignupStep(): 'form' | 'packages' | 'done' {
+  if (typeof sessionStorage === 'undefined') return 'form';
+  const step = sessionStorage.getItem(ADMIN_SIGNUP_STEP_KEY);
+  if (step === 'packages' || step === 'done') return step;
+  return 'form';
+}
+
+export function clearAdminSignupSession(): void {
+  clearSchoolRegistrationInProgress();
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.removeItem(ADMIN_SIGNUP_STEP_KEY);
+  }
 }
 
 /** Pending subscription request — must not auto-provision school admin profile yet. */

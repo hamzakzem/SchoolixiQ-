@@ -95,12 +95,15 @@ export function mapGoogleAuthError(
     };
   }
 
-  if (errorCode === 'auth/account-exists-with-different-credential') {
+  if (
+    errorCode === 'auth/account-exists-with-different-credential' ||
+    errorMessage.includes('ACCOUNT_EXISTS_USE_PASSWORD')
+  ) {
     return {
       ...base,
       message: isRtl
-        ? 'هذا البريد مسجّل بطريقة أخرى. سجّل الدخول بالبريد وكلمة المرور.'
-        : 'Email registered with another method. Use email and password.',
+        ? 'هذا البريد مربوط بكلمة مرور. اختر «تسجيل الدخول» وأدخل كلمة المرور (وليس Google).'
+        : 'This email uses a password. Switch to Sign in and use your password (not Google).',
     };
   }
 
