@@ -37,7 +37,7 @@ export default function MobileMockupFrame({
         schoolLogoUrl={schoolLogoUrl}
         onNotifications={onNotifications}
       />
-      <div className="pt-[64px] pb-[80px] min-h-[100dvh] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]">
+      <div className="pt-[72px] pb-[84px] min-h-[100dvh] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]">
         {children}
       </div>
       <MobileMockupBottomNav

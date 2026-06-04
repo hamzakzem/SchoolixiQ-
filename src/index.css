@@ -1000,3 +1000,44 @@ html.dark .sq-table tbody tr:hover .sq-table-sticky-actions {
     rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300
     hover:border-[#0B2345] hover:text-[#0B2345] dark:hover:border-[#D4A64A] dark:hover:text-[#D4A64A] transition-all;
 }
+
+/* Native app — compact admin / teacher sub-pages (same Firestore data as website) */
+.sq-mobile-panel {
+  @apply text-slate-800;
+}
+.sq-mobile-panel h1 {
+  @apply text-lg font-black text-[#0B2345] leading-tight;
+}
+.sq-mobile-panel h2 {
+  @apply text-base font-black text-[#0B2345];
+}
+.sq-mobile-panel h3 {
+  @apply text-sm font-bold text-slate-800;
+}
+.sq-mobile-panel .space-y-8 {
+  @apply space-y-4;
+}
+.sq-mobile-panel [class*='rounded-[2.5rem]'],
+.sq-mobile-panel [class*='rounded-[3rem]'] {
+  border-radius: 1rem !important;
+}
+.sq-mobile-panel [class*='p-8']:not([class*='px-8']) {
+  padding: 1rem !important;
+}
+.sq-mobile-panel button[class*='px-8'],
+.sq-mobile-panel button[class*='py-4'] {
+  @apply min-h-[40px] px-4 py-2 text-xs font-bold rounded-xl;
+}
+.sq-mobile-panel input,
+.sq-mobile-panel select,
+.sq-mobile-panel textarea {
+  @apply py-2.5 text-sm rounded-xl;
+}
+.sq-mobile-panel .from-blue-600 {
+  --tw-gradient-from: #0B2345 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(11 35 69 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.sq-mobile-panel .to-indigo-600 {
+  --tw-gradient-to: #163a6b var(--tw-gradient-to-position);
+}

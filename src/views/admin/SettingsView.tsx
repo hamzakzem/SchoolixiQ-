@@ -8,9 +8,11 @@ import { motion } from 'motion/react';
 import { School } from '../../types';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { formatArIqDate } from '../../lib/firestoreDates';
+import { useMobileMockupShell } from '../../lib/useMobileMockupShell';
 
 export default function SettingsView() {
   const { profile } = useAuth();
+  const inApp = useMobileMockupShell();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [schoolData, setSchoolData] = useState<School | null>(null);
@@ -186,17 +188,19 @@ export default function SettingsView() {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8"
+      className={inApp ? 'space-y-4' : 'space-y-8'}
     >
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+      <div className={`flex flex-col ${inApp ? 'gap-3 sticky top-0 z-10 bg-gradient-to-b from-[#f6f8fc] to-transparent pb-2' : 'md:flex-row md:items-center justify-between gap-4 mb-2'}`}>
         <div>
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">إعدادات المدرسة</h2>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">تخصيص معلومات المؤسسة وتفضيلات النظام</p>
+          <h2 className={`${inApp ? 'text-lg' : 'text-3xl'} font-black text-[#0B2345] dark:text-white tracking-tight`}>إعدادات المدرسة</h2>
+          {!inApp ? (
+            <p className="text-slate-500 dark:text-slate-400 font-medium">تخصيص معلومات المؤسسة وتفضيلات النظام</p>
+          ) : null}
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-8 py-4 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-[#1a3a6b] transition-all shadow-xl shadow-slate-200 dark:shadow-blue-900/20 active:scale-95 disabled:opacity-50"
+          className={`flex items-center justify-center gap-2 ${inApp ? 'w-full px-4 py-2.5 text-sm rounded-xl' : 'px-8 py-4 rounded-2xl shadow-xl'} bg-[#0B2345] text-white font-bold hover:bg-[#163a6b] transition-all active:scale-95 disabled:opacity-50`}
         >
           {saving ? 'جاري الحفظ...' : (
             <>
@@ -207,10 +211,10 @@ export default function SettingsView() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
+      <div className={`grid grid-cols-1 ${inApp ? 'gap-4' : 'lg:grid-cols-3 gap-8'}`}>
+        <div className={`${inApp ? '' : 'lg:col-span-2'} space-y-4`}>
           {/* Basic Info */}
-          <section className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
+          <section className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm ${inApp ? 'p-4 rounded-2xl' : 'p-8 rounded-[2.5rem]'}`}>
             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-3">
               <Building className="text-blue-500" size={24} />
               معلومات المؤسسة

@@ -1207,7 +1207,7 @@ export default function ParentDashboard() {
           </div>
         </header>
 
-        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0' : 'overflow-y-auto custom-scrollbar pb-10'} ${mobileUi ? 'pt-[64px] pb-[80px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]' : ''}`}>
+        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0' : 'overflow-y-auto custom-scrollbar pb-10'} ${mobileUi ? 'pt-[72px] pb-[84px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]' : ''}`}>
           {mobileUi ? (
             <>
               <MobileMockupHeader

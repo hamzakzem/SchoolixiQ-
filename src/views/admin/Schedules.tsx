@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { printElement } from '../../lib/printUtils';
+import { useMobileMockupShell } from '../../lib/useMobileMockupShell';
 
 const DAYS_OF_WEEK = [
   'الأحد',
@@ -20,6 +21,7 @@ const DAYS_OF_WEEK = [
 
 export default function Schedules() {
   const { profile } = useAuth();
+  const inApp = useMobileMockupShell();
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [schedule, setSchedule] = useState<any>({});
@@ -170,17 +172,23 @@ export default function Schedules() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className={`${inApp ? 'p-0' : 'p-6'} max-w-7xl mx-auto space-y-6`}>
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-gradient-to-r from-blue-600 to-indigo-600 p-8 rounded-[2rem] border border-blue-500 shadow-xl shadow-blue-500/20 print:hidden text-white relative overflow-hidden">
+      <div className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden text-white relative overflow-hidden ${
+        inApp
+          ? 'p-4 rounded-2xl bg-gradient-to-r from-[#0B2345] to-[#163a6b] shadow-lg'
+          : 'gap-6 bg-gradient-to-r from-blue-600 to-indigo-600 p-8 rounded-[2rem] border border-blue-500 shadow-xl shadow-blue-500/20'
+      }`}>
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
         <div className="flex items-center gap-4 z-10">
-          <div className="w-16 h-16 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center text-white border border-white/30 shadow-inner">
-            <Calendar size={32} />
+          <div className={`${inApp ? 'w-11 h-11' : 'w-16 h-16'} bg-white/20 backdrop-blur-xl rounded-xl flex items-center justify-center text-white border border-white/30 shadow-inner shrink-0`}>
+            <Calendar size={inApp ? 22 : 32} />
           </div>
-          <div>
-            <h1 className="text-3xl font-black text-white tracking-tight drop-shadow-md pb-1">الجداول الاسبوعية</h1>
-            <p className="text-sm font-bold text-blue-100 mt-1 max-w-sm leading-relaxed">إدارة وتخصيص الجداول الدراسية. يمكنك إضافة حصص جديدة، تعديل المواد، ومشاركة الجدول مع الجميع.</p>
+          <div className="min-w-0">
+            <h1 className={`${inApp ? 'text-lg' : 'text-3xl'} font-black text-white tracking-tight pb-0.5`}>الجداول الأسبوعية</h1>
+            {!inApp ? (
+              <p className="text-sm font-bold text-blue-100 mt-1 max-w-sm leading-relaxed">إدارة وتخصيص الجداول الدراسية. يمكنك إضافة حصص جديدة، تعديل المواد، ومشاركة الجدول مع الجميع.</p>
+            ) : null}
           </div>
         </div>
 

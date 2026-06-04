@@ -958,7 +958,7 @@ export default function TeacherDashboard() {
             />
           </>
         ) : null}
-        <div className={`flex-1 flex flex-col min-h-0 print:overflow-visible ${activeTab === 'chat' ? 'overflow-hidden h-full pb-[80px] lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-[90px] lg:pb-10'} ${mobileUi ? 'pt-[64px] pb-[80px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]' : ''}`}>
+        <div className={`flex-1 flex flex-col min-h-0 print:overflow-visible ${activeTab === 'chat' ? 'overflow-hidden h-full pb-[80px] lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-[90px] lg:pb-10'} ${mobileUi ? 'pt-[72px] pb-[84px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]' : ''}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

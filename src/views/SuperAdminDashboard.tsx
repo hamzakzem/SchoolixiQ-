@@ -2084,7 +2084,7 @@ export default function SuperAdminDashboard() {
         ) : null}
 
         <div
-          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full" : "overflow-y-auto custom-scrollbar pb-10"} ${mobileUi ? "pt-[64px] pb-[80px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]" : ""}`}
+          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full" : "overflow-y-auto custom-scrollbar pb-10"} ${mobileUi ? "pt-[72px] pb-[84px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]" : ""}`}
         >
           <AnimatePresence mode="wait">
             <motion.div

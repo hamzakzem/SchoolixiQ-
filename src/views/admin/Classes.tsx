@@ -6,9 +6,11 @@ import { Search, Plus, Filter, MoreVertical, LayoutDashboard, Trash2, AlertTrian
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+import { useMobileMockupShell } from '../../lib/useMobileMockupShell';
 
 export default function Classes() {
   const { profile } = useAuth();
+  const inApp = useMobileMockupShell();
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -152,21 +154,25 @@ export default function Classes() {
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className={`${inApp ? 'space-y-4' : 'space-y-8'} animate-in fade-in duration-500`}>
+      <div className={`flex flex-col ${inApp ? 'gap-3' : 'md:flex-row md:items-center justify-between gap-6'}`}>
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 font-display">إدارة الصفوف الدراسية</h1>
-          <p className="text-slate-500 mt-1">تحديد الهيكل الدراسي والمراحل المعترف بها في المدرسة</p>
+          <h1 className={`${inApp ? 'text-lg' : 'text-3xl'} font-black text-[#0B2345] font-display`}>
+            إدارة الصفوف
+          </h1>
+          {!inApp ? (
+            <p className="text-slate-500 mt-1">تحديد الهيكل الدراسي والمراحل المعترف بها في المدرسة</p>
+          ) : null}
         </div>
-        <div className="flex gap-4">
-          <div className="relative">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <div className={`flex ${inApp ? 'flex-col gap-2' : 'gap-4'}`}>
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input 
                type="text" 
                placeholder="بحث عن صف..." 
                value={searchTerm}
                onChange={(e) => setSearchTerm(e.target.value)}
-               className="pr-12 pl-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none w-full md:w-64 transition-all font-medium"
+               className={`pr-10 pl-3 ${inApp ? 'py-2.5 text-sm' : 'py-3'} bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0B2345]/15 focus:border-[#0B2345] outline-none w-full transition-all font-medium`}
             />
           </div>
           <button
@@ -175,28 +181,32 @@ export default function Classes() {
               setNewClass({ name: '' });
               setShowAddModal(true);
             }}
-            className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all font-bold shadow-xl active:scale-95 whitespace-nowrap"
+            className={`flex items-center justify-center gap-2 ${inApp ? 'px-4 py-2.5 text-xs' : 'px-8 py-3'} bg-[#0B2345] text-white rounded-xl hover:bg-[#163a6b] transition-all font-bold shadow-md active:scale-95 whitespace-nowrap`}
           >
-            <Plus size={20} />
-            <span className="hidden md:inline">صف جديد</span>
+            <Plus size={inApp ? 16 : 20} />
+            <span>صف جديد</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className={`grid ${inApp ? 'grid-cols-2 gap-2.5' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'}`}>
         {filteredClasses.map(cls => (
           <motion.div 
             layout
             key={cls.id}
             onClick={() => setSelectedClassForStudents(cls)}
-            className="bg-white p-8 rounded-[2.5rem] border border-slate-200 hover:shadow-xl hover:shadow-slate-200/50 transition-all group relative overflow-hidden cursor-pointer"
+            className={`bg-white border border-slate-200/90 hover:shadow-md transition-all group relative overflow-hidden cursor-pointer ${
+              inApp ? 'p-3 rounded-xl' : 'p-8 rounded-[2.5rem] hover:shadow-xl hover:shadow-slate-200/50'
+            }`}
           >
-            <div className="absolute top-0 left-0 w-32 h-32 bg-slate-50 rounded-full -translate-x-16 -translate-y-16 group-hover:bg-indigo-50 transition-colors"></div>
+            {!inApp ? (
+              <div className="absolute top-0 left-0 w-32 h-32 bg-slate-50 rounded-full -translate-x-16 -translate-y-16 group-hover:bg-indigo-50 transition-colors" />
+            ) : null}
             
             <div className="relative z-10">
-              <div className="flex items-start justify-between mb-6">
-                <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg transform group-hover:rotate-6 transition-transform">
-                  <LayoutDashboard size={28} />
+              <div className={`flex items-start justify-between ${inApp ? 'mb-2' : 'mb-6'}`}>
+                <div className={`${inApp ? 'w-9 h-9' : 'w-14 h-14'} bg-[#0B2345] text-white rounded-lg flex items-center justify-center shadow-sm`}>
+                  <LayoutDashboard size={inApp ? 18 : 28} />
                 </div>
                 <div className="relative">
                   <button 
@@ -247,14 +257,15 @@ export default function Classes() {
                 </div>
               </div>
 
-              <h3 className="text-2xl font-black text-slate-900 mb-2 font-display">{cls.name}</h3>
-              <div className="flex items-center gap-2 text-slate-400 mb-6">
-                <Users size={14} />
-                <span className="text-xs font-bold uppercase tracking-widest">
-                  {students.filter(s => s.classId === cls.id).length} طالب مسجل
+              <h3 className={`${inApp ? 'text-sm' : 'text-2xl'} font-black text-slate-900 mb-1 font-display truncate`}>{cls.name}</h3>
+              <div className={`flex items-center gap-1.5 text-slate-500 ${inApp ? 'mb-0' : 'mb-6'}`}>
+                <Users size={12} />
+                <span className="text-[10px] font-bold">
+                  {students.filter(s => s.classId === cls.id).length} طالب
                 </span>
               </div>
 
+              {!inApp ? (
               <div className="flex items-center justify-between pt-6 border-t border-slate-100">
                 <span className="text-[10px] text-slate-400 font-bold uppercase">المعرف: {cls.id.slice(0, 8)}</span>
                 <div className="flex -space-x-2 space-x-reverse">
@@ -265,6 +276,7 @@ export default function Classes() {
                    ))}
                 </div>
               </div>
+              ) : null}
             </div>
           </motion.div>
         ))}
@@ -285,7 +297,7 @@ export default function Classes() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col"
+              className={`w-full ${inApp ? 'max-w-full' : 'max-w-2xl'} bg-white h-full shadow-2xl flex flex-col`}
             >
                <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <div className="flex items-center gap-4">

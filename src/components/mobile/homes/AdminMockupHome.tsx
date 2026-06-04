@@ -1,42 +1,113 @@
+import { useEffect, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import {
   Calendar,
+  ClipboardCheck,
   GraduationCap,
-  LayoutGrid,
   Users,
   Wallet,
 } from 'lucide-react';
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  limit,
+} from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 import { useLanguage } from '../../../lib/LanguageContext';
 import { useAuth } from '../../../lib/AuthContext';
 import {
-  MobileMenuTile,
   MobilePage,
+  MobilePermissionChip,
   MobileSchoolHero,
   MobileSectionTitle,
   MobileStatCard,
 } from '../mobileUiKit';
 
+export type AdminHomeMenuItem = {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+};
+
 type Props = {
-  studentCount?: number;
-  teacherCount?: number;
-  attendancePct?: number;
+  permissions: AdminHomeMenuItem[];
   onTabChange: (tab: string) => void;
 };
 
 export default function AdminMockupHome({
-  studentCount = 0,
-  teacherCount = 0,
-  attendancePct = 90,
+  permissions,
   onTabChange,
 }: Props) {
-  const { isRtl } = useLanguage();
-  const { schoolData } = useAuth();
+  const { isRtl, t } = useLanguage();
+  const { schoolData, profile } = useAuth();
+  const [studentCount, setStudentCount] = useState(0);
+  const [teacherCount, setTeacherCount] = useState(0);
 
-  const menu = [
-    { id: 'classes', icon: LayoutGrid, labelAr: 'الفصول', labelEn: 'Classes' },
-    { id: 'staff', icon: Users, labelAr: 'المعلمون', labelEn: 'Teachers' },
-    { id: 'announcements', icon: Calendar, labelAr: 'الفعاليات', labelEn: 'Events' },
-    { id: 'tuition', icon: Wallet, labelAr: 'المالية', labelEn: 'Finance' },
+  useEffect(() => {
+    if (!profile?.schoolId) return;
+    const unsubs: (() => void)[] = [];
+
+    unsubs.push(
+      onSnapshot(
+        query(
+          collection(db, 'students'),
+          where('schoolId', '==', profile.schoolId),
+          limit(2000),
+        ),
+        (snap) => setStudentCount(snap.size),
+      ),
+    );
+
+    unsubs.push(
+      onSnapshot(
+        query(
+          collection(db, 'users'),
+          where('schoolId', '==', profile.schoolId),
+          where('role', '==', 'teacher'),
+          limit(500),
+        ),
+        (snap) => setTeacherCount(snap.size),
+      ),
+    );
+
+    return () => unsubs.forEach((u) => u());
+  }, [profile?.schoolId]);
+
+  const quickStats = [
+    {
+      id: 'staff',
+      label: isRtl ? 'المعلمون' : 'Teachers',
+      value: teacherCount,
+      icon: GraduationCap,
+    },
+    {
+      id: 'students',
+      label: isRtl ? 'الطلاب' : 'Students',
+      value: studentCount,
+      icon: Users,
+    },
+    {
+      id: 'attendance',
+      label: isRtl ? 'الحضور' : 'Attendance',
+      value: '—',
+      icon: ClipboardCheck,
+    },
+    {
+      id: 'tuition',
+      label: isRtl ? 'الإيرادات' : 'Revenue',
+      value: '—',
+      icon: Wallet,
+    },
   ];
+
+  const pinned = permissions.filter((p) =>
+    ['classes', 'schedules', 'announcements', 'chat'].includes(p.id),
+  );
+  const rest = permissions.filter(
+    (p) => !['classes', 'schedules', 'announcements', 'chat'].includes(p.id),
+  );
 
   return (
     <MobilePage>
@@ -47,43 +118,63 @@ export default function AdminMockupHome({
         isRtl={isRtl}
       />
 
-      <div className="grid grid-cols-2 gap-3">
-        <MobileStatCard
-          label={isRtl ? 'المعلمون' : 'Teachers'}
-          value={teacherCount}
-          icon={GraduationCap}
-        />
-        <MobileStatCard
-          label={isRtl ? 'الطلاب' : 'Students'}
-          value={studentCount}
-          icon={Users}
-        />
-        <MobileStatCard
-          label={isRtl ? 'الحضور' : 'Attendance'}
-          value={`${attendancePct}%`}
-          icon={Calendar}
-        />
-        <MobileStatCard
-          label={isRtl ? 'الإيرادات' : 'Revenue'}
-          value="—"
-          icon={Wallet}
-        />
-      </div>
-
-      <MobileSectionTitle
-        title={isRtl ? 'القائمة الرئيسية' : 'Main menu'}
-        icon={LayoutGrid}
-      />
-      <div className="grid grid-cols-2 gap-3">
-        {menu.map((m) => (
-          <MobileMenuTile
-            key={m.id}
-            icon={m.icon}
-            label={isRtl ? m.labelAr : m.labelEn}
-            onClick={() => onTabChange(m.id)}
+      <div className="grid grid-cols-2 gap-2.5">
+        {quickStats.map((s) => (
+          <MobileStatCard
+            key={s.id}
+            label={s.label}
+            value={s.value}
+            icon={s.icon}
+            onClick={() => onTabChange(s.id)}
           />
         ))}
       </div>
+
+      {pinned.length > 0 ? (
+        <section>
+          <MobileSectionTitle
+            title={isRtl ? 'اختصارات سريعة' : 'Quick access'}
+            icon={Calendar}
+          />
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {pinned.map((m) => (
+              <MobilePermissionChip
+                key={m.id}
+                icon={m.icon}
+                label={m.label}
+                onClick={() => onTabChange(m.id)}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section>
+        <MobileSectionTitle
+          title={isRtl ? 'صلاحيات المدرسة' : 'School modules'}
+          icon={Users}
+        />
+        <p className="text-[11px] text-slate-500 font-medium px-0.5 -mt-2 mb-2">
+          {isRtl
+            ? 'نفس الصلاحيات المعرفة في باقة المدرسة — متزامنة مع الموقع'
+            : 'Same package permissions as the website — live sync'}
+        </p>
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          {rest.map((m) => (
+            <MobilePermissionChip
+              key={m.id}
+              icon={m.icon}
+              label={m.label}
+              onClick={() => onTabChange(m.id)}
+            />
+          ))}
+        </div>
+        {permissions.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-6 font-bold">
+            {t('loading') || (isRtl ? 'جاري التحميل...' : 'Loading...')}
+          </p>
+        ) : null}
+      </section>
     </MobilePage>
   );
 }

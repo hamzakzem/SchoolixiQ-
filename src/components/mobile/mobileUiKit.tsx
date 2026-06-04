@@ -8,9 +8,9 @@ export const mobileTokens = {
   navyMid: '#163a6b',
   gold: '#C9A227',
   pageBg: 'bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]',
-  headerH: 'h-[64px]',
-  shellPt: 'pt-[64px]',
-  shellPb: 'pb-[80px]',
+  headerH: 'h-[72px]',
+  shellPt: 'pt-[72px]',
+  shellPb: 'pb-[84px]',
 } as const;
 
 export function MobilePage({ children }: { children: ReactNode }) {
@@ -61,19 +61,56 @@ export function MobileStatCard({
   label,
   value,
   icon: Icon,
+  onClick,
 }: {
   label: string;
   value: string | number;
   icon: LucideIcon;
+  onClick?: () => void;
+}) {
+  const Tag = onClick ? 'button' : 'div';
+  return (
+    <Tag
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`bg-white rounded-xl p-3 border border-slate-200/80 shadow-[0_4px_16px_rgba(11,35,69,0.06)] text-start w-full ${
+        onClick ? 'active:scale-[0.98] transition-transform' : ''
+      }`}
+    >
+      <div className="flex items-center gap-2.5 mb-2">
+        <span className="w-8 h-8 rounded-lg bg-[#0B2345]/8 flex items-center justify-center text-[#0B2345]">
+          <Icon size={16} strokeWidth={2.25} />
+        </span>
+        <p className="text-[10px] font-bold text-slate-500 flex-1">{label}</p>
+      </div>
+      <p className="text-xl font-black text-slate-900 tabular-nums">{value}</p>
+    </Tag>
+  );
+}
+
+/** Small permission shortcut — 3 per row on phones */
+export function MobilePermissionChip({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
 }) {
   return (
-    <div className="bg-white rounded-[1.25rem] p-4 border border-slate-200/80 shadow-[0_6px_24px_rgba(11,35,69,0.05)]">
-      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0B2345]/10 to-[#163a6b]/5 flex items-center justify-center text-[#0B2345] mb-2.5">
-        <Icon size={18} strokeWidth={2.25} />
-      </div>
-      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-black text-slate-900 tabular-nums mt-0.5">{value}</p>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl bg-white border border-slate-200/90 shadow-sm active:scale-[0.97] transition-transform min-h-[76px]"
+    >
+      <span className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#0B2345] to-[#163a6b] text-white flex items-center justify-center">
+        <Icon size={17} strokeWidth={2.25} />
+      </span>
+      <span className="text-[10px] font-bold text-slate-700 text-center leading-tight line-clamp-2">
+        {label}
+      </span>
+    </button>
   );
 }
 
@@ -152,16 +189,7 @@ export function MobileMenuTile({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="bg-white rounded-[1.25rem] p-4 border border-slate-200/80 shadow-[0_6px_24px_rgba(11,35,69,0.05)] flex flex-col items-center gap-3 active:scale-[0.98] transition-transform"
-    >
-      <span className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0B2345] to-[#163a6b] text-white flex items-center justify-center shadow-md">
-        <Icon size={22} strokeWidth={2.25} />
-      </span>
-      <span className="text-xs font-black text-slate-800">{label}</span>
-    </button>
+    <MobilePermissionChip icon={Icon} label={label} onClick={onClick} />
   );
 }
 

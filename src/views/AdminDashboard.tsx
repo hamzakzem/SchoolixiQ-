@@ -55,6 +55,7 @@ import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
 import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
 import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
 import AdminMockupHome from "../components/mobile/homes/AdminMockupHome";
+import MobileAdminPanel from "../components/mobile/MobileAdminPanel";
 import { notificationService } from "../lib/notificationService";
 
 const DEFAULT_PACKAGES = [
@@ -1096,7 +1097,10 @@ export default function AdminDashboard() {
     switch (activeTab) {
       case "overview":
         return mobileUi ? (
-          <AdminMockupHome onTabChange={navigateToTab} />
+          <AdminMockupHome
+            permissions={filteredMenuItems.filter((i) => i.id !== "overview")}
+            onTabChange={navigateToTab}
+          />
         ) : (
           <Overview setActiveTab={setActiveTab} />
         );
@@ -1481,7 +1485,7 @@ export default function AdminDashboard() {
           </>
         ) : null}
         <main
-          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0" : "overflow-y-auto pb-10"} ${mobileUi ? "pt-[64px] pb-[80px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]" : ""}`}
+          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0" : "overflow-y-auto pb-10"} ${mobileUi ? "pt-[72px] pb-[84px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]" : ""}`}
         >
           <div
             className={`w-full mx-auto flex flex-col print:min-h-0 print:pb-0 print:p-0 ${
@@ -1505,7 +1509,11 @@ export default function AdminDashboard() {
                 exit={{ opacity: 0, y: activeTab === "chat" ? 0 : -15 }}
                 transition={{ duration: 0.25, ease: "easeOut" }}
               >
-                {renderContent()}
+                {mobileUi && activeTab !== "overview" && activeTab !== "chat" ? (
+                  <MobileAdminPanel>{renderContent()}</MobileAdminPanel>
+                ) : (
+                  renderContent()
+                )}
               </motion.div>
             </AnimatePresence>
           </div>
