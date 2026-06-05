@@ -25,19 +25,7 @@ export interface PhotoSettings {
 }
 
 export interface IdCardTemplate {
-  layout:
-    | "corporate"
-    | "glass"
-    | "minimal"
-    | "executive"
-    | "dark"
-    | "gradient"
-    | "horizontal"
-    | "academy"
-    | "royal"
-    | "spotlight"
-    | "heritage"
-    | "wave";
+  layout: "corporate" | "glass" | "minimal" | "executive" | "dark" | "gradient" | "horizontal";
   size: "pvc" | "pocket" | "hanging" | "custom";
   customSize?: { width: number; height: number };
   photoSettings?: PhotoSettings;
@@ -89,7 +77,6 @@ export interface IdCardTemplate {
     imageUrl?: string;
     watermarkText?: string;
     watermarkOpacity?: number;
-    /** 20–120 — size of watermark image on card (%) */
     watermarkScale?: number;
   };
   printSettings: {

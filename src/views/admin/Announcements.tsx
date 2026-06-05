@@ -94,7 +94,7 @@ export default function Announcements() {
           message: newAnnouncement.content,
           type: 'announcement',
           schoolId: profile.schoolId,
-          metadata: { sourceId: annRef.id, tab: 'inbox' }
+          metadata: { sourceId: annRef.id }
         });
       } else if (newAnnouncement.target === 'parents') {
         await notificationService.notifyAllParents(profile.schoolId, {
@@ -102,7 +102,7 @@ export default function Announcements() {
           message: newAnnouncement.content,
           type: 'announcement',
           schoolId: profile.schoolId,
-          metadata: { sourceId: annRef.id, tab: 'inbox' }
+          metadata: { sourceId: annRef.id }
         });
       } else if (newAnnouncement.target === 'staff') {
         await notificationService.notifyAllStaff(profile.schoolId, {
@@ -110,7 +110,7 @@ export default function Announcements() {
           message: newAnnouncement.content,
           type: 'announcement',
           schoolId: profile.schoolId,
-          metadata: { sourceId: annRef.id, tab: 'announcements' }
+          metadata: { sourceId: annRef.id }
         });
       } else if (newAnnouncement.target === 'all') {
         await notificationService.notifyAllSchool(profile.schoolId, {
@@ -223,7 +223,7 @@ export default function Announcements() {
               <div className="flex items-start justify-between gap-4 relative z-10">
                 <div className="flex items-start gap-4">
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                    ann.target === 'all' ? 'bg-blue-50 text-[#0B2345] dark:bg-blue-900/30 dark:text-blue-400' :
+                    ann.target === 'all' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
                     ann.target === 'parents' ? 'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' :
                     'bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
                   }`}>

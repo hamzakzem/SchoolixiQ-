@@ -21,6 +21,7 @@ import {
   Printer,
   Edit2,
   X,
+  Image as ImageIcon,
   QrCode,
   Upload,
   Users,
@@ -29,14 +30,6 @@ import {
   Building,
   User,
   Settings2,
-  Camera,
-  Droplet,
-  Hash,
-  Calendar,
-  CalendarClock,
-  MapPin,
-  Bus,
-  Phone,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
@@ -44,11 +37,7 @@ import {
   handleFirestoreError,
   OperationType,
 } from "../../lib/firestore-errors";
-import {
-  uploadImageToServer,
-  compressImage,
-  compressImageToBase64,
-} from "../../lib/imageUtils";
+import { uploadImageToServer } from "../../lib/imageUtils";
 import { printService } from "../../lib/printService";
 import StudentCard from "../../components/admin/idcards/StudentCard";
 import StudentCardPrint from "../../components/admin/idcards/StudentCardPrint";
@@ -58,18 +47,11 @@ import QRCodeSection from "../../components/admin/idcards/QRCodeSection";
 
 import IdCardSettings from "./IdCardSettings";
 import { IdCardTemplate } from "../../types/idCardTemplate";
-import { mergeIdCardTemplate } from "../../lib/idCardTemplateUtils";
-import { DEFAULT_ID_CARD_TEMPLATE } from "../../lib/idCardPresets";
-import { useMobileMockupShell } from "../../lib/useMobileMockupShell";
-import IdCardsAppView from "../../components/mobile/IdCardsAppView";
-import { Modal } from "../../components/ui/Modal";
-import { Button } from "../../components/ui/Button";
 
 export default function IdCards() {
-  const { profile, schoolData } = useAuth();
+  const { profile } = useAuth();
   const { t, language } = useLanguage();
   const isRtl = language === "ar";
-  const inApp = useMobileMockupShell();
   
   // Printing State
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -108,74 +90,15 @@ export default function IdCards() {
   const bulkPrintRef = useRef<HTMLDivElement>(null);
 
   const currentCard = selectedStudent ? idCards[selectedStudent.id] : null;
-  const effectiveTemplate = mergeIdCardTemplate(template);
 
-  const studentsWithCards = students.filter((s) => idCards[s.id]);
-  const canPrintBulk = studentsWithCards.length > 0;
-
-  const openPrintModal = (mode: "single" | "bulk") => {
-    if (mode === "single") {
-      if (!selectedStudent) {
-        toast.error(isRtl ? "اختر طالباً أولاً" : "Select a student first");
-        return;
-      }
-      if (!currentCard) {
-        toast.error(
-          isRtl
-            ? "أصدر الهوية أولاً ثم اطبعها"
-            : "Issue the ID card before printing",
-        );
-        return;
-      }
-    } else if (!canPrintBulk) {
-      toast.error(
-        isRtl
-          ? "لا توجد هويات صادرة في هذا الصف"
-          : "No issued ID cards in this class",
-      );
-      return;
-    }
-    setPrintMode(mode);
+  const handleSinglePrint = () => {
+    setPrintMode("single");
     setShowPrintModal(true);
   };
 
-  const handleSinglePrint = () => openPrintModal("single");
-  const handleBulkPrint = () => openPrintModal("bulk");
-
-  const openEditCardForm = () => {
-    if (!selectedStudent) return;
-    if (currentCard) {
-      setPhotoUrl(currentCard.photoUrl || "");
-      setBloodType(currentCard.bloodType || "");
-      setTransportInfo(currentCard.transportInfo || "");
-      setDriverName(currentCard.driverName || "");
-      setDriverPhone(currentCard.driverPhone || "");
-      setCarNumber(currentCard.carNumber || "");
-      setGuardianName(currentCard.guardianName || "");
-      setSchoolPhone(currentCard.schoolPhone || "");
-      setIssueDate(currentCard.issueDate || "");
-      setValidUntil(currentCard.validUntil || "");
-      setExamNumber(currentCard.examNumber || selectedStudent.examNumber || "");
-      setResidenceAddress(
-        currentCard.residenceAddress || selectedStudent.address || "",
-      );
-      setSchoolName(currentCard.schoolName || schoolData?.name || "");
-    } else {
-      setPhotoUrl("");
-      setBloodType("");
-      setTransportInfo("");
-      setDriverName("");
-      setDriverPhone(selectedStudent.driverPhone || "");
-      setCarNumber("");
-      setGuardianName("");
-      setSchoolPhone(profile?.schoolPhone || profile?.phone || "");
-      setExamNumber(selectedStudent.examNumber || "");
-      setIssueDate(new Date().toISOString().split("T")[0]);
-      setValidUntil(String(new Date().getFullYear() + 1));
-      setResidenceAddress(selectedStudent.address || "");
-      setSchoolName(schoolData?.name || "");
-    }
-    setShowEditModal(true);
+  const handleBulkPrint = () => {
+    setPrintMode("bulk");
+    setShowPrintModal(true);
   };
   
   const handlePrintComplete = async (printedCount: number) => {
@@ -216,9 +139,7 @@ export default function IdCards() {
         );
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setTemplate(mergeIdCardTemplate(docSnap.data() as IdCardTemplate));
-        } else {
-          setTemplate(DEFAULT_ID_CARD_TEMPLATE);
+          setTemplate(docSnap.data() as IdCardTemplate);
         }
       } catch (error) {
         console.error("Error fetching template", error);
@@ -299,56 +220,35 @@ export default function IdCards() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !selectedStudent || !profile?.schoolId) return;
+    if (!file || !selectedStudent) return;
 
-    // Allow larger originals since we compress before uploading.
-    if (file.size > 15 * 1024 * 1024) {
+    // Check file size (max 5MB just to be safe as we compress anyway)
+    if (file.size > 5 * 1024 * 1024) {
       toast.error(
         isRtl
-          ? "حجم الصورة يجب أن لا يتجاوز 15 ميجابايت"
-          : "Image size must not exceed 15MB",
+          ? "حجم الصورة يجب أن لا يتجاوز 5 ميجابايت"
+          : "Image size must not exceed 5MB",
       );
-      e.target.value = "";
       return;
     }
 
-    setIsSaving(true);
-    const loadingToast = toast.loading(
-      isRtl ? "جاري معالجة الصورة..." : "Processing image...",
-    );
     try {
-      // Compress first so uploads are small and fast on mobile networks.
-      const compressed = await compressImage(file, 600, 600);
-      // IMPORTANT: storage rules expect students/{schoolId}/... so the path
-      // must start with the school id (not the student id) to pass auth.
+      setIsSaving(true);
       const url = await uploadImageToServer(
-        compressed,
-        `students/${profile.schoolId}/${selectedStudent.id}/id_card_${Date.now()}.jpg`,
+        file,
+        `students/${selectedStudent.id}/id_card_${Date.now()}`,
+        400,
+        400,
       );
       setPhotoUrl(url);
       toast.success(
         isRtl ? "تم رفع الصورة بنجاح" : "Image uploaded successfully",
-        { id: loadingToast },
       );
     } catch (error) {
-      console.error("Storage upload failed, falling back to inline image", error);
-      // Fallback: embed a compressed image directly so the photo always works
-      // even when storage is unavailable.
-      try {
-        const base64 = (await compressImageToBase64(file, 500, 500)) as string;
-        setPhotoUrl(base64);
-        toast.success(isRtl ? "تم تجهيز الصورة" : "Image ready", {
-          id: loadingToast,
-        });
-      } catch (fallbackError) {
-        console.error("Inline image fallback failed:", fallbackError);
-        toast.error(isRtl ? "فشل رفع الصورة" : "Failed to upload image", {
-          id: loadingToast,
-        });
-      }
+      console.error("Error preparing image:", error);
+      toast.error(isRtl ? "فشل رفع الصورة" : "Failed to upload image");
     } finally {
       setIsSaving(false);
-      e.target.value = "";
     }
   };
 
@@ -423,239 +323,7 @@ export default function IdCards() {
     }
   };
 
-  if (inApp && !showSettings) {
-    return (
-      <>
-        <IdCardsAppView
-          isRtl={isRtl}
-          classes={classes}
-          selectedClassId={selectedClassId}
-          onClassChange={setSelectedClassId}
-          students={students}
-          selectedStudent={selectedStudent}
-          onSelectStudent={setSelectedStudent}
-          idCards={idCards}
-          template={effectiveTemplate}
-          canPrintBulk={canPrintBulk}
-          onOpenSettings={() => setShowSettings(true)}
-          onEditCard={openEditCardForm}
-          onDeleteCard={() =>
-            selectedStudent && handleDeleteCard(selectedStudent.id)
-          }
-          onPrintSingle={handleSinglePrint}
-          onPrintBulk={handleBulkPrint}
-        />
-        <AnimatePresence>
-          {showPrintModal && (
-            <PrintPreviewModal
-              isOpen={showPrintModal}
-              onClose={() => setShowPrintModal(false)}
-              students={
-                printMode === "single" && selectedStudent
-                  ? [selectedStudent]
-                  : studentsWithCards
-              }
-              idCards={idCards}
-              isRtl={isRtl}
-              template={effectiveTemplate}
-              title={
-                printMode === "single"
-                  ? `Student-ID-${selectedStudent?.name || "Card"}`
-                  : `Class-IDs-${classes.find((c) => c.id === selectedClassId)?.name || "Class"}`
-              }
-              onAfterPrint={handlePrintComplete}
-            />
-          )}
-        </AnimatePresence>
-        <Modal
-          open={showEditModal}
-          onClose={() => !isSaving && setShowEditModal(false)}
-          title={
-            currentCard
-              ? isRtl
-                ? "تعديل الهوية"
-                : "Edit ID card"
-              : isRtl
-                ? "إصدار هوية"
-                : "Issue ID card"
-          }
-          description={selectedStudent?.name}
-          maxWidthClass="max-w-lg"
-          footer={
-            <div className="flex gap-2 w-full">
-              <Button
-                variant="secondary"
-                size="lg"
-                className="flex-1"
-                disabled={isSaving}
-                onClick={() => setShowEditModal(false)}
-              >
-                {isRtl ? "إلغاء" : "Cancel"}
-              </Button>
-              <Button
-                size="lg"
-                className="flex-1"
-                disabled={isSaving}
-                onClick={handleSaveCard}
-              >
-                {isSaving
-                  ? isRtl
-                    ? "جاري الحفظ..."
-                    : "Saving..."
-                  : isRtl
-                    ? "حفظ"
-                    : "Save"}
-              </Button>
-            </div>
-          }
-        >
-          <div className="space-y-5" dir={isRtl ? "rtl" : "ltr"}>
-            {/* Photo uploader */}
-            <div className="flex flex-col items-center gap-2.5">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="app-photo-upload"
-                disabled={isSaving}
-              />
-              <label
-                htmlFor="app-photo-upload"
-                className="relative cursor-pointer group"
-              >
-                <div className="w-28 h-28 rounded-3xl overflow-hidden bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 transition-all group-active:scale-95 group-hover:border-[#0B2345]/40">
-                  {photoUrl ? (
-                    <img
-                      src={photoUrl}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <>
-                      <Camera size={26} strokeWidth={2} />
-                      <span className="text-[10px] font-bold mt-1">
-                        {isRtl ? "إضافة صورة" : "Add photo"}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <span className="absolute -bottom-1 -end-1 w-9 h-9 rounded-full bg-[#0B2345] text-white flex items-center justify-center shadow-lg ring-2 ring-white">
-                  {isSaving ? (
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Camera size={16} />
-                  )}
-                </span>
-              </label>
-              <p className="text-[11px] font-bold text-slate-500">
-                {selectedStudent?.name}
-              </p>
-            </div>
-
-            {/* Identity */}
-            <div className="space-y-2.5">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-0.5">
-                {isRtl ? "بيانات الهوية" : "Identity"}
-              </p>
-              <div className="grid grid-cols-2 gap-2.5">
-                <AppCardField
-                  icon={Droplet}
-                  label={isRtl ? "فصيلة الدم" : "Blood"}
-                  value={bloodType}
-                  onChange={setBloodType}
-                  placeholder="O+"
-                />
-                <AppCardField
-                  icon={Hash}
-                  label={isRtl ? "الرقم الامتحاني" : "Exam #"}
-                  value={examNumber}
-                  onChange={setExamNumber}
-                />
-                <AppCardField
-                  icon={Calendar}
-                  label={isRtl ? "تاريخ الإصدار" : "Issued"}
-                  value={issueDate}
-                  onChange={setIssueDate}
-                  type="date"
-                />
-                <AppCardField
-                  icon={CalendarClock}
-                  label={isRtl ? "الصلاحية" : "Valid until"}
-                  value={validUntil}
-                  onChange={setValidUntil}
-                  placeholder="2026"
-                />
-              </div>
-            </div>
-
-            {/* Guardian & address */}
-            <div className="space-y-2.5">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-0.5">
-                {isRtl ? "ولي الأمر والعنوان" : "Guardian & address"}
-              </p>
-              <AppCardField
-                icon={User}
-                label={isRtl ? "اسم ولي الأمر" : "Guardian"}
-                value={guardianName}
-                onChange={setGuardianName}
-              />
-              <AppCardField
-                icon={MapPin}
-                label={isRtl ? "عنوان السكن" : "Address"}
-                value={residenceAddress}
-                onChange={setResidenceAddress}
-              />
-            </div>
-
-            {/* Transport (optional) */}
-            <div className="space-y-2.5">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-0.5">
-                {isRtl ? "النقل (اختياري)" : "Transport (optional)"}
-              </p>
-              <div className="grid grid-cols-2 gap-2.5">
-                <AppCardField
-                  icon={User}
-                  label={isRtl ? "اسم السائق" : "Driver"}
-                  value={driverName}
-                  onChange={setDriverName}
-                />
-                <AppCardField
-                  icon={Phone}
-                  label={isRtl ? "هاتف السائق" : "Driver phone"}
-                  value={driverPhone}
-                  onChange={setDriverPhone}
-                  placeholder="07..."
-                />
-                <AppCardField
-                  icon={Bus}
-                  label={isRtl ? "رقم السيارة" : "Car #"}
-                  value={carNumber}
-                  onChange={setCarNumber}
-                />
-                <AppCardField
-                  icon={Phone}
-                  label={isRtl ? "هاتف المدرسة" : "School phone"}
-                  value={schoolPhone}
-                  onChange={setSchoolPhone}
-                  placeholder="07..."
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
-              <Building size={15} className="text-slate-400 shrink-0" />
-              <p className="text-[11px] text-slate-500 font-bold leading-snug">
-                {isRtl
-                  ? `المدرسة: ${schoolName || "—"} (تلقائي من الإعدادات)`
-                  : `School: ${schoolName || "—"} (auto from settings)`}
-              </p>
-            </div>
-          </div>
-        </Modal>
-      </>
-    );
-  }
+  const canPrintBulk = students.filter((s) => idCards[s.id]).length > 0;
 
   if (showSettings) {
     return (
@@ -706,38 +374,24 @@ export default function IdCards() {
             </span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => handleBulkPrint()}
-            disabled={!canPrintBulk}
-            title={
-              !canPrintBulk
-                ? isRtl
-                  ? "لا توجد هويات صادرة في الصف"
-                  : "No issued cards in class"
-                : undefined
-            }
-            className="px-4 py-2 bg-[#e8eef5] dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Users size={18} />
-            <span>{isRtl ? "طباعة القائمة" : "Print All"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSinglePrint()}
-            disabled={!currentCard}
-            title={
-              !currentCard
-                ? isRtl
-                  ? "أصدر الهوية أولاً"
-                  : "Issue card first"
-                : undefined
-            }
-            className="px-4 py-2 bg-slate-900 dark:bg-slate-700 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Printer size={18} />
-            <span>{isRtl ? "طباعة الهوية" : "Print Card"}</span>
-          </button>
+          {canPrintBulk && (
+            <button
+              onClick={() => handleBulkPrint()}
+              className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-200 transition-colors"
+            >
+              <Users size={18} />
+              <span>{isRtl ? "طباعة القائمة" : "Print All"}</span>
+            </button>
+          )}
+          {currentCard && (
+            <button
+              onClick={() => handleSinglePrint()}
+              className="px-4 py-2 bg-slate-900 dark:bg-slate-700 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-lg"
+            >
+              <Printer size={18} />
+              <span>{isRtl ? "طباعة الهوية" : "Print Card"}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -753,7 +407,7 @@ export default function IdCards() {
                 <button
                   key={cls.id}
                   onClick={() => setSelectedClassId(cls.id)}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? "bg-[#0B2345] text-white shadow-md" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? "bg-indigo-600 text-white shadow-md" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
                 >
                   {cls.name}
                 </button>
@@ -765,7 +419,7 @@ export default function IdCards() {
             <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-4 px-2">
               {isRtl ? "اختر الطالب" : "Select Student"}
             </h3>
-            <div className={`space-y-2 overflow-y-auto pl-2 pr-1 custom-scrollbar ${inApp ? 'max-h-52' : 'h-[calc(100vh-180px)] min-h-[600px]'}`}>
+            <div className="space-y-2 h-[calc(100vh-180px)] min-h-[600px] overflow-y-auto pl-2 pr-1 custom-scrollbar">
               {students.map((student) => {
                 const hasCard = !!idCards[student.id];
                 return (
@@ -776,7 +430,7 @@ export default function IdCards() {
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedStudent?.id === student.id ? "bg-[#0B2345] text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedStudent?.id === student.id ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"}`}
                       >
                         {hasCard ? (
                           <ShieldCheck size={14} className="text-emerald-500" />
@@ -798,10 +452,10 @@ export default function IdCards() {
         {/* Right content: Card Preview */}
         <div className="lg:col-span-3 space-y-6">
           {selectedStudent ? (
-            <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col print:border-none print:shadow-none print:h-auto print:min-h-0 print:overflow-visible ${inApp ? 'min-h-0' : 'h-[calc(100vh-100px)] min-h-[800px]'}`}>
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-100px)] min-h-[800px] print:border-none print:shadow-none print:h-auto print:min-h-0 print:overflow-visible">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30 print:hidden">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[#e8eef5] dark:bg-indigo-900/50 text-[#0B2345] dark:text-indigo-400 rounded-2xl flex items-center justify-center font-bold text-xl">
+                  <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center font-bold text-xl">
                     <ShieldCheck size={24} />
                   </div>
                   <div>
@@ -829,11 +483,48 @@ export default function IdCards() {
                     </button>
                   )}
                   <button
-                    onClick={openEditCardForm}
-                    className="px-4 py-2 bg-[#0B2345] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
+                    onClick={() => {
+                      if (currentCard) {
+                        setPhotoUrl(currentCard.photoUrl || "");
+                        setBloodType(currentCard.bloodType || "");
+                        setTransportInfo(currentCard.transportInfo || "");
+                        setDriverName(currentCard.driverName || "");
+                        setDriverPhone(currentCard.driverPhone || "");
+                        setCarNumber(currentCard.carNumber || "");
+                        setGuardianName(currentCard.guardianName || "");
+                        setSchoolPhone(currentCard.schoolPhone || "");
+                        setIssueDate(currentCard.issueDate || "");
+                        setValidUntil(currentCard.validUntil || "");
+                        setExamNumber(currentCard.examNumber || selectedStudent.examNumber || "");
+                        setResidenceAddress(
+                          currentCard.residenceAddress ||
+                            selectedStudent.address ||
+                            "",
+                        );
+                        setSchoolName(
+                          currentCard.schoolName || profile.schoolName || "",
+                        );
+                      } else {
+                        setPhotoUrl("");
+                        setBloodType("");
+                        setTransportInfo("");
+                        setDriverName("");
+                        setDriverPhone(selectedStudent.driverPhone || "");
+                        setCarNumber("");
+                        setGuardianName("");
+                        setSchoolPhone(profile.schoolPhone || profile.phone || "");
+                        setExamNumber(selectedStudent.examNumber || "");
+                        setIssueDate(new Date().toISOString().split("T")[0]);
+                        setValidUntil(new Date().getFullYear() + 1 + "");
+                        setResidenceAddress(selectedStudent.address || "");
+                        setSchoolName(profile.schoolName || "");
+                      }
+                      setShowEditModal(true);
+                    }}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
                   >
                     {currentCard ? <Edit2 size={18} /> : <Plus size={18} />}
-                    <span>
+                    <span className="hidden sm:inline">
                       {currentCard
                         ? isRtl
                           ? "تعديل الهوية"
@@ -846,14 +537,14 @@ export default function IdCards() {
                 </div>
               </div>
 
-              <div className={`flex-1 flex items-center justify-center bg-slate-50 dark:bg-slate-900 print:bg-white print:p-0 ${inApp ? 'p-4' : 'p-8'}`}>
+              <div className="flex-1 p-8 flex items-center justify-center bg-slate-50 dark:bg-slate-900 print:bg-white print:p-0">
                 {currentCard ? (
-                  <div className={inApp ? 'scale-100 origin-center max-w-full overflow-x-auto' : 'scale-125 origin-center'}>
+                  <div className="scale-125 origin-center">
                     <StudentCard
                       student={selectedStudent}
                       cardData={currentCard}
                       isRtl={isRtl}
-                      template={effectiveTemplate}
+                      template={template}
                     />
                   </div>
                 ) : (
@@ -869,7 +560,7 @@ export default function IdCards() {
               </div>
             </div>
           ) : (
-            <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-center print:hidden relative overflow-hidden ${inApp ? 'p-4' : 'h-[calc(100vh-100px)] min-h-[800px] p-8'}`}>
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-100px)] min-h-[800px] flex items-center justify-center p-8 print:hidden relative overflow-hidden">
               <div
                 className="absolute top-0 right-0 w-full h-full opacity-[0.02] pointer-events-none"
                 style={{
@@ -878,9 +569,9 @@ export default function IdCards() {
                 }}
               />
 
-              <div className={`text-right text-slate-600 dark:text-slate-300 relative z-10 w-full ${inApp ? 'space-y-4' : 'space-y-8 max-w-2xl'}`}>
-                <div className={`text-center ${inApp ? 'mb-4' : 'mb-10'}`}>
-                  <div className={`${inApp ? 'w-14 h-14 mb-3' : 'w-20 h-20 mb-6'} bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] rounded-full flex items-center justify-center mx-auto shadow-inner relative`}>
+              <div className="text-right space-y-8 max-w-2xl text-slate-600 dark:text-slate-300 relative z-10 w-full">
+                <div className="text-center mb-10">
+                  <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner relative">
                     <div className="absolute inset-0 bg-indigo-400/20 blur-xl rounded-full animate-pulse" />
                     <QrCode size={40} className="relative z-10" />
                   </div>
@@ -898,8 +589,8 @@ export default function IdCards() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-700/50">
-                    <div className="flex items-center gap-3 mb-4 text-[#0B2345] dark:text-indigo-400">
-                      <div className="p-2 bg-[#e8eef5] dark:bg-indigo-900/50 rounded-lg">
+                    <div className="flex items-center gap-3 mb-4 text-indigo-600 dark:text-indigo-400">
+                      <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
                         <Check size={20} />
                       </div>
                       <strong className="text-lg">
@@ -946,7 +637,7 @@ export default function IdCards() {
                   </div>
 
                   <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-700/50">
-                    <div className="flex items-center gap-3 mb-4 text-[#0B2345] dark:text-blue-400">
+                    <div className="flex items-center gap-3 mb-4 text-blue-600 dark:text-blue-400">
                       <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
                         <Clock size={20} />
                       </div>
@@ -967,28 +658,22 @@ export default function IdCards() {
         </div>
       </div>
       
-      <AnimatePresence>
-        {showPrintModal && (
-          <PrintPreviewModal
-            isOpen={showPrintModal}
-            onClose={() => setShowPrintModal(false)}
-            students={
-              printMode === "single" && selectedStudent
-                ? [selectedStudent]
-                : studentsWithCards
-            }
-            idCards={idCards}
-            isRtl={isRtl}
-            template={effectiveTemplate}
-            title={
-              printMode === "single"
-                ? `Student-ID-${selectedStudent?.name || "Card"}`
-                : `Class-IDs-${classes.find((c) => c.id === selectedClassId)?.name || "Class"}`
-            }
-            onAfterPrint={handlePrintComplete}
-          />
-        )}
-      </AnimatePresence>
+      {template && (
+        <AnimatePresence>
+          {showPrintModal && (
+            <PrintPreviewModal
+              isOpen={showPrintModal}
+              onClose={() => setShowPrintModal(false)}
+              students={printMode === "single" && selectedStudent ? [selectedStudent] : students.filter((s) => idCards[s.id])}
+              idCards={idCards}
+              isRtl={isRtl}
+              template={template}
+              title={printMode === "single" ? `Student-ID-${selectedStudent?.name || "Card"}` : `Class-IDs-${classes.find((c) => c.id === selectedClassId)?.name || "Class"}`}
+              onAfterPrint={handlePrintComplete}
+            />
+          )}
+        </AnimatePresence>
+      )}
 
       <AnimatePresence>
         {showEditModal && (
@@ -1034,7 +719,7 @@ export default function IdCards() {
                     />
                     <label
                       htmlFor="photo-upload"
-                      className="cursor-pointer flex flex-col items-center justify-center gap-2 w-full aspect-square bg-indigo-50 hover:bg-[#e8eef5] dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-[#0B2345] dark:text-indigo-400 font-bold rounded-2xl border border-indigo-200 dark:border-indigo-800/50 border-dashed transition-all overflow-hidden"
+                      className="cursor-pointer flex flex-col items-center justify-center gap-2 w-full aspect-square bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 font-bold rounded-2xl border border-indigo-200 dark:border-indigo-800/50 border-dashed transition-all overflow-hidden"
                     >
                       {photoUrl ? (
                         <img src={photoUrl} className="w-full h-full object-cover" />
@@ -1238,7 +923,7 @@ export default function IdCards() {
                     <button
                       onClick={handleSaveCard}
                       disabled={isSaving}
-                      className="px-6 py-2.5 rounded-xl font-bold bg-[#0B2345] text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50 text-sm"
+                      className="px-6 py-2.5 rounded-xl font-bold bg-indigo-600 text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50 text-sm"
                     >
                       {isSaving ? (
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1257,37 +942,5 @@ export default function IdCards() {
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-function AppCardField({
-  icon: Icon,
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-}: {
-  icon: typeof User;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 mb-1 px-0.5">
-        <Icon size={13} className="text-slate-400 shrink-0" />
-        {label}
-      </span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-[#0B2345]/30 focus:border-[#0B2345]/40 transition-all"
-      />
-    </label>
   );
 }

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { adminCreateUser, adminDeleteUser } from "../lib/adminApi";
-import { rejectSchoolRegistrationRequest } from "../lib/rejectSchoolRegistration";
 import { getApiUrl } from "../lib/apiUtils";
 import {
   collection,
@@ -55,26 +54,17 @@ import {
   CreditCard,
   Bell,
 } from "lucide-react";
-import { NotificationBell } from "../components/NotificationBell";
-import BrandLogo from "../components/BrandLogo";
+import { NotificationCenter } from "../components/NotificationCenter";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { useAuth } from "../lib/AuthContext";
-import { usePushTabNavigation } from "../lib/pushNavigation";
 
 import { useLanguage } from "../lib/LanguageContext";
-import { emailVerificationHint } from "../lib/displayIdentity";
-import { useMobileMockupShell } from "../lib/useMobileMockupShell";
-import { useAndroidBackButton } from "../hooks/useAndroidBackButton";
-import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
-import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
-import MobileLogoutButton from "../components/mobile/MobileLogoutButton";
-import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
-import SuperAdminMockupHome from "../components/mobile/homes/SuperAdminMockupHome";
 import { useSystemConfig } from "../lib/SystemConfigContext";
+import SchoolixLogo from "../components/SchoolixLogo";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
@@ -137,7 +127,7 @@ const DEFAULT_PACKAGES = [
 ];
 
 export default function SuperAdminDashboard() {
-  const { profile } = useAuth();
+  const { profile, logout } = useAuth();
   const { t, isRtl, setLanguage, language } = useLanguage();
   const { config } = useSystemConfig();
 
@@ -153,7 +143,7 @@ export default function SuperAdminDashboard() {
   const hasPermission = (permission: string) => {
     if (profile?.role === "superadmin") return true;
     if (profile?.role === "assistant" && !profile?.schoolId) {
-      return !!(profile?.permissions as any)?.includes(permission);
+      return profile?.permissions?.includes(permission);
     }
     return false;
   };
@@ -185,13 +175,25 @@ export default function SuperAdminDashboard() {
     | "chat"
     | "backups"
     | "diagnostics"
-    | "footer"
   >("schools");
   const [schoolFilter, setSchoolFilter] = useState<"all" | "active" | "expiring">("all");
   const [usersTab, setUsersTab] = useState<"management" | "parents">(
     "management",
   );
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+    const qNotifications = query(
+      collection(db, "notifications"),
+      where("userId", "==", profile.uid)
+    );
+    return onSnapshot(qNotifications, (snap) => {
+      setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, [profile?.uid]);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [activeRequestSource, setActiveRequestSource] = useState<string | null>(
     null,
@@ -201,7 +203,6 @@ export default function SuperAdminDashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     window.innerWidth >= 768 && window.innerWidth < 1024,
   );
-  const mobileUi = useMobileMockupShell();
 
   useEffect(() => {
     const handleResize = () => {
@@ -274,7 +275,6 @@ export default function SuperAdminDashboard() {
     setNavigationHistory((prev) => [...prev, activeTab]);
     setActiveTab(tabId);
   };
-  usePushTabNavigation((tab) => navigateToTab(tab), profile?.role);
 
   const handleBack = () => {
     if (navigationHistory.length > 0) {
@@ -286,16 +286,6 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  useAndroidBackButton(
-    React.useCallback(() => {
-      if (activeTab !== "schools") {
-        handleBack();
-        return true;
-      }
-      return false;
-    }, [activeTab, navigationHistory]),
-  );
-
   if (!profile) return null;
   const [systemConfig, setSystemConfig] = useState<{
     supportPhones: string[];
@@ -303,9 +293,6 @@ export default function SuperAdminDashboard() {
     successPartners: { name: string; logoUrl: string }[];
     appName: string;
     appLogo: string;
-    androidApkUrl: string;
-    iosAppStoreUrl: string;
-    iosTestFlightUrl: string;
     marketingTitle?: string;
     marketingSubtitle?: string;
     marketingFeatures?: { title: string; description: string }[];
@@ -315,21 +302,12 @@ export default function SuperAdminDashboard() {
       linkedin?: string;
       whatsapp?: string;
     };
-    promotionalBanners?: {
-      id: string;
-      imageUrl: string;
-      active: boolean;
-      link: string;
-    }[];
   }>({
     supportPhones: ["+964 770 000 0000"],
     supportEmails: ["support@schoolixiq.iq"],
     successPartners: [],
     appName: "SchoolixiQ",
     appLogo: "",
-    androidApkUrl: "https://schoolixiq.com/downloads/schoolixiq.apk",
-    iosAppStoreUrl: "",
-    iosTestFlightUrl: "",
     marketingTitle: "",
     marketingSubtitle: "",
     marketingFeatures: [],
@@ -357,11 +335,6 @@ export default function SuperAdminDashboard() {
             successPartners: data.successPartners || [],
             appName: data.appName || "SchoolixiQ",
             appLogo: data.appLogo || "",
-            androidApkUrl:
-              data.androidApkUrl ||
-              "https://schoolixiq.com/downloads/schoolixiq.apk",
-            iosAppStoreUrl: data.iosAppStoreUrl || "",
-            iosTestFlightUrl: data.iosTestFlightUrl || "",
             marketingTitle: data.marketingTitle || "",
             marketingSubtitle: data.marketingSubtitle || "",
             marketingFeatures: data.marketingFeatures || [],
@@ -549,6 +522,7 @@ export default function SuperAdminDashboard() {
 
   const PERMISSION_LABELS: Record<string, string> = {
     overview: t('overview'),
+    daily_summary: t('dailySummary') || (isRtl ? "ملخص المدرسة اليومي" : "Daily School Summary"),
     chat: t('chat'),
     students_view: t('viewStudents'),
     students_edit: t('manageStudents'),
@@ -916,40 +890,21 @@ export default function SuperAdminDashboard() {
       return;
     }
 
-    const loadingToast = toast.loading("جاري رفض الطلب وحذف الحساب...");
+    const loadingToast = toast.loading("جاري إلغاء الطلب...");
     try {
-      const isSchoolRegistration =
-        source === "registrations" ||
-        request?.type === "direct_school_signup" ||
-        request?.type === "subscription_request";
-
-      if (
-        isSchoolRegistration &&
-        request &&
-        typeof request !== "string"
-      ) {
-        await rejectSchoolRegistrationRequest({
-          id,
-          _source: source,
-          uid: request.uid,
-          schoolId: request.schoolId,
+      // If it's a subscription request and has a schoolId, update school status to 'rejected'
+      if (request && typeof request !== "string" && request.schoolId) {
+        await updateDoc(doc(db, "schools", request.schoolId), {
+          status: "rejected",
+          updatedAt: serverTimestamp(),
         });
-      } else {
-        if (request && typeof request !== "string" && request.schoolId) {
-          await updateDoc(doc(db, "schools", request.schoolId), {
-            status: "rejected",
-            updatedAt: serverTimestamp(),
-          });
-        }
-        await deleteDoc(doc(db, source, id));
       }
 
+      const requestRef = doc(db, source, id);
+      await deleteDoc(requestRef);
+
       toast.dismiss(loadingToast);
-      toast.success(
-        isSchoolRegistration
-          ? "تم رفض الطلب وحذف حساب المدير نهائياً"
-          : "تم إلغاء الطلب بنجاح",
-      );
+      toast.success("تم إلغاء الطلب وتحويل حالة المدرسة إلى مرفوض");
       setDeleteConfirmId(null);
     } catch (error: any) {
       toast.dismiss(loadingToast);
@@ -1019,15 +974,20 @@ export default function SuperAdminDashboard() {
         "مدير المدرسة";
 
       // 1. Create School (Firestore)
+      const customerInfo = request.customerInfo || {};
       const schoolRef = await addDoc(collection(db, "schools"), {
         name: name,
         address: address,
-        governorate: (request.customerInfo?.governorate || request.governorate || ""),
-        directorate: (request.customerInfo?.directorate || request.directorate || ""),
-        educationLevel: (request.customerInfo?.educationLevel || request.educationLevel || ""),
-        workingHours: (request.customerInfo?.workingHours || request.workingHours || ""),
-        studyType: (request.customerInfo?.studyType || request.studyType || ""),
-        estimatedStudents: Number(request.customerInfo?.estimatedStudents || request.estimatedStudents || 0),
+        governorate: customerInfo.governorate || request.governorate || "",
+        directorate: customerInfo.directorate || request.directorate || "",
+        educationLevel: customerInfo.educationLevel || request.educationLevel || request.stage || "",
+        stage: customerInfo.educationLevel || request.educationLevel || request.stage || "",
+        workingHours: customerInfo.workingHours || request.workingHours || request.shift || "",
+        shift: customerInfo.workingHours || request.workingHours || request.shift || "",
+        studyType: customerInfo.studyType || request.studyType || request.genderType || "",
+        genderType: customerInfo.studyType || request.studyType || request.genderType || "",
+        estimatedStudents: Number(customerInfo.estimatedStudents || request.estimatedStudents) || 0,
+        approximateStudents: customerInfo.estimatedStudents || request.estimatedStudents || "",
         status: "active",
         planId: planId,
         studentCount: 0,
@@ -1148,7 +1108,7 @@ export default function SuperAdminDashboard() {
       }
       setShowUserModal(false);
       setEditingUser(null);
-      setNewUser({ name: "", email: "", role: "parent", schoolId: "", permissions: [] });
+      setNewUser({ name: "", email: "", role: "parent", schoolId: "" });
     } catch (error: any) {
       console.error("Add user error:", error);
       toast.error(error.message || "حدث خطأ أثناء المعالجة");
@@ -1441,7 +1401,6 @@ export default function SuperAdminDashboard() {
         setNewSchool({
           name: "",
           address: "",
-          googleMapsUrl: "",
           governorate: "",
           directorate: "",
           stage: "",
@@ -1540,7 +1499,6 @@ export default function SuperAdminDashboard() {
       setNewSchool({
         name: "",
         address: "",
-        googleMapsUrl: "",
         governorate: "",
         directorate: "",
         stage: "",
@@ -1565,7 +1523,7 @@ export default function SuperAdminDashboard() {
 
   return (
     <div
-      className={`h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:h-auto print:block ${mobileUi ? "sq-app-native bg-transparent" : "bg-transparent"}`}
+      className="h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Sidebar Mockup matching theme */}
@@ -1589,15 +1547,21 @@ export default function SuperAdminDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`${mobileUi ? "hidden " : ""}bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible`}
+            className={`bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible pt-[env(safe-area-inset-top,0px)]`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
                 className={`p-6 flex ${isSidebarCollapsed ? "justify-center border-b border-transparent" : "items-center gap-4 border-b border-slate-700 dark:border-slate-800"} pb-6`}
               >
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0">
-                  <BrandLogo size="sm" className="max-h-full max-w-full" alt={config.appName} />
-                </div>
+                {config.appLogo && config.appLogo !== "/icon.svg" ? (
+                  <img
+                    src={config.appLogo || undefined}
+                    alt={config.appName}
+                    className="w-10 h-10 md:w-12 md:h-12 object-contain rounded-xl bg-white p-1 shrink-0"
+                  />
+                ) : (
+                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
+                )}
                 {!isSidebarCollapsed && (
                   <motion.h1
                     initial={{ opacity: 0 }}
@@ -1619,7 +1583,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_schools') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "schools" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "schools" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <Building
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1644,7 +1608,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_accounts') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "accounts" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "accounts" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <Lock
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1673,7 +1637,7 @@ export default function SuperAdminDashboard() {
                         ? t('sidebar_team')
                         : undefined
                     }
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "team" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "team" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <ShieldCheck
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1698,7 +1662,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_packages') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "packages" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "packages" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <Plus
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1723,7 +1687,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_requests') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "requests" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "requests" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <Mail
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1758,7 +1722,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_chat') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "chat" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "chat" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                   >
                     <MessageSquare
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1786,7 +1750,7 @@ export default function SuperAdminDashboard() {
                       title={
                         isSidebarCollapsed ? t('sidebar_users') : undefined
                       }
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "users" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "users" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <Users
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1809,7 +1773,7 @@ export default function SuperAdminDashboard() {
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
                       title={isSidebarCollapsed ? t('sidebar_parents') : undefined}
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "parents" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "parents" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <Users
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1836,7 +1800,7 @@ export default function SuperAdminDashboard() {
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
                       title={isSidebarCollapsed ? t('sidebar_settings') : undefined}
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "settings" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "settings" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <SettingsIcon
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1863,7 +1827,7 @@ export default function SuperAdminDashboard() {
                           ? t('sidebar_footer')
                           : undefined
                       }
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "footer" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "footer" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <LayoutDashboard
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1888,7 +1852,7 @@ export default function SuperAdminDashboard() {
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
                       title={isSidebarCollapsed ? t('sidebar_backups') : undefined}
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "backups" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "backups" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <Save
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1915,7 +1879,7 @@ export default function SuperAdminDashboard() {
                           ? t('sidebar_diagnostics')
                           : undefined
                       }
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "diagnostics" ? "bg-[#0B2345] text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "diagnostics" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <Activity
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1973,7 +1937,7 @@ export default function SuperAdminDashboard() {
       </AnimatePresence>
 
       <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className={`${mobileUi ? "hidden " : ""}h-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-10 print:hidden`}>
+        <header className="min-h-[5rem] h-auto pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-10 print:hidden">
           <div className="flex items-center gap-1.5 sm:gap-4 min-w-0">
             <button
               onClick={() => {
@@ -2015,7 +1979,7 @@ export default function SuperAdminDashboard() {
             )}
             <h2
               id="super-admin-header"
-              className="text-sm sm:text-base md:text-xl font-black text-slate-900 dark:text-white font-display tracking-tight hover:text-[#0B2345] transition-colors cursor-default truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none"
+              className="text-sm sm:text-base md:text-xl font-black text-slate-900 dark:text-white font-display tracking-tight hover:text-blue-600 transition-colors cursor-default truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none"
             >
               {t('system_management')}
             </h2>
@@ -2024,10 +1988,25 @@ export default function SuperAdminDashboard() {
             <LanguageToggle />
             <ThemeToggle />
 
-            <NotificationBell
-              activeTabSetter={navigateToTab}
-              userRole="superadmin"
-            />
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+            >
+              <Bell size={18} />
+              {notifications.filter((n: any) => !n.read).length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                  {notifications.filter((n: any) => !n.read).length > 9 ? '9+' : notifications.filter((n: any) => !n.read).length}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <NotificationCenter
+                onClose={() => setShowNotifications(false)}
+                activeTabSetter={setActiveTab}
+                userRole="super_admin"
+              />
+            )}
             <div className="text-left md:block hidden">
               <p className="text-[10px] text-slate-400 leading-none mb-1 uppercase tracking-widest font-bold">
                 {t('system_status')}
@@ -2057,8 +2036,8 @@ export default function SuperAdminDashboard() {
                 <h4 className="text-xs md:text-sm font-bold text-amber-900 dark:text-amber-400 leading-tight">
                   تأكيد البريد الإلكتروني (Super Admin)
                 </h4>
-                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 max-w-[220px] md:max-w-[400px]">
-                  {emailVerificationHint(isRtl)}
+                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 truncate max-w-[220px] md:max-w-[400px]">
+                  يرجى تفعيل بريدك ({auth.currentUser?.email})
                 </p>
               </div>
             </div>
@@ -2093,45 +2072,8 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        {mobileUi ? (
-          <>
-            <MobileMockupHeader
-              sectionTitle={
-                activeTab === "schools"
-                  ? t("sidebar_schools") || (isRtl ? "المدارس" : "Schools")
-                  : activeTab === "settings"
-                    ? t("sidebar_settings")
-                    : activeTab === "chat"
-                      ? t("chat")
-                      : activeTab === "requests"
-                        ? isRtl
-                          ? "الطلبات"
-                          : "Requests"
-                        : config.appName
-              }
-              schoolName={config.appName}
-              schoolLogoUrl={config.appLogo}
-              modules={[
-                { id: "schools", label: t("sidebar_schools"), icon: Building },
-                { id: "requests", label: isRtl ? "الطلبات" : "Requests", icon: Bell },
-                { id: "settings", label: t("sidebar_settings"), icon: SettingsIcon },
-              ]}
-              onNavigateModule={(tab) => navigateToTab(tab as typeof activeTab)}
-              onNotifications={() => navigateToTab("requests")}
-              onBack={activeTab !== "schools" ? handleBack : undefined}
-            />
-            <MobileMockupBottomNav
-              role="superadmin"
-              active={tabToMobileNav("superadmin", activeTab)}
-              onChange={(nav) =>
-                navigateToTab(mobileNavToTab("superadmin", nav))
-              }
-            />
-          </>
-        ) : null}
-
         <div
-          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full" : "overflow-y-auto custom-scrollbar pb-10"} ${mobileUi ? "pt-[72px] pb-[84px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]" : ""}`}
+          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full" : "overflow-y-auto custom-scrollbar pb-10"}`}
         >
           <AnimatePresence mode="wait">
             <motion.div
@@ -2139,7 +2081,7 @@ export default function SuperAdminDashboard() {
               className={
                 activeTab === "chat"
                   ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden"
-                  : `w-full flex flex-col sq-page ${mobileUi ? "p-0" : "p-4 md:p-8"}`
+                  : "w-full p-4 md:p-8 flex flex-col"
               }
               initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -2147,15 +2089,6 @@ export default function SuperAdminDashboard() {
               transition={{ duration: 0.25, ease: "easeOut" }}
             >
               {activeTab === "schools" ? (
-                mobileUi ? (
-                  <SuperAdminMockupHome
-                    schoolCount={schools.length}
-                    adminCount={users.filter((u) => u.role === "admin").length}
-                    teacherCount={users.filter((u) => u.role === "teacher").length}
-                    eventCount={0}
-                    onTabChange={navigateToTab}
-                  />
-                ) : (
                 <>
                   <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md group gap-4">
                     <div id="overview-header-group">
@@ -2179,7 +2112,7 @@ export default function SuperAdminDashboard() {
                         setSchoolModalTab("info");
                         setShowAddModal(true);
                       }}
-                      className="mt-2 md:mt-0 w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl hover:bg-[#0B2345] dark:hover:bg-[#1a3a6b] transition-all font-black shadow-2xl shadow-blue-600/20 active:scale-95 group/btn text-sm shrink-0"
+                      className="mt-2 md:mt-0 w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl hover:bg-blue-600 dark:hover:bg-blue-700 transition-all font-black shadow-2xl shadow-blue-600/20 active:scale-95 group/btn text-sm shrink-0"
                     >
                       <Plus
                         size={18}
@@ -2217,16 +2150,16 @@ export default function SuperAdminDashboard() {
                       title={t('stat_total_users')}
                       value={users.length}
                       hint={t('stat_users_hint')}
-                      color="text-[#0B2345]"
+                      color="text-indigo-600"
                       onClick={() => setActiveTab("users")}
-                      isActive={(activeTab as string) === "users"}
+                      isActive={activeTab === "users"}
                     />
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none overflow-hidden transition-all">
                     <div className="px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/20 dark:bg-slate-800/20">
                       <div className="flex items-center gap-4">
-                        <div className="p-2 md:p-3 bg-[#0B2345] rounded-xl md:rounded-2xl text-white shadow-lg shadow-blue-600/20">
+                        <div className="p-2 md:p-3 bg-blue-600 rounded-xl md:rounded-2xl text-white shadow-lg shadow-blue-600/20">
                           <LayoutGrid size={24} />
                         </div>
                         <div>
@@ -2242,7 +2175,7 @@ export default function SuperAdminDashboard() {
                       <div className="flex flex-col items-end gap-2 w-full md:w-auto">
                         <div className="relative w-full md:w-96 group">
                           <Search
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0B2345] transition-colors"
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors"
                             size={18}
                           />
                           <input
@@ -2316,12 +2249,15 @@ export default function SuperAdminDashboard() {
                       </div>
                     </div>
                     <div className="overflow-x-auto w-full custom-scrollbar">
-                      <table className="w-full text-right border-collapse min-w-[800px]">
+                      <table className="w-full text-right border-collapse min-w-[1000px]">
                       <thead>
                         <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
                           <th className="px-8 py-5 text-right">
                             المدرسة والبيانات
                           </th>
+                          <th className="px-6 py-5 text-right">المحافظة</th>
+                          <th className="px-6 py-5 text-right">المديرية</th>
+                          <th className="px-6 py-5 text-right">المرحلة الدراسية</th>
                           <th className="px-6 py-5 text-right">المواصفات</th>
                           <th className="px-6 py-5 text-right">
                             فترة الاشتراك
@@ -2362,7 +2298,7 @@ export default function SuperAdminDashboard() {
                                       ID: {school.id?.slice(0, 8)}
                                     </span>
                                     {school.governorate && (
-                                      <div className="flex items-center gap-1.5 text-[10px] text-[#0B2345] dark:text-blue-400 font-bold max-w-[180px]">
+                                      <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-bold max-w-[180px]">
                                         {school.governorate}{" "}
                                         {school.directorate
                                           ? ` - ${school.directorate}`
@@ -2394,10 +2330,25 @@ export default function SuperAdminDashboard() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-6">
+                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
+                              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                {school.governorate || "غير محدد"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
+                              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                {school.directorate || "غير محدد"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
+                              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                {school.stage || school.educationLevel || "غير محدد"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
                               <div className="flex flex-col gap-2">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-[#0B2345] dark:text-blue-400 text-[9px] font-black rounded-md border border-blue-100 dark:border-blue-900/40 uppercase tracking-tighter">
+                                  <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] font-black rounded-md border border-blue-100 dark:border-blue-900/40 uppercase tracking-tighter">
                                     {packages.find(
                                       (p) => p.id === school.planId,
                                     )?.name || "BASIC_PLAN"}
@@ -2406,7 +2357,7 @@ export default function SuperAdminDashboard() {
                                 <div className="flex items-center gap-2">
                                   <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden w-20">
                                     <div
-                                      className="h-full bg-[#0B2345] transition-all"
+                                      className="h-full bg-blue-500 transition-all"
                                       style={{
                                         width: `${Math.min(100, ((school.studentCount || 0) / (packages.find((p) => p.id === school.planId)?.maxStudents || 500)) * 100)}%`,
                                       }}
@@ -2532,7 +2483,7 @@ export default function SuperAdminDashboard() {
                                             ? "إخفاء المؤقت عن المدرسة"
                                             : "إظهار المؤقت للمدرسة"
                                         }
-                                        className={`p-2.5 rounded-xl transition-all ${school.showSubscriptionTimer ? "bg-white dark:bg-slate-900 text-[#0B2345] shadow-sm border border-slate-100 dark:border-slate-800" : "text-slate-400 hover:text-slate-600 hover:bg-white dark:hover:bg-slate-900"}`}
+                                        className={`p-2.5 rounded-xl transition-all ${school.showSubscriptionTimer ? "bg-white dark:bg-slate-900 text-blue-600 shadow-sm border border-slate-100 dark:border-slate-800" : "text-slate-400 hover:text-slate-600 hover:bg-white dark:hover:bg-slate-900"}`}
                                       >
                                         {school.showSubscriptionTimer ? (
                                           <Eye size={16} />
@@ -2570,7 +2521,7 @@ export default function SuperAdminDashboard() {
                                           setSchoolModalTab("info");
                                           setShowAddModal(true);
                                         }}
-                                        className="p-2.5 text-slate-400 hover:text-[#0B2345] hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
+                                        className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
                                       >
                                         <SettingsIcon size={16} />
                                       </button>
@@ -2581,7 +2532,7 @@ export default function SuperAdminDashboard() {
                                             school.subscriptionExpiresAt,
                                           )
                                         }
-                                        className="p-2.5 text-[#0B2345] hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
+                                        className="p-2.5 text-blue-600 hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
                                       >
                                         <Plus size={16} />
                                       </button>
@@ -2620,13 +2571,12 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
                 </>
-                )
               ) : activeTab === "accounts" ? (
                 <>
                   <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div>
                       <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight flex items-center gap-2.5">
-                        <ShieldCheck className="text-[#0B2345] shrink-0" size={24} />
+                        <ShieldCheck className="text-blue-600 shrink-0" size={24} />
                         حسابات المدارس الرقمية
                       </h3>
                       <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 flex items-center gap-1.5 text-xs sm:text-sm">
@@ -2658,7 +2608,7 @@ export default function SuperAdminDashboard() {
                   <div className="mb-6 flex items-center gap-4">
                     <div className="flex-1 relative group">
                       <Search
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0B2345] transition-colors"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors"
                         size={18}
                       />
                       <input
@@ -2705,7 +2655,7 @@ export default function SuperAdminDashboard() {
                                       />
                                     </div>
                                   ) : (
-                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center text-[#0B2345] dark:text-blue-400 border border-blue-100 dark:border-slate-700 shadow-sm transition-transform group-hover:scale-110 shrink-0">
+                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-slate-700 shadow-sm transition-transform group-hover:scale-110 shrink-0">
                                       <Building size={20} />
                                     </div>
                                   )}
@@ -2782,7 +2732,7 @@ export default function SuperAdminDashboard() {
                                     <>
                                       <a
                                         href={`mailto:${school.adminEmail}`}
-                                        className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl text-slate-400 hover:text-[#0B2345] transition-all border border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900/50 hover:shadow-lg hover:shadow-blue-500/5"
+                                        className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl text-slate-400 hover:text-blue-600 transition-all border border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900/50 hover:shadow-lg hover:shadow-blue-500/5"
                                         title="إرسال بريد"
                                       >
                                         <Mail size={16} />
@@ -2953,7 +2903,7 @@ export default function SuperAdminDashboard() {
                         setPackageModalTab("general");
                         setShowPackageModal(true);
                       }}
-                      className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-[#0B2345] text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-[#1a3a6b] transition-all active:scale-95 text-sm shrink-0"
+                      className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-sm shrink-0"
                     >
                       <Plus size={18} />
                       إضافة باقة جديدة
@@ -2967,7 +2917,7 @@ export default function SuperAdminDashboard() {
                         className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-sm flex flex-col"
                       >
                         <div className="flex justify-between items-start mb-6">
-                          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-3xl text-[#0B2345]">
+                          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-3xl text-blue-600">
                             <Package size={24} />
                           </div>
                           <div className="flex flex-col items-end gap-1">
@@ -3102,7 +3052,7 @@ export default function SuperAdminDashboard() {
                                   });
                                   setShowPackageModal(true);
                                 }}
-                                className="py-3 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-[#1a3a6b] transition-all font-sans text-sm flex items-center justify-center gap-2"
+                                className="py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-blue-700 transition-all font-sans text-sm flex items-center justify-center gap-2"
                               >
                                 <SettingsIcon size={14} />
                                 تعديل
@@ -3137,7 +3087,7 @@ export default function SuperAdminDashboard() {
                       </p>
                     </div>
                     <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-2xl border border-blue-100 dark:border-blue-800 shrink-0">
-                      <span className="text-[#0B2345] dark:text-blue-400 font-black text-xs sm:text-sm">
+                      <span className="text-blue-600 dark:text-blue-400 font-black text-xs sm:text-sm">
                         {subscriptionRequests.length} طلبات معلقة
                       </span>
                     </div>
@@ -3154,7 +3104,7 @@ export default function SuperAdminDashboard() {
                         className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8 transition-all hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 group relative"
                       >
                         <div className="flex items-center gap-8 flex-1">
-                          <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-[#0B2345] transition-colors duration-500">
+                          <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors duration-500">
                             <Building size={32} />
                           </div>
                           <div className="space-y-2">
@@ -3165,7 +3115,7 @@ export default function SuperAdminDashboard() {
                                   request.adminName}
                               </h4>
                               <span
-                                className={`px-3 py-1 ${request.type === "renewal_request" ? "bg-orange-100 text-orange-600 border border-orange-200" : "bg-blue-50 dark:bg-blue-900/30 text-[#0B2345] dark:text-blue-400"} text-[10px] font-black rounded-full uppercase tracking-widest`}
+                                className={`px-3 py-1 ${request.type === "renewal_request" ? "bg-orange-100 text-orange-600 border border-orange-200" : "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"} text-[10px] font-black rounded-full uppercase tracking-widest`}
                               >
                                 {request.type === "renewal_request"
                                   ? "طلب تجديد"
@@ -3221,69 +3171,10 @@ export default function SuperAdminDashboard() {
                                 }
                               />
                             </div>
-                            {(request.customerInfo?.address || request.address) && (
+                            {request.customerInfo?.address && (
                               <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
                                 <MapPin size={14} className="text-slate-400" />
-                                <span>{request.customerInfo?.address || request.address}</span>
-                              </div>
-                            )}
-                            {(request.customerInfo?.governorate || request.governorate) && (
-                              <div className="flex flex-wrap gap-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                                <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                                  المحافظة: {request.customerInfo?.governorate || request.governorate}
-                                </span>
-                                {(request.customerInfo?.directorate || request.directorate) && (
-                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                                    المديرية: {request.customerInfo?.directorate || request.directorate}
-                                  </span>
-                                )}
-                                {(request.customerInfo?.educationLevel ||
-                                  request.educationLevel ||
-                                  request.customerInfo?.stage ||
-                                  request.stage) && (
-                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                                    المرحلة:{" "}
-                                    {request.customerInfo?.educationLevel ||
-                                      request.educationLevel ||
-                                      request.customerInfo?.stage ||
-                                      request.stage}
-                                  </span>
-                                )}
-                                {(request.customerInfo?.workingHours ||
-                                  request.workingHours ||
-                                  request.customerInfo?.shift ||
-                                  request.shift) && (
-                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                                    الدوام:{" "}
-                                    {request.customerInfo?.workingHours ||
-                                      request.workingHours ||
-                                      request.customerInfo?.shift ||
-                                      request.shift}
-                                  </span>
-                                )}
-                                {(request.customerInfo?.studyType ||
-                                  request.studyType ||
-                                  request.customerInfo?.genderType ||
-                                  request.genderType) && (
-                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                                    نوع الدراسة:{" "}
-                                    {request.customerInfo?.studyType ||
-                                      request.studyType ||
-                                      request.customerInfo?.genderType ||
-                                      request.genderType}
-                                  </span>
-                                )}
-                                {((request.customerInfo?.estimatedStudents !== undefined &&
-                                  request.customerInfo?.estimatedStudents !== "") ||
-                                  request.estimatedStudents !== undefined ||
-                                  request.approximateStudents) && (
-                                  <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                                    عدد الطلاب:{" "}
-                                    {request.customerInfo?.estimatedStudents ??
-                                      request.estimatedStudents ??
-                                      request.approximateStudents}
-                                  </span>
-                                )}
+                                <span>{request.customerInfo?.address}</span>
                               </div>
                             )}
                             <button
@@ -3301,7 +3192,7 @@ export default function SuperAdminDashboard() {
                                   );
                                 }
                               }}
-                              className="flex items-center gap-2 text-[10px] text-[#0B2345] dark:text-blue-400 underline decoration-2 underline-offset-4 font-black hover:text-blue-700 transition-colors"
+                              className="flex items-center gap-2 text-[10px] text-blue-600 dark:text-blue-400 underline decoration-2 underline-offset-4 font-black hover:text-blue-700 transition-colors"
                             >
                               <Plus size={12} />
                               تحديد/عرض تفاصيل الباقة المطلوبة
@@ -3378,7 +3269,7 @@ export default function SuperAdminDashboard() {
                                   }
                                   handleApproveRequest(request);
                                 }}
-                                className="px-8 py-4 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black hover:bg-[#0B2345] dark:hover:bg-[#1a3a6b] transition-all active:scale-90 flex items-center gap-2 shadow-lg shadow-blue-600/10 cursor-pointer relative z-30"
+                                className="px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-600 dark:hover:bg-blue-700 transition-all active:scale-90 flex items-center gap-2 shadow-lg shadow-blue-600/10 cursor-pointer relative z-30"
                               >
                                 <CheckCircle size={20} />
                                 {request._source === "subscriptionRequests" &&
@@ -3434,11 +3325,10 @@ export default function SuperAdminDashboard() {
                             email: "",
                             role: "assistant",
                             schoolId: "",
-                            permissions: [],
                           });
                           setShowUserModal(true);
                         }}
-                        className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-[#0B2345] text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-[#1a3a6b] transition-all active:scale-95 text-sm"
+                        className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-sm"
                       >
                         <ShieldCheck size={18} />
                         إضافة عضو فريق
@@ -3463,7 +3353,7 @@ export default function SuperAdminDashboard() {
                         ).length
                       }
                       hint="صلاحيات مخصصة"
-                      color="text-[#0B2345]"
+                      color="text-blue-600"
                     />
                   </div>
 
@@ -3519,7 +3409,7 @@ export default function SuperAdminDashboard() {
                                   className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${
                                     user.role === "superadmin"
                                       ? "bg-purple-100 text-purple-600 border border-purple-200"
-                                      : "bg-blue-100 text-[#0B2345] border border-blue-200"
+                                      : "bg-blue-100 text-blue-600 border border-blue-200"
                                   }`}
                                 >
                                   {user.role === "superadmin"
@@ -3537,7 +3427,7 @@ export default function SuperAdminDashboard() {
                                     user.permissions?.map((p: string) => (
                                       <span
                                         key={p}
-                                        className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-[#0B2345] dark:text-blue-400 rounded-md text-[8px] font-black"
+                                        className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md text-[8px] font-black"
                                       >
                                         {SYSTEM_PERMISSIONS[p] || p}
                                       </span>
@@ -3554,7 +3444,7 @@ export default function SuperAdminDashboard() {
                                   {MASTER_ADMIN_EMAILS.includes(
                                     user.email?.toLowerCase(),
                                   ) ? (
-                                    <div className="text-[10px] text-[#0B2345] font-black bg-blue-50 px-2 py-1 rounded-lg">
+                                    <div className="text-[10px] text-blue-600 font-black bg-blue-50 px-2 py-1 rounded-lg">
                                       حساب رئيسي محمي
                                     </div>
                                   ) : !isMasterAdmin &&
@@ -3595,7 +3485,7 @@ export default function SuperAdminDashboard() {
                                           } as any);
                                           setShowUserModal(true);
                                         }}
-                                        className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-slate-400 hover:text-[#0B2345] rounded-xl transition-all"
+                                        className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-slate-400 hover:text-blue-600 rounded-xl transition-all"
                                       >
                                         <SettingsIcon size={14} />
                                       </button>
@@ -3633,13 +3523,13 @@ export default function SuperAdminDashboard() {
                       <div className="bg-slate-100 dark:bg-slate-800 p-1 flex items-center rounded-2xl w-full sm:w-auto">
                         <button
                           onClick={() => setUsersTab("management")}
-                          className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${usersTab === "management" ? "bg-white dark:bg-slate-700 text-[#0B2345] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                          className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${usersTab === "management" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                         >
                           إدارة المدارس
                         </button>
                         <button
                           onClick={() => setUsersTab("parents")}
-                          className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${usersTab === "parents" ? "bg-white dark:bg-slate-700 text-[#0B2345] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                          className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${usersTab === "parents" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                         >
                           الأهالي
                         </button>
@@ -3647,7 +3537,7 @@ export default function SuperAdminDashboard() {
                       {usersTab === "management" && (
                         <button
                           onClick={() => setShowUserModal(true)}
-                          className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-[#0B2345] text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-[#1a3a6b] transition-all active:scale-95 text-sm"
+                          className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-sm"
                         >
                           <Plus size={18} />
                           إضافة مستخدم
@@ -3720,9 +3610,9 @@ export default function SuperAdminDashboard() {
                                             user.role === "superadmin"
                                               ? "bg-purple-100 text-purple-600 border border-purple-200"
                                               : user.role === "admin"
-                                                ? "bg-blue-100 text-[#0B2345] border border-blue-200"
+                                                ? "bg-blue-100 text-blue-600 border border-blue-200"
                                                 : user.role === "teacher"
-                                                  ? "bg-[#e8eef5] text-[#0B2345] border border-indigo-200"
+                                                  ? "bg-indigo-100 text-indigo-600 border border-indigo-200"
                                                   : "bg-green-100 text-green-600 border border-green-200"
                                           }`}
                                         >
@@ -3775,11 +3665,10 @@ export default function SuperAdminDashboard() {
                                                   email: user.email,
                                                   role: user.role,
                                                   schoolId: user.schoolId || "",
-                                                  permissions: user.permissions || [],
                                                 });
                                                 setShowUserModal(true);
                                               }}
-                                              className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-[#0B2345] dark:hover:text-blue-400 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/30"
+                                              className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/30"
                                               title="تعديل المستخدم"
                                             >
                                               <SettingsIcon size={16} />
@@ -3817,7 +3706,7 @@ export default function SuperAdminDashboard() {
                                           userStudents.map((s) => (
                                             <div
                                               key={s.id}
-                                              className="text-[10px] bg-blue-50 dark:bg-blue-900/20 text-[#0B2345] dark:text-blue-400 px-2 py-1 rounded-md inline-block mr-1"
+                                              className="text-[10px] bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-1 rounded-md inline-block mr-1"
                                             >
                                               {s.name}
                                             </div>
@@ -3896,7 +3785,7 @@ export default function SuperAdminDashboard() {
                                 <td className="px-6 py-4">
                                   {userSchool ? (
                                     <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-[#0B2345] dark:text-blue-400 flex justify-center items-center">
+                                      <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex justify-center items-center">
                                         <Building size={16} />
                                       </div>
                                       <span className="text-slate-800 dark:text-slate-200 font-black">
@@ -4003,7 +3892,7 @@ export default function SuperAdminDashboard() {
                             placeholder="https://example.com/logo.png"
                             dir="ltr"
                           />
-                          <label className="flex items-center justify-center gap-2 px-6 bg-blue-50 dark:bg-blue-900/20 text-[#0B2345] dark:text-blue-400 font-bold rounded-2xl cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors border border-blue-100 dark:border-blue-800/50 shrink-0">
+                          <label className="flex items-center justify-center gap-2 px-6 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold rounded-2xl cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors border border-blue-100 dark:border-blue-800/50 shrink-0">
                             <Upload size={20} />
                             <span className="hidden sm:inline">رفع صورة</span>
                             <input
@@ -4024,32 +3913,6 @@ export default function SuperAdminDashboard() {
                           </div>
                         )}
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
-                          رابط تحميل تطبيق Android (APK)
-                        </label>
-                        <input
-                          type="url"
-                          value={systemConfig.androidApkUrl}
-                          onChange={(e) =>
-                            setSystemConfig({
-                              ...systemConfig,
-                              androidApkUrl: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all font-mono text-sm"
-                          placeholder="https://schoolixiq.com/downloads/schoolixiq.apk"
-                          dir="ltr"
-                        />
-                        <p className="text-[10px] text-slate-500 mt-2 font-medium">
-                          يظهر في Footer الموقع. ارفع الملف عبر FTP إلى
-                          public_html/downloads/schoolixiq.apk أو ضع رابط
-                          Firebase Storage / Google Drive مباشر.
-                        </p>
-                      </div>
-                      <p className="text-[10px] text-slate-500 font-medium rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/50 px-4 py-3">
-                        تحميل iPhone من الموقع معطّل. مستخدمو iOS يستخدمون الموقع من Safari مباشرة.
-                      </p>
                     </div>
 
                     {/* Support Phones Section */}
@@ -4068,7 +3931,7 @@ export default function SuperAdminDashboard() {
                               ],
                             })
                           }
-                          className="text-[#0B2345] dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
+                          className="text-blue-600 dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
                         >
                           <Plus size={14} /> إضافة رقم
                         </button>
@@ -4139,7 +4002,7 @@ export default function SuperAdminDashboard() {
                               ],
                             })
                           }
-                          className="text-[#0B2345] dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
+                          className="text-blue-600 dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
                         >
                           <Plus size={14} /> إضافة بريد
                         </button>
@@ -4197,7 +4060,7 @@ export default function SuperAdminDashboard() {
                     <button
                       onClick={handleUpdateConfig}
                       disabled={isSavingConfig}
-                      className="w-full flex items-center justify-center gap-2 py-4 bg-[#0B2345] text-white rounded-2xl font-bold hover:bg-[#1a3a6b] transition-all shadow-xl shadow-blue-600/20 active:scale-95 disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 active:scale-95 disabled:opacity-50"
                     >
                       <Save size={20} />
                       {isSavingConfig ? "جاري الحفظ..." : "حفظ الإعدادات"}
@@ -4237,7 +4100,7 @@ export default function SuperAdminDashboard() {
                               ],
                             })
                           }
-                          className="text-[#0B2345] dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
+                          className="text-blue-600 dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
                         >
                           <Plus size={14} /> إضافة شريك
                         </button>
@@ -4482,7 +4345,7 @@ export default function SuperAdminDashboard() {
                                 ],
                               });
                             }}
-                            className="text-[#0B2345] dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
+                            className="text-blue-600 dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
                           >
                             <Plus size={14} /> إضافة لافته عرض (Banner)
                           </button>
@@ -4592,7 +4455,7 @@ export default function SuperAdminDashboard() {
                                                 currentBanners,
                                             });
                                           }}
-                                          className="w-5 h-5 rounded text-[#0B2345] focus:ring-blue-500 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 transition-all cursor-pointer"
+                                          className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 transition-all cursor-pointer"
                                         />
                                         <span className="text-xs font-bold text-slate-700 dark:text-slate-300 select-none">
                                           تفعيل النشر (يظهر للزائر)
@@ -4682,7 +4545,7 @@ export default function SuperAdminDashboard() {
                                   ],
                                 });
                               }}
-                              className="text-[#0B2345] dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
+                              className="text-blue-600 dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline"
                             >
                               <Plus size={14} /> إضافة ميزة تسويقية
                             </button>
@@ -4781,12 +4644,11 @@ export default function SuperAdminDashboard() {
                     <button
                       onClick={handleUpdateConfig}
                       disabled={isSavingConfig}
-                      className="w-full flex items-center justify-center gap-2 py-4 bg-[#0B2345] text-white rounded-2xl font-bold hover:bg-[#1a3a6b] transition-all shadow-xl shadow-blue-600/20 active:scale-95 disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 active:scale-95 disabled:opacity-50"
                     >
                       <Save size={20} />
                       {isSavingConfig ? "جاري الحفظ..." : "حفظ الإعدادات"}
                     </button>
-                    {mobileUi ? <MobileLogoutButton className="px-0" /> : null}
                   </div>
                 </motion.div>
               ) : activeTab === "backups" ? (
@@ -4796,7 +4658,7 @@ export default function SuperAdminDashboard() {
               ) : null}
             </motion.div>
           </AnimatePresence>
-          {activeTab !== "chat" && <GlobalFooter compact hideDownload={mobileUi} />}
+          {activeTab !== "chat" && <GlobalFooter compact />}
         </div>
       </main>
 
@@ -4815,7 +4677,7 @@ export default function SuperAdminDashboard() {
                     تجهيز بيئة عمل جديدة لإحدى المؤسسات التعليمية
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-[#0B2345] dark:text-blue-400">
+                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400">
                   <Building size={24} />
                 </div>
               </div>
@@ -4827,7 +4689,7 @@ export default function SuperAdminDashboard() {
                   onClick={() => setSchoolModalTab("info")}
                   className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all ${
                     schoolModalTab === "info"
-                      ? "bg-white dark:bg-slate-700 text-[#0B2345] dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
                       : "text-slate-400 dark:text-slate-500 hover:text-slate-600"
                   }`}
                 >
@@ -4838,7 +4700,7 @@ export default function SuperAdminDashboard() {
                   onClick={() => setSchoolModalTab("subscription")}
                   className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all ${
                     schoolModalTab === "subscription"
-                      ? "bg-white dark:bg-slate-700 text-[#0B2345] dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
                       : "text-slate-400 dark:text-slate-500 hover:text-slate-600"
                   }`}
                 >
@@ -4850,7 +4712,7 @@ export default function SuperAdminDashboard() {
                     onClick={() => setSchoolModalTab("admin")}
                     className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all ${
                       schoolModalTab === "admin"
-                        ? "bg-white dark:bg-slate-700 text-[#0B2345] dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
+                        ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
                         : "text-slate-400 dark:text-slate-500 hover:text-slate-600"
                     }`}
                   >
@@ -5224,7 +5086,7 @@ export default function SuperAdminDashboard() {
                                   !newSchool.showSubscriptionTimer,
                               })
                             }
-                            className={`w-10 h-5 rounded-full transition-all relative ${newSchool.showSubscriptionTimer ? "bg-[#0B2345]" : "bg-slate-300"}`}
+                            className={`w-10 h-5 rounded-full transition-all relative ${newSchool.showSubscriptionTimer ? "bg-blue-600" : "bg-slate-300"}`}
                           >
                             <div
                               className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${newSchool.showSubscriptionTimer ? "left-5.5" : "left-0.5"}`}
@@ -5239,7 +5101,7 @@ export default function SuperAdminDashboard() {
                 {schoolModalTab === "admin" && !editingSchool && (
                   <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
                     <div className="bg-blue-50/50 dark:bg-blue-900/10 p-5 rounded-2xl border border-blue-100/50 dark:border-blue-900/20 mb-2">
-                      <p className="text-xs font-bold text-[#0B2345] dark:text-blue-400 flex items-center gap-2 leading-relaxed">
+                      <p className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2 leading-relaxed">
                         <ShieldCheck size={16} className="shrink-0" />
                         سيتم إنشاء حساب مدير بصلاحية "Admin" لهذه المدرسة فور
                         الحفظ، ليتمكنوا من البدء فوراً.
@@ -5339,7 +5201,7 @@ export default function SuperAdminDashboard() {
                 <button
                   type="submit"
                   form="school-form"
-                  className="flex-1 px-8 py-4 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black hover:bg-[#1a3a6b] transition-all shadow-xl shadow-blue-600/10 active:scale-95"
+                  className="flex-1 px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/10 active:scale-95"
                 >
                   {editingSchool ? "حفظ التعديلات" : "تأكيد إنشاء المدرسة"}
                 </button>
@@ -5352,7 +5214,6 @@ export default function SuperAdminDashboard() {
                     setNewSchool({
                       name: "",
                       address: "",
-                      googleMapsUrl: "",
                       governorate: "",
                       directorate: "",
                       stage: "",
@@ -5394,7 +5255,7 @@ export default function SuperAdminDashboard() {
                     تحديد الميزات والقيود والأسعار لكل فئة
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-[#0B2345] dark:text-blue-400">
+                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400">
                   <ShieldCheck size={24} />
                 </div>
               </div>
@@ -5406,7 +5267,7 @@ export default function SuperAdminDashboard() {
                   onClick={() => setPackageModalTab("general")}
                   className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all ${
                     packageModalTab === "general"
-                      ? "bg-white dark:bg-slate-700 text-[#0B2345] dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
                       : "text-slate-400 dark:text-slate-500 hover:text-slate-600"
                   }`}
                 >
@@ -5417,7 +5278,7 @@ export default function SuperAdminDashboard() {
                   onClick={() => setPackageModalTab("permissions")}
                   className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all ${
                     packageModalTab === "permissions"
-                      ? "bg-white dark:bg-slate-700 text-[#0B2345] dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
                       : "text-slate-400 dark:text-slate-500 hover:text-slate-600"
                   }`}
                 >
@@ -5428,7 +5289,7 @@ export default function SuperAdminDashboard() {
                   onClick={() => setPackageModalTab("features")}
                   className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all ${
                     packageModalTab === "features"
-                      ? "bg-white dark:bg-slate-700 text-[#0B2345] dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-100 dark:border-slate-600"
                       : "text-slate-400 dark:text-slate-500 hover:text-slate-600"
                   }`}
                 >
@@ -5447,8 +5308,8 @@ export default function SuperAdminDashboard() {
                   <>
                     {/* Section 1: Basic Info */}
                     <div className="space-y-4">
-                      <h3 className="text-[10px] font-black uppercase text-[#0B2345] tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-[#0B2345] rounded-full"></span>
+                      <h3 className="text-[10px] font-black uppercase text-blue-600 tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
                         المعلومات الأساسية
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -5530,8 +5391,8 @@ export default function SuperAdminDashboard() {
 
                     {/* Section 2: Constraints & Duration */}
                     <div className="space-y-4">
-                      <h3 className="text-[10px] font-black uppercase text-[#0B2345] tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-[#0B2345] rounded-full"></span>
+                      <h3 className="text-[10px] font-black uppercase text-blue-600 tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
                         القيود والمدة الزمنية
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -5599,7 +5460,7 @@ export default function SuperAdminDashboard() {
                                   !newPackage.showSubscriptionTimer,
                               })
                             }
-                            className={`w-10 h-5 rounded-full transition-all relative ${newPackage.showSubscriptionTimer ? "bg-[#0B2345]" : "bg-slate-300"}`}
+                            className={`w-10 h-5 rounded-full transition-all relative ${newPackage.showSubscriptionTimer ? "bg-blue-600" : "bg-slate-300"}`}
                           >
                             <div
                               className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${newPackage.showSubscriptionTimer ? "left-5.5" : "left-0.5"}`}
@@ -5619,7 +5480,7 @@ export default function SuperAdminDashboard() {
                                   !newPackage.showInRegistration,
                               })
                             }
-                            className={`w-10 h-5 rounded-full transition-all relative ${newPackage.showInRegistration ? "bg-[#0B2345]" : "bg-slate-300"}`}
+                            className={`w-10 h-5 rounded-full transition-all relative ${newPackage.showInRegistration ? "bg-blue-600" : "bg-slate-300"}`}
                           >
                             <div
                               className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${newPackage.showInRegistration ? "left-5.5" : "left-0.5"}`}
@@ -5652,8 +5513,8 @@ export default function SuperAdminDashboard() {
 
                 {packageModalTab === "permissions" && (
                   <div className="space-y-4">
-                    <h3 className="text-[10px] font-black uppercase text-[#0B2345] tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-[#0B2345] rounded-full"></span>
+                    <h3 className="text-[10px] font-black uppercase text-blue-600 tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
                       الموديولات المتاحة (الصلاحيات)
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 dark:bg-slate-800/20 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
@@ -5674,18 +5535,18 @@ export default function SuperAdminDashboard() {
                                   permissions: {
                                     ...(newPackage.permissions || {}),
                                     [key]: e.target.checked,
-                                  } as typeof newPackage.permissions,
+                                  },
                                 })
                               }
                               className="sr-only peer"
                             />
-                            <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-md peer-checked:bg-[#0B2345] peer-checked:border-blue-600 transition-all"></div>
+                            <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-md peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all"></div>
                             <CheckCircle
                               size={14}
                               className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity"
                             />
                           </div>
-                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-[#0B2345] transition-colors">
+                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors">
                             {label}
                           </span>
                         </label>
@@ -5696,8 +5557,8 @@ export default function SuperAdminDashboard() {
 
                 {packageModalTab === "features" && (
                   <div className="space-y-4">
-                    <h3 className="text-[10px] font-black uppercase text-[#0B2345] tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-[#0B2345] rounded-full"></span>
+                    <h3 className="text-[10px] font-black uppercase text-blue-600 tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
                       ميزات التسويق
                     </h3>
                     <div>
@@ -5726,7 +5587,7 @@ export default function SuperAdminDashboard() {
                 <button
                   type="submit"
                   form="package-form"
-                  className="flex-1 px-8 py-4 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black hover:bg-[#1a3a6b] transition-all shadow-xl shadow-blue-600/10 active:scale-95"
+                  className="flex-1 px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/10 active:scale-95"
                 >
                   {editingPackage ? "حفظ التعديلات" : "إنشاء الباقة"}
                 </button>
@@ -5738,8 +5599,6 @@ export default function SuperAdminDashboard() {
                     setNewPackage({
                       name: "",
                       price: 0,
-                      priceMonthly: 0,
-                      priceYearly: 0,
                       maxStudents: 500,
                       features: "",
                       durationDays: 365,
@@ -5864,7 +5723,7 @@ export default function SuperAdminDashboard() {
 
               {newUser.role === "assistant" && !newUser.schoolId && (
                 <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30">
-                  <h4 className="text-[10px] font-black text-[#0B2345] dark:text-blue-400 uppercase tracking-widest mb-3">
+                  <h4 className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3">
                     تخصيص صلاحيات المساعد
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -5883,7 +5742,7 @@ export default function SuperAdminDashboard() {
                               : current.filter((p) => p !== key);
                             setNewUser({ ...newUser, permissions: updated });
                           }}
-                          className="rounded text-[#0B2345] border-slate-300 transition-all"
+                          className="rounded text-blue-600 border-slate-300 transition-all"
                         />
                         <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
                           {label}
@@ -5896,7 +5755,7 @@ export default function SuperAdminDashboard() {
               <div className="flex gap-4 pt-4">
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-4 bg-[#0B2345] text-white rounded-2xl font-bold hover:bg-[#1a3a6b] transition-all shadow-lg"
+                  className="flex-1 px-6 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg"
                 >
                   {editingUser ? "تحديث البيانات" : "حفظ"}
                 </button>
@@ -5910,7 +5769,6 @@ export default function SuperAdminDashboard() {
                       email: "",
                       role: "parent",
                       schoolId: "",
-                      permissions: [],
                     });
                   }}
                   className="flex-1 px-6 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all"
@@ -5978,7 +5836,7 @@ function PackageDetailsModal({
               <p className="text-[10px] font-black text-blue-400 uppercase mb-1 tracking-widest">
                 السعر السنوي
               </p>
-              <p className="text-2xl font-black text-[#0B2345] dark:text-blue-400 transition-colors">
+              <p className="text-2xl font-black text-blue-600 dark:text-blue-400 transition-colors">
                 {(pkg.priceYearly !== undefined
                   ? pkg.priceYearly
                   : pkg.price) === 0
@@ -5995,7 +5853,7 @@ function PackageDetailsModal({
               <p className="text-[10px] font-black text-blue-400 uppercase mb-1 tracking-widest">
                 السعر الشهري
               </p>
-              <p className="text-2xl font-black text-[#0B2345] dark:text-blue-400 transition-colors">
+              <p className="text-2xl font-black text-blue-600 dark:text-blue-400 transition-colors">
                 {(pkg.priceMonthly !== undefined
                   ? pkg.priceMonthly
                   : Math.round((pkg.price || 0) / 12)) === 0
@@ -6046,7 +5904,7 @@ function PackageDetailsModal({
         <div className="p-8 bg-slate-50 dark:bg-slate-800/50 flex justify-end transition-colors">
           <button
             onClick={onClose}
-            className="px-10 py-4 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
+            className="px-10 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
           >
             إغلاق النافذة
           </button>

@@ -438,7 +438,7 @@ export default function StudentArchive() {
                         {idx + 1}
                       </div>
                       <div>
-                        <h3 className="font-bold text-slate-900 group-hover:text-[#0B2345] transition-colors">
+                        <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                           {student.name}
                         </h3>
                         <p className="text-xs text-slate-500 mt-1 font-bold">
@@ -544,7 +544,7 @@ export default function StudentArchive() {
                 <button
                   onClick={handleSaveArchive}
                   disabled={loadingGrades || isSaving}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
                 >
                   {isSaving ? (
                     <Loader2 size={18} className="animate-spin" />
@@ -628,8 +628,8 @@ export default function StudentArchive() {
                   {years.map((year) => {
                     const yearGrades = gradesByYear[year];
                     // Extract unique subjects for this year
-                    const subjectsList: string[] = Array.from(
-                      new Set(yearGrades.map((g: any) => String(g.subject))),
+                    const subjectsList = Array.from(
+                      new Set(yearGrades.map((g) => g.subject)),
                     );
 
                     return (
@@ -832,7 +832,7 @@ export default function StudentArchive() {
                                             <span
                                               className={`font-mono font-bold text-sm ${
                                                 col.id === "finalGrade"
-                                                  ? "text-[#0B2345] text-base"
+                                                  ? "text-indigo-600 text-base"
                                                   : "text-slate-800"
                                               }`}
                                             >

@@ -54,13 +54,11 @@ export const PremiumLayouts = ({
   const showQr = template.elements?.qrCode !== false;
 
   // Custom Styles by Layout
-  const isGlass = template.layout === "glass" || template.layout === "spotlight";
+  const isGlass = template.layout === "glass";
   const isDark = template.layout === "dark";
-  const isExecutive = template.layout === "executive" || template.layout === "royal";
-  const isCorporate = template.layout === "corporate" || template.layout === "heritage";
-  const isGradient = template.layout === "gradient" || template.layout === "wave";
-  const isAcademy = template.layout === "academy";
-  const isMinimal = template.layout === "minimal";
+  const isExecutive = template.layout === "executive";
+  const isCorporate = template.layout === "corporate";
+  const isGradient = template.layout === "gradient";
   const isSmallCard = template.size === "pvc" || template.size === "pocket";
 
   const getRadiusClass = () => {
@@ -125,72 +123,8 @@ export const PremiumLayouts = ({
   const headerGradient = isGradient
     ? `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`
     : isExecutive
-    ? template.layout === "royal"
-      ? `linear-gradient(135deg, ${primaryColor}, #D4A64A, ${primaryColor})`
-      : `linear-gradient(to right, ${primaryColor}, #334155, ${primaryColor})`
+    ? `linear-gradient(to right, ${primaryColor}, #334155, ${primaryColor})`
     : primaryColor;
-
-  if (isAcademy) {
-    return (
-      <div
-        className="relative z-10 flex flex-col h-full w-full bg-white text-slate-900 border-2 overflow-hidden"
-        style={{ borderColor: primaryColor }}
-      >
-        <div
-          className="absolute top-0 bottom-0 start-0 w-[3cqi] z-20"
-          style={{ background: `linear-gradient(180deg, ${primaryColor}, ${secondaryColor})` }}
-        />
-        <div className="ps-[5cqi] flex flex-col h-full">
-          <div
-            className="w-full px-[4cqi] py-[3cqi] shrink-0 flex items-center gap-[2cqi] border-b"
-            style={{ borderColor: `${primaryColor}33`, backgroundColor: `${primaryColor}08` }}
-          >
-            {template.elements?.schoolLogo !== false && (
-              <div className="w-[10cqi] h-[10cqi] rounded-lg bg-white border border-slate-200 flex items-center justify-center p-[0.5cqi] shrink-0">
-                <GraduationCap className="w-[5cqi] h-[5cqi]" style={{ color: primaryColor }} />
-              </div>
-            )}
-            <h2 className="font-black text-[3.5cqi] truncate flex-1" style={getStyle("schoolName")}>
-              {cardData.schoolName || "School"}
-            </h2>
-          </div>
-          <div className="flex-1 px-[4cqi] py-[3cqi] flex flex-col gap-[2cqi] min-h-0" style={getStyle("contactInfo")}>
-            <div className="flex gap-[3cqi] items-start">
-              {showPhoto && (
-                <div
-                  className={`shrink-0 overflow-hidden border-2 ${radiusClass}`}
-                  style={{
-                    width: photoSize.width,
-                    height: photoSize.height,
-                    borderColor: photoSettings.borderColor || primaryColor,
-                  }}
-                >
-                  {cardData.photoUrl ? (
-                    <img src={cardData.photoUrl} alt="" className={`w-full h-full object-${fitMode}`} />
-                  ) : (
-                    <ImageIcon className="w-full h-full opacity-20 p-[2cqi]" />
-                  )}
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <h3 className="font-black text-[4.5cqi] leading-tight mb-[1cqi]" style={getStyle("studentName")}>
-                  {student.name}
-                </h3>
-                {template.elements?.className !== false && (
-                  <span className="text-[2.8cqi] font-bold opacity-70">{cardData.className}</span>
-                )}
-              </div>
-            </div>
-            {showQr && (
-              <div className="mt-auto flex justify-end">
-                <QRCodeSection studentId={student.id} qrSize="14cqi" studentName={student.name} />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (isExecutive) {
     return (
@@ -379,8 +313,8 @@ export const PremiumLayouts = ({
   if (isCorporate) {
     return (
       <div 
-        className={`relative z-10 flex flex-col h-full w-full justify-between bg-white overflow-hidden text-slate-900 ${template.layout === "heritage" ? "border-[3px] border-double" : "border-2"}`}
-        style={{ borderColor: template.layout === "heritage" ? `${primaryColor} ${secondaryColor}` : primaryColor }}
+        className={`relative z-10 flex flex-col h-full w-full justify-between bg-white overflow-hidden text-slate-900 border-2`}
+        style={{ borderColor: primaryColor }}
       >
         {/* Top Header */}
         <div className="w-full flex items-center px-[4cqi] py-[3cqi] shrink-0 border-b-2 gap-[3cqi]" style={{ borderColor: primaryColor, backgroundColor: isDark ? '#1e293b' : '#f8fafc' }}>
@@ -1068,63 +1002,6 @@ export const PremiumLayouts = ({
     );
   }
 
-  if (isMinimal) {
-    return (
-      <div className="relative z-10 flex flex-col h-full w-full bg-white text-slate-800 overflow-hidden border border-slate-200">
-        <div className="px-[5cqi] pt-[4cqi] pb-[2cqi] border-b border-slate-100 flex items-center justify-between gap-[2cqi]">
-          {template.elements?.schoolLogo !== false && (
-            <div className="w-[9cqi] h-[9cqi] rounded-md border border-slate-200 flex items-center justify-center shrink-0">
-              <GraduationCap className="w-[4.5cqi] h-[4.5cqi] text-slate-400" />
-            </div>
-          )}
-          <h2 className="font-semibold text-[3.2cqi] truncate flex-1 text-center tracking-wide" style={getStyle("schoolName")}>
-            {cardData.schoolName || "School"}
-          </h2>
-          <span className="text-[2cqi] font-medium text-slate-400 uppercase shrink-0">
-            {isRtl ? "هوية" : "ID"}
-          </span>
-        </div>
-        <div className="flex-1 px-[5cqi] py-[3cqi] flex flex-col gap-[2.5cqi] min-h-0">
-          <div className="flex gap-[3cqi] items-center">
-            {showPhoto && (
-              <div
-                className={`shrink-0 overflow-hidden border border-slate-200 ${radiusClass}`}
-                style={{ width: photoSize.width, height: photoSize.height }}
-              >
-                {cardData.photoUrl ? (
-                  <img src={cardData.photoUrl} alt="" className={`w-full h-full object-${fitMode}`} />
-                ) : (
-                  <ImageIcon className="w-full h-full opacity-15 p-[2cqi]" />
-                )}
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <h3 className="font-bold text-[4cqi] leading-snug" style={getStyle("studentName")}>
-                {student.name}
-              </h3>
-              {template.elements?.className !== false && (
-                <p className="text-[2.6cqi] text-slate-500 mt-[0.5cqi]">{cardData.className}</p>
-              )}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-x-[3cqi] gap-y-[1.5cqi] text-[2.4cqi] text-slate-600" style={getStyle("contactInfo")}>
-            {template.elements?.parentPhone !== false && student.parentPhone && (
-              <span className="truncate">{student.parentPhone}</span>
-            )}
-            {template.elements?.examNumber !== false && (
-              <span className="font-mono text-slate-400">{student.id}</span>
-            )}
-          </div>
-          {showQr && (
-            <div className="mt-auto flex justify-end pt-[1cqi]">
-              <QRCodeSection studentId={student.id} qrSize="13cqi" studentName={student.name} />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className={`relative z-10 flex flex-col h-full w-full justify-between ${bgClasses} overflow-hidden`}
@@ -1299,7 +1176,7 @@ export const PremiumLayouts = ({
           {/* Group 1: Student Primary Identifiers */ }
           <div className="grid grid-cols-2 gap-[2cqi]">
             <div className="flex flex-col bg-slate-50/50 dark:bg-slate-800/30 p-[1.5cqi] rounded-[1.5cqi] border border-slate-100 dark:border-slate-800/50 relative overflow-hidden">
-              <div className="absolute left-0 top-0 bottom-0 w-[0.75cqi] bg-[#0B2345] rounded-l-[1.5cqi]"></div>
+              <div className="absolute left-0 top-0 bottom-0 w-[0.75cqi] bg-indigo-500 rounded-l-[1.5cqi]"></div>
               <span className="opacity-60 font-semibold text-[2.8cqi] tracking-wider mb-[0.25cqi] pl-[1.5cqi] rtl:pl-0 rtl:pr-[1.5cqi]">
                 {isRtl ? "رقم الطالب" : "ID NUMBER"}
               </span>

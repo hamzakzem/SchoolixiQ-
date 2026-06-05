@@ -4,23 +4,9 @@
     <meta charset="UTF-8" />
     <script>
       (function() {
-        function isGoogleOAuthReturn() {
-          var h = location.search + location.hash;
-          if (/[?&#](state|code|apiKey|authType|providerId)=/i.test(h)) return true;
-          try {
-            if (sessionStorage.getItem('google_redirect_pending') === '1') return true;
-            if (localStorage.getItem('google_redirect_pending') === '1') return true;
-            if (sessionStorage.getItem('pendingGoogleRole')) return true;
-            if (localStorage.getItem('pendingGoogleRole')) return true;
-          } catch (e) {}
-          return false;
-        }
-
         // Safe immediate tracking of loading/script failures before Vite loads main.tsx
         window.addEventListener('error', function(e) {
           try {
-            if (isGoogleOAuthReturn()) return;
-
             var msg = e.message || '';
             var target = e.target || {};
             var tagName = (target.tagName || '').toUpperCase();
@@ -89,48 +75,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://firestore.googleapis.com">
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
-    <link rel="dns-prefetch" href="https://www.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
     <meta name="theme-color" content="#0B2345" />
-    <link rel="icon" type="image/png" href="/logo.png?v=20250603" />
-    <link rel="apple-touch-icon" href="/logo.png?v=20250603" />
-    <style>
-      #app-boot-splash {
-        position: fixed;
-        inset: 0;
-        z-index: 99999;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1rem;
-        background: #f8fafc;
-      }
-      #app-boot-splash img {
-        width: 88px;
-        height: 88px;
-        object-fit: contain;
-      }
-      #app-boot-splash span {
-        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-        font-size: 0.875rem;
-        font-weight: 700;
-        color: #475569;
-      }
-      #app-boot-splash.sq-boot-hidden {
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.25s ease;
-      }
-    </style>
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="SchoolixiQ" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   </head>
   <body>
-    <div id="app-boot-splash" aria-hidden="true">
-      <img src="/logo.png?v=20250603" alt="" width="88" height="88" decoding="sync" />
-      <span>SchoolixiQ</span>
-    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

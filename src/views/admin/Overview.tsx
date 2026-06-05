@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
 import { useLanguage } from '../../lib/LanguageContext';
+import DailySummary from './DailySummary';
 
 const translateSchoolValue = (value: string, isRtl: boolean): string => {
   if (!value) return isRtl ? 'غير محدد' : 'Not specified';
@@ -132,29 +133,15 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
       const unsubscribeSchool = onSnapshot(schoolRef, (doc) => {
         if (doc.exists()) {
           const data = doc.data();
-          const stage = data.educationLevel || data.stage || '';
-          const shift = data.workingHours || data.shift || '';
-          const genderType = data.studyType || data.genderType || '';
-          const approximateStudents =
-            data.estimatedStudents != null
-              ? data.estimatedStudents.toString()
-              : data.approximateStudents ?? '';
-          setSchoolInfo({
-            id: doc.id,
-            ...data,
-            stage,
-            shift,
-            genderType,
-            approximateStudents,
-          });
+          setSchoolInfo({ id: doc.id, ...data });
           setNewAddress(data.address || '');
           setNewMapsUrl(data.googleMapsUrl || '');
           setNewGovernorate(data.governorate || '');
           setNewDirectorate(data.directorate || '');
-          setNewStage(stage);
-          setNewShift(shift);
-          setNewGenderType(genderType);
-          setNewApproximateStudents(String(approximateStudents));
+          setNewStage(data.stage || '');
+          setNewShift(data.shift || '');
+          setNewGenderType(data.genderType || '');
+          setNewApproximateStudents(data.approximateStudents || '');
           setStats(prev => ({ 
             ...prev, 
             adjustment: data.salesAdjustment || 0,
@@ -297,8 +284,10 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500" dir={isRtl ? 'rtl' : 'ltr'}>
+      <DailySummary />
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title={t('totalStudents')} value={stats.students} icon={Users} color="border-blue-200 bg-blue-50/50" iconColor="text-[#0B2345]" action={() => setActiveTab?.("students_edit")} />
+        <StatCard title={t('totalStudents')} value={stats.students} icon={Users} color="border-blue-200 bg-blue-50/50" iconColor="text-blue-600" action={() => setActiveTab?.("students_edit")} />
         <StatCard 
           title={t('tuitionRevenue')} 
           value={(stats.calculatedTuition + stats.tuitionAdjustment).toLocaleString()} 
@@ -335,7 +324,7 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
           {/* Header row: School name and main update actions */}
           <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-100 dark:border-slate-800/80 gap-4 mb-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center text-[#0B2345] dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shadow-sm shrink-0">
+              <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shadow-sm shrink-0">
                 <Building2 size={28} className="animate-pulse" />
               </div>
               <div>
@@ -364,7 +353,7 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
                   href={schoolInfo.googleMapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-5 py-3 bg-[#0B2345] hover:bg-[#0B2345] text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 shadow-md shadow-indigo-600/10"
+                  className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 shadow-md shadow-indigo-600/10"
                 >
                   <MapPin size={14} />
                   <span>{isRtl ? 'الذهاب للعنوان' : 'Navigate To Map'}</span>
@@ -582,7 +571,7 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] w-full max-w-lg shadow-2xl p-6 md:p-8 relative max-h-[90vh] flex flex-col"
             >
-              <div className="flex items-center gap-4 mb-4 text-[#0B2345] dark:text-indigo-400 shrink-0">
+              <div className="flex items-center gap-4 mb-4 text-indigo-600 dark:text-indigo-400 shrink-0">
                 <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center border border-indigo-100 dark:border-indigo-900/30">
                   <MapPin size={24} />
                 </div>
@@ -732,7 +721,7 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
                 <button 
                   onClick={handleSaveLocation}
                   disabled={savingLocation}
-                  className="w-full py-3.5 bg-[#0B2345] hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/10 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/10 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {savingLocation ? (isRtl ? 'جاري الحفظ والمزامنة...' : 'Saving & Syncing...') : (isRtl ? 'حفظ التغييرات ومزامنتها' : 'Save & Sync Changes')}
                 </button>
@@ -801,7 +790,7 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
                  title={ann.title} 
                  desc={ann.content.substring(0, 60) + '...'} 
                  time={ann.createdAt?.seconds ? new Date(ann.createdAt.seconds * 1000).toLocaleDateString() : t('now')} 
-                 color={idx === 0 ? "bg-[#0B2345]" : idx === 1 ? "bg-emerald-500" : "bg-orange-500"} 
+                 color={idx === 0 ? "bg-blue-500" : idx === 1 ? "bg-emerald-500" : "bg-orange-500"} 
               />
             ))}
             {recentAnnouncements.length === 0 && (

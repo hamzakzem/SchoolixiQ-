@@ -17,10 +17,6 @@ import {
 import { UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from './firestore-errors';
 import { useLanguage } from './LanguageContext';
-import { isSchoolRegistrationInProgress } from './schoolRegistrationSession';
-import { waitForGoogleRedirectBootstrap } from './googleRedirectBootstrap';
-import { syncUserClaims } from './adminApi';
-import { healSchoolDataOnLogin } from './authLoginHelpers';
 
 interface AuthContextType {
   user: User | null;
@@ -36,17 +32,12 @@ const AuthContext = createContext<AuthContextType>({
   loading: true 
 });
 
-const AUTH_LOADING_TIMEOUT_MS = 12000;
-
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [schoolData, setSchoolData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const lastUserIdRef = useRef<string | null>(null);
-  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const claimsSyncedForUidRef = useRef<string | null>(null);
-  const schoolHealForUidRef = useRef<string | null>(null);
   
   const { language, setLanguage } = useLanguage();
   const languageRef = useRef(language);
@@ -55,27 +46,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     languageRef.current = language;
   }, [language]);
 
-  const clearLoadingTimeout = () => {
-    if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current);
-      loadingTimeoutRef.current = null;
-    }
-  };
-
-  const startLoadingTimeout = () => {
-    clearLoadingTimeout();
-    loadingTimeoutRef.current = setTimeout(() => {
-      console.warn('[Auth] Loading timeout — continuing without blocking UI');
-      setLoading(false);
-    }, AUTH_LOADING_TIMEOUT_MS);
-  };
-
-  const finishLoading = () => {
-    clearLoadingTimeout();
-    setLoading(false);
-  };
-
   useEffect(() => {
+    // Basic connection test as per skill guidelines
     async function testConnection() {
       try {
         await getDocFromServer(doc(db, 'system', 'connection-test'));
@@ -91,59 +63,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let unsubscribeSchool: (() => void) | null = null;
     let unsubscribePackage: (() => void) | null = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
-      void (async () => {
-        await waitForGoogleRedirectBootstrap();
-
-      const previousUid = lastUserIdRef.current;
-      const isNewSession = authUser?.uid !== previousUid;
-
+    const unsubscribeAuth = onAuthStateChanged(auth, async (authUser) => {
+      setUser(authUser);
+      
       if (authUser) {
         lastUserIdRef.current = authUser.uid;
       } else {
-        lastUserIdRef.current = null;
-      }
-
-      setUser(authUser);
-
-      if (authUser && isSchoolRegistrationInProgress()) {
-        setProfile(null);
-        setSchoolData(null);
-        finishLoading();
-        return;
-      }
-
-      if (!authUser) {
-        if (previousUid) {
-          void import('./pushService').then(({ unregisterPushToken }) =>
-            unregisterPushToken(previousUid)
-          ).catch(() => {});
+        if (lastUserIdRef.current) {
+          try {
+            const { unregisterPushToken } = await import('./pushService');
+            await unregisterPushToken(lastUserIdRef.current);
+          } catch (e) {}
+          lastUserIdRef.current = null;
         }
-        if (unsubscribeProfile) {
-          unsubscribeProfile();
-          unsubscribeProfile = null;
-        }
-        if (unsubscribeSchool) {
-          unsubscribeSchool();
-          unsubscribeSchool = null;
-        }
-        if (unsubscribePackage) {
-          unsubscribePackage();
-          unsubscribePackage = null;
-        }
-        setProfile(null);
-        setSchoolData(null);
-        finishLoading();
-        return;
       }
-
-      if (isNewSession) {
-        setLoading(true);
-        startLoadingTimeout();
-        setProfile(null);
-        setSchoolData(null);
-      }
-
+      
       if (unsubscribeProfile) {
         unsubscribeProfile();
         unsubscribeProfile = null;
@@ -157,240 +91,220 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         unsubscribePackage = null;
       }
 
-      const docRef = doc(db, 'users', authUser.uid);
-      unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
-        void (async () => {
-          try {
-            if (docSnap.exists()) {
-              const data = docSnap.data() as any;
-
-              if (data.language && data.language !== languageRef.current) {
-                setLanguage(data.language);
-              } else if (!data.language && languageRef.current) {
-                updateDoc(docRef, { language: languageRef.current }).catch(() => {});
-              }
-
-              let claims: Record<string, unknown> = {};
+      if (authUser) {
+        const docRef = doc(db, 'users', authUser.uid);
+        unsubscribeProfile = onSnapshot(docRef, async (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data() as any;
+            
+            // Sync user language from firestore database, or save local default
+            if (data.language && data.language !== languageRef.current) {
+              setLanguage(data.language);
+            } else if (!data.language && languageRef.current) {
               try {
-                let tokenResult = await authUser.getIdTokenResult();
-                claims = tokenResult.claims || {};
-
-                const claimsRole = (claims.role as string) || '';
-                const claimsSchool = (claims.schoolId as string) || '';
-                const docSchool = (data.schoolId as string) || '';
-                const claimsDrift =
-                  data.role &&
-                  (claimsRole !== data.role || claimsSchool !== docSchool);
-
-                if (claimsDrift) {
-                  try {
-                    tokenResult = await authUser.getIdTokenResult(true);
-                    claims = tokenResult.claims || {};
-                  } catch {
-                    /* use existing claims */
-                  }
-                }
-
-                if (
-                  claimsDrift &&
-                  claimsSyncedForUidRef.current !== authUser.uid &&
-                  ['admin', 'assistant', 'staff', 'superadmin'].includes(data.role)
-                ) {
-                  claimsSyncedForUidRef.current = authUser.uid;
-                  void syncUserClaims(authUser.uid).then(async (ok) => {
-                    if (!ok) return;
-                    try {
-                      const refreshed = await authUser.getIdTokenResult(true);
-                      claims = refreshed.claims || {};
-                      setProfile((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              permissions:
-                                (refreshed.claims?.p as UserProfile['permissions']) ||
-                                prev.permissions ||
-                                null,
-                            }
-                          : prev,
-                      );
-                    } catch {
-                      /* ignore */
-                    }
-                  });
-                }
-              } catch {
-                /* firestore profile is source of truth */
+                await updateDoc(docRef, { language: languageRef.current });
+              } catch (e) {
+                console.warn('Failed to save default user language to database:', e);
               }
+            }
 
-              if (
-                data.role === 'admin' &&
-                data.schoolId &&
-                authUser.email &&
-                schoolHealForUidRef.current !== authUser.uid
-              ) {
-                schoolHealForUidRef.current = authUser.uid;
-                void healSchoolDataOnLogin(
-                  authUser.email.toLowerCase(),
-                  authUser.uid,
-                ).catch((err) => console.warn('[Auth] healSchoolDataOnLogin:', err));
+            let claims: any = {};
+            try {
+              let tokenResult = await authUser.getIdTokenResult();
+              claims = tokenResult.claims || {};
+              
+              if (data.role && (claims.role !== data.role || claims.schoolId !== data.schoolId)) {
+                console.log("Stale or mismatched claims detected on snapshot. Forcing ID token refresh...");
+                try {
+                  tokenResult = await authUser.getIdTokenResult(true);
+                  claims = tokenResult.claims || {};
+                } catch (refreshErr) {
+                  console.warn("Failed to force refresh token:", refreshErr);
+                }
               }
+            } catch (tokenError) {
+              console.warn("Failed to get ID token result or session revoked, using firestore backup:", tokenError);
+            }
+            
+            setProfile({ 
+              uid: authUser.uid, 
+              ...data,
+              permissions: claims.p || data.permissions || null
+            } as UserProfile);
+            
+            // Register for Push Notifications automatically (only native)
+            try {
+              const { registerForPushNotifications } = await import('./pushService');
+              await registerForPushNotifications(authUser.uid, data.role, data.schoolId || '');
+            } catch (err) {
+              console.error('Failed to init push notifications', err);
+            }
 
-              setProfile({
-                uid: authUser.uid,
-                ...data,
-                permissions: (claims.p as UserProfile['permissions']) || data.permissions || null,
-              } as UserProfile);
-
-              void import('./pushService')
-                .then(({ registerForPushNotifications }) =>
-                  registerForPushNotifications(authUser.uid, data.role, data.schoolId || '')
-                )
-                .catch(() => {});
-
-              if (data.schoolId) {
+            // Listen to school data if schoolId exists
+            if (data.schoolId) {
+              if (!schoolData || schoolData.id !== data.schoolId) {
                 if (unsubscribeSchool) unsubscribeSchool();
-                unsubscribeSchool = onSnapshot(
-                  doc(db, 'schools', data.schoolId),
-                  (s) => {
-                    if (s.exists()) {
-                      const schoolInfo = { id: s.id, ...s.data() } as any;
-                      setSchoolData(schoolInfo);
-
-                      if (schoolInfo.planId && !unsubscribePackage) {
-                        unsubscribePackage = onSnapshot(
-                          doc(db, 'packages', schoolInfo.planId),
-                          (pkgSnap) => {
-                            if (pkgSnap.exists()) {
-                              setSchoolData((currVal: any) => ({
-                                ...currVal,
-                                packagePermissions: pkgSnap.data().permissions || {},
-                              }));
-                            }
-                          },
-                          (error) => console.error('Error fetching package for school', error)
-                        );
-                      } else if (!schoolInfo.planId && unsubscribePackage) {
+                unsubscribeSchool = onSnapshot(doc(db, 'schools', data.schoolId), (s) => {
+                  if (s.exists()) {
+                    const schoolInfo = { id: s.id, ...s.data() } as any;
+                    setSchoolData(schoolInfo);
+                    
+                    // Listen to active active package for the school
+                    if (schoolInfo.planId && unsubscribePackage === null) {
+                      unsubscribePackage = onSnapshot(doc(db, 'packages', schoolInfo.planId), (pkgSnap) => {
+                        if (pkgSnap.exists()) {
+                          setSchoolData((currVal: any) => ({
+                            ...currVal,
+                            packagePermissions: pkgSnap.data().permissions || {}
+                          }));
+                        }
+                        setLoading(false);
+                      }, (error) => {
+                        console.error("Error fetching package for school", error);
+                        setLoading(false);
+                      });
+                    } else {
+                      if (!schoolInfo.planId && unsubscribePackage) {
                         unsubscribePackage();
                         unsubscribePackage = null;
                       }
-                    } else {
-                      setSchoolData(null);
+                      setLoading(false);
                     }
-                  },
-                  (error) => {
-                    handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${data.schoolId}`);
+                  } else {
                     setSchoolData(null);
+                    setLoading(false);
                   }
-                );
+                }, (error) => {
+                  handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${data.schoolId}`);
+                  setLoading(false);
+                });
+              } else {
+                setLoading(false);
               }
-
-              finishLoading();
-              return;
+            } else {
+              setLoading(false);
             }
-
-            let claims: Record<string, unknown> = {};
+          } else {
+            // Check claims first - if server already set them, we can trust them
+            let claims: any = {};
             try {
               const tokenResult = await authUser.getIdTokenResult();
               claims = tokenResult.claims || {};
-            } catch {
-              /* continue */
+            } catch (tokenErr) {
+              console.warn("Failed to retrieve ID token before profile load:", tokenErr);
             }
+            
+            console.log(`[AUTH DIAG] Profile not found in Firestore for UID ${authUser.uid}. Claims:`, claims);
+            
+            if (claims && claims.role) {
+              const fallbackRole = claims.role;
+              const fallbackSchoolId = claims.schoolId || '';
+              const fallbackName = authUser.displayName || claims.name || (authUser.email ? authUser.email.split('@')[0] : 'مستخدم');
+              const fallbackEmail = authUser.email ? authUser.email.toLowerCase() : '';
 
-            if (claims.role) {
-              const fallbackEmail = authUser.email?.toLowerCase() || '';
+              console.log(`[AUTH PROFILE FALLBACK] Creating missing Firestore profile for UID ${authUser.uid} from Firebase claims/auth:`, {
+                email: fallbackEmail,
+                role: fallbackRole,
+                schoolId: fallbackSchoolId,
+                name: fallbackName
+              });
+
               try {
-                await setDoc(
-                  doc(db, 'users', authUser.uid),
-                  {
-                    uid: authUser.uid,
-                    email: fallbackEmail,
-                    name:
-                      authUser.displayName ||
-                      (claims.name as string) ||
-                      (fallbackEmail ? fallbackEmail.split('@')[0] : 'مستخدم'),
-                    role: claims.role,
-                    schoolId: (claims.schoolId as string) || '',
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                    autoProv: true,
-                  },
-                  { merge: true }
-                );
+                // Ensure profile document is created
+                await setDoc(doc(db, 'users', authUser.uid), {
+                  uid: authUser.uid,
+                  email: fallbackEmail,
+                  name: fallbackName,
+                  role: fallbackRole,
+                  schoolId: fallbackSchoolId,
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                  autoProv: true // indicator for logging
+                }, { merge: true });
+                
+                // Return immediately, the onSnapshot listener will be reactively updated and correctly fetch it in the next cycle
                 return;
               } catch (createErr) {
-                console.error('[AUTH PROFILE FALLBACK] Failed to auto-create profile:', createErr);
+                console.error("[AUTH PROFILE FALLBACK] Failed to auto-create missing user profile:", createErr);
               }
             }
 
+            // Profile doesn't exist for this UID, check if it was pre-registered by email
             if (!authUser.email) {
               if (!claims.role) setProfile(null);
-              finishLoading();
+              setLoading(false);
               return;
             }
 
-            const q = query(
-              collection(db, 'users'),
-              where('email', '==', authUser.email.toLowerCase())
-            );
-            const querySnapshot = await getDocs(q);
+            try {
+              const q = query(collection(db, 'users'), where('email', '==', authUser.email.toLowerCase()));
+              const querySnapshot = await getDocs(q);
+              
+              if (!querySnapshot.empty) {
+                const provisionedDoc = querySnapshot.docs[0];
+                const oldId = provisionedDoc.id;
+                
+                // Only claim if it's a random ID profile (not already a UID)
+                if (oldId !== authUser.uid) {
+                  const data = provisionedDoc.data();
+                  
+                  // 1. Create the correct profile doc with UID
+                  await setDoc(doc(db, 'users', authUser.uid), {
+                    ...data,
+                    claimedAt: serverTimestamp(),
+                    uid: authUser.uid
+                  });
 
-            if (!querySnapshot.empty) {
-              const provisionedDoc = querySnapshot.docs[0];
-              const oldId = provisionedDoc.id;
-
-              if (oldId !== authUser.uid) {
-                const data = provisionedDoc.data();
-                await setDoc(doc(db, 'users', authUser.uid), {
-                  ...data,
-                  claimedAt: serverTimestamp(),
-                  uid: authUser.uid,
-                });
-
-                const studentsQ = query(
-                  collection(db, 'students'),
-                  where('parentIds', 'array-contains', oldId)
-                );
-                const studentsSnap = await getDocs(studentsQ);
-                await Promise.all(
-                  studentsSnap.docs.map((studentDoc) => {
+                  // We don't set loading to false here, because the onSnapshot for authUser.uid will trigger
+                  // and set the profile and loading = false then.
+                  
+                  // 2. Update all students who point to the old ID
+                  const studentsQ = query(collection(db, 'students'), where('parentIds', 'array-contains', oldId));
+                  const studentsSnap = await getDocs(studentsQ);
+                  
+                  const updatePromises = studentsSnap.docs.map(studentDoc => {
                     const currentIds = studentDoc.data().parentIds || [];
-                    const updatedIds = currentIds.map((id: string) =>
-                      id === oldId ? authUser.uid : id
-                    );
-                    return updateDoc(doc(db, 'students', studentDoc.id), {
-                      parentIds: updatedIds,
-                    });
-                  })
-                ).catch(() => {});
-
-                await deleteDoc(doc(db, 'users', oldId));
+                    const updatedIds = currentIds.map((id: string) => id === oldId ? authUser.uid : id);
+                    return updateDoc(doc(db, 'students', studentDoc.id), { parentIds: updatedIds });
+                  });
+                  
+                  try {
+                    await Promise.all(updatePromises);
+                  } catch (e) {
+                    console.warn("Failed to update some students during claim:", e);
+                  }
+                  
+                  // 3. Delete the provisioned doc
+                  await deleteDoc(doc(db, 'users', oldId));
+                } else {
+                  setLoading(false);
+                }
               } else {
-                finishLoading();
+                setProfile(null);
+                setLoading(false);
               }
-            } else {
+            } catch (error) {
+              console.error("Error claiming profile:", error);
               setProfile(null);
-              finishLoading();
+              setLoading(false);
             }
-          } catch (error) {
-            console.error('Auth profile handler error:', error);
-            finishLoading();
           }
-        })();
-      }, (error) => {
-        handleFirestoreError(error, OperationType.GET, `AuthContext:users/${authUser.uid}`);
-        finishLoading();
-      });
-      })();
+        }, (error) => {
+          handleFirestoreError(error, OperationType.GET, `AuthContext:users/${authUser.uid}`);
+          setLoading(false);
+        });
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
     });
 
     return () => {
-      clearLoadingTimeout();
       unsubscribeAuth();
       if (unsubscribeProfile) unsubscribeProfile();
       if (unsubscribeSchool) unsubscribeSchool();
-      if (unsubscribePackage) unsubscribePackage();
     };
-  }, [setLanguage]);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, profile, schoolData, loading }}>

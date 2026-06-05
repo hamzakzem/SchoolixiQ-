@@ -1,7 +1,94 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="128" fill="#4f46e5" />
-  <path d="M128 224 L256 160 L384 224 L256 288 Z" fill="#ffffff" />
-  <path d="M256 288 L256 384 L160 320 L160 256 Z" fill="#c7d2fe" />
-  <path d="M256 288 L384 224 L384 320" fill="none" stroke="#ffffff" stroke-width="16" stroke-linejoin="round" />
-  <path d="M384 320 L384 384" stroke="#ffffff" stroke-width="16" stroke-linecap="round" />
+  <defs>
+    <!-- Premium Navy Blue Gradient -->
+    <linearGradient id="navy-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#07172E" />
+      <stop offset="50%" stop-color="#0B2345" />
+      <stop offset="100%" stop-color="#1E3E6B" />
+    </linearGradient>
+    
+    <!-- Premium Gold Gradient -->
+    <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EBC475" />
+      <stop offset="55%" stop-color="#D4A64A" />
+      <stop offset="100%" stop-color="#A57D32" />
+    </linearGradient>
+    
+    <filter id="luxury-shadow" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0B2345" flood-opacity="0.15" />
+    </filter>
+  </defs>
+
+  <!-- Container background fallback for square icons and standard launchers (subtle off-white) -->
+  <rect width="512" height="512" rx="128" fill="#FFFFFF" />
+
+  <!-- The Main Geometric Hexagon Logo -->
+  <g filter="url(#luxury-shadow)" transform="translate(16, 16) scale(0.9375)">
+    <!-- Main Navy Hexagon Base & Segments -->
+    <!-- Top-Left Segment (Navy Blue) -->
+    <path d="M 256,50 
+             L 115,131.5
+             C 105,137 100,147 100,158
+             L 100,225
+             L 220,155
+             C 230,149 242,149 252,155
+             L 370,224
+             L 370,165
+             C 370,155 365,145 355,140
+             L 256,50 Z" 
+          fill="url(#navy-grad)" />
+
+    <!-- Bottom-Right Segment (Navy Blue) -->
+    <path d="M 256,430
+             L 397,348.5
+             C 407,343 412,333 412,322
+             L 412,255
+             L 292,325
+             C 282,331 270,331 260,325
+             L 142,256
+             L 142,315
+             C 142,325 147,335 157,340
+             L 256,430 Z" 
+          fill="url(#navy-grad)" />
+
+    <!-- Top-Right Corner Highlight (Gold) -->
+    <path d="M 285,55
+             L 370,105
+             C 380,111 385,121 385,132
+             L 385,185
+             L 285,127
+             Z" 
+          fill="url(#gold-grad)" />
+
+    <!-- Bottom-Left Corner Highlight (Gold) -->
+    <path d="M 227,425
+             L 142,375
+             C 132,369 127,359 127,348
+             L 127,295
+             L 227,353
+             Z" 
+          fill="url(#gold-grad)" />
+
+    <!-- The S-Curve White Ribbon Track -->
+    <path d="M 120,205 
+             L 220,147
+             C 242,134 270,134 292,147
+             L 392,205
+             L 392,235
+             L 292,293
+             C 270,306 242,306 220,293
+             L 120,235
+             Z" 
+          fill="#FFFFFF" />
+
+    <!-- Inner Overlay Core (S-Curve Center Cut-Out, Navy Blue) -->
+    <path d="M 152,215 
+             L 230,170
+             C 246,161 266,161 282,170
+             L 360,215
+             L 292,255
+             C 270,268 242,268 220,255
+             Z" 
+          fill="url(#navy-grad)" />
+  </g>
 </svg>

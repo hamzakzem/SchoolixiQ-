@@ -56,13 +56,6 @@ import {
 } from "../lib/notificationSound";
 import { notificationService } from "../lib/notificationService";
 import { toast } from "react-hot-toast";
-import { useNotifications } from "../hooks/useNotifications";
-import { getNotificationInboxUserIdsFromProfile } from "../lib/notificationTargets";
-import { registerWebPushNotifications } from "../lib/webPushService";
-import {
-  getNotificationTabLabel,
-  resolveNotificationTab,
-} from "../lib/notificationDeepLink";
 
 interface NotificationCenterProps {
   onClose: () => void;
@@ -76,13 +69,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   userRole 
 }) => {
   const { user, profile } = useAuth();
-  const { notifications: inboxNotifications, inboxUserIds } = useNotifications();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [filteredNotifs, setFilteredNotifs] = useState<any[]>([]);
-
-  useEffect(() => {
-    setNotifications(inboxNotifications);
-  }, [inboxNotifications]);
   
   // Tab/Filter states
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'settings' | 'logs'>('all');
@@ -120,49 +108,66 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       return;
     }
 
-    if (!import.meta.env.VITE_FIREBASE_VAPID_KEY) {
-      toast.error(
-        isArabic
-          ? "مفتاح Web Push غير مُعدّ على الخادم (VITE_FIREBASE_VAPID_KEY)"
-          : "Web Push VAPID key is not configured on the server",
-      );
-      return;
-    }
-
     try {
       const permission = await Notification.requestPermission();
       setWebPushStatus(permission);
+      
+      if (permission === 'granted') {
+        // Mock FCM Web Token generation and database sync
+        const mockToken = "fcm_web_" + Math.random().toString(36).substr(2, 16).toUpperCase();
+        setDeviceToken(mockToken);
+        localStorage.setItem('schoolix_fcm_token_web', mockToken);
 
-      if (permission === 'granted' && user?.uid) {
-        const token = await registerWebPushNotifications(user.uid);
-        if (token) {
-          setDeviceToken(token);
+        // Sync token to Firestore `/users/{userId}` to show real-time persistence
+        if (user?.uid) {
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+            fcmTokens: [mockToken] // Store FCM token array
+          });
+          
+          // Log device token creation for auditing
           await addDoc(collection(db, 'audit_logs'), {
             userId: user.uid,
             action: 'fcm_token_register',
             platform: 'web',
-            tokenPreview: token.slice(0, 12) + '…',
-            createdAt: serverTimestamp(),
+            token: mockToken,
+            createdAt: serverTimestamp()
           });
-          toast.success(
-            isArabic
-              ? "تم تفعيل الإشعارات حتى عند إغلاق الموقع!"
-              : "Background push enabled — you'll get alerts when the site is closed",
-          );
-        } else {
-          toast.error(
-            isArabic
-              ? "تعذّر تسجيل الجهاز. تأكد من السماح بالإشعارات"
-              : "Could not register this device for push",
-          );
+
+          toast.success(isArabic ? "تم تفعيل الإشعارات الفورية للمتصفح!" : "Web push notifications enabled successfully!");
         }
-      } else if (permission !== 'granted') {
+      } else {
         toast.error(isArabic ? "تم رفض الإذن. يرجى تفعيله من إعدادات المتصفح" : "Permission denied. Enable it in browser settings.");
       }
     } catch (err) {
       console.error("Error asking Web Push permissions:", err);
     }
   };
+
+  // 1. Listen to user notifications
+  useEffect(() => {
+    if (!user) return;
+
+    // Standard notification user query
+    const notifQuery = query(
+      collection(db, "notifications"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsub = onSnapshot(notifQuery, (snap) => {
+      const items = snap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
+      }));
+      setNotifications(items);
+    }, (err) => {
+      console.error("Notification listener failed: ", err);
+    });
+
+    return () => unsub();
+  }, [user]);
 
   // 2. Fetch Administration Delivery Analytics inside 'logs' tab (Admins only)
   useEffect(() => {
@@ -220,11 +225,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const handleMarkAllRead = async () => {
     if (!user) return;
     try {
-      const ids =
-        inboxUserIds.length > 0
-          ? inboxUserIds
-          : getNotificationInboxUserIdsFromProfile(profile);
-      await notificationService.markAllAsReadForInbox(ids);
+      await notificationService.markAllAsRead(user.uid);
       toast.success(isArabic ? "تم تحديد الكل كمقروء" : "All marked as read");
     } catch (e) {
       toast.error("Error setting stats");
@@ -282,27 +283,53 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   // Deep Link Trigger
   const handleNotificationClick = async (n: any) => {
+    // Mark as read first
     await handleMarkOneRead(n.id, n.read);
 
-    const role = userRole || profile?.role || 'parent';
-    const targetTab = resolveNotificationTab(n, role);
-
+    // Deep link redirect
     if (activeTabSetter) {
-      activeTabSetter(targetTab);
-      const label = getNotificationTabLabel(targetTab, isArabic);
-      toast.success(
-        isArabic ? `تم فتح: ${label}` : `Opened: ${label}`,
-        { duration: 2500 },
-      );
-      onClose();
-      return;
+      // Decode related page based on notification type
+      switch (n.type) {
+        case 'homework':
+          activeTabSetter('homework');
+          toast.success(isArabic ? "جاري تحويلك للصفحة: الواجبات المدرسية" : "Deep Linking: Navigating to Homework");
+          break;
+        case 'grade':
+        case 'grades':
+          activeTabSetter('grades');
+          toast.success(isArabic ? "جاري تحويلك للصفحة: لوحة العلامات والنتائج" : "Deep Linking: Navigating to Academic Grades");
+          break;
+        case 'payment':
+        case 'tuition':
+          activeTabSetter('tuition');
+          toast.success(isArabic ? "جاري تحويلك للصفحة: الحسابات والرسوم الدراسية" : "Deep Linking: Navigating to Tuition & Fees");
+          break;
+        case 'behavior':
+          activeTabSetter('behavior');
+          toast.success(isArabic ? "جاري تحويلك للصفحة: تقارير السلوك والملاحظات" : "Deep Linking: Navigating to Behavior Conduct");
+          break;
+        case 'announcement':
+          activeTabSetter(userRole === 'admin' ? 'announcements' : 'home');
+          toast.success(isArabic ? "جاري تحويلك للصفحة: الإعلانات والمستجدات" : "Deep Linking: Navigating to Announcements board");
+          break;
+        case 'message':
+          activeTabSetter('chat');
+          toast.success(isArabic ? "جاري تحويلك للصفحة: غرف المحادثات" : "Deep Linking: Navigating to Chats");
+          break;
+        case 'attendance':
+          activeTabSetter(userRole === 'admin' ? 'attendance' : 'home');
+          toast.success(isArabic ? "جاري تحويلك للمتابعة" : "Deep Linking: Navigating");
+          break;
+        case 'report':
+          activeTabSetter(userRole === 'admin' ? 'evaluation_reports' : 'reports');
+          toast.success(isArabic ? "جاري تحويلك لصفحة التقارير" : "Deep Linking: Navigating to Reports");
+          break;
+        default:
+          activeTabSetter(userRole === 'parent' || userRole === 'teacher' ? 'home' : 'overview');
+          break;
+      }
+      onClose(); // Close the modal
     }
-
-    toast.error(
-      isArabic
-        ? 'تعذّر فتح الصفحة من هذه الشاشة'
-        : 'Cannot navigate from this screen',
-    );
   };
 
   // Admin delivery simulation tool
@@ -371,13 +398,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         {/* Header Section */}
         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/50 to-white dark:from-slate-800/10 dark:to-slate-900">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-[#0B2345] dark:text-indigo-400">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
               <Bell className="w-6 h-6 animate-swing" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 {isArabic ? "مركز التنبيهات المتقدم" : "Advanced Notification Hub"}
-                <span className="text-xs font-semibold px-2 py-0.5 bg-[#e8eef5] dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-full">
+                <span className="text-xs font-semibold px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full">
                   Pro v2.0
                 </span>
               </h2>
@@ -399,7 +426,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'all' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'all' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Bell className="w-3.5 h-3.5" />
               {isArabic ? "كل الإشعارات والرسائل" : "All Alerts & Messages"}
@@ -410,7 +437,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
             <button
               onClick={() => setActiveTab('unread')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'unread' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'unread' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Check className="w-3.5 h-3.5" />
               {isArabic ? "غير المقروءة والرسائل" : "Unread Messages & Alerts"}
@@ -421,7 +448,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
             <button
               onClick={() => setActiveTab('settings')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Settings className="w-3.5 h-3.5" />
               {isArabic ? "الأصوات والإعدادات" : "Voice & Audio Profiles"}
@@ -430,7 +457,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             {profile && ['admin', 'superadmin'].includes(profile.role) && (
               <button
                 onClick={() => setActiveTab('logs')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'logs' ? 'bg-[#0B2345] text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'logs' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
               >
                 <Activity className="w-3.5 h-3.5" />
                 {isArabic ? "سجلات التوصيل الـ FCM" : "Delivery Audit Ledger"}
@@ -443,7 +470,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               <>
                 <button
                   onClick={handleMarkAllRead}
-                  className="px-3 py-1.5 text-xs text-[#0B2345] dark:text-indigo-400 font-bold bg-indigo-50 border border-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-900/50 rounded-lg hover:bg-[#e8eef5] transition-all cursor-pointer"
+                  className="px-3 py-1.5 text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 border border-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-900/50 rounded-lg hover:bg-indigo-100 transition-all cursor-pointer"
                 >
                   {isArabic ? "تحديد الكل كمقروء" : "Mark all read"}
                 </button>
@@ -493,7 +520,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   ) : (
                     <button
                       onClick={requestWebPushPermission}
-                      className="px-4 py-2.5 bg-[#0B2345] text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer"
+                      className="px-4 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
                       {isArabic ? "طلب إذن المتصفح" : "Request Permission"}
@@ -533,7 +560,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           <button
                             key={p.id}
                             onClick={() => handleUpdateSoundSettings({ profile: p.id as any })}
-                            className={`p-3.5 rounded-2xl border text-right transition-all flex flex-col items-start ${soundSettings.profile === p.id ? 'border-indigo-600 bg-indigo-50/30 dark:bg-indigo-950/20 text-[#0B2345]' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-800/10'}`}
+                            className={`p-3.5 rounded-2xl border text-right transition-all flex flex-col items-start ${soundSettings.profile === p.id ? 'border-indigo-600 bg-indigo-50/30 dark:bg-indigo-950/20 text-indigo-600' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-800/10'}`}
                           >
                             <span className="text-xs font-bold">{p.label}</span>
                             <span className="text-[10px] text-slate-400 mt-1">{p.desc}</span>
@@ -637,7 +664,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       </div>
                       <button
                         onClick={triggerTestSound}
-                        className="px-4 py-2.5 bg-[#0B2345] text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer text-center whitespace-nowrap"
+                        className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer text-center whitespace-nowrap"
                       >
                         <Volume2 className="w-4 h-4" />
                         {isArabic ? "استمع الآن" : "Play Chime"}
@@ -743,7 +770,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           <td className="p-3">
                             <button
                               onClick={() => triggerSimulationPush(log)}
-                              className="px-2.5 py-1 bg-[#0B2345]/10 hover:bg-[#0B2345]/20 text-[#0B2345] dark:text-indigo-400 hover:text-indigo-500 rounded font-bold transition-all text-[10px]"
+                              className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 rounded font-bold transition-all text-[10px]"
                             >
                               {isArabic ? "أعد التوصيل" : "Resend"}
                             </button>
@@ -778,7 +805,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     <button
                       key={catPill.id}
                       onClick={() => setCategoryFilter(catPill.id)}
-                      className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all whitespace-nowrap cursor-pointer ${categoryFilter === catPill.id ? 'bg-[#0B2345] text-white' : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                      className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all whitespace-nowrap cursor-pointer ${categoryFilter === catPill.id ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                     >
                       {catPill.label}
                     </button>
@@ -827,14 +854,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       )}
 
                       {/* Icon */}
-                      <div className={`p-3 rounded-2xl shrink-0 flex items-center justify-center ${!n.read ? 'bg-white dark:bg-slate-850 shadow-sm text-[#0B2345]' : 'bg-slate-50 dark:bg-slate-900 text-slate-400'}`}>
+                      <div className={`p-3 rounded-2xl shrink-0 flex items-center justify-center ${!n.read ? 'bg-white dark:bg-slate-850 shadow-sm text-indigo-600' : 'bg-slate-50 dark:bg-slate-900 text-slate-400'}`}>
                         {getCategoryIcon(n.type)}
                       </div>
 
                       {/* Msg */}
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-[#0B2345] dark:bg-indigo-950/40 dark:text-indigo-300 select-none">
+                          <span className="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300 select-none">
                             {getCategoryLabel(n.type)}
                           </span>
                           <span className="text-[10px] text-slate-400 flex items-center gap-1">

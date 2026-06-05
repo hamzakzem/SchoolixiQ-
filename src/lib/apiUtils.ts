@@ -45,7 +45,7 @@ export function getApiUrl(path: string): string {
   if (!targetUrl) {
     targetUrl = isDevClient
       ? 'https://ais-dev-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app'
-      : 'https://schoolixiq-backend-377979165565.europe-west2.run.app';
+      : 'https://ais-pre-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app';
   }
 
   // Clean trailing slashes
@@ -56,33 +56,19 @@ export function getApiUrl(path: string): string {
     cleanSavedUrl = cleanSavedUrl.replace(/^http:\/\//i, 'https://');
   }
 
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-
-  // Static Hostinger frontend has no /api proxy — always hit Cloud Run for API routes
-  if (typeof window !== 'undefined' && path.startsWith('/api/')) {
-    const host = window.location.hostname.toLowerCase();
-    const isProductionSite =
-      host.includes('schoolixiq.com') || host.includes('schoolixiq.iq');
-    if (isProductionSite) {
-      let apiBase = cleanSavedUrl;
-      if (!apiBase.includes('run.app')) {
-        apiBase = isDevClient
-          ? 'https://ais-dev-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app'
-          : 'https://schoolixiq-backend-377979165565.europe-west2.run.app';
-      }
-      return `${apiBase.replace(/\/$/, '')}${cleanPath}`;
-    }
-  }
-
-  // Web: different origin → absolute URL; same origin → relative (local dev with API proxy)
+  // If on standard web browsers: check if the current frontend origin matches the backend destination.
+  // If they are on different origins (e.g., frontend hosted on a static domain and backend on Cloud Run),
+  // we MUST return the absolute URL. If they match, relative path is returned for perfect security and Zero-CORS.
   if (typeof window !== 'undefined' && !isMobileContainer) {
     const currentOrigin = window.location.origin.replace(/\/$/, '').toLowerCase();
     const backendOrigin = cleanSavedUrl.toLowerCase();
     if (currentOrigin !== backendOrigin && cleanSavedUrl) {
+      const cleanPath = path.startsWith('/') ? path : `/${path}`;
       return `${cleanSavedUrl}${cleanPath}`;
     }
-    return cleanPath;
+    return path;
   }
 
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${cleanSavedUrl}${cleanPath}`;
 }

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { IdCardTemplate, TextStyle, CustomFont } from '../../../types/idCardTemplate';
-import { Type, UploadCloud, Trash2 } from 'lucide-react';
-import { GOOGLE_FONT_FAMILIES } from '../../../lib/idCardPresets';
+import { Type, UploadCloud, Plus, Trash2 } from 'lucide-react';
+import { uploadImageToServer } from '../../../lib/imageUtils'; // We can use it for fonts too since it returns a server URL, or a base64, but wait. imageUtils does compressImageToBase64, maybe we shouldn't use it for fonts.
 
 interface FontSettingsProps {
   template: IdCardTemplate;
@@ -10,33 +10,14 @@ interface FontSettingsProps {
 }
 
 const ARABIC_FONTS = [
-  'Cairo', 'Tajawal', 'Almarai', 'Changa', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Amiri', 'Rubik',
+  "Cairo", "Tajawal", "IBM Plex Sans Arabic", "Noto Sans Arabic", "Almarai", "Changa"
 ];
-const ENGLISH_FONTS = GOOGLE_FONT_FAMILIES.filter((f) => !ARABIC_FONTS.includes(f));
-
-function ensureGoogleFontLoaded(family: string) {
-  const id = `gfont-${family.replace(/\s+/g, '-')}`;
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;500;600;700;800&display=swap`;
-  document.head.appendChild(link);
-}
+const ENGLISH_FONTS = [
+  "Inter", "Poppins", "Roboto", "Open Sans", "Montserrat", "Noto Sans"
+];
 
 export default function IdCardFontSettings({ template, setTemplate, isRtl }: FontSettingsProps) {
   const [activeTab, setActiveTab] = useState<'global' | 'elements' | 'custom'>('global');
-
-  useEffect(() => {
-    const families = new Set<string>([
-      template.fonts.family,
-      template.fonts.schoolName?.family,
-      template.fonts.studentName?.family,
-      template.fonts.cardTitle?.family,
-      template.fonts.contactInfo?.family,
-    ].filter(Boolean) as string[]);
-    families.forEach(ensureGoogleFontLoaded);
-  }, [template.fonts]);
 
   const updateGlobalFont = (field: keyof IdCardTemplate['fonts'], value: any) => {
     setTemplate(prev => ({
@@ -142,26 +123,26 @@ export default function IdCardFontSettings({ template, setTemplate, isRtl }: Fon
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden mt-4">
       <h3 className="text-lg font-black mb-4 flex items-center gap-2">
-        <Type className="text-[#0B2345]" />
+        <Type className="text-indigo-600" />
         {isRtl ? "إعدادات الخطوط والطباعة" : "Advanced Typography System"}
       </h3>
 
       <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
         <button
           onClick={() => setActiveTab('global')}
-          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'global' ? 'border-indigo-600 text-[#0B2345]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'global' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           {isRtl ? "الخط الأساسي" : "Global Font"}
         </button>
         <button
           onClick={() => setActiveTab('elements')}
-          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'elements' ? 'border-indigo-600 text-[#0B2345]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'elements' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           {isRtl ? "خطوط العناصر" : "Element Fonts"}
         </button>
         <button
           onClick={() => setActiveTab('custom')}
-          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'custom' ? 'border-indigo-600 text-[#0B2345]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`pb-3 px-4 text-sm font-bold transition-all border-b-2 ${activeTab === 'custom' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           {isRtl ? "رفع خط مخصص" : "Custom Fonts"}
         </button>

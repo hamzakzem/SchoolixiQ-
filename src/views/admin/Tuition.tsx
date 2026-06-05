@@ -163,8 +163,7 @@ export default function Tuition() {
         title: 'تأكيد استلام دفعة',
         message: `تم استلام مبلغ ${amountNum.toLocaleString()} د.ع (${installmentLabel}) للأقساط الدراسية.`,
         type: 'payment',
-        schoolId: profile.schoolId,
-        metadata: { tab: 'tuition' },
+        schoolId: profile.schoolId
       });
 
       toast.success(`تم تسجيل ${installmentLabel} بنجاح`);
@@ -374,8 +373,7 @@ export default function Tuition() {
         title: 'تنبيه: قسط مستحق',
         message: `نود تذكيركم بموعد القسط الدراسي للطالب ${student.name} بمبلغ ${installment.amount?.toLocaleString()} د.ع المستحق بتاريخ ${new Date(installment.dueDate).toLocaleDateString()}. يرجى تسديد المبلغ لتجنب المتأخرات.`,
         type: 'payment',
-        schoolId: profile.schoolId,
-        metadata: { tab: 'tuition' },
+        schoolId: profile.schoolId
       });
       toast.success('تم إرسال تذكير أوتوماتيكي لولي الأمر');
     } catch (err) {
@@ -422,8 +420,7 @@ export default function Tuition() {
             title: 'تنبيه: دفعة متأخرة',
             message: `نود تذكيركم بتأخر سداد قسط الطالب ${late.student.name} بمبلغ ${late.amount?.toLocaleString()} د.ع وكان مستحقاً بتاريخ ${new Date(late.dueDate).toLocaleDateString()}.`,
             type: 'payment',
-            schoolId: profile.schoolId,
-            metadata: { tab: 'tuition' },
+            schoolId: profile.schoolId
           });
           count++;
         }
@@ -520,7 +517,7 @@ export default function Tuition() {
                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">#{student.registrationNumber}</p>
                           
                           {/* Parent Phone under Name */}
-                          <p className="text-[10px] text-[#0B2345] font-black mt-1 flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full w-fit">
+                          <p className="text-[10px] text-blue-600 font-black mt-1 flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full w-fit">
                             <span className="opacity-70">ولي الأمر:</span>
                             {student.parentPhone || 'غير محدد'}
                           </p>
@@ -598,7 +595,7 @@ export default function Tuition() {
                 className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-6"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 text-[#0B2345] rounded-3xl flex items-center justify-center font-black text-2xl mb-4">
+                  <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-3xl flex items-center justify-center font-black text-2xl mb-4">
                     {selectedStudent.name[0]}
                   </div>
                   <h3 className="font-black text-xl text-slate-900 dark:text-white line-clamp-1">{selectedStudent.name}</h3>
@@ -626,7 +623,7 @@ export default function Tuition() {
                       </div>
                     ) : (
                       <div 
-                        className="font-mono font-black text-slate-900 dark:text-white text-xs cursor-pointer flex items-center justify-center gap-1 group-hover:text-[#0B2345] transition-colors"
+                        className="font-mono font-black text-slate-900 dark:text-white text-xs cursor-pointer flex items-center justify-center gap-1 group-hover:text-blue-600 transition-colors"
                         onClick={() => {
                           setTempTuitionAmount(selectedStudent.totalTuition?.toString() || '0');
                           setIsEditingTuition(true);
@@ -648,7 +645,7 @@ export default function Tuition() {
 
                 <div className="space-y-3">
                   <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <Clock size={14} className="text-[#0B2345]" />
+                    <Clock size={14} className="text-blue-600" />
                     جدول الأقساط
                   </h4>
                   <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
@@ -811,11 +808,11 @@ export default function Tuition() {
                 className="bg-white dark:bg-slate-900 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-14 w-full max-w-xl border border-slate-200 dark:border-slate-800 shadow-2xl relative"
               >
                 <div className="text-center mb-6 md:mb-10">
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-blue-50 dark:bg-blue-900/30 text-[#0B2345] rounded-3xl flex items-center justify-center mx-auto mb-4 md:mb-6">
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-4 md:mb-6">
                     <Wallet size={32} />
                   </div>
                   <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">تسجيل عملية دفع</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mt-2">تسجيل القسط الدراسي للطالب: <span className="text-[#0B2345]">{selectedStudent?.name}</span></p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mt-2">تسجيل القسط الدراسي للطالب: <span className="text-blue-600">{selectedStudent?.name}</span></p>
                 </div>
 
                 <form onSubmit={handleProcessPayment} className="space-y-6 md:space-y-8">
@@ -845,7 +842,7 @@ export default function Tuition() {
                     </button>
                     <button 
                       disabled={loading || !paymentAmount}
-                      className="flex-[2] py-4 md:py-5 bg-[#0B2345] text-white rounded-2xl font-black text-lg hover:bg-[#1a3a6b] transition-all shadow-xl shadow-blue-600/30 active:scale-95 disabled:opacity-50"
+                      className="flex-[2] py-4 md:py-5 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/30 active:scale-95 disabled:opacity-50"
                     >
                       {loading ? 'جاري المعالجة...' : 'تأكيد العملية'}
                     </button>
@@ -893,7 +890,7 @@ export default function Tuition() {
                       <button 
                         key={num}
                         onClick={() => setPlanCount(num)}
-                        className={`flex-1 py-3 rounded-xl font-bold text-xs md:text-sm transition-all ${planCount === num ? 'bg-[#0B2345] text-white shadow-lg' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                        className={`flex-1 py-3 rounded-xl font-bold text-xs md:text-sm transition-all ${planCount === num ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                       >
                         {num}
                       </button>

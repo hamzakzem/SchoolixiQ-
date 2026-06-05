@@ -100,7 +100,7 @@ export default function PublicStudentVerify() {
             <h1 className="text-2xl font-black text-slate-900">
               {student.name}
             </h1>
-            <p className="text-[#0B2345] font-bold tracking-widest mt-1 uppercase text-sm">
+            <p className="text-indigo-600 font-bold tracking-widest mt-1 uppercase text-sm">
               {student.id.substring(0, 8)}
             </p>
             <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold">
@@ -136,7 +136,7 @@ export default function PublicStudentVerify() {
 
             <div className="space-y-3">
               <div className="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div className="w-10 h-10 bg-indigo-50 text-[#0B2345] rounded-xl flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
                   <Phone size={18} />
                 </div>
                 <div>

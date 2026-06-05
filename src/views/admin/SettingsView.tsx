@@ -7,16 +7,27 @@ import { Save, Building, MapPin, Bell, Eye, EyeOff, ShieldCheck, Settings, Phone
 import { motion } from 'motion/react';
 import { School } from '../../types';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
-import { formatArIqDate } from '../../lib/firestoreDates';
-import { useMobileMockupShell } from '../../lib/useMobileMockupShell';
-import MobileLogoutButton from '../../components/mobile/MobileLogoutButton';
+
+const defaultGovernorates = ["بغداد", "البصرة", "نينوى", "أربيل", "النجف", "ذي قار", "كركوك", "الأنبار", "ديالى", "المثنى", "القادسية (الديوانية)", "القادسية", "ميسان", "واسط", "صلاح الدين", "دهوك", "السليمانية", "بابل", "كربلاء", "حلبجة"];
+const defaultDirectorates = [
+  "مديرية الكرخ الاولى",
+  "مديرية الكرخ الثانية",
+  "مديرية الكرخ الثالثه",
+  "مديرية الرصافة الاولى",
+  "مديرية الرصافة الثانية",
+  "مديرية الرصافة الثالثه",
+  "أخرى / مديرية أخرى"
+];
+const defaultStages = ["روضة", "ابتدائي", "متوسطة", "اعدادية"];
+const defaultShifts = ["صباحي", "مسائي", "مدمج"];
+const defaultGenders = ["مختلطة", "مختلط", "بنات فقط", "بنات", "اولاد فقط", "بنين"];
 
 export default function SettingsView() {
-  const { profile } = useAuth();
-  const inApp = useMobileMockupShell();
+  const { profile, schoolData: contextSchoolData } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [schoolData, setSchoolData] = useState<School | null>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   const [showSupport, setShowSupport] = useState(false);
   const [supportInfo, setSupportInfo] = useState({
@@ -61,11 +72,15 @@ export default function SettingsView() {
   useEffect(() => {
     async function loadSettings() {
       if (!profile?.schoolId) return;
+      if (hasInitialized) return;
+
       const path = `schools/${profile.schoolId}`;
       try {
         const snap = await getDoc(doc(db, 'schools', profile.schoolId));
-        if (snap.exists()) {
-          const data = snap.data() as any;
+        const snapData = snap.exists() ? snap.data() : null;
+        const data = { ...contextSchoolData, ...snapData } as any;
+
+        if (snap.exists() || contextSchoolData) {
           setSchoolData(data);
           setFormData({
             name: data.name || '',
@@ -78,12 +93,13 @@ export default function SettingsView() {
             directorate: data.directorate || '',
             stage: data.educationLevel || data.stage || '',
             shift: data.workingHours || data.shift || '',
-            genderType: data.studyType || data.genderType || '',
-            approximateStudents:
-              data.estimatedStudents != null
-                ? data.estimatedStudents.toString()
-                : data.approximateStudents ?? '',
+            genderType: (data.studyType || data.genderType || '') === 'بنين' ? 'اولاد فقط' : 
+                        (data.studyType || data.genderType || '') === 'بنات' ? 'بنات فقط' : 
+                        (data.studyType || data.genderType || '') === 'مختلط' ? 'مختلطة' : 
+                        (data.studyType || data.genderType || ''),
+            approximateStudents: data.estimatedStudents?.toString() || data.approximateStudents || '',
           });
+          setHasInitialized(true);
         }
       } catch (error) {
         handleFirestoreError(error, OperationType.GET, path);
@@ -93,7 +109,7 @@ export default function SettingsView() {
       }
     }
     loadSettings();
-  }, [profile?.schoolId]);
+  }, [profile?.schoolId, contextSchoolData, hasInitialized]);
 
   const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -166,12 +182,12 @@ export default function SettingsView() {
         governorate: formData.governorate,
         directorate: formData.directorate,
         stage: formData.stage,
-        shift: formData.shift,
-        genderType: formData.genderType,
-        approximateStudents: formData.approximateStudents,
         educationLevel: formData.stage,
+        shift: formData.shift,
         workingHours: formData.shift,
+        genderType: formData.genderType,
         studyType: formData.genderType,
+        approximateStudents: formData.approximateStudents,
         estimatedStudents: Number(formData.approximateStudents) || 0,
       });
       toast.success('تم حفظ الإعدادات بنجاح');
@@ -189,19 +205,17 @@ export default function SettingsView() {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={inApp ? 'space-y-4' : 'space-y-8'}
+      className="space-y-8"
     >
-      <div className={`flex flex-col ${inApp ? 'gap-3 sticky top-0 z-10 bg-gradient-to-b from-[#f6f8fc] to-transparent pb-2' : 'md:flex-row md:items-center justify-between gap-4 mb-2'}`}>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
         <div>
-          <h2 className={`${inApp ? 'text-lg' : 'text-3xl'} font-black text-[#0B2345] dark:text-white tracking-tight`}>إعدادات المدرسة</h2>
-          {!inApp ? (
-            <p className="text-slate-500 dark:text-slate-400 font-medium">تخصيص معلومات المؤسسة وتفضيلات النظام</p>
-          ) : null}
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">إعدادات المدرسة</h2>
+          <p className="text-slate-500 dark:text-slate-400 font-medium">تخصيص معلومات المؤسسة وتفضيلات النظام</p>
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
-          className={`flex items-center justify-center gap-2 ${inApp ? 'w-full px-4 py-2.5 text-sm rounded-xl' : 'px-8 py-4 rounded-2xl shadow-xl'} bg-[#0B2345] text-white font-bold hover:bg-[#163a6b] transition-all active:scale-95 disabled:opacity-50`}
+          className="flex items-center gap-2 px-8 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-blue-700 transition-all shadow-xl shadow-slate-200 dark:shadow-blue-900/20 active:scale-95 disabled:opacity-50"
         >
           {saving ? 'جاري الحفظ...' : (
             <>
@@ -212,10 +226,10 @@ export default function SettingsView() {
         </button>
       </div>
 
-      <div className={`grid grid-cols-1 ${inApp ? 'gap-4' : 'lg:grid-cols-3 gap-8'}`}>
-        <div className={`${inApp ? '' : 'lg:col-span-2'} space-y-4`}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
           {/* Basic Info */}
-          <section className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm ${inApp ? 'p-4 rounded-2xl' : 'p-8 rounded-[2.5rem]'}`}>
+          <section className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-3">
               <Building className="text-blue-500" size={24} />
               معلومات المؤسسة
@@ -282,25 +296,12 @@ export default function SettingsView() {
                     className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="" disabled>اختر المحافظة...</option>
-                    <option value="بغداد">بغداد</option>
-                    <option value="البصرة">البصرة</option>
-                    <option value="نينوى">نينوى</option>
-                    <option value="أربيل">أربيل</option>
-                    <option value="النجف">النجف</option>
-                    <option value="ذي قار">ذي قار</option>
-                    <option value="كركوك">كركوك</option>
-                    <option value="الأنبار">الأنبار</option>
-                    <option value="ديالى">ديالى</option>
-                    <option value="المثنى">المثنى</option>
-                    <option value="القادسية">القادسية (الديوانية)</option>
-                    <option value="ميسان">ميسان</option>
-                    <option value="واسط">واسط</option>
-                    <option value="صلاح الدين">صلاح الدين</option>
-                    <option value="دهوك">دهوك</option>
-                    <option value="السليمانية">السليمانية</option>
-                    <option value="بابل">بابل</option>
-                    <option value="كربلاء">كربلاء</option>
-                    <option value="حلبجة">حلبجة</option>
+                    {defaultGovernorates.map(gov => (
+                      <option key={gov} value={gov}>{gov}</option>
+                    ))}
+                    {formData.governorate && !defaultGovernorates.includes(formData.governorate) && (
+                      <option value={formData.governorate}>{formData.governorate}</option>
+                    )}
                   </select>
                 </div>
 
@@ -312,13 +313,12 @@ export default function SettingsView() {
                     className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="" disabled>اختر المديرية...</option>
-                    <option value="مديرية الكرخ الاولى">مديرية الكرخ الاولى</option>
-                    <option value="مديرية الكرخ الثانية">مديرية الكرخ الثانية</option>
-                    <option value="مديرية الكرخ الثالثه">مديرية الكرخ الثالثه</option>
-                    <option value="مديرية الرصافة الاولى">مديرية الرصافة الاولى</option>
-                    <option value="مديرية الرصافة الثانية">مديرية الرصافة الثانية</option>
-                    <option value="مديرية الرصافة الثالثه">مديرية الرصافة الثالثه</option>
-                    <option value="أخرى / مديرية أخرى">أخرى / مديرية أخرى</option>
+                    {defaultDirectorates.map(dir => (
+                      <option key={dir} value={dir}>{dir}</option>
+                    ))}
+                    {formData.directorate && !defaultDirectorates.includes(formData.directorate) && (
+                      <option value={formData.directorate}>{formData.directorate}</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -332,10 +332,12 @@ export default function SettingsView() {
                     className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="" disabled>اختر المرحلة...</option>
-                    <option value="روضة">روضة</option>
-                    <option value="ابتدائي">ابتدائي</option>
-                    <option value="متوسطة">متوسطة</option>
-                    <option value="اعدادية">اعدادية</option>
+                    {defaultStages.map(stg => (
+                      <option key={stg} value={stg}>{stg}</option>
+                    ))}
+                    {formData.stage && !defaultStages.includes(formData.stage) && (
+                      <option value={formData.stage}>{formData.stage}</option>
+                    )}
                   </select>
                 </div>
 
@@ -347,9 +349,12 @@ export default function SettingsView() {
                     className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="" disabled>اختر وقت الدوام...</option>
-                    <option value="صباحي">صباحي</option>
-                    <option value="مسائي">مسائي</option>
-                    <option value="مدمج">مدمج</option>
+                    {defaultShifts.map(sh => (
+                      <option key={sh} value={sh}>{sh}</option>
+                    ))}
+                    {formData.shift && !defaultShifts.includes(formData.shift) && (
+                      <option value={formData.shift}>{formData.shift}</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -363,9 +368,12 @@ export default function SettingsView() {
                     className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="" disabled>اختر نوع الدراسة...</option>
-                    <option value="مختلطة">مختلطة</option>
-                    <option value="بنات فقط">بنات فقط</option>
-                    <option value="اولاد فقط">اولاد فقط</option>
+                    {defaultGenders.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                    {formData.genderType && !defaultGenders.includes(formData.genderType) && (
+                      <option value={formData.genderType}>{formData.genderType}</option>
+                    )}
                   </select>
                 </div>
 
@@ -412,7 +420,7 @@ export default function SettingsView() {
                 className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-xl transition-colors ${formData.showSubscriptionTimer ? 'bg-blue-50 dark:bg-blue-900/30 text-[#0B2345]' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <div className={`p-3 rounded-xl transition-colors ${formData.showSubscriptionTimer ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                     {formData.showSubscriptionTimer ? <Eye size={20} /> : <EyeOff size={20} />}
                   </div>
                   <div>
@@ -421,7 +429,7 @@ export default function SettingsView() {
                   </div>
                 </div>
                 <div 
-                  className={`w-12 h-6 rounded-full relative transition-all ${formData.showSubscriptionTimer ? 'bg-[#0B2345]' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  className={`w-12 h-6 rounded-full relative transition-all ${formData.showSubscriptionTimer ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.showSubscriptionTimer ? 'right-7' : 'right-1'}`} />
                 </div>
@@ -432,7 +440,7 @@ export default function SettingsView() {
                 className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-xl transition-colors ${formData.notificationsEnabled ? 'bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345]' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                  <div className={`p-3 rounded-xl transition-colors ${formData.notificationsEnabled ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                     <Bell size={20} />
                   </div>
                   <div>
@@ -441,7 +449,7 @@ export default function SettingsView() {
                   </div>
                 </div>
                 <div 
-                   className={`w-12 h-6 rounded-full relative transition-all ${formData.notificationsEnabled ? 'bg-[#0B2345]' : 'bg-slate-300 dark:bg-slate-700'}`}
+                   className={`w-12 h-6 rounded-full relative transition-all ${formData.notificationsEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.notificationsEnabled ? 'right-7' : 'right-1'}`} />
                 </div>
@@ -464,7 +472,11 @@ export default function SettingsView() {
                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
                       <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">صالح لغاية</p>
                       <p className="text-lg font-bold font-mono">
-                        {formatArIqDate(schoolData?.subscriptionExpiresAt) || 'غير محدد'}
+                        {schoolData?.subscriptionExpiresAt ? new Date(schoolData.subscriptionExpiresAt).toLocaleDateString('ar-IQ', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        }) : 'غير محدد'}
                       </p>
                    </div>
                    <div className="flex items-center justify-between px-2">
@@ -473,7 +485,7 @@ export default function SettingsView() {
                    </div>
                 </div>
              </div>
-             <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-[#0B2345]/10 rounded-full blur-[80px]"></div>
+             <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px]"></div>
           </section>
 
           {/* Help Card */}
@@ -495,7 +507,7 @@ export default function SettingsView() {
                   className="space-y-6 bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900/30"
                 >
                   <div className="space-y-4">
-                    <p className="text-[10px] font-bold text-[#0B2345] dark:text-blue-400 uppercase tracking-widest mb-1 px-1">أرقام التواصل (WhatsApp)</p>
+                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 px-1">أرقام التواصل (WhatsApp)</p>
                     <div className="space-y-2">
                        {supportInfo.supportPhones.map((phone, i) => (
                          <div key={i} className="flex items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30">
@@ -506,7 +518,7 @@ export default function SettingsView() {
                     </div>
                   </div>
                   <div className="pt-6 border-t border-blue-100 dark:border-blue-900/30 space-y-4">
-                    <p className="text-[10px] font-bold text-[#0B2345] dark:text-blue-400 uppercase tracking-widest mb-1 px-1">البريد الإلكتروني الرسمي</p>
+                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 px-1">البريد الإلكتروني الرسمي</p>
                     <div className="space-y-2">
                        {supportInfo.supportEmails.map((email, i) => (
                          <div key={i} className="flex items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30">
@@ -527,7 +539,6 @@ export default function SettingsView() {
           </section>
         </div>
       </div>
-      {inApp ? <MobileLogoutButton /> : null}
     </motion.div>
   );
 }

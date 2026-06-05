@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { Save, Download, Clock, AlertCircle, CheckCircle2, ShieldCheck, DatabaseBackup } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { auth } from '../lib/firebase';
@@ -58,7 +58,7 @@ export function SuperAdminBackupsTab() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
         <div>
           <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight flex items-center gap-3">
-            <DatabaseBackup className="text-[#0B2345]" size={32} />
+            <DatabaseBackup className="text-blue-600" size={32} />
             نظام النسخ الاحتياطي الشامل
           </h3>
           <p className="text-slate-500 dark:text-slate-400 font-bold mt-2 opacity-80 text-sm">
@@ -79,7 +79,7 @@ export function SuperAdminBackupsTab() {
           <button
             onClick={handleManualBackup}
             disabled={isBackingUp}
-            className="w-full relative z-10 flex items-center justify-center gap-2 py-4 bg-[#0B2345] text-white rounded-2xl font-bold hover:bg-[#1a3a6b] transition-all shadow-xl shadow-blue-600/20 active:scale-95 disabled:opacity-50"
+            className="w-full relative z-10 flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 active:scale-95 disabled:opacity-50"
           >
             {isBackingUp ? (
                <>
@@ -98,7 +98,7 @@ export function SuperAdminBackupsTab() {
         <div className="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center">
             <div className="space-y-4">
               <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-[#0B2345] rounded-lg"><Clock size={20} /></div>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg"><Clock size={20} /></div>
                   <div>
                     <div className="text-xs text-slate-400 font-bold mb-1">حالة الجدولة التلقائية</div>
                     <div className="text-sm font-black text-slate-700 dark:text-white flex items-center gap-2">

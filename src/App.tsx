@@ -46,29 +46,10 @@ const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
 const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 
 import ScanHandler from "./components/ScanHandler";
-import NativeAppShellMarker from "./components/mobile/NativeAppShellMarker";
-import AndroidInstallGuideModal from "./components/AndroidInstallGuideModal";
 import SolarLoading from "./components/SolarLoading";
-import AuthBootScreen from "./components/AuthBootScreen";
-import { createSchoolSubscriptionRegistration } from "./lib/schoolSubscriptionRequest";
-import {
-  isSchoolRegistrationInProgress,
-  userHasPendingSchoolRegistration,
-} from "./lib/schoolRegistrationSession";
 import { LanguageToggle } from "./components/LanguageToggle";
-import {
-  getSchoolixPublicId,
-  schoolixAccountIdLabel,
-} from "./lib/displayIdentity";
-import { syncUserClaims } from "./lib/adminApi";
-
-const InstallAppBanner = lazy(() => import("./components/InstallAppBanner"));
-const AndroidAppVisitPrompt = lazy(() => import("./components/AndroidAppVisitPrompt"));
-const AudioNotificationManager = lazy(() =>
-  import("./components/AudioNotificationManager").then((m) => ({
-    default: m.AudioNotificationManager,
-  })),
-);
+import InstallAppBanner from "./components/InstallAppBanner";
+import { AudioNotificationManager } from "./components/AudioNotificationManager";
 
 const DEFAULT_PACKAGES = [
   {
@@ -126,8 +107,6 @@ const AppContent = () => {
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [autoLinkChecked, setAutoLinkChecked] = useState(false);
-  const [pendingRegResolved, setPendingRegResolved] = useState(true);
-  const [hasPendingSchoolReg, setHasPendingSchoolReg] = useState(false);
 
   // Reset chunk error reload and IndexedDb reload counters on successful render/mount
   useEffect(() => {
@@ -193,33 +172,7 @@ const AppContent = () => {
     stage: "",
     shift: "",
     genderType: "",
-    estimatedStudents: "",
   });
-
-  // Reset link check when signed out
-  useEffect(() => {
-    if (!user) {
-      setAutoLinkChecked(false);
-      setPendingRegResolved(true);
-      setHasPendingSchoolReg(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user || profile) {
-      setPendingRegResolved(true);
-      setHasPendingSchoolReg(false);
-      return;
-    }
-    setPendingRegResolved(false);
-    void userHasPendingSchoolRegistration(user.uid, user.email).then((pending) => {
-      setHasPendingSchoolReg(pending);
-      if (pending) {
-        setOnboardingState("waiting_approval");
-      }
-      setPendingRegResolved(true);
-    });
-  }, [user?.uid, user?.email, profile]);
 
   // Automatic School Admin & Parent Provisioning with Student Link
   useEffect(() => {
@@ -228,16 +181,6 @@ const AppContent = () => {
     const performAutoProvision = async () => {
       const email = user.email?.toLowerCase();
       if (!email) {
-        setAutoLinkChecked(true);
-        return;
-      }
-
-      if (isSchoolRegistrationInProgress()) {
-        setAutoLinkChecked(true);
-        return;
-      }
-
-      if (await userHasPendingSchoolRegistration(user.uid, email)) {
         setAutoLinkChecked(true);
         return;
       }
@@ -251,16 +194,10 @@ const AppContent = () => {
         const schoolSnap = await getDocs(schoolQuery);
 
         if (!schoolSnap.empty) {
+          setIsCreatingProfile(true);
           const schoolDoc = schoolSnap.docs[0];
           const schoolId = schoolDoc.id;
           const schoolData = schoolDoc.data();
-
-          if (schoolData.status && schoolData.status !== "active") {
-            setAutoLinkChecked(true);
-            return;
-          }
-
-          setIsCreatingProfile(true);
 
           // Auto-provision their "admin" user profile in the users collection
           await setDoc(doc(db, "users", user.uid), {
@@ -273,16 +210,20 @@ const AppContent = () => {
             updatedAt: serverTimestamp(),
           });
 
+          // Sync custom claims over our admin API securely
           try {
-            const synced = await syncUserClaims(user.uid);
-            if (synced) {
-              await user.getIdToken(true);
-              console.info("[AUTO PROVISION] Claims synced for school admin:", email);
-            } else {
-              console.warn("[AUTO PROVISION] Claims sync returned non-OK for:", email);
-            }
+            await fetch("/api/admin/sync-claims", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${await user.getIdToken()}`,
+                "X-Authorization": `Bearer ${await user.getIdToken()}`
+              },
+              body: JSON.stringify({ uid: user.uid }),
+            });
+            console.info("[AUTO PROVISION] Claims sync triggered for school admin:", email);
           } catch (syncErr) {
-            console.warn("[AUTO PROVISION] Failed to sync claims:", syncErr);
+            console.warn("[AUTO PROVISION] Failed to sync claims over API, falling back to local snapshot matching:", syncErr);
           }
 
           toast.success(
@@ -290,7 +231,6 @@ const AppContent = () => {
               ? "تم التحقق من بيانات مدرستك وتفعيل حسابك كمدير بنجاح!"
               : "Your registered school was verified! Admin account activated successfully!",
           );
-          setAutoLinkChecked(true);
           return;
         }
 
@@ -345,6 +285,7 @@ const AppContent = () => {
               ? "تم تفعيل حسابك وربطك بطلابك تلقائياً!"
               : "Account activated and linked to students automatically!",
           );
+          return;
         }
         setAutoLinkChecked(true);
       } catch (err) {
@@ -363,7 +304,7 @@ const AppContent = () => {
     let timer: NodeJS.Timeout;
     let unsubs: (() => void)[] = [];
     
-    if (user && (!profile || (profile.role === "admin" && !profile.schoolId)) && autoLinkChecked) {
+    if (!loading && user && (!profile || (profile.role === "admin" && !profile.schoolId)) && autoLinkChecked) {
       // Create three queries to locate registrations
       const qUid = query(
         collection(db, "registrations"),
@@ -401,18 +342,18 @@ const AppContent = () => {
             setOnboardingState("waiting_approval");
           }
         } else {
-          void (async () => {
-            const pending = await userHasPendingSchoolRegistration(
-              user?.uid || "",
-              user?.email,
-            );
-            setOnboardingState((prev) => {
-              if (prev === "approved") return "approved";
-              if (pending) return "waiting_approval";
-              if (profile?.role === "admin") return "packages";
-              return "options";
-            });
-          })();
+          // If no pending request, check if we should show options (with a short delay to avoid flicker)
+          setOnboardingState((prev) => {
+            if (prev === "approved") return "approved";
+            timer = setTimeout(() => {
+              if (profile?.role === "admin") {
+                setOnboardingState("packages");
+              } else {
+                setOnboardingState("options");
+              }
+            }, 1000);
+            return prev;
+          });
         }
       };
 
@@ -482,19 +423,13 @@ const AppContent = () => {
     };
   }, [onboardingState]);
 
-  if (isSchoolRegistrationInProgress()) {
-    return (
-      <>
-        <Login />
-        <div className="fixed top-4 right-4 md:top-6 md:right-6 z-[9999]">
-          <LanguageToggle />
-        </div>
-      </>
-    );
-  }
-
-  if (loading) {
-    return <AuthBootScreen />;
+  if (
+    loading ||
+    (user && !profile && !autoLinkChecked) ||
+    isCreatingProfile ||
+    (user && (!profile || (profile.role === "admin" && !profile.schoolId)) && onboardingState === "loading")
+  ) {
+    return <SolarLoading />;
   }
 
   if (!user) {
@@ -508,27 +443,7 @@ const AppContent = () => {
     );
   }
 
-  // No profile yet: wait for auto-provision, then show onboarding (not dashboard)
-  if (!profile) {
-    const booting =
-      isCreatingProfile ||
-      !autoLinkChecked ||
-      !pendingRegResolved ||
-      isSchoolRegistrationInProgress();
-    if (booting && !hasPendingSchoolReg) {
-      return <AuthBootScreen />;
-    }
-  } else if (isCreatingProfile) {
-    return <AuthBootScreen />;
-  }
-
-  const needsSchoolOnboarding =
-    profile?.role === UserRole.ADMIN && !profile?.schoolId;
-
-  const showOnboarding = !profile || needsSchoolOnboarding;
-
   const renderDashboard = () => {
-    if (!profile) return null;
     // Dedicated recovery/error screen if profile has school role but schoolId or schoolData is missing or inaccessible in Firestore
     const isSchoolRole = profile?.role && [
       UserRole.ADMIN,
@@ -536,7 +451,7 @@ const AppContent = () => {
       UserRole.ASSISTANT
     ].includes(profile.role);
 
-    if (isSchoolRole && !profile?.schoolId) {
+    if (isSchoolRole && (!profile?.schoolId || (!schoolData && !loading))) {
       return (
         <div
           className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6"
@@ -557,10 +472,8 @@ const AppContent = () => {
             
             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl text-right mb-8 flex flex-col gap-2 border border-slate-100 dark:border-slate-800 text-xs font-mono">
               <div className="flex justify-between items-center text-right text-[11px]" dir={isRtl ? "rtl" : "ltr"}>
-                <span className="text-slate-400">{schoolixAccountIdLabel(isRtl)}</span>
-                <span className="text-slate-700 dark:text-slate-300 font-bold font-mono">
-                  {getSchoolixPublicId(profile.uid)}
-                </span>
+                <span className="text-slate-400">{isRtl ? "البريد الإلكتروني:" : "Email:"}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-bold">{profile.email}</span>
               </div>
               <div className="flex justify-between items-center text-right text-[11px]" dir={isRtl ? "rtl" : "ltr"}>
                 <span className="text-slate-400">{isRtl ? "معرف المدرسة:" : "School ID:"}</span>
@@ -670,7 +583,7 @@ const AppContent = () => {
         dir={isRtl ? "rtl" : "ltr"}
         className={isRtl ? "font-sans" : "font-sans"}
       >
-        {!showOnboarding ? (
+        {profile && !(profile.role === "admin" && !profile.schoolId) ? (
           <>
             <ScanHandler />
             {renderDashboard()}
@@ -685,7 +598,7 @@ const AppContent = () => {
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="w-20 h-20 bg-[#e8eef5] text-[#0B2345] rounded-3xl flex items-center justify-center mb-6"
+                  className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center mb-6"
                 >
                   <ShieldCheck size={40} />
                 </motion.div>
@@ -804,7 +717,7 @@ const AppContent = () => {
                       type="button"
                       disabled={isCreatingProfile}
                       onClick={() => setOnboardingState("packages")}
-                      className="w-full px-6 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-bold shadow-sm active:scale-95 transition-all outline-none focus:ring-4 focus:ring-blue-100 hover:border-blue-500 hover:text-[#0B2345] disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                      className="w-full px-6 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-bold shadow-sm active:scale-95 transition-all outline-none focus:ring-4 focus:ring-blue-100 hover:border-blue-500 hover:text-blue-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
                     >
                       <Building size={18} />
                       {isRtl
@@ -879,7 +792,7 @@ const AppContent = () => {
                         className={`bg-white rounded-3xl p-6 border-2 transition-all flex flex-col text-right ${pkg.isPopular ? "border-blue-600 shadow-xl shadow-blue-100" : "border-slate-100 shadow-lg"}`}
                       >
                         {pkg.isPopular && (
-                          <span className="bg-[#0B2345] text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-4">
+                          <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-4">
                             الأكثر طلباً
                           </span>
                         )}
@@ -918,7 +831,7 @@ const AppContent = () => {
                             setSelectedPackage(pkg);
                             setOnboardingState("registration_form");
                           }}
-                          className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-[#0B2345] text-white hover:bg-[#1a3a6b]" : "bg-slate-900 text-white hover:bg-slate-800"}`}
+                          className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                         >
                           اختيار الباقة
                         </button>
@@ -953,25 +866,34 @@ const AppContent = () => {
                     if (!user) return;
                     setIsCreatingProfile(true);
                     try {
-                      await createSchoolSubscriptionRegistration({
+                      const isMonthly = billingCycle === "monthly";
+                      const actualPrice = isMonthly
+                        ? selectedPackage.priceMonthly !== undefined
+                          ? selectedPackage.priceMonthly
+                          : Math.round((selectedPackage.price || 0) / 12)
+                        : selectedPackage.priceYearly !== undefined
+                          ? selectedPackage.priceYearly
+                          : selectedPackage.price;
+
+                      await addDoc(collection(db, "registrations"), {
+                        type: "direct_school_signup",
                         uid: user.uid,
-                        email: user.email || "",
-                        schoolName: subscriptionForm.name,
+                        email: user.email,
+                        name: subscriptionForm.name,
                         phone: subscriptionForm.phone,
-                        schoolRegistration: {
-                          address: subscriptionForm.address,
-                          governorate: subscriptionForm.governorate,
-                          directorate: subscriptionForm.directorate,
-                          educationLevel: subscriptionForm.stage,
-                          workingHours: subscriptionForm.shift,
-                          studyType: subscriptionForm.genderType,
-                          estimatedStudents: subscriptionForm.estimatedStudents,
-                        },
-                        package: {
-                          id: selectedPackage.id,
-                          name: selectedPackage.name,
-                        },
-                        billingCycle,
+                        address: subscriptionForm.address,
+                        governorate: subscriptionForm.governorate,
+                        directorate: subscriptionForm.directorate,
+                        stage: subscriptionForm.stage,
+                        shift: subscriptionForm.shift,
+                        genderType: subscriptionForm.genderType,
+                        packageName: selectedPackage.name,
+                        packageId: selectedPackage.id,
+                        price: actualPrice,
+                        billingCycle: billingCycle,
+                        durationDays: isMonthly ? 30 : 365,
+                        status: "pending",
+                        createdAt: serverTimestamp(),
                       });
                       setOnboardingState("waiting_approval");
                     } catch (err) {
@@ -1199,37 +1121,18 @@ const AppContent = () => {
                           <option value="" disabled>
                             اختر نوع الدراسة...
                           </option>
-                          <option value="مختلطة">مختلطة</option>
-                          <option value="بنات فقط">بنات فقط</option>
-                          <option value="اولاد فقط">اولاد فقط</option>
+                          <option value="للبنين">للبنين</option>
+                          <option value="للبنات">للبنات</option>
+                          <option value="مختلط">مختلط</option>
                         </select>
                       </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
-                        عدد الطلاب المقدر
-                      </label>
-                      <input
-                        required
-                        type="number"
-                        min={1}
-                        value={subscriptionForm.estimatedStudents}
-                        onChange={(e) =>
-                          setSubscriptionForm({
-                            ...subscriptionForm,
-                            estimatedStudents: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all"
-                        placeholder="مثال: 500"
-                      />
                     </div>
                   </div>
 
                   <button
                     type="submit"
                     disabled={isCreatingProfile}
-                    className="w-full py-4 mt-4 bg-[#0B2345] text-white rounded-xl font-black shadow-lg shadow-blue-600/20 active:scale-95 transition-all text-sm flex justify-center items-center gap-2"
+                    className="w-full py-4 mt-4 bg-blue-600 text-white rounded-xl font-black shadow-lg shadow-blue-600/20 active:scale-95 transition-all text-sm flex justify-center items-center gap-2"
                   >
                     {isCreatingProfile ? (
                       <RefreshCw className="animate-spin" size={18} />
@@ -1269,8 +1172,8 @@ const AppContent = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 className="w-full max-w-sm mx-auto bg-white p-8 rounded-[2rem] shadow-xl border border-blue-100 text-center relative overflow-hidden"
               >
-                <div className="absolute top-0 left-0 w-full h-2 bg-[#0B2345] animate-pulse"></div>
-                <div className="w-20 h-20 bg-blue-50 text-[#0B2345] rounded-full flex justify-center items-center mx-auto mb-6">
+                <div className="absolute top-0 left-0 w-full h-2 bg-blue-500 animate-pulse"></div>
+                <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex justify-center items-center mx-auto mb-6">
                   <Clock size={40} className="animate-bounce" />
                 </div>
                 <h3 className="text-xl font-black text-slate-900 mb-2">
@@ -1303,22 +1206,25 @@ const AppContent = () => {
                   تم الغاء طلبك
                 </h3>
                 <p className="text-slate-500 text-sm font-bold leading-relaxed mb-6">
-                  تم رفض طلب اشتراك مدرستك وحذف الحساب. يمكنك التسجيل من جديد
-                  ببريد آخر أو نفس البريد بعد إعادة التسجيل.
+                  نأسف، لقد تم رفض أو إلغاء طلب اشتراك مدرستك من قبل الإدارة.
                 </p>
                 <div className="flex flex-col gap-3">
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        await auth.signOut();
-                      } catch {
+                    onClick={() => {
+                      if (myRequest?.id) {
+                        deleteDoc(
+                          doc(db, "registrations", myRequest.id),
+                        ).then(() => {
+                           setOnboardingState("options");
+                        });
+                      } else {
                         setOnboardingState("options");
                       }
                     }}
                     className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition-all cursor-pointer"
                   >
-                    العودة لتسجيل الدخول
+                    حاول مرة أخرى
                   </button>
                   <button
                     type="button"
@@ -1455,8 +1361,6 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
           <AuthProvider>
-            <NativeAppShellMarker />
-            <AndroidInstallGuideModal />
             <BrowserRouter>
               <Suspense fallback={<SolarLoading />}>
                 <Routes>
@@ -1468,11 +1372,8 @@ export default function App() {
                 </Routes>
               </Suspense>
               <Toaster position="top-right" />
-              <Suspense fallback={null}>
-                <InstallAppBanner />
-                <AndroidAppVisitPrompt />
-                <AudioNotificationManager />
-              </Suspense>
+              <InstallAppBanner />
+              <AudioNotificationManager />
             </BrowserRouter>
           </AuthProvider>
         </LanguageProvider>

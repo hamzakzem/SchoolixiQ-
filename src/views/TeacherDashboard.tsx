@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { db, auth } from "../lib/firebase";
 import {
   collection,
@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 import { LanguageToggle } from "../components/LanguageToggle";
-import { NotificationBell } from "../components/NotificationBell";
+import { NotificationCenter } from "../components/NotificationCenter";
 import {
   Users,
   BookOpen,
@@ -41,8 +41,6 @@ import {
   BarChart3,
   ShieldCheck,
   Check,
-  CheckSquare,
-  ArrowRight,
 } from "lucide-react";
 import { updatePassword, verifyBeforeUpdateEmail } from "firebase/auth";
 import { toast } from "react-hot-toast";
@@ -56,6 +54,7 @@ type Tab =
   | "grades"
   | "behavior"
   | "reports"
+  | "advanced_reports"
   | "id_cards"
   | "settings"
   | "chat"
@@ -65,17 +64,12 @@ import SolarLoading from "../components/SolarLoading";
 import TeacherSettingsTab from "./TeacherSettingsTab";
 import TeacherChatTab from "./TeacherChatTab";
 import Schedules from "./admin/Schedules";
+import AdvancedReports from "./admin/AdvancedReports";
 import IdCards from "./admin/IdCards";
+import SchoolixLogo from "../components/SchoolixLogo";
 
 import { useLanguage } from "../lib/LanguageContext";
-import { usePushTabNavigation } from "../lib/pushNavigation";
 import { GlobalFooter } from "../components/GlobalFooter";
-import { useMobileMockupShell } from "../lib/useMobileMockupShell";
-import { useAndroidBackButton } from "../hooks/useAndroidBackButton";
-import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
-import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
-import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
-import TeacherMockupHome from "../components/mobile/homes/TeacherMockupHome";
 
 export const getGradeTypeLabel = (val: string, isRtl: boolean) => {
   if (isRtl) return val;
@@ -99,38 +93,6 @@ export default function TeacherDashboard() {
   const { profile, schoolData } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>("home");
-  const [navigationHistory, setNavigationHistory] = useState<Tab[]>([]);
-  const mobileUi = useMobileMockupShell();
-
-  // Tab switcher that tracks history so the back button can return to the
-  // previously viewed screen.
-  const navigateToTab = (tabId: Tab) => {
-    if (tabId === activeTab) return;
-    setNavigationHistory((prev) => [...prev, activeTab]);
-    setActiveTab(tabId);
-  };
-
-  const handleBack = () => {
-    if (navigationHistory.length > 0) {
-      const prevTab = navigationHistory[navigationHistory.length - 1];
-      setNavigationHistory((prev) => prev.slice(0, -1));
-      setActiveTab(prevTab);
-    } else {
-      setActiveTab("home");
-    }
-  };
-
-  usePushTabNavigation((tab) => navigateToTab(tab as Tab), profile?.role);
-
-  useAndroidBackButton(
-    React.useCallback(() => {
-      if (activeTab !== "home") {
-        handleBack();
-        return true;
-      }
-      return false;
-    }, [activeTab, navigationHistory]),
-  );
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [schoolName, setSchoolName] = useState<string>("");
@@ -158,6 +120,10 @@ export default function TeacherDashboard() {
   // Package permissions are controlled by the Super Admin via the package properties
   const perms = schoolData?.packagePermissions || profile?.permissions; // fallback to profile if not loaded yet
 
+  // Notifications state
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
   // Homework state
   const [homework, setHomework] = useState<any[]>([]);
   const [showAddHomework, setShowAddHomework] = useState(false);
@@ -184,9 +150,6 @@ export default function TeacherDashboard() {
   );
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [isSavingGrades, setIsSavingGrades] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  // Synchronous lock to prevent ultra-fast double submits (before re-render disables the button).
-  const sendingRef = useRef(false);
   const [currentBulkDocId, setCurrentBulkDocId] = useState<string | null>(null);
 
   // Fetch existing grades when selection changes
@@ -262,10 +225,7 @@ export default function TeacherDashboard() {
   const handleSendBehaviorReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !selectedStudent) return;
-    if (sendingRef.current) return;
 
-    sendingRef.current = true;
-    setIsSending(true);
     try {
       const student = students.find((s) => s.id === selectedStudent.id);
       await addDoc(collection(db, "behavior_reports"), {
@@ -297,9 +257,6 @@ export default function TeacherDashboard() {
       setSelectedStudent(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "behavior_reports");
-    } finally {
-      sendingRef.current = false;
-      setIsSending(false);
     }
   };
   const [behaviorSearch, setBehaviorSearch] = useState("");
@@ -405,6 +362,20 @@ export default function TeacherDashboard() {
         );
       }));
 
+      const notificationsQ = query(
+        collection(db, "notifications"),
+        where("userId", "==", profile.uid),
+        limit(50),
+      );
+      unsubs.push(onSnapshot(notificationsQ, (snap) => {
+        const notifData = snap.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .sort(
+            (a: any, b: any) =>
+              (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+          );
+        setNotifications(notifData as any);
+      }));
 
       setLoading(false);
     } catch (error) {
@@ -420,22 +391,18 @@ export default function TeacherDashboard() {
   const handleAddHomework = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
-    if (sendingRef.current) return;
 
-    const targetClassId =
-      newHomework.classId || (profile as any)?.preferredClassId;
-    if (!targetClassId) {
-      toast.error(
-        isRtl
-          ? "يرجى اختيار الصف الدراسي أولاً"
-          : "Please select a class first",
-      );
-      return;
-    }
-
-    sendingRef.current = true;
-    setIsSending(true);
     try {
+      const targetClassId =
+        newHomework.classId || (profile as any)?.preferredClassId;
+      if (!targetClassId) {
+        toast.error(
+          isRtl
+            ? "يرجى اختيار الصف الدراسي أولاً"
+            : "Please select a class first",
+        );
+        return;
+      }
 
       const homeworkRef = await addDoc(collection(db, "homework"), {
         ...newHomework,
@@ -476,9 +443,6 @@ export default function TeacherDashboard() {
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "homework");
-    } finally {
-      sendingRef.current = false;
-      setIsSending(false);
     }
   };
 
@@ -638,10 +602,7 @@ export default function TeacherDashboard() {
   const handleSendReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !selectedStudent) return;
-    if (sendingRef.current) return;
 
-    sendingRef.current = true;
-    setIsSending(true);
     try {
       const student = students.find((s) => s.id === selectedStudent.id);
       const reportRef = await addDoc(collection(db, "teacher_reports"), {
@@ -664,7 +625,7 @@ export default function TeacherDashboard() {
           message: reportContent,
           type: "report",
           schoolId: profile.schoolId,
-          metadata: { sourceId: reportRef.id, tab: "reports" },
+          metadata: { sourceId: reportRef.id },
         });
       }
 
@@ -674,9 +635,6 @@ export default function TeacherDashboard() {
       setSelectedStudent(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "teacher_reports");
-    } finally {
-      sendingRef.current = false;
-      setIsSending(false);
     }
   };
 
@@ -725,6 +683,12 @@ export default function TeacherDashboard() {
       permission: "student_evaluation_reports",
     },
     {
+      id: "advanced_reports",
+      label: isRtl ? "تقارير متقدمة" : "Advanced Reports",
+      icon: BarChart3,
+      permission: "advanced_reports",
+    },
+    {
       id: "id_cards",
       label: isRtl ? "هويات الطالب" : "Student ID Cards",
       icon: ShieldCheck,
@@ -738,6 +702,7 @@ export default function TeacherDashboard() {
       if (item.id === "grades") return perms.exams_and_results !== false;
       if (item.id === "behavior") return perms.behavior_management !== false;
       if (item.id === "reports") return perms.student_evaluation_reports !== false;
+      if (item.id === "advanced_reports") return perms.advanced_reports !== false;
       if (item.id === "schedules") return perms.automated_schedules !== false;
       if (item.id === "id_cards") return perms.id_card_generation !== false;
     }
@@ -754,7 +719,7 @@ export default function TeacherDashboard() {
 
   return (
     <div
-      className={`h-[100dvh] overflow-hidden flex transition-all duration-300 print:overflow-visible print:h-auto print:block ${mobileUi ? "sq-app-native bg-transparent" : "bg-transparent"}`}
+      className="h-[100dvh] overflow-hidden bg-transparent flex transition-all duration-300 print:overflow-visible print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Sidebar Overlay for Mobile */}
@@ -778,11 +743,11 @@ export default function TeacherDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`${mobileUi ? "hidden " : ""}bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden`}
+            className={`bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)]`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
-                {schoolData?.logoUrl ? (
+                {schoolData?.logoUrl && schoolData?.logoUrl !== "/icon.svg" ? (
                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
                     <img
                       src={schoolData.logoUrl}
@@ -791,9 +756,7 @@ export default function TeacherDashboard() {
                     />
                   </div>
                 ) : (
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-[#0B2345] rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 shrink-0">
-                    <ClipboardList size={isSidebarCollapsed ? 24 : 20} />
-                  </div>
+                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
                 )}
                 {!isSidebarCollapsed && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0" dir={isRtl ? "rtl" : "ltr"}>
@@ -801,7 +764,7 @@ export default function TeacherDashboard() {
                       {t("teacherPortal")}
                     </h2>
                     <div className="flex flex-col">
-                      <p className="text-[10px] uppercase tracking-widest text-[#0B2345] font-bold truncate">
+                      <p className="text-[10px] uppercase tracking-widest text-indigo-600 font-bold truncate">
                         {profile?.subject}
                       </p>
                     </div>
@@ -823,6 +786,11 @@ export default function TeacherDashboard() {
                   id: "reports",
                   label: t("evaluationReports"),
                   icon: FileText,
+                },
+                {
+                  id: "advanced_reports",
+                  label: isRtl ? "تقارير متقدمة" : "Advanced Reports",
+                  icon: BarChart3,
                 },
                 {
                   id: "id_cards",
@@ -858,6 +826,8 @@ export default function TeacherDashboard() {
                       return p.behavior_management !== false;
                     if (item.id === "reports")
                       return p.student_evaluation_reports !== false;
+                    if (item.id === "advanced_reports")
+                      return p.advanced_reports !== false;
                     if (item.id === "schedules") return true;
                     if (item.id === "id_cards") return true;
                   }
@@ -906,7 +876,7 @@ export default function TeacherDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className={`${mobileUi ? "hidden " : ""}h-14 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-10 shrink-0 sticky top-0 z-40 print:hidden`}>
+        <header className="min-h-[3.5rem] md:min-h-[5rem] h-auto pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-2.5 md:pt-[calc(1.25rem+env(safe-area-inset-top,0px))] md:pb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-10 shrink-0 sticky top-0 z-40 print:hidden">
           <div className="flex items-center gap-1.5 md:gap-6">
             <button
               onClick={() => {
@@ -933,22 +903,9 @@ export default function TeacherDashboard() {
             </button>
             <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
 
-            {activeTab !== "home" && (
-              <button
-                onClick={handleBack}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all font-bold text-[10px] shadow-sm active:scale-95 group"
-              >
-                <ArrowRight
-                  size={14}
-                  className={`transition-transform ${isRtl ? "group-hover:translate-x-0.5" : "rotate-180 group-hover:-translate-x-0.5"}`}
-                />
-                <span className="hidden sm:inline">{t("back")}</span>
-              </button>
-            )}
-
             <div className="flex flex-col">
               <div className="flex items-center gap-1 md:gap-2">
-                <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-wider text-[#0B2345] truncate">
+                <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-wider text-indigo-600 truncate">
                   {t("dashboard")}
                 </span>
                 {schoolName && (
@@ -988,75 +945,41 @@ export default function TeacherDashboard() {
 
             <div className="flex items-center gap-1.5 md:gap-3">
               <LanguageToggle />
-              <NotificationBell
-                activeTabSetter={(tabName) => setActiveTab(tabName as any)}
-                userRole="teacher"
-              />
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white border-slate-200 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+              >
+                <Bell size={18} />
+                {notifications.filter((n) => !n.read).length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                    {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
+                  </span>
+                )}
+              </button>
+
+              {/* Redesigned Notification Center Modal */}
+              {showNotifications && (
+                <NotificationCenter
+                  onClose={() => setShowNotifications(false)}
+                  activeTabSetter={(tabName) => setActiveTab(tabName as any)}
+                  userRole="teacher"
+                />
+              )}
             </div>
           </div>
         </header>
 
-        {mobileUi ? (
-          <>
-            <MobileMockupHeader
-              sectionTitle={
-                activeTab === "home"
-                  ? isRtl
-                    ? "الرئيسية"
-                    : "Home"
-                  : [
-                      { id: "homework", label: t("dailyHomework") },
-                      { id: "grades", label: t("resultsAndGrades") },
-                      { id: "behavior", label: t("behaviorAndStudents") },
-                      { id: "reports", label: t("evaluationReports") },
-                      { id: "id_cards", label: isRtl ? "هويات الطالب" : "ID Cards" },
-                      { id: "schedules", label: t("schedules") },
-                      { id: "chat", label: t("chat") || (isRtl ? "المراسلة" : "Messages") },
-                      { id: "settings", label: t("settings") },
-                    ].find((x) => x.id === activeTab)?.label ??
-                    (isRtl ? "المعلم" : "Teacher")
-              }
-              schoolName={schoolData?.name}
-              schoolLogoUrl={schoolData?.logoUrl}
-              modules={[
-                { id: "attendance", label: isRtl ? "الحضور" : "Attendance", icon: CheckSquare },
-                { id: "grades", label: t("resultsAndGrades"), icon: Star },
-                { id: "homework", label: t("dailyHomework"), icon: BookOpen },
-                { id: "schedules", label: t("schedules"), icon: Calendar },
-                { id: "behavior", label: t("behaviorAndStudents"), icon: Users },
-                { id: "id_cards", label: isRtl ? "هويات" : "ID cards", icon: ShieldCheck },
-              ]}
-              onNavigateModule={(tab) => navigateToTab(tab as Tab)}
-              onNotifications={() => navigateToTab("chat")}
-              onBack={activeTab !== "home" ? handleBack : undefined}
-            />
-            <MobileMockupBottomNav
-              role="teacher"
-              active={tabToMobileNav('teacher', activeTab)}
-              onChange={(nav) => navigateToTab(mobileNavToTab('teacher', nav) as Tab)}
-            />
-          </>
-        ) : null}
-        <div className={`flex-1 flex flex-col min-h-0 print:overflow-visible ${activeTab === 'chat' ? 'overflow-hidden h-full pb-[80px] lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-[90px] lg:pb-10'} ${mobileUi ? 'pt-[72px] pb-[84px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]' : ''}`}>
+        <div className={`flex-1 flex flex-col min-h-0 print:overflow-visible ${activeTab === 'chat' ? 'overflow-hidden h-full pb-[72px] lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-[90px] lg:pb-10'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : `w-full flex flex-col sq-page ${mobileUi ? 'p-0' : 'p-6 md:p-10'}`}
+              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-6 md:p-10 flex flex-col"}
               initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: activeTab === "chat" ? 0 : -15 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
             >
-              {activeTab === "home" && mobileUi ? (
-                <TeacherMockupHome
-                  classLabel={
-                    classes.find((c) => c.id === (profile as any)?.preferredClassId)?.name
-                  }
-                  homeworkCount={homework.length}
-                  onTabChange={(tab) => navigateToTab(tab as Tab)}
-                />
-              ) : null}
-              {activeTab === "home" && !mobileUi ? (
+              {activeTab === "home" && (
                 <div className="space-y-8 animate-in fade-in duration-500">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {[
@@ -1136,7 +1059,7 @@ export default function TeacherDashboard() {
                             className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
                               selectedClassId === c.id
                                 ? "bg-white/10 text-white"
-                                : "bg-white text-[#0B2345] shadow-sm"
+                                : "bg-white text-indigo-600 shadow-sm"
                             }`}
                           >
                             <LayoutDashboard size={24} />
@@ -1197,7 +1120,7 @@ export default function TeacherDashboard() {
                         >
                           <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
                             <div className="flex items-center gap-3">
-                              <div className="w-1.5 h-6 bg-[#0B2345] rounded-full"></div>
+                              <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
                               <h4 className="font-bold text-slate-900">
                                 {t("studentList")}:{" "}
                                 {
@@ -1210,7 +1133,7 @@ export default function TeacherDashboard() {
                               onClick={() =>
                                 handleSetPreferredClass(selectedClassId)
                               }
-                              className="px-4 py-2 bg-indigo-50 text-[#0B2345] rounded-xl text-[10px] font-bold hover:bg-[#e8eef5] transition-all flex items-center gap-2"
+                              className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-bold hover:bg-indigo-100 transition-all flex items-center gap-2"
                             >
                               <Star
                                 size={14}
@@ -1237,7 +1160,7 @@ export default function TeacherDashboard() {
                                   }}
                                   className="p-4 bg-slate-50 border border-slate-100 rounded-3xl hover:border-indigo-200 hover:bg-white hover:shadow-xl hover:shadow-indigo-50 transition-all cursor-pointer group text-center"
                                 >
-                                  <div className="w-16 h-16 rounded-[1.5rem] bg-white mx-auto flex items-center justify-center text-slate-400 group-hover:text-[#0B2345] shadow-sm border border-slate-50 transition-all group-hover:scale-110 mb-4">
+                                  <div className="w-16 h-16 rounded-[1.5rem] bg-white mx-auto flex items-center justify-center text-slate-400 group-hover:text-indigo-600 shadow-sm border border-slate-50 transition-all group-hover:scale-110 mb-4">
                                     <User size={28} />
                                   </div>
                                   <p className="text-[11px] font-bold text-slate-900 truncate px-2">
@@ -1247,7 +1170,7 @@ export default function TeacherDashboard() {
                                     {student.registrationNumber || t("noId")}
                                   </p>
                                   <div className="mt-4 pt-4 border-t border-slate-100/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <span className="text-[9px] font-bold text-[#0B2345]">
+                                    <span className="text-[9px] font-bold text-indigo-600">
                                       {t("sendReport")}
                                     </span>
                                   </div>
@@ -1284,7 +1207,7 @@ export default function TeacherDashboard() {
                               key={hw.id}
                               className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:border-slate-200 transition-all cursor-pointer group relative"
                             >
-                              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#0B2345] shadow-sm">
+                              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-indigo-600 shadow-sm">
                                 <BookOpen size={18} />
                               </div>
                               <div className="flex-1">
@@ -1309,7 +1232,7 @@ export default function TeacherDashboard() {
                                 </button>
                                 <ChevronRight
                                   size={16}
-                                  className="text-slate-300 group-hover:text-[#0B2345] transition-colors"
+                                  className="text-slate-300 group-hover:text-indigo-600 transition-colors"
                                 />
                               </div>
                             </div>
@@ -1329,7 +1252,7 @@ export default function TeacherDashboard() {
                       <div className="grid grid-cols-2 gap-4">
                         <button
                           onClick={() => setShowAddHomework(true)}
-                          className="p-6 rounded-3xl bg-[#0B2345] hover:bg-[#0B2345] transition-colors text-right relative overflow-hidden group"
+                          className="p-6 rounded-3xl bg-indigo-600 hover:bg-indigo-500 transition-colors text-right relative overflow-hidden group"
                         >
                           <Plus
                             size={32}
@@ -1375,7 +1298,7 @@ export default function TeacherDashboard() {
                     </div>
                   </div>
                 </div>
-              ) : null}
+              )}
 
               {activeTab === "homework" && (
                 <div
@@ -1402,7 +1325,7 @@ export default function TeacherDashboard() {
                         className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative group hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300"
                       >
                         <div className="flex items-center justify-between mb-4">
-                          <span className="text-[10px] font-bold bg-indigo-50 text-[#0B2345] px-3 py-1 rounded-full">
+                          <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
                             {hw.subject}
                           </span>
                           <div className="flex items-center gap-3">
@@ -1460,7 +1383,7 @@ export default function TeacherDashboard() {
                                 onClick={() =>
                                   handleSetPreferredClass(selectedClassId)
                                 }
-                                className="text-xs font-bold text-[#0B2345] hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
+                                className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
                               >
                                 تعيين هذا الصف كصف دائم
                               </button>
@@ -1522,7 +1445,7 @@ export default function TeacherDashboard() {
                                         "تم تعيين المادة كمادة افتراضية",
                                       );
                                     }}
-                                    className="p-4 bg-indigo-50 text-[#0B2345] rounded-2xl hover:bg-[#e8eef5] transition-all"
+                                    className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 transition-all"
                                     title="تعيين كمادة افتراضية"
                                   >
                                     <Star size={18} fill="currentColor" />
@@ -1571,7 +1494,7 @@ export default function TeacherDashboard() {
 
                     {loadingGrades ? (
                       <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent shadow-lg text-[#0B2345] font-bold"></div>
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent shadow-lg text-indigo-600 font-bold"></div>
                       </div>
                     ) : selectedClassId ? (
                       <div className="space-y-4">
@@ -1647,7 +1570,7 @@ export default function TeacherDashboard() {
                                 </div>
                               </div>
                               <div className="col-span-4 flex flex-col items-center gap-1">
-                                <span className="text-xl font-black text-[#0B2345]">
+                                <span className="text-xl font-black text-indigo-600">
                                   {studentGrades[student.id] !== undefined
                                     ? maxScore === 100
                                       ? `${Math.round((studentGrades[student.id] / maxScore) * 100)}%`
@@ -1656,7 +1579,7 @@ export default function TeacherDashboard() {
                                 </span>
                                 <div className="w-16 h-1 bg-slate-200 rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-[#0B2345] transition-all"
+                                    className="h-full bg-indigo-500 transition-all"
                                     style={{
                                       width: `${studentGrades[student.id] !== undefined ? Math.min(100, Math.round((studentGrades[student.id] / maxScore) * 100)) : 0}%`,
                                     }}
@@ -1670,7 +1593,7 @@ export default function TeacherDashboard() {
                             <label className="flex items-center gap-3 cursor-pointer group hover:opacity-80 transition-opacity">
                               <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
                                 shareTeacherOnlyGrades 
-                                  ? "bg-[#0B2345] text-white shadow-md shadow-indigo-200" 
+                                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" 
                                   : "bg-slate-100 text-transparent border border-slate-200 group-hover:border-indigo-300"
                               }`}>
                                 <Check size={14} strokeWidth={3} />
@@ -1707,7 +1630,7 @@ export default function TeacherDashboard() {
                               !selectedSubject ||
                               Object.keys(studentGrades).length === 0
                                 ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
-                                : "bg-[#0B2345] text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95"
+                                : "bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95"
                             }`}
                           >
                             {(isSavingGrades || loadingGrades) && (
@@ -1809,7 +1732,7 @@ export default function TeacherDashboard() {
                                   setSelectedStudent(student);
                                   setShowAddReport(true);
                                 }}
-                                className="flex-1 py-3 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold text-xs hover:border-indigo-200 hover:text-[#0B2345] transition-all"
+                                className="flex-1 py-3 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold text-xs hover:border-indigo-200 hover:text-indigo-600 transition-all"
                               >
                                 {t("evaluationReportShort")}
                               </button>
@@ -1818,7 +1741,7 @@ export default function TeacherDashboard() {
                                   setSelectedStudent(student);
                                   setShowAddBehavior(true);
                                 }}
-                                className="flex-1 py-3 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold text-xs hover:border-indigo-200 hover:text-[#0B2345] transition-all"
+                                className="flex-1 py-3 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold text-xs hover:border-indigo-200 hover:text-indigo-600 transition-all"
                               >
                                 {t("behaviorReport")}
                               </button>
@@ -1827,6 +1750,12 @@ export default function TeacherDashboard() {
                         ))}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {activeTab === "advanced_reports" && (
+                <div className="animate-in fade-in duration-500">
+                  <AdvancedReports />
                 </div>
               )}
 
@@ -1847,7 +1776,7 @@ export default function TeacherDashboard() {
                     </h2>
                     <button
                       onClick={() => setShowAddReport(true)}
-                      className="flex items-center gap-2 px-6 py-3 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                      className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
                     >
                       <Plus size={20} />
                       {t("sendNewReport")}
@@ -1863,7 +1792,7 @@ export default function TeacherDashboard() {
                         >
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
-                              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-[#0B2345] shadow-sm">
+                              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm">
                                 <User size={18} />
                               </div>
                               <div>
@@ -1902,7 +1831,7 @@ export default function TeacherDashboard() {
                                 report.target === "parents"
                                   ? "bg-orange-50 text-orange-600"
                                   : report.target === "school"
-                                    ? "bg-blue-50 text-[#0B2345]"
+                                    ? "bg-blue-50 text-blue-600"
                                     : "bg-emerald-50 text-emerald-600"
                               }`}
                             >
@@ -1946,11 +1875,11 @@ export default function TeacherDashboard() {
               {activeTab === "chat" && <TeacherChatTab />}
             </motion.div>
           </AnimatePresence>
-          {activeTab !== "chat" && <GlobalFooter compact hideDownload={mobileUi} />}
+          {activeTab !== "chat" && <GlobalFooter compact />}
         </div>
 
-        {/* Mobile Tab Bar (browser only — native app uses MobileMockupBottomNav) */}
-        <nav className={`${mobileUi ? "hidden" : "lg:hidden"} fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-around z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] transition-colors h-[72px]`}>
+        {/* Mobile Tab Bar */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-around z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] transition-colors h-[72px]">
           {primaryItems.map((item: any) => (
             <button
               key={item.id}
@@ -1959,7 +1888,7 @@ export default function TeacherDashboard() {
                 setShowMoreMenu(false);
               }}
               className={`flex flex-col items-center justify-center gap-1 min-w-[64px] transition-all relative ${
-                activeTab === item.id ? "text-[#0B2345]" : "text-slate-400"
+                activeTab === item.id ? "text-indigo-600" : "text-slate-400"
               }`}
             >
               <div
@@ -1977,7 +1906,7 @@ export default function TeacherDashboard() {
               {activeTab === item.id && (
                 <motion.div
                   layoutId="activeTabUnderline"
-                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-[#0B2345] rounded-full"
+                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-600 rounded-full"
                 />
               )}
             </button>
@@ -1985,7 +1914,7 @@ export default function TeacherDashboard() {
           <button
             onClick={() => setShowMoreMenu(!showMoreMenu)}
             className={`flex flex-col items-center justify-center gap-1 min-w-[64px] transition-all ${
-              showMoreMenu ? "text-[#0B2345]" : "text-slate-400"
+              showMoreMenu ? "text-indigo-600" : "text-slate-400"
             }`}
           >
             <div
@@ -2003,7 +1932,7 @@ export default function TeacherDashboard() {
 
         {/* More Menu Modal */}
         <AnimatePresence>
-          {showMoreMenu && !mobileUi && (
+          {showMoreMenu && (
             <>
               <motion.div
                 initial={{ opacity: 0 }}
@@ -2030,7 +1959,7 @@ export default function TeacherDashboard() {
                       }}
                       className={`flex flex-col items-center gap-3 p-4 rounded-3xl transition-all ${
                         activeTab === item.id
-                          ? "bg-[#0B2345] text-white shadow-lg shadow-indigo-100"
+                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
                           : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
                       }`}
                     >
@@ -2135,7 +2064,7 @@ export default function TeacherDashboard() {
                             onClick={() =>
                               handleSetPreferredClass(newHomework.classId)
                             }
-                            className="text-[10px] font-bold text-[#0B2345] hover:underline"
+                            className="text-[10px] font-bold text-indigo-600 hover:underline"
                           >
                             {t("setPermanentClass")}
                           </button>
@@ -2185,15 +2114,10 @@ export default function TeacherDashboard() {
 
                   <button
                     type="submit"
-                    disabled={isSending}
-                    className="w-full py-5 bg-[#0B2345] text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
                   >
                     <Send size={18} />
-                    {isSending
-                      ? isRtl
-                        ? "جاري الإرسال..."
-                        : "Sending..."
-                      : t("publishHomeworkNow")}
+                    {t("publishHomeworkNow")}
                   </button>
                 </form>
               </motion.div>
@@ -2297,15 +2221,10 @@ export default function TeacherDashboard() {
 
                   <button
                     type="submit"
-                    disabled={isSending}
-                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
                   >
                     <Send size={18} />
-                    {isSending
-                      ? isRtl
-                        ? "جاري الإرسال..."
-                        : "Sending..."
-                      : t("saveReport")}
+                    {t("saveReport")}
                   </button>
                 </form>
               </motion.div>
@@ -2381,7 +2300,7 @@ export default function TeacherDashboard() {
                     </div>
                     <button
                       onClick={() => setSelectedStudent(null)}
-                      className="text-[10px] font-bold text-[#0B2345] hover:underline"
+                      className="text-[10px] font-bold text-indigo-600 hover:underline"
                     >
                       {t("change")}
                     </button>
@@ -2403,7 +2322,7 @@ export default function TeacherDashboard() {
                           key={opt.id}
                           type="button"
                           onClick={() => setReportTarget(opt.id as any)}
-                          className={`py-3 rounded-xl border text-[10px] font-bold transition-all ${reportTarget === opt.id ? "bg-[#0B2345] text-white border-indigo-600 shadow-md" : "bg-white text-slate-500 border-slate-200"}`}
+                          className={`py-3 rounded-xl border text-[10px] font-bold transition-all ${reportTarget === opt.id ? "bg-indigo-600 text-white border-indigo-600 shadow-md" : "bg-white text-slate-500 border-slate-200"}`}
                         >
                           {opt.label}
                         </button>
@@ -2427,15 +2346,10 @@ export default function TeacherDashboard() {
 
                   <button
                     type="submit"
-                    disabled={isSending}
-                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
                   >
                     <Send size={18} />
-                    {isSending
-                      ? isRtl
-                        ? "جاري الإرسال..."
-                        : "Sending..."
-                      : t("sendReportBtn")}
+                    {t("sendReportBtn")}
                   </button>
                 </form>
               </motion.div>

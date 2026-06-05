@@ -6,19 +6,3 @@ coverage/
 *.log
 .env*
 !.env.example
-
-# Secrets — never commit
-key.json
-key.json.json
-*.pem
-*-sa-key.json
-
-# Deploy artifacts
-schoolixiq-dist.zip
-
-# Nested duplicate project folder
-SchoolixiQ-/
-
-# Local fix scripts (not part of app)
-backend/fix*.cjs
-backend/remove_vite.cjs

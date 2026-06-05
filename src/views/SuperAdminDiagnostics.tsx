@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { Activity, Clock, Database, AlertTriangle, Users, TrendingUp, RefreshCw, Layers, ShieldAlert, Cpu } from 'lucide-react';
 import { collection, query, orderBy, limit, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -90,7 +90,7 @@ export function SuperAdminDiagnostics() {
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
         <div>
           <h3 className="text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight flex items-center gap-3">
-            <Activity className="text-[#0B2345]" size={32} />
+            <Activity className="text-blue-600" size={32} />
             مراقبة الأداء والنظام الأمني
           </h3>
           <p className="text-slate-500 font-bold mt-2 flex items-center gap-2 text-sm">
@@ -119,7 +119,7 @@ export function SuperAdminDiagnostics() {
       {/* Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col gap-4 group">
-          <div className="w-12 h-12 bg-indigo-50 dark:bg-[#0B2345]/10 text-[#0B2345] dark:text-indigo-400 rounded-2xl flex justify-center items-center shrink-0 group-hover:scale-110 transition-transform">
+          <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl flex justify-center items-center shrink-0 group-hover:scale-110 transition-transform">
             <Database size={24} />
           </div>
           <div>
@@ -139,7 +139,7 @@ export function SuperAdminDiagnostics() {
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col gap-4 group">
-          <div className="w-12 h-12 bg-blue-50 dark:bg-[#0B2345]/10 text-[#0B2345] dark:text-blue-400 rounded-2xl flex justify-center items-center shrink-0 group-hover:scale-110 transition-transform">
+          <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl flex justify-center items-center shrink-0 group-hover:scale-110 transition-transform">
             <Layers size={24} />
           </div>
           <div>

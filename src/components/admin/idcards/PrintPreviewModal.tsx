@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Printer, Settings2, Users, ZoomIn, ZoomOut, Maximize } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import StudentGridPrint from "./StudentGridPrint";
 import { IdCardTemplate } from "../../../types/idCardTemplate";
 import { printElement } from "../../../lib/printUtils";
-import { toast } from "react-hot-toast";
-import { mergeIdCardTemplate } from "../../../lib/idCardTemplateUtils";
 
 interface PrintPreviewModalProps {
   isOpen: boolean;
@@ -38,15 +36,12 @@ export default function PrintPreviewModal({
   const [isConfirmingPrint, setIsConfirmingPrint] = useState<boolean>(false);
   
   const printContentRef = useRef<HTMLDivElement>(null);
-  const resolvedTemplate = mergeIdCardTemplate(template);
-  const printableStudents = students.filter(
-    (s) => selectedStudents.has(s.id) && idCards[s.id],
-  );
+  const printableStudents = students.filter(s => selectedStudents.has(s.id));
 
+  // Reset selected students when students change
   useEffect(() => {
-    const ids = students.filter((s) => idCards[s.id]).map((s) => s.id);
-    setSelectedStudents(new Set(ids));
-  }, [students, idCards]);
+    setSelectedStudents(new Set(students.map(s => s.id)));
+  }, [students]);
 
   useEffect(() => {
     setPreviewSide(printSides);
@@ -54,24 +49,19 @@ export default function PrintPreviewModal({
 
   const handlePrint = () => {
     if (printableStudents.length === 0) {
-      toast.error(
-        isRtl ? "لم يتم تحديد طلاب لديهم هوية صادرة" : "No students with issued cards selected.",
-      );
+      alert(isRtl ? "لم يتم تحديد طلاب للطباعة" : "No students selected for printing.");
       return;
     }
 
-    if (!printContentRef.current) return;
-
-    const success = printElement(printContentRef.current, title);
-    if (!success) {
-      toast.error(
-        isRtl
-          ? "تعذر فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة أو جرّب متصفحاً آخر."
-          : "Could not open print dialog. Allow popups or try another browser.",
-      );
-      return;
+    if (printContentRef.current) {
+      const success = printElement(printContentRef.current, title);
+      
+      if (!success) {
+        alert(isRtl ? "حدث خطأ أثناء الطباعة أو تم حظر النافذة المنبثقة." : "An error occurred while printing or the popup was blocked.");
+      } else {
+        setIsConfirmingPrint(true);
+      }
     }
-    setIsConfirmingPrint(true);
   };
 
   const toggleStudent = (id: string) => {
@@ -104,7 +94,7 @@ export default function PrintPreviewModal({
         {/* Sidebar Settings */}
         <div className="w-full md:w-[380px] bg-slate-50 dark:bg-slate-800/50 p-6 md:p-8 flex flex-col h-full border-r border-slate-200 dark:border-slate-800 overflow-y-auto custom-scrollbar">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-[#e8eef5] dark:bg-indigo-900/50 text-[#0B2345] dark:text-indigo-400 font-bold rounded-2xl flex items-center justify-center text-xl">
+            <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 font-bold rounded-2xl flex items-center justify-center text-xl">
               <Printer size={24} />
             </div>
             <div>
@@ -174,20 +164,18 @@ export default function PrintPreviewModal({
                     {isRtl ? "تحديد الطلاب" : "Select Students"}
                   </label>
                   <div className="flex gap-2">
-                    <button onClick={selectAll} className="text-xs font-bold text-[#0B2345] hover:text-indigo-700 dark:text-indigo-400">All</button>
+                    <button onClick={selectAll} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">All</button>
                     <button onClick={deselectAll} className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400">None</button>
                   </div>
                 </div>
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 max-h-[200px] overflow-y-auto custom-scrollbar">
-                  {students
-                    .filter((student) => idCards[student.id])
-                    .map((student) => (
+                  {students.map(student => (
                     <label key={student.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={selectedStudents.has(student.id)}
                         onChange={() => toggleStudent(student.id)}
-                        className="w-4 h-4 rounded text-[#0B2345] focus:ring-indigo-600"
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-600"
                       />
                       <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{student.name}</span>
                     </label>
@@ -200,12 +188,12 @@ export default function PrintPreviewModal({
           <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700 space-y-4">
              <div className="flex justify-between text-sm font-medium text-slate-500 dark:text-slate-400">
                <span>{isRtl ? "إجمالي البطاقات" : "Total Cards to Print"}:</span>
-               <span className="font-bold text-[#0B2345] dark:text-indigo-400 text-lg">{printableStudents.length * copies * (printSides === 'both' ? 2 : 1)}</span>
+               <span className="font-bold text-indigo-600 dark:text-indigo-400 text-lg">{printableStudents.length * copies * (printSides === 'both' ? 2 : 1)}</span>
              </div>
             <button
               onClick={() => handlePrint()}
               disabled={printableStudents.length === 0}
-              className="w-full bg-[#0B2345] text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition-colors shadow-xl shadow-indigo-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition-colors shadow-xl shadow-indigo-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <Printer size={20} />
               {isRtl ? "طـبـاعـة الآن" : "Print Now"}
@@ -238,19 +226,19 @@ export default function PrintPreviewModal({
               <div className="flex justify-center mb-6 border-b border-slate-200 dark:border-slate-800 pb-2 gap-4 print:hidden">
                 <button
                   onClick={() => setPreviewSide("both")}
-                  className={`px-4 py-2 rounded-xl font-bold transition-all ${previewSide === "both" ? "bg-[#e8eef5] dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                  className={`px-4 py-2 rounded-xl font-bold transition-all ${previewSide === "both" ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
                 >
                   {isRtl ? "عرض الكل" : "Show Both"}
                 </button>
                 <button
                   onClick={() => setPreviewSide("front")}
-                  className={`px-4 py-2 rounded-xl font-bold transition-all ${previewSide === "front" ? "bg-[#e8eef5] dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                  className={`px-4 py-2 rounded-xl font-bold transition-all ${previewSide === "front" ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
                 >
                   {isRtl ? "الواجهة الأمامية" : "Front Preview"}
                 </button>
                 <button
                   onClick={() => setPreviewSide("back")}
-                  className={`px-4 py-2 rounded-xl font-bold transition-all ${previewSide === "back" ? "bg-[#e8eef5] dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                  className={`px-4 py-2 rounded-xl font-bold transition-all ${previewSide === "back" ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
                 >
                   {isRtl ? "الواجهة الخلفية" : "Back Preview"}
                 </button>
@@ -262,7 +250,7 @@ export default function PrintPreviewModal({
                 students={printableStudents}
                 idCards={idCards}
                 isRtl={isRtl}
-                template={resolvedTemplate}
+                template={template}
                 printSides={previewSide}
                 copies={copies}
                 layoutMode={layoutMode}
@@ -282,7 +270,7 @@ export default function PrintPreviewModal({
               className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden"
             >
               <div className="p-6 md:p-8 text-center space-y-6">
-                <div className="w-20 h-20 bg-[#e8eef5] dark:bg-indigo-900/50 text-[#0B2345] dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Printer size={32} />
                 </div>
                 <div>
@@ -308,7 +296,7 @@ export default function PrintPreviewModal({
                       onAfterPrint?.(printableStudents.length * copies);
                       onClose();
                     }}
-                    className="flex-1 bg-[#0B2345] hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-indigo-600/20"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-indigo-600/20"
                   >
                     {isRtl ? "نعم، تمت الطباعة بنجاح" : "Yes, Printed Successfully"}
                   </button>
@@ -326,7 +314,7 @@ export default function PrintPreviewModal({
             students={printableStudents}
             idCards={idCards}
             isRtl={isRtl}
-            template={resolvedTemplate}
+            template={template}
             printSides={printSides}
             copies={copies}
             layoutMode={layoutMode}

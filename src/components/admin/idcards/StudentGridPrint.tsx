@@ -3,7 +3,6 @@ import StudentCard from "./StudentCard";
 import StudentCardBack from "./StudentCardBack";
 
 import { IdCardTemplate } from "../../../types/idCardTemplate";
-import { mergeIdCardTemplate } from "../../../lib/idCardTemplateUtils";
 
 interface StudentGridPrintProps {
   students: any[];
@@ -17,8 +16,7 @@ interface StudentGridPrintProps {
 
 const StudentGridPrint = forwardRef<HTMLDivElement, StudentGridPrintProps>(
   ({ students, idCards, isRtl, template, printSides = "front", copies = 1, layoutMode = "a4" }, ref) => {
-    const resolvedTemplate = mergeIdCardTemplate(template);
-
+    
     // We expand the array based on copies
     const cardsToPrint = [];
     for (const student of students) {
@@ -57,7 +55,7 @@ const StudentGridPrint = forwardRef<HTMLDivElement, StudentGridPrintProps>(
                       student={student}
                       cardData={cardData}
                       isRtl={isRtl}
-                      template={resolvedTemplate}
+                      template={template}
                     />
                   </div>
                 )}
@@ -70,7 +68,7 @@ const StudentGridPrint = forwardRef<HTMLDivElement, StudentGridPrintProps>(
                        student={student}
                        cardData={cardData}
                        isRtl={isRtl}
-                       template={resolvedTemplate}
+                       template={template}
                      />
                    </div>
                 )}

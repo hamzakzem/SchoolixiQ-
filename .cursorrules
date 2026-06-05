@@ -1,0 +1,25 @@
+# Schoolix Project Rules & AI Guidelines (.cursorrules)
+
+# بالعربية - قواعد وتوجيهات للذكاء الاصطناعي في Cursor
+## توجيهات حماية التصميم والكود (مهم جداً)
+- **يُمنع منعاً باتاً تعديل أو إعادة كتابة التصاميم المرئية، التنسيقات (Styling)، الألوان، أو الخطوط** إلا إذا طلب المستخدم ذلك بصريح العبارة وبشكل محدد للغاية.
+- **المحافظة على الهوية البصرية**: مشروع Schoolix يمتلك هوية بصرية مخصصة (كالخطوط والألوان الداكنة والخلفيات المنسقة بالكامل مع دعم مدمج للغة العربية RTL). أي تعديل عشوائي يدمر تناسق واجهات لوحات التحكم (Admin/Teacher/Parent).
+- **التعديل الدقيق (Surgical Edits)**: لا تقم باستبدال ملفات كاملة أو كتابة الكود من الصفر لإجراء تعديل بسيط. قم بالتعديل فقط على السطور المعنية والمحددة لتجنب حذف الأكواد المهمة أو تدمير منطق العمل (Business Logic).
+- **التزامن مع AI Studio**: هذا المشروع مرتبط ببيئة بناء التطبيقات السحابية في **Google AI Studio**. التغييرات التي تتم هناك تعتبر خط الأساس المعتمد. لا تقم بفرض تغييرات تتعارض مع الأكواد المستقرة هناك.
+
+---
+
+# English - Cursor AI Behavior Guidelines
+
+## 1. Do Not Autonomously Refactor UI/UX
+- **Strict Visual Freeze**: Do NOT touch, alter, or "improve" any CSS, Tailwind classes, typography, margins, backgrounds, or component layouts unless the user gives an explicit, direct command to change the design of that specific area.
+- **Respect RTL Layouts**: The application is fully optimized for RTL (Arabic) layout grids. Do not break RTL alignments, padding directions (such as `pl-` or `pr-` or standard spacing), or font-family hierarchies.
+
+## 2. Surgical Code Modifications Only
+- Prefer line-by-line surgical edits over completely overwriting files.
+- Always preserve existing Firestore queries, states, and data models unless requested to refactor them.
+- When fixing errors, address the root cause directly instead of writing mock functions or scaffolding placeholder layouts.
+
+## 3. Work Synchronization
+- This local workspace is deployed and monitored via **Google AI Studio**. The cloud-deployed repository/environment is the source of truth.
+- Always ask the user for confirmation before initializing any automated formatting tools, linters that re-order imports, or sweeping file changes.

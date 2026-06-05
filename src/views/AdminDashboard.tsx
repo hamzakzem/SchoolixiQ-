@@ -28,8 +28,7 @@ import { sendEmailVerification, signOut } from "firebase/auth";
 import { useAuth } from "../lib/AuthContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
-import { NotificationBell } from "../components/NotificationBell";
-import BrandLogo from "../components/BrandLogo";
+import { NotificationCenter } from "../components/NotificationCenter";
 import { motion, AnimatePresence } from "motion/react";
 import {
   collection,
@@ -49,15 +48,8 @@ import { School } from "../types";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
-import { emailVerificationHint } from "../lib/displayIdentity";
-import { useMobileMockupShell } from "../lib/useMobileMockupShell";
-import { useAndroidBackButton } from "../hooks/useAndroidBackButton";
-import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
-import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
-import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
-import AdminMockupHome from "../components/mobile/homes/AdminMockupHome";
-import MobileAdminPanel from "../components/mobile/MobileAdminPanel";
 import { notificationService } from "../lib/notificationService";
+import SchoolixLogo from "../components/SchoolixLogo";
 
 const DEFAULT_PACKAGES = [
   {
@@ -116,6 +108,7 @@ import StudentsList from "./admin/StudentsList";
 import StaffList from "./admin/StaffList";
 import Attendance from "./admin/Attendance";
 import EvaluationReports from "./admin/EvaluationReports";
+import AdvancedReports from "./admin/AdvancedReports";
 import Homework from "./admin/Homework";
 import Grades from "./admin/Grades";
 import StudentArchive from "./admin/StudentArchive";
@@ -135,13 +128,11 @@ import AdminChatTab from "./admin/AdminChatTab";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
-import { usePushTabNavigation } from "../lib/pushNavigation";
 
 export default function AdminDashboard() {
   const { t, isRtl, language, setLanguage } = useLanguage();
   const { config } = useSystemConfig();
   const [activeTab, setActiveTab] = useState("overview");
-  const mobileUi = useMobileMockupShell();
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
@@ -182,19 +173,22 @@ export default function AdminDashboard() {
       setActiveTab("overview");
     }
   };
-
-  useAndroidBackButton(
-    React.useCallback(() => {
-      if (activeTab !== "overview") {
-        handleBack();
-        return true;
-      }
-      return false;
-    }, [activeTab, navigationHistory]),
-  );
   // Filter menu items based on assistant or plan permissions
   const { profile, schoolData: authSchoolData } = useAuth();
-  usePushTabNavigation(navigateToTab, profile?.role);
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+    const qNotifications = query(
+      collection(db, "notifications"),
+      where("userId", "==", profile.uid)
+    );
+    return onSnapshot(qNotifications, (snap) => {
+      setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, [profile?.uid]);
 
   // Package permissions are controlled by the Super Admin via the package properties
   const perms = authSchoolData?.packagePermissions || profile?.permissions; // fallback to profile if not loaded yet
@@ -218,6 +212,7 @@ export default function AdminDashboard() {
     { id: "schedules", label: t("schedules"), icon: Calendar },
     { id: "announcements", label: t("announcements"), icon: MessageSquare },
     { id: "parents", label: t("parentApp"), icon: Users },
+    { id: "advanced_reports", label: t("advancedReports"), icon: BarChart3 },
     { id: "market", label: t("marketplace"), icon: ShoppingBag },
     { id: "id_cards", label: t("idCards"), icon: ShieldCheck },
     {
@@ -258,6 +253,8 @@ export default function AdminDashboard() {
         if (item.id === "classes") return perms.classes !== false;
         if (item.id === "schedules") return perms.automated_schedules !== false;
         if (item.id === "announcements") return perms.announcements !== false;
+        if (item.id === "advanced_reports")
+          return perms.advanced_reports !== false;
         if (item.id === "market") return perms.marketplace_ordering !== false;
         if (item.id === "id_cards") return perms.id_card_generation !== false;
         if (item.id === "assistants")
@@ -289,15 +286,6 @@ export default function AdminDashboard() {
     }
     return false;
   });
-
-  const canManageStudents = filteredMenuItems.some(
-    (item) => item.id === "students_edit",
-  );
-  const mobileHomePermissions = filteredMenuItems.filter(
-    (item) =>
-      item.id !== "overview" &&
-      !(item.id === "students" && canManageStudents),
-  );
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const primaryItems = filteredMenuItems.filter((item) =>
@@ -445,7 +433,6 @@ export default function AdminDashboard() {
           schoolId: profile.schoolId,
           schoolName: schoolData.name,
           requestType: "renewal",
-          tab: "requests",
         },
       });
 
@@ -619,7 +606,7 @@ export default function AdminDashboard() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-white dark:bg-slate-900 rounded-[3rem] p-12 shadow-2xl border border-slate-100 dark:border-slate-800 text-center"
             >
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 w-16 h-16 rounded-2xl flex items-center justify-center text-[#0B2345] dark:text-indigo-400 mx-auto mb-8">
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 w-16 h-16 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto mb-8">
                 <ShieldCheck size={32} />
               </div>
               <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-4 uppercase">
@@ -664,7 +651,7 @@ export default function AdminDashboard() {
 
                       <div className="mb-8">
                         <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-black text-[#0B2345] dark:text-indigo-400">
+                          <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
                             {plan.price === 0
                               ? "مجاني"
                               : plan.price.toLocaleString("ar-IQ")}
@@ -683,7 +670,7 @@ export default function AdminDashboard() {
                       <div className="space-y-4 mb-8 flex-1">
                         <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-[#e8eef5] dark:bg-indigo-900/30 rounded-lg flex items-center justify-center text-[#0B2345] dark:text-indigo-400">
+                            <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                               <Users size={16} />
                             </div>
                             <div>
@@ -726,7 +713,7 @@ export default function AdminDashboard() {
                         disabled={isSubscribing}
                         className={`w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 shadow-xl ${
                           plan.isPopular
-                            ? "bg-[#0B2345] text-white hover:bg-indigo-700 shadow-indigo-600/20"
+                            ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/20"
                             : "bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600 shadow-slate-600/10"
                         }`}
                       >
@@ -779,7 +766,7 @@ export default function AdminDashboard() {
                       toast.success("يمكنك الآن اختيار باقة جديدة");
                     }
                   }}
-                  className="px-10 py-5 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
+                  className="px-10 py-5 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
                 >
                   إرسال طلب جديد
                 </button>
@@ -804,7 +791,7 @@ export default function AdminDashboard() {
                   : `Thank you for choosing ${config.appName}. Your activation request has been sent`}{" "}
                 مدرستك إلى الإدارة العليا (Super Admin).
                 <br />
-                <span className="text-[#0B2345] dark:text-indigo-400">
+                <span className="text-indigo-600 dark:text-indigo-400">
                   سنقوم بتفعيل حسابك والتواصل معك خلال ساعات قليلة.
                 </span>
               </p>
@@ -834,7 +821,7 @@ export default function AdminDashboard() {
                       if (pkg) setViewingPackage(pkg);
                       else toast.error("تفاصيل الباقة غير متوفرة حالياً");
                     }}
-                    className="text-[10px] font-black text-[#0B2345] dark:text-indigo-400 underline decoration-2 underline-offset-4 hover:text-indigo-700 transition-colors"
+                    className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 underline decoration-2 underline-offset-4 hover:text-indigo-700 transition-colors"
                   >
                     عرض تفاصيل الباقة
                   </button>
@@ -869,7 +856,7 @@ export default function AdminDashboard() {
                       }
                     }
                   }}
-                  className="px-10 py-5 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
+                  className="px-10 py-5 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
                 >
                   تحديث حالة الطلب
                 </button>
@@ -901,7 +888,7 @@ export default function AdminDashboard() {
           className="bg-white dark:bg-slate-900 rounded-[2rem] md:rounded-[3rem] p-6 md:p-12 shadow-2xl w-full max-w-xl border border-slate-100 dark:border-slate-800/80 my-auto"
         >
           <div className="flex justify-between items-start mb-8 gap-4">
-            <div className="bg-blue-50 dark:bg-blue-950/40 w-16 h-16 rounded-2xl flex items-center justify-center text-[#0B2345] dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 shadow-sm shrink-0">
+            <div className="bg-blue-50 dark:bg-blue-950/40 w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 shadow-sm shrink-0">
               <Building size={32} />
             </div>
             <button
@@ -1099,7 +1086,7 @@ export default function AdminDashboard() {
             </div>
             <button
               disabled={isSettingUp}
-              className="w-full py-5 bg-slate-900 dark:bg-[#0B2345] dark:hover:bg-[#0B2345] text-white rounded-[1.5rem] font-bold text-lg hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="w-full py-5 bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-[1.5rem] font-bold text-lg hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               {isSettingUp ? (isRtl ? "جاري الإعداد..." : "Setting up...") : (isRtl ? "حفظ البيانات والبدء" : "Save Record & Start")}
             </button>
@@ -1112,15 +1099,7 @@ export default function AdminDashboard() {
   const renderContent = () => {
     switch (activeTab) {
       case "overview":
-        return mobileUi ? (
-          <AdminMockupHome
-            permissions={mobileHomePermissions}
-            studentsTabId={canManageStudents ? "students_edit" : "students"}
-            onTabChange={navigateToTab}
-          />
-        ) : (
-          <Overview setActiveTab={setActiveTab} />
-        );
+        return <Overview setActiveTab={setActiveTab} />;
       case "chat":
         return <AdminChatTab />;
       case "classes":
@@ -1128,11 +1107,7 @@ export default function AdminDashboard() {
       case "schedules":
         return <Schedules />;
       case "students":
-        return (
-          <StudentsList
-            mode={mobileUi && canManageStudents ? "edit" : "view"}
-          />
-        );
+        return <StudentsList mode="view" />;
       case "students_edit":
         return <StudentsList mode="edit" />;
       case "parents":
@@ -1165,6 +1140,8 @@ export default function AdminDashboard() {
         return <EvaluationReports />;
       case "homework":
         return <Homework />;
+      case "advanced_reports":
+        return <AdvancedReports />;
       case "id_cards":
         return <IdCards />;
       default:
@@ -1178,7 +1155,7 @@ export default function AdminDashboard() {
 
   return (
     <div
-      className={`h-[100dvh] overflow-hidden flex flex-col md:flex-row transition-colors duration-300 print:h-auto print:block ${mobileUi ? "sq-app-native bg-transparent" : "bg-transparent"}`}
+      className="h-[100dvh] overflow-hidden bg-transparent flex flex-col md:flex-row transition-colors duration-300 print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Expiry Overlay */}
@@ -1239,13 +1216,13 @@ export default function AdminDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`${mobileUi ? "hidden " : ""}fixed inset-y-0 ${isRtl ? "right-0 rounded-l-[2rem] lg:rounded-none border-l" : "left-0 rounded-r-[2rem] lg:rounded-none border-r"} z-50 bg-slate-900 dark:bg-black text-white flex flex-col pt-safe lg:relative border-slate-800 dark:border-slate-900 print:hidden shadow-2xl lg:shadow-none shrink-0 overflow-visible`}
+            className={`fixed inset-y-0 ${isRtl ? "right-0 rounded-l-[2rem] lg:rounded-none border-l" : "left-0 rounded-r-[2rem] lg:rounded-none border-r"} z-50 bg-slate-900 dark:bg-black text-white flex flex-col pt-[env(safe-area-inset-top,0px)] lg:relative border-slate-800 dark:border-slate-900 print:hidden shadow-2xl lg:shadow-none shrink-0 overflow-visible`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
                 className={`p-6 border-b border-slate-800/50 flex ${isSidebarCollapsed ? "justify-center" : "items-center gap-4"}`}
               >
-                {schoolData?.logoUrl ? (
+                {schoolData?.logoUrl && schoolData?.logoUrl !== "/icon.svg" ? (
                   <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1 shadow-xl shrink-0 overflow-hidden">
                     <img
                       src={schoolData.logoUrl || undefined}
@@ -1254,9 +1231,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                 ) : (
-                  <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1.5 shadow-xl shrink-0 overflow-hidden">
-                    <BrandLogo size="sm" className="max-h-full max-w-full" alt={config.appName} />
-                  </div>
+                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
                 )}
                 {!isSidebarCollapsed && (
                   <motion.div
@@ -1348,7 +1323,7 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-colors duration-300 print:overflow-visible print:h-auto">
-        <header className={`${mobileUi ? "hidden " : ""}h-16 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-8 shrink-0 sticky top-0 z-40 transition-colors print:hidden`}>
+        <header className="min-h-[4rem] md:min-h-[5rem] h-auto pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-3 md:pt-[calc(1.25rem+env(safe-area-inset-top,0px))] md:pb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-8 shrink-0 sticky top-0 z-40 transition-colors print:hidden">
           <div className="flex items-center gap-2 md:gap-6">
             <button
               onClick={() => {
@@ -1405,10 +1380,25 @@ export default function AdminDashboard() {
               <ThemeToggle />
             </div>
 
-            <NotificationBell
-              activeTabSetter={navigateToTab}
-              userRole={profile?.role || "admin"}
-            />
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+            >
+              <Bell size={18} />
+              {notifications.filter((n: any) => !n.read).length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                  {notifications.filter((n: any) => !n.read).length > 9 ? '9+' : notifications.filter((n: any) => !n.read).length}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <NotificationCenter
+                onClose={() => setShowNotifications(false)}
+                activeTabSetter={setActiveTab}
+                userRole={profile?.role || "admin"}
+              />
+            )}
 
             <div className="flex items-center gap-2 md:gap-4">
               <div className="text-left hidden lg:block">
@@ -1453,8 +1443,8 @@ export default function AdminDashboard() {
                 <h4 className="text-xs md:text-sm font-bold text-amber-900 dark:text-amber-400 leading-tight">
                   تأكيد البريد الإلكتروني مطلوب
                 </h4>
-                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 max-w-[220px] md:max-w-[400px]">
-                  {emailVerificationHint(isRtl)}
+                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 truncate max-w-[220px] md:max-w-[400px]">
+                  يرجى تفعيل بريدك ({auth.currentUser?.email})
                 </p>
               </div>
             </div>
@@ -1489,41 +1479,14 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {mobileUi ? (
-          <>
-            <MobileMockupHeader
-              sectionTitle={
-                activeTab === "overview"
-                  ? isRtl
-                    ? "الرئيسية"
-                    : "Home"
-                  : menuItems.find((m) => m.id === activeTab)?.label ??
-                    (isRtl ? "المدرسة" : "School")
-              }
-              schoolName={schoolData?.name || config.appName}
-              schoolLogoUrl={schoolData?.logoUrl}
-              modules={mobileHomePermissions}
-              onNavigateModule={navigateToTab}
-              onNotifications={() => navigateToTab("announcements")}
-              onBack={activeTab !== "overview" ? handleBack : undefined}
-            />
-            <MobileMockupBottomNav
-              role="admin"
-              active={tabToMobileNav('admin', activeTab)}
-              onChange={(nav) => navigateToTab(mobileNavToTab('admin', nav))}
-            />
-          </>
-        ) : null}
         <main
-          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0" : "overflow-y-auto pb-10"} ${mobileUi ? "pt-[72px] pb-[84px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]" : ""}`}
+          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0" : "overflow-y-auto pb-10"}`}
         >
           <div
             className={`w-full mx-auto flex flex-col print:min-h-0 print:pb-0 print:p-0 ${
               activeTab === "chat"
                 ? "h-full max-w-none p-0 flex-1 min-h-0"
-                : mobileUi
-                  ? "max-w-7xl p-0"
-                  : "max-w-7xl p-4 md:p-8"
+                : "max-w-7xl p-4 md:p-8"
             }`}
           >
             <AnimatePresence mode="wait">
@@ -1532,18 +1495,14 @@ export default function AdminDashboard() {
                 className={
                   activeTab === "chat"
                     ? "flex-1 flex flex-col min-h-0"
-                    : "w-full flex flex-col sq-page"
+                    : "w-full flex flex-col"
                 }
                 initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: activeTab === "chat" ? 0 : -15 }}
                 transition={{ duration: 0.25, ease: "easeOut" }}
               >
-                {mobileUi && activeTab !== "overview" && activeTab !== "chat" ? (
-                  <MobileAdminPanel>{renderContent()}</MobileAdminPanel>
-                ) : (
-                  renderContent()
-                )}
+                {renderContent()}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -1597,7 +1556,7 @@ export default function AdminDashboard() {
               </motion.div>
             )}
           </AnimatePresence>
-          {activeTab !== "chat" && <GlobalFooter compact hideDownload={mobileUi} />}
+          {activeTab !== "chat" && <GlobalFooter compact />}
         </main>
 
         {/* Real-time Subscription Timer Bottom Bar */}
@@ -1667,7 +1626,7 @@ function PackageDetailsModal({
               <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
                 السعر السنوي
               </p>
-              <p className="text-2xl font-black text-[#0B2345] dark:text-indigo-400">
+              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
                 {(pkg.priceYearly !== undefined
                   ? pkg.priceYearly
                   : pkg.price) === 0
@@ -1684,7 +1643,7 @@ function PackageDetailsModal({
               <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
                 السعر الشهري
               </p>
-              <p className="text-2xl font-black text-[#0B2345] dark:text-indigo-400">
+              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
                 {(pkg.priceMonthly !== undefined
                   ? pkg.priceMonthly
                   : Math.round((pkg.price || 0) / 12)) === 0
@@ -1734,7 +1693,7 @@ function PackageDetailsModal({
         <div className="p-8 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
           <button
             onClick={onClose}
-            className="px-10 py-4 bg-slate-900 dark:bg-[#0B2345] text-white rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
+            className="px-10 py-4 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
           >
             إغلاق
           </button>

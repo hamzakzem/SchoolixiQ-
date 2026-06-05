@@ -6,15 +6,11 @@ import { updatePassword, verifyBeforeUpdateEmail } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useLanguage } from '../lib/LanguageContext';
-import { getLinkedAccountLabel } from '../lib/displayIdentity';
 import { AtSign, Lock, LayoutDashboard, MessageSquare, Send } from 'lucide-react';
-import { useMobileMockupShell } from '../lib/useMobileMockupShell';
-import MobileLogoutButton from '../components/mobile/MobileLogoutButton';
 
 export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
   const { profile } = useAuth();
   const { t, isRtl } = useLanguage();
-  const inApp = useMobileMockupShell();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedClass, setSelectedClass] = useState((profile as any)?.preferredClassId || '');
@@ -90,14 +86,12 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-3 bg-blue-50 text-[#0B2345] rounded-xl">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
               <AtSign size={24} />
             </div>
             <div>
               <h3 className="font-bold text-slate-900">{isRtl ? 'تحديث البريد الإلكتروني' : 'Update Email'}</h3>
-              <p className="text-sm text-slate-500 font-mono">
-                {getLinkedAccountLabel(profile, isRtl)}
-              </p>
+              <p className="text-sm text-slate-500">{profile?.email}</p>
             </div>
           </div>
           <form onSubmit={handleUpdateEmail} className="space-y-4">
@@ -180,7 +174,6 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
           </form>
         </div>
       </div>
-      {inApp ? <MobileLogoutButton /> : null}
     </div>
   );
 }

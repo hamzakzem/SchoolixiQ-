@@ -12,8 +12,6 @@ import { db } from "../lib/firebase";
 import { School } from "../types";
 import { ArrowLeft } from "lucide-react";
 import { useSystemConfig } from "../lib/SystemConfigContext";
-import { Capacitor } from "@capacitor/core";
-import { FooterAppDownloads } from "./FooterAppDownloads";
 
 interface DisplayPartner {
   id: string;
@@ -80,13 +78,7 @@ function PromotionalBannerSlider({
   );
 }
 
-export function GlobalFooter({
-  compact = false,
-  hideDownload = false,
-}: {
-  compact?: boolean;
-  hideDownload?: boolean;
-}) {
+export function GlobalFooter({ compact = false }: { compact?: boolean }) {
   const { config } = useSystemConfig();
   const [partnersList, setPartnersList] = useState<DisplayPartner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,18 +120,11 @@ export function GlobalFooter({
 
   if (loading) return null;
 
-  const suppressDownload = hideDownload || Capacitor.isNativePlatform();
-
   if (compact) {
     return (
       <footer className="mt-auto shrink-0 relative w-full py-3 bg-transparent print:hidden select-none">
         <div className="max-w-7xl mx-auto px-6">
           <div className="w-full h-px bg-slate-200/20 dark:bg-slate-800/25 mb-3" />
-          {!suppressDownload ? (
-            <div className="flex flex-col items-center gap-4 mb-3">
-              <FooterAppDownloads appName={config.appName} compact />
-            </div>
-          ) : null}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
             <span className="text-[10px] md:text-xs font-semibold text-slate-400 dark:text-slate-500 select-none">
               &copy; {new Date().getFullYear()} {config.appName}. جميع الحقوق
@@ -222,7 +207,7 @@ export function GlobalFooter({
                   window.location.href = "/login?mode=signup";
                 }
               }}
-              className="inline-flex items-center gap-3 px-8 py-4 bg-[#0B2345] hover:bg-indigo-700 text-white rounded-xl font-bold text-base transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25 active:scale-95"
+              className="inline-flex items-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-base transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25 active:scale-95"
             >
               احجز عرضاً تجريبياً
               <ArrowLeft size={20} className="rtl:-scale-x-100" />
@@ -289,11 +274,6 @@ export function GlobalFooter({
               </div>
             </div>
           )}
-
-        {/* ANDROID APP DOWNLOAD */}
-        <div className="w-full flex justify-center mb-10 md:mb-12 px-2">
-          <FooterAppDownloads appName={config.appName} />
-        </div>
 
         {/* BOTTOM FOOTER */}
         <div className="w-full flex flex-col items-center pt-8 border-t border-slate-200/60 dark:border-slate-800/60">

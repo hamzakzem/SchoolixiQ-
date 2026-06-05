@@ -1,36 +1,54 @@
-@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Almarai:wght@400;700&family=Cairo:wght@400;500;600;700;800&family=Changa:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Lato:wght@400;700&family=Montserrat:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;700&family=Nunito:wght@400;600;700&family=Open+Sans:wght@400;600;700&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Rubik:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap');
-
-/* ID card studio live preview — fixed container so cqi units render */
-.id-card-preview-host {
-  container-type: inline-size;
-  container-name: id-card-preview;
-}
-.id-card-preview-host .student-card-print {
-  width: 100% !important;
-  height: 100% !important;
-}
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, monospace;
-/* SchoolixiQ Brand Colors */
+  --font-sans: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --color-primary: #0B2345;
-  --color-primary-light: #1a3a6b;
   --color-secondary: #D4A64A;
-  --color-secondary-light: #e8c06e;
-  --color-surface: #F3F4F6;
-  --color-text-secondary: #6B7280;
+  
+  --color-indigo-50: #F3F4F6;
+  --color-indigo-100: #E1E6EE;
+  --color-indigo-200: #C2D0E4;
+  --color-indigo-300: #95B0D4;
+  --color-indigo-400: #638BC1;
+  --color-indigo-505: #40689E;
+  --color-indigo-600: #0B2345;
+  --color-indigo-700: #081B35;
+  --color-indigo-800: #061427;
+  --color-indigo-900: #040D1A;
+  
+  --color-blue-50: #F3F4F6;
+  --color-blue-100: #E1E6EE;
+  --color-blue-200: #C2D0E4;
+  --color-blue-300: #95B0D4;
+  --color-blue-400: #638BC1;
+  --color-blue-500: #0B2345;
+  --color-blue-600: #0B2345;
+  --color-blue-700: #081B35;
+  --color-blue-800: #061427;
+  --color-blue-900: #040D1A;
+  
+  --color-amber-50: #FFFDF2;
+  --color-amber-100: #FEF7DB;
+  --color-amber-200: #FCECB1;
+  --color-amber-300: #FAD97B;
+  --color-amber-400: #F6C147;
+  --color-amber-500: #D4A64A;
+  --color-amber-600: #D4A64A;
+  --color-amber-700: #B58B39;
+  --color-amber-800: #916E2B;
+  --color-amber-900: #75571F;
 }
 
 html[lang="ar"], html[lang="ar"] *:not(.font-mono):not(code):not(pre) {
-  font-family: "Cairo", "Inter", sans-serif !important;
+  font-family: "Cairo", "IBM Plex Sans Arabic", "Noto Sans Arabic", "Inter", sans-serif !important;
 }
 
 html[lang="en"], html[lang="en"] *:not(.font-mono):not(code):not(pre) {
-  font-family: "Inter", "Cairo", sans-serif !important;
+  font-family: "Plus Jakarta Sans", "Inter", sans-serif !important;
 }
 
 @keyframes shimmer {
@@ -58,12 +76,6 @@ html[lang="en"], html[lang="en"] *:not(.font-mono):not(code):not(pre) {
   }
   html.dark {
     color-scheme: dark;
-    --color-primary: #1a3a6b;
-    --color-primary-light: #2a4a7b;
-    --color-secondary: #D4A64A;
-    --color-secondary-light: #e8c06e;
-    --color-surface: #1e293b;
-    --color-text-secondary: #94a3b8;
     --chart-grid: #1e293b;
     --chart-text: #94a3b8;
     --chart-tooltip-bg: #0f172a;
@@ -512,35 +524,22 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-o
   }
 }
 
-/* Modern Fluid Animated Surface Background */
+/* Modern Premium Page Background */
 body {
-  background-color: #FAFAFC;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(0, 123, 255, 0.08) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(32, 201, 151, 0.08) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(0, 180, 216, 0.05) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(79, 70, 229, 0.05) 0px, transparent 50%);
-  background-size: 200% 200%;
-  animation: meshMovement 20s ease-in-out infinite alternate;
+  background-color: #FFFFFF !important;
+  background-image: none !important;
   min-height: 100vh;
   overflow-x: hidden;
   position: relative;
 }
 
 .dark body {
-  background-color: #0f172a;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(0, 123, 255, 0.12) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(32, 201, 151, 0.12) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(0, 180, 216, 0.08) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(79, 70, 229, 0.08) 0px, transparent 50%);
+  background-color: #07172E !important;
+  background-image: none !important;
 }
 
 @keyframes meshMovement {
   0% { background-position: 0% 0%; }
-  25% { background-position: 100% 50%; }
-  50% { background-position: 100% 100%; }
-  75% { background-position: 50% 100%; }
   100% { background-position: 0% 0%; }
 }
 
@@ -627,506 +626,170 @@ body {
   border: 1pt solid #000 !important;
   padding: 6pt !important;
 }
-/* SchoolixiQ Button System */
-.btn-primary {
-  background-color: #0B2345;
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-primary:hover {
-  background-color: #1a3a6b;
-}
-
-.btn-secondary {
-  background-color: transparent;
-  color: #0B2345;
-  border: 2px solid #0B2345;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-secondary:hover {
-  background-color: #0B2345;
-  color: #ffffff;
-}
-
-.btn-gold {
-  background-color: #D4A64A;
-  color: #0B2345;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-gold:hover {
-  background-color: #e8c06e;
-}
-
-/* ─── SchoolixiQ Platform UI (sq-*) ─── */
-.sq-page {
-  @apply space-y-5 md:space-y-8;
-  animation: sq-page-in 0.45s ease-out;
-}
-
-@keyframes sq-page-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Animation utilities used across views (replaces tailwindcss-animate plugin) */
-@utility fade-in {
-  animation: sq-page-in 0.45s ease-out both;
-}
-
-@utility animate-in {
-  animation-fill-mode: both;
-}
-
-@utility font-display {
-  font-family: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
-}
-
-.sq-page-header {
-  @apply flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6;
-}
-
-.sq-page-title {
-  @apply text-xl md:text-3xl font-bold text-[#0B2345] dark:text-white;
-}
-
-.sq-page-desc {
-  @apply text-slate-500 dark:text-slate-400 text-xs md:text-sm mt-1;
-}
-
-.sq-page-actions {
-  @apply flex flex-col sm:flex-row gap-3 w-full lg:w-auto;
-}
-
-.sq-search {
-  @apply relative flex-1 min-w-0;
-}
-
-.sq-search-icon {
-  @apply absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none;
-}
-
-.sq-search-input {
-  @apply w-full pr-11 pl-4 py-2.5 md:py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl
-    text-sm md:text-base font-medium text-slate-900 dark:text-slate-100
-    outline-none transition-all focus:ring-2 focus:ring-[#0B2345]/15 focus:border-[#0B2345] dark:focus:border-[#D4A64A];
-}
-
-.sq-panel {
-  @apply bg-white dark:bg-slate-900 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-visible;
-}
-
-.sq-panel-body {
-  @apply overflow-visible;
-}
-
-.sq-panel-toolbar {
-  @apply p-4 md:p-5 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-800/40;
-}
-
-.sq-table-wrap {
-  @apply overflow-x-auto overflow-y-auto w-full;
-}
-
-.sq-table {
-  @apply w-full min-w-[880px] text-right border-collapse;
-}
-
-.sq-table thead {
-  @apply sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 shadow-[0_1px_0_0_rgba(148,163,184,0.35)];
-}
-
-.sq-table thead th {
-  @apply px-4 md:px-6 py-3.5 text-[10px] md:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap;
-}
-
-.sq-table tbody td {
-  @apply px-4 md:px-6 py-4 align-middle;
-}
-
-.sq-table tbody tr {
-  @apply border-b border-slate-100 dark:border-slate-800 transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50;
-}
-
-.sq-view-toggle {
-  @apply inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700;
-}
-
-.sq-view-toggle-btn {
-  @apply px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 transition-all;
-}
-
-.sq-view-toggle-btn-active {
-  @apply bg-white dark:bg-slate-900 text-[#0B2345] dark:text-[#D4A64A] shadow-sm;
-}
-
-.sq-btn {
-  @apply inline-flex items-center justify-center gap-2 font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap;
-}
-
-.sq-btn-sm { @apply h-9 px-3.5 text-xs; }
-.sq-btn-md { @apply h-10 px-4 text-sm; }
-.sq-btn-lg { @apply h-11 px-5 md:px-6 text-sm md:text-base; }
-.sq-btn-icon { @apply h-10 w-10 p-0; }
-
-.sq-btn-primary {
-  @apply bg-[#0B2345] text-white hover:bg-[#1a3a6b] shadow-md shadow-[#0B2345]/20;
-}
-
-.sq-btn-secondary {
-  @apply bg-white dark:bg-slate-900 text-[#0B2345] dark:text-slate-100 border-2 border-[#0B2345]/20 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800;
-}
-
-.sq-btn-ghost {
-  @apply bg-transparent text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800;
-}
-
-.sq-btn-danger {
-  @apply bg-red-600 text-white hover:bg-red-700;
-}
-
-.sq-btn-accent {
-  @apply bg-[#D4A64A] text-[#0B2345] hover:bg-[#e8c06e];
-}
-
-.sq-icon-btn {
-  @apply inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 dark:border-slate-700
-    text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#0B2345] dark:hover:text-white;
-}
-
-.sq-icon-btn-primary {
-  @apply text-blue-600 bg-blue-50 border-blue-100 hover:bg-blue-100 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300;
-}
-
-.sq-icon-btn-danger {
-  @apply text-red-600 bg-red-50 border-red-100 hover:bg-red-100;
-}
 
-.sq-icon-btn-active {
-  @apply bg-[#0B2345] text-white border-[#0B2345] shadow-md;
-}
-
-.sq-action-menu {
-  @apply absolute z-[80] min-w-[13.5rem] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700;
-}
-
-.sq-action-menu-portal {
-  @apply bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700;
-}
-
-.sq-table-sticky-actions {
-  position: sticky;
-  left: 0;
-  z-index: 25;
-  background-color: #ffffff;
-  box-shadow: 6px 0 16px -8px rgba(11, 35, 69, 0.12);
-  min-width: 11rem;
-}
-
-html.dark .sq-table-sticky-actions {
-  background-color: #0f172a;
-  box-shadow: 6px 0 16px -8px rgba(0, 0, 0, 0.45);
-}
-
-.sq-table tbody tr:hover .sq-table-sticky-actions {
-  background-color: #f8fafc;
-}
-
-html.dark .sq-table tbody tr:hover .sq-table-sticky-actions {
-  background-color: #1e293b;
-}
-
-.sq-icon-btn-edit {
-  @apply text-[#0B2345] bg-[#0B2345]/5 border-[#0B2345]/15 hover:bg-[#0B2345]/10 dark:text-[#D4A64A] dark:bg-[#D4A64A]/10 dark:border-[#D4A64A]/30;
-}
-
-.sq-student-actions-bar {
-  @apply flex gap-2 w-full;
-}
-
-.sq-student-action-btn {
-  @apply flex-1 inline-flex items-center justify-center gap-2 h-10 rounded-xl text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-50;
-}
-
-.sq-student-action-edit {
-  @apply bg-[#0B2345]/8 text-[#0B2345] border border-[#0B2345]/15 hover:bg-[#0B2345]/12 dark:bg-[#D4A64A]/15 dark:text-[#D4A64A] dark:border-[#D4A64A]/25;
-}
-
-.sq-student-action-delete {
-  @apply bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 dark:bg-red-900/25 dark:text-red-400 dark:border-red-800/40;
-}
-
-.sq-action-menu-item {
-  @apply w-full flex items-center gap-3 px-3.5 py-2.5 text-right text-sm font-semibold text-slate-700 dark:text-slate-200
-    rounded-lg transition-colors hover:bg-slate-50 dark:hover:bg-slate-800;
-}
-
-.sq-student-card {
-  @apply p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col gap-3 relative shadow-sm;
-}
-
-.sq-student-card-grid {
-  @apply p-4 md:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 bg-slate-50/50 dark:bg-slate-950/40;
-}
-
-.sq-badge {
-  @apply inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold tracking-wide whitespace-nowrap;
-}
-
-.sq-badge-primary {
-  @apply bg-[#0B2345] text-white;
-}
-
-.sq-badge-muted {
-  @apply bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700;
-}
-
-/* ─── Modal & Form (sq-modal / sq-form) ─── */
-.sq-modal-backdrop {
-  @apply fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/55 backdrop-blur-sm;
-}
-
-/* Native app: sheet below header, always visible */
-.sq-modal-backdrop--app {
-  @apply z-[110] items-end justify-center pt-[72px] pb-[84px] px-0 sm:px-3;
-}
-
-.sq-modal {
-  @apply w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl
-    flex flex-col max-h-[min(92dvh,760px)] rounded-t-2xl sm:rounded-2xl;
-}
-
-.sq-modal--app {
-  @apply max-h-full rounded-t-2xl rounded-b-none border-x-0 sm:border sm:rounded-2xl;
-}
-
-.sq-modal-backdrop--app .sq-modal-body {
-  @apply p-4;
-}
-
-.sq-modal-backdrop--app .sq-modal-header {
-  @apply p-4;
-}
-
-.sq-modal-backdrop--app .sq-modal-footer {
-  @apply p-4 flex-col gap-2;
-}
-
-.sq-modal-backdrop--app .sq-form-section {
-  @apply p-3 space-y-3;
-}
-
-.sq-modal-header {
-  @apply flex items-start justify-between gap-3 p-5 md:p-6 border-b border-slate-200 dark:border-slate-700 shrink-0;
-}
-
-.sq-modal-icon {
-  @apply w-11 h-11 rounded-xl bg-[#0B2345]/8 dark:bg-[#D4A64A]/15 flex items-center justify-center;
-}
-
-.sq-modal-title {
-  @apply text-lg md:text-xl font-bold text-[#0B2345] dark:text-white leading-tight;
-}
+/* ==========================================================================
+   SchoolixiQ - Official Corporate Premium Design System Overrides
+   ========================================================================== */
 
-.sq-modal-desc {
-  @apply text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed;
+/* 1. CSS Custom Variables styling for dynamic dark / light states */
+:root {
+  --color-primary: #0B2345;
+  --color-secondary: #D4A64A;
+  --color-bg-main: #FFFFFF;
+  --color-bg-surface: #F3F4F6;
+  --color-bg-card: #FFFFFF;
+  --color-border-line: #E5E7EB;
+  --color-text-main: #0B2345;
+  --color-text-desc: #6B7280;
 }
 
-.sq-modal-body {
-  @apply flex-1 min-h-0 overflow-y-auto p-5 md:p-6;
+/* Redefine variables elegantly for dark mode without brutal overriding elements */
+.dark, html.dark {
+  --color-bg-main: #07172E;
+  --color-bg-surface: #0C1A30;
+  --color-bg-card: #0E1F35;
+  --color-border-line: #1E293B;
+  --color-text-main: #F3F4F6;
+  --color-text-desc: #9CA3AF;
 }
 
-.sq-modal-footer {
-  @apply shrink-0 flex flex-col sm:flex-row gap-3 p-5 md:p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-800/50;
+/* Now apply variables cleanly to appropriate layout components */
+body {
+  background-color: var(--color-bg-main) !important;
+  color: var(--color-text-main) !important;
 }
 
-.sq-form-section {
-  @apply rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 p-4 md:p-5 space-y-4;
+/* 2. Header (الشريط العلوي) styling - Premium corporate Navy Blue with gold highlight and high-contrast white content */
+header, [class*="header"]:not(.student-card-print):not([class*="aside"]) {
+  background-color: #0B2345 !important;
+  color: #FFFFFF !important;
+  border-bottom: 2px solid #D4A64A !important;
 }
 
-.sq-form-section-head {
-  @apply border-b border-slate-200/80 dark:border-slate-700/80 pb-3 mb-1;
+header *:not(input):not(select):not(textarea):not(button):not(a), 
+[class*="header"] *:not(input):not(select):not(textarea):not(button):not(a) {
+  color: #FFFFFF !important;
 }
 
-.sq-form-section-title {
-  @apply text-sm font-bold text-[#0B2345] dark:text-[#D4A64A];
+header input, header select, 
+[class*="header"] input, [class*="header"] select {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #FFFFFF !important;
 }
 
-.sq-form-section-desc {
-  @apply text-[11px] text-slate-500 dark:text-slate-400 mt-0.5;
+header input::placeholder, 
+[class*="header"] input::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
 }
 
-.sq-form-grid {
-  @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+header button, header a, 
+[class*="header"] button, [class*="header"] a {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #FFFFFF !important;
+  transition: all 0.2s ease-in-out !important;
 }
 
-.sq-form-span-2 {
-  grid-column: 1 / -1;
+header button:hover, header a:hover, 
+[class*="header"] button:hover, [class*="header"] a:hover {
+  background-color: #D4A64A !important;
+  color: #0B2345 !important;
+  border-color: #D4A64A !important;
 }
 
-.sq-form-field {
-  @apply flex flex-col gap-1.5 min-w-0;
+header button:hover *, header a:hover *, 
+[class*="header"] button:hover *, [class*="header"] a:hover * {
+  color: #0B2345 !important;
 }
 
-.sq-form-label {
-  @apply text-xs font-bold text-slate-600 dark:text-slate-300;
+/* 3. Sidebar (القائمة الجانبية) styling - Uniform Navy Blue (#0B2345) with Gold (#D4A64A) accents */
+aside, [class*="aside"], [class*="Sidebar"] {
+  background-color: #0B2345 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-.sq-form-hint {
-  @apply text-[10px] text-slate-400 -mt-0.5;
+aside *, [class*="aside"] *, [class*="Sidebar"] * {
+  color: rgba(255, 255, 255, 0.9) !important;
 }
 
-.sq-form-input-wrap {
-  @apply relative w-full;
+/* Gold active state link indicators within sidebars */
+aside [class*="bg-white"], 
+aside [class*="bg-indigo-600"], 
+aside .active-menu-item, 
+[class*="aside"] [class*="bg-white"], 
+[class*="Sidebar"] [class*="bg-white"] {
+  background-color: #D4A64A !important;
+  color: #0B2345 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 12px rgba(212, 166, 74, 0.25) !important;
 }
 
-.sq-form-input-icon {
-  @apply absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none;
+aside [class*="bg-white"] *, 
+aside [class*="bg-indigo-600"] *, 
+[class*="aside"] [class*="bg-white"] * {
+  color: #0B2345 !important;
 }
 
-.sq-form-control {
-  @apply w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-600
-    bg-white dark:bg-slate-900 text-sm font-semibold text-slate-900 dark:text-slate-100
-    outline-none transition-all
-    focus:ring-2 focus:ring-[#0B2345]/15 focus:border-[#0B2345] dark:focus:border-[#D4A64A];
+/* Hover effect on sidebars */
+aside a:hover, aside button:hover, .sidebar-link:hover {
+  background-color: rgba(212, 166, 74, 0.15) !important;
+  color: #D4A64A !important;
 }
 
-.sq-form-control-with-icon {
-  @apply pr-11;
+aside a:hover *, aside button:hover * {
+  color: #D4A64A !important;
 }
 
-.sq-form-photo-preview {
-  @apply w-20 h-20 rounded-xl border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900
-    flex items-center justify-center overflow-hidden;
+/* 4. Support responsive grid card & layout surfaces */
+.bg-slate-50, 
+.bg-gray-50, 
+.bg-slate-100, 
+.bg-gray-100,
+.bg-slate-100\/50,
+.bg-slate-50\/40,
+.bg-slate-50\/50,
+.bg-slate-50\/80 {
+  background-color: var(--color-bg-surface) !important;
 }
 
-.sq-form-upload-btn {
-  @apply cursor-pointer flex items-center justify-center gap-2 w-full h-11 px-4
-    bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-600
-    rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300
-    hover:border-[#0B2345] hover:text-[#0B2345] dark:hover:border-[#D4A64A] dark:hover:text-[#D4A64A] transition-all;
+/* Map standard card styles beautifully */
+.bg-white, .bg-card {
+  background-color: var(--color-bg-card) !important;
 }
 
-/* Native app — compact admin / teacher sub-pages (same Firestore data as website) */
-.sq-mobile-panel {
-  @apply text-slate-800;
+/* Border lines override */
+.border-slate-100, 
+.border-slate-200, 
+.border-slate-300, 
+.border-gray-100, 
+.border-gray-200, 
+.border-gray-300 {
+  border-color: var(--color-border-line) !important;
 }
-.sq-mobile-panel h1 {
-  @apply text-lg font-black text-[#0B2345] leading-tight;
-}
-.sq-mobile-panel h2 {
-  @apply text-base font-black text-[#0B2345];
-}
-.sq-mobile-panel h3 {
-  @apply text-sm font-bold text-slate-800;
-}
-.sq-mobile-panel .space-y-8 {
-  @apply space-y-4;
-}
-.sq-mobile-panel [class*='rounded-[2.5rem]'],
-.sq-mobile-panel [class*='rounded-[3rem]'] {
-  border-radius: 1rem !important;
-}
-.sq-mobile-panel [class*='p-8']:not([class*='px-8']) {
-  padding: 1rem !important;
-}
-.sq-mobile-panel button[class*='px-8'],
-.sq-mobile-panel button[class*='py-4'] {
-  @apply min-h-[40px] px-4 py-2 text-xs font-bold rounded-xl;
-}
-.sq-mobile-panel input,
-.sq-mobile-panel select,
-.sq-mobile-panel textarea {
-  @apply py-2.5 text-sm rounded-xl;
-}
-.sq-mobile-panel .from-blue-600 {
-  --tw-gradient-from: #0B2345 var(--tw-gradient-from-position);
-  --tw-gradient-to: rgb(11 35 69 / 0) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
-}
-.sq-mobile-panel .to-indigo-600 {
-  --tw-gradient-to: #163a6b var(--tw-gradient-to-position);
-}
-
-/* ─── SchoolixiQ native app shell (Capacitor only — NOT website) ─── */
-html[data-sq-native-app='true'],
-.sq-app-native {
-  --sq-navy: #0b2345;
-  --sq-gold: #d4a64a;
-}
-
-html[data-sq-native-app='true'] .sq-page,
-.sq-app-native .sq-page {
-  animation: sq-app-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
 
-html[data-sq-native-app='true'] button,
-html[data-sq-native-app='true'] a,
-.sq-app-native button,
-.sq-app-native a {
-  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
-  transition-duration: 0.2s;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+/* Shadows and card containers */
+.shadow-sm, .shadow-md, .shadow, .shadow-lg, .shadow-xl {
+  border-color: var(--color-border-line) !important;
 }
 
-@keyframes sq-app-enter {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Primary texts */
+.text-slate-900, 
+.text-slate-800, 
+.text-gray-900, 
+.text-slate-950,
+.text-black {
+  color: var(--color-text-main) !important;
 }
 
-html[data-sq-native-app='true'] [class*='bg-gradient-to-b'][class*='from-[#f6f8fc]'],
-.sq-app-native [class*='bg-gradient-to-b'][class*='from-[#f6f8fc]'] {
-  background: radial-gradient(
-      ellipse 120% 70% at 50% -15%,
-      rgba(212, 166, 74, 0.1),
-      transparent 55%
-    ),
-    linear-gradient(180deg, #f8fafc 0%, #eef2f8 48%, #e2e9f2 100%) !important;
+/* Secondary/muted texts */
+.text-slate-500, 
+.text-slate-400, 
+.text-gray-500, 
+.text-gray-400,
+.text-slate-600,
+.text-gray-600 {
+  color: var(--color-text-desc) !important;
 }
 
-html[data-sq-native-app='true'] .sq-mobile-panel .sq-student-action-delete,
-html[data-sq-native-app='true'] .sq-mobile-panel .sq-student-action-edit,
-.sq-mobile-panel .sq-student-action-delete,
-.sq-mobile-panel .sq-student-action-edit {
-  min-height: 44px !important;
-  z-index: 2;
-  position: relative;
-}
-
-html[data-sq-native-app='true'] .sq-mobile-panel .sq-student-card,
-.sq-mobile-panel .sq-student-card {
-  border-radius: 1.15rem !important;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 8px 28px rgba(11, 35, 69, 0.07) !important;
-}
-
-html[data-sq-native-app='true'] .sq-mobile-panel .sq-student-card-grid,
-.sq-mobile-panel .sq-student-card-grid {
-  gap: 0.75rem !important;
-  padding: 0.75rem !important;
-}

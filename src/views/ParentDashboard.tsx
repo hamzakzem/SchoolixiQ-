@@ -22,7 +22,7 @@ import { useAuth } from "../lib/AuthContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { GlobalFooter } from "../components/GlobalFooter";
-import { NotificationBell } from "../components/NotificationBell";
+import { NotificationCenter } from "../components/NotificationCenter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { toast } from "react-hot-toast";
 import {
@@ -63,19 +63,11 @@ import { Phone, Mail, MapPin, Save, Sparkles, ShieldAlert, ExternalLink } from "
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
-import { usePushTabNavigation } from "../lib/pushNavigation";
-import { useMobileMockupShell } from "../lib/useMobileMockupShell";
-import { useAndroidBackButton } from "../hooks/useAndroidBackButton";
-import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
-import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
-import MobileLogoutButton from "../components/mobile/MobileLogoutButton";
-import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
-import ParentMockupHome from "../components/mobile/homes/ParentMockupHome";
+import SchoolixLogo from "../components/SchoolixLogo";
 
 export default function ParentDashboard() {
   const { profile, schoolData } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
-  const mobileUi = useMobileMockupShell();
   const { config } = useSystemConfig();
   const [activeTab, setActiveTab] = useState("home");
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
@@ -87,7 +79,6 @@ export default function ParentDashboard() {
     setNavigationHistory((prev) => [...prev, activeTab]);
     setActiveTab(tabId);
   };
-  usePushTabNavigation(navigateToTab, profile?.role);
 
   const handleBack = () => {
     if (navigationHistory.length > 0) {
@@ -98,28 +89,19 @@ export default function ParentDashboard() {
       setActiveTab("home");
     }
   };
-
-  useAndroidBackButton(
-    React.useCallback(() => {
-      if (activeTab !== "home") {
-        handleBack();
-        return true;
-      }
-      return false;
-    }, [activeTab, navigationHistory]),
-  );
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentGrades, setStudentGrades] = useState<any[]>([]);
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [attendanceSummary, setAttendanceSummary] = useState({
-    present: 0,
     absent: 0,
     late: 0,
   });
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [installments, setInstallments] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [marketItems, setMarketItems] = useState<any[]>([]);
   const [marketLoading, setMarketLoading] = useState(true);
   const [purchaseModal, setPurchaseModal] = useState<any>(null);
@@ -137,6 +119,7 @@ export default function ParentDashboard() {
   );
   const [homework, setHomework] = useState<any[]>([]);
   const [teacherReports, setTeacherReports] = useState<any[]>([]);
+  const [advancedReports, setAdvancedReports] = useState<any[]>([]);
   const [idCards, setIdCards] = useState<Record<string, any>>({});
   const [idCardTemplate, setIdCardTemplate] = useState<IdCardTemplate | null>(null);
 
@@ -576,17 +559,14 @@ export default function ParentDashboard() {
         limit(50)
       );
       unsubs.push(onSnapshot(attendanceQ, snap => {
-        let presentCount = 0;
         let absentCount = 0;
         let lateCount = 0;
         snap.docs.forEach((doc) => {
           const records = doc.data().records || {};
-          const status = records[selectedStudent.id];
-          if (status === "absent") absentCount++;
-          else if (status === "late") lateCount++;
-          else if (status === "present") presentCount++;
+          if (records[selectedStudent.id] === "absent") absentCount++;
+          if (records[selectedStudent.id] === "late") lateCount++;
         });
-        setAttendanceSummary({ present: presentCount, absent: absentCount, late: lateCount });
+        setAttendanceSummary({ absent: absentCount, late: lateCount });
       }));
 
       // 3. Announcements
@@ -649,7 +629,17 @@ export default function ParentDashboard() {
         setMarketLoading(false);
       }));
 
-      // 7. Homework
+      // 7. Notifications
+      const notificationsQ = query(
+        collection(db, "notifications"),
+        where("userId", "==", profile.uid),
+        limit(50)
+      );
+      unsubs.push(onSnapshot(notificationsQ, snap => {
+        setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
+      }));
+
+      // 8. Homework
       if (currentClassId) {
         const hwQ = query(
           collection(db, "homework"),
@@ -677,7 +667,18 @@ export default function ParentDashboard() {
         setTeacherReports(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
       }));
 
-      // Id Cards
+      const advRepQ = query(
+        collection(db, "advanced_reports"),
+        where("schoolId", "==", selectedStudent.schoolId),
+        where("studentId", "==", selectedStudent.id),
+        where("parentIds", "array-contains", profile.uid),
+        limit(20)
+      );
+      unsubs.push(onSnapshot(advRepQ, snap => {
+         setAdvancedReports(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
+      }));
+
+      // 10. Id Cards
       const idCardsQ = query(
         collection(db, "id_cards"),
         where("schoolId", "==", selectedStudent.schoolId),
@@ -737,6 +738,12 @@ export default function ParentDashboard() {
       badge: teacherReports.length,
     },
     {
+      id: "advanced_reports",
+      label: isRtl ? "تقارير متقدمة" : "Advanced Reports",
+      icon: BarChart3,
+      badge: advancedReports.length,
+    },
+    {
       id: "id_cards",
       label: isRtl ? "هويات الطالب" : "ID Cards",
       icon: ShieldCheck,
@@ -767,6 +774,7 @@ export default function ParentDashboard() {
       if (item.id === "tuition") return p.tuition_fees !== false;
       if (item.id === "behavior") return p.behavior_management !== false;
       if (item.id === "reports") return p.student_evaluation_reports !== false;
+      if (item.id === "advanced_reports") return p.advanced_reports !== false;
       if (item.id === "id_cards") return p.id_card_generation !== false;
       if (item.id === "market") return p.marketplace_ordering !== false;
     }
@@ -926,15 +934,15 @@ export default function ParentDashboard() {
           className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8 text-center"
           dir="rtl"
         >
-          <div className="w-20 h-20 rounded-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-[#0B2345] mb-6 shadow-sm overflow-hidden">
-            {config.appLogo ? (
+          <div className="w-20 h-20 rounded-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-600 mb-6 shadow-sm overflow-hidden">
+            {config.appLogo && config.appLogo !== "/icon.svg" ? (
               <img
                 src={config.appLogo}
                 alt={config.appName}
                 className="w-full h-full object-contain p-2"
               />
             ) : (
-              <User size={40} />
+              <SchoolixLogo size={52} />
             )}
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -965,7 +973,7 @@ export default function ParentDashboard() {
                   }
                 }
               }}
-              className="px-6 py-4 bg-blue-50 text-[#0B2345] hover:bg-blue-100 border border-blue-100 shadow-sm font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
+              className="px-6 py-4 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 shadow-sm font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
             >
               <Building size={20} />
               {isRtl ? "التحول لحساب مدرسة / إدارة" : "Switch to School Admin"}
@@ -985,7 +993,7 @@ export default function ParentDashboard() {
 
     return (
       <div
-        className={`h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0 ${mobileUi ? "sq-app-native bg-transparent" : "bg-transparent"}`}
+        className="h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
         dir={isRtl ? "rtl" : "ltr"}
       >
         <AnimatePresence>
@@ -1007,11 +1015,11 @@ export default function ParentDashboard() {
               animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
               exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className={`${mobileUi ? "hidden " : ""}bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden`}
+              className={`bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)]`}
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
                 <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
-                  {config.appLogo ? (
+                  {config.appLogo && config.appLogo !== "/icon.svg" ? (
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
                       <img
                         src={config.appLogo}
@@ -1020,9 +1028,7 @@ export default function ParentDashboard() {
                       />
                     </div>
                   ) : (
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-[#0B2345] rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 shrink-0">
-                      <User size={isSidebarCollapsed ? 24 : 20} />
-                    </div>
+                    <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
                   )}
                   {!isSidebarCollapsed && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0" dir={isRtl ? "rtl" : "ltr"}>
@@ -1030,7 +1036,7 @@ export default function ParentDashboard() {
                          {t("parentWelcome")}
                       </h2>
                       <div className="flex flex-col">
-                        <p className="text-[10px] uppercase tracking-widest text-[#0B2345] font-bold truncate">
+                        <p className="text-[10px] uppercase tracking-widest text-indigo-600 font-bold truncate">
                           {profile?.name}
                         </p>
                       </div>
@@ -1089,8 +1095,8 @@ export default function ParentDashboard() {
 
         <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
         {/* Engineered Mobile Header */}
-        <header className={`${mobileUi ? "hidden " : ""}bg-white dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm transition-colors print:hidden`}>
-          <div className="px-4 pt-5 pb-3">
+        <header className="bg-white dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm transition-colors print:hidden">
+          <div className="px-4 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-3">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <button
@@ -1148,17 +1154,35 @@ export default function ParentDashboard() {
                 
                 <button
                   onClick={handleLogout}
-                  className="w-8 h-8 shrink-0 rounded transition-all flex items-center justify-center bg-white dark:bg-slate-800 text-red-500 hover:text-red-600 border border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-500/10 shadow-sm"
+                  className="w-11 h-11 shrink-0 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center bg-white dark:bg-slate-800 text-red-500 hover:text-red-600 border border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-500/10 shadow-sm active:scale-95"
                   title={t("logout")}
                 >
-                  <LogOut size={16} />
+                  <LogOut size={18} />
                 </button>
 
-                <NotificationBell
-                  variant="compact"
-                  activeTabSetter={navigateToTab}
-                  userRole="parent"
-                />
+                <div className="relative shrink-0">
+                  <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className={`w-11 h-11 shrink-0 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center relative shadow-sm ${showNotifications ? "bg-indigo-600 border-indigo-700 text-white shadow-lg shadow-indigo-200/50" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50"} active:scale-95`}
+                  >
+                    <Bell size={18} />
+                    {notifications.filter((n) => !n.read).length > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                        {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
+                      </span>
+                    )}
+                  </button>
+
+
+                {/* Notifications Center Modal */}
+                {showNotifications && (
+                  <NotificationCenter
+                    onClose={() => setShowNotifications(false)}
+                    activeTabSetter={setActiveTab}
+                    userRole="parent"
+                  />
+                )}
+              </div>
             </div>
           </div>
           {/* Close the px-4 pt-5 pb-3 div */}
@@ -1171,7 +1195,7 @@ export default function ParentDashboard() {
                 onClick={() => setSelectedStudent(s)}
                 className={`py-1.5 px-3 rounded text-xs font-mono font-bold whitespace-nowrap transition-all flex items-center gap-2.5 shrink-0 border ${
                   selectedStudent?.id === s.id
-                    ? "bg-[#0B2345] text-white border-indigo-700 shadow-md translate-y-[-1px]"
+                    ? "bg-indigo-600 text-white border-indigo-700 shadow-md translate-y-[-1px]"
                     : "bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
                 }`}
               >
@@ -1186,7 +1210,7 @@ export default function ParentDashboard() {
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <span className={`text-[9px] font-black uppercase ${selectedStudent?.id === s.id ? "text-white" : "text-[#0B2345]"}`}>
+                    <span className={`text-[9px] font-black uppercase ${selectedStudent?.id === s.id ? "text-white" : "text-indigo-600"}`}>
                       {s.name[0]}
                     </span>
                   )}
@@ -1196,7 +1220,7 @@ export default function ParentDashboard() {
             ))}
             <button
               onClick={() => setShowAddStudentModal(true)}
-              className="px-3 py-1.5 rounded text-xs font-mono font-bold bg-white dark:bg-slate-800 text-[#0B2345] border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 transition-all flex items-center gap-2 shrink-0 border-dashed"
+              className="px-3 py-1.5 rounded text-xs font-mono font-bold bg-white dark:bg-slate-800 text-indigo-600 border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 transition-all flex items-center gap-2 shrink-0 border-dashed"
             >
               <Users size={12} />
               {t("linkStudent")}
@@ -1204,74 +1228,17 @@ export default function ParentDashboard() {
           </div>
         </header>
 
-        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0' : 'overflow-y-auto custom-scrollbar pb-10'} ${mobileUi ? 'pt-[72px] pb-[84px] bg-gradient-to-b from-[#f6f8fc] via-[#eef2f8] to-[#e6ecf4]' : ''}`}>
-          {mobileUi ? (
-            <>
-              <MobileMockupHeader
-                sectionTitle={
-                  activeTab === "home"
-                    ? isRtl
-                      ? "الرئيسية"
-                      : "Home"
-                    : allItems.find((i) => i.id === activeTab)?.label ??
-                      (isRtl ? "ولي الأمر" : "Parent")
-                }
-                schoolName={schoolInfo?.name || config.appName}
-                schoolLogoUrl={schoolInfo?.logoUrl}
-                modules={allItems
-                  .filter((i) => i.id !== "home")
-                  .map((i) => ({
-                    id: i.id,
-                    label: i.label,
-                    icon: i.icon,
-                  }))}
-                onNavigateModule={navigateToTab}
-                onNotifications={() => navigateToTab("inbox")}
-                onBack={activeTab !== "home" ? handleBack : undefined}
-              />
-              <MobileMockupBottomNav
-                role="parent"
-                active={tabToMobileNav('parent', activeTab)}
-                onChange={(nav) => navigateToTab(mobileNavToTab('parent', nav))}
-              />
-            </>
-          ) : null}
+        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0' : 'overflow-y-auto custom-scrollbar pb-10'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : `w-full flex flex-col max-w-7xl mx-auto sq-page ${mobileUi ? 'p-0' : 'p-4 md:p-8'}`}
+              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-4 md:p-8 space-y-4 md:space-y-6 flex flex-col max-w-7xl mx-auto"}
               initial={{ opacity: 0, y: activeTab === 'chat' ? 0 : 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: activeTab === 'chat' ? 0 : -10 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab === "home" && mobileUi ? (
-                <ParentMockupHome
-                  students={students}
-                  announcements={announcements}
-                  avgGrade={
-                    studentGrades.length > 0
-                      ? Math.round(
-                          studentGrades.reduce((s, g) => s + Number(g.score), 0) /
-                            studentGrades.length,
-                        )
-                      : null
-                  }
-                  attendancePct={
-                    attendanceSummary.present + attendanceSummary.absent > 0
-                      ? Math.round(
-                          (attendanceSummary.present /
-                            (attendanceSummary.present + attendanceSummary.absent)) *
-                            100,
-                        )
-                      : 100
-                  }
-                  schoolName={schoolInfo?.name}
-                  schoolLogoUrl={schoolInfo?.logoUrl}
-                  onTabChange={navigateToTab}
-                />
-              ) : null}
-              {activeTab === "home" && !mobileUi ? (
+              {activeTab === "home" && (
                 <div className="space-y-4 md:space-y-6">
                   {/* Detailed School Address and Google Maps Location Card */}
                   {schoolInfo && (
@@ -1281,11 +1248,11 @@ export default function ParentDashboard() {
                       className="p-5 md:p-6 rounded-[2rem] bg-gradient-to-br from-indigo-50/70 via-white to-blue-50/50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800/80 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-5 transition-all text-right"
                     >
                       <div className="flex items-start gap-4 w-full md:w-auto">
-                        <div className="w-12 h-12 bg-[#0B2345] rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-600/20">
+                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-600/20">
                           <MapPin size={24} className="animate-bounce" style={{ animationDuration: '3s' }} />
                         </div>
                         <div>
-                          <p className="text-[10px] font-mono font-bold text-[#0B2345] dark:text-indigo-400 uppercase tracking-widest">{isRtl ? 'الموقع الجغرافي للمدرسة' : 'Detailed School Location & Address'}</p>
+                          <p className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{isRtl ? 'الموقع الجغرافي للمدرسة' : 'Detailed School Location & Address'}</p>
                           <h3 className="text-lg font-black text-slate-950 dark:text-white mt-1 leading-snug">{schoolInfo.name}</h3>
                           <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
                             <p className="flex items-center gap-1.5">
@@ -1299,7 +1266,7 @@ export default function ParentDashboard() {
                                   href={schoolInfo.googleMapsUrl} 
                                   target="_blank" 
                                   rel="noopener noreferrer" 
-                                  className="text-[#0B2345] dark:text-indigo-400 hover:underline inline-flex items-center gap-1 font-bold"
+                                  className="text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1 font-bold"
                                 >
                                   {isRtl ? 'خرائط جوجل (Google Maps)' : 'Google Maps'}
                                   <ExternalLink size={11} />
@@ -1315,7 +1282,7 @@ export default function ParentDashboard() {
                           href={schoolInfo.googleMapsUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-full md:w-auto px-5 py-3 bg-[#0B2345] hover:bg-indigo-505 text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-indigo-600/10 cursor-pointer"
+                          className="w-full md:w-auto px-5 py-3 bg-indigo-600 hover:bg-indigo-505 text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-indigo-600/10 cursor-pointer"
                         >
                           <MapPin size={14} />
                           <span>{isRtl ? 'الذهاب إلى خريطة المدرسة التفصيلية' : 'Open Detailed School Google Map'}</span>
@@ -1420,7 +1387,7 @@ export default function ParentDashboard() {
                       </h2>
                       <button
                         onClick={() => setActiveTab("homework")}
-                        className="text-[10px] font-mono font-bold text-[#0B2345] dark:text-indigo-400 hover:text-indigo-700 uppercase tracking-wider flex items-center gap-1"
+                        className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 uppercase tracking-wider flex items-center gap-1"
                       >
                         {t("seeAll")} <ArrowRight size={10} className={isRtl ? "rotate-180" : ""} />
                       </button>
@@ -1435,7 +1402,7 @@ export default function ParentDashboard() {
                           >
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-[#0B2345] transition-colors border border-slate-200 dark:border-slate-700">
+                                <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors border border-slate-200 dark:border-slate-700">
                                   <BookOpen size={16} />
                                 </div>
                                 <div className="flex-1">
@@ -1443,7 +1410,7 @@ export default function ParentDashboard() {
                                     {hw.title}
                                   </h4>
                                   <div className="text-right">
-                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider inline-block">
+                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider inline-block">
                                       {hw.subject}
                                     </span>
                                   </div>
@@ -1452,7 +1419,7 @@ export default function ParentDashboard() {
                             </div>
                             <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3 mt-auto">
                               <p className="text-[10px] font-mono font-bold text-slate-400">
-                                {t("deliveryDate")}: <span className="text-[#0B2345] dark:text-indigo-400">{hw.dueDate}</span>
+                                {t("deliveryDate")}: <span className="text-indigo-600 dark:text-indigo-400">{hw.dueDate}</span>
                               </p>
                               <button
                                 onClick={(e) => {
@@ -1543,7 +1510,7 @@ export default function ParentDashboard() {
                     )}
                   </section>
                 </div>
-              ) : null}
+              )}
 
               {activeTab === "behavior" && (
                 <div className="space-y-4 md:space-y-6">
@@ -1704,7 +1671,7 @@ export default function ParentDashboard() {
                         >
                           <div>
                             <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/50">
-                              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider">
+                              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider">
                                 {hw.subject}
                               </span>
                               <div className="flex items-center gap-3">
@@ -1825,7 +1792,7 @@ export default function ParentDashboard() {
                     {/* Right Column: Contact Details Form Editor */}
                     <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 md:p-8 rounded-[2.5rem] shadow-sm space-y-6">
                       <div className="flex items-start gap-3 p-4 bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-3xl text-right">
-                        <div className="w-10 h-10 bg-[#0B2345]/10 text-[#0B2345] dark:text-indigo-400 rounded-2xl flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center shrink-0">
                           <Sparkles size={18} className="animate-pulse" />
                         </div>
                         <div>
@@ -1924,6 +1891,70 @@ export default function ParentDashboard() {
                 </div>
               )}
 
+              {activeTab === "advanced_reports" && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display px-2 text-right">
+                    {isRtl ? "التقارير المتقدمة" : "Advanced Reports"}
+                  </h2>
+                  <div className="space-y-4">
+                    {advancedReports.length > 0 ? (
+                      advancedReports.map((report) => (
+                        <div
+                          key={report.id}
+                          className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right border-l-4 border-l-indigo-600"
+                        >
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                              {isRtl ? "تقرير متقدم" : "Advanced Report"}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold transition-colors">
+                                {report.teacherName?.[0] || "A"}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-slate-500">
+                                  {t("deliveredBy")}
+                                </p>
+                                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                                  {report.teacherName || t("admin")}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                            {report.title}
+                          </h3>
+                          <p className="text-slate-600 dark:text-slate-400 leading-relaxed font-medium whitespace-pre-wrap">
+                            {report.content}
+                          </p>
+                          <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-800 flex justify-between items-center">
+                            <span className="text-[10px] text-slate-400 font-bold">
+                              {report.createdAt?.seconds
+                                ? new Date(
+                                    report.createdAt.seconds * 1000,
+                                  ).toLocaleDateString()
+                                : ""}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="bg-white dark:bg-slate-900 p-12 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm text-center transition-colors">
+                        <BarChart3
+                          size={40}
+                          className="mx-auto mb-3 opacity-20"
+                        />
+                        <p className="text-slate-400 dark:text-slate-500 italic">
+                          {isRtl
+                            ? "لا توجد تقارير متقدمة"
+                            : "No advanced reports"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {activeTab === "reports" && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display px-2 text-right">
@@ -1937,7 +1968,7 @@ export default function ParentDashboard() {
                           className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right border-l-4 border-l-indigo-600"
                         >
                           <div className="flex items-center justify-between mb-4">
-                            <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                            <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
                               {report.subject}
                             </span>
                             <div className="flex items-center gap-2">
@@ -2022,7 +2053,7 @@ export default function ParentDashboard() {
                           </div>
                           <div className="mt-auto space-y-3">
                             <div className="flex items-center justify-between">
-                              <p className="text-[#0B2345] dark:text-indigo-400 font-black text-sm">
+                              <p className="text-indigo-600 dark:text-indigo-400 font-black text-sm">
                                 {item.price?.toLocaleString()} د.ع
                               </p>
                               <span className="text-[9px] font-bold text-slate-400">
@@ -2060,7 +2091,7 @@ export default function ParentDashboard() {
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display">
                       {t("resultsFor")} {selectedStudent?.name}
                     </h2>
-                    <div className="bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full text-[10px] font-bold text-[#0B2345] dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 transition-colors uppercase tracking-widest">
+                    <div className="bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full text-[10px] font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 transition-colors uppercase tracking-widest">
                       {t("firstSemester")}
                     </div>
                   </div>
@@ -2124,7 +2155,7 @@ export default function ParentDashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right flex flex-col justify-between">
                         <div className="flex items-center gap-3 mb-2">
-                          <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-lg flex items-center justify-center">
+                          <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center">
                             <Wallet size={16} />
                           </div>
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
@@ -2334,7 +2365,7 @@ export default function ParentDashboard() {
                             className={`bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors ${isRtl ? "border-r-4 border-r-indigo-600 text-right" : "border-l-4 border-l-indigo-600 text-left"}`}
                           >
                             <div className="flex items-center justify-between mb-4">
-                              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-[#0B2345] dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
                                 {t("privateMessage")}
                               </span>
                               <span className="text-xs text-slate-400 font-bold">
@@ -2494,12 +2525,11 @@ export default function ParentDashboard() {
                       );
                     })}
                   </div>
-                  {mobileUi ? <MobileLogoutButton /> : null}
                 </div>
               )}
             </motion.div>
           </AnimatePresence>
-          {activeTab !== "chat" && <GlobalFooter compact hideDownload={mobileUi} />}
+          {activeTab !== "chat" && <GlobalFooter compact />}
         </main>
       </div>
       </div>
@@ -2520,7 +2550,7 @@ export default function ParentDashboard() {
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative border border-slate-200 dark:border-slate-800"
             >
-              <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-[#0B2345] dark:text-indigo-400 mx-auto mb-6 overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
+              <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto mb-6 overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
                 {purchaseModal.image ? (
                   <img
                     src={purchaseModal.image || undefined}
@@ -2555,7 +2585,7 @@ export default function ParentDashboard() {
                   <span className="text-slate-900 dark:text-white">1</span>
                 </div>
                 <div className="h-px bg-slate-200 dark:border-slate-700 my-2"></div>
-                <div className="flex justify-between text-lg font-black tracking-tight text-[#0B2345] dark:text-indigo-400">
+                <div className="flex justify-between text-lg font-black tracking-tight text-indigo-600 dark:text-indigo-400">
                   <span>{t("total")}</span>
                   <span>{purchaseModal.price?.toLocaleString()} د.ع</span>
                 </div>
@@ -2595,7 +2625,7 @@ export default function ParentDashboard() {
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative border border-slate-200 dark:border-slate-800"
             >
-              <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-[#0B2345] dark:text-blue-400 mx-auto mb-6">
+              <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-6">
                 <Users size={32} />
               </div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 text-center font-display">

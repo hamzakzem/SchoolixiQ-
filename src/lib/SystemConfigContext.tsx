@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from './firebase';
 import { doc, onSnapshot, getDocFromServer } from 'firebase/firestore';
-import { BRAND_THEME_COLOR } from './brandAssets';
-import { BRAND_LOGO_URL, resolveAppLogo } from './resolveBrandLogo';
 
 interface MarketingFeature {
   title: string;
@@ -19,16 +17,6 @@ interface SocialLinks {
 interface SystemConfig {
   appName: string;
   appLogo?: string;
-  /** Direct link to Android APK (Firebase Storage, CDN, or /downloads/schoolixiq.apk) */
-  androidApkUrl?: string;
-  /** App Store link (https://apps.apple.com/app/id…) — الطريقة المعتمدة من Apple */
-  iosAppStoreUrl?: string;
-  /** TestFlight join link (اختياري قبل النشر على المتجر) */
-  iosTestFlightUrl?: string;
-  /** رابط الموقع لتثبيت التطبيق على iPhone (Safari / ملف تعريف) */
-  iosWebInstallUrl?: string;
-  /** تفعيل زر تحميل iPhone على الموقع */
-  iosInstallEnabled?: boolean;
   supportPhones: string[];
   supportEmails: string[];
   successPartners: {name: string, logoUrl: string}[];
@@ -41,12 +29,7 @@ interface SystemConfig {
 
 const defaultSystemConfig: SystemConfig = {
   appName: 'SchoolixiQ',
-  appLogo: BRAND_LOGO_URL,
-  androidApkUrl: 'https://schoolixiq.com/downloads/schoolixiq.apk',
-  iosAppStoreUrl: '',
-  iosTestFlightUrl: '',
-  iosWebInstallUrl: 'https://schoolixiq.com',
-  iosInstallEnabled: true,
+  appLogo: '/icon.svg',
   supportPhones: ['+964 770 000 0000'],
   supportEmails: ['support@schoolixiq.iq'],
   successPartners: [],
@@ -86,12 +69,7 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
     try {
       const cached = localStorage.getItem('schoolixiq_system_config');
       if (cached) {
-        const parsed = JSON.parse(cached) as SystemConfig;
-        return {
-          ...defaultSystemConfig,
-          ...parsed,
-          appLogo: resolveAppLogo(parsed.appLogo),
-        };
+        return JSON.parse(cached);
       }
     } catch (e) {
       console.warn("Error reading cached system config:", e);
@@ -107,18 +85,12 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
       if (snap.exists()) {
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
-        const appLogo = resolveAppLogo(
-          typeof data.appLogo === 'string' ? data.appLogo : undefined,
-        );
+        const appLogo = typeof data.appLogo !== 'undefined' ? data.appLogo : '';
         const updatedConfig = {
           ...defaultSystemConfig,
           ...data,
           appName: appName,
-          appLogo: appLogo,
-          androidApkUrl:
-            typeof data.androidApkUrl === 'string' && data.androidApkUrl.trim()
-              ? data.androidApkUrl.trim()
-              : defaultSystemConfig.androidApkUrl,
+          appLogo: appLogo
         };
         setConfig(updatedConfig);
         try {
@@ -134,35 +106,16 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
       if (snap.exists()) {
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
-        const appLogo = resolveAppLogo(
-          typeof data.appLogo === 'string' ? data.appLogo : undefined,
-        );
-        const newConfig: SystemConfig = {
-          ...defaultSystemConfig,
-          ...data,
-          appName,
-          appLogo,
-          androidApkUrl:
-            typeof data.androidApkUrl === 'string' && data.androidApkUrl.trim()
-              ? data.androidApkUrl.trim()
-              : defaultSystemConfig.androidApkUrl,
-          iosAppStoreUrl:
-            typeof data.iosAppStoreUrl === 'string' ? data.iosAppStoreUrl.trim() : '',
-          iosTestFlightUrl:
-            typeof data.iosTestFlightUrl === 'string' ? data.iosTestFlightUrl.trim() : '',
-          iosWebInstallUrl:
-            typeof data.iosWebInstallUrl === 'string' && data.iosWebInstallUrl.trim()
-              ? data.iosWebInstallUrl.trim()
-              : defaultSystemConfig.iosWebInstallUrl,
-          iosInstallEnabled: data.iosInstallEnabled !== false,
+        const appLogo = typeof data.appLogo !== 'undefined' ? data.appLogo : '';
+        const newConfig = {
+          appName: appName,
+          appLogo: appLogo,
           supportPhones: data.supportPhones || (data.supportPhone ? [data.supportPhone] : ['+964 770 000 0000']),
           supportEmails: data.supportEmails || (data.supportEmail ? [data.supportEmail] : ['support@schoolixiq.iq']),
           successPartners: data.successPartners || [],
           marketingTitle: data.marketingTitle || defaultSystemConfig.marketingTitle,
           marketingSubtitle: data.marketingSubtitle || defaultSystemConfig.marketingSubtitle,
-          marketingFeatures: data.marketingFeatures || defaultSystemConfig.marketingFeatures,
-          socialLinks: data.socialLinks || defaultSystemConfig.socialLinks,
-          promotionalBanners: data.promotionalBanners || defaultSystemConfig.promotionalBanners,
+          marketingFeatures: data.marketingFeatures || defaultSystemConfig.marketingFeatures
         };
         setConfig(newConfig);
         try {
@@ -190,27 +143,12 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         link.rel = 'icon';
         document.getElementsByTagName('head')[0].appendChild(link);
       }
-      const faviconSrc = resolveAppLogo(config.appLogo);
-      link.type = 'image/png';
-      link.href = faviconSrc;
-
+      link.href = config.appLogo || "/icon.svg";
+      
       let appleLink: HTMLLinkElement | null = document.querySelector("link[rel='apple-touch-icon']");
-      if (!appleLink) {
-        appleLink = document.createElement('link');
-        appleLink.rel = 'apple-touch-icon';
-        document.getElementsByTagName('head')[0].appendChild(appleLink);
+      if (appleLink) {
+        appleLink.href = config.appLogo || "/icon.svg";
       }
-      appleLink.href = faviconSrc;
-
-      const themeMeta =
-        document.querySelector('meta[name="theme-color"]') ||
-        (() => {
-          const m = document.createElement('meta');
-          m.setAttribute('name', 'theme-color');
-          document.head.appendChild(m);
-          return m;
-        })();
-      themeMeta.setAttribute('content', BRAND_THEME_COLOR);
     };
     updateFavicon();
   }, [config.appLogo, config.appName]);
