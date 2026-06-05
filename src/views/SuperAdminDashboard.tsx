@@ -68,6 +68,7 @@ import { usePushTabNavigation } from "../lib/pushNavigation";
 import { useLanguage } from "../lib/LanguageContext";
 import { emailVerificationHint } from "../lib/displayIdentity";
 import { useMobileMockupShell } from "../lib/useMobileMockupShell";
+import { useAndroidBackButton } from "../hooks/useAndroidBackButton";
 import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
 import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
 import MobileLogoutButton from "../components/mobile/MobileLogoutButton";
@@ -283,6 +284,16 @@ export default function SuperAdminDashboard() {
       setActiveTab("schools");
     }
   };
+
+  useAndroidBackButton(
+    React.useCallback(() => {
+      if (activeTab !== "schools") {
+        handleBack();
+        return true;
+      }
+      return false;
+    }, [activeTab, navigationHistory]),
+  );
 
   if (!profile) return null;
   const [systemConfig, setSystemConfig] = useState<{
@@ -2098,6 +2109,7 @@ export default function SuperAdminDashboard() {
               ]}
               onNavigateModule={(tab) => navigateToTab(tab as typeof activeTab)}
               onNotifications={() => navigateToTab("requests")}
+              onBack={activeTab !== "schools" ? handleBack : undefined}
             />
             <MobileMockupBottomNav
               role="superadmin"

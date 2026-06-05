@@ -352,26 +352,26 @@ export default function Schedules() {
             </table>
           </div>
 
-          {/* Mobile / App View List */}
-          <div className={`${inApp ? 'block' : 'md:hidden'} space-y-6 pb-28 print:hidden`}>
+          {/* Mobile / App / Tablet Grid View — responsive day cards */}
+          <div className={`${inApp ? 'block' : 'md:hidden'} grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 pb-28 print:hidden`}>
             {DAYS_OF_WEEK.slice(0, 5).map((day) => (
-              <div key={day} className="space-y-3">
-                <div className="flex items-center justify-between px-2">
-                   <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <div key={day} className="flex flex-col bg-white/70 dark:bg-slate-900/60 rounded-[1.5rem] border border-slate-200/80 dark:border-slate-800 p-3 sm:p-4 space-y-3">
+                <div className="flex items-center justify-between px-1">
+                   <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
                       <div className="w-1 h-6 bg-[#0B2345] rounded-full"></div>
                       {day}
                    </h3>
                    <button 
                      onClick={() => handleAddPeriod(day)}
-                     className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-[#0B2345] dark:text-blue-400 rounded-lg"
+                     className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-[#0B2345] dark:text-blue-400 rounded-lg active:scale-95 transition-transform"
                    >
                      <Plus size={20} />
                    </button>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-3">
                    {(schedule[day] || []).map((period: any, idx: number) => (
-                      <div key={idx} className="bg-white dark:bg-slate-900 rounded-[1.5rem] p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative space-y-4">
+                      <div key={idx} className="bg-white dark:bg-slate-900 rounded-[1.5rem] p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative space-y-4">
                          <div className="flex items-center justify-between">
                             <span className="w-6 h-6 bg-blue-100 dark:bg-blue-900/40 text-[#0B2345] dark:text-blue-400 text-xs font-black rounded-lg flex items-center justify-center">
                                {idx + 1}

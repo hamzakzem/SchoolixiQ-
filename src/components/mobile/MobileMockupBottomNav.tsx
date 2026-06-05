@@ -1,4 +1,4 @@
-import { Calendar, Home, MessageSquare, Settings } from 'lucide-react';
+import { CalendarDays, ClipboardList, Home, MessageSquare, Settings } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useLanguage } from '../../lib/LanguageContext';
 import { mobileTokens } from './mobileUiKit';
@@ -10,15 +10,25 @@ type Props = {
   onChange: (nav: MobileNavId) => void;
 };
 
-const items: { id: MobileNavId; icon: typeof Home; labelAr: string; labelEn: string }[] = [
-  { id: 'home', icon: Home, labelAr: 'الرئيسية', labelEn: 'Home' },
-  { id: 'messages', icon: MessageSquare, labelAr: 'الرسائل', labelEn: 'Messages' },
-  { id: 'calendar', icon: Calendar, labelAr: 'التقويم', labelEn: 'Calendar' },
-  { id: 'settings', icon: Settings, labelAr: 'الإعدادات', labelEn: 'Settings' },
-];
+type NavItem = { id: MobileNavId; icon: typeof Home; labelAr: string; labelEn: string };
 
-export default function MobileMockupBottomNav({ active, onChange }: Props) {
+const homeItem: NavItem = { id: 'home', icon: Home, labelAr: 'الرئيسية', labelEn: 'Home' };
+const messagesItem: NavItem = { id: 'messages', icon: MessageSquare, labelAr: 'الرسائل', labelEn: 'Messages' };
+const settingsItem: NavItem = { id: 'settings', icon: Settings, labelAr: 'الإعدادات', labelEn: 'Settings' };
+
+// The third slot ("calendar") maps to a different tab per role (schedules vs. requests),
+// so the label/icon must follow the role to avoid mislabeling.
+const schedulesItem: NavItem = { id: 'calendar', icon: CalendarDays, labelAr: 'الجداول', labelEn: 'Schedules' };
+const requestsItem: NavItem = { id: 'calendar', icon: ClipboardList, labelAr: 'الطلبات', labelEn: 'Requests' };
+
+function getItems(role: DashboardRole): NavItem[] {
+  const thirdItem = role === 'superadmin' ? requestsItem : schedulesItem;
+  return [homeItem, messagesItem, thirdItem, settingsItem];
+}
+
+export default function MobileMockupBottomNav({ role, active, onChange }: Props) {
   const { isRtl } = useLanguage();
+  const items = getItems(role);
 
   return (
     <nav

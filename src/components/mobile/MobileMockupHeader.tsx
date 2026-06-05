@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bell, Search } from 'lucide-react';
 import { motion } from 'motion/react';
 import BrandLogo from '../BrandLogo';
 import { useLanguage } from '../../lib/LanguageContext';
@@ -14,6 +14,8 @@ type Props = {
   onNotifications?: () => void;
   modules?: MobileModuleItem[];
   onNavigateModule?: (tabId: string) => void;
+  /** When provided, a back button is shown at the start of the header. */
+  onBack?: () => void;
 };
 
 export default function MobileMockupHeader({
@@ -23,10 +25,12 @@ export default function MobileMockupHeader({
   onNotifications,
   modules = [],
   onNavigateModule,
+  onBack,
 }: Props) {
   const { isRtl } = useLanguage();
   const [searchOpen, setSearchOpen] = useState(false);
   const showSchoolLogo = Boolean(schoolLogoUrl);
+  const BackIcon = isRtl ? ArrowRight : ArrowLeft;
   const title =
     sectionTitle?.trim() ||
     (isRtl ? 'SchoolixiQ' : 'SchoolixiQ');
@@ -43,6 +47,17 @@ export default function MobileMockupHeader({
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_100%_0%,rgba(212,166,74,0.15),transparent)] pointer-events-none" />
         <div className="relative h-full flex items-center gap-2 px-3 shadow-[0_8px_32px_rgba(11,35,69,0.35)]">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            {onBack ? (
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.92 }}
+                onClick={onBack}
+                className="w-10 h-10 rounded-xl bg-white/12 border border-white/20 backdrop-blur-md flex items-center justify-center shrink-0"
+                aria-label={isRtl ? 'رجوع' : 'Back'}
+              >
+                <BackIcon size={20} strokeWidth={2.5} />
+              </motion.button>
+            ) : null}
             <div className="w-11 h-11 rounded-xl bg-white p-0.5 shadow-md ring-1 ring-[#D4A64A]/30 shrink-0 flex items-center justify-center overflow-hidden">
               {showSchoolLogo ? (
                 <img

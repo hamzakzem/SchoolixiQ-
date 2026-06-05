@@ -106,60 +106,56 @@ export default function ParentSchedules({ selectedStudent }: ParentSchedulesProp
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="p-0 overflow-x-auto">
-          <table className="w-full text-right border-collapse">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/50">
-                <th className="p-5 border-b border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-black text-lg w-32 tracking-wide">اليوم</th>
-                <th className="p-5 border-b border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-black text-lg tracking-wide">الحصص الدراسية</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DAYS_OF_WEEK.slice(0, 5).map((day) => {
-                const periods = schedule[day] || [];
-                if (periods.length === 0) return null;
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+        {DAYS_OF_WEEK.slice(0, 5).map((day) => {
+          const periods = schedule[day] || [];
 
-                return (
-                  <tr key={day} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="p-5 align-top bg-slate-50/30 dark:bg-slate-800/20">
-                      <div className="font-black text-[#0B2345] dark:text-blue-400 text-xl flex items-center h-full pt-2">{day}</div>
-                    </td>
-                    <td className="p-5">
-                      <div className="flex flex-wrap gap-4">
-                        {periods.map((period: any, idx: number) => (
-                          <motion.div 
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.05 }}
-                            key={idx} 
-                            className="relative bg-white dark:bg-slate-800/80 rounded-2xl p-5 min-w-[200px] border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all"
-                          >
-                            <div className="absolute top-0 right-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/50 text-[#0B2345] dark:text-blue-400 font-black rounded-bl-2xl rounded-tr-2xl flex items-center justify-center text-sm">
-                              {idx + 1}
-                            </div>
-                            <div className="space-y-3 mt-2 pr-2">
-                              <div className="font-black text-slate-900 dark:text-white text-lg">{period.subject || 'بدون مادة'}</div>
-                              {period.teacher && (
-                                <div className="font-bold text-sm text-slate-600 dark:text-slate-400">{period.teacher}</div>
-                              )}
-                              {period.time && (
-                                <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-100 dark:border-slate-700">
-                                  <Clock size={12} className="text-slate-400" />
-                                  <span>{period.time}</span>
-                                </div>
-                              )}
-                            </div>
-                          </motion.div>
-                        ))}
+          return (
+            <div
+              key={day}
+              className="flex flex-col bg-white dark:bg-slate-900 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-4 space-y-3"
+            >
+              <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 px-1">
+                <div className="w-1 h-6 bg-[#0B2345] rounded-full"></div>
+                {day}
+              </h3>
+
+              <div className="space-y-3">
+                {periods.length === 0 ? (
+                  <div className="py-6 text-center text-slate-400 font-bold bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs">
+                    لا توجد حصص لهذا اليوم
+                  </div>
+                ) : (
+                  periods.map((period: any, idx: number) => (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.97 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.04 }}
+                      key={idx}
+                      className="relative bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 pr-12 border border-slate-100 dark:border-slate-700"
+                    >
+                      <div className="absolute top-0 right-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/50 text-[#0B2345] dark:text-blue-400 font-black rounded-bl-2xl rounded-tr-2xl flex items-center justify-center text-sm">
+                        {idx + 1}
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <div className="space-y-2">
+                        <div className="font-black text-slate-900 dark:text-white text-base">{period.subject || 'بدون مادة'}</div>
+                        {period.teacher && (
+                          <div className="font-bold text-sm text-slate-600 dark:text-slate-400">{period.teacher}</div>
+                        )}
+                        {period.time && (
+                          <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900/50 p-2 rounded-xl border border-slate-100 dark:border-slate-700 w-fit">
+                            <Clock size={12} className="text-slate-400" />
+                            <span>{period.time}</span>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

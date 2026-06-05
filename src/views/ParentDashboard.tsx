@@ -65,6 +65,7 @@ import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { usePushTabNavigation } from "../lib/pushNavigation";
 import { useMobileMockupShell } from "../lib/useMobileMockupShell";
+import { useAndroidBackButton } from "../hooks/useAndroidBackButton";
 import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
 import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
 import MobileLogoutButton from "../components/mobile/MobileLogoutButton";
@@ -97,6 +98,16 @@ export default function ParentDashboard() {
       setActiveTab("home");
     }
   };
+
+  useAndroidBackButton(
+    React.useCallback(() => {
+      if (activeTab !== "home") {
+        handleBack();
+        return true;
+      }
+      return false;
+    }, [activeTab, navigationHistory]),
+  );
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentGrades, setStudentGrades] = useState<any[]>([]);
@@ -1212,6 +1223,7 @@ export default function ParentDashboard() {
                   }))}
                 onNavigateModule={navigateToTab}
                 onNotifications={() => navigateToTab("inbox")}
+                onBack={activeTab !== "home" ? handleBack : undefined}
               />
               <MobileMockupBottomNav
                 role="parent"

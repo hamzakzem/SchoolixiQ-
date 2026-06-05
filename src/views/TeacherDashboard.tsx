@@ -42,6 +42,7 @@ import {
   ShieldCheck,
   Check,
   CheckSquare,
+  ArrowRight,
 } from "lucide-react";
 import { updatePassword, verifyBeforeUpdateEmail } from "firebase/auth";
 import { toast } from "react-hot-toast";
@@ -70,6 +71,7 @@ import { useLanguage } from "../lib/LanguageContext";
 import { usePushTabNavigation } from "../lib/pushNavigation";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { useMobileMockupShell } from "../lib/useMobileMockupShell";
+import { useAndroidBackButton } from "../hooks/useAndroidBackButton";
 import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
 import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
 import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
@@ -97,8 +99,38 @@ export default function TeacherDashboard() {
   const { profile, schoolData } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>("home");
+  const [navigationHistory, setNavigationHistory] = useState<Tab[]>([]);
   const mobileUi = useMobileMockupShell();
-  usePushTabNavigation((tab) => setActiveTab(tab as Tab), profile?.role);
+
+  // Tab switcher that tracks history so the back button can return to the
+  // previously viewed screen.
+  const navigateToTab = (tabId: Tab) => {
+    if (tabId === activeTab) return;
+    setNavigationHistory((prev) => [...prev, activeTab]);
+    setActiveTab(tabId);
+  };
+
+  const handleBack = () => {
+    if (navigationHistory.length > 0) {
+      const prevTab = navigationHistory[navigationHistory.length - 1];
+      setNavigationHistory((prev) => prev.slice(0, -1));
+      setActiveTab(prevTab);
+    } else {
+      setActiveTab("home");
+    }
+  };
+
+  usePushTabNavigation((tab) => navigateToTab(tab as Tab), profile?.role);
+
+  useAndroidBackButton(
+    React.useCallback(() => {
+      if (activeTab !== "home") {
+        handleBack();
+        return true;
+      }
+      return false;
+    }, [activeTab, navigationHistory]),
+  );
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [schoolName, setSchoolName] = useState<string>("");
@@ -879,6 +911,19 @@ export default function TeacherDashboard() {
             </button>
             <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
 
+            {activeTab !== "home" && (
+              <button
+                onClick={handleBack}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all font-bold text-[10px] shadow-sm active:scale-95 group"
+              >
+                <ArrowRight
+                  size={14}
+                  className={`transition-transform ${isRtl ? "group-hover:translate-x-0.5" : "rotate-180 group-hover:-translate-x-0.5"}`}
+                />
+                <span className="hidden sm:inline">{t("back")}</span>
+              </button>
+            )}
+
             <div className="flex flex-col">
               <div className="flex items-center gap-1 md:gap-2">
                 <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-wider text-[#0B2345] truncate">
@@ -959,13 +1004,14 @@ export default function TeacherDashboard() {
                 { id: "behavior", label: t("behaviorAndStudents"), icon: Users },
                 { id: "id_cards", label: isRtl ? "هويات" : "ID cards", icon: ShieldCheck },
               ]}
-              onNavigateModule={(tab) => setActiveTab(tab as Tab)}
-              onNotifications={() => setActiveTab("chat")}
+              onNavigateModule={(tab) => navigateToTab(tab as Tab)}
+              onNotifications={() => navigateToTab("chat")}
+              onBack={activeTab !== "home" ? handleBack : undefined}
             />
             <MobileMockupBottomNav
               role="teacher"
               active={tabToMobileNav('teacher', activeTab)}
-              onChange={(nav) => setActiveTab(mobileNavToTab('teacher', nav) as Tab)}
+              onChange={(nav) => navigateToTab(mobileNavToTab('teacher', nav) as Tab)}
             />
           </>
         ) : null}
@@ -985,7 +1031,7 @@ export default function TeacherDashboard() {
                     classes.find((c) => c.id === (profile as any)?.preferredClassId)?.name
                   }
                   homeworkCount={homework.length}
-                  onTabChange={(tab) => setActiveTab(tab as Tab)}
+                  onTabChange={(tab) => navigateToTab(tab as Tab)}
                 />
               ) : null}
               {activeTab === "home" && !mobileUi ? (

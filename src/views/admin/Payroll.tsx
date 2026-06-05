@@ -254,36 +254,75 @@ export default function Payroll() {
         return;
       }
 
-      const existingUserIds = new Set(existingSnap.docs.map(doc => doc.data().userId));
+      // Map existing payroll records this month by userId so we can sync
+      // (not just skip) employees who already have a record.
+      const existingByUserId = new Map<string, { id: string; data: any }>();
+      existingSnap.docs.forEach(d => {
+        existingByUserId.set(d.data().userId, { id: d.id, data: d.data() });
+      });
 
-      const staffToProcess = staffSnapshot.docs.filter(doc => !existingUserIds.has(doc.id));
+      let createdCount = 0;
+      let syncedCount = 0;
 
-      if (staffToProcess.length === 0) {
-        toast('تم توليد كشوفات لجميع الموظفين مسبقاً لهذا الشهر', { icon: 'ℹ️' });
-        return;
-      }
-
-      const promises = staffToProcess.map(async (staffDoc) => {
+      const operations = staffSnapshot.docs.map(async (staffDoc) => {
         const staffData = staffDoc.data();
+        const currentSalary = Number(staffData.salary) || 0;
+        const existing = existingByUserId.get(staffDoc.id);
+
         try {
-          return await addDoc(collection(db, 'payroll'), {
-            schoolId: profile.schoolId,
-            userId: staffDoc.id,
-            userName: staffData.name,
-            amount: staffData.salary || 500000,
-            day,
-            month,
-            year,
-            status: 'pending',
-            createdAt: serverTimestamp()
-          });
+          if (!existing) {
+            // New employee with no record this month → create one
+            await addDoc(collection(db, 'payroll'), {
+              schoolId: profile.schoolId,
+              userId: staffDoc.id,
+              userName: staffData.name || '',
+              amount: currentSalary,
+              bonus: 0,
+              deduction: 0,
+              totalAmount: currentSalary,
+              day,
+              month,
+              year,
+              status: 'pending',
+              createdAt: serverTimestamp()
+            });
+            createdCount += 1;
+            return;
+          }
+
+          // Existing record: keep paid records untouched, but re-sync pending
+          // ones to the employee's current salary / name.
+          const rec = existing.data;
+          if (rec.status === 'paid') return;
+
+          const recAmount = Number(rec.amount) || 0;
+          const nameChanged = (rec.userName || '') !== (staffData.name || '');
+          if (recAmount !== currentSalary || nameChanged) {
+            const bonus = Number(rec.bonus) || 0;
+            const deduction = Number(rec.deduction) || 0;
+            await updateDoc(doc(db, 'payroll', existing.id), {
+              amount: currentSalary,
+              userName: staffData.name || rec.userName || '',
+              totalAmount: (currentSalary + bonus) - deduction,
+              updatedAt: serverTimestamp()
+            });
+            syncedCount += 1;
+          }
         } catch (error) {
           handleFirestoreError(error, OperationType.CREATE, 'payroll');
         }
       });
 
-      await Promise.all(promises);
-      toast.success(`تمت توليد ${staffToProcess.length} كشوفات رواتب بنجاح`);
+      await Promise.all(operations);
+
+      if (createdCount === 0 && syncedCount === 0) {
+        toast('كشوفات الرواتب محدّثة ومتزامنة مع رواتب الموظفين', { icon: '✅' });
+      } else {
+        const parts = [];
+        if (createdCount > 0) parts.push(`توليد ${createdCount} كشف جديد`);
+        if (syncedCount > 0) parts.push(`مزامنة ${syncedCount} راتب`);
+        toast.success(`تم ${parts.join(' و ')} بنجاح`);
+      }
     } catch (error) {
       console.error('Payroll generation error:', error);
       toast.error('خطأ في توليد الكشوفات: تحقق من الصلاحيات');
@@ -338,7 +377,7 @@ export default function Payroll() {
             className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-sm active:scale-95 disabled:opacity-50"
           >
             <ReceiptText size={20} />
-            توليد كشف شهري
+            {loading ? 'جاري المزامنة...' : 'توليد ومزامنة الرواتب'}
           </button>
           <div className="flex items-center gap-3">
             <button 

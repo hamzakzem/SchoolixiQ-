@@ -51,6 +51,7 @@ import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { emailVerificationHint } from "../lib/displayIdentity";
 import { useMobileMockupShell } from "../lib/useMobileMockupShell";
+import { useAndroidBackButton } from "../hooks/useAndroidBackButton";
 import MobileMockupHeader from "../components/mobile/MobileMockupHeader";
 import MobileMockupBottomNav from "../components/mobile/MobileMockupBottomNav";
 import { mobileNavToTab, tabToMobileNav } from "../components/mobile/mobileNavMaps";
@@ -181,6 +182,16 @@ export default function AdminDashboard() {
       setActiveTab("overview");
     }
   };
+
+  useAndroidBackButton(
+    React.useCallback(() => {
+      if (activeTab !== "overview") {
+        handleBack();
+        return true;
+      }
+      return false;
+    }, [activeTab, navigationHistory]),
+  );
   // Filter menu items based on assistant or plan permissions
   const { profile, schoolData: authSchoolData } = useAuth();
   usePushTabNavigation(navigateToTab, profile?.role);
@@ -1494,6 +1505,7 @@ export default function AdminDashboard() {
               modules={mobileHomePermissions}
               onNavigateModule={navigateToTab}
               onNotifications={() => navigateToTab("announcements")}
+              onBack={activeTab !== "overview" ? handleBack : undefined}
             />
             <MobileMockupBottomNav
               role="admin"
