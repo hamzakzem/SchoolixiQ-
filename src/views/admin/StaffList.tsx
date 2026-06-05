@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, serverTimestamp, setDoc, doc, getDocs, updateDoc, limit, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { UserPlus, Mail, Phone, ShieldCheck, Trash2, Lock, Save, X, Search, Printer, FileText, Send } from 'lucide-react';
+import { UserPlus, Mail, Phone, ShieldCheck, Trash2, Lock, Save, X, Search, Printer, FileText, Send, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -11,6 +11,7 @@ import { printElement } from '../../lib/printUtils';
 
 export default function StaffList() {
   const { profile } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
   const [staff, setStaff] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -617,12 +618,19 @@ export default function StaffList() {
                         <Lock size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                           required
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           value={newStaff.password}
                           onChange={e => setNewStaff({ ...newStaff, password: e.target.value })}
-                          className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900"
+                          className="w-full pr-12 pl-12 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900"
                           placeholder="••••••••"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1"
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
                       </div>
                     </div>
                   )}

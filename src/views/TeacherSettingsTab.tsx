@@ -6,7 +6,7 @@ import { updatePassword, verifyBeforeUpdateEmail } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useLanguage } from '../lib/LanguageContext';
-import { AtSign, Lock, LayoutDashboard, MessageSquare, Send } from 'lucide-react';
+import { AtSign, Lock, LayoutDashboard, MessageSquare, Send, Eye, EyeOff } from 'lucide-react';
 
 export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
   const { profile } = useAuth();
@@ -15,6 +15,7 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
   const [password, setPassword] = useState('');
   const [selectedClass, setSelectedClass] = useState((profile as any)?.preferredClassId || '');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleUpdateEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,15 +125,24 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
             </div>
           </div>
           <form onSubmit={handleUpdatePassword} className="space-y-4">
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={isRtl ? 'كلمة المرور الجديدة' : 'New Password'}
-              className="w-full px-4 py-3 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 focus:ring-emerald-500/20 font-medium"
-              required
-              minLength={6}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={isRtl ? 'كلمة المرور الجديدة' : 'New Password'}
+                className={`w-full ${isRtl ? 'pl-11 pr-4' : 'pr-11 pl-4'} py-3 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 focus:ring-emerald-500/20 font-medium`}
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className={`absolute ${isRtl ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1`}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             <button
               disabled={isLoading || !password || password.length < 6}
               type="submit"

@@ -443,6 +443,7 @@ export default function SuperAdminDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterGovernorate, setFilterGovernorate] = useState("");
   const [filterDirectorate, setFilterDirectorate] = useState("");
+  const [showAdminPasswordInput, setShowAdminPasswordInput] = useState(false);
 
   const [newSchool, setNewSchool] = useState({
     name: "",
@@ -5174,23 +5175,32 @@ export default function SuperAdminDashboard() {
                       <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
                         كلمة المرور المؤقتة
                       </label>
-                      <input
-                        required={!newSchool.authUid}
-                        type="password"
-                        value={newSchool.adminPassword}
-                        onChange={(e) =>
-                          setNewSchool({
-                            ...newSchool,
-                            adminPassword: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all"
-                        placeholder={
-                          newSchool.authUid
-                            ? "اتركه فارغاً للاحتفاظ بكلمة مرور حساب الطالب"
-                            : "6 أحرف على الأقل"
-                        }
-                      />
+                      <div className="relative">
+                        <input
+                          required={!newSchool.authUid}
+                          type={showAdminPasswordInput ? "text" : "password"}
+                          value={newSchool.adminPassword}
+                          onChange={(e) =>
+                            setNewSchool({
+                              ...newSchool,
+                              adminPassword: e.target.value,
+                            })
+                          }
+                          className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all text-right"
+                          placeholder={
+                            newSchool.authUid
+                              ? "اتركه فارغاً للاحتفاظ بكلمة مرور حساب الطالب"
+                              : "6 أحرف على الأقل"
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPasswordInput(!showAdminPasswordInput)}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer z-10 flex items-center justify-center p-1"
+                        >
+                          {showAdminPasswordInput ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

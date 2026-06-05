@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { Users, Search, Trash2, Mail, User, GraduationCap, AlertTriangle, X, Plus, Phone, Edit2 } from 'lucide-react';
+import { Users, Search, Trash2, Mail, User, GraduationCap, AlertTriangle, X, Plus, Phone, Edit2, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -13,6 +13,7 @@ import { useLanguage } from '../../lib/LanguageContext';
 export default function ParentsList() {
   const { isRtl } = useLanguage();
   const { profile } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
   const [parents, setParents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -576,14 +577,23 @@ export default function ParentsList() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 pr-1">كلمة المرور (مطلوب)</label>
-                  <input 
-                    type="password"
-                    required
-                    value={newParent.password}
-                    onChange={(e) => setNewParent({ ...newParent, password: e.target.value })}
-                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-left"
-                    placeholder="******"
-                  />
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={newParent.password}
+                      onChange={(e) => setNewParent({ ...newParent, password: e.target.value })}
+                      className="w-full pl-12 pr-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-left"
+                      placeholder="******"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">

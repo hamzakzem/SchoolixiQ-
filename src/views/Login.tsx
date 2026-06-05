@@ -52,6 +52,8 @@ import {
   Share,
   PlusSquare,
   Info,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { UserRole } from "../types";
@@ -457,6 +459,16 @@ export default function Login() {
     e.preventDefault();
     if (!showSubscriptionModal) return;
 
+    if (subscriptionForm.password.length < 6) {
+      toast.error(isRtl ? "يجب أن تكون كلمة المرور مكونة من 6 أحرف على الأقل." : "Password must be at least 6 characters.");
+      return;
+    }
+    const pwdRes = validatePasswordComplexity(subscriptionForm.password);
+    if (!pwdRes.isValid) {
+      toast.error(pwdRes.message);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const isMonthly = billingCycle === "monthly";
@@ -523,6 +535,9 @@ export default function Login() {
     string | null
   >(null);
   const [showIframeHint, setShowIframeHint] = useState<boolean>(false);
+  const [showWebviewDialog, setShowWebviewDialog] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showSubscriptionPassword, setShowSubscriptionPassword] = useState<boolean>(false);
   const [firebaseProviderError, setFirebaseProviderError] = useState<
     string | null
   >(null);
@@ -543,11 +558,32 @@ export default function Login() {
   // Check if running in a third-party iframe (e.g. AI Studio development/shared preview)
   const inIframe = typeof window !== "undefined" && window.self !== window.top;
 
+  // Check if inside an in-app browser WebView (e.g. WhatsApp, Facebook, Instagram, Telegram)
+  const [isInsideWebView, setIsInsideWebView] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.navigator) {
+      const ua = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || "";
+      const webviewDetected = (
+        /FB_IAB|FBAN|FBAV|Instagram|Telegram|Twitter|Line|LinkedInApp|Messenger|WhatsApp|wv|Webview|CocCoc|MicroMessenger/i.test(ua) ||
+        (ua.includes("Android") && ua.includes("Version/")) || // Android WebView
+        (ua.includes("iPhone") && !ua.includes("Safari/") && !ua.includes("CriOS") && !ua.includes("FxiOS")) // iOS WebView
+      );
+      setIsInsideWebView(webviewDetected);
+    }
+  }, []);
+
   const handleGoogleAuth = async () => {
     setUnauthorizedDomainError(null);
     setShowIframeHint(false);
     setFirebaseProviderError(null);
     setNativePlatformNotice(false);
+
+    if (isInsideWebView && !isNativeApp) {
+      setShowWebviewDialog(true);
+      return;
+    }
+
     setLoading(true);
 
     if (isNativeApp) {
@@ -652,6 +688,36 @@ export default function Login() {
     }
   };
 
+  const validatePasswordComplexity = (pwd: string): { isValid: boolean; message: string } => {
+    if (pwd.length < 6) {
+      return {
+        isValid: false,
+        message: isRtl 
+          ? "يجب أن تكون كلمة المرور مكونة من 6 أحرف على الأقل." 
+          : "Password must be at least 6 characters."
+      };
+    }
+    // Check for extremely simple sequential/repeating passwords
+    if (/^(123456|12345678|abcdef|111111|000000|qwerty)$/i.test(pwd)) {
+      return {
+        isValid: false,
+        message: isRtl
+          ? "كلمة المرور هذه شائعة جداً وسهلة التخمين. الرجاء اختيار كلمة مرور أكثر تعقيداً."
+          : "This password is too simple and easy to guess. Please choose a more complex password."
+      };
+    }
+    const allRepeating = pwd.split("").every(char => char === pwd[0]);
+    if (allRepeating) {
+      return {
+        isValid: false,
+        message: isRtl
+          ? "لا يمكن أن تتكون كلمة المرور من تكرار حرف واحد فقط."
+          : "Password cannot consist of a single repeating character."
+      };
+    }
+    return { isValid: true, message: "" };
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -668,6 +734,14 @@ export default function Login() {
     if (passwordValue.length < 6) {
       toast.error(t("passwordShort"));
       return;
+    }
+
+    if (mode === "signup") {
+      const complexityRes = validatePasswordComplexity(passwordValue);
+      if (!complexityRes.isValid) {
+        toast.error(complexityRes.message);
+        return;
+      }
     }
 
     setLoading(true);
@@ -1376,12 +1450,19 @@ export default function Login() {
               )}
               <input
                 required
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder={t("password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 shadow-inner text-sm sm:text-base`}
+                className={`w-full ${isRtl ? "pr-12 pl-12 text-right" : "pl-12 pr-12 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 shadow-inner text-sm sm:text-base`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className={`absolute ${isRtl ? "left-4" : "right-4"} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1`}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
 
             <div className="bg-slate-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-100 shadow-inner">
@@ -1465,6 +1546,57 @@ export default function Login() {
                   : "Quick Sign-in with Google"}
               </span>
             </button>
+
+            {isInsideWebView && (
+              <div
+                id="webview-warning-banner"
+                className="mt-4 p-4 rounded-xl border-2 border-red-200 bg-red-50/50 text-slate-800 text-xs sm:text-sm shadow-sm text-right"
+              >
+                <div className="flex items-start gap-2.5 mb-2 flex-row-reverse">
+                  <ShieldAlert
+                    className="text-red-500 shrink-0 mt-0.5"
+                    size={18}
+                  />
+                  <div className="flex-1">
+                    <h4 className="font-bold text-red-950 text-sm">
+                      {isRtl
+                        ? "متصفح غير مدعوم لتسجيل جوجل!"
+                        : "Unsupported Browser for Google Auth!"}
+                    </h4>
+                    <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs">
+                      {isRtl
+                        ? "أنت تفتح التطبيق داخل متصفح مدمج (تطبيق التواصل). جوجل تمنع تسجيل الدخول هنا (Disallowed Useragent 403). يرجى نسخ الرابط والذهاب إلى Safari أو Chrome."
+                        : "You are inside an in-app browser. Google blocks authentication here (Disallowed Useragent 403). Please copy the link and open Safari or Chrome."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(window.location.href);
+                        toast.success(isRtl ? "تم نسخ الرابط!" : "Link copied!");
+                      } catch (e) {
+                        toast.error(isRtl ? "فشل النسخ تلقائياً" : "Failed to copy");
+                      }
+                    }}
+                    className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-all text-xs active:scale-95 flex items-center justify-center gap-1"
+                  >
+                    <Copy size={12} />
+                    <span>{isRtl ? "نسخ رابط المنصة" : "Copy Platform Link"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowWebviewDialog(true)}
+                    className="py-1.5 px-3 bg-red-100 text-red-700 font-bold rounded-lg transition-all text-xs hover:bg-red-200"
+                  >
+                    {isRtl ? "تعليمات الفتح" : "How to Open"}
+                  </button>
+                </div>
+              </div>
+            )}
 
 
             {unauthorizedDomainError && (
@@ -2179,6 +2311,82 @@ export default function Login() {
       </div>
 
       <AnimatePresence>
+        {showWebviewDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md" dir="rtl">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2rem] w-full max-w-lg p-6 sm:p-8 text-right shadow-2xl border-2 border-red-100 flex flex-col gap-6 relative"
+            >
+              <button
+                onClick={() => setShowWebviewDialog(false)}
+                className="absolute top-4 left-4 p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-all z-10"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-600 mx-auto">
+                <ShieldAlert size={36} />
+              </div>
+
+              <div className="text-center">
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-3">
+                  تنبيه: متصفح غير مدعوم من Google
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  أنت تتصفح حالياً من خلال متصفح مدمج داخل أحد التطبيقات (مثل واتساب، تلغرام، فيسبوك، أو انستغرام).
+                  <br />
+                  <strong className="text-red-600 font-bold block mt-2">
+                    تمنع شركة Google تسجيل الدخول بأي حساب من داخل هذه المتصفحات المدمجة (Disallowed Useragent 403) لأسباب أمنية.
+                  </strong>
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 text-xs sm:text-sm space-y-3">
+                <h4 className="font-bold text-slate-800 text-sm">
+                  💡 لحل المشكلة بسهولة اتبع أحد الخيارين:
+                </h4>
+                <ul className="text-xs text-slate-500 space-y-2 pr-4 pl-0 list-decimal leading-relaxed">
+                  <li>
+                    اضغط على <strong>الثلاث نقاط</strong> (أو القائمة/السهم) في الزاوية العلوية للمتصفح الحالي، ثم اختر <strong>"الفتح في متصفح خارجي"</strong> أو <strong>"Open in Chrome/Safari"</strong>.
+                  </li>
+                  <li>
+                    أو قم <strong>بنسخ الرابط</strong> أدناه، ثم افتح متصفحك الأساسي (مثل Chrome على الأندرويد، أو Safari على الـ iPhone) والصق الرابط هناك لتسجيل الدخول بأمان بـ Google.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(window.location.href);
+                      toast.success("تم نسخ الرابط بنجاح! الصقه في Chrome أو Safari.");
+                    } catch (err) {
+                      toast.error("فشل نسخ الرابط، يرجى نسخه يدوياً.");
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md active:scale-95 text-sm"
+                >
+                  <Copy size={16} />
+                  <span>نسخ رابط المنصة</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowWebviewDialog(false)}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all text-sm"
+                >
+                  إغلاق وتجربة خيارات أخرى
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {successCode && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
             <motion.div
@@ -2404,7 +2612,7 @@ export default function Login() {
                         )}
                         <input
                           required
-                          type="password"
+                          type={showSubscriptionPassword ? "text" : "password"}
                           value={subscriptionForm.password}
                           onChange={(e) =>
                             setSubscriptionForm({
@@ -2412,9 +2620,16 @@ export default function Login() {
                               password: e.target.value,
                             })
                           }
-                          className={`w-full ${isRtl ? "pr-11 pl-4 text-right" : "pl-11 pr-4 text-left"} py-3 md:py-4 rounded-xl md:rounded-2xl border border-slate-200 focus:border-blue-600 outline-none font-bold bg-slate-50/50 transition-colors text-sm md:text-base`}
+                          className={`w-full ${isRtl ? "pr-11 pl-11 text-right" : "pl-11 pr-11 text-left"} py-3 md:py-4 rounded-xl md:rounded-2xl border border-slate-200 focus:border-blue-600 outline-none font-bold bg-slate-50/50 transition-colors text-sm md:text-base`}
                           placeholder={t("strongPassword")}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowSubscriptionPassword(!showSubscriptionPassword)}
+                          className={`absolute ${isRtl ? "left-4" : "right-4"} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1`}
+                        >
+                          {showSubscriptionPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
                       </div>
                     </div>
 
