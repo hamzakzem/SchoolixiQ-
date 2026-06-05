@@ -137,7 +137,7 @@ const DEFAULT_PACKAGES = [
 ];
 
 export default function SuperAdminDashboard() {
-  const { profile, logout } = useAuth();
+  const { profile } = useAuth();
   const { t, isRtl, setLanguage, language } = useLanguage();
   const { config } = useSystemConfig();
 
@@ -153,7 +153,7 @@ export default function SuperAdminDashboard() {
   const hasPermission = (permission: string) => {
     if (profile?.role === "superadmin") return true;
     if (profile?.role === "assistant" && !profile?.schoolId) {
-      return profile?.permissions?.includes(permission);
+      return !!(profile?.permissions as any)?.includes(permission);
     }
     return false;
   };
@@ -185,6 +185,7 @@ export default function SuperAdminDashboard() {
     | "chat"
     | "backups"
     | "diagnostics"
+    | "footer"
   >("schools");
   const [schoolFilter, setSchoolFilter] = useState<"all" | "active" | "expiring">("all");
   const [usersTab, setUsersTab] = useState<"management" | "parents">(
@@ -314,6 +315,12 @@ export default function SuperAdminDashboard() {
       linkedin?: string;
       whatsapp?: string;
     };
+    promotionalBanners?: {
+      id: string;
+      imageUrl: string;
+      active: boolean;
+      link: string;
+    }[];
   }>({
     supportPhones: ["+964 770 000 0000"],
     supportEmails: ["support@schoolixiq.iq"],
@@ -1141,7 +1148,7 @@ export default function SuperAdminDashboard() {
       }
       setShowUserModal(false);
       setEditingUser(null);
-      setNewUser({ name: "", email: "", role: "parent", schoolId: "" });
+      setNewUser({ name: "", email: "", role: "parent", schoolId: "", permissions: [] });
     } catch (error: any) {
       console.error("Add user error:", error);
       toast.error(error.message || "حدث خطأ أثناء المعالجة");
@@ -1434,6 +1441,7 @@ export default function SuperAdminDashboard() {
         setNewSchool({
           name: "",
           address: "",
+          googleMapsUrl: "",
           governorate: "",
           directorate: "",
           stage: "",
@@ -1532,6 +1540,7 @@ export default function SuperAdminDashboard() {
       setNewSchool({
         name: "",
         address: "",
+        googleMapsUrl: "",
         governorate: "",
         directorate: "",
         stage: "",
@@ -2210,7 +2219,7 @@ export default function SuperAdminDashboard() {
                       hint={t('stat_users_hint')}
                       color="text-[#0B2345]"
                       onClick={() => setActiveTab("users")}
-                      isActive={activeTab === "users"}
+                      isActive={(activeTab as string) === "users"}
                     />
                   </div>
 
@@ -3425,6 +3434,7 @@ export default function SuperAdminDashboard() {
                             email: "",
                             role: "assistant",
                             schoolId: "",
+                            permissions: [],
                           });
                           setShowUserModal(true);
                         }}
@@ -3765,6 +3775,7 @@ export default function SuperAdminDashboard() {
                                                   email: user.email,
                                                   role: user.role,
                                                   schoolId: user.schoolId || "",
+                                                  permissions: user.permissions || [],
                                                 });
                                                 setShowUserModal(true);
                                               }}
@@ -5341,6 +5352,7 @@ export default function SuperAdminDashboard() {
                     setNewSchool({
                       name: "",
                       address: "",
+                      googleMapsUrl: "",
                       governorate: "",
                       directorate: "",
                       stage: "",
@@ -5662,7 +5674,7 @@ export default function SuperAdminDashboard() {
                                   permissions: {
                                     ...(newPackage.permissions || {}),
                                     [key]: e.target.checked,
-                                  },
+                                  } as typeof newPackage.permissions,
                                 })
                               }
                               className="sr-only peer"
@@ -5726,6 +5738,8 @@ export default function SuperAdminDashboard() {
                     setNewPackage({
                       name: "",
                       price: 0,
+                      priceMonthly: 0,
+                      priceYearly: 0,
                       maxStudents: 500,
                       features: "",
                       durationDays: 365,
@@ -5896,6 +5910,7 @@ export default function SuperAdminDashboard() {
                       email: "",
                       role: "parent",
                       schoolId: "",
+                      permissions: [],
                     });
                   }}
                   className="flex-1 px-6 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all"

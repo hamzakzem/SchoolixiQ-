@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db, auth } from "../lib/firebase";
 import {
   collection,
@@ -184,6 +184,9 @@ export default function TeacherDashboard() {
   );
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [isSavingGrades, setIsSavingGrades] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  // Synchronous lock to prevent ultra-fast double submits (before re-render disables the button).
+  const sendingRef = useRef(false);
   const [currentBulkDocId, setCurrentBulkDocId] = useState<string | null>(null);
 
   // Fetch existing grades when selection changes
@@ -259,7 +262,10 @@ export default function TeacherDashboard() {
   const handleSendBehaviorReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !selectedStudent) return;
+    if (sendingRef.current) return;
 
+    sendingRef.current = true;
+    setIsSending(true);
     try {
       const student = students.find((s) => s.id === selectedStudent.id);
       await addDoc(collection(db, "behavior_reports"), {
@@ -291,6 +297,9 @@ export default function TeacherDashboard() {
       setSelectedStudent(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "behavior_reports");
+    } finally {
+      sendingRef.current = false;
+      setIsSending(false);
     }
   };
   const [behaviorSearch, setBehaviorSearch] = useState("");
@@ -411,18 +420,22 @@ export default function TeacherDashboard() {
   const handleAddHomework = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
+    if (sendingRef.current) return;
 
+    const targetClassId =
+      newHomework.classId || (profile as any)?.preferredClassId;
+    if (!targetClassId) {
+      toast.error(
+        isRtl
+          ? "يرجى اختيار الصف الدراسي أولاً"
+          : "Please select a class first",
+      );
+      return;
+    }
+
+    sendingRef.current = true;
+    setIsSending(true);
     try {
-      const targetClassId =
-        newHomework.classId || (profile as any)?.preferredClassId;
-      if (!targetClassId) {
-        toast.error(
-          isRtl
-            ? "يرجى اختيار الصف الدراسي أولاً"
-            : "Please select a class first",
-        );
-        return;
-      }
 
       const homeworkRef = await addDoc(collection(db, "homework"), {
         ...newHomework,
@@ -463,6 +476,9 @@ export default function TeacherDashboard() {
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "homework");
+    } finally {
+      sendingRef.current = false;
+      setIsSending(false);
     }
   };
 
@@ -622,7 +638,10 @@ export default function TeacherDashboard() {
   const handleSendReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !selectedStudent) return;
+    if (sendingRef.current) return;
 
+    sendingRef.current = true;
+    setIsSending(true);
     try {
       const student = students.find((s) => s.id === selectedStudent.id);
       const reportRef = await addDoc(collection(db, "teacher_reports"), {
@@ -655,6 +674,9 @@ export default function TeacherDashboard() {
       setSelectedStudent(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "teacher_reports");
+    } finally {
+      sendingRef.current = false;
+      setIsSending(false);
     }
   };
 
@@ -2163,10 +2185,15 @@ export default function TeacherDashboard() {
 
                   <button
                     type="submit"
-                    className="w-full py-5 bg-[#0B2345] text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                    disabled={isSending}
+                    className="w-full py-5 bg-[#0B2345] text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Send size={18} />
-                    {t("publishHomeworkNow")}
+                    {isSending
+                      ? isRtl
+                        ? "جاري الإرسال..."
+                        : "Sending..."
+                      : t("publishHomeworkNow")}
                   </button>
                 </form>
               </motion.div>
@@ -2270,10 +2297,15 @@ export default function TeacherDashboard() {
 
                   <button
                     type="submit"
-                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                    disabled={isSending}
+                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Send size={18} />
-                    {t("saveReport")}
+                    {isSending
+                      ? isRtl
+                        ? "جاري الإرسال..."
+                        : "Sending..."
+                      : t("saveReport")}
                   </button>
                 </form>
               </motion.div>
@@ -2395,10 +2427,15 @@ export default function TeacherDashboard() {
 
                   <button
                     type="submit"
-                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                    disabled={isSending}
+                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Send size={18} />
-                    {t("sendReportBtn")}
+                    {isSending
+                      ? isRtl
+                        ? "جاري الإرسال..."
+                        : "Sending..."
+                      : t("sendReportBtn")}
                   </button>
                 </form>
               </motion.div>

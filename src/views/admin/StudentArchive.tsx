@@ -628,8 +628,8 @@ export default function StudentArchive() {
                   {years.map((year) => {
                     const yearGrades = gradesByYear[year];
                     // Extract unique subjects for this year
-                    const subjectsList = Array.from(
-                      new Set(yearGrades.map((g) => g.subject)),
+                    const subjectsList: string[] = Array.from(
+                      new Set(yearGrades.map((g: any) => String(g.subject))),
                     );
 
                     return (

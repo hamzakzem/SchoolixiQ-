@@ -25,7 +25,7 @@ export default function Grades() {
   const [newSubject, setNewSubject] = useState('');
   const [showAddSubject, setShowAddSubject] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
-  const [grades, setGrades] = useState<Record<string, number>>({});
+  const [grades, setGrades] = useState<Record<string, number | string>>({});
   const [loading, setLoading] = useState(false);
   const [gradingLoading, setGradingLoading] = useState(false);
   const [printTarget, setPrintTarget] = useState<any | null>(null);

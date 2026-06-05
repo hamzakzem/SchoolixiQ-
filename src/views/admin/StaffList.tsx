@@ -754,7 +754,6 @@ export default function StaffList() {
                     onClick={() => {
                       setShowModal(false);
                       setEditingStaff(null);
-                      setNewStaff({ name: '', email: '', password: '', role: 'teacher', phoneNumber: '', subject: '' });
                       resetNewStaff();
                     }}
                     className="px-6 py-4 bg-white border border-slate-200 text-slate-500 rounded-xl font-bold hover:bg-slate-100 transition-all"

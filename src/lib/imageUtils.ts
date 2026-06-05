@@ -7,7 +7,7 @@ export const compressImageToBase64 = (file, maxWidth = 400, maxHeight = 400) => 
     reader.readAsDataURL(file);
     reader.onload = (event) => {
       const img = new Image();
-      img.src = event.target?.result;
+      img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement('canvas');
         let width = img.width;
@@ -47,7 +47,7 @@ export const compressImage = (file, maxWidth = 400, maxHeight = 400) => {
     reader.readAsDataURL(file);
     reader.onload = (event) => {
       const img = new Image();
-      img.src = event.target?.result;
+      img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement('canvas');
         let width = img.width;

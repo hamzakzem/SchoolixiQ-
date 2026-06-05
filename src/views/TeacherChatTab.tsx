@@ -508,7 +508,7 @@ export default function TeacherChatTab() {
   ].filter(
     (c) =>
       c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.email?.toLowerCase().includes(searchTerm.toLowerCase()),
+      (c as any).email?.toLowerCase().includes(searchTerm.toLowerCase()),
   ).sort((a, b) => {
     const timeA = lastInteractionTimes[a.id] || 0;
     const timeB = lastInteractionTimes[b.id] || 0;

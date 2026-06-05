@@ -29,7 +29,13 @@ export type SchoolSubscriptionRegistrationInput = {
   adminName?: string;
   phone: string;
   schoolRegistration: SchoolRegistrationFormValues;
-  package: { id: string; name: string };
+  package: {
+    id: string;
+    name: string;
+    price?: number;
+    priceMonthly?: number;
+    priceYearly?: number;
+  };
   billingCycle: BillingCycle;
   type?: 'direct_school_signup' | 'subscription_request';
 };

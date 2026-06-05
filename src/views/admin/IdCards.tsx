@@ -335,7 +335,7 @@ export default function IdCards() {
       // Fallback: embed a compressed image directly so the photo always works
       // even when storage is unavailable.
       try {
-        const base64 = await compressImageToBase64(file, 500, 500);
+        const base64 = (await compressImageToBase64(file, 500, 500)) as string;
         setPhotoUrl(base64);
         toast.success(isRtl ? "تم تجهيز الصورة" : "Image ready", {
           id: loadingToast,

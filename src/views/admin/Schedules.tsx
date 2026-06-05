@@ -278,9 +278,9 @@ export default function Schedules() {
                       <span className="w-7 h-7 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center text-[11px] font-black text-[#D4A64A]">
                         {dayIndex + 1}
                       </span>
-                      <h3 className="font-black text-base tracking-tight">{day}</h3>
+                      <h3 className="font-black text-base tracking-tight !text-white">{day}</h3>
                     </div>
-                    <span className="text-[10px] font-bold bg-white/12 border border-white/15 rounded-full px-2.5 py-1">
+                    <span className="text-[10px] font-bold text-white bg-white/12 border border-white/15 rounded-full px-2.5 py-1">
                       {periods.length} حصة
                     </span>
                   </div>

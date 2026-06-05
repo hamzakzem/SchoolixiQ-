@@ -168,7 +168,7 @@ export default function IdCardCustomizer({
                         ...p,
                         elements: Object.fromEntries(
                           ELEMENT_TOGGLE_KEYS.map((k) => [k, true]),
-                        ) as IdCardTemplate['elements'],
+                        ) as unknown as IdCardTemplate['elements'],
                       }))
                     }
                     className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200"

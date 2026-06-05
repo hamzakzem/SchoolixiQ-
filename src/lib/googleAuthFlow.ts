@@ -203,10 +203,10 @@ export async function runGoogleSignInFlow(
   if (webResult.ok) {
     return { status: 'success', user: webResult.user };
   }
-  if (webResult.cancelled) {
+  if ('cancelled' in webResult) {
     return { status: 'cancelled' };
   }
-  if (webResult.popupBlocked) {
+  if ('popupBlocked' in webResult) {
     try {
       await signInWithGoogleRedirectWeb(auth);
       return { status: 'redirecting' };
@@ -217,7 +217,10 @@ export async function runGoogleSignInFlow(
     }
   }
 
-  const mapped = mapGoogleAuthError(webResult.error, isRtl);
+  const mapped = mapGoogleAuthError(
+    'error' in webResult ? webResult.error : undefined,
+    isRtl,
+  );
   return { status: 'error', error: new Error(mapped.message) };
 }
 
@@ -235,14 +238,17 @@ export async function runGoogleSignInPopupFlow(
   if (webResult.ok) {
     return { status: 'success', user: webResult.user };
   }
-  if (webResult.cancelled) {
+  if ('cancelled' in webResult) {
     return { status: 'cancelled' };
   }
-  if (webResult.popupBlocked) {
+  if ('popupBlocked' in webResult) {
     await signInWithGoogleRedirectWeb(auth);
     return { status: 'redirecting' };
   }
-  const mapped = mapGoogleAuthError(webResult.error, isRtl);
+  const mapped = mapGoogleAuthError(
+    'error' in webResult ? webResult.error : undefined,
+    isRtl,
+  );
   return { status: 'error', error: new Error(mapped.message) };
 }
 

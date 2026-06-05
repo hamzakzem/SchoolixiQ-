@@ -15,7 +15,7 @@ const translations: Record<Language, Record<string, string>> = {
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: TranslationKey) => string;
+  t: (key: TranslationKey | (string & {})) => string;
   isRtl: boolean;
   loading: boolean;
 }
@@ -59,7 +59,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const t = (key: TranslationKey): string => {
+  const t = (key: TranslationKey | (string & {})): string => {
     // Current translations -> Fallback (English / LTR) -> Safe Raw Key
     return translations[language][key] || translations['en'][key] || key;
   };

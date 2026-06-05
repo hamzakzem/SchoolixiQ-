@@ -14,11 +14,16 @@ export interface UserProfile {
   role: UserRole;
   schoolId: string;
   phoneNumber?: string;
+  phone?: string;
+  schoolPhone?: string;
+  schoolName?: string;
+  language?: string;
   photoURL?: string;
   subject?: string;
   preferredClassId?: string;
   preferredSubject?: string;
   permissions?: Record<string, boolean>;
+  certificateColumns?: string[];
   salary?: number;
 }
 
@@ -29,6 +34,8 @@ export interface School {
   status: 'active' | 'suspended' | 'pending_subscription' | 'pending_approval' | 'rejected';
   ownerUid: string;
   logoUrl?: string;
+  adminEmail?: string;
+  adminPhone?: string;
   subscriptionExpiresAt?: any; // Timestamp
   showSubscriptionTimer?: boolean;
   notificationsEnabled?: boolean;

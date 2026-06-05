@@ -113,6 +113,7 @@ export default function ParentDashboard() {
   const [studentGrades, setStudentGrades] = useState<any[]>([]);
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [attendanceSummary, setAttendanceSummary] = useState({
+    present: 0,
     absent: 0,
     late: 0,
   });
@@ -575,14 +576,17 @@ export default function ParentDashboard() {
         limit(50)
       );
       unsubs.push(onSnapshot(attendanceQ, snap => {
+        let presentCount = 0;
         let absentCount = 0;
         let lateCount = 0;
         snap.docs.forEach((doc) => {
           const records = doc.data().records || {};
-          if (records[selectedStudent.id] === "absent") absentCount++;
-          if (records[selectedStudent.id] === "late") lateCount++;
+          const status = records[selectedStudent.id];
+          if (status === "absent") absentCount++;
+          else if (status === "late") lateCount++;
+          else if (status === "present") presentCount++;
         });
-        setAttendanceSummary({ absent: absentCount, late: lateCount });
+        setAttendanceSummary({ present: presentCount, absent: absentCount, late: lateCount });
       }));
 
       // 3. Announcements

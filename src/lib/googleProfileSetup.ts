@@ -49,7 +49,7 @@ export async function finalizeGoogleSignIn(
     isRtl,
   });
 
-  if (!result.ok) {
+  if ('message' in result) {
     toast.error(result.message);
     if (result.signOutRequired) {
       await signOut(auth);

@@ -521,6 +521,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         parentPhone: '',
         parentEmail: '',
         address: '',
+        driverPhone: '',
         parentPassword: '',
         photoUrl: ''
       });
@@ -686,7 +687,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                 <ViewToggle
                   className="lg:hidden flex-1 justify-center"
                   value={viewMode}
-                  onChange={setViewMode}
+                  onChange={(v) => setViewMode(v as 'table' | 'cards')}
                   options={[
                     { value: 'table', label: 'جدول' },
                     { value: 'cards', label: 'بطاقات' },
@@ -707,7 +708,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             <ViewToggle
               className="hidden lg:inline-flex"
               value={viewMode}
-              onChange={setViewMode}
+              onChange={(v) => setViewMode(v as 'table' | 'cards')}
               options={[
                 { value: 'table', label: 'جدول' },
                 { value: 'cards', label: 'بطاقات' },

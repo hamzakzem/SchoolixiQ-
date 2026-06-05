@@ -643,7 +643,7 @@ export default function Login() {
           isRtl,
         });
 
-        if (!profileResult.ok) {
+        if ("message" in profileResult) {
           await signOut(auth).catch(() => {});
           toast.error(profileResult.message);
           return;
