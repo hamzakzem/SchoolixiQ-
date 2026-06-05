@@ -392,92 +392,94 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
-      <div className={`bg-white dark:bg-slate-900 w-full max-w-4xl h-[85vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200/50 dark:border-slate-800 dir-${isArabic ? 'rtl' : 'ltr'}`}>
+    <div className="fixed inset-0 bg-slate-950/60 dark:bg-slate-950/85 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ zIndex: 9999 }}>
+      <div className={`bg-white dark:bg-slate-900 w-full max-w-4xl h-[92vh] sm:h-[85vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border-0 sm:border border-slate-200/50 dark:border-slate-800 dir-${isArabic ? 'rtl' : 'ltr'}`}>
         
         {/* Header Section */}
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/50 to-white dark:from-slate-800/10 dark:to-slate-900">
+        <div className="p-5 sm:p-6 pb-4 sm:pb-6 border-b border-indigo-50/10 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/30 to-white dark:from-slate-800/10 dark:to-slate-900 relative">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <Bell className="w-6 h-6 animate-swing" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+              <Bell className="w-5 h-5 sm:w-6 sm:h-6 animate-swing" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <h2 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-1.5 sm:gap-2">
                 {isArabic ? "مركز التنبيهات المتقدم" : "Advanced Notification Hub"}
-                <span className="text-xs font-semibold px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full">
+                <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full select-none">
                   Pro v2.0
                 </span>
               </h2>
-              <p className="text-xs text-slate-400 font-medium">
-                {isArabic ? "تحكم بالروابط، مستويات الصوت والتوصيل الفوري الذكي" : "Control audio profiles, web-push links & robust FCM logs"}
+              <p className="text-[11px] sm:text-xs text-slate-450 dark:text-slate-400 font-bold mt-0.5 select-none leading-none">
+                {isArabic ? "تحكم بالروابط، مستويات الصوت والتوصيل الفوري" : "Audio profiles, web-push links & robust FCM logs"}
               </p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-all flex items-center justify-center border border-slate-200/30"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-720 transition-all flex items-center justify-center border border-slate-200/15 active:scale-95"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Global Navigation Settings Tabs */}
-        <div className="px-6 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/30 dark:bg-slate-900 overflow-x-auto gap-2">
-          <div className="flex items-center gap-2 shrink-0">
+        <div className="px-4 sm:px-6 py-2.5 border-b border-indigo-50/5 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between bg-slate-50/40 dark:bg-slate-900/40 gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0 w-full md:w-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 md:pb-0">
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'all' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0 ${activeTab === 'all' ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Bell className="w-3.5 h-3.5" />
-              {isArabic ? "كل الإشعارات والرسائل" : "All Alerts & Messages"}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'all' ? 'bg-indigo-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+              {isArabic ? "كل الإشعارات" : "All Alerts"}
+              <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'all' ? 'bg-[#15345d] text-white dark:bg-[#eed397] dark:text-slate-900' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
                 {notifications.length}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab('unread')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'unread' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0 ${activeTab === 'unread' ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Check className="w-3.5 h-3.5" />
-              {isArabic ? "غير المقروءة والرسائل" : "Unread Messages & Alerts"}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'unread' ? 'bg-indigo-700 text-white' : 'bg-red-500 text-white'}`}>
+              {isArabic ? "غير المقروءة" : "Unread"}
+              <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'unread' ? 'bg-red-500 text-white' : 'bg-red-500 text-white'}`}>
                 {notifications.filter(n => !n.read).length}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab('settings')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0 ${activeTab === 'settings' ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
               <Settings className="w-3.5 h-3.5" />
-              {isArabic ? "الأصوات والإعدادات" : "Voice & Audio Profiles"}
+              {isArabic ? "الأصوات والإعدادات" : "Sound & Settings"}
             </button>
 
             {profile && ['admin', 'superadmin'].includes(profile.role) && (
               <button
                 onClick={() => setActiveTab('logs')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'logs' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                className={`px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0 ${activeTab === 'logs' ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
               >
                 <Activity className="w-3.5 h-3.5" />
-                {isArabic ? "سجلات التوصيل الـ FCM" : "Delivery Audit Ledger"}
+                {isArabic ? "سجلات التوصيل" : "Delivery Logs"}
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 md:justify-end w-full md:w-auto">
             {activeTab !== 'settings' && activeTab !== 'logs' && (
               <>
                 <button
                   onClick={handleMarkAllRead}
-                  className="px-3 py-1.5 text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 border border-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-900/50 rounded-lg hover:bg-indigo-100 transition-all cursor-pointer"
+                  className="flex-1 md:flex-none text-center justify-center px-4 py-2 text-[11px] sm:text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-100/50 dark:border-indigo-900/40 rounded-xl hover:bg-indigo-150 transition-all active:scale-95 cursor-pointer flex items-center gap-1"
                 >
+                  <CheckSquare className="w-3.5 h-3.5" />
                   {isArabic ? "تحديد الكل كمقروء" : "Mark all read"}
                 </button>
                 <button
                   onClick={handleDeleteAll}
-                  className="px-3 py-1.5 text-xs text-red-600 dark:text-red-400 font-bold bg-red-50 border border-red-100 dark:bg-red-950/30 dark:border-red-950/50 rounded-lg hover:bg-red-100 transition-all cursor-pointer"
+                  className="flex-1 md:flex-none text-center justify-center px-4 py-2 text-[11px] sm:text-xs text-red-600 dark:text-red-400 font-bold bg-red-50/50 dark:bg-red-955/20 border border-red-100/50 dark:border-red-900/40 rounded-xl hover:bg-red-150 transition-all active:scale-95 cursor-pointer flex items-center gap-1"
                 >
+                  <Trash2 className="w-3.5 h-3.5" />
                   {isArabic ? "مسح الكل" : "Delete all"}
                 </button>
               </>
@@ -787,13 +789,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             </div>
           ) : (
             /* ALL & UNREAD NOTIFICATIONS TAB */
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               
               {/* Filter controls */}
-              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/50 p-4 border border-slate-100 dark:border-slate-800 rounded-3xl">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-50/40 dark:bg-slate-900/40 p-3 sm:p-4 border border-slate-150/40 dark:border-slate-800 rounded-[1.5rem] sm:rounded-3xl">
                 
                 {/* Visual Pill selection */}
-                <div className="flex items-center gap-1.5 overflow-x-auto shrink-0 pb-1.5 md:pb-0 custom-scrollbar">
+                <div className="flex items-center gap-2 overflow-x-auto shrink-0 pb-2 md:pb-0 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
                   {[
                     { id: 'all', label: isArabic ? '⭐ الكل' : '⭐ All' },
                     { id: 'announcement', label: isArabic ? '📢 الإعلانات' : '📢 Announcements' },
@@ -805,7 +807,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     <button
                       key={catPill.id}
                       onClick={() => setCategoryFilter(catPill.id)}
-                      className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all whitespace-nowrap cursor-pointer ${categoryFilter === catPill.id ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                      className={`px-3.5 py-2 text-[10px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap cursor-pointer active:scale-95 ${categoryFilter === catPill.id ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm font-black' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-750'}`}
                     >
                       {catPill.label}
                     </button>
@@ -813,26 +815,26 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 </div>
 
                 {/* Search field */}
-                <div className="relative flex-1 max-w-xs">
-                  <Search className="absolute right-3.5 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+                <div className="relative flex-1 w-full md:max-w-xs" dir={isArabic ? "rtl" : "ltr"}>
+                  <Search className={`absolute top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none ${isArabic ? "right-3.5" : "left-3.5"}`} />
                   <input
                     type="text"
-                    placeholder={isArabic ? "ابحث بنص الرسالة..." : "Filter text keywords..."}
+                    placeholder={isArabic ? "ابحث بنص التنبيه..." : "Filter text keywords..."}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-850 rounded-full py-2 pl-4 pr-10 text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className={`w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 ${isArabic ? "pr-10 pl-4" : "pl-10 pr-4"}`}
                   />
                 </div>
               </div>
 
               {/* Grid content feed list */}
               {filteredNotifs.length === 0 ? (
-                <div className="h-80 flex flex-col items-center justify-center text-slate-400 space-y-3 p-10 select-none">
-                  <div className="w-16 h-16 rounded-3xl bg-slate-50 dark:bg-slate-850 flex items-center justify-center text-slate-300">
+                <div className="h-[45vh] flex flex-col items-center justify-center text-slate-450 space-y-4 p-10 select-none">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-850 flex items-center justify-center text-slate-300">
                     <VolumeX className="w-8 h-8" />
                   </div>
                   <div className="text-center">
-                    <p className="font-bold text-slate-600 dark:text-slate-300">
+                    <p className="font-extrabold text-slate-700 dark:text-slate-300">
                       {isArabic ? "لا توجد أي إشعارات متوفرة" : "No Notifications matching"}
                     </p>
                     <p className="text-xs text-slate-400 mt-1">
@@ -841,50 +843,54 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+                <div className="space-y-3.5 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
                   {filteredNotifs.map((n) => (
                     <div
                       key={n.id}
                       onClick={() => handleNotificationClick(n)}
-                      className={`group p-4 pb-5 rounded-3xl border transition-all cursor-pointer flex items-start gap-4 hover:shadow-md ${!n.read ? 'bg-indigo-50/30 border-indigo-100/50 dark:bg-indigo-900/10 dark:border-indigo-900/20' : 'bg-white border-slate-100 dark:bg-slate-950 dark:border-slate-850/50'} relative`}
+                      className={`group p-4.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all cursor-pointer flex items-start gap-3.5 sm:gap-4 hover:shadow-lg active:scale-[0.99] hover:border-slate-350 dark:hover:border-slate-700/80 ${
+                        !n.read 
+                          ? 'bg-indigo-50/15 border-indigo-150/40 dark:bg-indigo-950/10 dark:border-indigo-900/30' 
+                          : 'bg-white border-slate-100 dark:bg-slate-950 dark:border-slate-850/50'
+                      } relative`}
                     >
                       {/* Read state flashing dot indicator */}
                       {!n.read && (
-                        <span className="absolute top-4 left-4 w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                        <span className={`absolute top-4 ${isArabic ? "left-4" : "right-4"} w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse`} />
                       )}
 
                       {/* Icon */}
-                      <div className={`p-3 rounded-2xl shrink-0 flex items-center justify-center ${!n.read ? 'bg-white dark:bg-slate-850 shadow-sm text-indigo-600' : 'bg-slate-50 dark:bg-slate-900 text-slate-400'}`}>
+                      <div className={`p-3.5 rounded-2xl shrink-0 flex items-center justify-center ${!n.read ? 'bg-white dark:bg-slate-900 shadow-sm text-indigo-600' : 'bg-slate-50 dark:bg-slate-900 text-slate-400'}`}>
                         {getCategoryIcon(n.type)}
                       </div>
 
                       {/* Msg */}
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300 select-none">
+                      <div className="flex-1 space-y-1.5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[9px] sm:text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300 select-none">
                             {getCategoryLabel(n.type)}
                           </span>
-                          <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <span className="text-[10px] text-slate-450 flex items-center gap-1 select-none font-medium">
                             <Clock className="w-3 h-3" />
                             {n.createdAt.toLocaleDateString()} {n.createdAt.toLocaleTimeString()}
                           </span>
                         </div>
-                        <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                        <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-md leading-tight">
                           {n.title}
                         </h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-normal">
+                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-semibold break-words">
                           {n.message}
                         </p>
                       </div>
 
                       {/* Actions */}
-                      <div className="shrink-0 self-center flex items-center gap-1opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="shrink-0 self-center flex items-center gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => handleDeleteOne(e, n.id)}
-                          className="p-2 text-slate-400 hover:text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full cursor-pointer"
+                          className="p-2.5 text-slate-400 hover:text-red-550 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-full transition-colors active:scale-90 cursor-pointer"
                           title={isArabic ? "مسح التنبيه" : "Delete Notification"}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4.5 h-4.5" />
                         </button>
                       </div>
                     </div>
@@ -896,15 +902,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         </div>
 
         {/* Global Footer banner */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400 bg-slate-50/50 dark:bg-slate-900/50 select-none shrink-0 font-medium">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400 bg-slate-50/50 dark:bg-slate-900/50 select-none shrink-0 font-bold">
           <span className="flex items-center gap-1.5">
             <Wifi className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
             {isArabic ? "متصل بالنظام الرئيسي ومزامنة التنبيهات فورية" : "Unified Active WebPush & FCM connection established."}
           </span>
-          <span className="flex items-center gap-1 text-[10px]">
+          <span className="hidden xs:flex items-center gap-1 text-[10px]">
             <Laptop className="w-3 h-3" />
             <Smartphone className="w-3 h-3" />
-            Capacitor iOS/Android compatible
+            iOS/Android compatible
           </span>
         </div>
 

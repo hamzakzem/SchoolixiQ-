@@ -23,6 +23,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { NotificationCenter } from "../components/NotificationCenter";
+import { MobileNavigationDock } from "../components/MobileNavigationDock";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { toast } from "react-hot-toast";
 import {
@@ -149,16 +150,13 @@ export default function ParentDashboard() {
   }, [selectedStudent?.schoolId]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) {
+      if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
         setIsSidebarCollapsed(false);
-      } else if (window.innerWidth < 1024) {
-        setIsSidebarOpen(true);
-        setIsSidebarCollapsed(true);
       } else {
         setIsSidebarOpen(true);
         setIsSidebarCollapsed(false);
@@ -1110,7 +1108,7 @@ export default function ParentDashboard() {
                        }
                     }
                   }}
-                  className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
+                  className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0 hidden lg:block"
                 >
                   <Menu
                     size={22}
@@ -1232,7 +1230,7 @@ export default function ParentDashboard() {
           </div>
         </header>
 
-        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0' : 'overflow-y-auto custom-scrollbar pb-10'}`}>
+        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-20 lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -2535,6 +2533,21 @@ export default function ParentDashboard() {
           </AnimatePresence>
           {activeTab !== "chat" && <GlobalFooter compact />}
         </main>
+
+        {/* Floating/Sticky Mobile Navigation Dock for Parents */}
+        <MobileNavigationDock
+          menuItems={allItems}
+          activeTab={activeTab}
+          setActiveTab={(tabId) => {
+            setActiveTab(tabId);
+          }}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          showNotifications={showNotifications}
+          setShowNotifications={setShowNotifications}
+          notificationsCount={notifications.filter((n: any) => !n.read).length}
+          isRtl={isRtl}
+        />
       </div>
       </div>
     );

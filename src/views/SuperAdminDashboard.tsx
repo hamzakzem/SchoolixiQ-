@@ -19,6 +19,7 @@ import {
 } from "firebase/firestore";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
+import { MobileNavigationDock } from "../components/MobileNavigationDock";
 import {
   School,
   Building,
@@ -42,6 +43,7 @@ import {
   Package,
   X,
   ClipboardCheck,
+  FileArchive,
   LayoutGrid,
   LayoutDashboard,
   Navigation,
@@ -200,18 +202,13 @@ export default function SuperAdminDashboard() {
   );
   const [viewingPackage, setViewingPackage] = useState<any | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
-    window.innerWidth >= 768 && window.innerWidth < 1024,
-  );
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) {
+      if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
         setIsSidebarCollapsed(false);
-      } else if (window.innerWidth < 1024) {
-        setIsSidebarOpen(true);
-        setIsSidebarCollapsed(true);
       } else {
         setIsSidebarOpen(true);
         setIsSidebarCollapsed(false);
@@ -1950,7 +1947,7 @@ export default function SuperAdminDashboard() {
                   }
                 }
               }}
-              className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
+              className="w-11 h-11 hidden lg:flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
             >
               <Menu
                 size={20}
@@ -2077,7 +2074,7 @@ export default function SuperAdminDashboard() {
         )}
 
         <div
-          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full" : "overflow-y-auto custom-scrollbar pb-10"}`}
+          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-20 lg:pb-0" : "overflow-y-auto custom-scrollbar pb-28 lg:pb-10"}`}
         >
           <AnimatePresence mode="wait">
             <motion.div
@@ -5792,6 +5789,34 @@ export default function SuperAdminDashboard() {
           />
         )}
       </AnimatePresence>
+
+      {/* Floating/Sticky Mobile Navigation Dock for Super Admin */}
+      <MobileNavigationDock
+        menuItems={[
+          hasPermission("manage_schools") && { id: "schools", label: t('sidebar_schools'), icon: Building },
+          hasPermission("manage_schools") && { id: "accounts", label: t('sidebar_accounts'), icon: Lock },
+          profile?.role === "superadmin" && { id: "team", label: t('sidebar_team'), icon: ShieldCheck },
+          hasPermission("manage_packages") && { id: "packages", label: t('sidebar_packages'), icon: Plus },
+          hasPermission("view_requests") && { id: "requests", label: t('sidebar_requests'), icon: Mail },
+          hasPermission("manage_schools") && { id: "chat", label: t('sidebar_chat'), icon: MessageSquare },
+          hasPermission("manage_users") && { id: "users", label: t('sidebar_users'), icon: Users },
+          hasPermission("manage_users") && { id: "parents", label: t('sidebar_parents'), icon: Users },
+          hasPermission("system_settings") && { id: "settings", label: t('sidebar_settings'), icon: SettingsIcon },
+          hasPermission("system_settings") && { id: "footer", label: t('sidebar_footer'), icon: Save },
+          hasPermission("view_backups") && { id: "backups", label: t('sidebar_backups') || (isRtl ? "النسخ الاحتياطي" : "Backups"), icon: FileArchive },
+          (profile?.role === "superadmin" || profile?.role === "dev_agent") && { id: "diagnostics", label: t('sidebar_diagnostics') || (isRtl ? "الفحص والتشخيص" : "Diagnostics"), icon: ClipboardCheck }
+        ].filter(Boolean) as any[]}
+        activeTab={activeTab}
+        setActiveTab={(tabId) => {
+          navigateToTab(tabId);
+        }}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+        showNotifications={showNotifications}
+        setShowNotifications={setShowNotifications}
+        notificationsCount={notifications.filter((n: any) => !n.read).length}
+        isRtl={isRtl}
+      />
     </div>
   );
 }

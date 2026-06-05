@@ -50,6 +50,7 @@ import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
 import SchoolixLogo from "../components/SchoolixLogo";
+import { MobileNavigationDock } from "../components/MobileNavigationDock";
 
 const DEFAULT_PACKAGES = [
   {
@@ -135,21 +136,15 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
-    window.innerWidth >= 768 && window.innerWidth < 1024,
-  );
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) {
+      if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
         setIsSidebarCollapsed(false);
-      } else if (window.innerWidth < 1024) {
-        setIsSidebarOpen(true);
-        setIsSidebarCollapsed(true);
       } else {
         setIsSidebarOpen(true);
-        // Retain user's collapse preference on desktop if possible, but for default:
         setIsSidebarCollapsed(false);
       }
     };
@@ -1337,7 +1332,7 @@ export default function AdminDashboard() {
                   }
                 }
               }}
-              className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
+              className="w-11 h-11 hidden lg:flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
             >
               <Menu
                 size={20}
@@ -1484,7 +1479,7 @@ export default function AdminDashboard() {
         )}
 
         <main
-          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0" : "overflow-y-auto pb-10"}`}
+          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-20 lg:pb-0" : "overflow-y-auto pb-28 lg:pb-10"}`}
         >
           <div
             className={`w-full mx-auto flex flex-col print:min-h-0 print:pb-0 print:p-0 ${
@@ -1581,6 +1576,23 @@ export default function AdminDashboard() {
             />
           )}
         </AnimatePresence>
+
+        {/* Floating/Sticky Mobile Navigation Dock */}
+        <MobileNavigationDock
+          menuItems={filteredMenuItems}
+          activeTab={activeTab}
+          setActiveTab={(tabId) => {
+            setActiveTab(tabId);
+            // also clear navigation history or append as needed
+            setNavigationHistory((prev) => [...prev, activeTab]);
+          }}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          showNotifications={showNotifications}
+          setShowNotifications={setShowNotifications}
+          notificationsCount={notifications.filter((n: any) => !n.read).length}
+          isRtl={isRtl}
+        />
       </div>
     </div>
   );

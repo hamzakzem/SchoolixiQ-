@@ -47,6 +47,7 @@ import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
+import { MobileNavigationDock } from "../components/MobileNavigationDock";
 
 type Tab =
   | "home"
@@ -98,16 +99,13 @@ export default function TeacherDashboard() {
   const [schoolName, setSchoolName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) {
+      if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
         setIsSidebarCollapsed(false);
-      } else if (window.innerWidth < 1024) {
-        setIsSidebarOpen(true);
-        setIsSidebarCollapsed(true);
       } else {
         setIsSidebarOpen(true);
         setIsSidebarCollapsed(false);
@@ -890,7 +888,7 @@ export default function TeacherDashboard() {
                    }
                 }
               }}
-              className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm"
+              className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm hidden lg:block"
             >
               <Menu
                 size={20}
@@ -1882,114 +1880,21 @@ export default function TeacherDashboard() {
           {activeTab !== "chat" && <GlobalFooter compact />}
         </div>
 
-        {/* Mobile Tab Bar */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-around z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] transition-colors h-[72px]">
-          {primaryItems.map((item: any) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                setShowMoreMenu(false);
-              }}
-              className={`flex flex-col items-center justify-center gap-1 min-w-[64px] transition-all relative ${
-                activeTab === item.id ? "text-indigo-600" : "text-slate-400"
-              }`}
-            >
-              <div
-                className={`p-2 rounded-xl transition-all ${
-                  activeTab === item.id 
-                    ? "bg-indigo-50 dark:bg-indigo-900/40" 
-                    : "bg-transparent"
-                }`}
-              >
-                <item.icon size={20} strokeWidth={activeTab === item.id ? 2.5 : 1.5} />
-              </div>
-              <span className={`text-[10px] font-bold ${activeTab === item.id ? "opacity-100" : "opacity-70"}`}>
-                {item.label}
-              </span>
-              {activeTab === item.id && (
-                <motion.div
-                  layoutId="activeTabUnderline"
-                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-600 rounded-full"
-                />
-              )}
-            </button>
-          ))}
-          <button
-            onClick={() => setShowMoreMenu(!showMoreMenu)}
-            className={`flex flex-col items-center justify-center gap-1 min-w-[64px] transition-all ${
-              showMoreMenu ? "text-indigo-600" : "text-slate-400"
-            }`}
-          >
-            <div
-              className={`p-2 rounded-xl transition-all ${
-                showMoreMenu ? "bg-indigo-50 dark:bg-indigo-900/40" : "bg-transparent"
-              }`}
-            >
-              <Menu size={20} strokeWidth={showMoreMenu ? 2.5 : 1.5} />
-            </div>
-            <span className={`text-[10px] font-bold ${showMoreMenu ? "opacity-100" : "opacity-70"}`}>
-              {t("more")}
-            </span>
-          </button>
-        </nav>
-
-        {/* More Menu Modal */}
-        <AnimatePresence>
-          {showMoreMenu && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowMoreMenu(false)}
-                className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] lg:hidden"
-              />
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed bottom-[72px] left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 rounded-t-[2.5rem] p-6 pb-12 z-[70] lg:hidden shadow-2xl"
-              >
-                <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-8" />
-                <div className="grid grid-cols-3 gap-4">
-                  {moreItems.map((item: any) => (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setActiveTab(item.id);
-                        setShowMoreMenu(false);
-                      }}
-                      className={`flex flex-col items-center gap-3 p-4 rounded-3xl transition-all ${
-                        activeTab === item.id
-                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                          : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                      }`}
-                    >
-                      <item.icon size={24} />
-                      <span className="text-[10px] font-bold text-center leading-tight">
-                        {item.label}
-                      </span>
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => {
-                        auth.signOut();
-                        setShowMoreMenu(false);
-                    }}
-                    className="flex flex-col items-center gap-3 p-4 rounded-3xl bg-red-50 dark:bg-red-900/20 text-red-600"
-                  >
-                    <LogOut size={24} />
-                    <span className="text-[10px] font-bold text-center leading-tight">
-                      {t("logout")}
-                    </span>
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
+        {/* Floating/Sticky Mobile Navigation Dock for Teachers */}
+        <MobileNavigationDock
+          menuItems={sidebarItems}
+          activeTab={activeTab}
+          setActiveTab={(tabId) => {
+            setActiveTab(tabId);
+            setShowMoreMenu(false);
+          }}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          showNotifications={showNotifications}
+          setShowNotifications={setShowNotifications}
+          notificationsCount={notifications.filter((n) => !n.read).length}
+          isRtl={isRtl}
+        />
 
         {/* HomeWork Modal */}
         <AnimatePresence>
