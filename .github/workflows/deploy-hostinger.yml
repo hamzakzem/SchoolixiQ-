@@ -1,0 +1,114 @@
+name: Deploy Frontend to Hostinger
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-hostinger.yml"
+
+concurrency:
+  group: hostinger-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      HOSTINGER_FTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}
+      HOSTINGER_FTP_USERNAME: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+      HOSTINGER_FTP_PASSWORD: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+      HOSTINGER_FTP_REMOTE_DIR: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require Hostinger deploy secrets
+        run: |
+          missing=""
+          for key in HOSTINGER_FTP_SERVER HOSTINGER_FTP_USERNAME HOSTINGER_FTP_PASSWORD HOSTINGER_FTP_REMOTE_DIR; do
+            if [ -z "${!key}" ]; then
+              missing="$missing $key"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error title=Missing Hostinger secrets::Add GitHub repository secrets:$missing"
+            exit 1
+          fi
+          remote="${HOSTINGER_FTP_REMOTE_DIR}"
+          if [[ "$remote" != /* ]]; then
+            echo "::error title=Invalid HOSTINGER_FTP_REMOTE_DIR::Use full path like /home/USERNAME/domains/schoolixiq.com/public_html"
+            exit 1
+          fi
+          echo "SFTP server: ${HOSTINGER_FTP_SERVER}"
+          echo "SFTP user: ${HOSTINGER_FTP_USERNAME}"
+          echo "SFTP remote: ${HOSTINGER_FTP_REMOTE_DIR}"
+          echo "SFTP port: 65002"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend (static only)
+        env:
+          VITE_APP_URL: https://schoolixiq.com
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_ANDROID_APK_URL: ${{ secrets.VITE_ANDROID_APK_URL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+        run: npx vite build
+
+      - name: Verify dist output
+        run: |
+          test -f dist/index.html
+          test -f dist/.htaccess
+          rm -f dist/server.cjs dist/server.cjs.map 2>/dev/null || true
+          ls -la dist/
+          if test -f dist/downloads/schoolixiq.apk; then
+            echo "APK present in dist/downloads/schoolixiq.apk"
+            ls -lh dist/downloads/schoolixiq.apk
+          else
+            echo "::warning::No APK at public/downloads/schoolixiq.apk — download link will 404 until you upload the file or set VITE_ANDROID_APK_URL / Firestore system/config.androidApkUrl"
+          fi
+      - name: Package dist zip (manual fallback)
+        run: |
+          cd dist && zip -r ../schoolixiq-dist.zip . && cd ..
+          ls -la schoolixiq-dist.zip
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: schoolixiq-dist
+          path: schoolixiq-dist.zip
+          retention-days: 7
+
+      - name: Deploy to Hostinger (SFTP)
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
+        with:
+          server: ${{ env.HOSTINGER_FTP_SERVER }}
+          port: 65002
+          username: ${{ env.HOSTINGER_FTP_USERNAME }}
+          password: ${{ env.HOSTINGER_FTP_PASSWORD }}
+          local_path: ./dist/
+          remote_path: ${{ env.HOSTINGER_FTP_REMOTE_DIR }}
+          sftp_only: true
+          sftpArgs: "-o ConnectTimeout=30 -o StrictHostKeyChecking=no"
+          rsyncArgs: "--exclude=server.cjs --exclude=server.cjs.map"
+
+      - name: Deployment summary
+        run: |
+          echo "### Hostinger deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "Uploaded \`dist/\` to \`${HOSTINGER_FTP_REMOTE_DIR}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "If the site looks old: hPanel → Cache Manager → Purge, then Ctrl+Shift+R." >> "$GITHUB_STEP_SUMMARY"
