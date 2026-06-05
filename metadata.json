@@ -2,5 +2,5 @@
   "name": "SchoolixiQ - نظام إدارة المدارس",
   "description": "منصة متكاملة لإدارة المدارس ورياض الأطفال في العراق، تدعم الإدارة، المعلمين، وأولياء الأمور مع نظام دفع ZainCash.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

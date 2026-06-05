@@ -549,11 +549,18 @@ export default function Login() {
   });
   const [showClientIdConfig, setShowClientIdConfig] = useState<boolean>(false);
 
-  // Check if running as native Capacitor app on Android/iOS
+  const [bypassWebViewCheck, setBypassWebViewCheck] = useState<boolean>(false);
+
+  // Check if running as native Capacitor app on Android/iOS (supports localhost, file, capacitor protocols, or injected Capacitor bridge)
   const isNativeApp = 
     window.location.hostname === "localhost" || 
     window.location.protocol.startsWith("capacitor") || 
-    window.location.protocol.startsWith("file");
+    window.location.protocol.startsWith("file") ||
+    (typeof window !== "undefined" && (
+      !!(window as any).Capacitor || 
+      !!(window as any).webkit?.messageHandlers?.Capacitor || 
+      (window.navigator && window.navigator.userAgent && window.navigator.userAgent.includes("Capacitor"))
+    ));
 
   // Check if running in a third-party iframe (e.g. AI Studio development/shared preview)
   const inIframe = typeof window !== "undefined" && window.self !== window.top;
@@ -573,13 +580,26 @@ export default function Login() {
     }
   }, []);
 
-  const handleGoogleAuth = async () => {
+  const handleGoogleAuth = async (forceBypass = false) => {
     setUnauthorizedDomainError(null);
     setShowIframeHint(false);
     setFirebaseProviderError(null);
     setNativePlatformNotice(false);
 
-    if (isInsideWebView && !isNativeApp) {
+    if (isInsideWebView && !isNativeApp && !bypassWebViewCheck && !forceBypass) {
+      const ua = typeof window !== "undefined" && window.navigator ? window.navigator.userAgent || "" : "";
+      const isAndroid = /Android/i.test(ua);
+      if (isAndroid) {
+        // Automatically attempt to escape WebView on Android using Google Chrome Intent
+        const currentUrlNoScheme = window.location.href.replace(/^https?:\/\//, "");
+        const intentUrl = `intent://${currentUrlNoScheme}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
+        
+        toast.loading(isRtl ? "جاري فتح متصفح Chrome الخارجي لتسجيل الدخول بأمان..." : "Opening Google Chrome browser to sign in securely...");
+        setTimeout(() => {
+          window.location.href = intentUrl;
+        }, 800);
+        return;
+      }
       setShowWebviewDialog(true);
       return;
     }
@@ -639,7 +659,33 @@ export default function Login() {
       window.sessionStorage.setItem("pendingGoogleRole", role);
       window.sessionStorage.setItem("pendingGoogleMode", mode);
       
-      const result = await signInWithPopup(auth, provider);
+      if (inIframe) {
+        toast.loading(isRtl ? "جاري تحويلك الآمن لتسجيل الدخول بـ Google..." : "Navigating securely to Google Sign-In redirect...");
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      let result;
+      try {
+        result = await signInWithPopup(auth, provider);
+      } catch (popupErr: any) {
+        const pCode = popupErr.code || "";
+        const pMsg = popupErr.message || "";
+        if (
+          pCode === "auth/popup-blocked" || 
+          pCode === "auth/popup-closed-by-user" || 
+          pCode === "auth/cancelled-popup-request" ||
+          pMsg.includes("popup-blocked") ||
+          pMsg.includes("popup-closed") ||
+          pMsg.includes("cancelled-popup-request")
+        ) {
+          toast.loading(isRtl ? "تم حظر النافذة المنبثقة. جاري تحويلك لتسجيل الدخول بأمان..." : "Popup blocked. Redirecting securely inside the same tab...");
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupErr;
+      }
+
       if (result && result.user) {
         await processGoogleUser(result.user, role, mode);
         toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
@@ -2317,7 +2363,7 @@ export default function Login() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-[2rem] w-full max-w-lg p-6 sm:p-8 text-right shadow-2xl border-2 border-red-100 flex flex-col gap-6 relative"
+              className="bg-white rounded-[2rem] w-full max-w-lg p-6 sm:p-8 text-right shadow-2xl border-2 border-rose-100 flex flex-col gap-6 relative"
             >
               <button
                 onClick={() => setShowWebviewDialog(false)}
@@ -2335,40 +2381,93 @@ export default function Login() {
                   تنبيه: متصفح غير مدعوم من Google
                 </h3>
                 <p className="text-slate-600 text-sm leading-relaxed">
-                  أنت تتصفح حالياً من خلال متصفح مدمج داخل أحد التطبيقات (مثل واتساب، تلغرام، فيسبوك، أو انستغرام).
+                  أنت تتصفح حالياً من داخل تطبيق مدمج (مثل واتساب، تلغرام، فيسبوك، أو انستغرام).
                   <br />
                   <strong className="text-red-600 font-bold block mt-2">
-                    تمنع شركة Google تسجيل الدخول بأي حساب من داخل هذه المتصفحات المدمجة (Disallowed Useragent 403) لأسباب أمنية.
+                    تمنع شركة Google تسجيل الدخول بأي حساب من داخل المتصفحات المدمجة (Disallowed Useragent 403) للحماية والأمان.
                   </strong>
                 </p>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 text-xs sm:text-sm space-y-3">
-                <h4 className="font-bold text-slate-800 text-sm">
-                  💡 لحل المشكلة بسهولة اتبع أحد الخيارين:
-                </h4>
-                <ul className="text-xs text-slate-500 space-y-2 pr-4 pl-0 list-decimal leading-relaxed">
-                  <li>
-                    اضغط على <strong>الثلاث نقاط</strong> (أو القائمة/السهم) في الزاوية العلوية للمتصفح الحالي، ثم اختر <strong>"الفتح في متصفح خارجي"</strong> أو <strong>"Open in Chrome/Safari"</strong>.
-                  </li>
-                  <li>
-                    أو قم <strong>بنسخ الرابط</strong> أدناه، ثم افتح متصفحك الأساسي (مثل Chrome على الأندرويد، أو Safari على الـ iPhone) والصق الرابط هناك لتسجيل الدخول بأمان بـ Google.
-                  </li>
-                </ul>
+              {/* Dynamic Content Based on Platform */}
+              {(() => {
+                const ua = typeof window !== "undefined" && window.navigator ? window.navigator.userAgent || "" : "";
+                const isAndroid = /Android/i.test(ua);
+                
+                if (isAndroid) {
+                  return (
+                    <div className="space-y-4">
+                      <div className="bg-emerald-50/55 p-4 rounded-xl border border-emerald-100 text-slate-700 text-xs sm:text-sm">
+                        <h4 className="font-extrabold text-emerald-900 text-sm mb-1">
+                          💡 ميزة الدخول التلقائي للأندرويد:
+                        </h4>
+                        <p className="text-slate-600 leading-relaxed font-medium">
+                          يمكننا فتح منصة SchoolixiQ تلقائياً في متصفح Google Chrome الرسمي والآمن على جهازك لتتمكن من التسجيل بضغطة واحدة وبسرعة فائقة.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentUrlNoScheme = window.location.href.replace(/^https?:\/\//, "");
+                          const intentUrl = `intent://${currentUrlNoScheme}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
+                          window.location.href = intentUrl;
+                        }}
+                        className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black py-4 px-4 rounded-2xl transition-all shadow-md active:scale-95 text-sm sm:text-base cursor-pointer"
+                      >
+                        🚀 فتح تلقائي في متصفح Chrome الآن
+                      </button>
+                    </div>
+                  );
+                } else {
+                  // iOS Safari Guide
+                  return (
+                    <div className="bg-indigo-50/40 p-5 rounded-2xl border border-indigo-100 text-slate-700 text-xs sm:text-sm space-y-3">
+                      <h4 className="font-bold text-indigo-950 text-sm">
+                        🍎 طريقة الدخول السريع لأجهزة iPhone:
+                      </h4>
+                      <ul className="text-xs text-slate-600 space-y-2.5 pr-4 pl-0 list-decimal leading-relaxed font-medium">
+                        <li>
+                          اضغط على زر <strong className="text-indigo-600">القائمة (•••)</strong> أو <strong className="text-indigo-600">زر المشاركة</strong> في الزاوية العلوية أو السفلية للمتصفح الحالي.
+                        </li>
+                        <li>
+                          اختر <strong className="text-indigo-600">"الفتح في متصفح خارجي"</strong> أو <strong className="text-indigo-600">"Open in Safari"</strong> لتفعيل تسجيل دخول Google بضغطة واحدة وأمان كامل.
+                        </li>
+                        <li>
+                          أو يمكنك نسخ الرابط المباشر أدناه وفتحه بمتصفح Safari الأصلي.
+                        </li>
+                      </ul>
+                    </div>
+                  );
+                }
+              })()}
+
+              <div className="border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setBypassWebViewCheck(true);
+                    setShowWebviewDialog(false);
+                    await handleGoogleAuth(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 font-black py-3 px-4 rounded-xl border border-dashed border-slate-200 hover:border-slate-300 transition-all text-xs cursor-pointer"
+                >
+                  🌐 محاولة تسجيل الدخول بـ Google مباشرة داخل هذا التطبيق (للنسخ المعدلة)
+                </button>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 mt-2">
+              <div className="flex flex-col sm:flex-row gap-3 mt-1">
                 <button
                   type="button"
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(window.location.href);
-                      toast.success("تم نسخ الرابط بنجاح! الصقه في Chrome أو Safari.");
+                      toast.success("تم نسخ الرابط! الصقه في Chrome أو Safari.");
                     } catch (err) {
                       toast.error("فشل نسخ الرابط، يرجى نسخه يدوياً.");
                     }
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md active:scale-95 text-sm"
+                  className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md active:scale-95 text-sm cursor-pointer"
                 >
                   <Copy size={16} />
                   <span>نسخ رابط المنصة</span>
@@ -2376,7 +2475,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowWebviewDialog(false)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all text-sm"
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 px-6 rounded-xl transition-all text-sm cursor-pointer"
                 >
                   إغلاق وتجربة خيارات أخرى
                 </button>
