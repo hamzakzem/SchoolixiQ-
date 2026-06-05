@@ -94,6 +94,48 @@ export default function TeacherDashboard() {
   const { profile, schoolData } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>("home");
+
+  useEffect(() => {
+    const handlePendingRedirect = () => {
+      const pendingType = localStorage.getItem('schoolix_pending_tab_redirect');
+      if (pendingType) {
+        localStorage.removeItem('schoolix_pending_tab_redirect');
+        
+        switch (pendingType) {
+          case 'homework':
+            setActiveTab('homework');
+            break;
+          case 'grade':
+          case 'grades':
+            setActiveTab('grades');
+            break;
+          case 'behavior':
+            setActiveTab('behavior');
+            break;
+          case 'announcement':
+            setActiveTab('home');
+            break;
+          case 'message':
+          case 'chat':
+            setActiveTab('chat');
+            break;
+          case 'report':
+            setActiveTab('reports');
+            break;
+          default:
+            setActiveTab('home');
+            break;
+        }
+      }
+    };
+
+    handlePendingRedirect();
+    window.addEventListener('schoolix_tab_redirect', handlePendingRedirect);
+    return () => {
+      window.removeEventListener('schoolix_tab_redirect', handlePendingRedirect);
+    };
+  }, []);
+
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [schoolName, setSchoolName] = useState<string>("");

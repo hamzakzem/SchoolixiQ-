@@ -30,7 +30,7 @@ export const AudioNotificationManager: React.FC = () => {
   }, []);
 
   // Helper trigger for HTML5 background native notification
-  const triggerNativeNotification = (title: string, body: string, tag?: string) => {
+  const triggerNativeNotification = (title: string, body: string, type: string, tag?: string) => {
     if (
       typeof window !== "undefined" &&
       "Notification" in window &&
@@ -46,6 +46,10 @@ export const AudioNotificationManager: React.FC = () => {
         notif.onclick = () => {
           window.focus();
           notif.close();
+          if (type) {
+            localStorage.setItem('schoolix_pending_tab_redirect', type);
+            window.dispatchEvent(new CustomEvent('schoolix_tab_redirect', { detail: { type } }));
+          }
         };
       } catch (err) {
         console.warn("Could not dispatch native Notification:", err);
@@ -90,7 +94,7 @@ export const AudioNotificationManager: React.FC = () => {
           }
 
           // Trigger OS native notification banners in background
-          triggerNativeNotification(title, msg, change.doc.id);
+          triggerNativeNotification(title, msg, type, change.doc.id);
         }
       });
     };
@@ -143,7 +147,7 @@ export const AudioNotificationManager: React.FC = () => {
                 : `School: ${schoolName} - Please review the dashboard to approve.`;
               
               playSubscriptionNotificationSound();
-              triggerNativeNotification(title, body, change.doc.id);
+              triggerNativeNotification(title, body, "system", change.doc.id);
             }
           });
         },
@@ -175,7 +179,7 @@ export const AudioNotificationManager: React.FC = () => {
                 : `Client: ${customerName} - Package: ${packageName}`;
 
               playSubscriptionNotificationSound();
-              triggerNativeNotification(title, body, change.doc.id);
+              triggerNativeNotification(title, body, "tuition", change.doc.id);
             }
           });
         },
@@ -205,7 +209,7 @@ export const AudioNotificationManager: React.FC = () => {
                 : `School: ${schoolName} - Please process the subscription request.`;
 
               playSubscriptionNotificationSound();
-              triggerNativeNotification(title, body, change.doc.id);
+              triggerNativeNotification(title, body, "system", change.doc.id);
             }
           });
         },
@@ -250,7 +254,7 @@ export const AudioNotificationManager: React.FC = () => {
             playPremiumNotificationSound();
 
             // Trigger OS native notification banners
-            triggerNativeNotification(title, body, change.doc.id);
+            triggerNativeNotification(title, body, "message", change.doc.id);
           }
         });
       },

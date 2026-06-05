@@ -536,6 +536,7 @@ export default function Login() {
   >(null);
   const [showIframeHint, setShowIframeHint] = useState<boolean>(false);
   const [showWebviewDialog, setShowWebviewDialog] = useState<boolean>(false);
+  const [showGoogleTroubleshoot, setShowGoogleTroubleshoot] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showSubscriptionPassword, setShowSubscriptionPassword] = useState<boolean>(false);
   const [firebaseProviderError, setFirebaseProviderError] = useState<
@@ -730,6 +731,7 @@ export default function Login() {
         );
         toast.error(t("failedConnection"));
       }
+      setShowGoogleTroubleshoot(true);
       setLoading(false);
     }
   };
@@ -1593,6 +1595,14 @@ export default function Login() {
               </span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => setShowGoogleTroubleshoot(true)}
+              className="mt-2 text-xs text-blue-600 hover:text-slate-800 dark:text-blue-400 font-bold flex items-center justify-center gap-1 mx-auto transition-all underline decoration-dashed bg-transparent border-0 cursor-pointer"
+            >
+              <span>{isRtl ? "هل تواجه خطأ Google 403 أو مشكلة بالدخول؟ اضغط هنا للحل الفوري" : "Having Google 403 or auth issues? Click for instant help"}</span>
+            </button>
+
             {isInsideWebView && (
               <div
                 id="webview-warning-banner"
@@ -2357,6 +2367,150 @@ export default function Login() {
       </div>
 
       <AnimatePresence>
+        {showGoogleTroubleshoot && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md overflow-y-auto" dir={isRtl ? "rtl" : "ltr"}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-2xl p-6 sm:p-8 text-right shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col gap-5 relative my-8"
+            >
+              <button
+                type="button"
+                onClick={() => setShowGoogleTroubleshoot(false)}
+                className="absolute top-4 left-4 p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all z-10"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/50 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto">
+                <ShieldCheck size={28} />
+              </div>
+
+              <div className="text-center">
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-2">
+                  {isRtl ? "دليل حل مشاكل تسجيل دخول Google" : "Google Sign-In Troubleshooting Guide"}
+                </h3>
+                <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
+                  {isRtl
+                    ? "خطوات معالجة خطأ 403 والمشاكل الشائعة على الهواتف والكمبيوتر 100%"
+                    : "Step-by-step solutions to solve 403 and configuration errors on PC & Mobile"}
+                </p>
+              </div>
+
+              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar text-right">
+                
+                {/* 1. Error 403 / Testing Mode */}
+                <div className="p-4 rounded-xl bg-amber-50/55 dark:bg-amber-950/20 border border-amber-200/40 dark:border-amber-900/30">
+                  <div className="flex items-center gap-3 justify-start flex-row-reverse mb-2">
+                    <ShieldAlert className="text-amber-500 shrink-0" size={18} />
+                    <h4 className="font-extrabold text-amber-950 dark:text-amber-400 text-sm">
+                      {isRtl ? "1. خطأ 403: ليس لديك صلاحية الدخول (Access Denied)" : "1. Error 403: Access Denied / App in Testing"}
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pr-6">
+                    {isRtl
+                      ? "هذا الخطأ يحدث عندما يكون تطبيق Google Cloud في وضع «التجريب (Testing)»."
+                      : "This error occurs when your Google Cloud Console project is left in \"Testing\" state."}
+                  </p>
+                  <ul className="text-xs text-slate-600 dark:text-slate-400 list-disc pr-10 pl-0 mt-2 space-y-1">
+                    <li>
+                      {isRtl
+                        ? "اذهب إلى Google Cloud Console -> ثم OAuth consent screen."
+                        : "Go to Google Cloud Console -> OAuth consent screen."}
+                    </li>
+                    <li>
+                      {isRtl
+                        ? "قم بتغيير حالة النشر من «Testing» إلى «Production»."
+                        : "Change the publishing status from 'Testing' to 'Production' to enable global logins."}
+                    </li>
+                    <li>
+                      {isRtl
+                        ? "أو قم بإضافة البريد الإلكتروني الذي تحاول الدخول به تحت قائمة «Test Users»."
+                        : "Alternatively, add your candidate email to the 'Test Users' list."}
+                    </li>
+                  </ul>
+                </div>
+
+                {/* 2. Embedded WebViews */}
+                <div className="p-4 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/40 dark:border-rose-900/30">
+                  <div className="flex items-center gap-3 justify-start flex-row-reverse mb-2">
+                    <ShieldAlert className="text-rose-500 shrink-0" size={18} />
+                    <h4 className="font-extrabold text-rose-950 dark:text-rose-400 text-sm">
+                      {isRtl ? "2. خطأ 403: متصفح WebView مدمج (Disallowed Useragent)" : "2. Error 403: Disallowed Useragent (Inside WebViews)"}
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pr-6">
+                    {isRtl
+                      ? "تمنع شركة Google تسجيل الدخول بأي حساب من داخل المتصفحات المدمجة (انستقرام، فيسبوك، واتساب) لأسباب أمنية."
+                      : "Google blocks OAuth logins inside embedded browsers (like inside WhatsApp, Telegram, Instagram)."}
+                  </p>
+                  <div className="mt-2 pr-6 flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowGoogleTroubleshoot(false);
+                        setShowWebviewDialog(true);
+                      }}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-bold underline bg-transparent cursor-pointer"
+                    >
+                      {isRtl ? "عرض خطوات فتح الرابط خارج التطبيق ↗" : "View steps to open link in Safari/Chrome ↗"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Package IDs & SHA-1 Fingerprints */}
+                <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/40 dark:border-blue-900/30">
+                  <div className="flex items-center gap-3 justify-start flex-row-reverse mb-2">
+                    <Smartphone className="text-blue-500 shrink-0" size={18} />
+                    <h4 className="font-extrabold text-blue-950 dark:text-blue-400 text-sm">
+                      {isRtl ? "3. تهيئة تطبيقات الهاتف (Android & iOS)" : "3. Android & iOS Native Configuration"}
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pr-6">
+                    {isRtl
+                      ? "إذا كنت تستخدم نسخة تطبيق مثبتة وتواجه خطأ المطور (developer_error):"
+                      : "If you're running a compiled native application and get a developer_error:"}
+                  </p>
+                  <ul className="text-xs text-slate-600 dark:text-slate-400 list-disc pr-10 pl-0 mt-2 space-y-1">
+                    <li>
+                      {isRtl
+                        ? "قم بتسجيل بصمة SHA-1 و SHA-256 الخاصة بك داخل منصة Firebase في إعدادات تطبيق Android."
+                        : "You must add your build's SHA-1 and SHA-256 fingerprints to your application settings in Firebase Console."}
+                    </li>
+                  </ul>
+                </div>
+
+                {/* 4. Alternate Option (Email/Password) */}
+                <div className="p-4 rounded-xl bg-emerald-50/55 dark:bg-emerald-950/20 border border-emerald-200/40 dark:border-emerald-900/30">
+                  <div className="flex items-center gap-3 justify-start flex-row-reverse mb-2">
+                    <Info className="text-emerald-500 shrink-0" size={18} />
+                    <h4 className="font-extrabold text-emerald-950 dark:text-emerald-400 text-sm">
+                      {isRtl ? "4. البديل الفوري: التسجيل بالبريد الإلكتروني" : "4. Fast Alternative: Email & Password Sign-In"}
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pr-6">
+                    {isRtl
+                      ? "تسجيل البريد الإلكتروني وكلمة المرور مباشر ويعمل 100% بنقرة واحدة دون الحاجة لكل إعدادات جوجل. يمكنك الحساب به في ثوانٍ!"
+                      : "Direct email and password login runs perfectly on all devices without any Google Console setup."}
+                  </p>
+                </div>
+
+              </div>
+
+              <div className="mt-2 flex gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleTroubleshoot(false)}
+                  className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 text-xs sm:text-sm rounded-xl font-bold transition-all active:scale-95 cursor-pointer"
+                >
+                  {isRtl ? "إغلاق وإكمال الدخول" : "Close and return to sign in"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {showWebviewDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md" dir="rtl">
             <motion.div

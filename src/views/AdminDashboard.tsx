@@ -134,6 +134,55 @@ export default function AdminDashboard() {
   const { t, isRtl, language, setLanguage } = useLanguage();
   const { config } = useSystemConfig();
   const [activeTab, setActiveTab] = useState("overview");
+
+  useEffect(() => {
+    const handlePendingRedirect = () => {
+      const pendingType = localStorage.getItem('schoolix_pending_tab_redirect');
+      if (pendingType) {
+        localStorage.removeItem('schoolix_pending_tab_redirect');
+        
+        switch (pendingType) {
+          case 'homework':
+            setActiveTab('homework');
+            break;
+          case 'grade':
+          case 'grades':
+            setActiveTab('grades');
+            break;
+          case 'payment':
+          case 'tuition':
+            setActiveTab('tuition');
+            break;
+          case 'behavior':
+            setActiveTab('behavior');
+            break;
+          case 'announcement':
+            setActiveTab('announcements');
+            break;
+          case 'message':
+          case 'chat':
+            setActiveTab('chat');
+            break;
+          case 'attendance':
+            setActiveTab('attendance');
+            break;
+          case 'report':
+            setActiveTab('evaluation_reports');
+            break;
+          default:
+            setActiveTab('overview');
+            break;
+        }
+      }
+    };
+
+    handlePendingRedirect();
+    window.addEventListener('schoolix_tab_redirect', handlePendingRedirect);
+    return () => {
+      window.removeEventListener('schoolix_tab_redirect', handlePendingRedirect);
+    };
+  }, []);
+
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -1420,6 +1469,18 @@ export default function AdminDashboard() {
                 <div className="w-9 h-9 md:w-11 md:h-11 bg-slate-900 dark:bg-slate-800 rounded-xl md:rounded-2xl flex items-center justify-center text-white font-bold border border-slate-800 dark:border-slate-700 shadow-md">
                   {profile?.name?.[0]}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(isRtl ? "هل أنت متأكد من تسجيل الخروج من منصة المدرسة؟" : "Are you sure you want to log out from the school dashboard?")) {
+                      auth.signOut();
+                    }
+                  }}
+                  title={isRtl ? "تسجيل الخروج" : "Sign Out"}
+                  className="w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/40 dark:text-rose-400 flex items-center justify-center transition-all duration-300 active:scale-95 border border-rose-100 hover:border-transparent dark:border-rose-900/30 cursor-pointer shrink-0"
+                >
+                  <LogOut size={16} />
+                </button>
               </div>
             </div>
           </div>

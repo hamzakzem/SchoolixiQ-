@@ -13,7 +13,7 @@ export interface SoundProfile {
 export type NotificationCategory = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'homework' | 'report' | 'system' | 'message';
 
 export interface UserSoundSettings {
-  profile: 'crystal' | 'minimal' | 'relaxing' | 'modern';
+  profile: 'crystal' | 'minimal' | 'relaxing' | 'modern' | 'loud_bell';
   volume: number; // 0.0 to 1.0
   mutedCategories: NotificationCategory[];
   pitchAdjust: number; // -300 to +300 Hz
@@ -23,8 +23,8 @@ export interface UserSoundSettings {
 const SETTINGS_KEY = 'schoolix_notification_sound_settings_v2';
 
 const DEFAULT_SETTINGS: UserSoundSettings = {
-  profile: 'crystal',
-  volume: 0.7,
+  profile: 'loud_bell',
+  volume: 1.0,
   mutedCategories: [],
   pitchAdjust: 0,
 };
@@ -97,8 +97,11 @@ export function playCategorizedSound(category: NotificationCategory, testSetting
       playRelaxingProfile(ctx, masterVolume, category, pitchShift);
       break;
     case 'modern':
-    default:
       playModernProfile(ctx, masterVolume, category, pitchShift);
+      break;
+    case 'loud_bell':
+    default:
+      playLoudBellProfile(ctx, masterVolume, category, pitchShift);
       break;
   }
 }
@@ -282,6 +285,89 @@ function playModernProfile(ctx: AudioContext, destination: AudioNode, category: 
 
   osc1.stop(now + 0.3);
   osc2.stop(now + 0.25);
+}
+
+/**
+ * Elegant High-Volume Electronic Chime with rich lingering resonance and acoustic vibrato.
+ * Perfect for being heard loudly and clearly on all devices.
+ */
+function playLoudBellProfile(ctx: AudioContext, destination: AudioNode, category: NotificationCategory, pitchShift: number) {
+  const now = ctx.currentTime;
+
+  // Dual harmonious tones with high penetration frequency (ding-dong effect)
+  let firstTone = 659.25; // E5 (bright, penetrating)
+  let secondTone = 880.00; // A5 (noble, resonating)
+
+  if (category === 'payment' || category === 'system') {
+    firstTone = 587.33; // D5
+    secondTone = 783.99; // G5
+  } else if (category === 'behavior' || category === 'homework') {
+    firstTone = 523.25; // C5
+    secondTone = 659.25; // E5
+  } else if (category === 'message') {
+    firstTone = 783.99; // G5
+    secondTone = 1046.50; // C6 (high clear chirp)
+  }
+
+  const f1 = Math.max(100, firstTone + pitchShift);
+  const f2 = Math.max(120, secondTone + pitchShift);
+
+  // Play Tone 1 (Ding)
+  playBellComponent(ctx, destination, f1, now, 0.8);
+  // Play Tone 2 (Dong) slightly delayed
+  playBellComponent(ctx, destination, f2, now + 0.12, 1.2);
+}
+
+function playBellComponent(ctx: AudioContext, destination: AudioNode, frequency: number, startTime: number, duration: number) {
+  const osc = ctx.createOscillator();
+  const subOsc = ctx.createOscillator();
+  const metalOsc = ctx.createOscillator();
+  
+  const gainNode = ctx.createGain();
+  const lfo = ctx.createOscillator();
+  const lfoGain = ctx.createGain();
+
+  // Create a fast, natural shivering vibrato
+  lfo.frequency.setValueAtTime(9, startTime); // 9Hz shivering ring
+  lfoGain.gain.setValueAtTime(8, startTime); // 8Hz deviation
+  lfo.connect(lfoGain);
+  lfoGain.connect(osc.frequency);
+  lfoGain.connect(subOsc.frequency);
+
+  // Primary tone carries crisp warm energy
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(frequency, startTime);
+
+  // Sub tone (one octave lower) gives deep majestic weight
+  subOsc.type = 'sine';
+  subOsc.frequency.setValueAtTime(frequency * 0.5, startTime);
+
+  // High metallic glass chime overtone
+  metalOsc.type = 'sine';
+  metalOsc.frequency.setValueAtTime(frequency * 2.501, startTime); // detuned perfect fifth above octave
+
+  // Set gain profile with powerful initial surge and long echoing decay
+  gainNode.gain.setValueAtTime(0, startTime);
+  gainNode.gain.linearRampToValueAtTime(0.35, startTime + 0.012); // instant crisp strike
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration); // long ringing resonance
+
+  osc.connect(gainNode);
+  subOsc.connect(gainNode);
+  metalOsc.connect(gainNode);
+  
+  gainNode.connect(destination);
+
+  // Trigger sound
+  lfo.start(startTime);
+  osc.start(startTime);
+  subOsc.start(startTime);
+  metalOsc.start(startTime);
+
+  // Stop everything neatly
+  lfo.stop(startTime + duration + 0.1);
+  osc.stop(startTime + duration + 0.1);
+  subOsc.stop(startTime + duration + 0.1);
+  metalOsc.stop(startTime + duration + 0.1);
 }
 
 // Deprecated Sound Chime APIs - Retained for backward-compatibility with other dashboard views.

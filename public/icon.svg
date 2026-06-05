@@ -1,94 +1,105 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <!-- Premium Navy Blue Gradient -->
-    <linearGradient id="navy-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#07172E" />
-      <stop offset="50%" stop-color="#0B2345" />
-      <stop offset="100%" stop-color="#1E3E6B" />
+    <!-- Elegant Deep Navy Royal Blue Gradient -->
+    <linearGradient id="schoolix-navy-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B2345" />
+      <stop offset="50%" stop-color="#07172E" />
+      <stop offset="100%" stop-color="#020914" />
     </linearGradient>
     
-    <!-- Premium Gold Gradient -->
-    <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#EBC475" />
-      <stop offset="55%" stop-color="#D4A64A" />
-      <stop offset="100%" stop-color="#A57D32" />
+    <!-- Rich Premium Golden Metallic Gradient -->
+    <linearGradient id="schoolix-gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5C453" />
+      <stop offset="50%" stop-color="#D4A64A" />
+      <stop offset="100%" stop-color="#AC7E2D" />
     </linearGradient>
     
     <filter id="luxury-shadow" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0B2345" flood-opacity="0.15" />
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0B2345" flood-opacity="0.12" />
     </filter>
   </defs>
 
-  <!-- Container background fallback for square icons and standard launchers (subtle off-white) -->
+  {/* Container background rounded card for standard mobile device launchers */}
   <rect width="512" height="512" rx="128" fill="#FFFFFF" />
 
-  <!-- The Main Geometric Hexagon Logo -->
-  <g filter="url(#luxury-shadow)" transform="translate(16, 16) scale(0.9375)">
-    <!-- Main Navy Hexagon Base & Segments -->
-    <!-- Top-Left Segment (Navy Blue) -->
-    <path d="M 256,50 
-             L 115,131.5
-             C 105,137 100,147 100,158
-             L 100,225
-             L 220,155
-             C 230,149 242,149 252,155
-             L 370,224
-             L 370,165
-             C 370,155 365,145 355,140
-             L 256,50 Z" 
-          fill="url(#navy-grad)" />
+  {/* Scale and translate the new stylized S Hexagon Logo to sit perfectly centered */}
+  <g filter="url(#luxury-shadow)" transform="translate(56, 56) scale(0.8)">
+    {/* Main S-Shape (Navy Blue Body) */}
+    <path 
+      d="M 250,35
+         L 415,130
+         C 423,135 428,144 428,154
+         L 428,346
+         C 428,356 423,365 415,370
+         L 250,465
+         C 242,470 232,470 224,465
+         L 59,370
+         C 51,365 46,356 46,346
+         L 46,154
+         C 46,144 51,135 59,130
+         L 224,35
+         C 232,30 242,30 250,35
+         Z" 
+      fill="url(#schoolix-navy-grad)" 
+    />
 
-    <!-- Bottom-Right Segment (Navy Blue) -->
-    <path d="M 256,430
-             L 397,348.5
-             C 407,343 412,333 412,322
-             L 412,255
-             L 292,325
-             C 282,331 270,331 260,325
-             L 142,256
-             L 142,315
-             C 142,325 147,335 157,340
-             L 256,430 Z" 
-          fill="url(#navy-grad)" />
+    {/* Top-Right Golden Wing Segment */}
+    <path 
+      d="M 292,52
+         L 410,120
+         C 416,124 420,131 420,138
+         L 420,224
+         C 420,230 412,233 408,229
+         L 290,161
+         C 284,157 280,150 280,143
+         L 280,57
+         C 280,51 288,48 292,52
+         Z" 
+      fill="url(#schoolix-gold-grad)" 
+    />
 
-    <!-- Top-Right Corner Highlight (Gold) -->
-    <path d="M 285,55
-             L 370,105
-             C 380,111 385,121 385,132
-             L 385,185
-             L 285,127
-             Z" 
-          fill="url(#gold-grad)" />
+    {/* Bottom-Left Golden Wing Segment */}
+    <path 
+      d="M 208,448
+         L 90,380
+         C 84,376 80,369 80,362
+         L 80,276
+         C 80,270 88,267 92,271
+         L 210,339
+         C 216,343 220,350 220,357
+         L 220,443
+         C 220,449 212,452 208,448
+         Z" 
+      fill="url(#schoolix-gold-grad)" 
+    />
 
-    <!-- Bottom-Left Corner Highlight (Gold) -->
-    <path d="M 227,425
-             L 142,375
-             C 132,369 127,359 127,348
-             L 127,295
-             L 227,353
-             Z" 
-          fill="url(#gold-grad)" />
+    {/* S shape Track Overlays for clean white bounds */}
+    <path 
+      d="M 76,260 
+         L 240,354 
+         C 246,358 254,358 260,354 
+         L 424,260" 
+      stroke="#FFFFFF" 
+      stroke-width="22" 
+      stroke-linecap="round" 
+      stroke-linejoin="round" 
+    />
+    <path 
+      d="M 424,240 
+         L 260,146 
+         C 254,142 246,142 240,146 
+         L 76,240" 
+      stroke="#FFFFFF" 
+      stroke-width="22" 
+      stroke-linecap="round" 
+      stroke-linejoin="round" 
+    />
 
-    <!-- The S-Curve White Ribbon Track -->
-    <path d="M 120,205 
-             L 220,147
-             C 242,134 270,134 292,147
-             L 392,205
-             L 392,235
-             L 292,293
-             C 270,306 242,306 220,293
-             L 120,235
-             Z" 
-          fill="#FFFFFF" />
-
-    <!-- Inner Overlay Core (S-Curve Center Cut-Out, Navy Blue) -->
-    <path d="M 152,215 
-             L 230,170
-             C 246,161 266,161 282,170
-             L 360,215
-             L 292,255
-             C 270,268 242,268 220,255
-             Z" 
-          fill="url(#navy-grad)" />
+    <path 
+      d="M 250,148 L 250,352" 
+      stroke="#FFFFFF" 
+      stroke-width="22" 
+      stroke-linecap="round" 
+    />
   </g>
 </svg>

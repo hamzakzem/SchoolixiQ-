@@ -74,6 +74,54 @@ export default function ParentDashboard() {
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [students, setStudents] = useState<any[]>([]);
 
+  useEffect(() => {
+    const handlePendingRedirect = () => {
+      const pendingType = localStorage.getItem('schoolix_pending_tab_redirect');
+      if (pendingType) {
+        localStorage.removeItem('schoolix_pending_tab_redirect');
+        
+        switch (pendingType) {
+          case 'homework':
+            setActiveTab('homework');
+            break;
+          case 'grade':
+          case 'grades':
+            setActiveTab('grades');
+            break;
+          case 'payment':
+          case 'tuition':
+            setActiveTab('tuition');
+            break;
+          case 'behavior':
+            setActiveTab('behavior');
+            break;
+          case 'announcement':
+            setActiveTab('home');
+            break;
+          case 'message':
+          case 'chat':
+            setActiveTab('chat');
+            break;
+          case 'attendance':
+            setActiveTab('home');
+            break;
+          case 'report':
+            setActiveTab('reports');
+            break;
+          default:
+            setActiveTab('home');
+            break;
+        }
+      }
+    };
+
+    handlePendingRedirect();
+    window.addEventListener('schoolix_tab_redirect', handlePendingRedirect);
+    return () => {
+      window.removeEventListener('schoolix_tab_redirect', handlePendingRedirect);
+    };
+  }, []);
+
   // Enhanced tab switcher that tracks history
   const navigateToTab = (tabId: string) => {
     if (tabId === activeTab) return;
