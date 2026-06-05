@@ -190,34 +190,34 @@ export default function IdCardsAppView({
       </div>
 
       {selectedStudent ? (
-        <div className="bg-white/95 rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
-          <div className="p-3 flex items-center justify-between gap-2 border-b border-slate-100">
-            <p className="text-xs font-black text-slate-800 truncate">
-              {selectedStudent.name}
-            </p>
-            <div className="flex gap-1 shrink-0">
-              {currentCard ? (
-                <button
-                  type="button"
-                  onClick={onDeleteCard}
-                  className="p-2 rounded-lg text-red-600 bg-red-50"
-                >
-                  <Trash2 size={16} />
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={onPrintSingle}
-                disabled={!currentCard}
-                className="p-2 rounded-lg text-[#0B2345] bg-slate-100 disabled:opacity-40"
-              >
-                <Printer size={16} />
-              </button>
+        <div className="bg-white rounded-[1.35rem] border border-slate-200/80 overflow-hidden shadow-[0_10px_40px_rgba(11,35,69,0.08)]">
+          <div className="px-4 py-3 flex items-center justify-between gap-2 bg-gradient-to-b from-[#0B2345] to-[#10305a] text-white">
+            <div className="min-w-0">
+              <p className="text-sm font-black truncate">{selectedStudent.name}</p>
+              <p className="text-[11px] font-semibold text-white/60">
+                {currentCard
+                  ? isRtl
+                    ? 'هوية صادرة'
+                    : 'Card issued'
+                  : isRtl
+                    ? 'لا توجد هوية'
+                    : 'No card'}
+              </p>
             </div>
+            <span
+              className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ${
+                currentCard
+                  ? 'bg-emerald-400/20 text-emerald-300'
+                  : 'bg-white/10 text-white/50'
+              }`}
+            >
+              <ShieldCheck size={18} />
+            </span>
           </div>
-          <div className="p-4 flex justify-center min-h-[200px] items-center bg-slate-50/80">
+
+          <div className="p-4 flex justify-center min-h-[210px] items-center bg-[radial-gradient(ellipse_100%_70%_at_50%_0%,rgba(212,166,74,0.08),transparent_60%),linear-gradient(180deg,#f8fafc,#eef2f8)]">
             {currentCard ? (
-              <div className="max-w-full overflow-x-auto">
+              <div className="max-w-full overflow-x-auto custom-scrollbar rounded-xl">
                 <StudentCard
                   student={selectedStudent}
                   cardData={currentCard}
@@ -226,20 +226,28 @@ export default function IdCardsAppView({
                 />
               </div>
             ) : (
-              <div className="text-center py-6 px-4">
-                <ShieldCheck size={40} className="mx-auto text-slate-300 mb-2" />
+              <div className="text-center py-8 px-4">
+                <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
+                  <ShieldCheck size={26} className="text-slate-300" />
+                </div>
                 <p className="text-sm font-bold text-slate-500">
                   {isRtl ? 'لم تُصدر هوية بعد' : 'No card issued yet'}
+                </p>
+                <p className="text-[11px] font-medium text-slate-400 mt-1">
+                  {isRtl
+                    ? 'اضغط إصدار هوية لإضافة الصورة والتفاصيل'
+                    : 'Tap issue to add a photo and details'}
                 </p>
               </div>
             )}
           </div>
+
           <div className="p-3 flex gap-2 border-t border-slate-100">
             <MobileBtnPrimary className="flex-1" onClick={onEditCard}>
               {currentCard ? (
                 <>
                   <Edit2 size={16} />
-                  {isRtl ? 'تعديل' : 'Edit'}
+                  {isRtl ? 'تعديل الهوية' : 'Edit card'}
                 </>
               ) : (
                 <>
@@ -248,12 +256,37 @@ export default function IdCardsAppView({
                 </>
               )}
             </MobileBtnPrimary>
+            {currentCard ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onPrintSingle}
+                  className="w-12 h-[46px] rounded-2xl bg-slate-100 text-[#0B2345] flex items-center justify-center active:scale-95 transition-transform"
+                  aria-label={isRtl ? 'طباعة' : 'Print'}
+                >
+                  <Printer size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onDeleteCard}
+                  className="w-12 h-[46px] rounded-2xl bg-red-50 text-red-600 flex items-center justify-center active:scale-95 transition-transform"
+                  aria-label={isRtl ? 'حذف' : 'Delete'}
+                >
+                  <Trash2 size={18} />
+                </button>
+              </>
+            ) : null}
           </div>
         </div>
       ) : (
-        <p className="text-center text-sm text-slate-500 font-bold py-8">
-          {isRtl ? 'اختر صفاً ثم طالباً' : 'Pick a class, then a student'}
-        </p>
+        <div className="text-center py-10 px-4">
+          <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
+            <Users size={24} className="text-slate-300" />
+          </div>
+          <p className="text-sm font-bold text-slate-500">
+            {isRtl ? 'اختر صفاً ثم طالباً' : 'Pick a class, then a student'}
+          </p>
+        </div>
       )}
     </MobilePage>
   );
