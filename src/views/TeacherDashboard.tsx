@@ -947,11 +947,15 @@ export default function TeacherDashboard() {
               <LanguageToggle />
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl border transition-all flex items-center justify-center relative ${showNotifications ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white border-slate-200 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"}`}
+                className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl border transition-all duration-300 flex items-center justify-center relative group active:scale-95 shrink-0 ${
+                  showNotifications
+                    ? "bg-[#D4A64A] border-[#D4A64A] text-[#0B2345] shadow-lg shadow-[#D4A64A]/25"
+                    : "bg-[#0B2345] border-[#D4A64A]/30 text-[#D4A64A] hover:bg-[#D4A64A] hover:text-[#0B2345] hover:border-[#D4A64A]"
+                }`}
               >
-                <Bell size={18} />
+                <Bell size={18} className="transition-transform duration-300 group-hover:scale-110" />
                 {notifications.filter((n) => !n.read).length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-[#0B2345] rounded-full text-[10px] font-black text-white flex items-center justify-center">
                     {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
                   </span>
                 )}

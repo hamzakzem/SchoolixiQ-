@@ -31,7 +31,7 @@ export const ThemeToggle = () => {
     <button
       onClick={toggleTheme}
       id="theme-toggle"
-      className="w-11 h-11 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 shadow-sm transition-all active:scale-95 shrink-0"
+      className="w-11 h-11 flex items-center justify-center rounded-2xl bg-[#0B2345] hover:bg-[#D4A64A] border border-[#D4A64A]/30 hover:border-[#D4A64A] text-[#D4A64A] hover:text-[#0B2345] shadow-md shadow-[#0B2345]/10 transition-all duration-300 active:scale-95 shrink-0 group"
     >
       <AnimatePresence mode="wait">
         <motion.div
@@ -41,7 +41,11 @@ export const ThemeToggle = () => {
           exit={{ y: -10, opacity: 0, rotate: 45 }}
           transition={{ duration: 0.2 }}
         >
-          {isDark ? <Moon size={18} /> : <Sun size={18} />}
+          {isDark ? (
+            <Moon size={18} className="text-[#D4A64A] group-hover:text-[#0B2345] transition-colors duration-300" />
+          ) : (
+            <Sun size={18} className="text-[#D4A64A] group-hover:text-[#0B2345] transition-colors duration-300" />
+          )}
         </motion.div>
       </AnimatePresence>
     </button>

@@ -685,22 +685,33 @@ header input::placeholder,
 
 header button, header a, 
 [class*="header"] button, [class*="header"] a {
-  background-color: rgba(255, 255, 255, 0.08) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  color: #FFFFFF !important;
-  transition: all 0.2s ease-in-out !important;
+  background-color: #D4A64A !important;
+  border: 1px solid #D4A64A !important;
+  color: #0B2345 !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 2px 8px rgba(212, 166, 74, 0.2) !important;
+}
+
+header button *, header a *, 
+[class*="header"] button *, [class*="header"] a * {
+  color: #0B2345 !important;
+  stroke: #0B2345 !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 header button:hover, header a:hover, 
 [class*="header"] button:hover, [class*="header"] a:hover {
-  background-color: #D4A64A !important;
-  color: #0B2345 !important;
+  background-color: #0B2345 !important;
+  color: #D4A64A !important;
   border-color: #D4A64A !important;
+  box-shadow: 0 4px 12px rgba(11, 35, 69, 0.4) !important;
+  transform: translateY(-1px) !important;
 }
 
 header button:hover *, header a:hover *, 
 [class*="header"] button:hover *, [class*="header"] a:hover * {
-  color: #0B2345 !important;
+  color: #D4A64A !important;
+  stroke: #D4A64A !important;
 }
 
 /* 3. Sidebar (القائمة الجانبية) styling - Uniform Navy Blue (#0B2345) with Gold (#D4A64A) accents */
@@ -791,5 +802,79 @@ aside a:hover *, aside button:hover * {
 .text-slate-600,
 .text-gray-600 {
   color: var(--color-text-desc) !important;
+}
+
+/* Custom Table Row & List Items Professional Navy Blue Hover Rules with Elegant Transparency */
+tbody tr,
+table tbody tr,
+[role="row"] {
+  transition: background-color 0.15s ease-in-out !important;
+}
+
+/* Light Mode: Elegant very light navy #1E3A8A translucency */
+tbody tr:hover,
+table tbody tr:hover,
+[role="row"]:hover {
+  background-color: rgba(30, 58, 138, 0.04) !important;
+}
+
+/* Dark Mode: Elegant dark navy #1E293B semitransparent overlay */
+html.dark tbody tr:hover,
+html.dark table tbody tr:hover,
+html.dark [role="row"]:hover {
+  background-color: rgba(30, 41, 59, 0.4) !important;
+}
+
+/* ==========================================================================
+   Schoolix Professional Global Button & Interactive Icon Color Coordination System
+   ========================================================================== */
+
+/* 1. Global Interactive Transitions and Button Alignment */
+button, 
+[role="button"], 
+a[class*="btn"], 
+button[class*="btn"],
+.btn {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 2. Support for general icons globally across lists, cards, headers, navbars and sidebar links */
+/* Standard Icon color is Navy (#0B2345), with transitioning effect */
+svg[class*="lucide"],
+.lucide,
+svg {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Hovering over elements, lists, or the icons themselves turns them Gold (#D4A64A) */
+svg:hover,
+svg:hover *,
+[class*="lucide"]:hover,
+[class*="lucide"]:hover *,
+a:hover svg,
+a:hover svg *,
+div[role="row"]:hover svg,
+div[role="row"]:hover svg *,
+tr:hover svg,
+tr:hover svg * {
+  color: #D4A64A !important;
+  stroke: #D4A64A !important;
+}
+
+/* Preserve specific Sidebar gold/white contrast on active states to maintain layout fidelity */
+aside *, [class*="aside"] *, [class*="Sidebar"] * {
+  /* Let sidebar links handle their own states */
+}
+aside .active-menu-item svg,
+aside .active-menu-item svg *,
+aside [class*="bg-white"] svg,
+aside [class*="bg-white"] svg * {
+  color: #0B2345 !important;
+  stroke: #0B2345 !important;
+}
+aside a:hover svg,
+aside a:hover svg * {
+  color: #D4A64A !important;
+  stroke: #D4A64A !important;
 }
 
