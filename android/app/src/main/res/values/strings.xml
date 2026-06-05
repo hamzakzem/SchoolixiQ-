@@ -4,4 +4,5 @@
     <string name="title_activity_main">Schoolix</string>
     <string name="package_name">com.schoolix.app</string>
     <string name="custom_url_scheme">com.schoolix.app</string>
+    <string name="server_client_id">377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com</string>
 </resources>

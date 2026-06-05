@@ -1,0 +1,34 @@
+{
+  "project_info": {
+    "project_number": "377979165565",
+    "project_id": "yala-safari-iq",
+    "storage_bucket": "yala-safari-iq.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:377979165565:android:bdbd4af86e80508e40fd",
+        "android_client_info": {
+          "package_name": "com.schoolix.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1-Wp-pVMceqVrpNlj--mdA5OXq236XdU"
+        }
+      ],
+      "services": {
+        "appdetect_service": {
+          "status": 1
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
