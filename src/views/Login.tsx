@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { auth, db } from "../lib/firebase";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  sendEmailVerification,
-  signInWithCredential,
-} from "firebase/auth";
+import { db } from "../lib/firebase";
 import {
   doc,
   getDoc,
@@ -59,7 +48,18 @@ import { toast } from "react-hot-toast";
 import { UserRole } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
-import { AppError, normalizeError } from "../lib/AppError";
+import {
+  classifyAuthError,
+  getAuthErrorMessage,
+  isInAppWebView,
+  isNativeApp,
+  openAndroidChromeIntent,
+  authenticateWithGoogle,
+  resetPassword,
+  signInWithEmail,
+  signUpWithEmail,
+  validatePasswordComplexity,
+} from "../lib/auth";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
@@ -153,32 +153,6 @@ const DEFAULT_PACKAGES = [
     ],
   },
 ];
-
-const loadGsiScript = (): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    if ((window as any).google?.accounts?.oauth2) {
-      resolve((window as any).google);
-      return;
-    }
-    const existingScript = document.getElementById("gsi-sdk-script");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve((window as any).google));
-      existingScript.addEventListener("error", (e) =>
-        reject(normalizeError(e, "Failed to load Google Sign-In SDK")),
-      );
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.id = "gsi-sdk-script";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve((window as any).google);
-    script.onerror = (e) =>
-      reject(normalizeError(e, "Failed to load Google Sign-In SDK"));
-    document.head.appendChild(script);
-  });
-};
 
 export default function Login() {
   const { t, isRtl } = useLanguage();
@@ -312,153 +286,6 @@ export default function Login() {
     }, 120);
   };
 
-  // Handle post-login logic (used for both redirect result and popup result)
-  const processGoogleUser = async (
-    user: any,
-    pendingRole: string,
-    pendingMode: string,
-  ) => {
-    try {
-      setLoading(true);
-      // Check if user document exists
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-
-      if (!userDoc.exists()) {
-        const emailLower = user.email?.toLowerCase() || "";
-        const q = query(
-          collection(db, "users"),
-          where("email", "==", emailLower),
-        );
-        const querySnap = await getDocs(q);
-        let provisionedData: any = null;
-        let oldDocId = "";
-
-        if (!querySnap.empty) {
-          const found = querySnap.docs[0];
-          provisionedData = found.data();
-          oldDocId = found.id;
-        }
-
-        let isFirstUser = false;
-        try {
-          const metadataSnap = await getDoc(doc(db, "users", "metadata"));
-          isFirstUser = !metadataSnap.exists();
-        } catch (err) {}
-
-        let finalRole = isFirstUser
-          ? UserRole.SUPERADMIN
-          : provisionedData?.role || pendingRole;
-
-        if (finalRole === "superadmin" && !isFirstUser) {
-          finalRole = UserRole.ADMIN;
-        }
-
-        // Create school document if signing up as Admin via Google
-        let schoolId = provisionedData?.schoolId || "";
-        if (finalRole === UserRole.ADMIN && !schoolId) {
-          try {
-            const schoolRef = await addDoc(collection(db, "schools"), {
-              name: user.displayName || (isRtl ? "مدرسة جديدة" : "New School"),
-              phone: phone || "",
-              address: schoolAddress || "",
-              governorate: schoolGovernorate || "",
-              directorate: schoolDirectorate || "",
-              educationLevel: schoolEducationLevel || "",
-              stage: schoolEducationLevel || "",
-              workingHours: schoolWorkingHours || "",
-              shift: schoolWorkingHours || "",
-              studyType: schoolStudyType || "",
-              genderType: schoolStudyType || "",
-              estimatedStudents: Number(schoolEstimatedStudents) || 0,
-              approximateStudents: schoolEstimatedStudents || "",
-              status: "active",
-              planId: "basic",
-              studentCount: 0,
-              adminEmail: user.email,
-              adminName: user.displayName || "",
-              adminPhone: phone || "",
-              createdAt: serverTimestamp(),
-            });
-            schoolId = schoolRef.id;
-          } catch (err) {
-            console.error("Error creating school on Google Signup", err);
-          }
-        }
-
-        // Create permanent profile
-        await setDoc(doc(db, "users", user.uid), {
-          name:
-            user.displayName ||
-            provisionedData?.name ||
-            (isRtl ? "مستخدم جديد" : "New User"),
-          email: user.email,
-          role: finalRole,
-          schoolId: schoolId,
-          createdAt: new Date().toISOString(),
-          uid: user.uid,
-          photoURL: user.photoURL,
-        });
-
-        // Migrate students if needed
-        if (oldDocId && oldDocId !== user.uid) {
-          const studentsQ = query(
-            collection(db, "students"),
-            where("parentIds", "array-contains", oldDocId),
-          );
-          const studentsSnap = await getDocs(studentsQ);
-
-          const migrationPromises = studentsSnap.docs.map((studentDoc) => {
-            const currentIds = studentDoc.data().parentIds || [];
-            const updatedIds = currentIds.map((id: string) =>
-              id === oldDocId ? user.uid : id,
-            );
-            return updateDoc(doc(db, "students", studentDoc.id), {
-              parentIds: updatedIds,
-            });
-          });
-
-          await Promise.all(migrationPromises);
-          await deleteDoc(doc(db, "users", oldDocId));
-        }
-
-        if (isFirstUser) {
-          await setDoc(doc(db, "users", "metadata"), { initialized: true });
-        }
-        toast.success(isRtl ? "تم تسجيل الدخول بنجاح!" : "Login Success!");
-      } else {
-        toast.success(`${t("welcomeLabel") || "Welcome"} ${user.displayName}`);
-      }
-    } catch (error: any) {
-      console.error("Profile creation error:", error);
-      toast.error(error.message || t("failedConnection"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Check for Redirect Result (Fallback if previous redirect was initiated)
-  useEffect(() => {
-    const checkRedirectFlow = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          const pendingRole =
-            window.sessionStorage.getItem("pendingGoogleRole") ||
-            UserRole.PARENT;
-          const pendingMode =
-            window.sessionStorage.getItem("pendingGoogleMode") || "login";
-          window.sessionStorage.removeItem("pendingGoogleRole");
-          window.sessionStorage.removeItem("pendingGoogleMode");
-          await processGoogleUser(result.user, pendingRole, pendingMode);
-        }
-      } catch (error: any) {
-        console.error("Redirect check error:", error);
-        toast.error(error.message || t("failedConnection"));
-      }
-    };
-    checkRedirectFlow();
-  }, []);
-
   const handleSubscribeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!showSubscriptionModal) return;
@@ -547,43 +374,7 @@ export default function Login() {
     string | null
   >(null);
   const [nativePlatformNotice, setNativePlatformNotice] = useState<boolean>(false);
-  const [googleClientId, setGoogleClientId] = useState<string>(() => {
-    return localStorage.getItem("override_google_client_id") || 
-      import.meta.env.VITE_GOOGLE_CLIENT_ID || 
-      "377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com";
-  });
-  const [showClientIdConfig, setShowClientIdConfig] = useState<boolean>(false);
-
   const [bypassWebViewCheck, setBypassWebViewCheck] = useState<boolean>(false);
-
-  // Check if running as native Capacitor app on Android/iOS (supports localhost, file, capacitor protocols, or injected Capacitor bridge)
-  const isNativeApp = 
-    window.location.hostname === "localhost" || 
-    window.location.protocol.startsWith("capacitor") || 
-    window.location.protocol.startsWith("file") ||
-    (typeof window !== "undefined" && (
-      !!(window as any).Capacitor || 
-      !!(window as any).webkit?.messageHandlers?.Capacitor || 
-      (window.navigator && window.navigator.userAgent && window.navigator.userAgent.includes("Capacitor"))
-    ));
-
-  // Check if running in a third-party iframe (e.g. AI Studio development/shared preview)
-  const inIframe = typeof window !== "undefined" && window.self !== window.top;
-
-  // Check if inside an in-app browser WebView (e.g. WhatsApp, Facebook, Instagram, Telegram)
-  const [isInsideWebView, setIsInsideWebView] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.navigator) {
-      const ua = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || "";
-      const webviewDetected = (
-        /FB_IAB|FBAN|FBAV|Instagram|Telegram|Twitter|Line|LinkedInApp|Messenger|WhatsApp|wv|Webview|CocCoc|MicroMessenger/i.test(ua) ||
-        (ua.includes("Android") && ua.includes("Version/")) || // Android WebView
-        (ua.includes("iPhone") && !ua.includes("Safari/") && !ua.includes("CriOS") && !ua.includes("FxiOS")) // iOS WebView
-      );
-      setIsInsideWebView(webviewDetected);
-    }
-  }, []);
 
   const handleGoogleAuth = async (forceBypass = false) => {
     setUnauthorizedDomainError(null);
@@ -591,18 +382,18 @@ export default function Login() {
     setFirebaseProviderError(null);
     setNativePlatformNotice(false);
 
-    if (isInsideWebView && !isNativeApp && !bypassWebViewCheck && !forceBypass) {
-      const ua = typeof window !== "undefined" && window.navigator ? window.navigator.userAgent || "" : "";
-      const isAndroid = /Android/i.test(ua);
-      if (isAndroid) {
-        // Automatically attempt to escape WebView on Android using Google Chrome Intent
-        const currentUrlNoScheme = window.location.href.replace(/^https?:\/\//, "");
-        const intentUrl = `intent://${currentUrlNoScheme}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
-        
-        toast.loading(isRtl ? "جاري فتح متصفح Chrome الخارجي لتسجيل الدخول بأمان..." : "Opening Google Chrome browser to sign in securely...");
-        setTimeout(() => {
-          window.location.href = intentUrl;
-        }, 800);
+    if (isInAppWebView() && !isNativeApp() && !bypassWebViewCheck && !forceBypass) {
+      const ua =
+        typeof window !== "undefined" && window.navigator
+          ? window.navigator.userAgent || ""
+          : "";
+      if (/Android/i.test(ua)) {
+        toast.loading(
+          isRtl
+            ? "جاري فتح متصفح Chrome الخارجي لتسجيل الدخول بأمان..."
+            : "Opening Google Chrome browser to sign in securely...",
+        );
+        setTimeout(() => openAndroidChromeIntent(), 800);
         return;
       }
       setShowWebviewDialog(true);
@@ -610,173 +401,63 @@ export default function Login() {
     }
 
     setLoading(true);
-
-    if (isNativeApp) {
-      try {
-        const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
-        
-        try {
-          await GoogleAuth.initialize({
-            clientId: googleClientId,
-            scopes: ["profile", "email"],
-            grantOfflineAccess: true,
-          });
-        } catch (initErr) {
-          console.warn("GoogleAuth already initialized or failed to init:", initErr);
-        }
-
-        const googleUser = await GoogleAuth.signIn();
-        if (googleUser && googleUser.authentication?.idToken) {
-          const idToken = googleUser.authentication.idToken;
-          
-          const { GoogleAuthProvider, signInWithCredential } = await import("firebase/auth");
-          const credential = GoogleAuthProvider.credential(idToken);
-          const result = await signInWithCredential(auth, credential);
-          
-          if (result && result.user) {
-            await processGoogleUser(result.user, role, mode);
-            toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
-          }
-        } else {
-          throw new AppError("Missing ID Token from Google Auth native plugin.", {
-            code: "auth/missing-id-token",
-            source: "auth",
-          });
-        }
-      } catch (error: any) {
-        console.error("Native Google Auth Error:", error);
-        setNativePlatformNotice(true);
-        setShowClientIdConfig(true);
-        setLoading(false);
-        
-        toast.error(
-          isRtl
-            ? `فشل تسجيل الدخول الأصلي. يرجى تهيئة الـ Client ID وبصمات SHA-1`
-            : `Native login failed. Please configure Web Client ID and SHA-1 fingerprint.`
-        );
-      }
-      return;
-    }
-
     try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('profile');
-      provider.addScope('email');
-      
-      // Store state before redirect
-      window.sessionStorage.setItem("pendingGoogleRole", role);
-      window.sessionStorage.setItem("pendingGoogleMode", mode);
-      
-      if (inIframe) {
-        toast.loading(isRtl ? "جاري تحويلك الآمن لتسجيل الدخول بـ Google..." : "Navigating securely to Google Sign-In redirect...");
-        await signInWithRedirect(auth, provider);
-        return;
-      }
+      const { user, profileCreated } = await authenticateWithGoogle(
+        { bypassWebViewCheck: bypassWebViewCheck || forceBypass },
+        {
+          selectedRole: role,
+          displayName: name.trim() || undefined,
+          phone: phone.trim(),
+          school: {
+            phone: phone.trim(),
+            address: schoolAddress,
+            governorate: schoolGovernorate,
+            directorate: schoolDirectorate,
+            educationLevel: schoolEducationLevel,
+            workingHours: schoolWorkingHours,
+            studyType: schoolStudyType,
+            estimatedStudents: schoolEstimatedStudents,
+          },
+          isRtl,
+        },
+      );
+      toast.success(
+        profileCreated
+          ? isRtl
+            ? "تم إنشاء حسابك وتسجيل الدخول بـ Google!"
+            : "Account created — signed in with Google!"
+          : isRtl
+            ? `مرحباً ${user.displayName || ""}!`
+            : `Welcome back, ${user.displayName || "user"}!`,
+      );
+    } catch (error) {
+      console.error("Google sign-in failed:", error);
+      const kind = classifyAuthError(error);
 
-      let result;
-      try {
-        result = await signInWithPopup(auth, provider);
-      } catch (popupErr: any) {
-        const pCode = popupErr.code || "";
-        const pMsg = popupErr.message || "";
-        if (
-          pCode === "auth/popup-blocked" || 
-          pCode === "auth/popup-closed-by-user" || 
-          pCode === "auth/cancelled-popup-request" ||
-          pMsg.includes("popup-blocked") ||
-          pMsg.includes("popup-closed") ||
-          pMsg.includes("cancelled-popup-request")
-        ) {
-          toast.loading(isRtl ? "تم حظر النافذة المنبثقة. جاري تحويلك لتسجيل الدخول بأمان..." : "Popup blocked. Redirecting securely inside the same tab...");
-          await signInWithRedirect(auth, provider);
-          return;
-        }
-        throw normalizeError(popupErr, "Google sign-in failed");
-      }
-
-      if (result && result.user) {
-        await processGoogleUser(result.user, role, mode);
-        toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
-      }
-    } catch (error: any) {
-      console.error("Google Auth Error with GSI SDK:", error);
-      const errorCode = error.code || "";
-      const errorMessage = error.message || "";
-
-      if (
-        errorCode === "auth/unauthorized-domain" ||
-        errorCode === "auth/unauthorized-client" ||
-        errorMessage.includes("unauthorized-domain") ||
-        errorMessage.includes("unauthorized_domain") ||
-        errorMessage.toLowerCase().includes("unauthorized domain")
-      ) {
+      if (kind === "unauthorized-domain") {
         setUnauthorizedDomainError(window.location.hostname);
-        toast.error(
-          isRtl
-            ? "خطأ: النطاق الحالي غير مصرح به في إعدادات Firebase Console الخاصة بـ Google Auth."
-            : "Error: The current domain is not authorized in Firebase Console settings for Google Auth.",
-        );
-      } else if (
-        errorCode === "auth/operation-not-allowed" ||
-        errorMessage.includes("operation-not-allowed") ||
-        errorMessage.toLowerCase().includes("operation not allowed") ||
-        errorMessage
-          .toLowerCase()
-          .includes("disabled for this firebase project") ||
-        errorMessage.toLowerCase().includes("provider is disabled")
-      ) {
+      } else if (kind === "provider-disabled") {
         setFirebaseProviderError("google-disabled");
-        toast.error(
-          isRtl
-            ? "خطأ: لم يتم تفعيل تسجيل دخول Google في لوحة تحكم Firebase لمشروعك!"
-            : "Error: Google Sign-In is not enabled in your Firebase Authentication Console!",
-        );
-      } else {
+      } else if (kind === "iframe-blocked") {
         setShowIframeHint(true);
-        setFirebaseProviderError(
-          `${errorCode || "Exception"}: ${errorMessage || String(error)}`,
-        );
-        toast.error(t("failedConnection"));
+      } else if (isNativeApp() && kind !== "cancelled") {
+        setNativePlatformNotice(true);
       }
-      setShowGoogleTroubleshoot(true);
+
+      if (kind !== "cancelled") {
+        const message = getAuthErrorMessage(error, t, isRtl);
+        setFirebaseProviderError(message);
+        setShowGoogleTroubleshoot(true);
+        toast.error(message);
+      }
+    } finally {
       setLoading(false);
     }
-  };
-
-  const validatePasswordComplexity = (pwd: string): { isValid: boolean; message: string } => {
-    if (pwd.length < 6) {
-      return {
-        isValid: false,
-        message: isRtl 
-          ? "يجب أن تكون كلمة المرور مكونة من 6 أحرف على الأقل." 
-          : "Password must be at least 6 characters."
-      };
-    }
-    // Check for extremely simple sequential/repeating passwords
-    if (/^(123456|12345678|abcdef|111111|000000|qwerty)$/i.test(pwd)) {
-      return {
-        isValid: false,
-        message: isRtl
-          ? "كلمة المرور هذه شائعة جداً وسهلة التخمين. الرجاء اختيار كلمة مرور أكثر تعقيداً."
-          : "This password is too simple and easy to guess. Please choose a more complex password."
-      };
-    }
-    const allRepeating = pwd.split("").every(char => char === pwd[0]);
-    if (allRepeating) {
-      return {
-        isValid: false,
-        message: isRtl
-          ? "لا يمكن أن تتكون كلمة المرور من تكرار حرف واحد فقط."
-          : "Password cannot consist of a single repeating character."
-      };
-    }
-    return { isValid: true, message: "" };
   };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Verify Captcha
     if (parseInt(captchaAnswer) !== captchaChallenge.a + captchaChallenge.b) {
       toast.error(t("captchaError"));
       generateCaptcha();
@@ -784,7 +465,7 @@ export default function Login() {
     }
 
     const emailTrimmed = email.toLowerCase().trim();
-    const passwordValue = password; // Do not trim passwords as they can contain valid spaces
+    const passwordValue = password;
 
     if (passwordValue.length < 6) {
       toast.error(t("passwordShort"));
@@ -794,7 +475,13 @@ export default function Login() {
     if (mode === "signup") {
       const complexityRes = validatePasswordComplexity(passwordValue);
       if (!complexityRes.isValid) {
-        toast.error(complexityRes.message);
+        toast.error(
+          isRtl && complexityRes.message === "This password is too simple and easy to guess"
+            ? "كلمة المرور هذه شائعة جداً وسهلة التخمين."
+            : isRtl && complexityRes.message === "Password cannot consist of a single repeating character"
+              ? "لا يمكن أن تتكون كلمة المرور من تكرار حرف واحد فقط."
+              : complexityRes.message,
+        );
         return;
       }
     }
@@ -802,326 +489,31 @@ export default function Login() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const result = await createUserWithEmailAndPassword(
-          auth,
-          emailTrimmed,
-          passwordValue,
-        );
-        const user = result.user;
-
-        await updateProfile(user, { displayName: name });
-
-        // Send Email Verification
-        try {
-          auth.languageCode = isRtl ? "ar" : "en";
-          await sendEmailVerification(user);
-          toast.success(t("verificationSent"));
-        } catch (verifErr) {
-          console.warn("Verification email failed", verifErr);
-          toast.error(t("verificationFailed"));
-        }
-
-        // Check for provisioned user by email
-        const q = query(
-          collection(db, "users"),
-          where("email", "==", emailTrimmed),
-        );
-        const querySnap = await getDocs(q);
-        let provisionedData = null;
-        let oldDocId = "";
-
-        if (!querySnap.empty) {
-          const found = querySnap.docs[0];
-          provisionedData = found.data();
-          oldDocId = found.id;
-        }
-
-        // Check if first user for SuperAdmin
-        let isFirstUser = false;
-        try {
-          const metadataSnap = await getDoc(doc(db, "users", "metadata"));
-          isFirstUser = !metadataSnap.exists();
-        } catch (err) {
-          console.warn("Metadata check error", err);
-        }
-
-        let finalRole = isFirstUser
-          ? UserRole.SUPERADMIN
-          : provisionedData?.role || role;
-
-        if (finalRole === "superadmin" && !isFirstUser) {
-          finalRole = UserRole.ADMIN;
-        }
-
-        // Role conflict check: management cannot be teacher or parent
-        const isManagement = [
-          "admin",
-          "staff",
-          "assistant",
-          "superadmin",
-        ].includes(provisionedData?.role);
-        if (
-          isManagement &&
-          (role === UserRole.PARENT || role === UserRole.TEACHER)
-        ) {
-          toast.error(
-            "هذا الحساب مسجل كإدارة مدرسة ولا يمكن استخدامه كمعلم أو ولي أمر بنفس البريد",
-          );
-          setLoading(false);
-          return;
-        }
-
-        // 1. Create school document if signing up as Admin
-        let schoolId = provisionedData?.schoolId || "";
-        if (finalRole === UserRole.ADMIN && !schoolId) {
-          const schoolRef = await addDoc(collection(db, "schools"), {
-            name: name, // School Name
-            phone: phone, // Admin/School Phone
-            address: schoolAddress, // Detailed Address
-            governorate: schoolGovernorate, // Governorate
-            directorate: schoolDirectorate, // Directorate
-            educationLevel: schoolEducationLevel, // School Stage
-            stage: schoolEducationLevel, // also keep stage mapping
-            workingHours: schoolWorkingHours, // School Shift/working hours
-            shift: schoolWorkingHours, // also keep shift mapping
-            studyType: schoolStudyType, // Study gender type
-            genderType: schoolStudyType, // also keep genderType mapping
-            estimatedStudents: Number(schoolEstimatedStudents) || 0, // Numeric input
-            approximateStudents: schoolEstimatedStudents, // also keep duplicate mapping as string
-            status: "active",
-            planId: "basic",
-            studentCount: 0,
-            adminEmail: emailTrimmed,
-            adminName: name,
-            adminPhone: phone,
-            createdAt: serverTimestamp(),
-          });
-          schoolId = schoolRef.id;
-        }
-
-        // 2. Create permanent profile
-        await setDoc(doc(db, "users", user.uid), {
-          name: name || provisionedData?.name || "مستخدم جديد",
+        await signUpWithEmail({
           email: emailTrimmed,
-          role: finalRole,
-          phone: phone, // Added phone to profile
-          schoolId: schoolId,
-          createdAt: new Date().toISOString(),
-          uid: user.uid,
+          password: passwordValue,
+          displayName: name,
+          phone,
+          selectedRole: role,
+          school: {
+            phone,
+            address: schoolAddress,
+            governorate: schoolGovernorate,
+            directorate: schoolDirectorate,
+            educationLevel: schoolEducationLevel,
+            workingHours: schoolWorkingHours,
+            studyType: schoolStudyType,
+            estimatedStudents: schoolEstimatedStudents,
+          },
+          isRtl,
         });
-
-        // 3. Migrate students
-        if (oldDocId && oldDocId !== user.uid) {
-          const studentsQ = query(
-            collection(db, "students"),
-            where("parentIds", "array-contains", oldDocId),
-          );
-          const studentsSnap = await getDocs(studentsQ);
-
-          const migrationPromises = studentsSnap.docs.map((studentDoc) => {
-            const currentIds = studentDoc.data().parentIds || [];
-            const updatedIds = currentIds.map((id: string) =>
-              id === oldDocId ? user.uid : id,
-            );
-            return updateDoc(doc(db, "students", studentDoc.id), {
-              parentIds: updatedIds,
-            });
-          });
-
-          await Promise.all(migrationPromises);
-          await deleteDoc(doc(db, "users", oldDocId));
-        }
-
-        if (isFirstUser) {
-          await setDoc(doc(db, "users", "metadata"), { initialized: true });
-        }
         toast.success(t("signupSuccess"));
       } else {
-        try {
-          // Attempt standard sign in
-          const result = await signInWithEmailAndPassword(auth, emailTrimmed, passwordValue);
-
-          // Self-healing school document block on login
-          try {
-            const userDocSnap = await getDoc(doc(db, "users", result.user.uid));
-            if (userDocSnap.exists()) {
-              const userData = userDocSnap.data();
-              if (userData?.role === "admin" && userData?.schoolId) {
-                const schoolDocRef = doc(db, "schools", userData.schoolId);
-                const schoolDocSnap = await getDoc(schoolDocRef);
-                if (schoolDocSnap.exists()) {
-                  const schoolData = schoolDocSnap.data();
-                  // Check if school has empty/missing fields
-                  if (!schoolData.governorate || !schoolData.directorate || schoolData.estimatedStudents === undefined) {
-                    // Search in registrations for a match
-                    const registrationsRef = collection(db, "registrations");
-                    const regQuery = query(
-                      registrationsRef,
-                      where("customerInfo.email", "==", emailTrimmed)
-                    );
-                    const regDocs = await getDocs(regQuery);
-
-                    let regData = null;
-                    if (!regDocs.empty) {
-                      regData = regDocs.docs[0].data();
-                    } else {
-                      // fallback to direct email field
-                      const regQuery2 = query(
-                        registrationsRef,
-                        where("email", "==", emailTrimmed)
-                      );
-                      const regDocs2 = await getDocs(regQuery2);
-                      if (!regDocs2.empty) {
-                        regData = regDocs2.docs[0].data();
-                      }
-                    }
-
-                    if (regData) {
-                      const regFields = regData.customerInfo || regData;
-                      const updatePayload: Record<string, any> = {};
-
-                      if (regFields.name && !schoolData.name) {
-                        updatePayload.name = regFields.name;
-                      }
-                      if (regFields.phone && !schoolData.phone) {
-                        updatePayload.phone = regFields.phone;
-                        updatePayload.adminPhone = regFields.phone;
-                      }
-                      if (regFields.address && !schoolData.address) {
-                        updatePayload.address = regFields.address;
-                      }
-                      if (regFields.governorate && !schoolData.governorate) {
-                        updatePayload.governorate = regFields.governorate;
-                      }
-                      if (regFields.directorate && !schoolData.directorate) {
-                        updatePayload.directorate = regFields.directorate;
-                      }
-
-                      // Handle educationLevel
-                      const eduLvl = regFields.educationLevel || regFields.stage;
-                      if (eduLvl && (!schoolData.educationLevel || !schoolData.stage)) {
-                        updatePayload.educationLevel = eduLvl;
-                        updatePayload.stage = eduLvl;
-                      }
-
-                      // Handle workingHours
-                      const wrkHrs = regFields.workingHours || regFields.shift;
-                      if (wrkHrs && (!schoolData.workingHours || !schoolData.shift)) {
-                        updatePayload.workingHours = wrkHrs;
-                        updatePayload.shift = wrkHrs;
-                      }
-
-                      // Handle studyType
-                      const stdTyp = regFields.studyType || regFields.genderType;
-                      if (stdTyp && (!schoolData.studyType || !schoolData.genderType)) {
-                        updatePayload.studyType = stdTyp;
-                        updatePayload.genderType = stdTyp;
-                      }
-
-                      // Handle estimatedStudents
-                      const estStud = regFields.estimatedStudents !== undefined ? regFields.estimatedStudents : regFields.approximateStudents;
-                      if (estStud !== undefined && schoolData.estimatedStudents === undefined) {
-                        updatePayload.estimatedStudents = Number(estStud) || 0;
-                        updatePayload.approximateStudents = String(estStud);
-                      }
-
-                      if (Object.keys(updatePayload).length > 0) {
-                        await updateDoc(schoolDocRef, updatePayload);
-                        console.log("School data synced successfully on login!");
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } catch (healErr) {
-            console.error("Heal school data error value:", healErr);
-          }
-
-          toast.success(t("welcomeBack"));
-        } catch (signInErr: any) {
-          // Dynamic Fallback 1: Try with password trimmed (handles accidental spaces on mobile/copy-paste)
-          if (passwordValue.trim() !== passwordValue) {
-            try {
-              await signInWithEmailAndPassword(auth, emailTrimmed, passwordValue.trim());
-              toast.success(t("welcomeBack"));
-              return;
-            } catch (trimErr) {
-              // Ignore trim error, continue to next fallback
-            }
-          }
-
-          // Dynamic Fallback 2: Check if they are a pre-registered/pre-created user in Firestore who has no Auth account yet.
-          // In Firebase v9+, any bad login or user-not-found returns 'auth/invalid-credential'
-          const errCode = signInErr.code || "";
-          const errMsg = signInErr.message || "";
-          const isInvalid =
-            errCode === "auth/user-not-found" ||
-            errCode === "auth/wrong-password" ||
-            errCode === "auth/invalid-credential" ||
-            errCode === "INVALID_CREDENTIAL" ||
-            errMsg.includes("invalid-credential") ||
-            errMsg.toLowerCase().includes("invalid credential");
-
-          if (isInvalid) {
-            try {
-              // If we do an anonymous or direct signup check:
-              // Since rules prevent public users query without sign-in, we try to create an account for them.
-              // If they do not exist in Auth, this will succeed and create their Auth account, 
-              // which then gets automatically claimed by AuthContext claiming logic using their email!
-              // But if they already exist in Auth, this will throw "auth/email-already-in-use", 
-              // meaning they just typed the wrong password, so we safely present the original invalidCredential error!
-              const signUpResult = await createUserWithEmailAndPassword(
-                auth,
-                emailTrimmed,
-                passwordValue
-              );
-              
-              if (signUpResult.user) {
-                // Account created and linked successfully automatically!
-                toast.success(
-                  isRtl 
-                    ? "تم تفعيل حسابك بنجاح والدخول للوحة التحكم!" 
-                    : "Account activated and logged in successfully!"
-                );
-                return;
-              }
-            } catch (signUpErr: any) {
-              if (signUpErr.code !== "auth/email-already-in-use") {
-                console.warn("Auto activation signUp failed:", signUpErr);
-              }
-            }
-          }
-
-          // Inner catch to distinguish between different auth failures if needed
-          throw normalizeError(signInErr, "Sign-in failed");
-        }
+        await signInWithEmail(emailTrimmed, passwordValue);
+        toast.success(t("welcomeBack"));
       }
-    } catch (error: any) {
-      const errorCode = error.code || "";
-      const errorMessage = error.message || "";
-
-      // auth/invalid-credential is the generic error for wrong email/password in newer Firebase versions
-      if (
-        errorCode === "auth/user-not-found" ||
-        errorCode === "auth/wrong-password" ||
-        errorCode === "auth/invalid-credential" ||
-        errorCode === "INVALID_CREDENTIAL" ||
-        errorMessage.includes("invalid-credential") ||
-        errorMessage.toLowerCase().includes("invalid credential")
-      ) {
-        toast.error(t("invalidCredential"));
-      } else if (errorCode === "auth/email-already-in-use") {
-        toast.error(t("emailInUse"));
-      } else if (errorCode === "auth/weak-password") {
-        toast.error(t("weakPassword"));
-      } else if (errorCode === "auth/too-many-requests") {
-        toast.error(t("tooManyRequests"));
-      } else if (errorCode === "auth/user-disabled") {
-        toast.error(t("userDisabled"));
-      } else {
-        toast.error(errorMessage || t("authFailed"));
-      }
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error, t, isRtl));
     } finally {
       setLoading(false);
     }
@@ -1129,17 +521,18 @@ export default function Login() {
 
   const handleForgotPassword = async () => {
     if (!email) {
-      toast.error("يرجى إدخال البريد الإلكتروني أولاً");
+      toast.error(isRtl ? "يرجى إدخال البريد الإلكتروني أولاً" : "Enter your email first");
       return;
     }
     try {
-      const { sendPasswordResetEmail } = await import("firebase/auth");
-      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      await resetPassword(email);
       toast.success(
-        "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني",
+        isRtl
+          ? "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني"
+          : "Password reset email sent",
       );
-    } catch (error: any) {
-      toast.error("فشل إرسال البريد: " + (error.message || "حدث خطأ"));
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error, t, isRtl));
     }
   };
 
@@ -1781,37 +1174,11 @@ export default function Login() {
                   </p>
                 </div>
 
-                <div className="mt-4 p-3 rounded-lg border border-slate-200 bg-white shadow-sm font-sans">
-                  <p className="font-bold text-slate-950 text-xs mb-1.5 flex items-center gap-1.5 justify-start">
-                    <Smartphone size={15} className="text-blue-500 animate-pulse" />
-                    <span>{isRtl ? "تعديل واختبار Web Client ID مباشر" : "Live Test Web Client ID Override"}</span>
-                  </p>
-                  <p className="text-[10px] text-slate-500 mb-2 leading-normal">
-                    {isRtl
-                      ? "قم بتحديث المعرّف الذي نسخته من منصة Firebase هنا واحفظه ليتم ربطه بكود تسجيل الدخول مباشرة على جهازك الحالي:"
-                      : "Update your Client ID from Firebase here and click Save to test on your phone in real-time:"}
-                  </p>
-                  
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={googleClientId}
-                      onChange={(e) => setGoogleClientId(e.target.value)}
-                      placeholder="xxxxx-xxxxx.apps.googleusercontent.com"
-                      className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 placeholder-slate-400 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        localStorage.setItem("override_google_client_id", googleClientId);
-                        toast.success(isRtl ? "تم الحفظ محلياً! اضغط على أيقونة جوجل بالأعلى لإعادة المحاولة" : "Saved locally! Tap Google Sign-In above to retry.");
-                      }}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded transition-colors active:scale-95 duration-100 shrink-0"
-                    >
-                      {isRtl ? "حفظ" : "Save"}
-                    </button>
-                  </div>
-                </div>
+                <p className="mt-3 text-[10px] text-slate-500 leading-relaxed">
+                  {isRtl
+                    ? "معرّف Web Client يُضبط في capacitor.config.ts و VITE_GOOGLE_CLIENT_ID — لا حاجة لحقن سكربت Google القديم."
+                    : "Web Client ID is configured in capacitor.config.ts and VITE_GOOGLE_CLIENT_ID — no legacy Google script injection."}
+                </p>
               </div>
             )}
 
