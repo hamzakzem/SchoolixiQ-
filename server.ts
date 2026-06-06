@@ -9,6 +9,7 @@ import { getStorage } from 'firebase-admin/storage';
 import dotEnv from 'dotenv';
 import fs from 'fs';
 import crypto from 'crypto';
+import { normalizeError } from './src/lib/AppError';
 
 dotEnv.config();
 
@@ -445,7 +446,7 @@ async function startServer() {
           console.warn('Storage bucket not found, falling back to base64 Data URL...');
           return res.json({ url: base64 });
         }
-        throw uploadError;
+        throw normalizeError(uploadError, 'File upload failed');
       }
     } catch (error: any) {
       console.error('Upload API Error:', error);
@@ -617,7 +618,7 @@ async function startServer() {
           uid = userRecord.uid;
           console.log(`Created new Auth user: ${uid}, email: ${emailLower}`);
         } else {
-          throw authError; // Rethrow other Auth errors
+          throw normalizeError(authError, 'Authentication operation failed');
         }
       }
 

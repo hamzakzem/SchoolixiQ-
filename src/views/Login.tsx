@@ -59,6 +59,7 @@ import { toast } from "react-hot-toast";
 import { UserRole } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
+import { AppError, normalizeError } from "../lib/AppError";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
@@ -162,7 +163,9 @@ const loadGsiScript = (): Promise<any> => {
     const existingScript = document.getElementById("gsi-sdk-script");
     if (existingScript) {
       existingScript.addEventListener("load", () => resolve((window as any).google));
-      existingScript.addEventListener("error", (e) => reject(e));
+      existingScript.addEventListener("error", (e) =>
+        reject(normalizeError(e, "Failed to load Google Sign-In SDK")),
+      );
       return;
     }
     const script = document.createElement("script");
@@ -171,7 +174,8 @@ const loadGsiScript = (): Promise<any> => {
     script.async = true;
     script.defer = true;
     script.onload = () => resolve((window as any).google);
-    script.onerror = (e) => reject(e);
+    script.onerror = (e) =>
+      reject(normalizeError(e, "Failed to load Google Sign-In SDK"));
     document.head.appendChild(script);
   });
 };
@@ -634,7 +638,10 @@ export default function Login() {
             toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
           }
         } else {
-          throw new Error("Missing ID Token from Google Auth native plugin.");
+          throw new AppError("Missing ID Token from Google Auth native plugin.", {
+            code: "auth/missing-id-token",
+            source: "auth",
+          });
         }
       } catch (error: any) {
         console.error("Native Google Auth Error:", error);
@@ -684,7 +691,7 @@ export default function Login() {
           await signInWithRedirect(auth, provider);
           return;
         }
-        throw popupErr;
+        throw normalizeError(popupErr, "Google sign-in failed");
       }
 
       if (result && result.user) {
@@ -1087,7 +1094,7 @@ export default function Login() {
           }
 
           // Inner catch to distinguish between different auth failures if needed
-          throw signInErr;
+          throw normalizeError(signInErr, "Sign-in failed");
         }
       }
     } catch (error: any) {

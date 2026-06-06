@@ -1,3 +1,5 @@
+import { normalizeError } from './AppError';
+
 let sentryPromise: Promise<typeof import('@sentry/react')> | null = null;
 
 function getSentry() {
@@ -32,11 +34,12 @@ export function initSentry(dsn: string) {
   });
 }
 
-export function captureException(error: any, hint?: any) {
+export function captureException(error: unknown, hint?: any) {
+  const normalized = normalizeError(error);
   getSentry().then((Sentry) => {
-    Sentry.captureException(error, hint);
+    Sentry.captureException(normalized, hint);
   }).catch(() => {
-    console.error("Fallback Uncaught Error:", error, hint);
+    console.error("Fallback Uncaught Error:", normalized, hint);
   });
 }
 

@@ -1,5 +1,6 @@
 import { getApiUrl } from './apiUtils';
 import { auth } from './firebase';
+import { AppError, normalizeError } from './AppError';
 
 export const compressImageToBase64 = (file: File, maxWidth = 400, maxHeight = 400): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -35,9 +36,11 @@ export const compressImageToBase64 = (file: File, maxWidth = 400, maxHeight = 40
           reject(new Error('Failed to get canvas context'));
         }
       };
-      img.onerror = (error) => reject(error);
+      img.onerror = (error) =>
+        reject(normalizeError(error, 'Failed to load image for compression'));
     };
-    reader.onerror = (error) => reject(error);
+    reader.onerror = (error) =>
+      reject(normalizeError(error, 'Failed to read image file'));
   });
 };
 
@@ -54,7 +57,11 @@ export const uploadImageToServer = async (file: File, storagePath: string, maxWi
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || 'Failed to upload image to server');
+    throw AppError.fromApi(
+      errorData.error || 'Failed to upload image to server',
+      response.status,
+      'api/upload-failed',
+    );
   }
   const data = await response.json();
   return data.url;
@@ -100,8 +107,10 @@ export const compressImage = (file: File, maxWidth = 400, maxHeight = 400): Prom
           reject(new Error('Failed to get canvas context'));
         }
       };
-      img.onerror = (error) => reject(error);
+      img.onerror = (error) =>
+        reject(normalizeError(error, 'Failed to load image for compression'));
     };
-    reader.onerror = (error) => reject(error);
+    reader.onerror = (error) =>
+      reject(normalizeError(error, 'Failed to read image file'));
   });
 };

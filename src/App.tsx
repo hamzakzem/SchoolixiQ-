@@ -36,6 +36,7 @@ import {
 import { useState, useEffect, lazy, Suspense, Component, ReactNode, ErrorInfo } from "react";
 import { motion } from "motion/react";
 import { captureException } from "./lib/sentryWrapper";
+import { normalizeError } from "./lib/AppError";
 
 // Views (Lazy-Loaded for Performance Optimization)
 const Login = lazy(() => import("./views/Login"));
@@ -1269,13 +1270,15 @@ class SafeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
     error: null
   };
 
-  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+  public static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
+    const normalized = normalizeError(error);
+    return { hasError: true, error: normalized };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught application error:", error, errorInfo);
-    captureException(error, { extra: errorInfo as any });
+  public componentDidCatch(error: unknown, errorInfo: ErrorInfo) {
+    const normalized = normalizeError(error);
+    console.error("Uncaught application error:", normalized, errorInfo);
+    captureException(normalized, { extra: errorInfo as any });
   }
 
   public render() {

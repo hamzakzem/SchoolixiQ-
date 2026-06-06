@@ -317,7 +317,6 @@ export default function ParentDashboard() {
           OperationType.UPDATE,
           `students_search_and_link:student_doc`,
         );
-        throw err;
       }
 
       // Update parent's profile with schoolId and studentIds for rule checking
