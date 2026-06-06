@@ -1,13 +1,11 @@
 import type { User } from 'firebase/auth';
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
-  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -86,43 +84,6 @@ function signupRoleConflict(
   return null;
 }
 
-async function createSchoolForAdmin(
-  input: ProvisionProfileInput,
-  email: string,
-  existingSchoolId: string,
-): Promise<string> {
-  if (existingSchoolId || input.selectedRole !== UserRole.ADMIN) return existingSchoolId;
-
-  const school = input.school ?? {};
-  const schoolRef = await addDoc(collection(db, 'schools'), {
-    name:
-      input.displayName ||
-      input.user.displayName ||
-      (input.isRtl ? 'مدرسة جديدة' : 'New School'),
-    phone: school.phone || input.phone || '',
-    address: school.address || '',
-    governorate: school.governorate || '',
-    directorate: school.directorate || '',
-    educationLevel: school.educationLevel || '',
-    stage: school.educationLevel || '',
-    workingHours: school.workingHours || '',
-    shift: school.workingHours || '',
-    studyType: school.studyType || '',
-    genderType: school.studyType || '',
-    estimatedStudents: Number(school.estimatedStudents) || 0,
-    approximateStudents: school.estimatedStudents || '',
-    status: 'active',
-    planId: 'basic',
-    studentCount: 0,
-    adminEmail: email,
-    adminName: input.displayName || input.user.displayName || '',
-    adminPhone: school.phone || input.phone || '',
-    createdAt: serverTimestamp(),
-  });
-
-  return schoolRef.id;
-}
-
 async function migrateProvisionedStudents(
   oldDocId: string,
   newUid: string,
@@ -163,6 +124,11 @@ export async function provisionUserProfile(
     return { created: false, isFirstUser: false };
   }
 
+  // School admins must complete pending subscription registration — never auto-provision here.
+  if (input.selectedRole === UserRole.ADMIN) {
+    return { created: false, isFirstUser: false };
+  }
+
   const { data: provisionedData, oldDocId } = email
     ? await findProvisionedByEmail(email)
     : { data: null, oldDocId: '' };
@@ -183,8 +149,7 @@ export async function provisionUserProfile(
     isFirstUser,
   );
 
-  let schoolId = (provisionedData?.schoolId as string) || '';
-  schoolId = await createSchoolForAdmin(input, email, schoolId);
+  const schoolId = (provisionedData?.schoolId as string) || '';
 
   await setDoc(doc(db, 'users', user.uid), {
     name:

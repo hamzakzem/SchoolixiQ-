@@ -87,7 +87,7 @@ jobs:
         run: |
           test -f dist/index.html
           test -f dist/.htaccess
-          rm -f dist/server.cjs dist/server.cjs.map 2>/dev/null || true
+          rm -f dist/server.mjs dist/server.cjs dist/server.cjs.map 2>/dev/null || true
           ls -la dist/
           if test -f dist/downloads/schoolixiq.apk; then
             echo "APK present in dist/downloads/schoolixiq.apk"
@@ -132,6 +132,7 @@ jobs:
           log-level: verbose
           exclude: |
             **/.git*
+            **/server.mjs
             **/server.cjs
             **/server.cjs.map
 

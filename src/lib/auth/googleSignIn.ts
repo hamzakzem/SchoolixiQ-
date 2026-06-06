@@ -1,7 +1,9 @@
 import { GoogleAuthProvider, signInWithPopup, type User } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
-import { auth } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import { AppError } from '../AppError';
+import { UserRole } from '../../types';
 import { classifyAuthError } from './errors';
 import { isInAppWebView, isInIframe } from './environment';
 import {
@@ -78,12 +80,28 @@ async function signInWithGoogleWebPopup(): Promise<GoogleSignInResult> {
   }
 }
 
-/** Firebase Auth + Firestore profile provisioning (single production entry point). */
+/**
+ * Google identity + optional profile provisioning.
+ * Admin signup only authenticates — pending registration is completed separately.
+ */
 export async function authenticateWithGoogle(
   signInOptions: GoogleSignInOptions,
-  profileInput: Omit<ProvisionProfileInput, 'user'>,
+  profileInput?: Omit<ProvisionProfileInput, 'user'>,
 ): Promise<{ user: User; profileCreated: boolean }> {
   const { user } = await signInWithGoogle(signInOptions);
-  const { created } = await provisionUserProfile({ ...profileInput, user });
-  return { user, profileCreated: created };
+
+  const existing = await getDoc(doc(db, 'users', user.uid));
+  if (existing.exists()) {
+    return { user, profileCreated: false };
+  }
+
+  if (
+    profileInput &&
+    profileInput.selectedRole !== UserRole.ADMIN
+  ) {
+    const { created } = await provisionUserProfile({ ...profileInput, user });
+    return { user, profileCreated: created };
+  }
+
+  return { user, profileCreated: false };
 }

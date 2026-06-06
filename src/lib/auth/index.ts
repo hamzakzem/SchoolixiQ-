@@ -32,3 +32,10 @@ export {
   type SchoolSignupFields,
   type ProvisionProfileInput,
 } from './profileProvisioning';
+
+export {
+  submitPendingAdminSubscription,
+  isPendingSchoolAdmin,
+  type AdminRegistrationCustomerInfo,
+  type PendingAdminPackage,
+} from './adminRegistration';

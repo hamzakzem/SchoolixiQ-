@@ -1,6 +1,10 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
+import {
+  isPendingSchoolAdmin,
+  submitPendingAdminSubscription,
+} from "./lib/auth";
 import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
 import { Toaster, toast } from "react-hot-toast";
 import { UserRole } from "./types";
@@ -163,6 +167,7 @@ const AppContent = () => {
   const [myRequest, setMyRequest] = useState<any>(null);
   const [subscriptionForm, setSubscriptionForm] = useState({
     name: "",
+    adminName: "",
     phone: "",
     email: "",
     address: "",
@@ -172,6 +177,7 @@ const AppContent = () => {
     stage: "",
     shift: "",
     genderType: "",
+    estimatedStudents: "",
   });
 
   // Automatic School Admin & Parent Provisioning with Student Link
@@ -193,11 +199,13 @@ const AppContent = () => {
         );
         const schoolSnap = await getDocs(schoolQuery);
 
-        if (!schoolSnap.empty) {
+        const activeSchoolDoc = schoolSnap.docs.find(
+          (d) => d.data().status === "active",
+        );
+        if (activeSchoolDoc) {
           setIsCreatingProfile(true);
-          const schoolDoc = schoolSnap.docs[0];
-          const schoolId = schoolDoc.id;
-          const schoolData = schoolDoc.data();
+          const schoolId = activeSchoolDoc.id;
+          const schoolData = activeSchoolDoc.data();
 
           // Auto-provision their "admin" user profile in the users collection
           await setDoc(doc(db, "users", user.uid), {
@@ -304,7 +312,12 @@ const AppContent = () => {
     let timer: NodeJS.Timeout;
     let unsubs: (() => void)[] = [];
     
-    if (!loading && user && (!profile || (profile.role === "admin" && !profile.schoolId)) && autoLinkChecked) {
+    if (
+      !loading &&
+      user &&
+      (!profile || isPendingSchoolAdmin(profile)) &&
+      autoLinkChecked
+    ) {
       // Create three queries to locate registrations
       const qUid = query(
         collection(db, "registrations"),
@@ -423,11 +436,20 @@ const AppContent = () => {
     };
   }, [onboardingState]);
 
+  useEffect(() => {
+    if (onboardingState !== "registration_form" || !user) return;
+    setSubscriptionForm((prev) => ({
+      ...prev,
+      adminName: prev.adminName || user.displayName || "",
+      email: prev.email || user.email || "",
+    }));
+  }, [onboardingState, user]);
+
   if (
     loading ||
     (user && !profile && !autoLinkChecked) ||
     isCreatingProfile ||
-    (user && (!profile || (profile.role === "admin" && !profile.schoolId)) && onboardingState === "loading")
+    (user && (!profile || isPendingSchoolAdmin(profile)) && onboardingState === "loading")
   ) {
     return <SolarLoading />;
   }
@@ -444,6 +466,10 @@ const AppContent = () => {
   }
 
   const renderDashboard = () => {
+    if (isPendingSchoolAdmin(profile)) {
+      return null;
+    }
+
     // Dedicated recovery/error screen if profile has school role but schoolId or schoolData is missing or inaccessible in Firestore
     const isSchoolRole = profile?.role && [
       UserRole.ADMIN,
@@ -583,7 +609,7 @@ const AppContent = () => {
         dir={isRtl ? "rtl" : "ltr"}
         className={isRtl ? "font-sans" : "font-sans"}
       >
-        {profile && !(profile.role === "admin" && !profile.schoolId) ? (
+        {profile && !isPendingSchoolAdmin(profile) ? (
           <>
             <ScanHandler />
             {renderDashboard()}
@@ -866,35 +892,27 @@ const AppContent = () => {
                     if (!user) return;
                     setIsCreatingProfile(true);
                     try {
-                      const isMonthly = billingCycle === "monthly";
-                      const actualPrice = isMonthly
-                        ? selectedPackage.priceMonthly !== undefined
-                          ? selectedPackage.priceMonthly
-                          : Math.round((selectedPackage.price || 0) / 12)
-                        : selectedPackage.priceYearly !== undefined
-                          ? selectedPackage.priceYearly
-                          : selectedPackage.price;
-
-                      await addDoc(collection(db, "registrations"), {
-                        type: "direct_school_signup",
-                        uid: user.uid,
-                        email: user.email,
-                        name: subscriptionForm.name,
-                        phone: subscriptionForm.phone,
-                        address: subscriptionForm.address,
-                        governorate: subscriptionForm.governorate,
-                        directorate: subscriptionForm.directorate,
-                        stage: subscriptionForm.stage,
-                        shift: subscriptionForm.shift,
-                        genderType: subscriptionForm.genderType,
-                        packageName: selectedPackage.name,
-                        packageId: selectedPackage.id,
-                        price: actualPrice,
-                        billingCycle: billingCycle,
-                        durationDays: isMonthly ? 30 : 365,
-                        status: "pending",
-                        createdAt: serverTimestamp(),
-                      });
+                      await submitPendingAdminSubscription(
+                        user,
+                        selectedPackage,
+                        billingCycle,
+                        {
+                          name: subscriptionForm.name,
+                          adminName:
+                            subscriptionForm.adminName ||
+                            user.displayName ||
+                            subscriptionForm.name,
+                          email: user.email || subscriptionForm.email,
+                          phone: subscriptionForm.phone,
+                          address: subscriptionForm.address,
+                          governorate: subscriptionForm.governorate,
+                          directorate: subscriptionForm.directorate,
+                          stage: subscriptionForm.stage,
+                          shift: subscriptionForm.shift,
+                          genderType: subscriptionForm.genderType,
+                          estimatedStudents: subscriptionForm.estimatedStudents,
+                        },
+                      );
                       setOnboardingState("waiting_approval");
                     } catch (err) {
                       toast.error("حدث خطأ أثناء الإرسال");
@@ -920,6 +938,24 @@ const AppContent = () => {
                       }
                       className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 transition-colors font-bold text-slate-700"
                       placeholder="مدرسة المستقبل الأهلية"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">
+                      {isRtl ? "اسم المدير / المسؤول" : "Director / Admin name"}
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      value={subscriptionForm.adminName}
+                      onChange={(e) =>
+                        setSubscriptionForm({
+                          ...subscriptionForm,
+                          adminName: e.target.value,
+                        })
+                      }
+                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 transition-colors font-bold text-slate-700"
+                      placeholder={isRtl ? "اسم المدير" : "Director name"}
                     />
                   </div>
                   <div>
@@ -1126,6 +1162,25 @@ const AppContent = () => {
                           <option value="مختلط">مختلط</option>
                         </select>
                       </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest px-1">
+                        {isRtl ? "عدد الطلاب التقريبي" : "Estimated students"}
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min="1"
+                        value={subscriptionForm.estimatedStudents}
+                        onChange={(e) =>
+                          setSubscriptionForm({
+                            ...subscriptionForm,
+                            estimatedStudents: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all"
+                        placeholder={isRtl ? "مثال: 250" : "e.g. 250"}
+                      />
                     </div>
                   </div>
 

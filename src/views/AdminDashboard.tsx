@@ -26,6 +26,7 @@ import {
 import { auth, db } from "../lib/firebase";
 import { sendEmailVerification, signOut } from "firebase/auth";
 import { useAuth } from "../lib/AuthContext";
+import { isPendingSchoolAdmin } from "../lib/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { NotificationCenter } from "../components/NotificationCenter";
@@ -617,6 +618,31 @@ export default function AdminDashboard() {
       setIsSubscribing(false);
     }
   };
+
+  if (isPendingSchoolAdmin(profile)) {
+    return (
+      <div
+        className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center"
+        dir={isRtl ? "rtl" : "ltr"}
+      >
+        <Clock className="text-blue-600 mb-4" size={48} />
+        <h2 className="text-xl font-black text-slate-900 mb-2">
+          {isRtl ? "طلبك قيد المراجعة" : "Registration pending approval"}
+        </h2>
+        <p className="text-slate-500 font-bold text-sm max-w-md mb-6">
+          {isRtl
+            ? "لا يمكن الوصول إلى لوحة التحكم حتى يوافق المسؤول على طلب اشتراك مدرستك."
+            : "Dashboard access is blocked until your school subscription request is approved."}
+        </p>
+        <button
+          onClick={() => signOut(auth)}
+          className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold"
+        >
+          {isRtl ? "تسجيل الخروج" : "Sign out"}
+        </button>
+      </div>
+    );
+  }
 
   if (
     profile?.role === "admin" &&

@@ -389,32 +389,33 @@ export default function Login() {
     try {
       const { user, profileCreated } = await authenticateWithGoogle(
         {},
-        {
-          selectedRole: role,
-          displayName: name.trim() || undefined,
-          phone: phone.trim(),
-          school: {
-            phone: phone.trim(),
-            address: schoolAddress,
-            governorate: schoolGovernorate,
-            directorate: schoolDirectorate,
-            educationLevel: schoolEducationLevel,
-            workingHours: schoolWorkingHours,
-            studyType: schoolStudyType,
-            estimatedStudents: schoolEstimatedStudents,
-          },
-          isRtl,
-        },
+        mode === "signup"
+          ? {
+              selectedRole: role,
+              displayName: name.trim() || undefined,
+              phone: phone.trim(),
+              isRtl,
+            }
+          : undefined,
       );
-      toast.success(
-        profileCreated
-          ? isRtl
-            ? "تم إنشاء حسابك وتسجيل الدخول بـ Google!"
-            : "Account created — signed in with Google!"
-          : isRtl
-            ? `مرحباً ${user.displayName || ""}!`
-            : `Welcome back, ${user.displayName || "user"}!`,
-      );
+
+      if (mode === "signup" && role === UserRole.ADMIN && !profileCreated) {
+        toast.success(
+          isRtl
+            ? "تم التحقق من هويتك. أكمل تسجيل المدرسة واختر الباقة."
+            : "Identity verified. Complete school registration and select a package.",
+        );
+      } else {
+        toast.success(
+          profileCreated
+            ? isRtl
+              ? "تم إنشاء حسابك وتسجيل الدخول بـ Google!"
+              : "Account created — signed in with Google!"
+            : isRtl
+              ? `مرحباً ${user.displayName || ""}!`
+              : `Welcome back, ${user.displayName || "user"}!`,
+        );
+      }
     } catch (error) {
       console.error("Google sign-in failed:", error);
       const kind = classifyAuthError(error);

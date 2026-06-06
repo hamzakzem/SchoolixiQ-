@@ -13,7 +13,11 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   schoolId: string;
+  status?: 'active' | 'pending' | 'suspended';
+  subscriptionStatus?: 'active' | 'pending' | 'expired';
+  pendingRegistrationId?: string;
   phoneNumber?: string;
+  phone?: string;
   photoURL?: string;
   subject?: string;
   preferredClassId?: string;
