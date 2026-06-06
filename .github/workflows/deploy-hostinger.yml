@@ -8,7 +8,7 @@ on:
       - "src/**"
       - "public/**"
       - "index.html"
-      - "vite.config.ts"
+      - "vite.config.mjs"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/deploy-hostinger.yml"
@@ -94,18 +94,18 @@ jobs:
           path: schoolixiq-dist.zip
           retention-days: 7
 
-      - name: Deploy to Hostinger (SFTP)
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
+      - name: Deploy to Hostinger (SFTP port 65002)
+        uses: wangyucode/sftp-upload-action@v3
         with:
-          server: ${{ env.HOSTINGER_FTP_SERVER }}
+          host: ${{ env.HOSTINGER_FTP_SERVER }}
           port: 65002
           username: ${{ env.HOSTINGER_FTP_USERNAME }}
           password: ${{ env.HOSTINGER_FTP_PASSWORD }}
-          local_path: ./dist/
-          remote_path: ${{ env.HOSTINGER_FTP_REMOTE_DIR }}
-          sftp_only: true
-          sftpArgs: "-o ConnectTimeout=30 -o StrictHostKeyChecking=no"
-          rsyncArgs: "--exclude=server.cjs --exclude=server.cjs.map"
+          localDir: dist
+          remoteDir: ${{ env.HOSTINGER_FTP_REMOTE_DIR }}
+          concurrency: 8
+          forceUpload: true
+          exclude: "server.cjs,server.cjs.map"
 
       - name: Deployment summary
         run: |

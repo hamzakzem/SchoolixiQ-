@@ -7,7 +7,7 @@ if (-not $Message) {
   $Message = "deploy $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 }
 
-git add src/ public/ index.html vite.config.ts package.json package-lock.json backend/ firebase.json firestore.rules storage.rules .github/workflows/deploy-hostinger.yml scripts/deploy.ps1
+git add src/ public/ index.html vite.config.mjs package.json package-lock.json backend/ firebase.json firestore.rules storage.rules .github/workflows/deploy-hostinger.yml scripts/deploy.ps1 scripts/deploy.cmd
 
 # NOTE: the APK (~150MB) exceeds GitHub's 100MB file limit and CANNOT be pushed
 # through git. It must be uploaded directly to Hostinger. We intentionally do NOT
