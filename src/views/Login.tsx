@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { auth, db } from "../lib/firebase";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  sendEmailVerification,
-  signInWithCredential,
-} from "firebase/auth";
+import { db } from "../lib/firebase";
 import {
   doc,
   getDoc,
@@ -44,14 +33,11 @@ import {
   TrendingUp,
   Bell,
   Copy,
-  ShieldAlert,
-  ExternalLink,
   Smartphone,
   ClipboardList,
   Download,
   Share,
   PlusSquare,
-  Info,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -59,6 +45,18 @@ import { toast } from "react-hot-toast";
 import { UserRole } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
+import {
+  classifyAuthError,
+  getAuthErrorMessage,
+  isInAppWebView,
+  isNativeApp,
+  openAndroidChromeIntent,
+  authenticateWithGoogle,
+  resetPassword,
+  signInWithEmail,
+  signUpWithEmail,
+  validatePasswordComplexity,
+} from "../lib/auth";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
@@ -152,29 +150,6 @@ const DEFAULT_PACKAGES = [
     ],
   },
 ];
-
-const loadGsiScript = (): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    if ((window as any).google?.accounts?.oauth2) {
-      resolve((window as any).google);
-      return;
-    }
-    const existingScript = document.getElementById("gsi-sdk-script");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve((window as any).google));
-      existingScript.addEventListener("error", (e) => reject(e));
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.id = "gsi-sdk-script";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve((window as any).google);
-    script.onerror = (e) => reject(e);
-    document.head.appendChild(script);
-  });
-};
 
 export default function Login() {
   const { t, isRtl } = useLanguage();
@@ -308,153 +283,6 @@ export default function Login() {
     }, 120);
   };
 
-  // Handle post-login logic (used for both redirect result and popup result)
-  const processGoogleUser = async (
-    user: any,
-    pendingRole: string,
-    pendingMode: string,
-  ) => {
-    try {
-      setLoading(true);
-      // Check if user document exists
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-
-      if (!userDoc.exists()) {
-        const emailLower = user.email?.toLowerCase() || "";
-        const q = query(
-          collection(db, "users"),
-          where("email", "==", emailLower),
-        );
-        const querySnap = await getDocs(q);
-        let provisionedData: any = null;
-        let oldDocId = "";
-
-        if (!querySnap.empty) {
-          const found = querySnap.docs[0];
-          provisionedData = found.data();
-          oldDocId = found.id;
-        }
-
-        let isFirstUser = false;
-        try {
-          const metadataSnap = await getDoc(doc(db, "users", "metadata"));
-          isFirstUser = !metadataSnap.exists();
-        } catch (err) {}
-
-        let finalRole = isFirstUser
-          ? UserRole.SUPERADMIN
-          : provisionedData?.role || pendingRole;
-
-        if (finalRole === "superadmin" && !isFirstUser) {
-          finalRole = UserRole.ADMIN;
-        }
-
-        // Create school document if signing up as Admin via Google
-        let schoolId = provisionedData?.schoolId || "";
-        if (finalRole === UserRole.ADMIN && !schoolId) {
-          try {
-            const schoolRef = await addDoc(collection(db, "schools"), {
-              name: user.displayName || (isRtl ? "مدرسة جديدة" : "New School"),
-              phone: phone || "",
-              address: schoolAddress || "",
-              governorate: schoolGovernorate || "",
-              directorate: schoolDirectorate || "",
-              educationLevel: schoolEducationLevel || "",
-              stage: schoolEducationLevel || "",
-              workingHours: schoolWorkingHours || "",
-              shift: schoolWorkingHours || "",
-              studyType: schoolStudyType || "",
-              genderType: schoolStudyType || "",
-              estimatedStudents: Number(schoolEstimatedStudents) || 0,
-              approximateStudents: schoolEstimatedStudents || "",
-              status: "active",
-              planId: "basic",
-              studentCount: 0,
-              adminEmail: user.email,
-              adminName: user.displayName || "",
-              adminPhone: phone || "",
-              createdAt: serverTimestamp(),
-            });
-            schoolId = schoolRef.id;
-          } catch (err) {
-            console.error("Error creating school on Google Signup", err);
-          }
-        }
-
-        // Create permanent profile
-        await setDoc(doc(db, "users", user.uid), {
-          name:
-            user.displayName ||
-            provisionedData?.name ||
-            (isRtl ? "مستخدم جديد" : "New User"),
-          email: user.email,
-          role: finalRole,
-          schoolId: schoolId,
-          createdAt: new Date().toISOString(),
-          uid: user.uid,
-          photoURL: user.photoURL,
-        });
-
-        // Migrate students if needed
-        if (oldDocId && oldDocId !== user.uid) {
-          const studentsQ = query(
-            collection(db, "students"),
-            where("parentIds", "array-contains", oldDocId),
-          );
-          const studentsSnap = await getDocs(studentsQ);
-
-          const migrationPromises = studentsSnap.docs.map((studentDoc) => {
-            const currentIds = studentDoc.data().parentIds || [];
-            const updatedIds = currentIds.map((id: string) =>
-              id === oldDocId ? user.uid : id,
-            );
-            return updateDoc(doc(db, "students", studentDoc.id), {
-              parentIds: updatedIds,
-            });
-          });
-
-          await Promise.all(migrationPromises);
-          await deleteDoc(doc(db, "users", oldDocId));
-        }
-
-        if (isFirstUser) {
-          await setDoc(doc(db, "users", "metadata"), { initialized: true });
-        }
-        toast.success(isRtl ? "تم تسجيل الدخول بنجاح!" : "Login Success!");
-      } else {
-        toast.success(`${t("welcomeLabel") || "Welcome"} ${user.displayName}`);
-      }
-    } catch (error: any) {
-      console.error("Profile creation error:", error);
-      toast.error(error.message || t("failedConnection"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Check for Redirect Result (Fallback if previous redirect was initiated)
-  useEffect(() => {
-    const checkRedirectFlow = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          const pendingRole =
-            window.sessionStorage.getItem("pendingGoogleRole") ||
-            UserRole.PARENT;
-          const pendingMode =
-            window.sessionStorage.getItem("pendingGoogleMode") || "login";
-          window.sessionStorage.removeItem("pendingGoogleRole");
-          window.sessionStorage.removeItem("pendingGoogleMode");
-          await processGoogleUser(result.user, pendingRole, pendingMode);
-        }
-      } catch (error: any) {
-        console.error("Redirect check error:", error);
-        toast.error(error.message || t("failedConnection"));
-      }
-    };
-    checkRedirectFlow();
-  }, []);
-
   const handleSubscribeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!showSubscriptionModal) return;
@@ -531,245 +359,76 @@ export default function Login() {
     setCaptchaAnswer("");
   };
 
-  const [unauthorizedDomainError, setUnauthorizedDomainError] = useState<
-    string | null
-  >(null);
-  const [showIframeHint, setShowIframeHint] = useState<boolean>(false);
-  const [showWebviewDialog, setShowWebviewDialog] = useState<boolean>(false);
-  const [showGoogleTroubleshoot, setShowGoogleTroubleshoot] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showSubscriptionPassword, setShowSubscriptionPassword] = useState<boolean>(false);
-  const [firebaseProviderError, setFirebaseProviderError] = useState<
-    string | null
-  >(null);
-  const [nativePlatformNotice, setNativePlatformNotice] = useState<boolean>(false);
-  const [googleClientId, setGoogleClientId] = useState<string>(() => {
-    return localStorage.getItem("override_google_client_id") || 
-      import.meta.env.VITE_GOOGLE_CLIENT_ID || 
-      "377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com";
-  });
-  const [showClientIdConfig, setShowClientIdConfig] = useState<boolean>(false);
 
-  const [bypassWebViewCheck, setBypassWebViewCheck] = useState<boolean>(false);
-
-  // Check if running as native Capacitor app on Android/iOS (supports localhost, file, capacitor protocols, or injected Capacitor bridge)
-  const isNativeApp = 
-    window.location.hostname === "localhost" || 
-    window.location.protocol.startsWith("capacitor") || 
-    window.location.protocol.startsWith("file") ||
-    (typeof window !== "undefined" && (
-      !!(window as any).Capacitor || 
-      !!(window as any).webkit?.messageHandlers?.Capacitor || 
-      (window.navigator && window.navigator.userAgent && window.navigator.userAgent.includes("Capacitor"))
-    ));
-
-  // Check if running in a third-party iframe (e.g. AI Studio development/shared preview)
-  const inIframe = typeof window !== "undefined" && window.self !== window.top;
-
-  // Check if inside an in-app browser WebView (e.g. WhatsApp, Facebook, Instagram, Telegram)
-  const [isInsideWebView, setIsInsideWebView] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.navigator) {
-      const ua = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || "";
-      const webviewDetected = (
-        /FB_IAB|FBAN|FBAV|Instagram|Telegram|Twitter|Line|LinkedInApp|Messenger|WhatsApp|wv|Webview|CocCoc|MicroMessenger/i.test(ua) ||
-        (ua.includes("Android") && ua.includes("Version/")) || // Android WebView
-        (ua.includes("iPhone") && !ua.includes("Safari/") && !ua.includes("CriOS") && !ua.includes("FxiOS")) // iOS WebView
-      );
-      setIsInsideWebView(webviewDetected);
-    }
-  }, []);
-
-  const handleGoogleAuth = async (forceBypass = false) => {
-    setUnauthorizedDomainError(null);
-    setShowIframeHint(false);
-    setFirebaseProviderError(null);
-    setNativePlatformNotice(false);
-
-    if (isInsideWebView && !isNativeApp && !bypassWebViewCheck && !forceBypass) {
-      const ua = typeof window !== "undefined" && window.navigator ? window.navigator.userAgent || "" : "";
-      const isAndroid = /Android/i.test(ua);
-      if (isAndroid) {
-        // Automatically attempt to escape WebView on Android using Google Chrome Intent
-        const currentUrlNoScheme = window.location.href.replace(/^https?:\/\//, "");
-        const intentUrl = `intent://${currentUrlNoScheme}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
-        
-        toast.loading(isRtl ? "جاري فتح متصفح Chrome الخارجي لتسجيل الدخول بأمان..." : "Opening Google Chrome browser to sign in securely...");
-        setTimeout(() => {
-          window.location.href = intentUrl;
-        }, 800);
+  const handleGoogleAuth = async () => {
+    if (isInAppWebView() && !isNativeApp()) {
+      const ua =
+        typeof window !== "undefined" && window.navigator
+          ? window.navigator.userAgent || ""
+          : "";
+      if (/Android/i.test(ua)) {
+        toast.loading(
+          isRtl
+            ? "جاري فتح Chrome لتسجيل الدخول..."
+            : "Opening Chrome to sign in...",
+        );
+        setTimeout(() => openAndroidChromeIntent(), 800);
         return;
       }
-      setShowWebviewDialog(true);
+      toast.error(
+        isRtl
+          ? "افتح الرابط في Safari أو Chrome لتسجيل الدخول بـ Google"
+          : "Open this link in Safari or Chrome to sign in with Google",
+      );
       return;
     }
 
     setLoading(true);
-
-    if (isNativeApp) {
-      try {
-        const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
-        
-        try {
-          await GoogleAuth.initialize({
-            clientId: googleClientId,
-            scopes: ["profile", "email"],
-            grantOfflineAccess: true,
-          });
-        } catch (initErr) {
-          console.warn("GoogleAuth already initialized or failed to init:", initErr);
-        }
-
-        const googleUser = await GoogleAuth.signIn();
-        if (googleUser && googleUser.authentication?.idToken) {
-          const idToken = googleUser.authentication.idToken;
-          
-          const { GoogleAuthProvider, signInWithCredential } = await import("firebase/auth");
-          const credential = GoogleAuthProvider.credential(idToken);
-          const result = await signInWithCredential(auth, credential);
-          
-          if (result && result.user) {
-            await processGoogleUser(result.user, role, mode);
-            toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
-          }
-        } else {
-          throw new Error("Missing ID Token from Google Auth native plugin.");
-        }
-      } catch (error: any) {
-        console.error("Native Google Auth Error:", error);
-        setNativePlatformNotice(true);
-        setShowClientIdConfig(true);
-        setLoading(false);
-        
-        toast.error(
-          isRtl
-            ? `فشل تسجيل الدخول الأصلي. يرجى تهيئة الـ Client ID وبصمات SHA-1`
-            : `Native login failed. Please configure Web Client ID and SHA-1 fingerprint.`
-        );
-      }
-      return;
-    }
-
     try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('profile');
-      provider.addScope('email');
-      
-      // Store state before redirect
-      window.sessionStorage.setItem("pendingGoogleRole", role);
-      window.sessionStorage.setItem("pendingGoogleMode", mode);
-      
-      if (inIframe) {
-        toast.loading(isRtl ? "جاري تحويلك الآمن لتسجيل الدخول بـ Google..." : "Navigating securely to Google Sign-In redirect...");
-        await signInWithRedirect(auth, provider);
-        return;
+      const { user, profileCreated } = await authenticateWithGoogle(
+        {},
+        {
+          selectedRole: role,
+          displayName: name.trim() || undefined,
+          phone: phone.trim(),
+          school: {
+            phone: phone.trim(),
+            address: schoolAddress,
+            governorate: schoolGovernorate,
+            directorate: schoolDirectorate,
+            educationLevel: schoolEducationLevel,
+            workingHours: schoolWorkingHours,
+            studyType: schoolStudyType,
+            estimatedStudents: schoolEstimatedStudents,
+          },
+          isRtl,
+        },
+      );
+      toast.success(
+        profileCreated
+          ? isRtl
+            ? "تم إنشاء حسابك وتسجيل الدخول بـ Google!"
+            : "Account created — signed in with Google!"
+          : isRtl
+            ? `مرحباً ${user.displayName || ""}!`
+            : `Welcome back, ${user.displayName || "user"}!`,
+      );
+    } catch (error) {
+      console.error("Google sign-in failed:", error);
+      const kind = classifyAuthError(error);
+      if (kind !== "cancelled") {
+        toast.error(getAuthErrorMessage(error, t, isRtl));
       }
-
-      let result;
-      try {
-        result = await signInWithPopup(auth, provider);
-      } catch (popupErr: any) {
-        const pCode = popupErr.code || "";
-        const pMsg = popupErr.message || "";
-        if (
-          pCode === "auth/popup-blocked" || 
-          pCode === "auth/popup-closed-by-user" || 
-          pCode === "auth/cancelled-popup-request" ||
-          pMsg.includes("popup-blocked") ||
-          pMsg.includes("popup-closed") ||
-          pMsg.includes("cancelled-popup-request")
-        ) {
-          toast.loading(isRtl ? "تم حظر النافذة المنبثقة. جاري تحويلك لتسجيل الدخول بأمان..." : "Popup blocked. Redirecting securely inside the same tab...");
-          await signInWithRedirect(auth, provider);
-          return;
-        }
-        throw popupErr;
-      }
-
-      if (result && result.user) {
-        await processGoogleUser(result.user, role, mode);
-        toast.success(isRtl ? "تم تسجيل الدخول بنجاح بـ Google!" : "Signed in with Google successfully!");
-      }
-    } catch (error: any) {
-      console.error("Google Auth Error with GSI SDK:", error);
-      const errorCode = error.code || "";
-      const errorMessage = error.message || "";
-
-      if (
-        errorCode === "auth/unauthorized-domain" ||
-        errorCode === "auth/unauthorized-client" ||
-        errorMessage.includes("unauthorized-domain") ||
-        errorMessage.includes("unauthorized_domain") ||
-        errorMessage.toLowerCase().includes("unauthorized domain")
-      ) {
-        setUnauthorizedDomainError(window.location.hostname);
-        toast.error(
-          isRtl
-            ? "خطأ: النطاق الحالي غير مصرح به في إعدادات Firebase Console الخاصة بـ Google Auth."
-            : "Error: The current domain is not authorized in Firebase Console settings for Google Auth.",
-        );
-      } else if (
-        errorCode === "auth/operation-not-allowed" ||
-        errorMessage.includes("operation-not-allowed") ||
-        errorMessage.toLowerCase().includes("operation not allowed") ||
-        errorMessage
-          .toLowerCase()
-          .includes("disabled for this firebase project") ||
-        errorMessage.toLowerCase().includes("provider is disabled")
-      ) {
-        setFirebaseProviderError("google-disabled");
-        toast.error(
-          isRtl
-            ? "خطأ: لم يتم تفعيل تسجيل دخول Google في لوحة تحكم Firebase لمشروعك!"
-            : "Error: Google Sign-In is not enabled in your Firebase Authentication Console!",
-        );
-      } else {
-        setShowIframeHint(true);
-        setFirebaseProviderError(
-          `${errorCode || "Exception"}: ${errorMessage || String(error)}`,
-        );
-        toast.error(t("failedConnection"));
-      }
-      setShowGoogleTroubleshoot(true);
+    } finally {
       setLoading(false);
     }
-  };
-
-  const validatePasswordComplexity = (pwd: string): { isValid: boolean; message: string } => {
-    if (pwd.length < 6) {
-      return {
-        isValid: false,
-        message: isRtl 
-          ? "يجب أن تكون كلمة المرور مكونة من 6 أحرف على الأقل." 
-          : "Password must be at least 6 characters."
-      };
-    }
-    // Check for extremely simple sequential/repeating passwords
-    if (/^(123456|12345678|abcdef|111111|000000|qwerty)$/i.test(pwd)) {
-      return {
-        isValid: false,
-        message: isRtl
-          ? "كلمة المرور هذه شائعة جداً وسهلة التخمين. الرجاء اختيار كلمة مرور أكثر تعقيداً."
-          : "This password is too simple and easy to guess. Please choose a more complex password."
-      };
-    }
-    const allRepeating = pwd.split("").every(char => char === pwd[0]);
-    if (allRepeating) {
-      return {
-        isValid: false,
-        message: isRtl
-          ? "لا يمكن أن تتكون كلمة المرور من تكرار حرف واحد فقط."
-          : "Password cannot consist of a single repeating character."
-      };
-    }
-    return { isValid: true, message: "" };
   };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Verify Captcha
     if (parseInt(captchaAnswer) !== captchaChallenge.a + captchaChallenge.b) {
       toast.error(t("captchaError"));
       generateCaptcha();
@@ -777,7 +436,7 @@ export default function Login() {
     }
 
     const emailTrimmed = email.toLowerCase().trim();
-    const passwordValue = password; // Do not trim passwords as they can contain valid spaces
+    const passwordValue = password;
 
     if (passwordValue.length < 6) {
       toast.error(t("passwordShort"));
@@ -787,7 +446,13 @@ export default function Login() {
     if (mode === "signup") {
       const complexityRes = validatePasswordComplexity(passwordValue);
       if (!complexityRes.isValid) {
-        toast.error(complexityRes.message);
+        toast.error(
+          isRtl && complexityRes.message === "This password is too simple and easy to guess"
+            ? "كلمة المرور هذه شائعة جداً وسهلة التخمين."
+            : isRtl && complexityRes.message === "Password cannot consist of a single repeating character"
+              ? "لا يمكن أن تتكون كلمة المرور من تكرار حرف واحد فقط."
+              : complexityRes.message,
+        );
         return;
       }
     }
@@ -795,326 +460,31 @@ export default function Login() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const result = await createUserWithEmailAndPassword(
-          auth,
-          emailTrimmed,
-          passwordValue,
-        );
-        const user = result.user;
-
-        await updateProfile(user, { displayName: name });
-
-        // Send Email Verification
-        try {
-          auth.languageCode = isRtl ? "ar" : "en";
-          await sendEmailVerification(user);
-          toast.success(t("verificationSent"));
-        } catch (verifErr) {
-          console.warn("Verification email failed", verifErr);
-          toast.error(t("verificationFailed"));
-        }
-
-        // Check for provisioned user by email
-        const q = query(
-          collection(db, "users"),
-          where("email", "==", emailTrimmed),
-        );
-        const querySnap = await getDocs(q);
-        let provisionedData = null;
-        let oldDocId = "";
-
-        if (!querySnap.empty) {
-          const found = querySnap.docs[0];
-          provisionedData = found.data();
-          oldDocId = found.id;
-        }
-
-        // Check if first user for SuperAdmin
-        let isFirstUser = false;
-        try {
-          const metadataSnap = await getDoc(doc(db, "users", "metadata"));
-          isFirstUser = !metadataSnap.exists();
-        } catch (err) {
-          console.warn("Metadata check error", err);
-        }
-
-        let finalRole = isFirstUser
-          ? UserRole.SUPERADMIN
-          : provisionedData?.role || role;
-
-        if (finalRole === "superadmin" && !isFirstUser) {
-          finalRole = UserRole.ADMIN;
-        }
-
-        // Role conflict check: management cannot be teacher or parent
-        const isManagement = [
-          "admin",
-          "staff",
-          "assistant",
-          "superadmin",
-        ].includes(provisionedData?.role);
-        if (
-          isManagement &&
-          (role === UserRole.PARENT || role === UserRole.TEACHER)
-        ) {
-          toast.error(
-            "هذا الحساب مسجل كإدارة مدرسة ولا يمكن استخدامه كمعلم أو ولي أمر بنفس البريد",
-          );
-          setLoading(false);
-          return;
-        }
-
-        // 1. Create school document if signing up as Admin
-        let schoolId = provisionedData?.schoolId || "";
-        if (finalRole === UserRole.ADMIN && !schoolId) {
-          const schoolRef = await addDoc(collection(db, "schools"), {
-            name: name, // School Name
-            phone: phone, // Admin/School Phone
-            address: schoolAddress, // Detailed Address
-            governorate: schoolGovernorate, // Governorate
-            directorate: schoolDirectorate, // Directorate
-            educationLevel: schoolEducationLevel, // School Stage
-            stage: schoolEducationLevel, // also keep stage mapping
-            workingHours: schoolWorkingHours, // School Shift/working hours
-            shift: schoolWorkingHours, // also keep shift mapping
-            studyType: schoolStudyType, // Study gender type
-            genderType: schoolStudyType, // also keep genderType mapping
-            estimatedStudents: Number(schoolEstimatedStudents) || 0, // Numeric input
-            approximateStudents: schoolEstimatedStudents, // also keep duplicate mapping as string
-            status: "active",
-            planId: "basic",
-            studentCount: 0,
-            adminEmail: emailTrimmed,
-            adminName: name,
-            adminPhone: phone,
-            createdAt: serverTimestamp(),
-          });
-          schoolId = schoolRef.id;
-        }
-
-        // 2. Create permanent profile
-        await setDoc(doc(db, "users", user.uid), {
-          name: name || provisionedData?.name || "مستخدم جديد",
+        await signUpWithEmail({
           email: emailTrimmed,
-          role: finalRole,
-          phone: phone, // Added phone to profile
-          schoolId: schoolId,
-          createdAt: new Date().toISOString(),
-          uid: user.uid,
+          password: passwordValue,
+          displayName: name,
+          phone,
+          selectedRole: role,
+          school: {
+            phone,
+            address: schoolAddress,
+            governorate: schoolGovernorate,
+            directorate: schoolDirectorate,
+            educationLevel: schoolEducationLevel,
+            workingHours: schoolWorkingHours,
+            studyType: schoolStudyType,
+            estimatedStudents: schoolEstimatedStudents,
+          },
+          isRtl,
         });
-
-        // 3. Migrate students
-        if (oldDocId && oldDocId !== user.uid) {
-          const studentsQ = query(
-            collection(db, "students"),
-            where("parentIds", "array-contains", oldDocId),
-          );
-          const studentsSnap = await getDocs(studentsQ);
-
-          const migrationPromises = studentsSnap.docs.map((studentDoc) => {
-            const currentIds = studentDoc.data().parentIds || [];
-            const updatedIds = currentIds.map((id: string) =>
-              id === oldDocId ? user.uid : id,
-            );
-            return updateDoc(doc(db, "students", studentDoc.id), {
-              parentIds: updatedIds,
-            });
-          });
-
-          await Promise.all(migrationPromises);
-          await deleteDoc(doc(db, "users", oldDocId));
-        }
-
-        if (isFirstUser) {
-          await setDoc(doc(db, "users", "metadata"), { initialized: true });
-        }
         toast.success(t("signupSuccess"));
       } else {
-        try {
-          // Attempt standard sign in
-          const result = await signInWithEmailAndPassword(auth, emailTrimmed, passwordValue);
-
-          // Self-healing school document block on login
-          try {
-            const userDocSnap = await getDoc(doc(db, "users", result.user.uid));
-            if (userDocSnap.exists()) {
-              const userData = userDocSnap.data();
-              if (userData?.role === "admin" && userData?.schoolId) {
-                const schoolDocRef = doc(db, "schools", userData.schoolId);
-                const schoolDocSnap = await getDoc(schoolDocRef);
-                if (schoolDocSnap.exists()) {
-                  const schoolData = schoolDocSnap.data();
-                  // Check if school has empty/missing fields
-                  if (!schoolData.governorate || !schoolData.directorate || schoolData.estimatedStudents === undefined) {
-                    // Search in registrations for a match
-                    const registrationsRef = collection(db, "registrations");
-                    const regQuery = query(
-                      registrationsRef,
-                      where("customerInfo.email", "==", emailTrimmed)
-                    );
-                    const regDocs = await getDocs(regQuery);
-
-                    let regData = null;
-                    if (!regDocs.empty) {
-                      regData = regDocs.docs[0].data();
-                    } else {
-                      // fallback to direct email field
-                      const regQuery2 = query(
-                        registrationsRef,
-                        where("email", "==", emailTrimmed)
-                      );
-                      const regDocs2 = await getDocs(regQuery2);
-                      if (!regDocs2.empty) {
-                        regData = regDocs2.docs[0].data();
-                      }
-                    }
-
-                    if (regData) {
-                      const regFields = regData.customerInfo || regData;
-                      const updatePayload: Record<string, any> = {};
-
-                      if (regFields.name && !schoolData.name) {
-                        updatePayload.name = regFields.name;
-                      }
-                      if (regFields.phone && !schoolData.phone) {
-                        updatePayload.phone = regFields.phone;
-                        updatePayload.adminPhone = regFields.phone;
-                      }
-                      if (regFields.address && !schoolData.address) {
-                        updatePayload.address = regFields.address;
-                      }
-                      if (regFields.governorate && !schoolData.governorate) {
-                        updatePayload.governorate = regFields.governorate;
-                      }
-                      if (regFields.directorate && !schoolData.directorate) {
-                        updatePayload.directorate = regFields.directorate;
-                      }
-
-                      // Handle educationLevel
-                      const eduLvl = regFields.educationLevel || regFields.stage;
-                      if (eduLvl && (!schoolData.educationLevel || !schoolData.stage)) {
-                        updatePayload.educationLevel = eduLvl;
-                        updatePayload.stage = eduLvl;
-                      }
-
-                      // Handle workingHours
-                      const wrkHrs = regFields.workingHours || regFields.shift;
-                      if (wrkHrs && (!schoolData.workingHours || !schoolData.shift)) {
-                        updatePayload.workingHours = wrkHrs;
-                        updatePayload.shift = wrkHrs;
-                      }
-
-                      // Handle studyType
-                      const stdTyp = regFields.studyType || regFields.genderType;
-                      if (stdTyp && (!schoolData.studyType || !schoolData.genderType)) {
-                        updatePayload.studyType = stdTyp;
-                        updatePayload.genderType = stdTyp;
-                      }
-
-                      // Handle estimatedStudents
-                      const estStud = regFields.estimatedStudents !== undefined ? regFields.estimatedStudents : regFields.approximateStudents;
-                      if (estStud !== undefined && schoolData.estimatedStudents === undefined) {
-                        updatePayload.estimatedStudents = Number(estStud) || 0;
-                        updatePayload.approximateStudents = String(estStud);
-                      }
-
-                      if (Object.keys(updatePayload).length > 0) {
-                        await updateDoc(schoolDocRef, updatePayload);
-                        console.log("School data synced successfully on login!");
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } catch (healErr) {
-            console.error("Heal school data error value:", healErr);
-          }
-
-          toast.success(t("welcomeBack"));
-        } catch (signInErr: any) {
-          // Dynamic Fallback 1: Try with password trimmed (handles accidental spaces on mobile/copy-paste)
-          if (passwordValue.trim() !== passwordValue) {
-            try {
-              await signInWithEmailAndPassword(auth, emailTrimmed, passwordValue.trim());
-              toast.success(t("welcomeBack"));
-              return;
-            } catch (trimErr) {
-              // Ignore trim error, continue to next fallback
-            }
-          }
-
-          // Dynamic Fallback 2: Check if they are a pre-registered/pre-created user in Firestore who has no Auth account yet.
-          // In Firebase v9+, any bad login or user-not-found returns 'auth/invalid-credential'
-          const errCode = signInErr.code || "";
-          const errMsg = signInErr.message || "";
-          const isInvalid =
-            errCode === "auth/user-not-found" ||
-            errCode === "auth/wrong-password" ||
-            errCode === "auth/invalid-credential" ||
-            errCode === "INVALID_CREDENTIAL" ||
-            errMsg.includes("invalid-credential") ||
-            errMsg.toLowerCase().includes("invalid credential");
-
-          if (isInvalid) {
-            try {
-              // If we do an anonymous or direct signup check:
-              // Since rules prevent public users query without sign-in, we try to create an account for them.
-              // If they do not exist in Auth, this will succeed and create their Auth account, 
-              // which then gets automatically claimed by AuthContext claiming logic using their email!
-              // But if they already exist in Auth, this will throw "auth/email-already-in-use", 
-              // meaning they just typed the wrong password, so we safely present the original invalidCredential error!
-              const signUpResult = await createUserWithEmailAndPassword(
-                auth,
-                emailTrimmed,
-                passwordValue
-              );
-              
-              if (signUpResult.user) {
-                // Account created and linked successfully automatically!
-                toast.success(
-                  isRtl 
-                    ? "تم تفعيل حسابك بنجاح والدخول للوحة التحكم!" 
-                    : "Account activated and logged in successfully!"
-                );
-                return;
-              }
-            } catch (signUpErr: any) {
-              if (signUpErr.code !== "auth/email-already-in-use") {
-                console.warn("Auto activation signUp failed:", signUpErr);
-              }
-            }
-          }
-
-          // Inner catch to distinguish between different auth failures if needed
-          throw signInErr;
-        }
+        await signInWithEmail(emailTrimmed, passwordValue);
+        toast.success(t("welcomeBack"));
       }
-    } catch (error: any) {
-      const errorCode = error.code || "";
-      const errorMessage = error.message || "";
-
-      // auth/invalid-credential is the generic error for wrong email/password in newer Firebase versions
-      if (
-        errorCode === "auth/user-not-found" ||
-        errorCode === "auth/wrong-password" ||
-        errorCode === "auth/invalid-credential" ||
-        errorCode === "INVALID_CREDENTIAL" ||
-        errorMessage.includes("invalid-credential") ||
-        errorMessage.toLowerCase().includes("invalid credential")
-      ) {
-        toast.error(t("invalidCredential"));
-      } else if (errorCode === "auth/email-already-in-use") {
-        toast.error(t("emailInUse"));
-      } else if (errorCode === "auth/weak-password") {
-        toast.error(t("weakPassword"));
-      } else if (errorCode === "auth/too-many-requests") {
-        toast.error(t("tooManyRequests"));
-      } else if (errorCode === "auth/user-disabled") {
-        toast.error(t("userDisabled"));
-      } else {
-        toast.error(errorMessage || t("authFailed"));
-      }
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error, t, isRtl));
     } finally {
       setLoading(false);
     }
@@ -1122,17 +492,18 @@ export default function Login() {
 
   const handleForgotPassword = async () => {
     if (!email) {
-      toast.error("يرجى إدخال البريد الإلكتروني أولاً");
+      toast.error(isRtl ? "يرجى إدخال البريد الإلكتروني أولاً" : "Enter your email first");
       return;
     }
     try {
-      const { sendPasswordResetEmail } = await import("firebase/auth");
-      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      await resetPassword(email);
       toast.success(
-        "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني",
+        isRtl
+          ? "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني"
+          : "Password reset email sent",
       );
-    } catch (error: any) {
-      toast.error("فشل إرسال البريد: " + (error.message || "حدث خطأ"));
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error, t, isRtl));
     }
   };
 
@@ -1595,357 +966,6 @@ export default function Login() {
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setShowGoogleTroubleshoot(true)}
-              className="mt-2 text-xs text-blue-600 hover:text-slate-800 dark:text-blue-400 font-bold flex items-center justify-center gap-1 mx-auto transition-all underline decoration-dashed bg-transparent border-0 cursor-pointer"
-            >
-              <span>{isRtl ? "هل تواجه خطأ Google 403 أو مشكلة بالدخول؟ اضغط هنا للحل الفوري" : "Having Google 403 or auth issues? Click for instant help"}</span>
-            </button>
-
-            {isInsideWebView && (
-              <div
-                id="webview-warning-banner"
-                className="mt-4 p-4 rounded-xl border-2 border-red-200 bg-red-50/50 text-slate-800 text-xs sm:text-sm shadow-sm text-right"
-              >
-                <div className="flex items-start gap-2.5 mb-2 flex-row-reverse">
-                  <ShieldAlert
-                    className="text-red-500 shrink-0 mt-0.5"
-                    size={18}
-                  />
-                  <div className="flex-1">
-                    <h4 className="font-bold text-red-950 text-sm">
-                      {isRtl
-                        ? "متصفح غير مدعوم لتسجيل جوجل!"
-                        : "Unsupported Browser for Google Auth!"}
-                    </h4>
-                    <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs">
-                      {isRtl
-                        ? "أنت تفتح التطبيق داخل متصفح مدمج (تطبيق التواصل). جوجل تمنع تسجيل الدخول هنا (Disallowed Useragent 403). يرجى نسخ الرابط والذهاب إلى Safari أو Chrome."
-                        : "You are inside an in-app browser. Google blocks authentication here (Disallowed Useragent 403). Please copy the link and open Safari or Chrome."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(window.location.href);
-                        toast.success(isRtl ? "تم نسخ الرابط!" : "Link copied!");
-                      } catch (e) {
-                        toast.error(isRtl ? "فشل النسخ تلقائياً" : "Failed to copy");
-                      }
-                    }}
-                    className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-all text-xs active:scale-95 flex items-center justify-center gap-1"
-                  >
-                    <Copy size={12} />
-                    <span>{isRtl ? "نسخ رابط المنصة" : "Copy Platform Link"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowWebviewDialog(true)}
-                    className="py-1.5 px-3 bg-red-100 text-red-700 font-bold rounded-lg transition-all text-xs hover:bg-red-200"
-                  >
-                    {isRtl ? "تعليمات الفتح" : "How to Open"}
-                  </button>
-                </div>
-              </div>
-            )}
-
-
-            {unauthorizedDomainError && (
-              <div
-                id="unauthorized-domain-card"
-                className="mt-4 p-4 rounded-xl border-2 border-amber-200 bg-amber-50/50 text-slate-800 text-xs sm:text-sm shadow-sm"
-              >
-                <div className="flex items-start gap-2.5 mb-2.5">
-                  <ShieldAlert
-                    className="text-amber-500 shrink-0 mt-0.5"
-                    size={18}
-                  />
-                  <div>
-                    <h4 className="font-bold text-amber-950 text-sm">
-                      {isRtl
-                        ? "تفعيل دخول Google (خطوة مطلوبة)"
-                        : "Enable Google Sign-in (Action Required)"}
-                    </h4>
-                    <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
-                      {isRtl
-                        ? "نظراً لأن التطبيق يعمل في بيئة معاينة آمنة، يجب عليك إضافة هذا النطاق يدوياً كمجال مصرح به في لوحة تحكم Firebase الخاص بمشروعك (Authentication -> Settings -> Authorized domains)."
-                        : "Because this preview runs in a sandboxed environment, you must manually add this domain into your Firebase project settings (Authentication -> Settings -> Authorized domains)."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-white/90 p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2 shadow-inner">
-                  <code
-                    id="domain-to-copy"
-                    className="font-mono text-[10px] sm:text-xs text-slate-700 select-all font-bold tracking-tight bg-slate-50 px-1.5 py-0.5 rounded break-all"
-                  >
-                    {unauthorizedDomainError}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(unauthorizedDomainError);
-                      toast.success(
-                        isRtl
-                          ? "تم نسخ النطاق بنجاح!"
-                          : "Domain copied successfully!",
-                      );
-                    }}
-                    className="flex items-center gap-1.5 hover:bg-slate-100 px-2.5 py-1.5 rounded-md font-bold transition-all text-[11px] text-blue-600 shrink-0 active:scale-95 border border-slate-200 bg-white shadow-sm"
-                  >
-                    <Copy size={13} />
-                    <span>{isRtl ? "نسخ" : "Copy"}</span>
-                  </button>
-                </div>
-
-                <div className="mt-2 text-[10px] sm:text-[11px] text-slate-500 list-decimal pl-4 space-y-0.5 rtl:pr-4 rtl:pl-0 font-medium leading-relaxed">
-                  <p>
-                    1.{" "}
-                    {isRtl
-                      ? "اذهب لـ Firebase Console وافتح مشروعك."
-                      : "Go to Firebase Console and open your project."}
-                  </p>
-                  <p>
-                    2.{" "}
-                    {isRtl
-                      ? "اختر Build ثم Authentication ثم تبويب Settings."
-                      : "Click on Build, then Authentication, then Settings tab."}
-                  </p>
-                  <p>
-                    3.{" "}
-                    {isRtl
-                      ? "تحت Authorized domains، اضغط على Add domain وألصق النطاق المنسوخ أعلاه."
-                      : "Under Authorized domains, click Add domain and paste the copied domain."}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {nativePlatformNotice && (
-              <div
-                id="native-platform-notice-card"
-                className="mt-4 p-4 rounded-xl border-2 border-amber-200 bg-amber-50/50 text-slate-800 text-xs sm:text-sm shadow-sm"
-              >
-                <div className="flex items-start gap-2.5 mb-3">
-                  <ShieldAlert
-                    className="text-amber-600 shrink-0 mt-0.5"
-                    size={20}
-                  />
-                  <div>
-                    <h4 className="font-bold text-amber-950 text-sm">
-                      {isRtl
-                        ? "تفعيل الدخول بـ Google للأجهزة والتطبيقات الكابستور"
-                        : "Native Google Sign-In for Capacitor Mobile Packages"}
-                    </h4>
-                    <p className="text-slate-700 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
-                      {isRtl
-                        ? "أنت تقوم بتشغيل التطبيق حالياً كحزمة هاتف مثبتة (Capacitor WebView). للتسجيل بنجاح ومنع المشاكل الناتجة عن متصفحات الويب الخارجية، قمنا بدمج كود أصلي (Native Plugin) يفتح واجهة نظام التشغيل المباشرة لالتقاط حساب Google."
-                        : "You are running the app inside a mobile package (Capacitor). To prevent login issues with external browsers, we have integrated a native plugin that triggers the native OS account picker seamlessly."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-white/80 p-3 rounded-lg border border-slate-200 text-slate-700 space-y-2 text-[11px] sm:text-xs">
-                  <p className="font-bold text-slate-900 border-b border-slate-100 pb-1">
-                    {isRtl ? "💡 كيف تقوم بتهيئة الخدمة للعمل بشكل طبيعي 100%؟" : "💡 How to configure Native Google Auth successfully:"}
-                  </p>
-                  <p>
-                    <strong>{isRtl ? "المتطلب 1: كود الويب (Web Client ID):" : "Requirement 1: Web Client ID:"}</strong>{" "}
-                    {isRtl
-                      ? "اذهب إلى Firebase Console -> الـ Authentication ثم تبويب Sign-in method -> ثم اختر Google -> وقم بنسخ معرّف Web Client ID ولصقه في الحقل أدناه وحفظه لتجربته مباشرة."
-                      : "Go to Firebase Console -> Authentication -> Sign-in method -> edit Google -> copy the Web Client ID, paste it below, and save to test immediately."}
-                  </p>
-                  <p>
-                    <strong>{isRtl ? "المتطلب 2: بصمة SHA-1 للأندرويد:" : "Requirement 2: Android SHA-1 fingerprint:"}</strong>{" "}
-                    {isRtl
-                      ? "يجب إضافة بصمة SHA-1 الخاصة بشهادة التوقيع (Signing Certificate) لملف الـ APK الخاص بك في إعدادات تطبيق الأندرويد داخل Firebase Console وإلا سيرجع جوجل خطأ 'developer_error - 10'."
-                      : "You must add your build's SHA-1 signing certificate fingerprint to your Android app settings in the Firebase Console. Otherwise, Google returning 'developer_error - 10'."}
-                  </p>
-                  <p>
-                    <strong>{isRtl ? "الخيار البديل (الأسرع):" : "Alternative Option (Fastest):"}</strong>{" "}
-                    {isRtl
-                      ? "استخدم البريد الإلكتروني وكلمة المرور لعمل حساب جديد والدخول فوراً بدون أي ضبط إضافي للمفاتيح وبأعلى أمان."
-                      : "Use standard 'Email and Password' to sign in instantly with no extra Google settings is always fully supported."}
-                  </p>
-                </div>
-
-                <div className="mt-4 p-3 rounded-lg border border-slate-200 bg-white shadow-sm font-sans">
-                  <p className="font-bold text-slate-950 text-xs mb-1.5 flex items-center gap-1.5 justify-start">
-                    <Smartphone size={15} className="text-blue-500 animate-pulse" />
-                    <span>{isRtl ? "تعديل واختبار Web Client ID مباشر" : "Live Test Web Client ID Override"}</span>
-                  </p>
-                  <p className="text-[10px] text-slate-500 mb-2 leading-normal">
-                    {isRtl
-                      ? "قم بتحديث المعرّف الذي نسخته من منصة Firebase هنا واحفظه ليتم ربطه بكود تسجيل الدخول مباشرة على جهازك الحالي:"
-                      : "Update your Client ID from Firebase here and click Save to test on your phone in real-time:"}
-                  </p>
-                  
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={googleClientId}
-                      onChange={(e) => setGoogleClientId(e.target.value)}
-                      placeholder="xxxxx-xxxxx.apps.googleusercontent.com"
-                      className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 placeholder-slate-400 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        localStorage.setItem("override_google_client_id", googleClientId);
-                        toast.success(isRtl ? "تم الحفظ محلياً! اضغط على أيقونة جوجل بالأعلى لإعادة المحاولة" : "Saved locally! Tap Google Sign-In above to retry.");
-                      }}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded transition-colors active:scale-95 duration-100 shrink-0"
-                    >
-                      {isRtl ? "حفظ" : "Save"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {firebaseProviderError && (
-              <div
-                id="firebase-provider-error-card"
-                className="mt-4 p-4 rounded-xl border-2 border-rose-200 bg-rose-50/50 text-slate-800 text-xs sm:text-sm shadow-sm text-right"
-              >
-                <div className="flex items-start gap-2.5 mb-2.5 rtl:flex-row-reverse">
-                  <ShieldAlert
-                    className="text-rose-600 shrink-0 mt-0.5"
-                    size={18}
-                  />
-                  <div>
-                    <h4 className="font-bold text-rose-950 text-sm">
-                      {firebaseProviderError === "google-disabled"
-                        ? isRtl
-                          ? "تفعيل دخول Google (خطأ إعدادات)"
-                          : "Enable Google Auth (Configuration Error)"
-                        : isRtl
-                          ? "تفاصيل الخطأ الفني (Firebase Exception)"
-                          : "Technical Error Details (Firebase Exception)"}
-                    </h4>
-                    <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
-                      {firebaseProviderError === "google-disabled"
-                        ? isRtl
-                          ? "لم يتم تفعيل موفر تسجيل الدخول Google في لوحة تحكم عتاد Firebase. يرجى تفعيله من Firebase Console لتشغيل الخدمة."
-                          : "Google Authentication Sign-In is not activated in the Firebase Project Console."
-                        : isRtl
-                          ? "لقد أطلق نظام المصادقة استثناءاً فنياً محدداً. التفاصيل معروضة أدناه للتحقق والإصلاح:"
-                          : "The auth system threw an explicit technical exception. See details below to resolve: "}
-                    </p>
-                  </div>
-                </div>
-
-                {firebaseProviderError !== "google-disabled" ? (
-                  <div className="bg-white p-2.5 rounded-lg border border-rose-200 shadow-inner">
-                    <code className="font-mono text-[10px] sm:text-xs text-rose-700 select-all font-bold tracking-tight break-all">
-                      {firebaseProviderError}
-                    </code>
-                  </div>
-                ) : (
-                  <div className="mt-3 bg-white p-3 rounded-lg border border-slate-200 flex flex-col gap-2.5 shadow-sm text-center">
-                    <p className="font-bold text-slate-900 text-xs">
-                      {isRtl
-                        ? "طريقة الحل وتفعيل موفر تسجيل الخدمة:"
-                        : "Steps to Activate and Resolve:"}
-                    </p>
-                    <div className="text-[10px] sm:text-[11px] text-slate-500 list-decimal pr-4 pl-0 rtl:pl-4 space-y-1 font-medium leading-relaxed text-right">
-                      <p>
-                        1.{" "}
-                        {isRtl
-                          ? "ادخل على حساب Firebase Console وافتح مشروعك."
-                          : "Open Firebase Console and pick your project."}
-                      </p>
-                      <p>
-                        2.{" "}
-                        {isRtl
-                          ? "اذهب إلى قائمة Build ثم Authentication ثم تبويب Sign-in method."
-                          : "Click on Build -> Authentication -> Sign-in method tab."}
-                      </p>
-                      <p>
-                        3.{" "}
-                        {isRtl
-                          ? "اضغط على Add provider واختر Google وقم بتفعيله ثم حفظ."
-                          : "Click Add provider -> Google -> Enable and save the changes."}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {showIframeHint && (
-              <div
-                id="iframe-connection-hint-card"
-                className="mt-4 p-4 rounded-xl border-2 border-indigo-200 bg-indigo-50/50 text-slate-800 text-xs sm:text-sm shadow-sm text-right"
-              >
-                <div className="flex items-start gap-2.5 mb-2.5 rtl:flex-row-reverse">
-                  <ShieldAlert
-                    className="text-indigo-600 shrink-0 mt-0.5"
-                    size={18}
-                  />
-                  <div>
-                    <h4 className="font-bold text-indigo-950 text-sm">
-                      {isRtl
-                        ? "لماذا تظهر هذه الرسالة؟ (مشكلة تقييد المتصفح)"
-                        : "Why does this message appear? (Browser Restriction)"}
-                    </h4>
-                    <p className="text-slate-600 leading-relaxed mt-1 text-[11px] sm:text-xs font-normal">
-                      {isRtl
-                        ? "عند تشغيل التطبيق داخل نافذة المعاينة بالمنصة، يقوم المتصفح بحظر ملفات تعريف الارتباط للطرف الثالث (Third-Party Cookies) وتخزين الويب لأسباب أمنية، مما يمنع Google من مكاملة الاتصال."
-                        : "When running the application inside the platform preview frame, browsers block third-party cookies & web storage for security, which prevents Google Auth from completing."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-3 bg-white p-3 rounded-lg border border-slate-200 flex flex-col gap-2.5 shadow-sm">
-                  <p className="font-bold text-slate-900 text-xs text-center">
-                    {isRtl
-                      ? "الحل الأبسط والأسرع: تشغيله في علامة تبويب جديدة"
-                      : "Easiest solution: Run in a separate tab"}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.open(window.location.href, "_blank");
-                    }}
-                    className="w-full flex items-center justify-center gap-2 hover:bg-indigo-600 hover:text-white bg-indigo-500 text-white px-3 py-2 sm:py-2.5 rounded-lg font-bold transition-all text-xs sm:text-sm active:scale-95 shadow"
-                  >
-                    <ExternalLink size={14} />
-                    <span>
-                      {isRtl
-                        ? "الفتح وتشغيل التطبيق في علامة تبويب مستقلة"
-                        : "Open & Run App in New Tab"}
-                    </span>
-                  </button>
-                </div>
-
-                <div className="mt-2.5 text-[10px] sm:text-[11px] text-slate-500 list-decimal pr-4 pl-0 rtl:pl-4 space-y-1 font-medium leading-relaxed">
-                  <p>
-                    1.{" "}
-                    {isRtl
-                      ? "اضغط على الزر الزرق أعلاه لفتح التطبيق بشكل كامل."
-                      : "Click the blue button above to open the application fully."}
-                  </p>
-                  <p>
-                    2.{" "}
-                    {isRtl
-                      ? 'أو يمكنك تفعيل "قبول ملفات تعريف الارتباط للطرف الثالث" (Third-Party Cookies) في المتصفح.'
-                      : 'Or you can enable "Third-Party Cookies" in your browser settings.'}
-                  </p>
-                  <p>
-                    3.{" "}
-                    {isRtl
-                      ? "يمكنك أيضاً استخدام نظام تسجيل الدخول العادي بالبريد الإلكتروني وكلمة المرور دون أي قيود."
-                      : "You can also use standard email & password login directly without restrictions."}
-                  </p>
-                </div>
-              </div>
-            )}
           </form>
 
           <p className="mt-6 sm:mt-8 text-center text-slate-400 text-xs sm:text-sm font-medium">
@@ -2365,279 +1385,6 @@ export default function Login() {
       <div className="-mx-6 -mb-12 mt-20 w-[calc(100%+3rem)]">
         <GlobalFooter />
       </div>
-
-      <AnimatePresence>
-        {showGoogleTroubleshoot && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md overflow-y-auto" dir={isRtl ? "rtl" : "ltr"}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-2xl p-6 sm:p-8 text-right shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col gap-5 relative my-8"
-            >
-              <button
-                type="button"
-                onClick={() => setShowGoogleTroubleshoot(false)}
-                className="absolute top-4 left-4 p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all z-10"
-              >
-                <X size={18} />
-              </button>
-
-              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/50 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto">
-                <ShieldCheck size={28} />
-              </div>
-
-              <div className="text-center">
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-2">
-                  {isRtl ? "دليل حل مشاكل تسجيل دخول Google" : "Google Sign-In Troubleshooting Guide"}
-                </h3>
-                <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
-                  {isRtl
-                    ? "خطوات معالجة خطأ 403 والمشاكل الشائعة على الهواتف والكمبيوتر 100%"
-                    : "Step-by-step solutions to solve 403 and configuration errors on PC & Mobile"}
-                </p>
-              </div>
-
-              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar text-right">
-                
-                {/* 1. Error 403 / Testing Mode */}
-                <div className="p-4 rounded-xl bg-amber-50/55 dark:bg-amber-950/20 border border-amber-200/40 dark:border-amber-900/30">
-                  <div className="flex items-center gap-3 justify-start flex-row-reverse mb-2">
-                    <ShieldAlert className="text-amber-500 shrink-0" size={18} />
-                    <h4 className="font-extrabold text-amber-950 dark:text-amber-400 text-sm">
-                      {isRtl ? "1. خطأ 403: ليس لديك صلاحية الدخول (Access Denied)" : "1. Error 403: Access Denied / App in Testing"}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pr-6">
-                    {isRtl
-                      ? "هذا الخطأ يحدث عندما يكون تطبيق Google Cloud في وضع «التجريب (Testing)»."
-                      : "This error occurs when your Google Cloud Console project is left in \"Testing\" state."}
-                  </p>
-                  <ul className="text-xs text-slate-600 dark:text-slate-400 list-disc pr-10 pl-0 mt-2 space-y-1">
-                    <li>
-                      {isRtl
-                        ? "اذهب إلى Google Cloud Console -> ثم OAuth consent screen."
-                        : "Go to Google Cloud Console -> OAuth consent screen."}
-                    </li>
-                    <li>
-                      {isRtl
-                        ? "قم بتغيير حالة النشر من «Testing» إلى «Production»."
-                        : "Change the publishing status from 'Testing' to 'Production' to enable global logins."}
-                    </li>
-                    <li>
-                      {isRtl
-                        ? "أو قم بإضافة البريد الإلكتروني الذي تحاول الدخول به تحت قائمة «Test Users»."
-                        : "Alternatively, add your candidate email to the 'Test Users' list."}
-                    </li>
-                  </ul>
-                </div>
-
-                {/* 2. Embedded WebViews */}
-                <div className="p-4 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/40 dark:border-rose-900/30">
-                  <div className="flex items-center gap-3 justify-start flex-row-reverse mb-2">
-                    <ShieldAlert className="text-rose-500 shrink-0" size={18} />
-                    <h4 className="font-extrabold text-rose-950 dark:text-rose-400 text-sm">
-                      {isRtl ? "2. خطأ 403: متصفح WebView مدمج (Disallowed Useragent)" : "2. Error 403: Disallowed Useragent (Inside WebViews)"}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pr-6">
-                    {isRtl
-                      ? "تمنع شركة Google تسجيل الدخول بأي حساب من داخل المتصفحات المدمجة (انستقرام، فيسبوك، واتساب) لأسباب أمنية."
-                      : "Google blocks OAuth logins inside embedded browsers (like inside WhatsApp, Telegram, Instagram)."}
-                  </p>
-                  <div className="mt-2 pr-6 flex gap-2 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowGoogleTroubleshoot(false);
-                        setShowWebviewDialog(true);
-                      }}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-bold underline bg-transparent cursor-pointer"
-                    >
-                      {isRtl ? "عرض خطوات فتح الرابط خارج التطبيق ↗" : "View steps to open link in Safari/Chrome ↗"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3. Package IDs & SHA-1 Fingerprints */}
-                <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/40 dark:border-blue-900/30">
-                  <div className="flex items-center gap-3 justify-start flex-row-reverse mb-2">
-                    <Smartphone className="text-blue-500 shrink-0" size={18} />
-                    <h4 className="font-extrabold text-blue-950 dark:text-blue-400 text-sm">
-                      {isRtl ? "3. تهيئة تطبيقات الهاتف (Android & iOS)" : "3. Android & iOS Native Configuration"}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pr-6">
-                    {isRtl
-                      ? "إذا كنت تستخدم نسخة تطبيق مثبتة وتواجه خطأ المطور (developer_error):"
-                      : "If you're running a compiled native application and get a developer_error:"}
-                  </p>
-                  <ul className="text-xs text-slate-600 dark:text-slate-400 list-disc pr-10 pl-0 mt-2 space-y-1">
-                    <li>
-                      {isRtl
-                        ? "قم بتسجيل بصمة SHA-1 و SHA-256 الخاصة بك داخل منصة Firebase في إعدادات تطبيق Android."
-                        : "You must add your build's SHA-1 and SHA-256 fingerprints to your application settings in Firebase Console."}
-                    </li>
-                  </ul>
-                </div>
-
-                {/* 4. Alternate Option (Email/Password) */}
-                <div className="p-4 rounded-xl bg-emerald-50/55 dark:bg-emerald-950/20 border border-emerald-200/40 dark:border-emerald-900/30">
-                  <div className="flex items-center gap-3 justify-start flex-row-reverse mb-2">
-                    <Info className="text-emerald-500 shrink-0" size={18} />
-                    <h4 className="font-extrabold text-emerald-950 dark:text-emerald-400 text-sm">
-                      {isRtl ? "4. البديل الفوري: التسجيل بالبريد الإلكتروني" : "4. Fast Alternative: Email & Password Sign-In"}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pr-6">
-                    {isRtl
-                      ? "تسجيل البريد الإلكتروني وكلمة المرور مباشر ويعمل 100% بنقرة واحدة دون الحاجة لكل إعدادات جوجل. يمكنك الحساب به في ثوانٍ!"
-                      : "Direct email and password login runs perfectly on all devices without any Google Console setup."}
-                  </p>
-                </div>
-
-              </div>
-
-              <div className="mt-2 flex gap-3 justify-center">
-                <button
-                  type="button"
-                  onClick={() => setShowGoogleTroubleshoot(false)}
-                  className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 text-xs sm:text-sm rounded-xl font-bold transition-all active:scale-95 cursor-pointer"
-                >
-                  {isRtl ? "إغلاق وإكمال الدخول" : "Close and return to sign in"}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {showWebviewDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-slate-900/80 backdrop-blur-md" dir="rtl">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-[2rem] w-full max-w-lg p-6 sm:p-8 text-right shadow-2xl border-2 border-rose-100 flex flex-col gap-6 relative"
-            >
-              <button
-                onClick={() => setShowWebviewDialog(false)}
-                className="absolute top-4 left-4 p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-all z-10"
-              >
-                <X size={18} />
-              </button>
-
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-600 mx-auto">
-                <ShieldAlert size={36} />
-              </div>
-
-              <div className="text-center">
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-3">
-                  تنبيه: متصفح غير مدعوم من Google
-                </h3>
-                <p className="text-slate-600 text-sm leading-relaxed">
-                  أنت تتصفح حالياً من داخل تطبيق مدمج (مثل واتساب، تلغرام، فيسبوك، أو انستغرام).
-                  <br />
-                  <strong className="text-red-600 font-bold block mt-2">
-                    تمنع شركة Google تسجيل الدخول بأي حساب من داخل المتصفحات المدمجة (Disallowed Useragent 403) للحماية والأمان.
-                  </strong>
-                </p>
-              </div>
-
-              {/* Dynamic Content Based on Platform */}
-              {(() => {
-                const ua = typeof window !== "undefined" && window.navigator ? window.navigator.userAgent || "" : "";
-                const isAndroid = /Android/i.test(ua);
-                
-                if (isAndroid) {
-                  return (
-                    <div className="space-y-4">
-                      <div className="bg-emerald-50/55 p-4 rounded-xl border border-emerald-100 text-slate-700 text-xs sm:text-sm">
-                        <h4 className="font-extrabold text-emerald-900 text-sm mb-1">
-                          💡 ميزة الدخول التلقائي للأندرويد:
-                        </h4>
-                        <p className="text-slate-600 leading-relaxed font-medium">
-                          يمكننا فتح منصة SchoolixiQ تلقائياً في متصفح Google Chrome الرسمي والآمن على جهازك لتتمكن من التسجيل بضغطة واحدة وبسرعة فائقة.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const currentUrlNoScheme = window.location.href.replace(/^https?:\/\//, "");
-                          const intentUrl = `intent://${currentUrlNoScheme}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
-                          window.location.href = intentUrl;
-                        }}
-                        className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black py-4 px-4 rounded-2xl transition-all shadow-md active:scale-95 text-sm sm:text-base cursor-pointer"
-                      >
-                        🚀 فتح تلقائي في متصفح Chrome الآن
-                      </button>
-                    </div>
-                  );
-                } else {
-                  // iOS Safari Guide
-                  return (
-                    <div className="bg-indigo-50/40 p-5 rounded-2xl border border-indigo-100 text-slate-700 text-xs sm:text-sm space-y-3">
-                      <h4 className="font-bold text-indigo-950 text-sm">
-                        🍎 طريقة الدخول السريع لأجهزة iPhone:
-                      </h4>
-                      <ul className="text-xs text-slate-600 space-y-2.5 pr-4 pl-0 list-decimal leading-relaxed font-medium">
-                        <li>
-                          اضغط على زر <strong className="text-indigo-600">القائمة (•••)</strong> أو <strong className="text-indigo-600">زر المشاركة</strong> في الزاوية العلوية أو السفلية للمتصفح الحالي.
-                        </li>
-                        <li>
-                          اختر <strong className="text-indigo-600">"الفتح في متصفح خارجي"</strong> أو <strong className="text-indigo-600">"Open in Safari"</strong> لتفعيل تسجيل دخول Google بضغطة واحدة وأمان كامل.
-                        </li>
-                        <li>
-                          أو يمكنك نسخ الرابط المباشر أدناه وفتحه بمتصفح Safari الأصلي.
-                        </li>
-                      </ul>
-                    </div>
-                  );
-                }
-              })()}
-
-              <div className="border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setBypassWebViewCheck(true);
-                    setShowWebviewDialog(false);
-                    await handleGoogleAuth(true);
-                  }}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 font-black py-3 px-4 rounded-xl border border-dashed border-slate-200 hover:border-slate-300 transition-all text-xs cursor-pointer"
-                >
-                  🌐 محاولة تسجيل الدخول بـ Google مباشرة داخل هذا التطبيق (للنسخ المعدلة)
-                </button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 mt-1">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(window.location.href);
-                      toast.success("تم نسخ الرابط! الصقه في Chrome أو Safari.");
-                    } catch (err) {
-                      toast.error("فشل نسخ الرابط، يرجى نسخه يدوياً.");
-                    }
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md active:scale-95 text-sm cursor-pointer"
-                >
-                  <Copy size={16} />
-                  <span>نسخ رابط المنصة</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowWebviewDialog(false)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 px-6 rounded-xl transition-all text-sm cursor-pointer"
-                >
-                  إغلاق وتجربة خيارات أخرى
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {successCode && (
