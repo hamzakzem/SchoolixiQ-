@@ -12,6 +12,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/deploy-hostinger.yml"
+      - "scripts/hostinger-deploy.sh"
 
 concurrency:
   group: hostinger-deploy-${{ github.ref }}
@@ -94,62 +95,11 @@ jobs:
           path: schoolixiq-dist.zip
           retention-days: 7
 
-      - name: Resolve Hostinger FTPS target directory
-        id: ftpdir
-        run: |
-          remote="${HOSTINGER_FTP_REMOTE_DIR}"
-          remote="${remote%/}"
-          # FTPS accounts are usually chrooted under /home/USER — use path from /domains/...
-          if [[ "$remote" == *"/domains/"* ]]; then
-            dir="/${remote#*/domains/}/"
-          else
-            dir="${remote}/"
-          fi
-          echo "dir=${dir}" >> "$GITHUB_OUTPUT"
-          echo "FTPS server-dir: ${dir}"
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
 
-      - name: Deploy to Hostinger (FTPS port 21) — attempt 1
-        id: ftps_deploy_1
-        continue-on-error: true
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ env.HOSTINGER_FTP_SERVER }}
-          username: ${{ env.HOSTINGER_FTP_USERNAME }}
-          password: ${{ env.HOSTINGER_FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          timeout: 180000
-          local-dir: ./dist/
-          server-dir: ${{ steps.ftpdir.outputs.dir }}
-          dangerous-clean-slate: false
-          log-level: verbose
-          exclude: |
-            **/.git*
-            **/server.cjs
-            **/server.cjs.map
-
-      - name: Wait before FTPS retry
-        if: steps.ftps_deploy_1.outcome == 'failure'
-        run: sleep 25
-
-      - name: Deploy to Hostinger (FTPS port 21) — attempt 2
-        if: steps.ftps_deploy_1.outcome == 'failure'
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ env.HOSTINGER_FTP_SERVER }}
-          username: ${{ env.HOSTINGER_FTP_USERNAME }}
-          password: ${{ env.HOSTINGER_FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          timeout: 180000
-          local-dir: ./dist/
-          server-dir: ${{ steps.ftpdir.outputs.dir }}
-          dangerous-clean-slate: false
-          log-level: verbose
-          exclude: |
-            **/.git*
-            **/server.cjs
-            **/server.cjs.map
+      - name: Deploy to Hostinger (lftp FTPS/SFTP multi-target)
+        run: bash scripts/hostinger-deploy.sh dist
 
       - name: Deployment summary
         run: |
