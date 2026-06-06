@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Printer, Settings2, Users, ZoomIn, ZoomOut, Maximize } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import StudentGridPrint from "./StudentGridPrint";
 import { IdCardTemplate } from "../../../types/idCardTemplate";
 import { printElement } from "../../../lib/printUtils";

@@ -1,6 +1,5 @@
 import { auth } from './firebase';
 import { captureException } from './sentryWrapper';
-import { AppError } from './AppError';
 
 export enum OperationType {
   CREATE = 'create',
@@ -25,15 +24,10 @@ export interface FirestoreErrorInfo {
       providerId?: string | null;
       email?: string | null;
     }[];
-  };
+  }
 }
 
-export function handleFirestoreError(
-  error: unknown,
-  operationType: OperationType,
-  path: string | null,
-  shouldThrow = true,
-) {
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null, shouldThrow = true) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -42,37 +36,29 @@ export function handleFirestoreError(
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
-      providerInfo:
-        auth.currentUser?.providerData?.map((provider) => ({
-          providerId: provider.providerId,
-          email: provider.email,
-        })) || [],
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
     },
     operationType,
-    path,
+    path
   };
-
+  
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-
+  
   captureException(error, {
     extra: {
-      firestoreErrorInfo: errInfo,
+      firestoreErrorInfo: errInfo
     },
     tags: {
       operation: operationType,
-      path: path || 'unknown',
-    },
+      path: path || 'unknown'
+    }
   });
 
-  if (
-    shouldThrow &&
-    [
-      OperationType.CREATE,
-      OperationType.UPDATE,
-      OperationType.DELETE,
-      OperationType.WRITE,
-    ].includes(operationType)
-  ) {
-    throw AppError.fromFirestore(errInfo.error, errInfo, error);
+  // Only throw error for state mutation/write operations to prevent read/list sockets from crashing the React rendering tree
+  if (shouldThrow && [OperationType.CREATE, OperationType.UPDATE, OperationType.DELETE, OperationType.WRITE].includes(operationType)) {
+    throw new Error(JSON.stringify(errInfo));
   }
 }

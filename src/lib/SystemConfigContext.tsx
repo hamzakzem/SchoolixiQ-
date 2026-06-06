@@ -20,6 +20,7 @@ interface SystemConfig {
   supportPhones: string[];
   supportEmails: string[];
   successPartners: {name: string, logoUrl: string}[];
+  ourPartners?: { name: string; logoUrl: string; link: string; active?: boolean }[];
   marketingTitle?: string;
   marketingSubtitle?: string;
   marketingFeatures?: MarketingFeature[];
@@ -33,6 +34,7 @@ const defaultSystemConfig: SystemConfig = {
   supportPhones: ['+964 770 000 0000'],
   supportEmails: ['support@schoolixiq.iq'],
   successPartners: [],
+  ourPartners: [],
   marketingTitle: 'منصة الإدارة والتحصيل الذكي لمدارس العراق الأهلية',
   marketingSubtitle: 'نظام متكامل يربط الإدارة والمعلمين وأولياء الأمور لتسهيل جباية الأقساط، تتبع الغيابات ومراقبة النتائج بمرونة تامة ونظام إشعارات ذكي.',
   marketingFeatures: [
@@ -108,6 +110,8 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         const appName = data.appName || 'SchoolixiQ';
         const appLogo = typeof data.appLogo !== 'undefined' ? data.appLogo : '';
         const newConfig = {
+          ...defaultSystemConfig,
+          ...data,
           appName: appName,
           appLogo: appLogo,
           supportPhones: data.supportPhones || (data.supportPhone ? [data.supportPhone] : ['+964 770 000 0000']),

@@ -1,7 +1,6 @@
 import { addDoc, updateDoc, deleteDoc, DocumentReference, CollectionReference, WithFieldValue, UpdateData } from 'firebase/firestore';
 import { captureMessage } from './sentryWrapper';
 import { handleFirestoreError, OperationType } from './firestore-errors';
-import { AppError } from './AppError';
 
 // Simple token bucket rate limiter per session
 class RateLimiter {
@@ -38,10 +37,7 @@ export async function rateLimitedAdd<T = any>(
 ): Promise<DocumentReference<T>> {
   if (!writeLimiter.canConsume()) {
     captureMessage('Rate limit exceeded (Add)', { level: 'warning' });
-    throw new AppError('تم تجاوز الحد المسموح للعمليات. يرجى الانتظار قليلاً.', {
-      code: 'api/rate-limit',
-      source: 'api',
-    });
+    throw new Error('تم تجاوز الحد المسموح للعمليات. يرجى الانتظار قليلاً.');
   }
   return addDoc(ref, data);
 }
@@ -52,10 +48,7 @@ export async function rateLimitedUpdate<T = { [x: string]: any }>(
 ): Promise<void> {
   if (!writeLimiter.canConsume()) {
     captureMessage('Rate limit exceeded (Update)', { level: 'warning' });
-    throw new AppError('تم تجاوز الحد المسموح للعمليات. يرجى الانتظار قليلاً.', {
-      code: 'api/rate-limit',
-      source: 'api',
-    });
+    throw new Error('تم تجاوز الحد المسموح للعمليات. يرجى الانتظار قليلاً.');
   }
   return updateDoc(ref, data as any);
 }
@@ -65,10 +58,7 @@ export async function rateLimitedDelete<T = any>(
 ): Promise<void> {
   if (!writeLimiter.canConsume()) {
     captureMessage('Rate limit exceeded (Delete)', { level: 'warning' });
-    throw new AppError('تم تجاوز الحد المسموح للعمليات. يرجى الانتظار قليلاً.', {
-      code: 'api/rate-limit',
-      source: 'api',
-    });
+    throw new Error('تم تجاوز الحد المسموح للعمليات. يرجى الانتظار قليلاً.');
   }
   return deleteDoc(ref);
 }
@@ -77,9 +67,6 @@ export const UPLOAD_LIMIT_BYTES = 5 * 1024 * 1024; // 5MB Upload limit
 
 export function validateFileSize(file: File) {
   if (file.size > UPLOAD_LIMIT_BYTES) {
-    throw new AppError(`حجم الملف كبير جداً. الحد المسموح هو 5MB`, {
-      code: 'api/payload-too-large',
-      source: 'api',
-    });
+    throw new Error(`حجم الملف كبير جداً. الحد المسموح هو 5MB`);
   }
 }

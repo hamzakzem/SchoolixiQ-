@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { Settings2, X, Users, RefreshCw, AlertCircle, CalendarRange } from 'lucide-react';
 import { db } from '../../../lib/firebase';
 import { doc, updateDoc, collection, serverTimestamp, setDoc, query, where, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';

@@ -2,7 +2,6 @@ import { getDocs, Query, DocumentData, QuerySnapshot } from 'firebase/firestore'
 import { captureMessage } from './sentryWrapper';
 import { db, auth } from './firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { normalizeError } from './AppError';
 
 export async function monitoredGetDocs<T = DocumentData>(
   q: Query<T>, 
@@ -65,6 +64,6 @@ export async function monitoredGetDocs<T = DocumentData>(
   } catch (error) {
     const duration = performance.now() - startTime;
     console.error(`[QUERY FAILED] ${contextName} failed after ${Math.round(duration)}ms`, error);
-    throw normalizeError(error, `Query failed: ${contextName}`);
+    throw error;
   }
 }

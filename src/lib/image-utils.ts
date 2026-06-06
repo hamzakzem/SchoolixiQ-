@@ -1,5 +1,3 @@
-import { AppError, normalizeError } from './AppError';
-
 export const compressImageToBase64 = (file: File, maxWidth = 400, maxHeight = 400, quality = 0.8): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -32,10 +30,8 @@ export const compressImageToBase64 = (file: File, maxWidth = 400, maxHeight = 40
         ctx.drawImage(img, 0, 0, width, height);
         resolve(canvas.toDataURL('image/webp', quality));
       };
-      img.onerror = (error) =>
-        reject(normalizeError(error, 'Failed to load image for compression'));
+      img.onerror = (error) => reject(error);
     };
-    reader.onerror = (error) =>
-      reject(normalizeError(error, 'Failed to read image file'));
+    reader.onerror = (error) => reject(error);
   });
 };

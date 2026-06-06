@@ -1,6 +1,5 @@
 import { auth } from './firebase';
 import { getApiUrl } from './apiUtils';
-import { AppError } from './AppError';
 
 // Helper to log requests and responses for debugging
 async function logApiDebug(url: string, response: Response) {
@@ -35,12 +34,7 @@ export async function adminCreateUser(userData: {
   additionalData?: any;
 }) {
   const token = await auth.currentUser?.getIdToken();
-  if (!token) {
-    throw new AppError('No auth token available', {
-      code: 'auth/no-token',
-      source: 'auth',
-    });
-  }
+  if (!token) throw new Error('No auth token available');
 
   const endpoint = `/api/admin/create-user?t=${Date.now()}`;
   const absoluteUrl = getApiUrl(endpoint);
@@ -76,7 +70,7 @@ export async function adminCreateUser(userData: {
     } catch (e) {
       errorMessage = `Failed to create user (Status ${response.status})`;
     }
-    throw AppError.fromApi(errorMessage, response.status);
+    throw new Error(errorMessage);
   }
 
   if (isJson) {
@@ -93,22 +87,13 @@ export async function adminCreateUser(userData: {
     try {
       text = await responseClone.text();
     } catch (_) {}
-    throw AppError.fromApi(
-      `Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`,
-      response.status,
-      'api/non-json-response',
-    );
+    throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
   }
 }
 
 export async function adminDeleteUser(uid: string) {
   const token = await auth.currentUser?.getIdToken();
-  if (!token) {
-    throw new AppError('No auth token available', {
-      code: 'auth/no-token',
-      source: 'auth',
-    });
-  }
+  if (!token) throw new Error('No auth token available');
 
   const endpoint = `/api/admin/delete-user?t=${Date.now()}`;
   const absoluteUrl = getApiUrl(endpoint);
@@ -144,7 +129,7 @@ export async function adminDeleteUser(uid: string) {
     } catch (e) {
       errorMessage = `Failed to delete user (Status ${response.status})`;
     }
-    throw AppError.fromApi(errorMessage, response.status);
+    throw new Error(errorMessage);
   }
 
   if (isJson) {
@@ -161,22 +146,13 @@ export async function adminDeleteUser(uid: string) {
     try {
       text = await responseClone.text();
     } catch (_) {}
-    throw AppError.fromApi(
-      `Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`,
-      response.status,
-      'api/non-json-response',
-    );
+    throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
   }
 }
 
 export async function adminDeleteStudent(id: string) {
   const token = await auth.currentUser?.getIdToken();
-  if (!token) {
-    throw new AppError('No auth token available', {
-      code: 'auth/no-token',
-      source: 'auth',
-    });
-  }
+  if (!token) throw new Error('No auth token available');
 
   const endpoint = `/api/admin/delete-student?t=${Date.now()}`;
   const absoluteUrl = getApiUrl(endpoint);
@@ -212,7 +188,7 @@ export async function adminDeleteStudent(id: string) {
     } catch (e) {
       errorMessage = `Failed to delete student (Status ${response.status})`;
     }
-    throw AppError.fromApi(errorMessage, response.status);
+    throw new Error(errorMessage);
   }
 
   if (isJson) {
@@ -229,10 +205,6 @@ export async function adminDeleteStudent(id: string) {
     try {
       text = await responseClone.text();
     } catch (_) {}
-    throw AppError.fromApi(
-      `Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`,
-      response.status,
-      'api/non-json-response',
-    );
+    throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
   }
 }

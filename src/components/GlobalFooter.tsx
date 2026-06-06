@@ -122,9 +122,38 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
 
   if (compact) {
     return (
-      <footer className="mt-auto shrink-0 relative w-full py-3 bg-transparent print:hidden select-none">
+      <footer className="mt-auto shrink-0 relative w-full py-4 bg-transparent print:hidden select-none">
         <div className="max-w-7xl mx-auto px-6">
           <div className="w-full h-px bg-slate-200/20 dark:bg-slate-800/25 mb-3" />
+          
+          {config.ourPartners && config.ourPartners.length > 0 && (
+            <div className="flex flex-col items-center justify-center mb-5 mt-2 gap-2.5">
+              <span className="text-[10px] font-black text-slate-400/70 dark:text-slate-500/70 tracking-widest uppercase">
+                شركاؤنا
+              </span>
+              <div className="flex flex-wrap justify-center items-center gap-4">
+                {config.ourPartners.map((partner, idx) => (
+                  <a
+                    key={idx}
+                    href={partner.link || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative transition-all duration-300 active:scale-95"
+                    title={partner.name}
+                  >
+                    <div className="w-10 h-10 rounded-full border border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-center p-1 overflow-hidden hover:border-blue-500/50 transition-all duration-200 shadow-sm">
+                      <img
+                        src={partner.logoUrl}
+                        alt={partner.name}
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
             <span className="text-[10px] md:text-xs font-semibold text-slate-400 dark:text-slate-500 select-none">
               &copy; {new Date().getFullYear()} {config.appName}. جميع الحقوق
@@ -274,6 +303,38 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
               </div>
             </div>
           )}
+
+        {/* OUR PLATFORM PARTNERS */}
+        {config.ourPartners && config.ourPartners.length > 0 && (
+          <div className="w-full flex flex-col items-center mt-6 mb-12 border-t border-slate-200/40 dark:border-slate-800/40 pt-10">
+            <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 mb-6 uppercase tracking-widest text-center select-none">
+              شركاؤنا
+            </h4>
+            <div className="flex flex-wrap justify-center items-center gap-6 md:gap-8 max-w-4xl mx-auto">
+              {config.ourPartners.map((partner, idx) => (
+                <a
+                  key={idx}
+                  href={partner.link || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative flex flex-col items-center justify-center transition-all duration-300 active:scale-95"
+                  title={partner.name}
+                >
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-full border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center justify-center p-1.5 overflow-hidden hover:border-blue-500/60 dark:hover:border-blue-500/60 transition-all duration-300">
+                    <img
+                      src={partner.logoUrl}
+                      alt={partner.name}
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute -bottom-6 whitespace-nowrap bg-slate-900/95 text-white dark:bg-white dark:text-slate-900 px-2 py-0.5 rounded-md text-[9px] z-20 shadow-md">
+                    {partner.name}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* BOTTOM FOOTER */}
         <div className="w-full flex flex-col items-center pt-8 border-t border-slate-200/60 dark:border-slate-800/60">

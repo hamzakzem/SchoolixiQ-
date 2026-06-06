@@ -288,6 +288,7 @@ export default function SuperAdminDashboard() {
     supportPhones: string[];
     supportEmails: string[];
     successPartners: { name: string; logoUrl: string }[];
+    ourPartners?: { name: string; logoUrl: string; link: string; active?: boolean }[];
     appName: string;
     appLogo: string;
     marketingTitle?: string;
@@ -299,16 +300,19 @@ export default function SuperAdminDashboard() {
       linkedin?: string;
       whatsapp?: string;
     };
+    promotionalBanners?: { id: string; imageUrl: string; active: boolean; link?: string }[];
   }>({
     supportPhones: ["+964 770 000 0000"],
     supportEmails: ["support@schoolixiq.iq"],
     successPartners: [],
+    ourPartners: [],
     appName: "SchoolixiQ",
     appLogo: "",
     marketingTitle: "",
     marketingSubtitle: "",
     marketingFeatures: [],
     socialLinks: { instagram: "", twitter: "", linkedin: "", whatsapp: "" },
+    promotionalBanners: [],
   });
   const [isSavingConfig, setIsSavingConfig] = useState(false);
 
@@ -330,6 +334,7 @@ export default function SuperAdminDashboard() {
                 ? [data.supportEmail]
                 : ["support@schoolixiq.iq"]),
             successPartners: data.successPartners || [],
+            ourPartners: data.ourPartners || [],
             appName: data.appName || "SchoolixiQ",
             appLogo: data.appLogo || "",
             marketingTitle: data.marketingTitle || "",
@@ -341,6 +346,7 @@ export default function SuperAdminDashboard() {
               linkedin: "",
               whatsapp: "",
             },
+            promotionalBanners: data.promotionalBanners || [],
           });
         }
       },
@@ -422,6 +428,36 @@ export default function SuperAdminDashboard() {
       toast.success("تم رفع الصورة بنجاح", { id: toastId });
     } catch (error: any) {
       console.error("Error processing partner logo:", error);
+      toast.error("فشل رفع الصورة.", { id: toastId });
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const handleUploadOurPartnerLogo = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    idx: number,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("حجم الصورة يجب أن لا يتجاوز 2 ميغابايت");
+      return;
+    }
+
+    const toastId = toast.loading("جاري رفع الصورة...");
+    try {
+      const { compressImageToBase64 } = await import("../lib/image-utils");
+      const base64Url = await compressImageToBase64(file, 200, 200, 0.8);
+
+      const newPartners = [...(systemConfig.ourPartners || [])];
+      newPartners[idx].logoUrl = base64Url;
+      setSystemConfig({ ...systemConfig, ourPartners: newPartners });
+
+      toast.success("تم رفع الصورة بنجاح", { id: toastId });
+    } catch (error: any) {
+      console.error("Error processing our partner logo:", error);
       toast.error("فشل رفع الصورة.", { id: toastId });
     } finally {
       e.target.value = "";
@@ -4210,6 +4246,165 @@ export default function SuperAdminDashboard() {
                         {systemConfig.successPartners.length === 0 && (
                           <div className="col-span-full py-8 text-center text-slate-400 text-sm bg-slate-50 dark:bg-slate-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
                             لا يوجد شركاء نجاح. اضغط على 'إضافة شريك' للبدء.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* OUR PARTNERS (شركائنا) SECTION */}
+                    <div className="pt-6 border-t border-slate-150 dark:border-slate-800 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-1 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                            قسم شركائنا (دائري بـ روابط) في الفوتر
+                          </label>
+                          <span className="text-xs text-slate-400 dark:text-slate-500 font-bold block mt-1">
+                            يظهر بشكل دائري في منتصف الفوتر وكل صورة ترتبط برابط مخصص يتم فتحه عند الضغط عليه.
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSystemConfig({
+                              ...systemConfig,
+                              ourPartners: [
+                                ...(systemConfig.ourPartners || []),
+                                { name: "", logoUrl: "", link: "", active: true },
+                              ],
+                            })
+                          }
+                          className="text-blue-600 dark:text-blue-400 text-xs font-black flex items-center gap-1 hover:underline shrink-0"
+                        >
+                          <Plus size={14} /> إضافة شريك للفوتر
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {(systemConfig.ourPartners || []).map((partner, idx) => (
+                          <div
+                            key={idx}
+                            className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4 relative"
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSystemConfig({
+                                  ...systemConfig,
+                                  ourPartners: (systemConfig.ourPartners || []).filter(
+                                    (_, i) => i !== idx,
+                                  ),
+                                })
+                              }
+                              className="absolute top-2 left-2 p-2 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all z-10"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-2">
+                                اسم الشريك
+                              </label>
+                              <input
+                                type="text"
+                                value={partner.name}
+                                onChange={(e) => {
+                                  const newOurPartners = [
+                                    ...(systemConfig.ourPartners || []),
+                                  ];
+                                  newOurPartners[idx].name = e.target.value;
+                                  setSystemConfig({
+                                    ...systemConfig,
+                                    ourPartners: newOurPartners,
+                                  });
+                                }}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:border-blue-500 transition-all text-sm"
+                                placeholder="اسم شريك المنصة"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-2">
+                                رابط موقع الشريك (URL)
+                              </label>
+                              <input
+                                type="url"
+                                value={partner.link}
+                                onChange={(e) => {
+                                  const newOurPartners = [
+                                    ...(systemConfig.ourPartners || []),
+                                  ];
+                                  newOurPartners[idx].link = e.target.value;
+                                  setSystemConfig({
+                                    ...systemConfig,
+                                    ourPartners: newOurPartners,
+                                  });
+                                }}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:border-blue-500 transition-all text-sm"
+                                placeholder="https://example.com"
+                                dir="ltr"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-2">
+                                صورة الشعار (دائرية بالفوتر)
+                              </label>
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                  <input
+                                    type="url"
+                                    value={partner.logoUrl}
+                                    onChange={(e) => {
+                                      const newOurPartners = [
+                                        ...(systemConfig.ourPartners || []),
+                                      ];
+                                      newOurPartners[idx].logoUrl = e.target.value;
+                                      setSystemConfig({
+                                        ...systemConfig,
+                                        ourPartners: newOurPartners,
+                                      });
+                                    }}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:border-blue-500 transition-all text-sm"
+                                    placeholder="https://example.com/partner.png"
+                                    dir="ltr"
+                                  />
+                                  <div className="absolute left-2 top-1.5 bottom-1.5 flex items-center gap-1">
+                                    <label className="cursor-pointer px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-1">
+                                      <Upload size={14} /> رفع
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) =>
+                                          handleUploadOurPartnerLogo(e, idx)
+                                        }
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                                {partner.logoUrl && (
+                                  <div className="w-12 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full overflow-hidden flex items-center justify-center shrink-0 p-1">
+                                    <img
+                                      src={partner.logoUrl || undefined}
+                                      alt="prev"
+                                      className="w-full h-full object-cover rounded-full"
+                                      onError={(e) =>
+                                        (e.currentTarget.style.display = "none")
+                                      }
+                                      onLoad={(e) =>
+                                        (e.currentTarget.style.display =
+                                          "block")
+                                      }
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {(systemConfig.ourPartners || []).length === 0 && (
+                          <div className="col-span-full py-8 text-center text-slate-400 text-sm bg-slate-50 dark:bg-slate-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                            لا يوجد شركاء مضافين حالياً للفوتر الدائري. اضغط على 'إضافة شريك للفوتر' للبدء.
                           </div>
                         )}
                       </div>

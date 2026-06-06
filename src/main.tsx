@@ -3,7 +3,6 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { initSentry } from './lib/sentryWrapper';
-import { normalizeError } from './lib/AppError';
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   let dsn = import.meta.env.VITE_SENTRY_DSN;
@@ -94,13 +93,7 @@ if (typeof window !== 'undefined') {
 
   window.addEventListener('unhandledrejection', (event) => {
     if (event.reason) {
-      if (!(event.reason instanceof Error)) {
-        event.reason = normalizeError(event.reason);
-      }
-      const msg =
-        typeof event.reason === 'string'
-          ? event.reason
-          : (event.reason.message || '');
+      const msg = typeof event.reason === 'string' ? event.reason : (event.reason.message || '');
       checkAndHandleDbError(msg);
 
       const isChunkError = 
