@@ -94,34 +94,37 @@ jobs:
           path: schoolixiq-dist.zip
           retention-days: 7
 
-      - name: Install lftp (SFTP client)
-        run: sudo apt-get update && sudo apt-get install -y lftp
-
-      - name: Test Hostinger SFTP connection
+      - name: Resolve Hostinger FTPS target directory
+        id: ftpdir
         run: |
-          lftp -u "${HOSTINGER_FTP_USERNAME},${HOSTINGER_FTP_PASSWORD}" \
-            "sftp://${HOSTINGER_FTP_SERVER}:65002" <<-EOF
-          set sftp:auto-confirm yes
-          set net:timeout 30
-          set net:max-retries 2
-          ls -la ${HOSTINGER_FTP_REMOTE_DIR}
-          bye
-          EOF
+          remote="${HOSTINGER_FTP_REMOTE_DIR}"
+          remote="${remote%/}"
+          # FTPS accounts are usually chrooted under /home/USER — use path from /domains/...
+          if [[ "$remote" == *"/domains/"* ]]; then
+            dir="/${remote#*/domains/}/"
+          else
+            dir="${remote}/"
+          fi
+          echo "dir=${dir}" >> "$GITHUB_OUTPUT"
+          echo "FTPS server-dir: ${dir}"
 
-      - name: Deploy dist to Hostinger (SFTP mirror)
-        run: |
-          lftp -u "${HOSTINGER_FTP_USERNAME},${HOSTINGER_FTP_PASSWORD}" \
-            "sftp://${HOSTINGER_FTP_SERVER}:65002" <<-EOF
-          set sftp:auto-confirm yes
-          set cmd:fail-exit yes
-          set net:timeout 60
-          set net:max-retries 3
-          mirror -R --parallel=6 --verbose \
-            --exclude server.cjs \
-            --exclude server.cjs.map \
-            dist ${HOSTINGER_FTP_REMOTE_DIR}
-          bye
-          EOF
+      - name: Deploy to Hostinger (FTPS port 21)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ env.HOSTINGER_FTP_SERVER }}
+          username: ${{ env.HOSTINGER_FTP_USERNAME }}
+          password: ${{ env.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          timeout: 120000
+          local-dir: ./dist/
+          server-dir: ${{ steps.ftpdir.outputs.dir }}
+          dangerous-clean-slate: false
+          log-level: verbose
+          exclude: |
+            **/.git*
+            **/server.cjs
+            **/server.cjs.map
 
       - name: Deployment summary
         run: |
