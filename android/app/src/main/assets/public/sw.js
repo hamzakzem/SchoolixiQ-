@@ -1,4 +1,5 @@
-const CACHE_NAME = 'schoolix-cache-v6';
+// Cache name with versioning
+const CACHE_NAME = 'schoolix-cache-v8';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -40,7 +41,38 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Stale-While-Revalidate strategy for lightning-fast UI rendering & offline stability
+  // Detect if the request is for an HTML page or root routing (SPA Navigation)
+  const isHtmlRequest = 
+    event.request.mode === 'navigate' || 
+    event.request.headers.get('accept')?.includes('text/html') ||
+    event.request.url === self.location.origin ||
+    event.request.url === self.location.origin + '/' ||
+    event.request.url.endsWith('.html');
+
+  if (isHtmlRequest) {
+    // NETWORK-FIRST Strategy for HTML/routing to prevent white-screen on new build hash updates
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Offline fallback
+          return caches.match(event.request).then((cachedResponse) => {
+            return cachedResponse || caches.match('/index.html') || caches.match('/');
+          });
+        })
+    );
+    return;
+  }
+  
+  // Stale-While-Revalidate strategy for other assets (images, fonts, scripts, css)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)

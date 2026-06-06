@@ -1,18 +1,27 @@
 {
   "project_info": {
     "project_number": "377979165565",
+    "firebase_url": "https://yala-safari-iq-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "yala-safari-iq",
     "storage_bucket": "yala-safari-iq.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:377979165565:android:bdbd4af86e80508e40fd",
+        "mobilesdk_app_id": "1:377979165565:android:5e798cc4a493d1dfb78a14",
         "android_client_info": {
           "package_name": "com.schoolix.app"
         }
       },
       "oauth_client": [
+        {
+          "client_id": "377979165565-jhlqifl74sgouhn3b1pe8g07a5kg16u8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.schoolix.app",
+            "certificate_hash": "bdbd4af86e80508e40fd486f557c6683ca436096"
+          }
+        },
         {
           "client_id": "377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com",
           "client_type": 3
@@ -20,12 +29,17 @@
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyD1-Wp-pVMceqVrpNlj--mdA5OXq236XdU"
+          "current_key": "AIzaSyCEBCkS984hI2O_F0Jg_eMMID0-OHe-baw"
         }
       ],
       "services": {
-        "appdetect_service": {
-          "status": 1
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

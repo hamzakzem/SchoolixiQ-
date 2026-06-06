@@ -2,6 +2,72 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function() {
+        // Safe immediate tracking of loading/script failures before Vite loads main.tsx
+        window.addEventListener('error', function(e) {
+          try {
+            var msg = e.message || '';
+            var target = e.target || {};
+            var tagName = (target.tagName || '').toUpperCase();
+            
+            // Check if it is a script or stylesheet loading error, or chunk load error
+            var isLoadError = tagName === 'SCRIPT' || 
+                              tagName === 'LINK' || 
+                              msg.indexOf('Script error') !== -1 || 
+                              msg.indexOf('Failed to fetch') !== -1 || 
+                              msg.indexOf('ChunkLoadError') !== -1 ||
+                              msg.indexOf('dynamically imported') !== -1 ||
+                              msg.indexOf('loading chunk') !== -1;
+            
+            if (isLoadError) {
+              var lastReload = sessionStorage.getItem('schoolix_recovery_timestamp');
+              var now = Date.now();
+              // Prevent infinite rapid reload loops (allow max 1 reload attempt every 12 seconds)
+              if (!lastReload || (now - parseInt(lastReload, 10) > 12000)) {
+                sessionStorage.setItem('schoolix_recovery_timestamp', now.toString());
+                console.warn('SchoolixiQ: Detected critical script/chunk loading failure. Resolving white-screen state by clearing SW caches and reloading...');
+                
+                // 1. Purge Service Workers
+                if (navigator.serviceWorker) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    for (var i = 0; i < regs.length; i++) {
+                      regs[i].unregister();
+                    }
+                    purgeAndReload();
+                  }).catch(function() {
+                    purgeAndReload();
+                  });
+                } else {
+                  purgeAndReload();
+                }
+              }
+            }
+          } catch(err) {
+            console.error('Schoolix inline rescue error:', err);
+          }
+        }, true); // Use useCapture=true to intercept script and css file 404s/load failures
+
+        function purgeAndReload() {
+          // 2. Clear application caches
+          if (window.caches) {
+            caches.keys().then(function(keys) {
+              var deletes = [];
+              for (var i = 0; i < keys.length; i++) {
+                deletes.push(caches.delete(keys[i]));
+              }
+              Promise.all(deletes).finally(function() {
+                window.location.reload(true);
+              });
+            }).catch(function() {
+              window.location.reload(true);
+            });
+          } else {
+            window.location.reload(true);
+          }
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>SchoolixiQ</title>
     <link rel="manifest" href="/manifest.json" />
@@ -10,19 +76,18 @@
     <link rel="preconnect" href="https://firestore.googleapis.com">
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <meta name="theme-color" content="#4f46e5" />
-    <link rel="icon" type="image/svg+xml" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg" />
-    <link rel="apple-touch-icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg" />
+    <meta name="theme-color" content="#0B2345" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <script type="module" crossorigin src="/assets/index-BGDgzh2n.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/react-vendor-DYANHs8_.js">
-    <link rel="modulepreload" crossorigin href="/assets/ui-vendor-CBmqAADy.js">
-    <link rel="modulepreload" crossorigin href="/assets/firebase-vendor-K4C4kJir.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-DZs6c6C7.css">
+    <script type="module" crossorigin src="/assets/index-B8ithsqF.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-Bb0GJkIO.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-vendor-CqbN0itx.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-tLKrQ7nT.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>
 
