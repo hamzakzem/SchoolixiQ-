@@ -94,18 +94,34 @@ jobs:
           path: schoolixiq-dist.zip
           retention-days: 7
 
-      - name: Deploy to Hostinger (SFTP port 65002)
-        uses: wangyucode/sftp-upload-action@v3
-        with:
-          host: ${{ env.HOSTINGER_FTP_SERVER }}
-          port: 65002
-          username: ${{ env.HOSTINGER_FTP_USERNAME }}
-          password: ${{ env.HOSTINGER_FTP_PASSWORD }}
-          localDir: dist
-          remoteDir: ${{ env.HOSTINGER_FTP_REMOTE_DIR }}
-          concurrency: 8
-          forceUpload: true
-          exclude: "server.cjs,server.cjs.map"
+      - name: Install lftp (SFTP client)
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Test Hostinger SFTP connection
+        run: |
+          lftp -u "${HOSTINGER_FTP_USERNAME},${HOSTINGER_FTP_PASSWORD}" \
+            "sftp://${HOSTINGER_FTP_SERVER}:65002" <<-EOF
+          set sftp:auto-confirm yes
+          set net:timeout 30
+          set net:max-retries 2
+          ls -la ${HOSTINGER_FTP_REMOTE_DIR}
+          bye
+          EOF
+
+      - name: Deploy dist to Hostinger (SFTP mirror)
+        run: |
+          lftp -u "${HOSTINGER_FTP_USERNAME},${HOSTINGER_FTP_PASSWORD}" \
+            "sftp://${HOSTINGER_FTP_SERVER}:65002" <<-EOF
+          set sftp:auto-confirm yes
+          set cmd:fail-exit yes
+          set net:timeout 60
+          set net:max-retries 3
+          mirror -R --parallel=6 --verbose \
+            --exclude server.cjs \
+            --exclude server.cjs.map \
+            dist ${HOSTINGER_FTP_REMOTE_DIR}
+          bye
+          EOF
 
       - name: Deployment summary
         run: |
