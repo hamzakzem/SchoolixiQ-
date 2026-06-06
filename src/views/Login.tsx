@@ -1003,7 +1003,7 @@ export default function Login() {
               <span>{isRtl ? "هل تواجه خطأ Google 403 أو مشكلة بالدخول؟ اضغط هنا للحل الفوري" : "Having Google 403 or auth issues? Click for instant help"}</span>
             </button>
 
-            {isInsideWebView && (
+            {isInAppWebView() && (
               <div
                 id="webview-warning-banner"
                 className="mt-4 p-4 rounded-xl border-2 border-red-200 bg-red-50/50 text-slate-800 text-xs sm:text-sm shadow-sm text-right"
