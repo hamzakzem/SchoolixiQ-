@@ -1513,54 +1513,60 @@ export default function AdminDashboard() {
         </header>
 
         {!auth.currentUser?.emailVerified && !hideVerificationBanner && (
-          <div className="mx-4 md:mx-8 mt-4 md:mt-6 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 p-3 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm shrink-0 relative">
-            <button
-              onClick={handleHideVerification}
-              className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-700 p-1 rounded-full shadow-sm hover:scale-110 active:scale-95 transition-all z-10"
-              title="إخفاء مؤقتاً"
-            >
-              <X size={14} />
-            </button>
-            <div className="flex items-center gap-3 text-right w-full">
-              <div className="w-8 h-8 shrink-0 bg-amber-100 dark:bg-amber-900/50 text-amber-600 rounded-xl flex items-center justify-center">
-                <ShieldCheck size={18} />
+          <div
+            className="mx-4 md:mx-8 mt-3 md:mt-4 shrink-0"
+            dir={isRtl ? 'rtl' : 'ltr'}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 px-3 py-2.5 rounded-xl border border-amber-200/70 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/15 border-s-4 border-s-amber-400 dark:border-s-amber-500">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="w-7 h-7 shrink-0 bg-amber-100/80 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-lg flex items-center justify-center">
+                  <ShieldCheck size={15} />
+                </div>
+                <div className="min-w-0 text-right">
+                  <p className="text-xs font-bold text-amber-900 dark:text-amber-300 leading-tight">
+                    {isRtl ? 'تأكيد البريد الإلكتروني مطلوب' : 'Email verification required'}
+                  </p>
+                  <p className="text-[10px] text-amber-700/80 dark:text-amber-500 font-medium truncate">
+                    {auth.currentUser?.email}
+                  </p>
+                </div>
               </div>
-              <div className="flex-1">
-                <h4 className="text-xs md:text-sm font-bold text-amber-900 dark:text-amber-400 leading-tight">
-                  تأكيد البريد الإلكتروني مطلوب
-                </h4>
-                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 truncate max-w-[220px] md:max-w-[400px]">
-                  يرجى تفعيل بريدك ({auth.currentUser?.email})
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <button
-                onClick={async () => {
-                  if (auth.currentUser) {
-                    await auth.currentUser.reload();
-                    if (auth.currentUser.emailVerified) {
-                      toast.success("تم تأكيد البريد بنجاح");
-                    } else {
-                      toast.error("لم يتم التأكيد بعد، يرجى مراجعة بريدك");
+              <div className="flex items-center gap-1.5 shrink-0 ps-0 sm:ps-2">
+                <button
+                  onClick={async () => {
+                    if (auth.currentUser) {
+                      await auth.currentUser.reload();
+                      if (auth.currentUser.emailVerified) {
+                        toast.success("تم تأكيد البريد بنجاح");
+                      } else {
+                        toast.error("لم يتم التأكيد بعد، يرجى مراجعة بريدك");
+                      }
                     }
-                  }
-                }}
-                className="flex-1 md:flex-none px-4 py-2 bg-white/50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-[10px] hover:bg-white dark:hover:bg-slate-700 transition-all active:scale-95 border border-slate-200 dark:border-slate-700 whitespace-nowrap"
-              >
-                تحديث
-              </button>
-              <button
-                onClick={handleResendVerification}
-                disabled={isSendingVerification || verificationCooldown > 0}
-                className="flex-1 md:flex-none px-4 py-2 bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-400 rounded-lg font-bold text-[10px] hover:bg-amber-300 dark:hover:bg-amber-800 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap overflow-hidden text-ellipsis"
-              >
-                {isSendingVerification
-                  ? "جاري..."
-                  : verificationCooldown > 0
-                    ? `انتظر ${verificationCooldown} ثانية`
-                    : "إعادة إرسال"}
-              </button>
+                  }}
+                  className="px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg font-bold text-[10px] hover:bg-amber-50 dark:hover:bg-slate-700 transition-all border border-amber-200/80 dark:border-slate-700 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                >
+                  {isRtl ? 'تحديث' : 'Refresh'}
+                </button>
+                <button
+                  onClick={handleResendVerification}
+                  disabled={isSendingVerification || verificationCooldown > 0}
+                  className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 rounded-lg font-bold text-[10px] transition-all disabled:opacity-50 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                >
+                  {isSendingVerification
+                    ? (isRtl ? 'جاري...' : 'Sending...')
+                    : verificationCooldown > 0
+                      ? (isRtl ? `انتظر ${verificationCooldown}ث` : `Wait ${verificationCooldown}s`)
+                      : (isRtl ? 'إعادة الإرسال' : 'Resend')}
+                </button>
+                <button
+                  onClick={handleHideVerification}
+                  className="p-1.5 text-amber-700/70 hover:text-amber-900 dark:text-amber-500 dark:hover:text-amber-300 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                  aria-label={isRtl ? 'إخفاء مؤقتاً' : 'Dismiss temporarily'}
+                  title={isRtl ? 'إخفاء مؤقتاً' : 'Dismiss temporarily'}
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
           </div>
         )}

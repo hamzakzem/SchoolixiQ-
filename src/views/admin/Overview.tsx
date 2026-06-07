@@ -283,156 +283,171 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500" dir={isRtl ? 'rtl' : 'ltr'}>
       <DailySummary onGoToAttendance={() => setActiveTab?.('attendance')} />
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title={t('totalStudents')} value={stats.students} icon={Users} color="border-blue-200 bg-blue-50/50" iconColor="text-blue-600" action={() => setActiveTab?.("students_edit")} />
-        <StatCard 
-          title={t('tuitionRevenue')} 
-          value={(stats.calculatedTuition + stats.tuitionAdjustment).toLocaleString()} 
-          icon={Wallet} 
-          color="border-emerald-200 bg-emerald-50/50" 
-          iconColor="text-emerald-600" 
-          unit={t('iqd')} 
-          action={() => {
-            setTuitionAdjustValue(stats.tuitionAdjustment);
-            setShowTuitionModal(true);
-          }}
-        />
-        <StatCard title={t('totalStaff')} value={stats.staff} icon={UserRound} color="border-slate-200 bg-white" iconColor="text-slate-600" action={() => setActiveTab?.("staff")} />
-        <StatCard 
-          title={t('storeSales')} 
-          value={(stats.calculatedSales + stats.adjustment).toLocaleString()} 
-          icon={ShoppingBag} 
-          color="border-orange-200 bg-orange-50/50" 
-          iconColor="text-orange-600" 
-          unit={t('iqd')}
-          action={() => {
-            setAdjustValue(stats.adjustment);
-            setShowAdjustModal(true);
-          }}
-        />
-      </div>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <h2 className="text-sm font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+            {isRtl ? 'مؤشرات المدرسة' : 'School Metrics'}
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
+          <StatCard
+            title={t('totalStudents')}
+            value={stats.students}
+            icon={Users}
+            tone="blue"
+            emptyHint={isRtl ? 'لا يوجد طلاب بعد' : 'No students yet'}
+            action={() => setActiveTab?.('students_edit')}
+          />
+          <StatCard
+            title={t('tuitionRevenue')}
+            value={(stats.calculatedTuition + stats.tuitionAdjustment).toLocaleString()}
+            icon={Wallet}
+            tone="emerald"
+            unit={t('iqd')}
+            isNumericDisplay
+            emptyHint={isRtl ? 'لا أرصدة مسجّلة' : 'No balances recorded'}
+            action={() => {
+              setTuitionAdjustValue(stats.tuitionAdjustment);
+              setShowTuitionModal(true);
+            }}
+          />
+          <StatCard
+            title={t('totalStaff')}
+            value={stats.staff}
+            icon={UserRound}
+            tone="slate"
+            emptyHint={isRtl ? 'لا موظفين بعد' : 'No staff yet'}
+            action={() => setActiveTab?.('staff')}
+          />
+          <StatCard
+            title={t('storeSales')}
+            value={(stats.calculatedSales + stats.adjustment).toLocaleString()}
+            icon={ShoppingBag}
+            tone="orange"
+            unit={t('iqd')}
+            isNumericDisplay
+            emptyHint={isRtl ? 'لا مبيعات بعد' : 'No sales yet'}
+            action={() => {
+              setAdjustValue(stats.adjustment);
+              setShowAdjustModal(true);
+            }}
+          />
+        </div>
+      </section>
 
       {schoolInfo && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-6 md:p-8 shadow-sm transition-all"
+          className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden"
         >
-          {/* Header row: School name and main update actions */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-100 dark:border-slate-800/80 gap-4 mb-6">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shadow-sm shrink-0">
-                <Building2 size={28} className="animate-pulse" />
+          <div className="h-1 bg-gradient-to-l from-amber-400 via-amber-500/80 to-slate-900" />
+          <div className="p-5 md:p-7">
+            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5 pb-5 border-b border-slate-100 dark:border-slate-800/80 mb-5">
+              <div className="flex items-start gap-4 min-w-0">
+                <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-900 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-amber-400 border border-slate-800 dark:border-slate-700 shadow-sm shrink-0">
+                  <Building2 size={26} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    {isRtl ? 'بطاقة السجل الرسمي للمدرسة' : 'Official School Registry Card'}
+                  </p>
+                  <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mt-1 font-display truncate">
+                    {schoolInfo.name}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40">
+                      {isRtl ? 'حساب نشط' : 'Active Account'}
+                    </span>
+                    {schoolInfo.governorate ? (
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        {translateSchoolValue(schoolInfo.governorate, isRtl)}
+                      </span>
+                    ) : null}
+                    {schoolInfo.stage ? (
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        {translateSchoolValue(schoolInfo.stage, isRtl)}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">
-                  {isRtl ? 'سجل وبطاقة البيانات التعريفية للمدرسة' : 'Official Registered School Profile Card'}
-                </p>
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1.5 font-display flex flex-wrap items-center gap-2">
-                  {schoolInfo.name}
-                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30">
-                    {isRtl ? 'حساب نشط' : 'Active Account'}
-                  </span>
-                </h3>
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap gap-2.5 justify-start md:justify-end">
-              <button
-                onClick={() => setShowLocationModal(true)}
-                className="px-5 py-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 cursor-pointer shadow-sm"
-              >
-                <Edit2 size={14} />
-                <span>{isRtl ? 'تحديث وتعديل السجل' : 'Update School Profile'}</span>
-              </button>
-              {schoolInfo.googleMapsUrl && (
-                <a
-                  href={schoolInfo.googleMapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 shadow-md shadow-indigo-600/10"
+
+              <div className="flex flex-wrap gap-2 justify-start lg:justify-end shrink-0">
+                <button
+                  onClick={() => setShowLocationModal(true)}
+                  className="px-4 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                 >
-                  <MapPin size={14} />
-                  <span>{isRtl ? 'الذهاب للعنوان' : 'Navigate To Map'}</span>
-                </a>
-              )}
-            </div>
-          </div>
-
-          {/* School Attributes Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
-              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
-                <MapPin size={16} className="text-rose-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'الموقع والعنوان' : 'Detailed Address'}</span>
+                  <Edit2 size={14} />
+                  <span>{isRtl ? 'تحديث السجل' : 'Update Profile'}</span>
+                </button>
+                {schoolInfo.googleMapsUrl && (
+                  <a
+                    href={schoolInfo.googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                  >
+                    <MapPin size={14} />
+                    <span>{isRtl ? 'الموقع على الخريطة' : 'View on Map'}</span>
+                  </a>
+                )}
               </div>
-              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate" title={schoolInfo.address}>
-                {schoolInfo.address || (isRtl ? 'غير محدد' : 'Not specified')}
-              </p>
             </div>
 
-            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
-              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
-                <Map size={16} className="text-blue-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'المحافظة' : 'Governorate'}</span>
-              </div>
-              <p className="text-sm font-black text-slate-800 dark:text-slate-100">
-                {translateSchoolValue(schoolInfo.governorate, isRtl)}
-              </p>
-            </div>
-
-            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
-              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
-                <Building2 size={16} className="text-indigo-500" />
-                <span className="text-[11px] font-black uppercase tracking-widest">{isRtl ? 'المديرية' : 'Directorate'}</span>
-              </div>
-              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate" title={schoolInfo.directorate}>
-                {translateSchoolValue(schoolInfo.directorate, isRtl)}
-              </p>
-            </div>
-
-            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
-              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
-                <GraduationCap size={16} className="text-emerald-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'المرحلة الدراسية' : 'School Stage'}</span>
-              </div>
-              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate">
-                {translateSchoolValue(schoolInfo.stage, isRtl)}
-              </p>
-            </div>
-
-            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
-              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
-                <Clock size={16} className="text-amber-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'دوام المدرسة' : 'School Shift'}</span>
-              </div>
-              <p className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 truncate">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                {translateSchoolValue(schoolInfo.shift, isRtl)}
-              </p>
-            </div>
-
-            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all">
-              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
-                <Users size={16} className="text-purple-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'جنس الطلاب/فئة الدراسة' : 'Study Gender Type'}</span>
-              </div>
-              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate">
-                {translateSchoolValue(schoolInfo.genderType, isRtl)}
-              </p>
-            </div>
-
-            <div className="bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-805/60 hover:border-slate-200/85 dark:hover:border-slate-700/80 transition-all col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1.5">
-                <Users size={16} className="text-cyan-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'العدد التقريبي للطلاب' : 'Approximate Students'}</span>
-              </div>
-              <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate">
-                {schoolInfo.approximateStudents ? `${schoolInfo.approximateStudents} ${isRtl ? 'طالب' : 'students'}` : (isRtl ? 'غير محدد' : 'Not specified')}
-              </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+              <SchoolInfoChip
+                icon={MapPin}
+                iconClass="text-rose-500"
+                label={isRtl ? 'الموقع والعنوان' : 'Address'}
+                value={schoolInfo.address || (isRtl ? 'غير محدد' : 'Not specified')}
+              />
+              <SchoolInfoChip
+                icon={Map}
+                iconClass="text-blue-500"
+                label={isRtl ? 'المحافظة' : 'Governorate'}
+                value={translateSchoolValue(schoolInfo.governorate, isRtl)}
+              />
+              <SchoolInfoChip
+                icon={Building2}
+                iconClass="text-indigo-500"
+                label={isRtl ? 'المديرية' : 'Directorate'}
+                value={translateSchoolValue(schoolInfo.directorate, isRtl)}
+              />
+              <SchoolInfoChip
+                icon={GraduationCap}
+                iconClass="text-emerald-500"
+                label={isRtl ? 'المرحلة الدراسية' : 'School Stage'}
+                value={translateSchoolValue(schoolInfo.stage, isRtl)}
+              />
+              <SchoolInfoChip
+                icon={Clock}
+                iconClass="text-amber-500"
+                label={isRtl ? 'دوام المدرسة' : 'School Shift'}
+                value={translateSchoolValue(schoolInfo.shift, isRtl)}
+              />
+              <SchoolInfoChip
+                icon={Users}
+                iconClass="text-purple-500"
+                label={isRtl ? 'فئة الدراسة' : 'Study Type'}
+                value={translateSchoolValue(schoolInfo.genderType, isRtl)}
+              />
+              <SchoolInfoChip
+                icon={Users}
+                iconClass="text-cyan-500"
+                label={isRtl ? 'العدد التقريبي' : 'Approx. Students'}
+                value={
+                  schoolInfo.approximateStudents
+                    ? `${schoolInfo.approximateStudents} ${isRtl ? 'طالب' : 'students'}`
+                    : isRtl
+                      ? 'غير محدد'
+                      : 'Not specified'
+                }
+                className="col-span-2 md:col-span-1"
+              />
             </div>
           </div>
         </motion.div>
@@ -737,9 +752,9 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
-          <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-8 font-display">{t('attendanceStats')}</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <div className="bg-white dark:bg-slate-900 p-5 md:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors">
+          <h3 className="text-lg font-black text-slate-800 dark:text-white mb-6 font-display">{t('attendanceStats')}</h3>
           <div className="h-[300px] w-full" style={{ minWidth: 0 }}>
             <ResponsiveContainer width="99%" height="100%">
               <BarChart data={chartData}>
@@ -775,9 +790,9 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-bold text-slate-800 dark:text-white font-display">{t('recentAnnouncements')}</h3>
+        <div className="bg-white dark:bg-slate-900 p-5 md:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-black text-slate-800 dark:text-white font-display">{t('recentAnnouncements')}</h3>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{isRtl ? 'مباشر الآن' : 'Live Now'}</span>
@@ -803,27 +818,128 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
   );
 }
 
-function StatCard({ title, value, icon: Icon, color, iconColor, unit = '', action }: any) {
+const STAT_TONE_STYLES: Record<
+  string,
+  { badge: string; icon: string; ring: string }
+> = {
+  blue: {
+    badge: 'bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40',
+    icon: 'text-blue-600 dark:text-blue-400',
+    ring: 'focus-visible:ring-blue-300',
+  },
+  emerald: {
+    badge: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/40',
+    icon: 'text-emerald-600 dark:text-emerald-400',
+    ring: 'focus-visible:ring-emerald-300',
+  },
+  slate: {
+    badge: 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700',
+    icon: 'text-slate-600 dark:text-slate-300',
+    ring: 'focus-visible:ring-slate-300',
+  },
+  orange: {
+    badge: 'bg-orange-50 dark:bg-orange-950/30 border-orange-100 dark:border-orange-900/40',
+    icon: 'text-orange-600 dark:text-orange-400',
+    ring: 'focus-visible:ring-orange-300',
+  },
+};
+
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  tone,
+  unit = '',
+  emptyHint,
+  action,
+}: {
+  title: string;
+  value: number | string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  tone: keyof typeof STAT_TONE_STYLES;
+  unit?: string;
+  emptyHint?: string;
+  isNumericDisplay?: boolean;
+  action?: () => void;
+}) {
+  const styles = STAT_TONE_STYLES[tone] || STAT_TONE_STYLES.slate;
+  const numericValue = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''));
+  const isZero = !Number.isNaN(numericValue) && numericValue === 0;
+  const Wrapper = action ? 'button' : 'div';
+
   return (
-    <div 
+    <Wrapper
+      type={action ? 'button' : undefined}
       onClick={action}
-      className={`p-6 rounded-2xl border shadow-sm flex items-center justify-between transition-all duration-500 transform ${color} dark:bg-slate-900 dark:border-slate-800 ${action ? 'group relative overflow-hidden cursor-pointer hover:scale-105 hover:shadow-2xl' : ''}`}
+      className={`w-full p-4 md:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm text-right transition-all ${
+        action
+          ? `cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${styles.ring}`
+          : ''
+      }`}
     >
-      {action && (
-        <span className="absolute top-0 left-0 z-0 h-32 w-32 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 opacity-0 transition-all duration-500 transform group-hover:scale-[20] group-hover:opacity-75"></span>
-      )}
-      <div className={`relative z-10 transition-all duration-500 ${action ? 'group-hover:text-white' : ''}`}>
-        <div className="flex items-center gap-2">
-          <p className={`text-slate-500 dark:text-slate-400 text-sm font-medium transition-colors duration-500 ${action ? 'group-hover:text-white' : ''}`}>{title}</p>
-          {action && <Settings2 size={12} className="text-slate-300 transition-colors duration-500 group-hover:text-white" />}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 mb-3">
+            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              {title}
+            </p>
+            {action ? <Settings2 size={12} className="text-slate-300 shrink-0" /> : null}
+          </div>
+          <p
+            className={`text-2xl md:text-3xl font-black tabular-nums ${
+              isZero ? 'text-slate-300 dark:text-slate-600' : 'text-slate-900 dark:text-white'
+            }`}
+          >
+            {value}
+            {unit ? (
+              <span className="text-[10px] font-bold text-slate-400 ms-1.5">{unit}</span>
+            ) : null}
+          </p>
+          {isZero && emptyHint ? (
+            <p className="text-[10px] font-bold text-slate-400 mt-2">{emptyHint}</p>
+          ) : null}
         </div>
-        <p className={`text-3xl font-bold text-slate-900 dark:text-white mt-1 transition-colors duration-500 ${action ? 'group-hover:text-white' : ''}`}>
-          {value} <span className={`text-xs font-normal text-slate-400 transition-colors duration-500 ${action ? 'group-hover:text-white/80' : ''}`}>{unit}</span>
-        </p>
+        <div
+          className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${styles.badge}`}
+        >
+          <Icon size={20} className={styles.icon} />
+        </div>
       </div>
-      <div className={`relative z-10 w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm transition-all duration-500 ${iconColor} ${action ? 'group-hover:bg-transparent group-hover:border-white/20 group-hover:text-white' : ''}`}>
-        <Icon size={24} />
+    </Wrapper>
+  );
+}
+
+function SchoolInfoChip({
+  icon: Icon,
+  iconClass,
+  label,
+  value,
+  className = '',
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  iconClass: string;
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  const isEmpty = !value || value === 'غير محدد' || value === 'Not specified';
+
+  return (
+    <div
+      className={`p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/20 hover:border-slate-200 dark:hover:border-slate-700 transition-colors ${className}`}
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <Icon size={14} className={iconClass} />
+        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+          {label}
+        </span>
       </div>
+      <p
+        className={`text-sm font-bold truncate ${isEmpty ? 'text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}
+        title={value}
+      >
+        {value}
+      </p>
     </div>
   );
 }

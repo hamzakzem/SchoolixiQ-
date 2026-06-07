@@ -48,6 +48,112 @@ const STATUS_LABELS: Record<string, { ar: string; en: string; color: string }> =
   leave: { ar: 'إجازة', en: 'Leave', color: 'bg-blue-100 text-blue-700' },
 };
 
+type SummaryTone = 'emerald' | 'rose' | 'indigo' | 'red' | 'orange';
+
+const SUMMARY_TONE_STYLES: Record<
+  SummaryTone,
+  { card: string; badge: string; icon: string; value: string }
+> = {
+  emerald: {
+    card: 'bg-white dark:bg-slate-900 border-emerald-100/80 dark:border-emerald-900/30 hover:border-emerald-200 dark:hover:border-emerald-800',
+    badge: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/40 text-emerald-600 dark:text-emerald-400',
+    icon: 'text-emerald-600 dark:text-emerald-400',
+    value: 'text-emerald-700 dark:text-emerald-300',
+  },
+  rose: {
+    card: 'bg-white dark:bg-slate-900 border-rose-100/80 dark:border-rose-900/30 hover:border-rose-200 dark:hover:border-rose-800',
+    badge: 'bg-rose-50 dark:bg-rose-950/40 border-rose-100 dark:border-rose-900/40 text-rose-600 dark:text-rose-400',
+    icon: 'text-rose-600 dark:text-rose-400',
+    value: 'text-rose-700 dark:text-rose-300',
+  },
+  indigo: {
+    card: 'bg-white dark:bg-slate-900 border-indigo-100/80 dark:border-indigo-900/30 hover:border-indigo-200 dark:hover:border-indigo-800',
+    badge: 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-100 dark:border-indigo-900/40 text-indigo-600 dark:text-indigo-400',
+    icon: 'text-indigo-600 dark:text-indigo-400',
+    value: 'text-indigo-700 dark:text-indigo-300',
+  },
+  red: {
+    card: 'bg-white dark:bg-slate-900 border-red-100/80 dark:border-red-900/30',
+    badge: 'bg-red-50 dark:bg-red-950/40 border-red-100 dark:border-red-900/40 text-red-600 dark:text-red-400',
+    icon: 'text-red-600 dark:text-red-400',
+    value: 'text-red-700 dark:text-red-300',
+  },
+  orange: {
+    card: 'bg-white dark:bg-slate-900 border-orange-100/80 dark:border-orange-900/30',
+    badge: 'bg-orange-50 dark:bg-orange-950/40 border-orange-100 dark:border-orange-900/40 text-orange-600 dark:text-orange-400',
+    icon: 'text-orange-600 dark:text-orange-400',
+    value: 'text-orange-700 dark:text-orange-300',
+  },
+};
+
+function SummaryStatCard({
+  label,
+  value,
+  emptyHint,
+  icon: Icon,
+  tone,
+  unit = '',
+  formatNumber = false,
+  onClick,
+  isRtl,
+  className = '',
+}: {
+  label: string;
+  value: number | null;
+  emptyHint: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  tone: SummaryTone;
+  unit?: string;
+  formatNumber?: boolean;
+  onClick?: () => void;
+  isRtl: boolean;
+  className?: string;
+}) {
+  const styles = SUMMARY_TONE_STYLES[tone];
+  const isZero = value === 0;
+  const displayValue =
+    value === null ? '—' : formatNumber ? value.toLocaleString() : String(value);
+  const isInteractive = Boolean(onClick);
+  const Wrapper = isInteractive ? 'button' : 'div';
+
+  return (
+    <Wrapper
+      type={isInteractive ? 'button' : undefined}
+      onClick={onClick}
+      className={`p-4 md:p-5 rounded-2xl border shadow-sm flex flex-col text-right transition-all ${styles.card} ${className} ${
+        isInteractive
+          ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
+          : ''
+      }`}
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+          {label}
+        </span>
+        <div
+          className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${styles.badge}`}
+        >
+          <Icon size={17} className={styles.icon} />
+        </div>
+      </div>
+      <div className="flex items-baseline gap-1.5 min-h-[2.25rem]">
+        <span
+          className={`text-2xl md:text-3xl font-black tabular-nums ${isZero ? 'text-slate-300 dark:text-slate-600' : styles.value}`}
+        >
+          {displayValue}
+        </span>
+        {unit ? (
+          <span className="text-[10px] font-bold text-slate-400 shrink-0">{unit}</span>
+        ) : null}
+      </div>
+      <p className={`text-[10px] font-bold mt-2 ${isZero ? 'text-slate-400' : 'text-slate-400/80'}`}>
+        {isZero ? emptyHint : isRtl ? 'محدّث اليوم' : 'Updated today'}
+      </p>
+    </Wrapper>
+  );
+}
+
 function StudentAttendanceCard({
   student,
   isRtl,
@@ -471,150 +577,164 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
             : 'School Store Collection Today'
           : '';
 
+  const formattedToday = new Date().toLocaleDateString(isRtl ? 'ar-IQ' : 'en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 mb-8" dir={isRtl ? 'rtl' : 'ltr'}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 dark:text-white font-display mb-2 flex items-center gap-2">
-            {isRtl ? 'ملخص المدرسة اليوم' : 'Daily School Summary'}
-          </h2>
-          <p className="text-sm text-slate-500 font-medium">
-            {isRtl
-              ? 'نظرة شاملة ومباشرة على أداء المدرسة لهذا اليوم'
-              : 'A quick overview of school performance today'}
-          </p>
+    <div className="space-y-5 animate-in fade-in duration-500 mb-6" dir={isRtl ? 'rtl' : 'ltr'}>
+      {/* Hero */}
+      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+        <div className="h-1 bg-gradient-to-l from-amber-400 via-amber-500 to-slate-900" />
+        <div className="px-5 py-5 md:px-6 md:py-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                <Clock size={12} className="text-amber-600" />
+                {formattedToday}
+              </span>
+              {!loading && totalStudents > 0 && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40">
+                  {isRtl ? `${totalStudents} طالب مسجّل اليوم` : `${totalStudents} students tracked today`}
+                </span>
+              )}
+            </div>
+            <h2 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white font-display">
+              {isRtl ? 'ملخص المدرسة اليوم' : 'Daily School Summary'}
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1 max-w-xl">
+              {isRtl
+                ? 'نظرة مباشرة على الحضور والغياب والمتأخرات ومبيعات المتجر لهذا اليوم'
+                : 'Live view of attendance, arrears, and store activity for today'}
+            </p>
+          </div>
         </div>
-        <button
-          onClick={sendInstallmentAlerts}
-          disabled={sendingAlerts}
-          className="flex items-center justify-center gap-2 px-5 py-3 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
-        >
-          {sendingAlerts ? (
-            <Clock size={16} className="animate-spin" />
-          ) : (
-            <Send size={16} />
-          )}
-          {isRtl ? 'إرسال تنبيهات الأقساط لأولياء الأمور' : 'Send installment alerts to parents'}
-        </button>
       </div>
 
+      {/* Statistics grid */}
       <div
-        className={`grid grid-cols-2 gap-4 ${hasMarketplace ? 'md:grid-cols-3 lg:grid-cols-5' : 'md:grid-cols-2 lg:grid-cols-4'}`}
+        className={`grid grid-cols-2 gap-3 md:gap-4 ${hasMarketplace ? 'md:grid-cols-3 lg:grid-cols-5' : 'md:grid-cols-2 lg:grid-cols-4'}`}
       >
-        <button
-          type="button"
+        <SummaryStatCard
+          label={isRtl ? 'حضور الطلاب' : 'Present'}
+          value={loading ? null : stats.presentToday}
+          emptyHint={isRtl ? 'لم يُسجّل بعد' : 'Not recorded yet'}
+          icon={CheckCircle2}
+          tone="emerald"
           onClick={() => setActiveModal('present')}
-          className="p-5 rounded-[1.5rem] bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 flex flex-col justify-center text-right hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center shrink-0">
-              <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-              {isRtl ? 'حضور الطلاب' : 'Present'}
-            </span>
-          </div>
-          <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
-            {loading ? '-' : stats.presentToday}
-          </span>
-        </button>
-
-        <button
-          type="button"
+          isRtl={isRtl}
+        />
+        <SummaryStatCard
+          label={isRtl ? 'غياب الطلاب' : 'Absent'}
+          value={loading ? null : stats.absentToday}
+          emptyHint={isRtl ? 'لا غياب مسجّل' : 'No absences'}
+          icon={UserX}
+          tone="rose"
           onClick={() => setActiveModal('absent')}
-          className="p-5 rounded-[1.5rem] bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 flex flex-col justify-center text-right hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center shrink-0">
-              <UserX size={16} className="text-rose-600 dark:text-rose-400" />
-            </div>
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-              {isRtl ? 'غياب الطلاب' : 'Absent'}
-            </span>
-          </div>
-          <span className="text-3xl font-black text-rose-600 dark:text-rose-400">
-            {loading ? '-' : stats.absentToday}
-          </span>
-        </button>
-
+          isRtl={isRtl}
+        />
         {hasMarketplace && (
-          <button
-            type="button"
+          <SummaryStatCard
+            label={isRtl ? 'المُحصل اليوم' : 'Store Today'}
+            value={loading ? null : stats.collectedToday}
+            emptyHint={isRtl ? 'لا مبيعات اليوم' : 'No sales today'}
+            icon={Wallet}
+            tone="indigo"
+            unit={t('iqd')}
+            formatNumber
             onClick={() => setActiveModal('market')}
-            className="p-5 rounded-[1.5rem] bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 flex flex-col justify-center text-right hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-          >
+            isRtl={isRtl}
+          />
+        )}
+        <SummaryStatCard
+          label={isRtl ? 'المتأخرات' : 'Arrears'}
+          value={loading ? null : stats.delayedTuition}
+          emptyHint={isRtl ? 'لا متأخرات' : 'No arrears'}
+          icon={TrendingDown}
+          tone="red"
+          unit={t('iqd')}
+          formatNumber
+          isRtl={isRtl}
+          className="col-span-2 md:col-span-1"
+        />
+        <SummaryStatCard
+          label={isRtl ? 'مخزون منخفض' : 'Low Stock'}
+          value={loading ? null : stats.lowInventory}
+          emptyHint={isRtl ? 'المخزون مستقر' : 'Stock is healthy'}
+          icon={AlertTriangle}
+          tone="orange"
+          isRtl={isRtl}
+          className="col-span-2 md:col-span-1"
+        />
+      </div>
+
+      {/* Alerts + actions panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {!loading && alerts.length > 0 ? (
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center shrink-0">
-                <Wallet size={16} className="text-indigo-600 dark:text-indigo-400" />
+              <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40 flex items-center justify-center">
+                <Bell size={15} className="text-amber-600" />
               </div>
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                {isRtl ? 'المُحصل اليوم' : 'Store Today'}
-              </span>
+              <h3 className="text-sm font-black text-slate-800 dark:text-white">
+                {isRtl ? 'ما يحتاج انتباهك اليوم' : 'Needs Your Attention Today'}
+              </h3>
             </div>
-            <p className="flex items-baseline gap-1">
-              <span className="text-2xl lg:text-3xl font-black text-indigo-600 dark:text-indigo-400 truncate">
-                {loading ? '-' : stats.collectedToday.toLocaleString()}
-              </span>
-              <span className="text-[10px] text-slate-400 shrink-0">{t('iqd')}</span>
+            <div className="space-y-2">
+              {alerts.slice(0, 3).map((alert, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/50"
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full shrink-0 ${alert.type === 'absence' ? 'bg-rose-500' : alert.type === 'delayed' ? 'bg-red-500' : 'bg-orange-500'}`}
+                  />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{alert.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="lg:col-span-2 hidden lg:flex items-center p-5 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+            <p className="text-sm font-bold text-slate-400">
+              {isRtl ? 'لا تنبيهات عاجلة اليوم — الوضع مستقر' : 'No urgent alerts today — all clear'}
             </p>
-          </button>
+          </div>
         )}
 
-        <div className="p-5 rounded-[1.5rem] bg-red-50/50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 flex flex-col justify-center col-span-2 md:col-span-1">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center shrink-0">
-              <TrendingDown size={16} className="text-red-600 dark:text-red-400" />
+        <div className="bg-slate-900 dark:bg-slate-800 rounded-2xl border border-slate-800 dark:border-slate-700 p-5 shadow-md flex flex-col justify-between gap-4">
+          <div>
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center mb-3">
+              <Send size={16} className="text-amber-400" />
             </div>
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-              {isRtl ? 'المتأخرات' : 'Arrears'}
-            </span>
+            <h3 className="text-sm font-black text-white">
+              {isRtl ? 'إجراءات سريعة' : 'Quick Actions'}
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              {isRtl
+                ? 'أرسل تنبيهات الأقساط المتأخرة أو المستحقة لأولياء الأمور'
+                : 'Notify parents about overdue or upcoming installments'}
+            </p>
           </div>
-          <p className="flex items-baseline gap-1">
-            <span className="text-2xl lg:text-3xl font-black text-red-600 dark:text-red-400 truncate">
-              {loading ? '-' : stats.delayedTuition.toLocaleString()}
+          <button
+            onClick={sendInstallmentAlerts}
+            disabled={sendingAlerts}
+            aria-label={isRtl ? 'إرسال تنبيهات الأقساط لأولياء الأمور' : 'Send installment alerts to parents'}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl font-bold text-sm transition-all disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+          >
+            {sendingAlerts ? (
+              <Clock size={16} className="animate-spin" />
+            ) : (
+              <Send size={16} />
+            )}
+            <span className="truncate">
+              {isRtl ? 'إرسال تنبيهات الأقساط' : 'Send fee alerts'}
             </span>
-            <span className="text-[10px] text-slate-400 shrink-0">{t('iqd')}</span>
-          </p>
-        </div>
-
-        <div className="p-5 rounded-[1.5rem] bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 flex flex-col justify-center col-span-2 md:col-span-1">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center shrink-0">
-              <AlertTriangle size={16} className="text-orange-600 dark:text-orange-400" />
-            </div>
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-              {isRtl ? 'مخزون منخفض' : 'Low Stock'}
-            </span>
-          </div>
-          <span className="text-3xl font-black text-orange-600 dark:text-orange-400">
-            {loading ? '-' : stats.lowInventory}
-          </span>
+          </button>
         </div>
       </div>
-
-      {!loading && alerts.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Bell size={18} className="text-slate-400" />
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider">
-              {isRtl ? 'ما يحتاج انتباهك اليوم' : 'Needs Your Attention Today'}
-            </h3>
-          </div>
-          <div className="space-y-3">
-            {alerts.slice(0, 3).map((alert, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50"
-              >
-                <div
-                  className={`w-2 h-2 rounded-full shrink-0 ${alert.type === 'absence' ? 'bg-rose-500' : alert.type === 'delayed' ? 'bg-red-500' : 'bg-orange-500'}`}
-                />
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{alert.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <AnimatePresence>
         {activeModal && (
