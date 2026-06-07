@@ -357,11 +357,61 @@ async function startServer() {
     }
   };
 
+  async function assertUploadPathAllowed(uid: string, storagePath: string): Promise<{ role: string; schoolId: string } | null> {
+    const db = getDb();
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return null;
+    }
+    const userData = userDoc.data() || {};
+    const role = String(userData.role || '');
+    const schoolId = String(userData.schoolId || '');
+    const staffRoles = ['superadmin', 'admin', 'assistant', 'staff', 'teacher'];
+
+    const studentMatch = storagePath.match(/^students\/([^/]+)\/([^/]+)\/([^/]+)$/);
+    if (studentMatch) {
+      const pathSchoolId = studentMatch[1];
+      const fileName = studentMatch[3];
+      if (!staffRoles.includes(role)) {
+        throw Object.assign(new Error('FORBIDDEN_ROLE'), { status: 403 });
+      }
+      if (role !== 'superadmin' && schoolId !== pathSchoolId) {
+        throw Object.assign(new Error('FORBIDDEN_SCHOOL'), { status: 403 });
+      }
+      if (!/^photo_\d+\.(jpg|jpeg|png|webp)$/i.test(fileName)) {
+        throw Object.assign(new Error('INVALID_STUDENT_PHOTO_PATH'), { status: 400 });
+      }
+      return { role, schoolId };
+    }
+
+    return { role, schoolId };
+  }
+
   // Upload API using Firebase Admin Storage (Securely Authenticated)
   app.post('/api/upload', verifyToken, express.json({ limit: '20mb' }), async (req: any, res: any) => {
     try {
       const { path: storagePath, base64 } = req.body;
       if (!storagePath || !base64) return res.status(400).json({ error: 'Missing path or base64' });
+
+      try {
+        const allowed = await assertUploadPathAllowed(req.user.uid, storagePath);
+        if (!allowed) {
+          return res.status(403).json({
+            error: 'FORBIDDEN',
+            message: 'ملف المستخدم غير موجود أو غير مصرح له برفع الصور',
+          });
+        }
+      } catch (authzError: any) {
+        const status = authzError.status || 403;
+        const code = authzError.message || 'FORBIDDEN';
+        const message =
+          code === 'FORBIDDEN_SCHOOL'
+            ? 'غير مسموح برفع صور لمدرسة أخرى'
+            : code === 'FORBIDDEN_ROLE'
+              ? 'غير مصرح لك برفع صور الطلاب'
+              : 'مسار رفع الصورة غير صالح';
+        return res.status(status).json({ error: code, message });
+      }
 
       // 1. File Size Verification (Max 10MB to avoid oversized uploads)
       const base64Data = base64.replace(/^data:[^;]+;base64,/, '');

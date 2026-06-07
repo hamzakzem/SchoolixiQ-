@@ -6,67 +6,113 @@ service firebase.storage {
       allow read, write: if false;
     }
 
-    // 2. Auth Helper
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // 3. Profiles: Authenticated users can read all user profile images, but only owners can upload
+    function userDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function userDocExists() {
+      return isSignedIn() && userDoc().exists;
+    }
+
+    function userData() {
+      return userDoc().data;
+    }
+
+    function isSuperAdmin() {
+      return userDocExists() && userData().role == 'superadmin';
+    }
+
+    function userSchoolId() {
+      return userDocExists() && userData().keys().hasAll(['schoolId'])
+        ? userData().schoolId
+        : '';
+    }
+
+    function isSchoolStaffRole() {
+      return userDocExists()
+        && userData().role in ['admin', 'assistant', 'staff', 'teacher'];
+    }
+
+    function sameSchool(schoolId) {
+      return userSchoolId() == schoolId;
+    }
+
+    function canManageSchoolStudentPhotos(schoolId) {
+      return isSuperAdmin()
+        || (isSchoolStaffRole() && sameSchool(schoolId));
+    }
+
+    function isAllowedStudentImageUpload() {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType != null
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    function isStudentPhotoFileName(fileName) {
+      return fileName.matches('photo_[0-9]+\\.(jpg|jpeg|png|webp)');
+    }
+
+    // 2. Profiles: Authenticated users can read all user profile images, but only owners can upload
     match /users/{userId}/{allPaths=**} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // 4. School store product images (admin/assistant of same school)
+    // 3. School store product images (admin/assistant of same school)
     match /schools/{schoolId}/store/products/{fileName} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
+        isSuperAdmin()
         || (
-          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId == schoolId
-          && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'assistant']
+          sameSchool(schoolId)
+          && userDocExists()
+          && userData().role in ['admin', 'assistant']
         )
       );
     }
 
-    // 5. Schools: school-related images (logos, etc.)
+    // 4. Schools: school-related images (logos, etc.) — staff of same school
     match /schools/{schoolId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId == schoolId || 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
-      );
+      allow write: if canManageSchoolStudentPhotos(schoolId);
     }
 
-    // 5. Students: Teachers and Admins can manage student photos
-    match /students/{schoolId}/{studentId}/{allPaths=**} {
+    // 5. Student photos — school-scoped, staff only, images only
+    match /students/{schoolId}/{studentId}/{fileName} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId == schoolId || 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
-      );
+      allow write: if canManageSchoolStudentPhotos(schoolId)
+        && isAllowedStudentImageUpload()
+        && isStudentPhotoFileName(fileName);
     }
-    
-    // Legacy generic path
+
+    // Legacy generic path (superadmin only)
     match /students/{studentId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
+      allow write: if isSuperAdmin();
     }
 
-    // Attachments
+    // Chat attachments
     match /chat_attachments/{messageId}/{allPaths=**} {
-       allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
-    
+
     // Legacy store image path (backward compatibility)
     match /market/{itemId}/{allPaths=**} {
-       allow read: if isSignedIn();
-       allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'assistant', 'superadmin'];
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && userDocExists()
+        && userData().role in ['admin', 'assistant', 'superadmin'];
     }
 
     match /system/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
+      allow write: if isSuperAdmin();
     }
   }
 }

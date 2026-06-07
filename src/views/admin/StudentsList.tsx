@@ -540,6 +540,8 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         toast.error('حجم الصورة يجب أن لا يتجاوز 5 ميجابايت');
       } else if (code === 'INVALID_FILE_TYPE') {
         toast.error('نوع الملف غير مدعوم. استخدم JPG أو PNG');
+      } else if (code === 'STORAGE_UNAUTHORIZED') {
+        toast.error('صلاحيات رفع الصور غير مفعّلة على الخادم. يرجى نشر قواعد Firebase Storage ثم إعادة المحاولة');
       } else {
         toast.error('فشل رفع الصورة. تحقق من الاتصال والصلاحيات');
       }

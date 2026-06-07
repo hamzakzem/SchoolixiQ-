@@ -88,13 +88,25 @@ export async function uploadStudentPhoto(
     return getDownloadURL(snapshot.ref);
   } catch (error) {
     clientError = error;
-    console.warn('Client student photo upload failed, trying same-origin server upload:', error);
+    const code = (error as { code?: string })?.code || '';
+    if (code === 'storage/unauthorized') {
+      console.warn(
+        'Client student photo upload denied by Storage rules — deploy storage.rules to Firebase:',
+        error,
+      );
+    } else {
+      console.warn('Client student photo upload failed, trying same-origin server upload:', error);
+    }
   }
 
   try {
     return await uploadImageToServer(file, path, 400, 400);
   } catch (serverError) {
     console.error('Server student photo upload failed:', serverError, clientError);
+    const clientCode = (clientError as { code?: string })?.code || '';
+    if (clientCode === 'storage/unauthorized') {
+      throw new Error('STORAGE_UNAUTHORIZED');
+    }
     throw serverError;
   }
 }
