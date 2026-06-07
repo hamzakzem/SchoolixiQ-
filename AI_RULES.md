@@ -96,3 +96,14 @@ Do not delete files to simplify the project.
 Do not modify ID card settings unless explicitly requested.
 
 If a protected file must change, stop and ask for explicit approval first.
+## Mandatory Verification
+
+Before modifying any protected file:
+
+1. Show the exact reason.
+2. Show the list of affected files.
+3. Wait for explicit user approval.
+4. Never prepare deletions.
+5. Never commit automatically.
+6. Never push automatically.
+7. If the current workspace differs from GitHub main, stop and ask for approval.
