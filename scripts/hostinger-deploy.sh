@@ -8,7 +8,41 @@ set -euo pipefail
 
 LOCAL_DIR="${1:-dist}"
 SCRIPT_FILE="$(mktemp)"
-trap 'rm -f "$SCRIPT_FILE" "${SCRIPT_FILE}.run"' EXIT
+trap 'rm -f "$SCRIPT_FILE" "${SCRIPT_FILE}.run"; unset LFTP_PASSWORD' EXIT
+
+# lftp -u "user,pass" treats comma as a delimiter; passwords with commas/spaces/quotes
+# are parsed as extra commands (e.g. "Unknown command ',***'"). Pass the password only via
+# LFTP_PASSWORD + --env-password so it never appears in argv or script commands.
+run_lftp() {
+  local scheme="$1"
+  local port="$2"
+  local target="$3"
+  shift 3
+  local -a extra_settings=("$@")
+
+  echo "=== ${scheme^^} (${port}) -> '${target}' ==="
+  write_mirror_script "$target"
+
+  {
+    for setting in "${extra_settings[@]}"; do
+      printf '%s\n' "$setting"
+    done
+    cat "$SCRIPT_FILE"
+  } >"${SCRIPT_FILE}.run"
+
+  export LFTP_PASSWORD="${HOSTINGER_FTP_PASSWORD}"
+
+  if lftp --env-password \
+    -u "${HOSTINGER_FTP_USERNAME}" \
+    "${scheme}://${HOSTINGER_FTP_SERVER}:${port}" \
+    -f "${SCRIPT_FILE}.run"; then
+    echo "${scheme^^} deploy OK: ${target}"
+    return 0
+  fi
+
+  echo "${scheme^^} deploy failed: ${target}"
+  return 1
+}
 
 write_mirror_script() {
   local target="$1"
@@ -30,38 +64,16 @@ EOF
 
 try_ftps() {
   local target="$1"
-  echo "=== FTPS (21) -> '${target}' ==="
-  write_mirror_script "$target"
-  {
-    echo "set ssl:verify-certificate no"
-    echo "set ftp:ssl-force true"
-    echo "set ftp:ssl-protect-data true"
-    cat "$SCRIPT_FILE"
-  } > "${SCRIPT_FILE}.run"
-  if lftp -u "${HOSTINGER_FTP_USERNAME},${HOSTINGER_FTP_PASSWORD}" \
-    "ftps://${HOSTINGER_FTP_SERVER}:21" -f "${SCRIPT_FILE}.run"; then
-    echo "FTPS deploy OK: ${target}"
-    return 0
-  fi
-  echo "FTPS deploy failed: ${target}"
-  return 1
+  run_lftp ftps 21 "$target" \
+    "set ssl:verify-certificate no" \
+    "set ftp:ssl-force true" \
+    "set ftp:ssl-protect-data true"
 }
 
 try_sftp() {
   local target="$1"
-  echo "=== SFTP (65002) -> '${target}' ==="
-  write_mirror_script "$target"
-  {
-    echo "set sftp:auto-confirm yes"
-    cat "$SCRIPT_FILE"
-  } > "${SCRIPT_FILE}.run"
-  if lftp -u "${HOSTINGER_FTP_USERNAME},${HOSTINGER_FTP_PASSWORD}" \
-    "sftp://${HOSTINGER_FTP_SERVER}:65002" -f "${SCRIPT_FILE}.run"; then
-    echo "SFTP deploy OK: ${target}"
-    return 0
-  fi
-  echo "SFTP deploy failed: ${target}"
-  return 1
+  run_lftp sftp 65002 "$target" \
+    "set sftp:auto-confirm yes"
 }
 
 REMOTE="${HOSTINGER_FTP_REMOTE_DIR%/}"
