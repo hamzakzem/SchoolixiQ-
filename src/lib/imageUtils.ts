@@ -1,5 +1,6 @@
 import { getApiUrl } from './apiUtils';
-import { auth } from './firebase';
+import { auth, storage } from './firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export const compressImageToBase64 = (file: File, maxWidth = 400, maxHeight = 400): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -41,13 +42,50 @@ export const compressImageToBase64 = (file: File, maxWidth = 400, maxHeight = 40
   });
 };
 
+function resolveImageExtension(filename: string, mimeType?: string): string {
+  const fromName = filename.match(/\.(jpe?g|png|webp)$/i)?.[0]?.toLowerCase();
+  if (fromName) {
+    return fromName === '.jpeg' ? '.jpg' : fromName;
+  }
+  if (mimeType === 'image/png') return '.png';
+  if (mimeType === 'image/webp') return '.webp';
+  return '.jpg';
+}
+
 /** School-scoped student photo path matching storage.rules */
 export function buildStudentPhotoPath(
   schoolId: string,
   studentId: string,
+  filename = '',
+  mimeType?: string,
 ): string {
   const safeId = studentId.replace(/[^a-zA-Z0-9_-]/g, '_') || 'new';
-  return `students/${schoolId}/${safeId}/photo_${Date.now()}.jpg`;
+  const ext = resolveImageExtension(filename, mimeType);
+  return `students/${schoolId}/${safeId}/photo_${Date.now()}${ext}`;
+}
+
+/** Upload student photo via Firebase Storage, falling back to server /api/upload. */
+export async function uploadStudentPhoto(
+  file: File,
+  schoolId: string,
+  studentId: string,
+): Promise<string> {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('INVALID_IMAGE_TYPE');
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('FILE_TOO_LARGE');
+  }
+
+  const path = buildStudentPhotoPath(schoolId, studentId, file.name, file.type);
+  try {
+    const storageRef = ref(storage, path);
+    const snapshot = await uploadBytes(storageRef, file);
+    return getDownloadURL(snapshot.ref);
+  } catch (clientError) {
+    console.warn('Client student photo upload failed, trying server upload:', clientError);
+    return uploadImageToServer(file, path, 400, 400);
+  }
 }
 
 export const uploadImageToServer = async (file: File, storagePath: string, maxWidth = 400, maxHeight = 400): Promise<string> => {
