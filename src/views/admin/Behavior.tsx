@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, limit, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, limit, orderBy } from 'firebase/firestore';
+import { fetchStudentLinkFields } from '../../lib/schoolSync';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { useAuth } from '../../lib/AuthContext';
 import { Calendar, Plus, Search, User, MessageSquare, AlertTriangle, CheckCircle, Trash2 } from 'lucide-react';
@@ -24,37 +25,31 @@ export default function Behavior() {
   const [reportToDelete, setReportToDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
     if (!profile?.schoolId) return;
-    
-    const fetchBehaviorData = async () => {
-      setLoading(true);
-      try {
-        const studentsPath = 'students';
-        const studentsQ = query(collection(db, studentsPath), where('schoolId', '==', profile.schoolId), limit(500));
-        
-        const reportsPath = 'behavior_reports';
-        const reportsQ = query(collection(db, reportsPath), where('schoolId', '==', profile.schoolId), orderBy('createdAt', 'desc'), limit(100));
 
-        const [studentsSnap, reportsSnap] = await Promise.all([
-          getDocs(studentsQ),
-          getDocs(reportsQ)
-        ]);
+    setLoading(true);
+    const unsubs: (() => void)[] = [];
 
-        if (!isMounted) return;
+    const studentsQ = query(collection(db, 'students'), where('schoolId', '==', profile.schoolId), limit(500));
+    unsubs.push(onSnapshot(studentsQ, (snap) => {
+      setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => console.error('Error fetching students:', error)));
 
-        setStudents(studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setReports(reportsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        console.error("Error fetching behavior data: ", error);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
+    const reportsQ = query(
+      collection(db, 'behavior_reports'),
+      where('schoolId', '==', profile.schoolId),
+      orderBy('createdAt', 'desc'),
+      limit(100)
+    );
+    unsubs.push(onSnapshot(reportsQ, (snap) => {
+      setReports(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (error) => {
+      console.error('Error fetching behavior reports:', error);
+      setLoading(false);
+    }));
 
-    fetchBehaviorData();
-
-    return () => { isMounted = false; };
+    return () => unsubs.forEach(unsub => unsub());
   }, [profile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,13 +58,14 @@ export default function Behavior() {
     setLoading(true);
     
     try {
+      const link = await fetchStudentLinkFields(selectedStudent.id);
       const path = 'behavior_reports';
       const docRef = await addDoc(collection(db, path), {
         schoolId: profile.schoolId,
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,
-        parentIds: selectedStudent.parentIds || [],
-        parentEmail: (selectedStudent.parentEmail || '').toLowerCase(),
+        parentIds: link?.parentIds || [],
+        parentEmail: link?.parentEmail || '',
         type: newReport.type,
         description: newReport.description,
         createdAt: serverTimestamp(),

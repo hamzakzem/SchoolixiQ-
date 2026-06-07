@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../lib/AuthContext';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, limit, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, limit, orderBy } from 'firebase/firestore';
 import { MessageSquare, Plus, Trash2, Send, Bell, Filter, Users, User, ArrowRight, Search } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
@@ -29,31 +29,26 @@ export default function Announcements() {
   });
 
   useEffect(() => {
-    let isMounted = true;
     if (!profile?.schoolId) return;
 
-    const fetchData = async () => {
-      try {
-        const studentsQ = query(collection(db, 'students'), where('schoolId', '==', profile.schoolId), limit(500));
-        const annQ = query(collection(db, 'announcements'), where('schoolId', '==', profile.schoolId), orderBy('createdAt', 'desc'), limit(100));
+    const unsubs: (() => void)[] = [];
 
-        const [studentsSnap, annSnap] = await Promise.all([
-          getDocs(studentsQ),
-          getDocs(annQ)
-        ]);
+    const studentsQ = query(collection(db, 'students'), where('schoolId', '==', profile.schoolId), limit(500));
+    unsubs.push(onSnapshot(studentsQ, (snap) => {
+      setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => console.error('Error fetching students:', error)));
 
-        if (!isMounted) return;
+    const annQ = query(
+      collection(db, 'announcements'),
+      where('schoolId', '==', profile.schoolId),
+      orderBy('createdAt', 'desc'),
+      limit(100)
+    );
+    unsubs.push(onSnapshot(annQ, (snap) => {
+      setAnnouncements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => console.error('Error fetching announcements:', error)));
 
-        setStudents(studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setAnnouncements(annSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        console.error("Error fetching announcements data:", error);
-      }
-    };
-
-    fetchData();
-
-    return () => { isMounted = false; };
+    return () => unsubs.forEach(unsub => unsub());
   }, [profile]);
 
   // Group students by grade

@@ -1,5 +1,6 @@
 import { db } from './firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, writeBatch, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { fetchStudentLinkFields } from './schoolSync';
 
 export type NotificationType = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'homework' | 'report' | 'system';
 
@@ -59,19 +60,15 @@ export const notificationService = {
   async notifyStudentParents(studentId: string, payload: Omit<NotificationPayload, 'userId'>) {
     try {
       if (!studentId) return false;
-      const studentSnap = await getDoc(doc(db, 'students', studentId));
-      if (!studentSnap.exists()) return false;
-      
-      const studentData = studentSnap.data();
-      const parentIds = studentData.parentIds || [];
-      
-      // Also notify by email if relevant (mocked for now as we don't have a mail server, but we send in-app notification)
-      if (parentIds.length === 0) {
+      const link = await fetchStudentLinkFields(studentId);
+      if (!link) return false;
+
+      if (link.parentIds.length === 0) {
         console.log(`No parents linked to student ${studentId} for notification`);
         return true;
       }
 
-      return await this.sendToMultiple(parentIds, payload);
+      return await this.sendToMultiple(link.parentIds, payload);
     } catch (error) {
       console.error('Error notifying student parents:', error);
       return false;
@@ -183,7 +180,7 @@ export const notificationService = {
    */
   async notifyAllStaff(schoolId: string, payload: Omit<NotificationPayload, 'userId'>) {
     try {
-      const q = query(collection(db, 'users'), where('schoolId', '==', schoolId), where('role', 'in', ['staff', 'teacher']));
+      const q = query(collection(db, 'users'), where('schoolId', '==', schoolId), where('role', 'in', ['staff', 'teacher', 'admin', 'assistant']));
       const snap = await getDocs(q);
       const userIds = snap.docs.map((doc: any) => doc.id);
       

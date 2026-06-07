@@ -47,6 +47,7 @@ import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
+import { fetchStudentLinkFields, homeworkMatchesStudent } from "../lib/schoolSync";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 
 type Tab =
@@ -267,13 +268,13 @@ export default function TeacherDashboard() {
     if (!profile || !selectedStudent) return;
 
     try {
-      const student = students.find((s) => s.id === selectedStudent.id);
+      const link = await fetchStudentLinkFields(selectedStudent.id);
       await addDoc(collection(db, "behavior_reports"), {
         schoolId: profile.schoolId,
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,
-        parentIds: student?.parentIds || [],
-        parentEmail: (student?.parentEmail || "").toLowerCase(),
+        parentIds: link?.parentIds || [],
+        parentEmail: link?.parentEmail || "",
         type: behaviorNote.type,
         description: behaviorNote.description,
         createdAt: serverTimestamp(),
@@ -451,11 +452,14 @@ export default function TeacherDashboard() {
         teacherName: profile.name,
         subject: profile.subject || t("undefined"),
         schoolId: profile.schoolId,
+        hiddenFor: [],
         createdAt: serverTimestamp(),
       });
 
       // Notify all parents in the class about the homework
-      const classStudents = students.filter((s) => s.classId === targetClassId);
+      const classStudents = students.filter((s) =>
+        homeworkMatchesStudent(targetClassId, s, classes),
+      );
       if (classStudents.length > 0) {
         for (const student of classStudents) {
           await notificationService.notifyStudentParents(student.id, {
@@ -571,6 +575,7 @@ export default function TeacherDashboard() {
 
       // Individual updates to prevent overwriting other students
       for (const studentId of studentIds) {
+        const link = await fetchStudentLinkFields(studentId);
         const student = students.find((s) => s.id === studentId);
         const percentage = Math.round(
           (studentGrades[studentId] / maxScore) * 100,
@@ -593,8 +598,8 @@ export default function TeacherDashboard() {
           className: currentClass.name,
           studentId,
           studentName: student?.name || t("student"),
-          parentIds: isTeacherOnly ? [] : (student?.parentIds || []),
-          parentEmail: isTeacherOnly ? "" : (student?.parentEmail || "").toLowerCase(),
+          parentIds: isTeacherOnly ? [] : (link?.parentIds || []),
+          parentEmail: isTeacherOnly ? "" : (link?.parentEmail || ""),
           score: studentGrades[studentId],
           maxScore,
           percentage,
@@ -644,12 +649,12 @@ export default function TeacherDashboard() {
     if (!profile || !selectedStudent) return;
 
     try {
-      const student = students.find((s) => s.id === selectedStudent.id);
+      const link = await fetchStudentLinkFields(selectedStudent.id);
       const reportRef = await addDoc(collection(db, "teacher_reports"), {
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,
-        parentIds: student?.parentIds || [],
-        parentEmail: (student?.parentEmail || "").toLowerCase(),
+        parentIds: link?.parentIds || [],
+        parentEmail: link?.parentEmail || "",
         teacherId: profile.uid,
         teacherName: profile.name,
         subject: profile.subject || t("undefined"),

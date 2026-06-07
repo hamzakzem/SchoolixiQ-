@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, deleteDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { fetchStudentLinkFields } from '../../lib/schoolSync';
 import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { FileText, Plus, Search, Edit2, Trash2, Send, X, Shield, Star, Users, CheckCircle, AlertCircle } from 'lucide-react';
@@ -30,80 +31,58 @@ export default function Evaluations() {
 
   // Fetch classes
   useEffect(() => {
-    let isMounted = true;
     if (!profile?.schoolId) return;
 
-    const fetchClasses = async () => {
-      try {
-        const q = query(collection(db, 'classes'), where('schoolId', '==', profile.schoolId), limit(100));
-        const snap = await getDocs(q);
-        if (!isMounted) return;
-        const classData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setClasses(classData);
-        if (classData.length > 0 && !selectedClassId) setSelectedClassId(classData[0].id);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'classes');
-      }
-    };
-    
-    fetchClasses();
-    return () => { isMounted = false; };
+    const q = query(collection(db, 'classes'), where('schoolId', '==', profile.schoolId), limit(100));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const classData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setClasses(classData);
+      if (classData.length > 0 && !selectedClassId) setSelectedClassId(classData[0].id);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'classes'));
+
+    return () => unsubscribe();
   }, [profile]);
 
   // Fetch students for selected class
   useEffect(() => {
-    let isMounted = true;
     if (!profile?.schoolId || !selectedClassId) {
       setStudents([]);
       return;
     }
 
-    const fetchStudents = async () => {
-      try {
-        const q = query(
-          collection(db, 'students'),
-          where('schoolId', '==', profile.schoolId),
-          where('classId', '==', selectedClassId),
-          limit(200)
-        );
-        const snap = await getDocs(q);
-        if (!isMounted) return;
-        setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'students');
-      }
-    };
+    const q = query(
+      collection(db, 'students'),
+      where('schoolId', '==', profile.schoolId),
+      where('classId', '==', selectedClassId),
+      limit(200)
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'students'));
 
-    fetchStudents();
-    return () => { isMounted = false; };
+    return () => unsubscribe();
   }, [profile, selectedClassId]);
 
   // Fetch evaluation reports
   useEffect(() => {
-    let isMounted = true;
     if (!profile?.schoolId) return;
     setLoading(true);
-    
-    const fetchReports = async () => {
-      try {
-        const reportsQ = query(
-          collection(db, 'teacher_reports'),
-          where('schoolId', '==', profile.schoolId),
-          limit(300)
-        );
-        const snap = await getDocs(reportsQ);
-        if (!isMounted) return;
-        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setReports(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'teacher_reports');
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
 
-    fetchReports();
-    return () => { isMounted = false; };
+    const reportsQ = query(
+      collection(db, 'teacher_reports'),
+      where('schoolId', '==', profile.schoolId),
+      limit(300)
+    );
+    const unsubscribe = onSnapshot(reportsQ, (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setReports(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'teacher_reports');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [profile]);
 
   const handleSaveReport = async () => {
@@ -118,12 +97,12 @@ export default function Evaluations() {
         });
         toast.success(isRtl ? 'تم تحديث التقييم بنجاح' : 'Evaluation updated successfully');
       } else {
-        const student = students.find(s => s.id === selectedStudent.id);
+        const link = await fetchStudentLinkFields(selectedStudent.id);
         const reportRef = await addDoc(collection(db, 'teacher_reports'), {
           studentId: selectedStudent.id,
           studentName: selectedStudent.name,
-          parentIds: student?.parentIds || [],
-          parentEmail: (student?.parentEmail || '').toLowerCase(),
+          parentIds: link?.parentIds || [],
+          parentEmail: link?.parentEmail || '',
           teacherId: profile.uid, // Using admin's UID
           teacherName: profile.name,
           subject: 'إدارة المدرسة', // Meaning "School Administration"

@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
+import { homeworkMatchesStudent } from '../../lib/schoolSync';
 
 export default function Homework() {
   const { profile } = useAuth();
@@ -38,7 +39,7 @@ export default function Homework() {
     return () => unsubscribe();
   }, [profile]);
 
-  // Fetch students for selected class to know to whom to send notifications eventually
+  // Fetch school students and filter by class (supports classId doc ID or legacy class name)
   useEffect(() => {
     if (!profile?.schoolId || !selectedClassId) {
       setStudents([]);
@@ -47,13 +48,13 @@ export default function Homework() {
     const q = query(
       collection(db, 'students'),
       where('schoolId', '==', profile.schoolId),
-      where('classId', '==', selectedClassId)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setStudents(all.filter((s) => homeworkMatchesStudent(selectedClassId, s, classes)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'students'));
     return () => unsubscribe();
-  }, [profile, selectedClassId]);
+  }, [profile, selectedClassId, classes]);
 
   // Fetch homeworks
   useEffect(() => {
@@ -100,17 +101,20 @@ export default function Homework() {
           hiddenFor: []
         });
         
-        // Notify parents
-        if (students.length > 0) {
+        // Notify parents of students in the target class only
+        const classStudents = students.filter((s) =>
+          homeworkMatchesStudent(selectedClassId, s, classes),
+        );
+        for (const student of classStudents) {
           try {
-            await notificationService.notifyAllParents(profile.schoolId, {
+            await notificationService.notifyStudentParents(student.id, {
               title: `${isRtl ? 'واجب من الإدارة' : 'Homework from Admin'}: ${newHomework.title}`,
               message: `${newHomework.content.substring(0, 50)}...`,
               type: 'homework',
               schoolId: profile.schoolId,
-              metadata: { sourceId: homeworkRef.id }
+              metadata: { sourceId: homeworkRef.id },
             });
-          } catch(e) {
+          } catch (e) {
             console.error('Failed to send notification', e);
           }
         }

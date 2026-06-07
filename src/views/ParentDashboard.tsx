@@ -25,6 +25,7 @@ import { GlobalFooter } from "../components/GlobalFooter";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
+import { homeworkMatchesStudent } from "../lib/schoolSync";
 import { toast } from "react-hot-toast";
 import {
   Home,
@@ -685,20 +686,47 @@ export default function ParentDashboard() {
         setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
       }));
 
-      // 8. Homework
-      if (currentClassId) {
-        const hwQ = query(
-          collection(db, "homework"),
-          where("schoolId", "==", selectedStudent.schoolId),
-          where("classId", "==", currentClassId),
-          limit(30)
+      // 8. Homework (school-scoped query + client class matching for ID/name compatibility)
+      let latestClasses: Array<{ id: string; name?: string }> = [];
+      let latestHomework: any[] = [];
+      const applyHomeworkFilter = () => {
+        setHomework(
+          latestHomework
+            .filter(
+              (hw: any) =>
+                homeworkMatchesStudent(hw.classId, selectedStudent, latestClasses) &&
+                !(hw.hiddenFor || []).includes(profile?.uid),
+            )
+            .sort(
+              (a: any, b: any) =>
+                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+            ) as any,
         );
-        unsubs.push(onSnapshot(hwQ, snap => {
-          setHomework(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter((hw: any) => !(hw.hiddenFor || []).includes(profile?.uid))
-            .sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
-        }));
-      }
+      };
+      const classesQ = query(
+        collection(db, "classes"),
+        where("schoolId", "==", selectedStudent.schoolId),
+      );
+      unsubs.push(
+        onSnapshot(classesQ, (snap) => {
+          latestClasses = snap.docs.map((d) => ({
+            id: d.id,
+            name: d.data().name,
+          }));
+          applyHomeworkFilter();
+        }),
+      );
+      const hwQ = query(
+        collection(db, "homework"),
+        where("schoolId", "==", selectedStudent.schoolId),
+        limit(50),
+      );
+      unsubs.push(
+        onSnapshot(hwQ, (snap) => {
+          latestHomework = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          applyHomeworkFilter();
+        }),
+      );
 
       // 9. Reports
       const repQ = query(
