@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import React from "react";
 import { db, auth } from "../lib/firebase";
 import {
@@ -42,6 +42,7 @@ import {
   Settings,
   CheckCircle2,
   XCircle,
+  X,
   AlertTriangle,
   CheckCircle,
   FileText,
@@ -786,6 +787,36 @@ export default function ParentDashboard() {
     return () => unsubs.forEach(unsub => unsub());
   }, [selectedStudent, profile?.uid]);
 
+  const studentIds = useMemo(() => students.map((s) => s.id), [students]);
+
+  const installmentBanners = useMemo(
+    () =>
+      notifications.filter(
+        (n) =>
+          n.type === "payment" &&
+          n.metadata?.banner &&
+          !n.dismissed &&
+          (!n.metadata?.studentId || studentIds.includes(n.metadata.studentId)),
+      ),
+    [notifications, studentIds],
+  );
+
+  const dismissInstallmentBanner = async (notificationId: string) => {
+    try {
+      await updateDoc(doc(db, "notifications", notificationId), {
+        dismissed: true,
+        read: true,
+      });
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notificationId ? { ...n, dismissed: true, read: true } : n,
+        ),
+      );
+    } catch (err) {
+      console.error("Failed to dismiss installment banner", err);
+    }
+  };
+
   const allItems = [
     { id: "home", label: t("home"), icon: Home },
     {
@@ -1318,6 +1349,46 @@ export default function ParentDashboard() {
             >
               {activeTab === "home" && (
                 <div className="space-y-4 md:space-y-6">
+                  {installmentBanners.length > 0 && (
+                    <div className="space-y-3">
+                      {installmentBanners.map((banner) => (
+                        <motion.div
+                          key={banner.id}
+                          initial={{ opacity: 0, y: -8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="relative overflow-hidden rounded-[1.5rem] border border-amber-200/80 dark:border-amber-900/40 bg-gradient-to-l from-amber-50 via-white to-orange-50/80 dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900 p-5 shadow-md"
+                          dir={isRtl ? "rtl" : "ltr"}
+                        >
+                          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-amber-400 to-orange-500" />
+                          <button
+                            type="button"
+                            onClick={() => dismissInstallmentBanner(banner.id)}
+                            className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-white transition-all z-10"
+                            aria-label={isRtl ? "إخفاء التنبيه" : "Dismiss alert"}
+                          >
+                            <X size={14} />
+                          </button>
+                          <div className="flex items-start gap-4 pr-2 pl-10">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 shrink-0">
+                              <Wallet size={22} />
+                            </div>
+                            <div className="flex-1 min-w-0 text-right">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-1">
+                                {isRtl ? "تنبيه الأقساط الدراسية" : "Tuition installment alert"}
+                              </p>
+                              <h3 className="text-base font-black text-slate-900 dark:text-white mb-1.5">
+                                {banner.title}
+                              </h3>
+                              <p className="text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                                {banner.message}
+                              </p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Detailed School Address and Google Maps Location Card */}
                   {schoolInfo && (
                     <motion.div 
