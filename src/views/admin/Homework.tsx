@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
 import { homeworkMatchesStudent } from '../../lib/schoolSync';
+import { getHomeworkSubjectDisplay } from '../../lib/homeworkSubjects';
 
 export default function Homework() {
   const { profile } = useAuth();
@@ -90,12 +91,17 @@ export default function Homework() {
         });
         toast.success(isRtl ? 'تم تحديث الواجب بنجاح' : 'Homework updated successfully');
       } else {
+        const className = classes.find((c) => c.id === selectedClassId)?.name || '';
+        const adminSubjectName = isRtl ? 'إدارة المدرسة' : 'School Administration';
         const homeworkRef = await addDoc(collection(db, 'homework'), {
           ...newHomework,
           classId: selectedClassId,
+          className,
           teacherId: profile.uid,
           teacherName: profile.name,
-          subject: 'إدارة المدرسة', // Meaning "School Administration"
+          subjectId: null,
+          subjectName: adminSubjectName,
+          subject: adminSubjectName,
           schoolId: profile.schoolId,
           createdAt: serverTimestamp(),
           hiddenFor: []
@@ -222,7 +228,7 @@ export default function Homework() {
                               <div>
                                 <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{hw.title}</h4>
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                                  <span>{hw.teacherName || hw.subject}</span>
+                                  <span>{hw.teacherName || getHomeworkSubjectDisplay(hw)}</span>
                                   <span>•</span>
                                   <span>{hw.createdAt?.seconds ? new Date(hw.createdAt.seconds * 1000).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : ''}</span>
                                 </div>

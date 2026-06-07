@@ -26,6 +26,10 @@ import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { homeworkMatchesStudent } from "../lib/schoolSync";
+import {
+  getHomeworkSubjectDisplay,
+  groupHomeworkBySubject,
+} from "../lib/homeworkSubjects";
 import { toast } from "react-hot-toast";
 import {
   Home,
@@ -169,6 +173,10 @@ export default function ParentDashboard() {
     {},
   );
   const [homework, setHomework] = useState<any[]>([]);
+  const homeworkBySubject = useMemo(
+    () => groupHomeworkBySubject(homework),
+    [homework],
+  );
   const [teacherReports, setTeacherReports] = useState<any[]>([]);
   const [advancedReports, setAdvancedReports] = useState<any[]>([]);
   const [idCards, setIdCards] = useState<Record<string, any>>({});
@@ -1560,7 +1568,7 @@ export default function ParentDashboard() {
                                   </h4>
                                   <div className="text-right">
                                     <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider inline-block">
-                                      {hw.subject}
+                                      {getHomeworkSubjectDisplay(hw)}
                                     </span>
                                   </div>
                                 </div>
@@ -1811,59 +1819,68 @@ export default function ParentDashboard() {
                       {t("homeworkList")}
                     </h2>
                   </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {homework.length > 0 ? (
-                      homework.map((hw) => (
-                        <div
-                          key={hw.id}
-                          className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-all text-right relative overflow-hidden group hover:border-indigo-300 flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/50">
-                              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider">
-                                {hw.subject}
-                              </span>
-                              <div className="flex items-center gap-3">
-                                <span className="text-[10px] text-slate-500 font-mono font-bold">
-                                  {t("dueDateLabel")}: <span className="text-red-500 dark:text-red-400">{hw.dueDate}</span>
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteRecord(
-                                      "homework",
-                                      hw.id,
-                                      hw.title,
-                                    );
-                                  }}
-                                  className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
-                                  title={t("hide")}
-                                >
-                                  <Trash2 size={12} />
-                                </button>
+                  <div className="space-y-6">
+                    {homeworkBySubject.length > 0 ? (
+                      homeworkBySubject.map((group) => (
+                        <div key={group.subject} className="space-y-3">
+                          <h3 className="text-sm font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider px-1 border-b border-slate-200 dark:border-slate-800 pb-2">
+                            {group.subject}
+                          </h3>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {group.items.map((hw) => (
+                              <div
+                                key={hw.id}
+                                className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-all text-right relative overflow-hidden group hover:border-indigo-300 flex flex-col justify-between"
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/50">
+                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider">
+                                      {getHomeworkSubjectDisplay(hw)}
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-[10px] text-slate-500 font-mono font-bold">
+                                        {t("dueDateLabel")}: <span className="text-red-500 dark:text-red-400">{hw.dueDate}</span>
+                                      </span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteRecord(
+                                            "homework",
+                                            hw.id,
+                                            hw.title,
+                                          );
+                                        }}
+                                        className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+                                        title={t("hide")}
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 leading-tight">
+                                    {hw.title}
+                                  </h3>
+                                  <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed whitespace-pre-wrap mb-4">
+                                    {hw.content}
+                                  </p>
+                                </div>
+                                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50 mt-auto opacity-80">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[9px] font-mono font-bold text-slate-500">
+                                      {t("deliveredBy")}:{" "}
+                                      {hw.teacherName || t("teacher")}
+                                    </span>
+                                  </div>
+                                  <span className="text-[9px] font-mono font-bold text-slate-400">
+                                    {hw.createdAt?.seconds
+                                      ? new Date(
+                                          hw.createdAt.seconds * 1000,
+                                        ).toLocaleDateString()
+                                      : ""}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 leading-tight">
-                              {hw.title}
-                            </h3>
-                            <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed whitespace-pre-wrap mb-4">
-                              {hw.content}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50 mt-auto opacity-80">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[9px] font-mono font-bold text-slate-500">
-                                {t("deliveredBy")}:{" "}
-                                {hw.teacherName || t("teacher")}
-                              </span>
-                            </div>
-                            <span className="text-[9px] font-mono font-bold text-slate-400">
-                              {hw.createdAt?.seconds
-                                ? new Date(
-                                    hw.createdAt.seconds * 1000,
-                                  ).toLocaleDateString()
-                                : ""}
-                            </span>
+                            ))}
                           </div>
                         </div>
                       ))

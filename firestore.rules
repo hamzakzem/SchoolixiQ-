@@ -311,7 +311,12 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenFor'])
         );
       allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || (
+          signedIn() && sameSchool(resource) && isTeacher()
+          && resource.data.keys().hasAll(['teacherId'])
+          && resource.data.teacherId == request.auth.uid
+        );
     }
 
     match /grades/{gradeId} {

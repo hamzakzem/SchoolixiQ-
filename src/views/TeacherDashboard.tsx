@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { db, auth } from "../lib/firebase";
 import {
   collection,
@@ -48,6 +48,16 @@ import { motion, AnimatePresence } from "motion/react";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
 import { fetchStudentLinkFields, homeworkMatchesStudent } from "../lib/schoolSync";
+import {
+  TEACHER_SUBJECT_REQUIRED_MSG,
+  teacherHasAssignedSubject,
+  resolveSubjectsForTeacher,
+  getSubjectOptionsForClass,
+  resolveHomeworkSubjectForPublish,
+  getHomeworkSubjectDisplay,
+  canTeacherDeleteHomework,
+  type SchoolSubjectDoc,
+} from "../lib/homeworkSubjects";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 
 type Tab =
@@ -186,6 +196,8 @@ export default function TeacherDashboard() {
     {},
   );
   const [schoolSubjects, setSchoolSubjects] = useState<string[]>([]);
+  const [schoolSubjectDocs, setSchoolSubjectDocs] = useState<SchoolSubjectDoc[]>([]);
+  const [homeworkPublishSubjectId, setHomeworkPublishSubjectId] = useState("");
   const [selectedSubject, setSelectedSubject] = useState(
     (profile as any)?.preferredSubject || profile?.subject || "",
   );
@@ -324,7 +336,15 @@ export default function TeacherDashboard() {
       );
       unsubs.push(onSnapshot(subjectsQ, (snap) => {
         if (auth.currentUser) {
-          const subjs = snap.docs.map((doc) => doc.data().name);
+          const docs = snap.docs.map((docSnap) => ({
+            id: docSnap.id,
+            name: String(docSnap.data().name || ""),
+            classId: docSnap.data().classId,
+            className: docSnap.data().className,
+            schoolId: docSnap.data().schoolId,
+          }));
+          setSchoolSubjectDocs(docs);
+          const subjs = docs.map((d) => d.name).filter(Boolean);
           const defaults = isRtl
             ? [
                 "الرياضيات",
@@ -429,11 +449,41 @@ export default function TeacherDashboard() {
     };
   }, [profile, isRtl]);
 
+  const teacherAssignedSubjects = useMemo(
+    () => resolveSubjectsForTeacher(profile, schoolSubjectDocs),
+    [profile, schoolSubjectDocs],
+  );
+
+  const homeworkSubjectOptions = useMemo(() => {
+    const classId = newHomework.classId || (profile as any)?.preferredClassId || "";
+    if (!classId) return teacherAssignedSubjects;
+    return getSubjectOptionsForClass(teacherAssignedSubjects, classId, classes);
+  }, [newHomework.classId, teacherAssignedSubjects, classes, profile]);
+
+  useEffect(() => {
+    if (!showAddHomework) return;
+    if (homeworkSubjectOptions.length === 1) {
+      setHomeworkPublishSubjectId(homeworkSubjectOptions[0].id);
+      return;
+    }
+    if (
+      homeworkPublishSubjectId &&
+      !homeworkSubjectOptions.some((s) => s.id === homeworkPublishSubjectId)
+    ) {
+      setHomeworkPublishSubjectId("");
+    }
+  }, [showAddHomework, homeworkSubjectOptions, homeworkPublishSubjectId]);
+
   const handleAddHomework = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
 
     try {
+      if (!teacherHasAssignedSubject(profile)) {
+        toast.error(TEACHER_SUBJECT_REQUIRED_MSG);
+        return;
+      }
+
       const targetClassId =
         newHomework.classId || (profile as any)?.preferredClassId;
       if (!targetClassId) {
@@ -445,12 +495,37 @@ export default function TeacherDashboard() {
         return;
       }
 
+      const subjectPayload = resolveHomeworkSubjectForPublish(
+        homeworkPublishSubjectId,
+        teacherAssignedSubjects,
+        targetClassId,
+        classes,
+        profile,
+      );
+
+      if (!subjectPayload) {
+        toast.error(
+          isRtl
+            ? "يرجى اختيار المادة الدراسية للواجب"
+            : "Please select the homework subject",
+        );
+        return;
+      }
+
+      const targetClassName =
+        classes.find((c) => c.id === targetClassId)?.name || "";
+
       const homeworkRef = await addDoc(collection(db, "homework"), {
-        ...newHomework,
+        title: newHomework.title,
+        content: newHomework.content,
+        dueDate: newHomework.dueDate,
         classId: targetClassId,
+        className: targetClassName,
         teacherId: profile.uid,
         teacherName: profile.name,
-        subject: profile.subject || t("undefined"),
+        subjectId: subjectPayload.subjectId || null,
+        subjectName: subjectPayload.subjectName,
+        subject: subjectPayload.subjectName,
         schoolId: profile.schoolId,
         hiddenFor: [],
         createdAt: serverTimestamp(),
@@ -463,7 +538,7 @@ export default function TeacherDashboard() {
       if (classStudents.length > 0) {
         for (const student of classStudents) {
           await notificationService.notifyStudentParents(student.id, {
-            title: `${t("newHomework")}: ${profile.subject}`,
+            title: `${t("newHomework")}: ${subjectPayload.subjectName}`,
             message: `${newHomework.title} - ${t("deliveryDate")}: ${newHomework.dueDate}`,
             type: "homework",
             schoolId: profile.schoolId,
@@ -479,6 +554,7 @@ export default function TeacherDashboard() {
 
       toast.success(t("homeworkPublished"));
       setShowAddHomework(false);
+      setHomeworkPublishSubjectId("");
       setNewHomework({
         title: "",
         content: "",
@@ -490,9 +566,18 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleDeleteHomework = async (id: string) => {
+  const handleDeleteHomework = async (id: string, ownerId?: string) => {
     if (!id) {
       toast.error(isRtl ? "خطأ في معرف الواجب" : "Invalid homework ID");
+      return;
+    }
+
+    if (!canTeacherDeleteHomework({ teacherId: ownerId }, profile?.uid)) {
+      toast.error(
+        isRtl
+          ? "لا يمكنك حذف واجب لم تنشره أنت"
+          : "You can only delete homework you published",
+      );
       return;
     }
 
@@ -1268,17 +1353,19 @@ export default function TeacherDashboard() {
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteHomework(hw.id);
-                                  }}
-                                  className="p-2.5 text-red-500 hover:text-white hover:bg-red-600 rounded-xl transition-all opacity-100 bg-white shadow-md border border-red-50 active:scale-95 z-[30] cursor-pointer"
-                                  title="حذف الواجب"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
+                                {canTeacherDeleteHomework(hw, profile?.uid) && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteHomework(hw.id, hw.teacherId);
+                                    }}
+                                    className="p-2.5 text-red-500 hover:text-white hover:bg-red-600 rounded-xl transition-all opacity-100 bg-white shadow-md border border-red-50 active:scale-95 z-[30] cursor-pointer"
+                                    title="حذف الواجب"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
                                 <ChevronRight
                                   size={16}
                                   className="text-slate-300 group-hover:text-indigo-600 transition-colors"
@@ -1359,7 +1446,18 @@ export default function TeacherDashboard() {
                       {t("homeworkManagement")}
                     </h2>
                     <button
-                      onClick={() => setShowAddHomework(true)}
+                      onClick={() => {
+                        if (!teacherHasAssignedSubject(profile)) {
+                          toast.error(TEACHER_SUBJECT_REQUIRED_MSG);
+                          return;
+                        }
+                        setHomeworkPublishSubjectId(
+                          homeworkSubjectOptions.length === 1
+                            ? homeworkSubjectOptions[0].id
+                            : "",
+                        );
+                        setShowAddHomework(true);
+                      }}
                       className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-sm"
                     >
                       <Plus size={20} />
@@ -1375,7 +1473,7 @@ export default function TeacherDashboard() {
                       >
                         <div className="flex items-center justify-between mb-4">
                           <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
-                            {hw.subject}
+                            {getHomeworkSubjectDisplay(hw)}
                           </span>
                           <div className="flex items-center gap-3">
                             <span className="text-[10px] font-bold text-slate-400">
@@ -1383,14 +1481,17 @@ export default function TeacherDashboard() {
                                 hw.createdAt?.seconds * 1000,
                               ).toLocaleDateString()}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteHomework(hw.id)}
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              title="حذف الواجب"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            {canTeacherDeleteHomework(hw, profile?.uid) && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteHomework(hw.id, hw.teacherId)}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                title={isRtl ? "حذف الواجب" : "Delete homework"}
+                                aria-label={isRtl ? "حذف الواجب" : "Delete homework"}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
                           </div>
                         </div>
                         <h3 className="font-bold text-slate-900 mb-2">
@@ -2047,6 +2148,36 @@ export default function TeacherDashboard() {
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
+                      {t("subjectLabel")}
+                    </label>
+                    {homeworkSubjectOptions.length > 1 ? (
+                      <select
+                        required
+                        value={homeworkPublishSubjectId}
+                        onChange={(e) => setHomeworkPublishSubjectId(e.target.value)}
+                        className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border-none font-bold outline-none appearance-none"
+                      >
+                        <option value="">
+                          {isRtl ? "اختر المادة" : "Select subject"}
+                        </option>
+                        {homeworkSubjectOptions.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                            {s.className ? ` — ${s.className}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="w-full px-5 py-3.5 bg-slate-50 rounded-xl font-bold text-slate-800">
+                        {homeworkSubjectOptions[0]?.name ||
+                          profile?.subject ||
+                          "—"}
+                      </div>
+                    )}
                   </div>
 
                   <div>
