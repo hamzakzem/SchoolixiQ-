@@ -5,6 +5,10 @@ import {
   isPendingSchoolAdmin,
   isActiveSchoolAdmin,
   submitPendingAdminSubscription,
+  isSchoolDraftComplete,
+  draftToCustomerInfo,
+  draftToSubscriptionForm,
+  type AdminSchoolDraft,
 } from "./lib/auth";
 import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
 import { Toaster, toast } from "react-hot-toast";
@@ -480,6 +484,22 @@ const AppContent = () => {
   }, [onboardingState]);
 
   useEffect(() => {
+    if (!user) return;
+    const draft = (profile as { schoolDraft?: AdminSchoolDraft } | null)?.schoolDraft;
+    if (!draft) return;
+    setSubscriptionForm((prev) => ({
+      ...prev,
+      ...draftToSubscriptionForm(draft, user),
+      adminName:
+        draft.adminName ||
+        prev.adminName ||
+        user.displayName ||
+        "",
+      email: draft.email || prev.email || user.email || "",
+    }));
+  }, [user, profile]);
+
+  useEffect(() => {
     if (onboardingState !== "registration_form" || !user) return;
     setSubscriptionForm((prev) => ({
       ...prev,
@@ -896,8 +916,35 @@ const AppContent = () => {
                           ))}
                         </ul>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             setSelectedPackage(pkg);
+                            if (!user) return;
+                            const draft = (profile as { schoolDraft?: AdminSchoolDraft } | null)
+                              ?.schoolDraft;
+                            if (isSchoolDraftComplete(draft)) {
+                              setIsCreatingProfile(true);
+                              try {
+                                await submitPendingAdminSubscription(
+                                  user,
+                                  pkg,
+                                  billingCycle,
+                                  draftToCustomerInfo(draft!, user),
+                                );
+                                setOnboardingState("waiting_approval");
+                              } catch (err) {
+                                console.error("Package subscription failed:", err);
+                                toast.error("حدث خطأ أثناء الإرسال");
+                              } finally {
+                                setIsCreatingProfile(false);
+                              }
+                              return;
+                            }
+                            if (draft) {
+                              setSubscriptionForm((prev) => ({
+                                ...prev,
+                                ...draftToSubscriptionForm(draft, user),
+                              }));
+                            }
                             setOnboardingState("registration_form");
                           }}
                           className={`w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}

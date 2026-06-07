@@ -37,6 +37,86 @@ export type PendingAdminPackage = {
   priceYearly?: number;
 };
 
+export type AdminSchoolDraft = {
+  name?: string;
+  adminName?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  governorate?: string;
+  directorate?: string;
+  stage?: string;
+  shift?: string;
+  genderType?: string;
+  estimatedStudents?: string;
+};
+
+export function isSchoolDraftComplete(draft: AdminSchoolDraft | null | undefined): boolean {
+  if (!draft) return false;
+  return Boolean(
+    draft.phone?.trim() &&
+      draft.address?.trim() &&
+      draft.governorate?.trim() &&
+      draft.directorate?.trim() &&
+      draft.stage?.trim() &&
+      draft.shift?.trim() &&
+      draft.genderType?.trim() &&
+      draft.estimatedStudents?.trim(),
+  );
+}
+
+export function draftToCustomerInfo(
+  draft: AdminSchoolDraft,
+  user: User,
+): AdminRegistrationCustomerInfo {
+  const schoolName = draft.name?.trim() || draft.adminName?.trim() || user.displayName?.trim() || '';
+  const adminName = draft.adminName?.trim() || user.displayName?.trim() || schoolName;
+  return {
+    name: schoolName,
+    adminName,
+    email: (draft.email || user.email || '').toLowerCase(),
+    phone: draft.phone?.trim() || '',
+    address: draft.address?.trim() || '',
+    governorate: draft.governorate?.trim() || '',
+    directorate: draft.directorate?.trim() || '',
+    stage: draft.stage?.trim() || '',
+    shift: draft.shift?.trim() || '',
+    genderType: draft.genderType?.trim() || '',
+    estimatedStudents: draft.estimatedStudents?.trim() || '',
+  };
+}
+
+export function draftToSubscriptionForm(
+  draft: AdminSchoolDraft,
+  user?: User | null,
+): {
+  name: string;
+  adminName: string;
+  phone: string;
+  email: string;
+  address: string;
+  governorate: string;
+  directorate: string;
+  stage: string;
+  shift: string;
+  genderType: string;
+  estimatedStudents: string;
+} {
+  return {
+    name: draft.name?.trim() || draft.adminName?.trim() || user?.displayName || '',
+    adminName: draft.adminName?.trim() || user?.displayName || '',
+    phone: draft.phone?.trim() || '',
+    email: draft.email?.trim() || user?.email || '',
+    address: draft.address?.trim() || '',
+    governorate: draft.governorate?.trim() || '',
+    directorate: draft.directorate?.trim() || '',
+    stage: draft.stage?.trim() || '',
+    shift: draft.shift?.trim() || '',
+    genderType: draft.genderType?.trim() || '',
+    estimatedStudents: draft.estimatedStudents?.trim() || '',
+  };
+}
+
 function resolveAuthProvider(user: User): string {
   const providerId = user.providerData[0]?.providerId;
   if (providerId === 'google.com') return 'google';

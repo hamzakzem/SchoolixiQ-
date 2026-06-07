@@ -1,3 +1,9 @@
+import {
+  getTeacherSubjectDisplay,
+  isRedactedCredentialValue,
+  type TeacherSubjectSource,
+} from './userProfile';
+
 /** School-defined subject document from Firestore `subjects` collection. */
 export type SchoolSubjectDoc = {
   id: string;
@@ -17,7 +23,7 @@ export function getTeacherSubjectNames(profile: {
 } | null | undefined): string[] {
   if (!profile) return [];
   const names = new Set<string>();
-  const primary = profile.subject?.trim();
+  const primary = getTeacherSubjectDisplay(profile);
   if (primary) names.add(primary);
   if (Array.isArray(profile.subjects)) {
     profile.subjects.forEach((s) => {
@@ -106,21 +112,45 @@ export function resolveHomeworkSubjectForPublish(
 }
 
 /** Backward-compatible display label for homework documents. */
-export function getHomeworkSubjectDisplay(hw: {
-  subjectName?: string;
-  subject?: string;
-}): string {
-  const label = (hw.subjectName || hw.subject || '').trim();
-  return label || '—';
+export function getHomeworkSubjectDisplay(
+  hw: {
+    subjectName?: string;
+    subject?: string;
+    teacherId?: string;
+  },
+  teacher?: TeacherSubjectSource | null,
+): string {
+  const subjectName = (hw.subjectName || '').trim();
+  const subject = (hw.subject || '').trim();
+  const label = subjectName || subject;
+
+  if (!label) return '—';
+
+  if (teacher && isRedactedCredentialValue(label, teacher)) {
+    return getTeacherSubjectDisplay(teacher) || '—';
+  }
+
+  if (
+    !subjectName &&
+    subject &&
+    teacher &&
+    isRedactedCredentialValue(subject, teacher)
+  ) {
+    return getTeacherSubjectDisplay(teacher) || '—';
+  }
+
+  return label;
 }
 
 /** Group homework items by subject for parent views. */
-export function groupHomeworkBySubject<T extends { subjectName?: string; subject?: string }>(
+export function groupHomeworkBySubject<T extends { subjectName?: string; subject?: string; teacherId?: string }>(
   items: T[],
+  teachersById?: Record<string, TeacherSubjectSource>,
 ): Array<{ subject: string; items: T[] }> {
   const map = new Map<string, T[]>();
   items.forEach((hw) => {
-    const key = getHomeworkSubjectDisplay(hw);
+    const teacher = hw.teacherId ? teachersById?.[hw.teacherId] : undefined;
+    const key = getHomeworkSubjectDisplay(hw, teacher);
     const list = map.get(key) || [];
     list.push(hw);
     map.set(key, list);

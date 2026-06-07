@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { db, auth } from "../lib/firebase";
 import {
   collection,
@@ -65,6 +65,11 @@ import {
   getProductStock,
   subscribeSchoolStoreProducts,
 } from "../lib/storeProducts";
+import {
+  getTeacherSubjectDisplay,
+  isRedactedCredentialValue,
+} from "../lib/userProfile";
+import { alertIncomingNotification } from "../lib/notificationAlerts";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 
 type Tab =
@@ -181,6 +186,8 @@ export default function TeacherDashboard() {
 
   // Notifications state
   const [notifications, setNotifications] = useState<any[]>([]);
+  const notificationsPrimedRef = useRef(false);
+  const knownNotificationIdsRef = useRef<Set<string>>(new Set());
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Homework state
@@ -207,7 +214,7 @@ export default function TeacherDashboard() {
   const [schoolSubjectDocs, setSchoolSubjectDocs] = useState<SchoolSubjectDoc[]>([]);
   const [homeworkPublishSubjectId, setHomeworkPublishSubjectId] = useState("");
   const [selectedSubject, setSelectedSubject] = useState(
-    (profile as any)?.preferredSubject || profile?.subject || "",
+    (profile as any)?.preferredSubject || getTeacherSubjectDisplay(profile) || "",
   );
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [isSavingGrades, setIsSavingGrades] = useState(false);
@@ -446,6 +453,18 @@ export default function TeacherDashboard() {
             (a: any, b: any) =>
               (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
           );
+        if (notificationsPrimedRef.current) {
+          notifData.forEach((notif: any) => {
+            if (!knownNotificationIdsRef.current.has(notif.id)) {
+              alertIncomingNotification(notif, isRtl);
+            }
+          });
+        } else {
+          notificationsPrimedRef.current = true;
+        }
+        knownNotificationIdsRef.current = new Set(
+          notifData.map((notif: any) => notif.id),
+        );
         setNotifications(notifData as any);
       }));
 
@@ -776,7 +795,7 @@ export default function TeacherDashboard() {
         parentEmail: link?.parentEmail || "",
         teacherId: profile.uid,
         teacherName: profile.name,
-        subject: profile.subject || t("undefined"),
+        subject: getTeacherSubjectDisplay(profile) || t("undefined"),
         content: reportContent,
         target: reportTarget,
         schoolId: profile.schoolId,
@@ -785,7 +804,7 @@ export default function TeacherDashboard() {
 
       if (reportTarget === "parents" || reportTarget === "both") {
         await notificationService.notifyStudentParents(selectedStudent.id, {
-          title: `${t("reportFromTeacher")}: ${profile.subject}`,
+          title: `${t("reportFromTeacher")}: ${getTeacherSubjectDisplay(profile)}`,
           message: reportContent,
           type: "report",
           schoolId: profile.schoolId,
@@ -893,18 +912,6 @@ export default function TeacherDashboard() {
       className="h-[100dvh] overflow-hidden bg-transparent flex transition-all duration-300 print:overflow-visible print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
-      {/* Sidebar Overlay for Mobile */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden print:hidden"
-          />
-        )}
-      </AnimatePresence>
 
       {/* Sidebar - Desktop */}
       <AnimatePresence mode="wait">
@@ -914,7 +921,7 @@ export default function TeacherDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)]`}
+            className={`bg-white dark:bg-slate-900 flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)] hidden lg:flex`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
@@ -936,7 +943,7 @@ export default function TeacherDashboard() {
                     </h2>
                     <div className="flex flex-col">
                       <p className="text-[10px] uppercase tracking-widest text-indigo-600 font-bold truncate">
-                        {profile?.subject}
+                        {getTeacherSubjectDisplay(profile)}
                       </p>
                     </div>
                   </motion.div>
@@ -1435,7 +1442,18 @@ export default function TeacherDashboard() {
                       </h3>
                       <div className="grid grid-cols-2 gap-4">
                         <button
-                          onClick={() => setShowAddHomework(true)}
+                          onClick={() => {
+                            if (!teacherHasAssignedSubject(profile)) {
+                              toast.error(TEACHER_SUBJECT_REQUIRED_MSG);
+                              return;
+                            }
+                            setHomeworkPublishSubjectId(
+                              homeworkSubjectOptions.length === 1
+                                ? homeworkSubjectOptions[0].id
+                                : "",
+                            );
+                            setShowAddHomework(true);
+                          }}
                           className="p-6 rounded-3xl bg-indigo-600 hover:bg-indigo-500 transition-colors text-right relative overflow-hidden group"
                         >
                           <Plus
@@ -1521,7 +1539,7 @@ export default function TeacherDashboard() {
                       >
                         <div className="flex items-center justify-between mb-4">
                           <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
-                            {getHomeworkSubjectDisplay(hw)}
+                            {getHomeworkSubjectDisplay(hw, profile)}
                           </span>
                           <div className="flex items-center gap-3">
                             <span className="text-[10px] font-bold text-slate-400">
@@ -2041,7 +2059,11 @@ export default function TeacherDashboard() {
                                   : t("all")}
                             </span>
                             <span className="text-[10px] text-slate-400 font-bold">
-                              {t("subjectLabel")}: {report.subject}
+                              {t("subjectLabel")}:{" "}
+                              {report.subject &&
+                              !isRedactedCredentialValue(report.subject, profile)
+                                ? report.subject
+                                : getTeacherSubjectDisplay(profile) || "—"}
                             </span>
                           </div>
                         </div>
@@ -2288,7 +2310,7 @@ export default function TeacherDashboard() {
                     ) : (
                       <div className="w-full px-5 py-3.5 bg-slate-50 rounded-xl font-bold text-slate-800">
                         {homeworkSubjectOptions[0]?.name ||
-                          profile?.subject ||
+                          getTeacherSubjectDisplay(profile) ||
                           "—"}
                       </div>
                     )}

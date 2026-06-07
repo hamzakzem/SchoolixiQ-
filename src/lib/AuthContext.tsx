@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from './firestore-errors';
+import { stripSensitiveUserFields } from './userProfile';
 import { useLanguage } from './LanguageContext';
 
 interface AuthContextType {
@@ -95,7 +96,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const docRef = doc(db, 'users', authUser.uid);
         unsubscribeProfile = onSnapshot(docRef, async (docSnap) => {
           if (docSnap.exists()) {
-            const data = docSnap.data() as any;
+            const data = stripSensitiveUserFields(docSnap.data() as Record<string, unknown>);
             
             // Sync user language from firestore database, or save local default
             if (data.language && data.language !== languageRef.current) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import React from "react";
 import { db, auth } from "../lib/firebase";
 import {
@@ -30,6 +30,12 @@ import {
   getHomeworkSubjectDisplay,
   groupHomeworkBySubject,
 } from "../lib/homeworkSubjects";
+import {
+  getTeacherSubjectDisplay,
+  isRedactedCredentialValue,
+  sanitizeStaffRecord,
+} from "../lib/userProfile";
+import { alertIncomingNotification } from "../lib/notificationAlerts";
 import {
   getProductImageUrl,
   getProductName,
@@ -162,6 +168,9 @@ export default function ParentDashboard() {
   const [payments, setPayments] = useState<any[]>([]);
   const [installments, setInstallments] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const notificationsPrimedRef = useRef(false);
+  const knownNotificationIdsRef = useRef<Set<string>>(new Set());
+  const [teachersById, setTeachersById] = useState<Record<string, any>>({});
   const [showNotifications, setShowNotifications] = useState(false);
   const [marketItems, setMarketItems] = useState<any[]>([]);
   const [marketLoading, setMarketLoading] = useState(true);
@@ -180,8 +189,8 @@ export default function ParentDashboard() {
   );
   const [homework, setHomework] = useState<any[]>([]);
   const homeworkBySubject = useMemo(
-    () => groupHomeworkBySubject(homework),
-    [homework],
+    () => groupHomeworkBySubject(homework, teachersById),
+    [homework, teachersById],
   );
   const [teacherReports, setTeacherReports] = useState<any[]>([]);
   const [advancedReports, setAdvancedReports] = useState<any[]>([]);
@@ -694,17 +703,48 @@ export default function ParentDashboard() {
       );
       unsubs.push(unsubMarket);
 
-      // 7. Notifications
+      // 7. School teachers (for safe homework subject labels)
+      const teachersQ = query(
+        collection(db, "users"),
+        where("schoolId", "==", selectedStudent.schoolId),
+        where("role", "==", "teacher"),
+        limit(100),
+      );
+      unsubs.push(onSnapshot(teachersQ, (snap) => {
+        const map: Record<string, any> = {};
+        snap.docs.forEach((teacherDoc) => {
+          map[teacherDoc.id] = sanitizeStaffRecord({
+            id: teacherDoc.id,
+            ...teacherDoc.data(),
+          });
+        });
+        setTeachersById(map);
+      }));
+
+      // 8. Notifications
       const notificationsQ = query(
         collection(db, "notifications"),
         where("userId", "==", profile.uid),
         limit(50)
       );
       unsubs.push(onSnapshot(notificationsQ, snap => {
-        setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
+        const items = snap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any;
+        if (notificationsPrimedRef.current) {
+          items.forEach((notif: any) => {
+            if (!knownNotificationIdsRef.current.has(notif.id)) {
+              alertIncomingNotification(notif, isRtl);
+            }
+          });
+        } else {
+          notificationsPrimedRef.current = true;
+        }
+        knownNotificationIdsRef.current = new Set(items.map((notif: any) => notif.id));
+        setNotifications(items);
       }));
 
-      // 8. Homework (school-scoped query + client class matching for ID/name compatibility)
+      // 9. Homework (school-scoped query + client class matching for ID/name compatibility)
       let latestClasses: Array<{ id: string; name?: string }> = [];
       let latestHomework: any[] = [];
       const applyHomeworkFilter = () => {
@@ -1577,7 +1617,10 @@ export default function ParentDashboard() {
                                   </h4>
                                   <div className="text-right">
                                     <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider inline-block">
-                                      {getHomeworkSubjectDisplay(hw)}
+                                      {getHomeworkSubjectDisplay(
+                                        hw,
+                                        hw.teacherId ? teachersById[hw.teacherId] : undefined,
+                                      )}
                                     </span>
                                   </div>
                                 </div>
@@ -1844,7 +1887,10 @@ export default function ParentDashboard() {
                                 <div>
                                   <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/50">
                                     <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider">
-                                      {getHomeworkSubjectDisplay(hw)}
+                                      {getHomeworkSubjectDisplay(
+                                        hw,
+                                        hw.teacherId ? teachersById[hw.teacherId] : undefined,
+                                      )}
                                     </span>
                                     <div className="flex items-center gap-3">
                                       <span className="text-[10px] text-slate-500 font-mono font-bold">
@@ -2144,7 +2190,19 @@ export default function ParentDashboard() {
                         >
                           <div className="flex items-center justify-between mb-4">
                             <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                              {report.subject}
+                              {report.subject &&
+                              !isRedactedCredentialValue(
+                                report.subject,
+                                report.teacherId
+                                  ? teachersById[report.teacherId]
+                                  : undefined,
+                              )
+                                ? report.subject
+                                : getTeacherSubjectDisplay(
+                                    report.teacherId
+                                      ? teachersById[report.teacherId]
+                                      : undefined,
+                                  ) || "—"}
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-slate-400 font-bold">

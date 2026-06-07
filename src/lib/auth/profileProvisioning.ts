@@ -6,12 +6,14 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserRole } from '../../types';
+import type { AdminSchoolDraft } from './adminRegistration';
 
 export type SchoolSignupFields = {
   phone?: string;
@@ -124,8 +126,33 @@ export async function provisionUserProfile(
     return { created: false, isFirstUser: false };
   }
 
-  // School admins must complete pending subscription registration — never auto-provision here.
+  // School admins complete subscription separately — persist signup draft once here.
   if (input.selectedRole === UserRole.ADMIN) {
+    const schoolDraft: AdminSchoolDraft = {
+      name: (input.displayName || user.displayName || '').trim(),
+      adminName: (input.displayName || user.displayName || '').trim(),
+      phone: (input.phone || input.school?.phone || '').trim(),
+      email: (user.email || '').toLowerCase().trim(),
+      address: input.school?.address?.trim() || '',
+      governorate: input.school?.governorate?.trim() || '',
+      directorate: input.school?.directorate?.trim() || '',
+      stage: input.school?.educationLevel?.trim() || '',
+      shift: input.school?.workingHours?.trim() || '',
+      genderType: input.school?.studyType?.trim() || '',
+      estimatedStudents: input.school?.estimatedStudents?.trim() || '',
+    };
+    await setDoc(
+      doc(db, 'users', user.uid),
+      {
+        uid: user.uid,
+        email: user.email,
+        name: input.displayName || user.displayName || '',
+        role: 'admin',
+        schoolDraft,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
     return { created: false, isFirstUser: false };
   }
 

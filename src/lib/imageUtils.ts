@@ -41,6 +41,15 @@ export const compressImageToBase64 = (file: File, maxWidth = 400, maxHeight = 40
   });
 };
 
+/** School-scoped student photo path matching storage.rules */
+export function buildStudentPhotoPath(
+  schoolId: string,
+  studentId: string,
+): string {
+  const safeId = studentId.replace(/[^a-zA-Z0-9_-]/g, '_') || 'new';
+  return `students/${schoolId}/${safeId}/photo_${Date.now()}.jpg`;
+}
+
 export const uploadImageToServer = async (file: File, storagePath: string, maxWidth = 400, maxHeight = 400): Promise<string> => {
   const base64 = await compressImageToBase64(file, maxWidth, maxHeight);
   const token = await auth.currentUser?.getIdToken();

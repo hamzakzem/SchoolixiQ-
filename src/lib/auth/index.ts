@@ -37,7 +37,11 @@ export {
   submitPendingAdminSubscription,
   isPendingSchoolAdmin,
   isActiveSchoolAdmin,
+  isSchoolDraftComplete,
+  draftToCustomerInfo,
+  draftToSubscriptionForm,
   type AdminRegistrationCustomerInfo,
+  type AdminSchoolDraft,
   type PendingAdminPackage,
 } from './adminRegistration';
 

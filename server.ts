@@ -521,10 +521,20 @@ async function startServer() {
     res.send(profileXML);
   });
 
+  function sanitizeAdditionalData(data: any) {
+    if (!data || typeof data !== 'object') return {};
+    const clean = { ...data };
+    for (const key of Object.keys(clean)) {
+      if (/password/i.test(key)) delete clean[key];
+    }
+    return clean;
+  }
+
   // Admin APIs
   app.post('/api/admin/create-user', verifyAdmin, async (req: any, res: any) => {
     try {
       const { email, password, displayName, role, schoolId, additionalData } = req.body || {};
+      const safeAdditionalData = sanitizeAdditionalData(additionalData);
       if (!email) {
         return res.status(400).json({ error: 'EMAIL_REQUIRED', message: 'البريد الإلكتروني مطلوب' });
       }
@@ -649,7 +659,7 @@ async function startServer() {
             name: displayName,
             role,
             schoolId,
-            ...additionalData,
+            ...safeAdditionalData,
             createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp(),
           }, { merge: true });
           
@@ -659,7 +669,7 @@ async function startServer() {
             email: emailLower,
             name: displayName,
             schoolId,
-            ...additionalData,
+            ...safeAdditionalData,
             createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp(),
           }, { merge: true });
 
@@ -681,7 +691,7 @@ async function startServer() {
           name: displayName,
           role,
           schoolId,
-          ...additionalData,
+          ...safeAdditionalData,
           createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
       }

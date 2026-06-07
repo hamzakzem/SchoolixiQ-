@@ -152,15 +152,20 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     const notifQuery = query(
       collection(db, "notifications"),
       where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
     );
 
     const unsub = onSnapshot(notifQuery, (snap) => {
-      const items = snap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
-      }));
+      const items = snap.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
+        }))
+        .sort(
+          (a: any, b: any) =>
+            (b.createdAt?.seconds || b.createdAt?.getTime?.() || 0) -
+            (a.createdAt?.seconds || a.createdAt?.getTime?.() || 0),
+        );
       setNotifications(items);
     }, (err) => {
       console.error("Notification listener failed: ", err);

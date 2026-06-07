@@ -198,7 +198,8 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
           {/* 5. Menu Drawer Toggle */}
           <button
             onClick={() => {
-              setIsSidebarOpen(!isSidebarOpen);
+              const nextOpen = !isSidebarOpen;
+              setIsSidebarOpen(nextOpen);
               setShowQuickAccess(false);
               if (setShowNotifications) setShowNotifications(false);
             }}
@@ -335,6 +336,100 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-slate-500">
                     <p className="text-sm font-semibold">{isRtl ? "لم يتم العثور على صلاحيات تطابق بحثك" : "No matching permissions found"}</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile full services menu (More / three-line) */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <div className="fixed inset-0 z-50 overflow-hidden lg:hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSidebarOpen(false)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 220 }}
+              className="absolute bottom-0 inset-x-0 bg-[#0B2345] border-t border-[#D4A64A]/30 rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] text-white overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+20px)]"
+              dir={isRtl ? "rtl" : "ltr"}
+            >
+              <div className="p-6 pb-3 shrink-0 relative flex flex-col items-center">
+                <div
+                  className="w-12 h-1.5 bg-slate-500/30 rounded-full mb-5 cursor-pointer hover:bg-slate-500/50"
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <div className="w-full flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-black text-white font-display tracking-tight flex items-center gap-2">
+                      <Menu className="text-[#D4A64A] w-5 h-5" />
+                      <span>{isRtl ? "خدمات المعلم" : "Teacher Services"}</span>
+                    </h3>
+                    <p className="text-slate-400 text-xs mt-0.5">
+                      {isRtl ? "جميع أقسام لوحة التحكم" : "All dashboard sections"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="w-10 h-10 bg-slate-800/60 text-slate-300 hover:text-white rounded-full flex items-center justify-center border border-slate-700/50 hover:bg-slate-800 transition-all active:scale-95"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-6 py-2 custom-scrollbar">
+                {menuItems.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {menuItems.map((item, index) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <motion.button
+                          key={item.id}
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.03 }}
+                          onClick={() => handleTabClick(item.id)}
+                          className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] min-h-[4.5rem] justify-between ${
+                            isActive
+                              ? "bg-[#D4A64A] text-[#0B2345] border-[#D4A64A] shadow-lg shadow-[#D4A64A]/10"
+                              : "bg-slate-900/50 hover:bg-[#0B2345]/50 border-slate-800/80 hover:border-slate-700/80 text-slate-300 hover:text-white"
+                          }`}
+                        >
+                          <div
+                            className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${
+                              isActive
+                                ? "bg-[#0B2345] text-[#D4A64A]"
+                                : "bg-[#0B2345] text-slate-400"
+                            }`}
+                          >
+                            <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
+                          </div>
+                          <p
+                            className={`text-xs font-black tracking-tight leading-snug break-words w-full ${
+                              isActive ? "text-[#0B2345]" : "text-white"
+                            }`}
+                          >
+                            {item.label}
+                          </p>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                    <p className="text-sm font-semibold">
+                      {isRtl ? "لا توجد خدمات متاحة" : "No services available"}
+                    </p>
                   </div>
                 )}
               </div>

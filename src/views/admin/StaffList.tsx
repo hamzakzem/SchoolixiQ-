@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, serverTimestamp, setDoc, doc, getDocs, updateDoc, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, serverTimestamp, setDoc, doc, getDocs, updateDoc, limit, onSnapshot, deleteField } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { UserPlus, Mail, Phone, ShieldCheck, Trash2, Lock, Save, X, Search, Printer, FileText, Send, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -8,6 +8,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { printElement } from '../../lib/printUtils';
+import {
+  getTeacherSubjectDisplay,
+  sanitizeStaffRecord,
+} from '../../lib/userProfile';
 
 export default function StaffList() {
   const { profile } = useAuth();
@@ -63,7 +67,11 @@ export default function StaffList() {
         limit(200)
       );
       const unsub = onSnapshot(q, snap => {
-        setStaff(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setStaff(
+          snap.docs.map((docSnap) =>
+            sanitizeStaffRecord({ id: docSnap.id, ...docSnap.data() }),
+          ),
+        );
       });
       return () => unsub();
     } catch (error) {
@@ -107,6 +115,16 @@ export default function StaffList() {
       return;
     }
 
+    if (
+      newStaff.role === 'teacher' &&
+      newStaff.subject.trim() &&
+      newStaff.password.trim() &&
+      newStaff.subject.trim() === newStaff.password.trim()
+    ) {
+      toast.error('لا يمكن أن تكون المادة الدراسية نفس كلمة المرور');
+      return;
+    }
+
     setIsSaving(true);
     try {
       if (editingStaff) {
@@ -114,12 +132,18 @@ export default function StaffList() {
           name: newStaff.name,
           phoneNumber: newStaff.phoneNumber,
           role: newStaff.role,
-          subject: newStaff.role === 'teacher' ? newStaff.subject : '',
+          subject: newStaff.role === 'teacher' ? newStaff.subject.trim() : '',
           salary: Number(newStaff.salary),
           joiningDate: newStaff.joiningDate,
           gender: newStaff.gender,
           status: newStaff.status,
           notes: newStaff.notes,
+          password: deleteField(),
+          parentPassword: deleteField(),
+          teacherPassword: deleteField(),
+          plainPassword: deleteField(),
+          defaultPassword: deleteField(),
+          tempPassword: deleteField(),
           updatedAt: serverTimestamp(),
         }, { merge: true });
 
@@ -128,16 +152,17 @@ export default function StaffList() {
 
         toast.success('تم تحديث بيانات الموظف والراتب');
       } else {
-        // Use Admin API for real Auth creation
+        const createdPassword = newStaff.password;
+        // Use Admin API for real Auth creation (password stays in Auth only)
         await adminCreateUser({
           email: newStaff.email.toLowerCase(),
-          password: newStaff.password,
+          password: createdPassword,
           displayName: newStaff.name,
           role: newStaff.role,
           schoolId: profile.schoolId,
           additionalData: {
             phoneNumber: newStaff.phoneNumber,
-            subject: newStaff.role === 'teacher' ? newStaff.subject : '',
+            subject: newStaff.role === 'teacher' ? newStaff.subject.trim() : '',
             salary: Number(newStaff.salary),
             joiningDate: newStaff.joiningDate,
             gender: newStaff.gender,
@@ -145,7 +170,10 @@ export default function StaffList() {
             notes: newStaff.notes,
           }
         });
-        toast.success('تم إنشاء حساب الموظف وتحديد الراتب بنجاح');
+        toast.success(
+          `تم إنشاء حساب الموظف بنجاح. كلمة المرور (عرض لمرة واحدة): ${createdPassword}`,
+          { duration: 12000 },
+        );
       }
       setShowModal(false);
       setEditingStaff(null);
@@ -256,7 +284,7 @@ export default function StaffList() {
   const filteredStaff = staff.filter(member => {
     const matchesSearch = member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.subject?.toLowerCase().includes(searchTerm.toLowerCase());
+                         getTeacherSubjectDisplay(member).toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -360,9 +388,9 @@ export default function StaffList() {
                       {member.role === 'teacher' ? 'معلم' : (member.role === 'admin' ? 'مدير' : 'موظف')}
                     </span>
                   </div>
-                  {member.role === 'teacher' && member.subject && (
+                  {member.role === 'teacher' && getTeacherSubjectDisplay(member) && (
                     <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full border border-indigo-100">
-                      {member.subject}
+                      {getTeacherSubjectDisplay(member)}
                     </span>
                   )}
                   {member.status && (
@@ -478,7 +506,7 @@ export default function StaffList() {
                     password: '',
                     role: member.role || 'teacher',
                     phoneNumber: member.phoneNumber || '',
-                    subject: member.subject || '',
+                    subject: getTeacherSubjectDisplay(member) || '',
                     salary: member.salary || 0,
                     joiningDate: member.joiningDate || new Date().toISOString().split('T')[0],
                     gender: member.gender || 'male',
@@ -619,6 +647,7 @@ export default function StaffList() {
                         <input
                           required
                           type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
                           value={newStaff.password}
                           onChange={e => setNewStaff({ ...newStaff, password: e.target.value })}
                           className="w-full pr-12 pl-12 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900"
@@ -664,6 +693,8 @@ export default function StaffList() {
                       <input
                         required
                         type="text"
+                        autoComplete="off"
+                        name="teacher-subject"
                         value={newStaff.subject}
                         onChange={e => setNewStaff({ ...newStaff, subject: e.target.value })}
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900"

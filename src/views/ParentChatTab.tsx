@@ -17,6 +17,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useLanguage } from "../lib/LanguageContext";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
+import { getTeacherSubjectDisplay } from "../lib/userProfile";
 import { notificationService } from "../lib/notificationService";
 import { playPremiumNotificationSound } from "../lib/notificationSound";
 import { useSystemConfig } from "../lib/SystemConfigContext";
@@ -128,7 +129,9 @@ export default function ParentChatTab() {
           id: t.id,
           name: t.name || t.email,
           type: "teacher" as const,
-          subtitle: isRtl ? "معلم الفصل" : "Class Teacher",
+          subtitle:
+            getTeacherSubjectDisplay(t) ||
+            (isRtl ? "معلم الفصل" : "Class Teacher"),
         }));
 
       // Combine admin at the top, then teachers

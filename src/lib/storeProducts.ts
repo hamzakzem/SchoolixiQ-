@@ -9,6 +9,7 @@ import {
   type Timestamp,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadImageToServer } from './imageUtils';
 
 /** Canonical school store collection (admin writes here). */
 export const STORE_COLLECTION = 'market' as const;
@@ -103,7 +104,10 @@ export function buildStoreImageStoragePath(
   schoolId: string,
   filename: string,
 ): string {
-  const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+  let safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+  if (!/\.(jpe?g|png|webp|gif)$/i.test(safe)) {
+    safe = `${safe || 'product'}.jpg`;
+  }
   return `schools/${schoolId}/store/products/${Date.now()}-${safe}`;
 }
 
@@ -205,10 +209,15 @@ export async function uploadStoreProductImage(
     throw new Error('FILE_TOO_LARGE');
   }
 
-  const path = buildStoreImageStoragePath(schoolId, file.name);
-  const storageRef = ref(storage, path);
-  const snapshot = await uploadBytes(storageRef, file);
-  return getDownloadURL(snapshot.ref);
+  const path = buildStoreImageStoragePath(schoolId, file.name || 'product.jpg');
+  try {
+    const storageRef = ref(storage, path);
+    const snapshot = await uploadBytes(storageRef, file);
+    return getDownloadURL(snapshot.ref);
+  } catch (clientError) {
+    console.warn('Client storage upload failed, trying server upload:', clientError);
+    return uploadImageToServer(file, path, 800, 800);
+  }
 }
 
 export function buildStoreProductCreatePayload(

@@ -6,7 +6,7 @@ import { Search, Plus, UserPlus, Filter, MoreVertical, GraduationCap, Copy, Chec
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
-import { uploadImageToServer } from '../../lib/imageUtils';
+import { buildStudentPhotoPath, uploadImageToServer } from '../../lib/imageUtils';
 
 import { adminCreateUser, adminDeleteUser, adminDeleteStudent } from '../../lib/adminApi';
 
@@ -502,7 +502,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     try {
       setIsUploadingPhoto(true);
       const studentIdOrNew = editingStudent?.id || 'new';
-      const url = await uploadImageToServer(file, `students/${studentIdOrNew}/photo_${Date.now()}`, 400, 400);
+      const url = await uploadImageToServer(
+        file,
+        buildStudentPhotoPath(profile.schoolId, studentIdOrNew),
+        400,
+        400,
+      );
       setNewStudent(prev => ({ ...prev, photoUrl: url }));
       toast.success('تم رفع الصورة بنجاح');
     } catch (error) {
