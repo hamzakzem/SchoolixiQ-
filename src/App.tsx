@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import {
   isPendingSchoolAdmin,
+  isActiveSchoolAdmin,
   submitPendingAdminSubscription,
 } from "./lib/auth";
 import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
@@ -187,6 +188,15 @@ const AppContent = () => {
     }
   }, [loading, user, profile, autoLinkChecked]);
 
+  // Active admin profile always wins over stale onboarding UI state
+  useEffect(() => {
+    if (isActiveSchoolAdmin(profile)) {
+      setOnboardingState("approved");
+      setSelectedPackage(null);
+      setMyRequest(null);
+    }
+  }, [profile]);
+
   // Automatic School Admin & Parent Provisioning with Student Link
   useEffect(() => {
     if (loading || !user || profile || autoLinkChecked) return;
@@ -220,7 +230,10 @@ const AppContent = () => {
             email: email,
             name: schoolData.adminName || user.displayName || schoolData.name || "مدير المدرسة",
             role: "admin",
+            status: "active",
+            subscriptionStatus: "active",
             schoolId: schoolId,
+            pendingRegistrationId: null,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -349,9 +362,18 @@ const AppContent = () => {
           delete results[key];
         }
 
-        const mergedDocs = Object.values(results);
+        if (isActiveSchoolAdmin(profile)) {
+          setOnboardingState("approved");
+          return;
+        }
+
+        const mergedDocs = Object.values(results).sort((a: any, b: any) => {
+          const aTime = a.createdAt?.seconds || 0;
+          const bTime = b.createdAt?.seconds || 0;
+          return bTime - aTime;
+        });
+
         if (mergedDocs.length > 0) {
-          // Sort or pick the active one
           const req: any = mergedDocs[0];
           setMyRequest(req);
           if (req.status === "rejected" || req.status === "cancelled") {
@@ -361,13 +383,20 @@ const AppContent = () => {
           } else {
             setOnboardingState("waiting_approval");
           }
+        } else if (
+          profile?.pendingRegistrationId ||
+          profile?.status === "pending" ||
+          profile?.subscriptionStatus === "pending"
+        ) {
+          setOnboardingState("waiting_approval");
         } else {
-          // If no pending request, check if we should show options (with a short delay to avoid flicker)
           setOnboardingState((prev) => {
             if (prev === "approved") return "approved";
             timer = setTimeout(() => {
-              if (profile?.role === "admin") {
+              if (profile?.role === "admin" && isPendingSchoolAdmin(profile)) {
                 setOnboardingState("packages");
+              } else if (profile?.role === "admin") {
+                setOnboardingState("waiting_approval");
               } else {
                 setOnboardingState("options");
               }

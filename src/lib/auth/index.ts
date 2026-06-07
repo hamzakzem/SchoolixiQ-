@@ -36,6 +36,17 @@ export {
 export {
   submitPendingAdminSubscription,
   isPendingSchoolAdmin,
+  isActiveSchoolAdmin,
   type AdminRegistrationCustomerInfo,
   type PendingAdminPackage,
 } from './adminRegistration';
+
+export {
+  activateSchoolRegistration,
+  activateExistingSchoolAdmin,
+  activateSubscriptionSchool,
+  resolveAdminUidFromRequest,
+  healAdminActivationOnLogin,
+  type SchoolRegistrationRequest,
+  type ActivationResult,
+} from './schoolActivation';

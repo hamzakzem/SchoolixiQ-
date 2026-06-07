@@ -136,7 +136,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (
               data.role === 'admin' &&
               data.schoolId &&
-              (data.status === 'active' || data.subscriptionStatus === 'active')
+              (data.status === 'active' ||
+                data.subscriptionStatus === 'active' ||
+                (!data.pendingRegistrationId && data.schoolId))
             ) {
               setLoading(false);
             }

@@ -16,8 +16,6 @@ import {
   getDocs,
   updateDoc,
   limit,
-  writeBatch,
-  deleteField,
 } from "firebase/firestore";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
@@ -65,6 +63,12 @@ import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { useAuth } from "../lib/AuthContext";
+import {
+  activateSchoolRegistration,
+  activateExistingSchoolAdmin,
+  activateSubscriptionSchool,
+  type SchoolRegistrationRequest,
+} from "../lib/auth/schoolActivation";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
@@ -885,6 +889,31 @@ export default function SuperAdminDashboard() {
     return () => unsubs.forEach((unsub) => unsub());
   }, []);
 
+  const syncAdminClaims = async (adminUid: string | null) => {
+    if (!adminUid) return;
+    try {
+      await fetch(getApiUrl("/api/admin/sync-claims"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+          "X-Authorization": `Bearer ${await auth.currentUser?.getIdToken()}`
+        },
+        body: JSON.stringify({ uid: adminUid }),
+      });
+    } catch (e) {
+      console.error("Failed to sync claims", e);
+    }
+  };
+
+  const scheduleRegistrationCleanup = (source: string, requestId: string) => {
+    setTimeout(async () => {
+      await deleteDoc(doc(db, source, requestId)).catch((e) =>
+        console.error("Failed to clean up approved registration:", e),
+      );
+    }, 10000);
+  };
+
   const handleApproveSubscription = async (request: any) => {
     if (!request.schoolId) {
       toast.error("هذا الطلب غير مرتبط بمعرف مدرسة");
@@ -892,62 +921,11 @@ export default function SuperAdminDashboard() {
     }
     const loadingToast = toast.loading("جاري تفعيل الحساب...");
     try {
-      const durationDays = request.durationDays || 365;
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + durationDays);
-
-      const batch = writeBatch(db);
-      batch.update(doc(db, "schools", request.schoolId), {
-        status: "active",
-        planId: request.planId || "basic",
-        subscriptionExpiresAt: expiresAt.toISOString(),
-        updatedAt: serverTimestamp(),
-      });
-
-      if (request.uid) {
-        batch.set(
-          doc(db, "users", request.uid),
-          {
-            role: "admin",
-            status: "active",
-            subscriptionStatus: "active",
-            schoolId: request.schoolId,
-            pendingRegistrationId: deleteField(),
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true },
-        );
-      }
-
-      const source = request._source || "subscriptionRequests";
-      batch.update(doc(db, source, request.id), {
-        status: "approved",
-        schoolId: request.schoolId,
-        approvedAt: serverTimestamp(),
-      });
-
-      await batch.commit();
-
-      if (request.uid) {
-        try {
-          await fetch(getApiUrl("/api/admin/sync-claims"), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
-              "X-Authorization": `Bearer ${await auth.currentUser?.getIdToken()}`
-            },
-            body: JSON.stringify({ uid: request.uid }),
-          });
-        } catch (e) {
-          console.error("Failed to sync claims after subscription approval:", e);
-        }
-      }
-
-      setTimeout(async () => {
-        await deleteDoc(doc(db, source, request.id)).catch(console.error);
-      }, 10000);
-
+      const result = await activateSubscriptionSchool(
+        request as SchoolRegistrationRequest,
+      );
+      await syncAdminClaims(result.adminUid);
+      scheduleRegistrationCleanup(result.source, request.id);
       toast.dismiss(loadingToast);
       toast.success("تم تفعيل حساب المدرسة بنجاح");
     } catch (error: any) {
@@ -998,168 +976,67 @@ export default function SuperAdminDashboard() {
   const handleApproveRequest = async (request: any) => {
     if (!request || !request.id) return;
 
-    // Check if school already exists to prevent duplicate effort
-    const email = (request.customerInfo?.email || request.email)
-      ?.toLowerCase()
-      ?.trim();
-    if (email) {
-      const existingSchool = schools.find(
-        (s) => s.adminEmail?.toLowerCase() === email,
-      );
-      if (existingSchool) {
-        try {
-          await deleteDoc(doc(db, request._source || "orders", request.id));
-          toast.success("تم حذف الطلب المكرر حيث أن المدرسة مسجلة بالفعل");
-        } catch (e) {
-          toast.error("هذه المدرسة مسجلة بالفعل، يرجى حذف الطلب المكرر يدوياً");
-        }
-        return;
-      }
-    }
+    const typedRequest = request as SchoolRegistrationRequest;
+    const email = (
+      typedRequest.customerInfo?.email || typedRequest.email || ""
+    )
+      .toLowerCase()
+      .trim();
 
     const loadingToast = toast.loading(
       "جاري تجهيز المدرسة وتفعيل حساب المدير وتسجيل البيانات...",
     );
+
     try {
-      const durationDays = request.durationDays || 365;
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + durationDays);
+      const existingSchool = email
+        ? schools.find((s) => s.adminEmail?.toLowerCase() === email)
+        : undefined;
 
-      const name =
-        request.customerInfo?.name ||
-        request.name ||
-        request.schoolName ||
-        "مدرسة جديدة";
-      const address = request.customerInfo?.address || request.address || "";
-      const planId =
-        request.planId || request.packageId || request.packageName || "basic";
-      const password =
-        request.password ||
-        request.adminPassword ||
-        request.customerInfo?.password ||
-        "";
-      const phone =
-        request.customerInfo?.phone ||
-        request.phone ||
-        request.adminPhone ||
-        "";
-      const adminName =
-        request.customerInfo?.adminName ||
-        request.adminName ||
-        request.name ||
-        request.customerInfo?.name ||
-        "مدير المدرسة";
-
-      const customerInfo = request.customerInfo || {};
-      const source = request._source || "registrations";
-      const schoolRef = doc(collection(db, "schools"));
-      const batch = writeBatch(db);
-
-      batch.set(schoolRef, {
-        name: name,
-        address: address,
-        governorate: customerInfo.governorate || request.governorate || "",
-        directorate: customerInfo.directorate || request.directorate || "",
-        educationLevel: customerInfo.educationLevel || request.educationLevel || request.stage || "",
-        stage: customerInfo.educationLevel || request.educationLevel || request.stage || "",
-        workingHours: customerInfo.workingHours || request.workingHours || request.shift || "",
-        shift: customerInfo.workingHours || request.workingHours || request.shift || "",
-        studyType: customerInfo.studyType || request.studyType || request.genderType || "",
-        genderType: customerInfo.studyType || request.studyType || request.genderType || "",
-        estimatedStudents: Number(customerInfo.estimatedStudents || request.estimatedStudents) || 0,
-        approximateStudents: customerInfo.estimatedStudents || request.estimatedStudents || "",
-        status: "active",
-        planId: planId,
-        studentCount: 0,
-        subscriptionExpiresAt: expiresAt.toISOString(),
-        showSubscriptionTimer: true,
-        adminEmail: email,
-        adminPassword: password,
-        adminPhone: phone,
-        adminName: adminName,
-        ownerUid: request.uid || null,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      if (request.uid) {
-        batch.set(
-          doc(db, "users", request.uid),
-          {
-            uid: request.uid,
-            email: email,
-            name: adminName,
-            role: "admin",
-            status: "active",
-            subscriptionStatus: "active",
-            schoolId: schoolRef.id,
-            pendingRegistrationId: deleteField(),
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true },
+      let result;
+      if (existingSchool) {
+        result = await activateExistingSchoolAdmin(
+          typedRequest,
+          existingSchool.id,
         );
-      }
-
-      batch.update(doc(db, source, request.id), {
-        status: "approved",
-        schoolId: schoolRef.id,
-        approvedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      await batch.commit();
-
-      if (request.uid) {
-        try {
-          await fetch(getApiUrl("/api/admin/sync-claims"), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
-              "X-Authorization": `Bearer ${await auth.currentUser?.getIdToken()}`
-            },
-            body: JSON.stringify({ uid: request.uid }),
-          });
-        } catch (e) {
-          console.error("Failed to sync claims", e);
-        }
       } else {
-        // Fallback or warning if no UID
-        try {
-          const userResult = await adminCreateUser({
-            email: email,
-            password: password || "123456",
-            displayName: adminName,
-            role: "admin",
-            schoolId: schoolRef.id,
-          });
-          if (userResult && userResult.uid) {
-            await fetch(getApiUrl("/api/admin/sync-claims"), {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
-                "X-Authorization": `Bearer ${await auth.currentUser?.getIdToken()}`
-              },
-              body: JSON.stringify({ uid: userResult.uid }),
+        result = await activateSchoolRegistration(typedRequest);
+      }
+
+      if (!result.adminUid) {
+        const password =
+          typedRequest.password ||
+          typedRequest.adminPassword ||
+          typedRequest.customerInfo?.password ||
+          "";
+        const adminName =
+          typedRequest.customerInfo?.adminName ||
+          typedRequest.adminName ||
+          "مدير المدرسة";
+        if (email) {
+          try {
+            const userResult = await adminCreateUser({
+              email,
+              password: password || "123456",
+              displayName: adminName,
+              role: "admin",
+              schoolId: result.schoolId,
             });
+            if (userResult?.uid) {
+              result.adminUid = userResult.uid;
+            }
+          } catch (e) {
+            console.warn("Failed to create fallback auth user", e);
           }
-        } catch (e) {
-          console.warn("Failed to create fallback auth user", e);
+        } else {
+          toast.error("تعذر ربط حساب المدير: لا يوجد بريد إلكتروني في الطلب");
         }
       }
+
+      await syncAdminClaims(result.adminUid);
+      scheduleRegistrationCleanup(result.source, request.id);
 
       toast.dismiss(loadingToast);
-      toast.success(
-        "تم تفعيل المدرسة وربط حساب المدير بنجاح",
-      );
-
-      // Remove approved registration after a short delay
-      setTimeout(async () => {
-        await deleteDoc(doc(db, source, request.id)).catch((e) =>
-          console.error("Failed to clean up approved registration:", e),
-        );
-      }, 10000);
+      toast.success("تم تفعيل المدرسة وربط حساب المدير بنجاح");
     } catch (error: any) {
       toast.dismiss(loadingToast);
       console.error("Approve school request error:", error);

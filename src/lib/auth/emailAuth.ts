@@ -14,6 +14,7 @@ import {
   provisionUserProfile,
   type SchoolSignupFields,
 } from './profileProvisioning';
+import { healAdminActivationOnLogin } from './schoolActivation';
 import { UserRole } from '../../types';
 
 export function validatePasswordComplexity(pwd: string): {
@@ -93,6 +94,7 @@ export async function signInWithEmail(
   try {
     const result = await signInWithEmailAndPassword(auth, emailTrimmed, password);
     try {
+      await healAdminActivationOnLogin(emailTrimmed, result.user.uid);
       await healSchoolDataOnLogin(emailTrimmed, result.user.uid);
     } catch (healErr) {
       console.warn('Heal school data on login failed', healErr);

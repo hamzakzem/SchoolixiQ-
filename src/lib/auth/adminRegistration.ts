@@ -157,22 +157,36 @@ export async function submitPendingAdminSubscription(
   return { registrationId: regRef.id };
 }
 
+export function isActiveSchoolAdmin(profile: {
+  role?: string;
+  schoolId?: string;
+  status?: string;
+  subscriptionStatus?: string;
+  pendingRegistrationId?: string;
+} | null): boolean {
+  if (!profile || profile.role !== 'admin' || !profile.schoolId) return false;
+  if (profile.status === 'active' || profile.subscriptionStatus === 'active') {
+    return true;
+  }
+  // Backward compatible: approved linkage without pending registration pointer
+  if (!profile.pendingRegistrationId && profile.schoolId) {
+    return true;
+  }
+  return false;
+}
+
 export function isPendingSchoolAdmin(profile: {
   role?: string;
   schoolId?: string;
   status?: string;
   subscriptionStatus?: string;
+  pendingRegistrationId?: string;
 } | null): boolean {
   if (!profile || profile.role !== 'admin') return false;
-  // Active admin with a linked school is never pending (backward compatible with older approvals)
-  if (
-    profile.schoolId &&
-    (profile.status === 'active' || profile.subscriptionStatus === 'active')
-  ) {
-    return false;
-  }
+  if (isActiveSchoolAdmin(profile)) return false;
   if (profile.status === 'pending' || profile.subscriptionStatus === 'pending') {
     return true;
   }
+  if (profile.pendingRegistrationId) return true;
   return !profile.schoolId;
 }
