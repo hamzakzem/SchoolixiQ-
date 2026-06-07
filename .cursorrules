@@ -23,3 +23,63 @@
 ## 3. Work Synchronization
 - This local workspace is deployed and monitored via **Google AI Studio**. The cloud-deployed repository/environment is the source of truth.
 - Always ask the user for confirmation before initializing any automated formatting tools, linters that re-order imports, or sweeping file changes.
+## 4. Production Architecture Protection
+
+* Before making any change, read and obey `AI_RULES.md`.
+* `AI_RULES.md` is mandatory and overrides any simplification or cleanup suggestions.
+* Never delete, rename, overwrite, or refactor protected production systems without explicit user approval.
+* Never prepare deletion operations for protected files.
+
+Protected systems include:
+
+* src/lib/auth/*
+* src/lib/AppError.ts
+* scripts/verify-web-build.mjs
+* scripts/hostinger-deploy.sh
+* .github/workflows/*
+* vite.config.ts
+* package.json
+* package-lock.json
+
+## 5. Authentication Safety
+
+* Web Google authentication must use Firebase Auth v9 with:
+
+  * GoogleAuthProvider
+  * signInWithPopup
+
+* Never introduce:
+
+  * gapi
+  * platform.js
+  * google.accounts
+  * gsi/client
+  * gapi.auth2
+  * signInWithRedirect
+  * getRedirectResult
+  * idpiframe
+
+* Never allow `@codetrix-studio/capacitor-google-auth` to execute on normal web browsers.
+
+* Native Google login must remain isolated in:
+
+  src/lib/auth/googleSignIn.native.ts
+
+## 6. Deployment Safety
+
+* Never remove Hostinger deployment workflows.
+* Never break GitHub Actions.
+* Keep package.json and package-lock.json synchronized.
+* Before completing a task, run:
+
+  * npm run build
+  * npm run verify:web-build
+
+## 7. Change Discipline
+
+* Modify only files required for the task.
+* Avoid broad refactors.
+* Never delete files to simplify the project.
+* If a protected file must change, explain the reason and ask for user approval first.
+* Never commit or push automatically.
+
