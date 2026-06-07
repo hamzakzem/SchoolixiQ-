@@ -1,74 +1,108 @@
+const AI_STUDIO_BACKEND_PATTERN = /ais-(pre|dev)|europe-west2\.run\.app/i;
+
+function isCapacitorNativeApp(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.location.href.startsWith('capacitor:') ||
+    window.location.href.startsWith('file:') ||
+    navigator.userAgent.includes('Capacitor') ||
+    (window as { Capacitor?: unknown }).Capacitor !== undefined
+  );
+}
+
+function isProductionWebHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname.toLowerCase();
+  return host === 'schoolixiq.com' || host.endsWith('.schoolixiq.com');
+}
+
+function isLocalDevHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname.toLowerCase();
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.includes('-dev-')
+  );
+}
+
+export function isAiStudioBackendUrl(url: string): boolean {
+  return AI_STUDIO_BACKEND_PATTERN.test(url);
+}
+
+/** Remove stale AI Studio preview URLs cached for production web browsers. */
+export function purgeStaleApiUrlCache(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const saved = window.localStorage.getItem('schoolix_app_api_url') || '';
+    if (!saved) return;
+    if (isProductionWebHost() || isAiStudioBackendUrl(saved)) {
+      window.localStorage.removeItem('schoolix_app_api_url');
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+// Clear polluted cache as early as possible on production web.
+if (typeof window !== 'undefined' && isProductionWebHost()) {
+  purgeStaleApiUrlCache();
+}
+
 // Helper to determine the backend API server URL dynamically
 export function getApiUrl(path: string): string {
-  // Check if we are in a mobile container (Capacitor) or standalone local build
-  const isMobileContainer = 
-    typeof window !== 'undefined' && (
-      window.location.href.startsWith('capacitor:') || 
-      window.location.href.startsWith('http://localhost') || 
-      window.location.href.startsWith('file:') ||
-      navigator.userAgent.includes('Capacitor') ||
-      (window as any).Capacitor !== undefined
-    );
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
 
-  // Only for mobile apps, look for dynamic API URL stored in localStorage
+  // All browser web clients use same-origin API routes (no cross-origin CORS).
+  if (typeof window !== 'undefined' && !isCapacitorNativeApp()) {
+    purgeStaleApiUrlCache();
+    return cleanPath;
+  }
+
+  // Native/Capacitor apps may target an external backend.
   let savedUrl = '';
   if (typeof window !== 'undefined') {
     try {
       savedUrl = window.localStorage.getItem('schoolix_app_api_url') || '';
-    } catch (_) {}
+    } catch {
+      savedUrl = '';
+    }
   }
 
-  const isDevClient = typeof window !== 'undefined' && (
-    window.location.hostname.includes('-dev-') || 
-    window.location.hostname.includes('localhost') || 
-    window.location.hostname.includes('127.0.0.1')
-  );
-
+  const isDevClient = isLocalDevHost();
   let targetUrl = '';
 
   if (savedUrl) {
-    const isDevSavedUrl = savedUrl.includes('-dev-') || savedUrl.includes('localhost') || savedUrl.includes('127.0.0.1');
-    // Security/Stability Guard: If we are a production build but saved URL is dev, ignore it
+    const isDevSavedUrl =
+      savedUrl.includes('-dev-') ||
+      savedUrl.includes('localhost') ||
+      savedUrl.includes('127.0.0.1');
     if (!isDevClient && isDevSavedUrl) {
       targetUrl = '';
-    } else {
+    } else if (!isProductionWebHost() || !isAiStudioBackendUrl(savedUrl)) {
       targetUrl = savedUrl;
     }
   }
 
-  // Fallback 1: process.env.APP_URL defined by Vite configuration during build
   if (!targetUrl) {
     targetUrl = process.env.APP_URL || '';
   }
 
-  // Fallback 2: Direct hardcoded backup URLs for total stability of native apps
   if (!targetUrl) {
     targetUrl = isDevClient
       ? 'https://ais-dev-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app'
       : 'https://ais-pre-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app';
   }
 
-  // Clean trailing slashes
   let cleanSavedUrl = targetUrl.replace(/\/$/, '');
 
-  // CRITICAL: Force upgrade HTTP to HTTPS for external domains to prevent POST method downgrades from redirects
-  if (cleanSavedUrl && !cleanSavedUrl.startsWith('http://localhost') && !cleanSavedUrl.startsWith('http://127.0.0.1')) {
+  if (
+    cleanSavedUrl &&
+    !cleanSavedUrl.startsWith('http://localhost') &&
+    !cleanSavedUrl.startsWith('http://127.0.0.1')
+  ) {
     cleanSavedUrl = cleanSavedUrl.replace(/^http:\/\//i, 'https://');
   }
 
-  // If on standard web browsers: check if the current frontend origin matches the backend destination.
-  // If they are on different origins (e.g., frontend hosted on a static domain and backend on Cloud Run),
-  // we MUST return the absolute URL. If they match, relative path is returned for perfect security and Zero-CORS.
-  if (typeof window !== 'undefined' && !isMobileContainer) {
-    const currentOrigin = window.location.origin.replace(/\/$/, '').toLowerCase();
-    const backendOrigin = cleanSavedUrl.toLowerCase();
-    if (currentOrigin !== backendOrigin && cleanSavedUrl) {
-      const cleanPath = path.startsWith('/') ? path : `/${path}`;
-      return `${cleanSavedUrl}${cleanPath}`;
-    }
-    return path;
-  }
-
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${cleanSavedUrl}${cleanPath}`;
 }

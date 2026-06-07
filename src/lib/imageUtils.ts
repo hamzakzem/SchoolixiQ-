@@ -64,7 +64,7 @@ export function buildStudentPhotoPath(
   return `students/${schoolId}/${safeId}/photo_${Date.now()}${ext}`;
 }
 
-/** Upload student photo via Firebase Storage, falling back to server /api/upload. */
+/** Upload student photo via Firebase Storage, falling back to same-origin /api/upload. */
 export async function uploadStudentPhoto(
   file: File,
   schoolId: string,
@@ -78,13 +78,24 @@ export async function uploadStudentPhoto(
   }
 
   const path = buildStudentPhotoPath(schoolId, studentId, file.name, file.type);
+
+  let clientError: unknown;
   try {
     const storageRef = ref(storage, path);
-    const snapshot = await uploadBytes(storageRef, file);
+    const snapshot = await uploadBytes(storageRef, file, {
+      contentType: file.type || 'image/jpeg',
+    });
     return getDownloadURL(snapshot.ref);
-  } catch (clientError) {
-    console.warn('Client student photo upload failed, trying server upload:', clientError);
-    return uploadImageToServer(file, path, 400, 400);
+  } catch (error) {
+    clientError = error;
+    console.warn('Client student photo upload failed, trying same-origin server upload:', error);
+  }
+
+  try {
+    return await uploadImageToServer(file, path, 400, 400);
+  } catch (serverError) {
+    console.error('Server student photo upload failed:', serverError, clientError);
+    throw serverError;
   }
 }
 

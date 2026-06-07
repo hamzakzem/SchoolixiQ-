@@ -136,11 +136,32 @@ const AppContent = () => {
             window.location.hostname.includes('localhost') || 
             window.location.hostname.includes('127.0.0.1')
           );
-          const targetUrl = isDevClient ? (data.appUrlDev || data.appUrl) : (data.appUrl || data.appUrlProd);
+          const isNativeApp =
+            window.location.href.startsWith("capacitor:") ||
+            window.location.href.startsWith("file:") ||
+            navigator.userAgent.includes("Capacitor") ||
+            (window as { Capacitor?: unknown }).Capacitor !== undefined;
+
+          // Web browsers use same-origin /api/* — never cache AI Studio preview URLs.
+          if (!isNativeApp) {
+            try {
+              localStorage.removeItem("schoolix_app_api_url");
+            } catch (err) {
+              console.warn("localStorage is not writeable:", err);
+            }
+            return;
+          }
+
+          const targetUrl = isDevClient
+            ? data.appUrlDev || data.appUrl
+            : data.appUrl || data.appUrlProd;
           if (targetUrl) {
             try {
               localStorage.setItem("schoolix_app_api_url", targetUrl);
-              console.info("[API CONFIG] Saved environment-matched appUrl from Firestore to localStorage:", targetUrl);
+              console.info(
+                "[API CONFIG] Saved environment-matched appUrl from Firestore to localStorage:",
+                targetUrl,
+              );
             } catch (err) {
               console.warn("localStorage is not writeable:", err);
             }
