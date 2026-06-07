@@ -16,6 +16,8 @@ import {
   getDocs,
   updateDoc,
   limit,
+  writeBatch,
+  deleteField,
 } from "firebase/firestore";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
@@ -894,20 +896,60 @@ export default function SuperAdminDashboard() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + durationDays);
 
-      // 1. Update school status
-      await updateDoc(doc(db, "schools", request.schoolId), {
+      const batch = writeBatch(db);
+      batch.update(doc(db, "schools", request.schoolId), {
         status: "active",
         planId: request.planId || "basic",
         subscriptionExpiresAt: expiresAt.toISOString(),
         updatedAt: serverTimestamp(),
       });
 
-      // 2. Delete request document so it disappears
+      if (request.uid) {
+        batch.set(
+          doc(db, "users", request.uid),
+          {
+            role: "admin",
+            status: "active",
+            subscriptionStatus: "active",
+            schoolId: request.schoolId,
+            pendingRegistrationId: deleteField(),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        );
+      }
+
       const source = request._source || "subscriptionRequests";
-      await deleteDoc(doc(db, source, request.id));
+      batch.update(doc(db, source, request.id), {
+        status: "approved",
+        schoolId: request.schoolId,
+        approvedAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      if (request.uid) {
+        try {
+          await fetch(getApiUrl("/api/admin/sync-claims"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+              "X-Authorization": `Bearer ${await auth.currentUser?.getIdToken()}`
+            },
+            body: JSON.stringify({ uid: request.uid }),
+          });
+        } catch (e) {
+          console.error("Failed to sync claims after subscription approval:", e);
+        }
+      }
+
+      setTimeout(async () => {
+        await deleteDoc(doc(db, source, request.id)).catch(console.error);
+      }, 10000);
 
       toast.dismiss(loadingToast);
-      toast.success("تم تفعيل حساب المدرسة ومسح الطلب بنجاح");
+      toast.success("تم تفعيل حساب المدرسة بنجاح");
     } catch (error: any) {
       toast.dismiss(loadingToast);
       toast.error("فشل التفعيل: " + error.message);
@@ -1002,14 +1044,18 @@ export default function SuperAdminDashboard() {
         request.adminPhone ||
         "";
       const adminName =
-        request.customerInfo?.name ||
-        request.name ||
+        request.customerInfo?.adminName ||
         request.adminName ||
+        request.name ||
+        request.customerInfo?.name ||
         "مدير المدرسة";
 
-      // 1. Create School (Firestore)
       const customerInfo = request.customerInfo || {};
-      const schoolRef = await addDoc(collection(db, "schools"), {
+      const source = request._source || "registrations";
+      const schoolRef = doc(collection(db, "schools"));
+      const batch = writeBatch(db);
+
+      batch.set(schoolRef, {
         name: name,
         address: address,
         governorate: customerInfo.governorate || request.governorate || "",
@@ -1028,27 +1074,42 @@ export default function SuperAdminDashboard() {
         subscriptionExpiresAt: expiresAt.toISOString(),
         showSubscriptionTimer: true,
         adminEmail: email,
-        adminPassword: password, // Store for reference only
+        adminPassword: password,
         adminPhone: phone,
+        adminName: adminName,
+        ownerUid: request.uid || null,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
-      // 2. Create User Profile
       if (request.uid) {
-        await setDoc(
+        batch.set(
           doc(db, "users", request.uid),
           {
             uid: request.uid,
             email: email,
             name: adminName,
             role: "admin",
+            status: "active",
+            subscriptionStatus: "active",
             schoolId: schoolRef.id,
-            createdAt: serverTimestamp(),
+            pendingRegistrationId: deleteField(),
+            updatedAt: serverTimestamp(),
           },
           { merge: true },
         );
+      }
 
-        // Sync claims via admin API
+      batch.update(doc(db, source, request.id), {
+        status: "approved",
+        schoolId: schoolRef.id,
+        approvedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      if (request.uid) {
         try {
           await fetch(getApiUrl("/api/admin/sync-claims"), {
             method: "POST",
@@ -1090,23 +1151,15 @@ export default function SuperAdminDashboard() {
 
       toast.dismiss(loadingToast);
       toast.success(
-        "تم تفعيل المدرسة التفعيل كامل فايربيس (Firebase) وربط الحساب بنجاح",
+        "تم تفعيل المدرسة وربط حساب المدير بنجاح",
       );
 
-      // Update request notification to approved
-      const source = request._source || "orders";
-      try {
-        await updateDoc(doc(db, source, request.id), { status: "approved" });
-        // Automatically delete it after 10 seconds to keep clean
-        setTimeout(async () => {
-          await deleteDoc(doc(db, source, request.id)).catch((e) =>
-            console.error(e),
-          );
-        }, 10000);
-      } catch (e) {
-        // Fallback just delete
-        await deleteDoc(doc(db, source, request.id)).catch(console.error);
-      }
+      // Remove approved registration after a short delay
+      setTimeout(async () => {
+        await deleteDoc(doc(db, source, request.id)).catch((e) =>
+          console.error("Failed to clean up approved registration:", e),
+        );
+      }, 10000);
     } catch (error: any) {
       toast.dismiss(loadingToast);
       console.error("Approve school request error:", error);

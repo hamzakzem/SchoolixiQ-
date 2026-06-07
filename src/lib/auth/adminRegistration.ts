@@ -164,6 +164,13 @@ export function isPendingSchoolAdmin(profile: {
   subscriptionStatus?: string;
 } | null): boolean {
   if (!profile || profile.role !== 'admin') return false;
+  // Active admin with a linked school is never pending (backward compatible with older approvals)
+  if (
+    profile.schoolId &&
+    (profile.status === 'active' || profile.subscriptionStatus === 'active')
+  ) {
+    return false;
+  }
   if (profile.status === 'pending' || profile.subscriptionStatus === 'pending') {
     return true;
   }

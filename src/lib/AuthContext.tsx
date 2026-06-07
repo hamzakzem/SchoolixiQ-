@@ -131,6 +131,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               ...data,
               permissions: claims.p || data.permissions || null
             } as UserProfile);
+
+            // Active school admins can render while school/package data streams in
+            if (
+              data.role === 'admin' &&
+              data.schoolId &&
+              (data.status === 'active' || data.subscriptionStatus === 'active')
+            ) {
+              setLoading(false);
+            }
             
             // Register for Push Notifications automatically (only native)
             try {

@@ -180,6 +180,13 @@ const AppContent = () => {
     estimatedStudents: "",
   });
 
+  // Pending admins already have a Firestore profile — skip auto-link but allow onboarding listeners
+  useEffect(() => {
+    if (!loading && user && profile && !autoLinkChecked) {
+      setAutoLinkChecked(true);
+    }
+  }, [loading, user, profile, autoLinkChecked]);
+
   // Automatic School Admin & Parent Provisioning with Student Link
   useEffect(() => {
     if (loading || !user || profile || autoLinkChecked) return;
@@ -392,24 +399,31 @@ const AppContent = () => {
     };
   }, [loading, user, profile, autoLinkChecked]);
 
-  // Automatically trigger a profile sync & page reload if approved, to apply the new admin credentials smoothly
+  // Refresh token after approval; reload only if profile is still pending (real-time listener fallback)
   useEffect(() => {
-    if (onboardingState === "approved") {
-      const reloadTimer = setTimeout(async () => {
-        try {
-          if (auth.currentUser) {
-            // Force refresh ID Token to get updated claims from server
-            await auth.currentUser.getIdToken(true);
-          }
-        } catch (e) {
-          console.warn("Failed to force refresh token during approved transition:", e);
-        }
-        // Force fully fresh page reload
-        window.location.reload();
-      }, 2500);
-      return () => clearTimeout(reloadTimer);
+    if (onboardingState !== "approved") return;
+
+    if (profile && !isPendingSchoolAdmin(profile) && profile.schoolId) {
+      auth.currentUser?.getIdToken(true).catch((e) => {
+        console.warn("Failed to refresh token after approval:", e);
+      });
+      return;
     }
-  }, [onboardingState]);
+
+    const reloadTimer = setTimeout(async () => {
+      try {
+        if (auth.currentUser) {
+          await auth.currentUser.getIdToken(true);
+        }
+      } catch (e) {
+        console.warn("Failed to force refresh token during approved transition:", e);
+      }
+      if (!profile || isPendingSchoolAdmin(profile)) {
+        window.location.reload();
+      }
+    }, 2500);
+    return () => clearTimeout(reloadTimer);
+  }, [onboardingState, profile]);
 
   // Fetch packages when in 'packages' state
   useEffect(() => {
