@@ -30,6 +30,12 @@ import {
   getHomeworkSubjectDisplay,
   groupHomeworkBySubject,
 } from "../lib/homeworkSubjects";
+import {
+  getProductImageUrl,
+  getProductName,
+  getProductStock,
+  subscribeSchoolStoreProducts,
+} from "../lib/storeProducts";
 import { toast } from "react-hot-toast";
 import {
   Home,
@@ -674,16 +680,19 @@ export default function ParentDashboard() {
         setInstallments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (a.dueDate?.seconds || 0) - (b.dueDate?.seconds || 0)) as any);
       }));
 
-      // 6. Market
-      const marketQ = query(
-        collection(db, "marketplace"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("status", "==", "active"),
+      // 6. School store (market + legacy marketplace merge)
+      const unsubMarket = subscribeSchoolStoreProducts(
+        selectedStudent.schoolId,
+        (products) => {
+          setMarketItems(products);
+          setMarketLoading(false);
+        },
+        {
+          onError: (error) =>
+            handleFirestoreError(error, OperationType.LIST, "market"),
+        },
       );
-      unsubs.push(onSnapshot(marketQ, snap => {
-        setMarketItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
-        setMarketLoading(false);
-      }));
+      unsubs.push(unsubMarket);
 
       // 7. Notifications
       const notificationsQ = query(
@@ -898,7 +907,7 @@ export default function ParentDashboard() {
     if (!profile?.uid || !selectedStudent?.id) return;
 
     // Check stock before proceeding
-    if (item.stock <= 0) {
+    if (getProductStock(item) <= 0) {
       toast.error(
         isRtl
           ? "عذراً، هذا المنتج غير متوفر حالياً"
@@ -918,7 +927,7 @@ export default function ParentDashboard() {
         items: [
           {
             id: item.id,
-            name: item.itemName,
+            name: getProductName(item),
             price: item.price,
             quantity: 1,
           },
@@ -2198,10 +2207,10 @@ export default function ParentDashboard() {
                           className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all flex flex-col group"
                         >
                           <div className="w-full aspect-square bg-slate-50 dark:bg-slate-800 rounded-xl mb-4 flex items-center justify-center text-slate-300 dark:text-slate-600 transition-colors group-hover:bg-slate-100 dark:group-hover:bg-slate-700 relative overflow-hidden">
-                            {item.image ? (
+                            {getProductImageUrl(item) ? (
                               <img
-                                src={item.image || undefined}
-                                alt={item.itemName}
+                                src={getProductImageUrl(item) || undefined}
+                                alt={getProductName(item)}
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                 referrerPolicy="no-referrer"
                               />
@@ -2211,7 +2220,7 @@ export default function ParentDashboard() {
                           </div>
                           <div className="flex-1">
                             <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-1">
-                              {item.itemName}
+                              {getProductName(item)}
                             </h4>
                             <p className="text-[10px] text-slate-500 line-clamp-2 mb-3 leading-relaxed">
                               {item.description || t("noProductDescription")}
@@ -2223,7 +2232,7 @@ export default function ParentDashboard() {
                                 {item.price?.toLocaleString()} د.ع
                               </p>
                               <span className="text-[9px] font-bold text-slate-400">
-                                {t("remaining")}: {item.stock}
+                                {t("remaining")}: {getProductStock(item)}
                               </span>
                             </div>
                             <button
@@ -2732,10 +2741,10 @@ export default function ParentDashboard() {
               className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative border border-slate-200 dark:border-slate-800"
             >
               <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto mb-6 overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
-                {purchaseModal.image ? (
+                {getProductImageUrl(purchaseModal) ? (
                   <img
-                    src={purchaseModal.image || undefined}
-                    alt={purchaseModal.itemName}
+                    src={getProductImageUrl(purchaseModal) || undefined}
+                    alt={getProductName(purchaseModal)}
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
@@ -2749,7 +2758,7 @@ export default function ParentDashboard() {
               <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-8">
                 {t("purchaseItem")}{" "}
                 <span className="font-bold text-slate-900 dark:text-white">
-                  "{purchaseModal.itemName}"
+                  "{getProductName(purchaseModal)}"
                 </span>{" "}
                 لـ {selectedStudent?.name}
               </p>

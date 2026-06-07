@@ -41,6 +41,7 @@ import {
   BarChart3,
   ShieldCheck,
   Check,
+  ShoppingBag,
 } from "lucide-react";
 import { updatePassword, verifyBeforeUpdateEmail } from "firebase/auth";
 import { toast } from "react-hot-toast";
@@ -58,6 +59,12 @@ import {
   canTeacherDeleteHomework,
   type SchoolSubjectDoc,
 } from "../lib/homeworkSubjects";
+import {
+  getProductImageUrl,
+  getProductName,
+  getProductStock,
+  subscribeSchoolStoreProducts,
+} from "../lib/storeProducts";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 
 type Tab =
@@ -70,7 +77,8 @@ type Tab =
   | "id_cards"
   | "settings"
   | "chat"
-  | "schedules";
+  | "schedules"
+  | "market";
 
 import SolarLoading from "../components/SolarLoading";
 import TeacherSettingsTab from "./TeacherSettingsTab";
@@ -204,6 +212,9 @@ export default function TeacherDashboard() {
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [isSavingGrades, setIsSavingGrades] = useState(false);
   const [currentBulkDocId, setCurrentBulkDocId] = useState<string | null>(null);
+
+  const [marketItems, setMarketItems] = useState<any[]>([]);
+  const [marketLoading, setMarketLoading] = useState(true);
 
   // Fetch existing grades when selection changes
   useEffect(() => {
@@ -448,6 +459,29 @@ export default function TeacherDashboard() {
       unsubs.forEach(unsub => unsub());
     };
   }, [profile, isRtl]);
+
+  useEffect(() => {
+    if (!profile?.schoolId) {
+      setMarketItems([]);
+      setMarketLoading(false);
+      return;
+    }
+
+    setMarketLoading(true);
+    const unsub = subscribeSchoolStoreProducts(
+      profile.schoolId,
+      (products) => {
+        setMarketItems(products);
+        setMarketLoading(false);
+      },
+      {
+        onError: (error) =>
+          handleFirestoreError(error, OperationType.LIST, "market"),
+      },
+    );
+
+    return () => unsub();
+  }, [profile?.schoolId]);
 
   const teacherAssignedSubjects = useMemo(
     () => resolveSubjectsForTeacher(profile, schoolSubjectDocs),
@@ -824,6 +858,12 @@ export default function TeacherDashboard() {
       icon: ShieldCheck,
       permission: "id_card_generation",
     },
+    {
+      id: "market",
+      label: t("market"),
+      icon: ShoppingBag,
+      permission: "marketplace_ordering",
+    },
     { id: "chat", label: isRtl ? "الدردشة" : "Chat", icon: MessageSquare },
   ].filter((item) => {
     if (item.id === "home" || item.id === "chat") return true;
@@ -835,6 +875,7 @@ export default function TeacherDashboard() {
       if (item.id === "advanced_reports") return perms.advanced_reports !== false;
       if (item.id === "schedules") return perms.automated_schedules !== false;
       if (item.id === "id_cards") return perms.id_card_generation !== false;
+      if (item.id === "market") return perms.marketplace_ordering !== false;
     }
     return true;
   });
@@ -929,6 +970,11 @@ export default function TeacherDashboard() {
                 },
                 { id: "schedules", label: t("schedules"), icon: Calendar },
                 {
+                  id: "market",
+                  label: t("market"),
+                  icon: ShoppingBag,
+                },
+                {
                   id: "chat",
                   label: t("chat") || (isRtl ? "المراسلة" : "Messages"),
                   icon: MessageSquare,
@@ -960,6 +1006,8 @@ export default function TeacherDashboard() {
                       return p.advanced_reports !== false;
                     if (item.id === "schedules") return true;
                     if (item.id === "id_cards") return true;
+                    if (item.id === "market")
+                      return p.marketplace_ordering !== false;
                   }
                   return true;
                 })
@@ -2017,6 +2065,72 @@ export default function TeacherDashboard() {
               )}
 
               {activeTab === "schedules" && <Schedules />}
+
+              {activeTab === "market" && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between px-1">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display">
+                      {t("schoolStore")}
+                    </h2>
+                    <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-slate-500 uppercase tracking-widest">
+                      {schoolName || t("officialStore")}
+                    </span>
+                  </div>
+
+                  {marketLoading ? (
+                    <div className="py-20 flex justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-slate-900" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                      {marketItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col"
+                        >
+                          <div className="w-full aspect-square bg-slate-50 dark:bg-slate-800 rounded-xl mb-4 flex items-center justify-center text-slate-300 relative overflow-hidden">
+                            {getProductImageUrl(item) ? (
+                              <img
+                                src={getProductImageUrl(item) || undefined}
+                                alt={getProductName(item)}
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <ShoppingBag size={40} strokeWidth={1} />
+                            )}
+                          </div>
+                          <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-1">
+                            {getProductName(item)}
+                          </h4>
+                          <p className="text-[10px] text-slate-500 line-clamp-2 mb-3 leading-relaxed flex-1">
+                            {item.description || t("noProductDescription")}
+                          </p>
+                          <div className="flex items-center justify-between mt-auto">
+                            <p className="text-indigo-600 dark:text-indigo-400 font-black text-sm">
+                              {item.price?.toLocaleString()} د.ع
+                            </p>
+                            <span className="text-[9px] font-bold text-slate-400">
+                              {t("remaining")}: {getProductStock(item)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {marketItems.length === 0 && (
+                        <div className="col-span-full py-20 text-center bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-slate-100 dark:border-slate-800">
+                          <ShoppingBag
+                            size={40}
+                            className="mx-auto mb-3 opacity-20"
+                          />
+                          <p className="text-slate-400 text-sm">
+                            {t("noProductsInStore")}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {activeTab === "settings" && (
                 <TeacherSettingsTab classes={classes} />

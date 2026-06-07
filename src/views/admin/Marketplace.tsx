@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { db, storage } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, getDoc, limit } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '../../lib/firebase';
+import { collection, query, where, addDoc, deleteDoc, doc, updateDoc, getDoc, limit, onSnapshot } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { useAuth } from '../../lib/AuthContext';
-import { Plus, ShoppingBag, Package, DollarSign, Tag, Trash2, Camera, Image as ImageIcon, Upload, X, Loader2, Check } from 'lucide-react';
+import { Plus, ShoppingBag, Trash2, Camera, Image as ImageIcon, X, Loader2, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { notificationService } from '../../lib/notificationService';
 import { useLanguage } from '../../lib/LanguageContext';
 import { useSystemConfig } from '../../lib/SystemConfigContext';
+import {
+  STORE_COLLECTION,
+  LEGACY_STORE_COLLECTION,
+  buildStoreProductCreatePayload,
+  getProductImageUrl,
+  getProductName,
+  getProductStock,
+  isPersistableImageUrl,
+  subscribeSchoolStoreProducts,
+  uploadStoreProductImage,
+  MAX_STORE_IMAGE_BYTES,
+} from '../../lib/storeProducts';
 
 export default function Marketplace() {
   const { profile } = useAuth();
@@ -20,41 +31,49 @@ export default function Marketplace() {
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
-  const [newItem, setNewItem] = useState({ itemName: '', price: 0, description: '', stock: 0, image: '' });
+  const [newItem, setNewItem] = useState({ itemName: '', price: 0, description: '', stock: 0, imageUrl: '' });
 
   useEffect(() => {
-    let isMounted = true;
     if (!profile?.schoolId) return;
 
-    const fetchMarketplace = async () => {
-      try {
-        const itemsQ = query(collection(db, 'market'), where('schoolId', '==', profile.schoolId), limit(100));
-        const ordersQ = query(collection(db, 'orders'), where('schoolId', '==', profile.schoolId), limit(200));
+    const unsubProducts = subscribeSchoolStoreProducts(
+      profile.schoolId,
+      (products) => setItems(products),
+      {
+        includeInactive: true,
+        onError: (error) => handleFirestoreError(error, OperationType.LIST, STORE_COLLECTION),
+      },
+    );
 
-        const [itemsSnap, ordersSnap] = await Promise.all([
-          getDocs(itemsQ),
-          getDocs(ordersQ)
-        ]);
+    const ordersQ = query(
+      collection(db, 'orders'),
+      where('schoolId', '==', profile.schoolId),
+      limit(200),
+    );
+    const unsubOrders = onSnapshot(
+      ordersQ,
+      (snap) => {
+        setOrders(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, 'orders'),
+    );
 
-        if (!isMounted) return;
-
-        setItems(itemsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'market');
-      }
+    return () => {
+      unsubProducts();
+      unsubOrders();
     };
-
-    fetchMarketplace();
-    return () => { isMounted = false; };
-  }, [profile]);
+  }, [profile?.schoolId]);
 
   const handleDeleteItem = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (deletingId === id) {
       try {
         setUploading(true); // Reuse uploading state for deletion loading if needed, or just perform logic
-        await deleteDoc(doc(db, 'market', id));
+        try {
+          await deleteDoc(doc(db, STORE_COLLECTION, id));
+        } catch {
+          await deleteDoc(doc(db, LEGACY_STORE_COLLECTION, id));
+        }
         toast.success('تم حذف المنتج بنجاح');
         setDeletingId(null);
       } catch (error) {
@@ -86,7 +105,7 @@ export default function Marketplace() {
         const orderItems = orderData.items || [];
         for (const item of orderItems) {
           if (item.id) {
-            const itemRef = doc(db, 'market', item.id);
+            const itemRef = doc(db, STORE_COLLECTION, item.id);
             const itemSnap = await getDoc(itemRef);
             if (itemSnap.exists()) {
               const currentStock = itemSnap.data().stock || 0;
@@ -140,17 +159,36 @@ export default function Marketplace() {
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile?.schoolId) return;
+    if (!profile?.schoolId || !profile?.uid) return;
+
+    if (uploading) {
+      toast.error(isRtl ? 'يرجى انتظار اكتمال رفع الصورة' : 'Please wait for the image upload to finish');
+      return;
+    }
+
+    if (!newItem.itemName.trim()) {
+      toast.error(isRtl ? 'يرجى إدخال اسم المنتج' : 'Please enter a product name');
+      return;
+    }
+
+    if (!isPersistableImageUrl(newItem.imageUrl)) {
+      toast.error(isRtl ? 'رابط الصورة غير صالح. يرجى رفع الصورة أو إدخال رابط صحيح' : 'Invalid image URL. Upload an image or enter a valid link');
+      return;
+    }
+
     try {
-      await addDoc(collection(db, 'market'), {
-        ...newItem,
-        schoolId: profile.schoolId,
-        createdAt: serverTimestamp(),
-      });
+      await addDoc(
+        collection(db, STORE_COLLECTION),
+        buildStoreProductCreatePayload(newItem, {
+          uid: profile.uid,
+          schoolId: profile.schoolId,
+        }),
+      );
       toast.success('تمت إضافة المنتج بنجاح');
       setShowAddModal(false);
-      setNewItem({ itemName: '', price: 0, description: '', stock: 0, image: '' });
+      setNewItem({ itemName: '', price: 0, description: '', stock: 0, imageUrl: '' });
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, STORE_COLLECTION);
       toast.error('خطأ في الإضافة');
     }
   };
@@ -159,30 +197,34 @@ export default function Marketplace() {
     const file = e.target.files?.[0];
     if (!file || !profile?.schoolId) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('يرجى اختيار ملف صورة صحيح');
       return;
     }
 
-    // Validate size (max 2MB for faster uploads)
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('حجم الصورة يجب أن لا يتجاوز 2 ميجابايت');
+    if (file.size > MAX_STORE_IMAGE_BYTES) {
+      toast.error('حجم الصورة يجب أن لا يتجاوز 5 ميجابايت');
       return;
     }
 
     setUploading(true);
     try {
-      const storageRef = ref(storage, `market/${profile.schoolId}/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
-      setNewItem({ ...newItem, image: url });
+      const url = await uploadStoreProductImage(file, profile.schoolId);
+      setNewItem((prev) => ({ ...prev, imageUrl: url }));
       toast.success('تم رفع الصورة بنجاح');
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast.error('فشل رفع الصورة');
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'INVALID_IMAGE_TYPE') {
+        toast.error('يرجى اختيار ملف صورة صحيح');
+      } else if (code === 'FILE_TOO_LARGE') {
+        toast.error('حجم الصورة يجب أن لا يتجاوز 5 ميجابايت');
+      } else {
+        toast.error('فشل رفع الصورة. تحقق من الاتصال والصلاحيات');
+      }
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -232,10 +274,10 @@ export default function Marketplace() {
               )}
             </div>
             <div className="aspect-square bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 group-hover:bg-slate-100 transition-colors relative overflow-hidden">
-               {item.image ? (
+               {getProductImageUrl(item) ? (
                  <img 
-                   src={item.image || undefined} 
-                   alt={item.itemName} 
+                   src={getProductImageUrl(item) || undefined} 
+                   alt={getProductName(item)} 
                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                    referrerPolicy="no-referrer"
                  />
@@ -245,12 +287,12 @@ export default function Marketplace() {
             </div>
             <div className="p-3 md:p-5 flex-1 flex flex-col justify-between">
                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm md:text-lg line-clamp-1">{item.itemName}</h3>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm md:text-lg line-clamp-1">{getProductName(item)}</h3>
                   <p className="text-[10px] md:text-xs text-slate-500 mt-1 line-clamp-1 md:line-clamp-2 md:leading-relaxed">{item.description}</p>
                </div>
                <div className="mt-3 md:mt-5 flex flex-col md:flex-row md:items-center justify-between gap-1">
                  <span className="text-indigo-600 font-bold text-sm md:text-lg">{item.price.toLocaleString()} د.ع</span>
-                 <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400 w-fit">متبقي: {item.stock}</span>
+                 <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400 w-fit">متبقي: {getProductStock(item)}</span>
                </div>
             </div>
           </div>
@@ -425,12 +467,12 @@ export default function Marketplace() {
                    
                    {/* Upload Area */}
                    <div className="flex items-center gap-6">
-                      {newItem.image ? (
+                      {newItem.imageUrl ? (
                         <div className="relative w-28 h-28 rounded-2xl overflow-hidden border border-slate-200">
-                          <img src={newItem.image || undefined} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={newItem.imageUrl || undefined} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           <button 
                             type="button"
-                            onClick={() => setNewItem({...newItem, image: ''})}
+                            onClick={() => setNewItem({...newItem, imageUrl: ''})}
                             className="absolute top-1.5 left-1.5 p-1.5 bg-white/90 text-red-500 rounded-lg shadow-sm hover:bg-red-50 transition-colors"
                           >
                             <X size={14} />
@@ -456,8 +498,8 @@ export default function Marketplace() {
                           <ImageIcon size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                           <input
                             type="url"
-                            value={newItem.image}
-                            onChange={(e) => setNewItem({ ...newItem, image: e.target.value })}
+                            value={newItem.imageUrl}
+                            onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
                             placeholder="https://example.com/image.jpg"
                             className="w-full px-9 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all"
                           />
@@ -515,7 +557,7 @@ export default function Marketplace() {
                   />
                 </div>
                 <div className="flex gap-4 pt-6">
-                  <button type="submit" className="flex-1 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95">حفظ المنتج</button>
+                  <button type="submit" disabled={uploading} className="flex-1 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95 disabled:opacity-50">حفظ المنتج</button>
                   <button type="button" onClick={() => setShowAddModal(false)} className="px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all">إلغاء</button>
                 </div>
              </form>

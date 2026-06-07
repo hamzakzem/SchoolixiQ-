@@ -17,7 +17,19 @@ service firebase.storage {
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // 4. Schools: Admins can manage school-related images (logos, etc.)
+    // 4. School store product images (admin/assistant of same school)
+    match /schools/{schoolId}/store/products/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
+        || (
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId == schoolId
+          && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'assistant']
+        )
+      );
+    }
+
+    // 5. Schools: school-related images (logos, etc.)
     match /schools/{schoolId}/{allPaths=**} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (
@@ -46,9 +58,10 @@ service firebase.storage {
        allow read, write: if isSignedIn();
     }
     
+    // Legacy store image path (backward compatibility)
     match /market/{itemId}/{allPaths=**} {
        allow read: if isSignedIn();
-       allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
+       allow write: if isSignedIn() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'assistant', 'superadmin'];
     }
 
     match /system/{allPaths=**} {
