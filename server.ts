@@ -357,25 +357,42 @@ async function startServer() {
     }
   };
 
-  async function assertUploadPathAllowed(uid: string, storagePath: string): Promise<{ role: string; schoolId: string } | null> {
+  const STUDENT_PHOTO_STAFF_ROLES = [
+    'superadmin',
+    'super_admin',
+    'admin',
+    'school_admin',
+    'assistant',
+    'staff',
+    'teacher',
+  ];
+
+  const isSuperAdminRole = (role: string) => role === 'superadmin' || role === 'super_admin';
+
+  async function assertUploadPathAllowed(
+    uid: string,
+    storagePath: string,
+    tokenUser?: { role?: string; schoolId?: string },
+  ): Promise<{ role: string; schoolId: string } | null> {
     const db = getDb();
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists) {
       return null;
     }
     const userData = userDoc.data() || {};
-    const role = String(userData.role || '');
-    const schoolId = String(userData.schoolId || '');
-    const staffRoles = ['superadmin', 'admin', 'assistant', 'staff', 'teacher'];
+    const tokenRole = String(tokenUser?.role || '');
+    const tokenSchoolId = String(tokenUser?.schoolId || '');
+    const role = String(userData.role || tokenRole || '');
+    const schoolId = String(userData.schoolId || tokenSchoolId || '');
 
     const studentMatch = storagePath.match(/^students\/([^/]+)\/([^/]+)\/([^/]+)$/);
     if (studentMatch) {
       const pathSchoolId = studentMatch[1];
       const fileName = studentMatch[3];
-      if (!staffRoles.includes(role)) {
+      if (!STUDENT_PHOTO_STAFF_ROLES.includes(role)) {
         throw Object.assign(new Error('FORBIDDEN_ROLE'), { status: 403 });
       }
-      if (role !== 'superadmin' && schoolId !== pathSchoolId) {
+      if (!isSuperAdminRole(role) && schoolId !== pathSchoolId) {
         throw Object.assign(new Error('FORBIDDEN_SCHOOL'), { status: 403 });
       }
       if (!/^photo_\d+\.(jpg|jpeg|png|webp)$/i.test(fileName)) {
@@ -394,7 +411,7 @@ async function startServer() {
       if (!storagePath || !base64) return res.status(400).json({ error: 'Missing path or base64' });
 
       try {
-        const allowed = await assertUploadPathAllowed(req.user.uid, storagePath);
+        const allowed = await assertUploadPathAllowed(req.user.uid, storagePath, req.user);
         if (!allowed) {
           return res.status(403).json({
             error: 'FORBIDDEN',

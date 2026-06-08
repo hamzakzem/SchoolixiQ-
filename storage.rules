@@ -10,35 +10,62 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function userPath() {
-      return /databases/(default)/documents/users/$(request.auth.uid);
-    }
-
+    // Inline path — some rule engines reject function-wrapped paths for cross-service calls.
     function userDocExists() {
-      return isSignedIn() && firestore.exists(userPath());
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
     }
 
     function userData() {
-      return userDocExists() ? firestore.get(userPath()).data : {};
+      return userDocExists()
+        ? firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data
+        : {};
     }
 
-    function userRole() {
+    // Prefer non-empty JWT custom claims (synced by server), then Firestore users/{uid}.
+    // Empty-string claim schoolId is common after admin signup before activation — must not block Firestore fallback.
+    function claimRole() {
+      return isSignedIn()
+        && request.auth.token.keys().hasAll(['role'])
+        && request.auth.token.role is string
+        ? request.auth.token.role
+        : '';
+    }
+
+    function claimSchoolId() {
+      return isSignedIn()
+        && request.auth.token.keys().hasAll(['schoolId'])
+        && request.auth.token.schoolId is string
+        ? request.auth.token.schoolId
+        : '';
+    }
+
+    function firestoreRole() {
       return userDocExists() && userData().keys().hasAll(['role'])
         ? userData().role
         : '';
+    }
+
+    function firestoreSchoolId() {
+      return userDocExists() && userData().keys().hasAll(['schoolId'])
+        ? userData().schoolId
+        : '';
+    }
+
+    function userRole() {
+      return claimRole().size() > 0 ? claimRole() : firestoreRole();
+    }
+
+    function userSchoolId() {
+      return claimSchoolId().size() > 0 ? claimSchoolId() : firestoreSchoolId();
     }
 
     function isSuperAdmin() {
       return userRole() in ['superadmin', 'super_admin'];
     }
 
-    function userSchoolId() {
-      return userDocExists() && userData().keys().hasAll(['schoolId'])
-        ? userData().schoolId
-        : '';
-    }
-
-    // Roles that may manage student photos for their own school only.
+    // App roles (types.ts): superadmin, admin, assistant, teacher, parent, staff
+    // Legacy aliases: school_admin, super_admin
     function isSchoolStaffRole() {
       return userRole() in [
         'admin',
@@ -50,9 +77,9 @@ service firebase.storage {
     }
 
     function sameSchool(schoolId) {
-      return userSchoolId() == schoolId
-        && userSchoolId() is string
-        && userSchoolId().size() > 0;
+      return userSchoolId() is string
+        && userSchoolId().size() > 0
+        && userSchoolId() == schoolId;
     }
 
     function canManageSchoolStudentPhotos(schoolId) {
@@ -60,16 +87,20 @@ service firebase.storage {
         || (isSchoolStaffRole() && sameSchool(schoolId));
     }
 
-    function isAllowedStudentImageUpload() {
+    function isStudentPhotoFileName(fileName) {
+      return fileName.matches('photo_[0-9]+\\.(jpg|jpeg|png|webp)');
+    }
+
+    function isAllowedStudentImageUpload(fileName) {
       return request.resource != null
         && request.resource.size > 0
         && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType != null
-        && request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
-    }
-
-    function isStudentPhotoFileName(fileName) {
-      return fileName.matches('photo_[0-9]+\\.(jpg|jpeg|png|webp)');
+        && isStudentPhotoFileName(fileName)
+        && (
+          request.resource.contentType == null
+          || request.resource.contentType == 'application/octet-stream'
+          || request.resource.contentType.matches('image/(jpeg|jpg|png|webp)')
+        );
     }
 
     // 2. Profiles: Authenticated users can read all user profile images, but only owners can upload
@@ -100,8 +131,7 @@ service firebase.storage {
     match /students/{schoolId}/{studentId}/{fileName} {
       allow read: if isSignedIn();
       allow write: if canManageSchoolStudentPhotos(schoolId)
-        && isAllowedStudentImageUpload()
-        && isStudentPhotoFileName(fileName);
+        && isAllowedStudentImageUpload(fileName);
     }
 
     // Legacy generic path (superadmin only)
