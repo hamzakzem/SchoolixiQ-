@@ -55,6 +55,8 @@ import {
   NotificationCategory 
 } from "../lib/notificationSound";
 import { notificationService } from "../lib/notificationService";
+import { getSafeHomeworkNotificationTitle } from "../lib/homeworkSubjects";
+import { buildTeacherRedactionContext } from "../lib/userProfile";
 import { toast } from "react-hot-toast";
 
 interface NotificationCenterProps {
@@ -71,6 +73,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const { user, profile } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [filteredNotifs, setFilteredNotifs] = useState<any[]>([]);
+  const [teachersById, setTeachersById] = useState<Record<string, any>>({});
   
   // Tab/Filter states
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'settings' | 'logs'>('all');
@@ -142,6 +145,33 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     } catch (err) {
       console.error("Error asking Web Push permissions:", err);
     }
+  };
+
+  useEffect(() => {
+    if (!profile?.schoolId) return;
+    const teachersQ = query(
+      collection(db, "users"),
+      where("schoolId", "==", profile.schoolId),
+      where("role", "==", "teacher"),
+    );
+    const unsub = onSnapshot(teachersQ, (snap) => {
+      const map: Record<string, any> = {};
+      snap.docs.forEach((teacherDoc) => {
+        map[teacherDoc.id] =
+          buildTeacherRedactionContext({
+            id: teacherDoc.id,
+            ...teacherDoc.data(),
+          }) || { id: teacherDoc.id, ...teacherDoc.data() };
+      });
+      setTeachersById(map);
+    });
+    return () => unsub();
+  }, [profile?.schoolId]);
+
+  const getNotificationTitle = (n: any) => {
+    if (n.type !== "homework") return n.title;
+    const teacher = n.teacherId ? teachersById[n.teacherId] : undefined;
+    return getSafeHomeworkNotificationTitle(n.title, teacher, isArabic);
   };
 
   // 1. Listen to user notifications
@@ -881,7 +911,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           </span>
                         </div>
                         <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-md leading-tight">
-                          {n.title}
+                          {getNotificationTitle(n)}
                         </h4>
                         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-semibold break-words">
                           {n.message}

@@ -1,3 +1,4 @@
+import { getSafeHomeworkNotificationTitle } from './homeworkSubjects';
 import {
   playCategorizedSound,
   type NotificationCategory,
@@ -19,13 +20,14 @@ export function alertIncomingNotification(
   }
 
   try {
-    new Notification(
-      notif.title || (isArabic ? 'إشعار جديد' : 'New notification'),
-      {
-        body: notif.message,
-        icon: '/icon.svg',
-      },
-    );
+    const title =
+      notif.type === 'homework'
+        ? getSafeHomeworkNotificationTitle(notif.title, undefined, isArabic)
+        : notif.title || (isArabic ? 'إشعار جديد' : 'New notification');
+    new Notification(title, {
+      body: notif.message,
+      icon: '/icon.svg',
+    });
   } catch (error) {
     console.warn('Browser notification failed:', error);
   }

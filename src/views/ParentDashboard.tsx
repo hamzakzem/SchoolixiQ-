@@ -31,9 +31,9 @@ import {
   groupHomeworkBySubject,
 } from "../lib/homeworkSubjects";
 import {
+  buildTeacherRedactionContext,
   getTeacherSubjectDisplay,
   isRedactedCredentialValue,
-  sanitizeStaffRecord,
 } from "../lib/userProfile";
 import { alertIncomingNotification } from "../lib/notificationAlerts";
 import {
@@ -189,8 +189,8 @@ export default function ParentDashboard() {
   );
   const [homework, setHomework] = useState<any[]>([]);
   const homeworkBySubject = useMemo(
-    () => groupHomeworkBySubject(homework, teachersById),
-    [homework, teachersById],
+    () => groupHomeworkBySubject(homework, teachersById, isRtl),
+    [homework, teachersById, isRtl],
   );
   const [teacherReports, setTeacherReports] = useState<any[]>([]);
   const [advancedReports, setAdvancedReports] = useState<any[]>([]);
@@ -713,10 +713,11 @@ export default function ParentDashboard() {
       unsubs.push(onSnapshot(teachersQ, (snap) => {
         const map: Record<string, any> = {};
         snap.docs.forEach((teacherDoc) => {
-          map[teacherDoc.id] = sanitizeStaffRecord({
-            id: teacherDoc.id,
-            ...teacherDoc.data(),
-          });
+          map[teacherDoc.id] =
+            buildTeacherRedactionContext({
+              id: teacherDoc.id,
+              ...teacherDoc.data(),
+            }) || { id: teacherDoc.id, ...teacherDoc.data() };
         });
         setTeachersById(map);
       }));
@@ -1620,6 +1621,7 @@ export default function ParentDashboard() {
                                       {getHomeworkSubjectDisplay(
                                         hw,
                                         hw.teacherId ? teachersById[hw.teacherId] : undefined,
+                                        isRtl,
                                       )}
                                     </span>
                                   </div>
@@ -1890,6 +1892,7 @@ export default function ParentDashboard() {
                                       {getHomeworkSubjectDisplay(
                                         hw,
                                         hw.teacherId ? teachersById[hw.teacherId] : undefined,
+                                        isRtl,
                                       )}
                                     </span>
                                     <div className="flex items-center gap-3">

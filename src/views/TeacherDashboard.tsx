@@ -56,6 +56,7 @@ import {
   getSubjectOptionsForClass,
   resolveHomeworkSubjectForPublish,
   getHomeworkSubjectDisplay,
+  isSafeHomeworkSubjectValue,
   canTeacherDeleteHomework,
   type SchoolSubjectDoc,
 } from "../lib/homeworkSubjects";
@@ -66,6 +67,7 @@ import {
   subscribeSchoolStoreProducts,
 } from "../lib/storeProducts";
 import {
+  buildTeacherRedactionContext,
   getTeacherSubjectDisplay,
   isRedactedCredentialValue,
 } from "../lib/userProfile";
@@ -562,6 +564,16 @@ export default function TeacherDashboard() {
             ? "يرجى اختيار المادة الدراسية للواجب"
             : "Please select the homework subject",
         );
+        return;
+      }
+
+      if (
+        !isSafeHomeworkSubjectValue(
+          subjectPayload.subjectName,
+          buildTeacherRedactionContext(profile),
+        )
+      ) {
+        toast.error(TEACHER_SUBJECT_REQUIRED_MSG);
         return;
       }
 
@@ -1543,7 +1555,11 @@ export default function TeacherDashboard() {
                       >
                         <div className="flex items-center justify-between mb-4">
                           <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
-                            {getHomeworkSubjectDisplay(hw, profile)}
+                            {getHomeworkSubjectDisplay(
+                              hw,
+                              buildTeacherRedactionContext(profile) || profile,
+                              isRtl,
+                            )}
                           </span>
                           <div className="flex items-center gap-3">
                             <span className="text-[10px] font-bold text-slate-400">

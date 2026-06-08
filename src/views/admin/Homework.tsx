@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { BookOpen, Plus, Calendar, Edit2, Trash2, Send, X, Users, MessageSquare } from 'lucide-react';
@@ -10,6 +10,7 @@ import { handleFirestoreError, OperationType } from '../../lib/firestore-errors'
 import { notificationService } from '../../lib/notificationService';
 import { homeworkMatchesStudent } from '../../lib/schoolSync';
 import { getHomeworkSubjectDisplay } from '../../lib/homeworkSubjects';
+import { buildTeacherRedactionContext } from '../../lib/userProfile';
 
 export default function Homework() {
   const { profile } = useAuth();
@@ -21,6 +22,7 @@ export default function Homework() {
   const [students, setStudents] = useState<any[]>([]);
   
   const [homeworks, setHomeworks] = useState<any[]>([]);
+  const [teachersById, setTeachersById] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   
   const [showAddModal, setShowAddModal] = useState(false);
@@ -56,6 +58,28 @@ export default function Homework() {
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'students'));
     return () => unsubscribe();
   }, [profile, selectedClassId, classes]);
+
+  useEffect(() => {
+    if (!profile?.schoolId) return;
+    const teachersQ = query(
+      collection(db, 'users'),
+      where('schoolId', '==', profile.schoolId),
+      where('role', '==', 'teacher'),
+      limit(100),
+    );
+    const unsubTeachers = onSnapshot(teachersQ, (snapshot) => {
+      const map: Record<string, any> = {};
+      snapshot.docs.forEach((teacherDoc) => {
+        map[teacherDoc.id] =
+          buildTeacherRedactionContext({
+            id: teacherDoc.id,
+            ...teacherDoc.data(),
+          }) || { id: teacherDoc.id, ...teacherDoc.data() };
+      });
+      setTeachersById(map);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'users/teachers'));
+    return () => unsubTeachers();
+  }, [profile]);
 
   // Fetch homeworks
   useEffect(() => {
@@ -228,7 +252,9 @@ export default function Homework() {
                               <div>
                                 <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{hw.title}</h4>
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                                  <span>{hw.teacherName || getHomeworkSubjectDisplay(hw)}</span>
+                                  <span>{hw.teacherName || (isRtl ? 'معلم' : 'Teacher')}</span>
+                                  <span>•</span>
+                                  <span>{getHomeworkSubjectDisplay(hw, hw.teacherId ? teachersById[hw.teacherId] : undefined, isRtl)}</span>
                                   <span>•</span>
                                   <span>{hw.createdAt?.seconds ? new Date(hw.createdAt.seconds * 1000).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : ''}</span>
                                 </div>

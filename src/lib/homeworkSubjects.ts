@@ -1,4 +1,5 @@
 import {
+  buildTeacherRedactionContext,
   getTeacherSubjectDisplay,
   isRedactedCredentialValue,
   type TeacherSubjectSource,
@@ -16,21 +17,30 @@ export type SchoolSubjectDoc = {
 export const TEACHER_SUBJECT_REQUIRED_MSG =
   'يجب تحديد المادة الخاصة بالمعلم من قبل إدارة المدرسة قبل نشر الواجب.';
 
+export const HOMEWORK_SUBJECT_UNKNOWN_AR = 'مادة غير محددة';
+export const HOMEWORK_SUBJECT_UNKNOWN_EN = 'Unassigned subject';
+
 /** Subject name(s) assigned to a teacher by school administration on `users`. */
 export function getTeacherSubjectNames(profile: {
   subject?: string;
   subjects?: string[];
 } | null | undefined): string[] {
-  if (!profile) return [];
+  const ctx = buildTeacherRedactionContext(profile);
+  if (!ctx) return [];
+
   const names = new Set<string>();
-  const primary = getTeacherSubjectDisplay(profile);
+  const primary = getTeacherSubjectDisplay(ctx);
   if (primary) names.add(primary);
-  if (Array.isArray(profile.subjects)) {
-    profile.subjects.forEach((s) => {
+
+  if (Array.isArray(ctx.subjects)) {
+    ctx.subjects.forEach((s) => {
       const trimmed = typeof s === 'string' ? s.trim() : '';
-      if (trimmed) names.add(trimmed);
+      if (trimmed && !isRedactedCredentialValue(trimmed, ctx)) {
+        names.add(trimmed);
+      }
     });
   }
+
   return Array.from(names);
 }
 
@@ -54,10 +64,9 @@ export function resolveSubjectsForTeacher(
   );
   if (matched.length > 0) return matched;
 
-  // Admin assigned a subject name not yet in `subjects` collection — synthetic entry
-  return names.map((name, idx) => ({
+  return getTeacherSubjectNames(profile).map((name, idx) => ({
     id: `assigned_${idx}_${name}`,
-    name: getTeacherSubjectNames(profile)[idx],
+    name,
   }));
 }
 
@@ -97,9 +106,14 @@ export function resolveHomeworkSubjectForPublish(
 
   if (picked) {
     const isSynthetic = picked.id.startsWith('assigned_');
+    const subjectName = picked.name.trim();
+    const ctx = buildTeacherRedactionContext(profile);
+    if (!subjectName || isRedactedCredentialValue(subjectName, ctx)) {
+      return null;
+    }
     return {
       subjectId: isSynthetic ? '' : picked.id,
-      subjectName: picked.name,
+      subjectName,
     };
   }
 
@@ -111,6 +125,17 @@ export function resolveHomeworkSubjectForPublish(
   return null;
 }
 
+/** Reject credential-like values before writing homework.subject / subjectName. */
+export function isSafeHomeworkSubjectValue(
+  subjectName: string,
+  teacher?: TeacherSubjectSource | null,
+): boolean {
+  const trimmed = subjectName.trim();
+  if (!trimmed) return false;
+  const ctx = teacher ? buildTeacherRedactionContext(teacher) : null;
+  return !isRedactedCredentialValue(trimmed, ctx);
+}
+
 /** Backward-compatible display label for homework documents. */
 export function getHomeworkSubjectDisplay(
   hw: {
@@ -119,38 +144,75 @@ export function getHomeworkSubjectDisplay(
     teacherId?: string;
   },
   teacher?: TeacherSubjectSource | null,
+  isRtl = true,
 ): string {
+  const fallback = isRtl
+    ? HOMEWORK_SUBJECT_UNKNOWN_AR
+    : HOMEWORK_SUBJECT_UNKNOWN_EN;
+  const ctx = teacher ? buildTeacherRedactionContext(teacher) : null;
+  const safeTeacherSubject = ctx ? getTeacherSubjectDisplay(ctx) : '';
+
+  const subjectName = (hw.subjectName || '').trim();
+  const subject = (hw.subject || '').trim();
+
+  if (subjectName && !isRedactedCredentialValue(subjectName, ctx)) {
+    return subjectName;
+  }
+
+  if (subject && !isRedactedCredentialValue(subject, ctx)) {
+    return subject;
+  }
+
+  if (safeTeacherSubject) return safeTeacherSubject;
+  return fallback;
+}
+
+/** Redact homework notification titles that embed a leaked credential as subject. */
+export function getSafeHomeworkNotificationTitle(
+  title: string | undefined,
+  teacher?: TeacherSubjectSource | null,
+  isRtl = true,
+): string {
+  if (!title) return title || '';
+  const parts = title.split(':');
+  if (parts.length < 2) return title;
+
+  const prefix = parts[0].trim();
+  const maybeSubject = parts.slice(1).join(':').trim();
+  const ctx = teacher ? buildTeacherRedactionContext(teacher) : null;
+
+  if (!maybeSubject || !isRedactedCredentialValue(maybeSubject, ctx)) {
+    return title;
+  }
+
+  const safeSubject =
+    getTeacherSubjectDisplay(ctx) ||
+    (isRtl ? HOMEWORK_SUBJECT_UNKNOWN_AR : HOMEWORK_SUBJECT_UNKNOWN_EN);
+  return `${prefix}: ${safeSubject}`;
+}
+
+/** Detect homework docs that may have credential text stored as subject (audit helper). */
+export function isSuspectHomeworkSubjectRecord(
+  hw: { subject?: string; subjectName?: string; teacherId?: string },
+  teacher?: TeacherSubjectSource | null,
+): boolean {
+  const ctx = teacher ? buildTeacherRedactionContext(teacher) : null;
   const subjectName = (hw.subjectName || '').trim();
   const subject = (hw.subject || '').trim();
   const label = subjectName || subject;
-
-  if (!label) return '—';
-
-  if (teacher && isRedactedCredentialValue(label, teacher)) {
-    return getTeacherSubjectDisplay(teacher) || '—';
-  }
-
-  if (
-    !subjectName &&
-    subject &&
-    teacher &&
-    isRedactedCredentialValue(subject, teacher)
-  ) {
-    return getTeacherSubjectDisplay(teacher) || '—';
-  }
-
-  return label;
+  return Boolean(label && isRedactedCredentialValue(label, ctx));
 }
 
 /** Group homework items by subject for parent views. */
 export function groupHomeworkBySubject<T extends { subjectName?: string; subject?: string; teacherId?: string }>(
   items: T[],
   teachersById?: Record<string, TeacherSubjectSource>,
+  isRtl = true,
 ): Array<{ subject: string; items: T[] }> {
   const map = new Map<string, T[]>();
   items.forEach((hw) => {
     const teacher = hw.teacherId ? teachersById?.[hw.teacherId] : undefined;
-    const key = getHomeworkSubjectDisplay(hw, teacher);
+    const key = getHomeworkSubjectDisplay(hw, teacher, isRtl);
     const list = map.get(key) || [];
     list.push(hw);
     map.set(key, list);
@@ -173,4 +235,28 @@ export function canTeacherDeleteHomework(
   teacherUid: string | undefined,
 ): boolean {
   return Boolean(teacherUid && hw.teacherId === teacherUid);
+}
+
+/** In-memory audit report for homework docs with credential-like subject fields. */
+export function auditHomeworkSubjectRecords<
+  T extends {
+    id?: string;
+    subject?: string;
+    subjectName?: string;
+    teacherId?: string;
+  },
+>(homework: T[], teachersById?: Record<string, TeacherSubjectSource>) {
+  return homework
+    .filter((hw) =>
+      isSuspectHomeworkSubjectRecord(
+        hw,
+        hw.teacherId ? teachersById?.[hw.teacherId] : undefined,
+      ),
+    )
+    .map((hw) => ({
+      id: hw.id,
+      teacherId: hw.teacherId,
+      subject: hw.subject,
+      subjectName: hw.subjectName,
+    }));
 }

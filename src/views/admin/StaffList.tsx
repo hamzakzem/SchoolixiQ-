@@ -10,6 +10,7 @@ import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { printElement } from '../../lib/printUtils';
 import {
   getTeacherSubjectDisplay,
+  sanitizeUserWritePayload,
   sanitizeStaffRecord,
 } from '../../lib/userProfile';
 
@@ -128,7 +129,7 @@ export default function StaffList() {
     setIsSaving(true);
     try {
       if (editingStaff) {
-        await setDoc(doc(db, 'users', editingStaff.id), {
+        await setDoc(doc(db, 'users', editingStaff.id), sanitizeUserWritePayload({
           name: newStaff.name,
           phoneNumber: newStaff.phoneNumber,
           role: newStaff.role,
@@ -145,7 +146,7 @@ export default function StaffList() {
           defaultPassword: deleteField(),
           tempPassword: deleteField(),
           updatedAt: serverTimestamp(),
-        }, { merge: true });
+        }), { merge: true });
 
         // Update pending payroll if exists for current month
         await updatePendingPayroll(editingStaff.id, Number(newStaff.salary), newStaff.name);
