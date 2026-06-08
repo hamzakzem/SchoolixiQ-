@@ -1,8 +1,12 @@
 import { auth } from './firebase';
 import {
+  BACKEND_NOT_CONFIGURED_MESSAGE,
   getApiUrl,
   getBackendApiBaseUrl,
   isProductionWebBrowser,
+  isSchoolixFrontendHost,
+  logBackendResolutionStatus,
+  requiresRemoteBackend,
 } from './apiUtils';
 
 export const API_BACKEND_DISCONNECTED_MESSAGE =
@@ -24,13 +28,20 @@ async function logApiDebug(url: string, response: Response, bodyPreview = '') {
 }
 
 function assertBackendReachable(endpoint: string): void {
+  logBackendResolutionStatus('adminApi:pre-request', endpoint);
+
+  if (!requiresRemoteBackend(endpoint)) return;
+
+  const backendBase = getBackendApiBaseUrl();
   const absoluteUrl = getApiUrl(endpoint);
-  if (
-    isProductionWebBrowser() &&
-    !getBackendApiBaseUrl() &&
-    absoluteUrl.startsWith('/')
-  ) {
-    throw new Error(API_BACKEND_DISCONNECTED_MESSAGE);
+
+  if (isProductionWebBrowser()) {
+    if (!backendBase) {
+      throw new Error(BACKEND_NOT_CONFIGURED_MESSAGE);
+    }
+    if (absoluteUrl.startsWith('/') || isSchoolixFrontendHost(absoluteUrl)) {
+      throw new Error(API_BACKEND_DISCONNECTED_MESSAGE);
+    }
   }
 }
 
@@ -47,6 +58,12 @@ async function adminApiPost(endpoint: string, body: Record<string, unknown>) {
   if (!token) throw new Error('No auth token available');
 
   const absoluteUrl = getApiUrl(endpoint);
+  console.info('[API BACKEND STATUS] adminApi:fetch', {
+    endpoint,
+    method: 'POST',
+    target: absoluteUrl.split('?')[0],
+    hasBackendBase: Boolean(getBackendApiBaseUrl()),
+  });
 
   const response = await fetch(absoluteUrl, {
     method: 'POST',

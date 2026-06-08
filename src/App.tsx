@@ -54,7 +54,11 @@ const SuperAdminDashboard = lazy(() => import("./views/SuperAdminDashboard"));
 const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
 const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 
-import { isAiStudioBackendUrl, setBackendApiBaseUrl, purgeStaleApiUrlCache } from "./lib/apiUtils";
+import {
+  purgeStaleApiUrlCache,
+  resolveBackendUrlFromSystemConfig,
+  setBackendApiBaseUrl,
+} from "./lib/apiUtils";
 import ScanHandler from "./components/ScanHandler";
 import SolarLoading from "./components/SolarLoading";
 import { LanguageToggle } from "./components/LanguageToggle";
@@ -146,14 +150,16 @@ const AppContent = () => {
           // Production web (schoolixiq.com) is static — admin APIs must target Cloud Run, not same-origin HTML.
           if (!isNativeApp) {
             purgeStaleApiUrlCache();
-            const backendUrl = isDevClient
-              ? data.appUrlDev || data.appUrl
-              : data.appUrlProd || data.appUrl;
-            if (backendUrl && !isAiStudioBackendUrl(backendUrl)) {
+            const backendUrl = resolveBackendUrlFromSystemConfig(data, isDevClient);
+            if (backendUrl) {
               setBackendApiBaseUrl(backendUrl);
               console.info(
-                "[API CONFIG] Production web backend URL:",
+                "[API CONFIG] Resolved backend URL:",
                 backendUrl,
+              );
+            } else {
+              console.warn(
+                "[API CONFIG] No valid backend URL. Set system/config.appUrlProd or backendUrl to your Cloud Run URL.",
               );
             }
             return;
