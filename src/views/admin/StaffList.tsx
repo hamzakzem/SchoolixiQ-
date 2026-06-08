@@ -10,28 +10,37 @@ import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { printElement } from '../../lib/printUtils';
 import {
   getTeacherSubjectDisplay,
+  isRedactedCredentialValue,
   sanitizeUserWritePayload,
   sanitizeStaffRecord,
 } from '../../lib/userProfile';
 
+/** Same Firestore path as Grades/Certificates subject management. */
+const SCHOOL_SUBJECTS_COLLECTION = 'subjects';
+
 type SchoolSubjectOption = {
   id: string;
   name: string;
+  schoolId?: string;
   className?: string;
 };
 
 function dedupeSchoolSubjects(
   docs: { id: string; data: () => Record<string, unknown> }[],
+  schoolId: string,
 ): SchoolSubjectOption[] {
   const byName = new Map<string, SchoolSubjectOption>();
   for (const docSnap of docs) {
     const data = docSnap.data();
+    const docSchoolId = typeof data.schoolId === 'string' ? data.schoolId : '';
+    if (docSchoolId && docSchoolId !== schoolId) continue;
     const name = typeof data.name === 'string' ? data.name.trim() : '';
     if (!name) continue;
     const key = name.toLowerCase();
     const entry: SchoolSubjectOption = {
       id: docSnap.id,
       name,
+      schoolId: docSchoolId || schoolId,
       className: typeof data.className === 'string' ? data.className : undefined,
     };
     const existing = byName.get(key);
@@ -62,6 +71,18 @@ function resolveSubjectIdForMember(
     if (match) return match.id;
   }
   return '';
+}
+
+function findApprovedSubject(
+  subjectId: string,
+  schoolSubjects: SchoolSubjectOption[],
+  schoolId: string,
+): SchoolSubjectOption | null {
+  if (!subjectId) return null;
+  const picked = schoolSubjects.find((s) => s.id === subjectId);
+  if (!picked || !picked.name.trim()) return null;
+  if (picked.schoolId && picked.schoolId !== schoolId) return null;
+  return picked;
 }
 
 export default function StaffList() {
@@ -143,14 +164,14 @@ export default function StaffList() {
     setSubjectsLoading(true);
     try {
       const q = query(
-        collection(db, 'subjects'),
+        collection(db, SCHOOL_SUBJECTS_COLLECTION),
         where('schoolId', '==', profile.schoolId),
         limit(200),
       );
       const unsub = onSnapshot(
         q,
         (snap) => {
-          setSchoolSubjects(dedupeSchoolSubjects(snap.docs));
+          setSchoolSubjects(dedupeSchoolSubjects(snap.docs, profile.schoolId));
           setSubjectsLoading(false);
         },
         () => {
@@ -164,6 +185,43 @@ export default function StaffList() {
       setSubjectsLoading(false);
     }
   }, [profile?.schoolId]);
+
+  useEffect(() => {
+    if (!showModal || newStaff.role !== 'teacher' || subjectsLoading) return;
+
+    if (newStaff.subjectId) {
+      const picked = findApprovedSubject(
+        newStaff.subjectId,
+        schoolSubjects,
+        profile?.schoolId || '',
+      );
+      if (!picked) {
+        setNewStaff((prev) => ({ ...prev, subjectId: '', subject: '' }));
+      } else if (picked.name !== newStaff.subject) {
+        setNewStaff((prev) => ({ ...prev, subject: picked.name }));
+      }
+      return;
+    }
+
+    if (!editingStaff || !profile?.schoolId) return;
+    const resolved = resolveSubjectIdForMember(editingStaff, schoolSubjects);
+    if (!resolved) return;
+    const picked = findApprovedSubject(resolved, schoolSubjects, profile.schoolId);
+    if (!picked) return;
+    setNewStaff((prev) => {
+      if (prev.subjectId) return prev;
+      return { ...prev, subjectId: resolved, subject: picked.name };
+    });
+  }, [
+    schoolSubjects,
+    subjectsLoading,
+    showModal,
+    newStaff.role,
+    newStaff.subjectId,
+    newStaff.subject,
+    editingStaff,
+    profile?.schoolId,
+  ]);
 
   const handleShareStatus = (member: any) => {
     if (!member.phoneNumber) {
@@ -212,12 +270,20 @@ export default function StaffList() {
         toast.error('لا توجد مواد معتمدة لهذه المدرسة. أضف المواد من قسم العلامات أولاً.');
         return;
       }
-      const picked = schoolSubjects.find((s) => s.id === newStaff.subjectId);
+      const picked = findApprovedSubject(
+        newStaff.subjectId,
+        schoolSubjects,
+        profile.schoolId,
+      );
       if (!picked) {
         toast.error('يرجى اختيار مادة دراسية معتمدة للمعلم');
         return;
       }
       const subjectName = picked.name.trim();
+      if (isRedactedCredentialValue(subjectName)) {
+        toast.error('المادة المختارة غير صالحة');
+        return;
+      }
       teacherSubjectFields = {
         subjectId: picked.id,
         subjectName,
@@ -829,7 +895,11 @@ export default function StaffList() {
                           value={newStaff.subjectId}
                           onChange={e => {
                             const subjectId = e.target.value;
-                            const picked = schoolSubjects.find((s) => s.id === subjectId);
+                            const picked = findApprovedSubject(
+                              subjectId,
+                              schoolSubjects,
+                              profile?.schoolId || '',
+                            );
                             setNewStaff({
                               ...newStaff,
                               subjectId,
