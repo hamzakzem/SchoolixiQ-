@@ -1,5 +1,5 @@
 // Cache name with versioning
-const CACHE_NAME = 'schoolix-cache-v8';
+const CACHE_NAME = 'schoolix-cache-v9';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -72,7 +72,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Stale-While-Revalidate strategy for other assets (images, fonts, scripts, css)
+  const isHashedBundle =
+    event.request.url.includes('/assets/') &&
+    /\.(js|mjs|css)(\?|$)/i.test(event.request.url);
+
+  if (isHashedBundle) {
+    // Network-first for Vite bundles — avoids stale/corrupt cached JS after deploy.
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request)),
+    );
+    return;
+  }
+
+  // Stale-While-Revalidate for images, fonts, and other static files
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)

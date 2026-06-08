@@ -70,7 +70,7 @@ set net:timeout 90
 set net:max-retries 3
 pwd
 ls -la
-mirror -R --parallel=6 --verbose \
+mirror -R --delete --parallel=6 --verbose \
   --exclude server.mjs \
   --exclude server.cjs \
   --exclude server.cjs.map \
