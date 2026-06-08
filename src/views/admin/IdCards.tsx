@@ -10,7 +10,6 @@ import {
   doc,
   deleteDoc,
   serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
 import { useAuth } from "../../lib/AuthContext";
 import { useLanguage } from "../../lib/LanguageContext";
@@ -21,9 +20,7 @@ import {
   Printer,
   Edit2,
   X,
-  Image as ImageIcon,
   QrCode,
-  Upload,
   Users,
   Check,
   Clock,
@@ -37,8 +34,8 @@ import {
   handleFirestoreError,
   OperationType,
 } from "../../lib/firestore-errors";
-import { uploadImageToServer } from "../../lib/imageUtils";
 import { printService } from "../../lib/printService";
+import { resolveStudentPhotoUrl } from "../../lib/studentPhoto";
 import StudentCard from "../../components/admin/idcards/StudentCard";
 import StudentCardPrint from "../../components/admin/idcards/StudentCardPrint";
 import StudentGridPrint from "../../components/admin/idcards/StudentGridPrint";
@@ -72,7 +69,6 @@ export default function IdCards() {
   const [template, setTemplate] = useState<IdCardTemplate | null>(null);
 
   // Card Form state
-  const [photoUrl, setPhotoUrl] = useState("");
   const [bloodType, setBloodType] = useState("");
   const [transportInfo, setTransportInfo] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
@@ -190,6 +186,18 @@ export default function IdCards() {
     return () => unsubscribe();
   }, [profile, selectedClassId]);
 
+  useEffect(() => {
+    if (!selectedStudent?.id) return;
+    const updated = students.find((s) => s.id === selectedStudent.id);
+    if (!updated) return;
+    if (
+      updated.photoUrl !== selectedStudent.photoUrl ||
+      updated.name !== selectedStudent.name
+    ) {
+      setSelectedStudent(updated);
+    }
+  }, [students, selectedStudent]);
+
   // Fetch id cards
   useEffect(() => {
     if (!profile?.schoolId) return;
@@ -218,40 +226,6 @@ export default function IdCards() {
     return () => unsubscribe();
   }, [profile]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedStudent) return;
-
-    // Check file size (max 5MB just to be safe as we compress anyway)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error(
-        isRtl
-          ? "حجم الصورة يجب أن لا يتجاوز 5 ميجابايت"
-          : "Image size must not exceed 5MB",
-      );
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      const url = await uploadImageToServer(
-        file,
-        `students/${selectedStudent.id}/id_card_${Date.now()}`,
-        400,
-        400,
-      );
-      setPhotoUrl(url);
-      toast.success(
-        isRtl ? "تم رفع الصورة بنجاح" : "Image uploaded successfully",
-      );
-    } catch (error) {
-      console.error("Error preparing image:", error);
-      toast.error(isRtl ? "فشل رفع الصورة" : "Failed to upload image");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleSaveCard = async () => {
     if (!selectedStudent || !profile) return;
     setIsSaving(true);
@@ -267,7 +241,6 @@ export default function IdCards() {
         parentEmail: (selectedStudent.parentEmail || "").toLowerCase(),
         schoolId: profile.schoolId,
         schoolName,
-        photoUrl,
         bloodType,
         transportInfo,
         driverName,
@@ -281,11 +254,6 @@ export default function IdCards() {
         residenceAddress,
         updatedAt: serverTimestamp(),
       });
-
-      if (photoUrl && photoUrl !== selectedStudent.photoUrl) {
-        const studentRef = doc(db, "students", selectedStudent.id);
-        await updateDoc(studentRef, { photoUrl });
-      }
 
       toast.success(
         isRtl ? "تم حفظ الهوية بنجاح" : "ID Card saved successfully",
@@ -485,7 +453,6 @@ export default function IdCards() {
                   <button
                     onClick={() => {
                       if (currentCard) {
-                        setPhotoUrl(currentCard.photoUrl || "");
                         setBloodType(currentCard.bloodType || "");
                         setTransportInfo(currentCard.transportInfo || "");
                         setDriverName(currentCard.driverName || "");
@@ -505,7 +472,6 @@ export default function IdCards() {
                           currentCard.schoolName || profile.schoolName || "",
                         );
                       } else {
-                        setPhotoUrl("");
                         setBloodType("");
                         setTransportInfo("");
                         setDriverName("");
@@ -707,49 +673,30 @@ export default function IdCards() {
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="md:w-1/3 flex flex-col gap-4">
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">
-                    {isRtl ? "الصورة الشخصية" : "Profile Photo"}
+                    {isRtl ? "صورة الطالب" : "Student Photo"}
                   </label>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="photo-upload"
-                    />
-                    <label
-                      htmlFor="photo-upload"
-                      className="cursor-pointer flex flex-col items-center justify-center gap-2 w-full aspect-square bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 font-bold rounded-2xl border border-indigo-200 dark:border-indigo-800/50 border-dashed transition-all overflow-hidden"
-                    >
-                      {photoUrl ? (
-                        <img src={photoUrl} className="w-full h-full object-cover" />
-                      ) : (
-                        <>
-                          <Upload size={24} />
-                          <span className="text-xs text-center px-4">
-                            {isRtl
-                              ? "رفع صورة"
-                              : "Upload photo"}
-                          </span>
-                        </>
-                      )}
-                    </label>
+                  <div className="flex flex-col items-center justify-center gap-3 w-full aspect-square bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold rounded-2xl border border-indigo-200 dark:border-indigo-800/50 overflow-hidden">
+                    {resolveStudentPhotoUrl(selectedStudent, currentCard) ? (
+                      <img
+                        src={resolveStudentPhotoUrl(selectedStudent, currentCard)}
+                        alt={selectedStudent?.name || "Student"}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 px-4 text-center text-slate-400">
+                        <User size={32} className="opacity-50" />
+                        <span className="text-xs font-bold">
+                          {isRtl ? "لا توجد صورة" : "No photo"}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-700" />
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {isRtl ? "أو رابط" : "OR URL"}
-                    </span>
-                    <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-700" />
-                  </div>
-                  <input
-                    type="url"
-                    value={photoUrl}
-                    onChange={(e) => setPhotoUrl(e.target.value)}
-                    dir="ltr"
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
-                  />
+                  <p className="text-[11px] leading-relaxed font-medium text-slate-500 dark:text-slate-400 text-center px-1">
+                    {isRtl
+                      ? "يتم استخدام صورة الطالب من قائمة الطلاب. غيّرها هناك لتنعكس تلقائياً على الهوية."
+                      : "The student profile photo is managed from the Students list. Update it there to refresh every ID card."}
+                  </p>
                 </div>
 
                 <div className="md:w-2/3 flex flex-col gap-4">

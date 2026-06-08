@@ -1,5 +1,6 @@
 import React from "react";
 import { IdCardTemplate } from "../../../types/idCardTemplate";
+import { resolveStudentPhotoUrl } from "../../../lib/studentPhoto";
 import { PremiumLayouts } from "./PremiumLayouts";
 
 interface StudentCardProps {
@@ -25,6 +26,11 @@ export default function StudentCard({
       </div>
     );
   }
+
+  const displayCardData = {
+    ...cardData,
+    photoUrl: resolveStudentPhotoUrl(student, cardData),
+  };
 
   const bgColor = template?.colors?.background || "#ffffff";
   const textColor = template?.colors?.text || "#1e293b";
@@ -111,7 +117,7 @@ export default function StudentCard({
       {/* Dynamic Layout Engine */}
       <PremiumLayouts
         student={student}
-        cardData={cardData}
+        cardData={displayCardData}
         isRtl={!!isRtl}
         template={template!}
       />
