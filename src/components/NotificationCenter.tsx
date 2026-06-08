@@ -59,6 +59,146 @@ import { getSafeHomeworkNotificationTitle } from "../lib/homeworkSubjects";
 import { buildTeacherRedactionContext } from "../lib/userProfile";
 import { toast } from "react-hot-toast";
 
+type DashboardRole =
+  | "parent"
+  | "teacher"
+  | "admin"
+  | "staff"
+  | "assistant"
+  | "superadmin"
+  | "super_admin";
+
+/** Normalize stored notification fields into a routing category. */
+function resolveNotificationCategory(notification: Record<string, unknown>): string {
+  const metadata =
+    notification.metadata && typeof notification.metadata === "object"
+      ? (notification.metadata as Record<string, unknown>)
+      : {};
+
+  const routeHints = [
+    notification.route,
+    notification.link,
+    notification.targetType,
+    metadata.route,
+    metadata.link,
+    metadata.targetType,
+  ];
+  for (const hint of routeHints) {
+    if (typeof hint === "string" && hint.trim()) {
+      return hint.trim().toLowerCase();
+    }
+  }
+
+  const rawType = String(notification.type || "").toLowerCase();
+
+  if (
+    rawType === "system" &&
+    (metadata.conversationId ||
+      metadata.chat === true ||
+      metadata.senderId ||
+      String(notification.title || "").includes("رسالة") ||
+      String(notification.title || "").toLowerCase().includes("message"))
+  ) {
+    return "chat";
+  }
+
+  if (metadata.installmentAlert || metadata.installmentId) {
+    return "payment";
+  }
+
+  if (
+    metadata.orderId ||
+    metadata.store === true ||
+    metadata.market === true ||
+    rawType === "inventory" ||
+    rawType === "order" ||
+    rawType === "market" ||
+    rawType === "store"
+  ) {
+    return "market";
+  }
+
+  return rawType;
+}
+
+function normalizeDashboardRole(
+  userRole?: string,
+  profileRole?: string,
+): DashboardRole | "" {
+  const role = (userRole || profileRole || "").toLowerCase();
+  if (role === "super_admin") return "superadmin";
+  return role as DashboardRole;
+}
+
+/** Map notification category + role to an existing dashboard tab id, or null to stay put. */
+function resolveNotificationTab(
+  notification: Record<string, unknown>,
+  role: DashboardRole | "",
+): string | null {
+  const category = resolveNotificationCategory(notification);
+  const isSchoolAdmin =
+    role === "admin" || role === "staff" || role === "assistant";
+
+  switch (category) {
+    case "homework":
+      if (role === "superadmin") return null;
+      return "homework";
+
+    case "grade":
+    case "grades":
+      if (role === "superadmin") return null;
+      return "grades";
+
+    case "payment":
+    case "tuition":
+    case "installment":
+      if (role === "parent" || isSchoolAdmin) return "tuition";
+      if (role === "teacher") return "home";
+      return null;
+
+    case "behavior":
+      if (role === "superadmin") return null;
+      return "behavior";
+
+    case "announcement":
+      if (isSchoolAdmin) return "announcements";
+      if (role === "parent" || role === "teacher") return "home";
+      if (role === "superadmin") return "schools";
+      return null;
+
+    case "message":
+    case "chat":
+      return "chat";
+
+    case "attendance":
+      if (isSchoolAdmin) return "attendance";
+      if (role === "parent" || role === "teacher") return "home";
+      return null;
+
+    case "report":
+    case "evaluation":
+    case "evaluation_reports":
+      if (isSchoolAdmin) return "evaluation_reports";
+      if (role === "parent" || role === "teacher") return "reports";
+      return null;
+
+    case "market":
+    case "store":
+    case "inventory":
+    case "order":
+      if (role === "parent" || role === "teacher" || isSchoolAdmin) {
+        return "market";
+      }
+      return null;
+
+    case "system":
+      return null;
+
+    default:
+      return null;
+  }
+}
+
 interface NotificationCenterProps {
   onClose: () => void;
   activeTabSetter?: (tabName: string) => void;
@@ -316,55 +456,17 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     playCategorizedSound(testCategory, soundSettings);
   };
 
-  // Deep Link Trigger
   const handleNotificationClick = async (n: any) => {
-    // Mark as read first
     await handleMarkOneRead(n.id, n.read);
 
-    // Deep link redirect
-    if (activeTabSetter) {
-      // Decode related page based on notification type
-      switch (n.type) {
-        case 'homework':
-          activeTabSetter('homework');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: الواجبات المدرسية" : "Deep Linking: Navigating to Homework");
-          break;
-        case 'grade':
-        case 'grades':
-          activeTabSetter('grades');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: لوحة العلامات والنتائج" : "Deep Linking: Navigating to Academic Grades");
-          break;
-        case 'payment':
-        case 'tuition':
-          activeTabSetter('tuition');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: الحسابات والرسوم الدراسية" : "Deep Linking: Navigating to Tuition & Fees");
-          break;
-        case 'behavior':
-          activeTabSetter('behavior');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: تقارير السلوك والملاحظات" : "Deep Linking: Navigating to Behavior Conduct");
-          break;
-        case 'announcement':
-          activeTabSetter(userRole === 'admin' ? 'announcements' : 'home');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: الإعلانات والمستجدات" : "Deep Linking: Navigating to Announcements board");
-          break;
-        case 'message':
-          activeTabSetter('chat');
-          toast.success(isArabic ? "جاري تحويلك للصفحة: غرف المحادثات" : "Deep Linking: Navigating to Chats");
-          break;
-        case 'attendance':
-          activeTabSetter(userRole === 'admin' ? 'attendance' : 'home');
-          toast.success(isArabic ? "جاري تحويلك للمتابعة" : "Deep Linking: Navigating");
-          break;
-        case 'report':
-          activeTabSetter(userRole === 'admin' ? 'evaluation_reports' : 'reports');
-          toast.success(isArabic ? "جاري تحويلك لصفحة التقارير" : "Deep Linking: Navigating to Reports");
-          break;
-        default:
-          activeTabSetter(userRole === 'parent' || userRole === 'teacher' ? 'home' : 'overview');
-          break;
-      }
-      onClose(); // Close the modal
+    const role = normalizeDashboardRole(userRole, profile?.role);
+    const targetTab = resolveNotificationTab(n, role);
+
+    if (targetTab && activeTabSetter) {
+      activeTabSetter(targetTab);
     }
+
+    onClose();
   };
 
   // Admin delivery simulation tool
