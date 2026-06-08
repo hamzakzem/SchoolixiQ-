@@ -14,76 +14,13 @@ import {
   sanitizeUserWritePayload,
   sanitizeStaffRecord,
 } from '../../lib/userProfile';
-
-/** Same Firestore path as Grades/Certificates subject management. */
-const SCHOOL_SUBJECTS_COLLECTION = 'subjects';
-
-type SchoolSubjectOption = {
-  id: string;
-  name: string;
-  schoolId?: string;
-  className?: string;
-};
-
-function dedupeSchoolSubjects(
-  docs: { id: string; data: () => Record<string, unknown> }[],
-  schoolId: string,
-): SchoolSubjectOption[] {
-  const byName = new Map<string, SchoolSubjectOption>();
-  for (const docSnap of docs) {
-    const data = docSnap.data();
-    const docSchoolId = typeof data.schoolId === 'string' ? data.schoolId : '';
-    if (docSchoolId && docSchoolId !== schoolId) continue;
-    const name = typeof data.name === 'string' ? data.name.trim() : '';
-    if (!name) continue;
-    const key = name.toLowerCase();
-    const entry: SchoolSubjectOption = {
-      id: docSnap.id,
-      name,
-      schoolId: docSchoolId || schoolId,
-      className: typeof data.className === 'string' ? data.className : undefined,
-    };
-    const existing = byName.get(key);
-    if (!existing || entry.className === 'جميع الصفوف') {
-      byName.set(key, entry);
-    }
-  }
-  return Array.from(byName.values()).sort((a, b) =>
-    a.name.localeCompare(b.name, 'ar'),
-  );
-}
-
-function resolveSubjectIdForMember(
-  member: Record<string, unknown>,
-  schoolSubjects: SchoolSubjectOption[],
-): string {
-  const storedId = typeof member.subjectId === 'string' ? member.subjectId : '';
-  if (storedId && schoolSubjects.some((s) => s.id === storedId)) {
-    return storedId;
-  }
-  const display = getTeacherSubjectDisplay(member);
-  const storedName =
-    typeof member.subjectName === 'string' ? member.subjectName.trim() : '';
-  if (display || storedName) {
-    const match = schoolSubjects.find(
-      (s) => s.name === display || (storedName && s.name === storedName),
-    );
-    if (match) return match.id;
-  }
-  return '';
-}
-
-function findApprovedSubject(
-  subjectId: string,
-  schoolSubjects: SchoolSubjectOption[],
-  schoolId: string,
-): SchoolSubjectOption | null {
-  if (!subjectId) return null;
-  const picked = schoolSubjects.find((s) => s.id === subjectId);
-  if (!picked || !picked.name.trim()) return null;
-  if (picked.schoolId && picked.schoolId !== schoolId) return null;
-  return picked;
-}
+import {
+  dedupeSchoolSubjects,
+  findApprovedSubject,
+  resolveSubjectIdForMember,
+  SCHOOL_SUBJECTS_COLLECTION,
+  type SchoolSubjectOption,
+} from '../../lib/schoolSubjects';
 
 export default function StaffList() {
   const { profile } = useAuth();

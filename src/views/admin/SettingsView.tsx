@@ -7,6 +7,7 @@ import { Save, Building, MapPin, Bell, Eye, EyeOff, ShieldCheck, Settings, Phone
 import { motion } from 'motion/react';
 import { School } from '../../types';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+import SchoolSubjectsManagement from './SchoolSubjectsManagement';
 
 const defaultGovernorates = ["بغداد", "البصرة", "نينوى", "أربيل", "النجف", "ذي قار", "كركوك", "الأنبار", "ديالى", "المثنى", "القادسية (الديوانية)", "القادسية", "ميسان", "واسط", "صلاح الدين", "دهوك", "السليمانية", "بابل", "كربلاء", "حلبجة"];
 const defaultDirectorates = [
@@ -456,6 +457,8 @@ export default function SettingsView() {
               </div>
             </div>
           </section>
+
+          <SchoolSubjectsManagement />
         </div>
 
         <div className="space-y-8">
