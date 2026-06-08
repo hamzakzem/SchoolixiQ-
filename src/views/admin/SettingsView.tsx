@@ -72,7 +72,10 @@ export default function SettingsView() {
 
   useEffect(() => {
     async function loadSettings() {
-      if (!profile?.schoolId) return;
+      if (!profile?.schoolId) {
+        setLoading(false);
+        return;
+      }
       if (hasInitialized) return;
 
       const path = `schools/${profile.schoolId}`;
@@ -225,6 +228,10 @@ export default function SettingsView() {
             </>
           )}
         </button>
+      </div>
+
+      <div id="school-subjects-management">
+        <SchoolSubjectsManagement />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -457,8 +464,6 @@ export default function SettingsView() {
               </div>
             </div>
           </section>
-
-          <SchoolSubjectsManagement />
         </div>
 
         <div className="space-y-8">
