@@ -1,6 +1,7 @@
 import { auth } from './firebase';
 import {
   BACKEND_NOT_CONFIGURED_MESSAGE,
+  ensureBackendApiBaseUrl,
   getApiUrl,
   getBackendApiBaseUrl,
   isProductionWebBrowser,
@@ -27,12 +28,12 @@ async function logApiDebug(url: string, response: Response, bodyPreview = '') {
   });
 }
 
-function assertBackendReachable(endpoint: string): void {
-  logBackendResolutionStatus('adminApi:pre-request', endpoint);
-
+async function assertBackendReachable(endpoint: string): Promise<void> {
   if (!requiresRemoteBackend(endpoint)) return;
 
-  const backendBase = getBackendApiBaseUrl();
+  const backendBase = await ensureBackendApiBaseUrl();
+  logBackendResolutionStatus('adminApi:pre-request', endpoint);
+
   const absoluteUrl = getApiUrl(endpoint);
 
   if (isProductionWebBrowser()) {
@@ -52,17 +53,24 @@ function isHtmlLikeResponse(contentType: string | null, text: string): boolean {
 }
 
 async function adminApiPost(endpoint: string, body: Record<string, unknown>) {
-  assertBackendReachable(endpoint);
+  await assertBackendReachable(endpoint);
 
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('No auth token available');
 
   const absoluteUrl = getApiUrl(endpoint);
+  const backendBase = getBackendApiBaseUrl();
+
+  if (isProductionWebBrowser() && (!backendBase || absoluteUrl.startsWith('/'))) {
+    throw new Error(BACKEND_NOT_CONFIGURED_MESSAGE);
+  }
+
   console.info('[API BACKEND STATUS] adminApi:fetch', {
     endpoint,
     method: 'POST',
     target: absoluteUrl.split('?')[0],
-    hasBackendBase: Boolean(getBackendApiBaseUrl()),
+    hasBackendBase: Boolean(backendBase),
+    resolvedBase: backendBase || null,
   });
 
   const response = await fetch(absoluteUrl, {

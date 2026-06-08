@@ -55,8 +55,9 @@ const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
 const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 
 import {
+  logFirestoreBackendDebug,
   purgeStaleApiUrlCache,
-  resolveBackendUrlFromSystemConfig,
+  resolveBackendConfigFromSystemConfig,
   setBackendApiBaseUrl,
 } from "./lib/apiUtils";
 import ScanHandler from "./components/ScanHandler";
@@ -150,13 +151,16 @@ const AppContent = () => {
           // Production web (schoolixiq.com) is static — admin APIs must target Cloud Run, not same-origin HTML.
           if (!isNativeApp) {
             purgeStaleApiUrlCache();
-            const backendUrl = resolveBackendUrlFromSystemConfig(data, isDevClient);
-            if (backendUrl) {
-              setBackendApiBaseUrl(backendUrl);
-              console.info(
-                "[API CONFIG] Resolved backend URL:",
-                backendUrl,
-              );
+            const configResult = resolveBackendConfigFromSystemConfig(
+              data,
+              isDevClient,
+            );
+            logFirestoreBackendDebug("App:onSnapshot", {
+              ...configResult,
+              exists: true,
+            });
+            if (configResult.url) {
+              setBackendApiBaseUrl(configResult.url);
             } else {
               console.warn(
                 "[API CONFIG] No valid backend URL. Set system/config.appUrlProd or backendUrl to your Cloud Run URL.",

@@ -1,10 +1,14 @@
-const AI_STUDIO_BACKEND_PATTERN = /ais-(pre|dev)|europe-west2\.run\.app/i;
+import firebaseConfig from '../../firebase-applet-config.json';
+
+/** Reject AI Studio preview hosts only — not production Cloud Run (*.run.app). */
+const AI_STUDIO_BACKEND_PATTERN = /ais-(pre|dev)|99877674137\.europe-west2\.run\.app/i;
 const BACKEND_STORAGE_KEY = 'schoolix_api_backend_url';
 
 export const BACKEND_NOT_CONFIGURED_MESSAGE =
   'رابط الخادم الخلفي غير مضبوط في إعدادات النظام';
 
 let runtimeBackendBaseUrl = '';
+let configFetchPromise: Promise<string> | null = null;
 
 function isCapacitorNativeApp(): boolean {
   if (typeof window === 'undefined') return false;
@@ -101,22 +105,88 @@ if (typeof window !== 'undefined') {
   if (stored) runtimeBackendBaseUrl = stored;
 }
 
-/** Resolve backend URL from Firestore system/config (production web). */
+export function getFirestoreDatabaseId(): string {
+  return firebaseConfig.firestoreDatabaseId || '(default)';
+}
+
+export function getFirebaseProjectId(): string {
+  return firebaseConfig.projectId || '';
+}
+
+type ConfigResolveResult = {
+  url: string;
+  field: string;
+  exists: boolean;
+};
+
+export type BackendConfigResolveResult = ConfigResolveResult;
+
+/** Resolve backend URL + source field from Firestore system/config. */
+export function resolveBackendConfigFromSystemConfig(
+  config: Record<string, unknown>,
+  isDevClient: boolean,
+): ConfigResolveResult {
+  return pickBackendFromConfig(config, isDevClient);
+}
+
+/** Resolve backend URL from Firestore system/config document fields. */
 export function resolveBackendUrlFromSystemConfig(
   config: Record<string, unknown>,
   isDevClient: boolean,
 ): string {
-  const candidates = isDevClient
-    ? [config.appUrlDev, config.appUrl]
-    : [config.appUrlProd, config.backendUrl, config.appUrl];
+  return pickBackendFromConfig(config, isDevClient).url;
+}
 
-  for (const raw of candidates) {
+function pickBackendFromConfig(
+  config: Record<string, unknown>,
+  isDevClient: boolean,
+): ConfigResolveResult {
+  const fields = isDevClient
+    ? (['appUrlDev', 'appUrl'] as const)
+    : (['appUrlProd', 'backendUrl', 'appUrl'] as const);
+
+  for (const field of fields) {
+    const raw = config[field];
     const url = typeof raw === 'string' ? raw : '';
     if (isValidBackendBaseUrl(url)) {
-      return normalizeBaseUrl(url);
+      return { url: normalizeBaseUrl(url), field, exists: true };
     }
   }
-  return '';
+  return { url: '', field: '', exists: true };
+}
+
+async function fetchBackendFromFirestore(): Promise<ConfigResolveResult> {
+  const { db } = await import('./firebase');
+  const { doc, getDoc } = await import('firebase/firestore');
+  const snap = await getDoc(doc(db, 'system', 'config'));
+  if (!snap.exists()) {
+    return { url: '', field: '', exists: false };
+  }
+  const isDevClient = isLocalDevHost();
+  return pickBackendFromConfig(snap.data() as Record<string, unknown>, isDevClient);
+}
+
+export function logFirestoreBackendDebug(
+  source: string,
+  result: ConfigResolveResult,
+): void {
+  console.info('[API BACKEND STATUS] firestore-config', {
+    source,
+    projectId: getFirebaseProjectId(),
+    databaseId: getFirestoreDatabaseId(),
+    configExists: result.exists,
+    fieldUsed: result.field || null,
+    resolvedBase: result.url || null,
+  });
+}
+
+function logBackendSource(source: string, url: string): void {
+  console.info('[API BACKEND STATUS] resolved', {
+    source,
+    projectId: getFirebaseProjectId(),
+    databaseId: getFirestoreDatabaseId(),
+    resolvedBase: url,
+  });
 }
 
 /** Persist Cloud Run / Node backend base URL (not the static frontend host). */
@@ -131,20 +201,8 @@ export function setBackendApiBaseUrl(url: string): void {
   }
 }
 
-/**
- * Resolution order:
- * 1. VITE_API_BACKEND_URL
- * 2. Runtime value from Firestore (appUrlProd / backendUrl)
- * 3. localStorage cache
- */
+/** Synchronous read of already-resolved backend (may be empty before lazy fetch). */
 export function getBackendApiBaseUrl(): string {
-  const viteBackend = normalizeBaseUrl(
-    String(import.meta.env.VITE_API_BACKEND_URL || ''),
-  );
-  if (isValidBackendBaseUrl(viteBackend)) {
-    return viteBackend;
-  }
-
   if (isValidBackendBaseUrl(runtimeBackendBaseUrl)) {
     return runtimeBackendBaseUrl;
   }
@@ -152,6 +210,69 @@ export function getBackendApiBaseUrl(): string {
   const stored = readStoredBackendUrl();
   if (isValidBackendBaseUrl(stored)) {
     return stored;
+  }
+
+  const viteBackend = normalizeBaseUrl(
+    String(import.meta.env.VITE_API_BACKEND_URL || ''),
+  );
+  if (isValidBackendBaseUrl(viteBackend)) {
+    return viteBackend;
+  }
+
+  return '';
+}
+
+/**
+ * Lazy resolution before admin API calls:
+ * 1. runtime cache
+ * 2. localStorage
+ * 3. Firestore system/config (active database)
+ * 4. VITE_API_BACKEND_URL
+ */
+export async function ensureBackendApiBaseUrl(): Promise<string> {
+  if (isValidBackendBaseUrl(runtimeBackendBaseUrl)) {
+    logBackendSource('runtime-cache', runtimeBackendBaseUrl);
+    return runtimeBackendBaseUrl;
+  }
+
+  const stored = readStoredBackendUrl();
+  if (isValidBackendBaseUrl(stored)) {
+    runtimeBackendBaseUrl = stored;
+    logBackendSource('localStorage', stored);
+    return stored;
+  }
+
+  if (!configFetchPromise) {
+    configFetchPromise = (async () => {
+      try {
+        const result = await fetchBackendFromFirestore();
+        logFirestoreBackendDebug('ensureBackendApiBaseUrl', result);
+        if (result.url) {
+          setBackendApiBaseUrl(result.url);
+          return result.url;
+        }
+        return '';
+      } catch (error) {
+        console.warn('[API BACKEND STATUS] Firestore config fetch failed:', error);
+        return '';
+      } finally {
+        configFetchPromise = null;
+      }
+    })();
+  }
+
+  const fromFirestore = await configFetchPromise;
+  if (fromFirestore) {
+    return fromFirestore;
+  }
+
+  const viteBackend = normalizeBaseUrl(
+    String(import.meta.env.VITE_API_BACKEND_URL || ''),
+  );
+  if (isValidBackendBaseUrl(viteBackend)) {
+    setBackendApiBaseUrl(viteBackend);
+    logBackendSource('vite-env', viteBackend);
+    return viteBackend;
   }
 
   return '';
@@ -171,6 +292,8 @@ export function logBackendResolutionStatus(
   console.info('[API BACKEND STATUS]', {
     context,
     endpoint: endpoint || null,
+    projectId: getFirebaseProjectId(),
+    databaseId: getFirestoreDatabaseId(),
     resolvedBase: resolved || null,
     resolvedAbsolute:
       absolute && !absolute.startsWith('/')
@@ -220,7 +343,6 @@ export function isProductionWebBrowser(): boolean {
   return typeof window !== 'undefined' && isProductionWebHost() && !isCapacitorNativeApp();
 }
 
-// Helper to determine the backend API server URL dynamically
 export function getApiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const needsRemote = requiresRemoteBackend(cleanPath);
@@ -231,13 +353,11 @@ export function getApiUrl(path: string): string {
     if (backendBase) {
       return `${backendBase}${cleanPath}`;
     }
-    // Production static Hostinger must never call same-origin /api/admin/*.
     if (isProductionWebBrowser()) {
       return cleanPath;
     }
   }
 
-  // Local dev may proxy /api/* to a local Node server.
   if (typeof window !== 'undefined' && !isNative && isLocalDevHost()) {
     purgeStaleApiUrlCache();
     return cleanPath;
