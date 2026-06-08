@@ -1,6 +1,5 @@
 import express from 'express';
 import compression from 'compression';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
@@ -1171,8 +1170,9 @@ async function startServer() {
     });
   });
 
-  // Vite transformation
+  // Vite transformation (dev only — dynamic import keeps Vite out of production bundle deps)
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

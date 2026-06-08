@@ -1,0 +1,16 @@
+node_modules
+dist
+android
+ios
+schoolix_flutter
+.git
+.github
+*.md
+.env
+.env.*
+key.json*
+backend/fix*.cjs
+backend/remove_vite.cjs
+public
+src
+scripts/hostinger-deploy.sh
