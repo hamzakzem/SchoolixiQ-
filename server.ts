@@ -90,9 +90,11 @@ async function startServer() {
     const origin = req.headers.origin;
     const allowedOrigins = [
       'https://schoolixiq.com',
+      'https://www.schoolixiq.com',
       'https://app.schoolixiq.com',
       'https://schoolixiq.iq',
-      'https://app.schoolixiq.iq'
+      'https://www.schoolixiq.iq',
+      'https://app.schoolixiq.iq',
     ];
 
     if (process.env.APP_URL) {
