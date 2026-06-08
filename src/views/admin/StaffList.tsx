@@ -14,6 +14,56 @@ import {
   sanitizeStaffRecord,
 } from '../../lib/userProfile';
 
+type SchoolSubjectOption = {
+  id: string;
+  name: string;
+  className?: string;
+};
+
+function dedupeSchoolSubjects(
+  docs: { id: string; data: () => Record<string, unknown> }[],
+): SchoolSubjectOption[] {
+  const byName = new Map<string, SchoolSubjectOption>();
+  for (const docSnap of docs) {
+    const data = docSnap.data();
+    const name = typeof data.name === 'string' ? data.name.trim() : '';
+    if (!name) continue;
+    const key = name.toLowerCase();
+    const entry: SchoolSubjectOption = {
+      id: docSnap.id,
+      name,
+      className: typeof data.className === 'string' ? data.className : undefined,
+    };
+    const existing = byName.get(key);
+    if (!existing || entry.className === 'جميع الصفوف') {
+      byName.set(key, entry);
+    }
+  }
+  return Array.from(byName.values()).sort((a, b) =>
+    a.name.localeCompare(b.name, 'ar'),
+  );
+}
+
+function resolveSubjectIdForMember(
+  member: Record<string, unknown>,
+  schoolSubjects: SchoolSubjectOption[],
+): string {
+  const storedId = typeof member.subjectId === 'string' ? member.subjectId : '';
+  if (storedId && schoolSubjects.some((s) => s.id === storedId)) {
+    return storedId;
+  }
+  const display = getTeacherSubjectDisplay(member);
+  const storedName =
+    typeof member.subjectName === 'string' ? member.subjectName.trim() : '';
+  if (display || storedName) {
+    const match = schoolSubjects.find(
+      (s) => s.name === display || (storedName && s.name === storedName),
+    );
+    if (match) return match.id;
+  }
+  return '';
+}
+
 export default function StaffList() {
   const { profile } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
@@ -29,12 +79,15 @@ export default function StaffList() {
   const [salaryEditStaff, setSalaryEditStaff] = useState<any>(null);
   const [newSalary, setNewSalary] = useState(0);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubjectOption[]>([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(true);
   const [newStaff, setNewStaff] = useState({ 
     name: '', 
     email: '', 
     password: '',
     role: 'teacher', 
     phoneNumber: '',
+    subjectId: '',
     subject: '',
     salary: 0,
     joiningDate: new Date().toISOString().split('T')[0],
@@ -80,6 +133,38 @@ export default function StaffList() {
     }
   }, [profile]);
 
+  useEffect(() => {
+    if (!profile?.schoolId) {
+      setSchoolSubjects([]);
+      setSubjectsLoading(false);
+      return;
+    }
+
+    setSubjectsLoading(true);
+    try {
+      const q = query(
+        collection(db, 'subjects'),
+        where('schoolId', '==', profile.schoolId),
+        limit(200),
+      );
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          setSchoolSubjects(dedupeSchoolSubjects(snap.docs));
+          setSubjectsLoading(false);
+        },
+        () => {
+          setSchoolSubjects([]);
+          setSubjectsLoading(false);
+        },
+      );
+      return () => unsub();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'StaffList:subjects');
+      setSubjectsLoading(false);
+    }
+  }, [profile?.schoolId]);
+
   const handleShareStatus = (member: any) => {
     if (!member.phoneNumber) {
       toast.error('لا يوجد رقم هاتف لهذا الموظف');
@@ -116,14 +201,35 @@ export default function StaffList() {
       return;
     }
 
-    if (
-      newStaff.role === 'teacher' &&
-      newStaff.subject.trim() &&
-      newStaff.password.trim() &&
-      newStaff.subject.trim() === newStaff.password.trim()
-    ) {
-      toast.error('لا يمكن أن تكون المادة الدراسية نفس كلمة المرور');
-      return;
+    let teacherSubjectFields: {
+      subjectId: string;
+      subjectName: string;
+      subject: string;
+    } | null = null;
+
+    if (newStaff.role === 'teacher') {
+      if (schoolSubjects.length === 0) {
+        toast.error('لا توجد مواد معتمدة لهذه المدرسة. أضف المواد من قسم العلامات أولاً.');
+        return;
+      }
+      const picked = schoolSubjects.find((s) => s.id === newStaff.subjectId);
+      if (!picked) {
+        toast.error('يرجى اختيار مادة دراسية معتمدة للمعلم');
+        return;
+      }
+      const subjectName = picked.name.trim();
+      teacherSubjectFields = {
+        subjectId: picked.id,
+        subjectName,
+        subject: subjectName,
+      };
+      if (
+        newStaff.password.trim() &&
+        subjectName === newStaff.password.trim()
+      ) {
+        toast.error('لا يمكن أن تكون المادة الدراسية نفس كلمة المرور');
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -133,7 +239,13 @@ export default function StaffList() {
           name: newStaff.name,
           phoneNumber: newStaff.phoneNumber,
           role: newStaff.role,
-          subject: newStaff.role === 'teacher' ? newStaff.subject.trim() : '',
+          ...(newStaff.role === 'teacher' && teacherSubjectFields
+            ? teacherSubjectFields
+            : {
+                subject: '',
+                subjectId: deleteField(),
+                subjectName: deleteField(),
+              }),
           salary: Number(newStaff.salary),
           joiningDate: newStaff.joiningDate,
           gender: newStaff.gender,
@@ -163,7 +275,9 @@ export default function StaffList() {
           schoolId: profile.schoolId,
           additionalData: {
             phoneNumber: newStaff.phoneNumber,
-            subject: newStaff.role === 'teacher' ? newStaff.subject.trim() : '',
+            ...(newStaff.role === 'teacher' && teacherSubjectFields
+              ? teacherSubjectFields
+              : { subject: '' }),
             salary: Number(newStaff.salary),
             joiningDate: newStaff.joiningDate,
             gender: newStaff.gender,
@@ -257,6 +371,7 @@ export default function StaffList() {
       password: '', 
       role: 'teacher', 
       phoneNumber: '', 
+      subjectId: '',
       subject: '', 
       salary: 0,
       joiningDate: new Date().toISOString().split('T')[0],
@@ -507,6 +622,7 @@ export default function StaffList() {
                     password: '',
                     role: member.role || 'teacher',
                     phoneNumber: member.phoneNumber || '',
+                    subjectId: resolveSubjectIdForMember(member, schoolSubjects),
                     subject: getTeacherSubjectDisplay(member) || '',
                     salary: member.salary || 0,
                     joiningDate: member.joiningDate || new Date().toISOString().split('T')[0],
@@ -679,7 +795,14 @@ export default function StaffList() {
                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">الصلاحية</label>
                     <select
                       value={newStaff.role}
-                      onChange={e => setNewStaff({ ...newStaff, role: e.target.value })}
+                      onChange={e => {
+                        const role = e.target.value;
+                        setNewStaff({
+                          ...newStaff,
+                          role,
+                          ...(role !== 'teacher' ? { subjectId: '', subject: '' } : {}),
+                        });
+                      }}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900 bg-white"
                     >
                       <option value="teacher">معلم / مدرس</option>
@@ -691,16 +814,36 @@ export default function StaffList() {
                   {newStaff.role === 'teacher' && (
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">المادة الدراسية</label>
-                      <input
-                        required
-                        type="text"
-                        autoComplete="off"
-                        name="teacher-subject"
-                        value={newStaff.subject}
-                        onChange={e => setNewStaff({ ...newStaff, subject: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900"
-                        placeholder="لغة عربية، علوم، رياضيات..."
-                      />
+                      {subjectsLoading ? (
+                        <p className="text-xs font-bold text-slate-400 px-4 py-3 rounded-xl border border-slate-100 bg-slate-50">
+                          جاري تحميل المواد المعتمدة...
+                        </p>
+                      ) : schoolSubjects.length === 0 ? (
+                        <p className="text-xs font-bold text-amber-700 px-4 py-3 rounded-xl border border-amber-100 bg-amber-50">
+                          لا توجد مواد معتمدة لهذه المدرسة. أضف المواد من قسم العلامات أولاً.
+                        </p>
+                      ) : (
+                        <select
+                          required
+                          name="teacher-subject"
+                          value={newStaff.subjectId}
+                          onChange={e => {
+                            const subjectId = e.target.value;
+                            const picked = schoolSubjects.find((s) => s.id === subjectId);
+                            setNewStaff({
+                              ...newStaff,
+                              subjectId,
+                              subject: picked?.name || '',
+                            });
+                          }}
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900 bg-white"
+                        >
+                          <option value="">اختر المادة الدراسية</option>
+                          {schoolSubjects.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   )}
 
@@ -770,7 +913,12 @@ export default function StaffList() {
                 <div className="p-8 pt-4 bg-slate-50/50 shrink-0 border-t border-slate-100 flex flex-wrap gap-3">
                   <button
                     type="submit"
-                    disabled={isSaving}
+                    disabled={
+                      isSaving ||
+                      (newStaff.role === 'teacher' &&
+                        !subjectsLoading &&
+                        (schoolSubjects.length === 0 || !newStaff.subjectId))
+                    }
                     className="flex-1 min-w-[120px] py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg flex items-center justify-center gap-2"
                   >
                     <Save size={18} />
@@ -794,7 +942,6 @@ export default function StaffList() {
                     onClick={() => {
                       setShowModal(false);
                       setEditingStaff(null);
-                      setNewStaff({ name: '', email: '', password: '', role: 'teacher', phoneNumber: '', subject: '' });
                       resetNewStaff();
                     }}
                     className="px-6 py-4 bg-white border border-slate-200 text-slate-500 rounded-xl font-bold hover:bg-slate-100 transition-all"
