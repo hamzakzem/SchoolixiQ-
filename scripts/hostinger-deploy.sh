@@ -19,78 +19,33 @@ REMOTE="${REMOTE%/}"
 
 LOCAL_DIR="${1:-dist}"
 SCRIPT_FILE="$(mktemp)"
-trap 'rm -f "$SCRIPT_FILE" "${SCRIPT_FILE}.run"; unset LFTP_PASSWORD' EXIT
+trap 'rm -f "$SCRIPT_FILE"' EXIT
 
-# Build lftp script: plain "open" + "user" lines (no printf %q — %q emits $'...' tokens lftp misparses).
 write_lftp_script() {
-  local scheme="$1"
-  local port="$2"
-  local target="$3"
-  shift 3
-  local -a extra_settings=("$@")
-  local open_url="${scheme}://${FTP_SERVER}:${port}"
-
-  write_mirror_commands "$target"
-
+  local target="$1"
   {
-    for setting in "${extra_settings[@]}"; do
-      printf '%s\n' "$setting"
-    done
-    printf 'open %s\n' "$open_url"
-    printf 'user %s\n' "$FTP_USER"
-    cat "$SCRIPT_FILE"
-  } >"${SCRIPT_FILE}.run"
+    printf '%s\n' 'set sftp:auto-confirm yes'
+    printf 'open sftp://%s:65002\n' "$FTP_SERVER"
+    printf 'user %s %s\n' "$FTP_USER" "$FTP_PASSWORD"
+    printf '%s\n' 'set cmd:fail-exit yes'
+    printf '%s\n' 'set net:timeout 90'
+    printf '%s\n' 'set net:max-retries 3'
+    printf 'mirror -R --delete --parallel=6 --verbose %s/ %s\n' "$LOCAL_DIR" "$target"
+    printf '%s\n' 'bye'
+  } >"$SCRIPT_FILE"
+  chmod 600 "$SCRIPT_FILE"
 }
 
-run_lftp() {
-  local scheme="$1"
-  local port="$2"
-  local target="$3"
-  shift 3
-
-  echo "=== ${scheme^^} (${port}) -> '${target}' ==="
-  write_lftp_script "$scheme" "$port" "$target" "$@"
-
-  export LFTP_PASSWORD="${FTP_PASSWORD}"
-
-  if lftp --env-password -f "${SCRIPT_FILE}.run"; then
-    echo "${scheme^^} deploy OK: ${target}"
+run_sftp_deploy() {
+  local target="$1"
+  echo "=== SFTP (65002) -> '${target}' ==="
+  write_lftp_script "$target"
+  if lftp -f "$SCRIPT_FILE"; then
+    echo "SFTP deploy OK: ${target}"
     return 0
   fi
-
-  echo "${scheme^^} deploy failed: ${target}"
+  echo "SFTP deploy failed: ${target}"
   return 1
-}
-
-write_mirror_commands() {
-  local target="$1"
-  cat >"$SCRIPT_FILE" <<EOF
-set cmd:fail-exit yes
-set net:timeout 90
-set net:max-retries 3
-pwd
-ls -la
-mirror -R --delete --parallel=6 --verbose \
-  --exclude server.mjs \
-  --exclude server.cjs \
-  --exclude server.cjs.map \
-  --exclude .ftp-deploy-sync-state.json \
-  ${LOCAL_DIR}/ ${target}
-bye
-EOF
-}
-
-try_sftp() {
-  local target="$1"
-  run_lftp sftp 65002 "$target" "set sftp:auto-confirm yes"
-}
-
-try_ftps() {
-  local target="$1"
-  run_lftp ftps 21 "$target" \
-    "set ssl:verify-certificate no" \
-    "set ftp:ssl-force true" \
-    "set ftp:ssl-protect-data true"
 }
 
 SHORT_REMOTE=""
@@ -105,21 +60,9 @@ for target in "${TARGETS[@]}"; do
   [[ -z "$target" ]] && continue
   case "$seen" in *"|${target}|"*) continue ;; esac
   seen="${seen}${target}|"
-  if try_sftp "$target"; then exit 0; fi
+  if run_sftp_deploy "$target"; then exit 0; fi
   sleep 5
 done
-
-# FTPS (21) only when explicitly enabled — Hostinger often blocks/timeouts port 21 on CI.
-if [[ "${HOSTINGER_USE_FTPS:-}" == "1" || "${HOSTINGER_USE_FTPS:-}" == "true" ]]; then
-  seen="|"
-  for target in "${TARGETS[@]}"; do
-    [[ -z "$target" ]] && continue
-    case "$seen" in *"|${target}|"*) continue ;; esac
-    seen="${seen}${target}|"
-    if try_ftps "$target"; then exit 0; fi
-    sleep 5
-  done
-fi
 
 echo "::error title=Hostinger deploy failed::Download artifact schoolixiq-dist from Actions and upload to public_html via hPanel File Manager."
 exit 1
