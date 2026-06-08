@@ -10,20 +10,26 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function userDoc() {
-      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
+    function userPath() {
+      return /databases/(default)/documents/users/$(request.auth.uid);
     }
 
     function userDocExists() {
-      return isSignedIn() && userDoc().exists;
+      return isSignedIn() && firestore.exists(userPath());
     }
 
     function userData() {
-      return userDoc().data;
+      return userDocExists() ? firestore.get(userPath()).data : {};
+    }
+
+    function userRole() {
+      return userDocExists() && userData().keys().hasAll(['role'])
+        ? userData().role
+        : '';
     }
 
     function isSuperAdmin() {
-      return userDocExists() && userData().role == 'superadmin';
+      return userRole() in ['superadmin', 'super_admin'];
     }
 
     function userSchoolId() {
@@ -32,13 +38,21 @@ service firebase.storage {
         : '';
     }
 
+    // Roles that may manage student photos for their own school only.
     function isSchoolStaffRole() {
-      return userDocExists()
-        && userData().role in ['admin', 'assistant', 'staff', 'teacher'];
+      return userRole() in [
+        'admin',
+        'school_admin',
+        'assistant',
+        'staff',
+        'teacher'
+      ];
     }
 
     function sameSchool(schoolId) {
-      return userSchoolId() == schoolId;
+      return userSchoolId() == schoolId
+        && userSchoolId() is string
+        && userSchoolId().size() > 0;
     }
 
     function canManageSchoolStudentPhotos(schoolId) {
@@ -51,7 +65,7 @@ service firebase.storage {
         && request.resource.size > 0
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType != null
-        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+        && request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
     }
 
     function isStudentPhotoFileName(fileName) {
@@ -71,8 +85,7 @@ service firebase.storage {
         isSuperAdmin()
         || (
           sameSchool(schoolId)
-          && userDocExists()
-          && userData().role in ['admin', 'assistant']
+          && userRole() in ['admin', 'school_admin', 'assistant']
         )
       );
     }
@@ -107,7 +120,7 @@ service firebase.storage {
       allow read: if isSignedIn();
       allow write: if isSignedIn()
         && userDocExists()
-        && userData().role in ['admin', 'assistant', 'superadmin'];
+        && userRole() in ['admin', 'school_admin', 'assistant', 'superadmin', 'super_admin'];
     }
 
     match /system/{allPaths=**} {
