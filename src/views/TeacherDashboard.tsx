@@ -1046,7 +1046,11 @@ export default function TeacherDashboard() {
 
             <div className="p-4 md:p-6 mt-auto">
               <button
-                onClick={() => auth.signOut()}
+                onClick={() => {
+                  setIsSidebarOpen(false);
+                  setShowNotifications(false);
+                  auth.signOut();
+                }}
                 title={isSidebarCollapsed ? t("logout") : undefined}
                 className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3 px-4 md:px-5'} py-3 md:py-4 rounded-xl md:rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all font-bold text-sm`}
               >
@@ -2178,6 +2182,8 @@ export default function TeacherDashboard() {
           setShowNotifications={setShowNotifications}
           notificationsCount={notifications.filter((n) => !n.read).length}
           isRtl={isRtl}
+          logoutLabel={t("logout")}
+          onLogout={() => auth.signOut()}
         />
 
         {/* HomeWork Modal */}

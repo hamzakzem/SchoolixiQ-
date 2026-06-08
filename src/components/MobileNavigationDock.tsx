@@ -9,7 +9,8 @@ import {
   X,
   Search,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  LogOut,
 } from "lucide-react";
 
 interface MenuItem {
@@ -28,6 +29,8 @@ interface MobileNavigationDockProps {
   setShowNotifications?: (show: boolean) => void;
   notificationsCount?: number;
   isRtl?: boolean;
+  onLogout?: () => void;
+  logoutLabel?: string;
 }
 
 export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
@@ -40,6 +43,8 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   setShowNotifications,
   notificationsCount = 0,
   isRtl = true,
+  onLogout,
+  logoutLabel,
 }) => {
   const [showQuickAccess, setShowQuickAccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,6 +70,15 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
     if (setShowNotifications) {
       setShowNotifications(false);
     }
+  };
+
+  const handleLogout = () => {
+    setShowQuickAccess(false);
+    setIsSidebarOpen(false);
+    if (setShowNotifications) {
+      setShowNotifications(false);
+    }
+    onLogout?.();
   };
 
   return (
@@ -433,6 +447,18 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   </div>
                 )}
               </div>
+              {onLogout && (
+                <div className="shrink-0 px-6 pt-2 pb-1 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 font-black text-sm transition-all active:scale-[0.98]"
+                  >
+                    <LogOut size={18} className="shrink-0" />
+                    <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
+                  </button>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
