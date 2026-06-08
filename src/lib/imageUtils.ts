@@ -1,4 +1,4 @@
-import { getApiUrl } from './apiUtils';
+import { getApiUrl, isProductionWebBrowser } from './apiUtils';
 import { auth, storage } from './firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -59,7 +59,10 @@ export function buildStudentPhotoPath(
   filename = '',
   mimeType?: string,
 ): string {
-  const safeId = studentId.replace(/[^a-zA-Z0-9_-]/g, '_') || 'new';
+  const safeId = studentId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  if (!schoolId?.trim() || !safeId || safeId === 'new' || safeId === 'undefined') {
+    throw new Error('INVALID_STUDENT_ID');
+  }
   const ext = resolveImageExtension(filename, mimeType);
   return `students/${schoolId}/${safeId}/photo_${Date.now()}${ext}`;
 }
@@ -95,7 +98,14 @@ export async function uploadStudentPhoto(
         error,
       );
     } else {
-      console.warn('Client student photo upload failed, trying same-origin server upload:', error);
+      console.warn('Client student photo upload failed:', error);
+    }
+
+    if (isProductionWebBrowser()) {
+      if (code === 'storage/unauthorized') {
+        throw new Error('STORAGE_UNAUTHORIZED');
+      }
+      throw error instanceof Error ? error : new Error('STORAGE_UPLOAD_FAILED');
     }
   }
 

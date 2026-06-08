@@ -42,6 +42,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   });
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [pendingStudentId, setPendingStudentId] = useState<string | null>(null);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -111,6 +112,39 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     if (isMounted) fetchStudents();
     return () => { isMounted = false; };
   }, [profile]);
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setEditingStudent(null);
+    setPendingStudentId(null);
+  };
+
+  const openAddStudentModal = () => {
+    setEditingStudent(null);
+    setPendingStudentId(doc(collection(db, 'students')).id);
+    setNewStudent({
+      name: '',
+      registrationNumber: '',
+      classId: '',
+      email: '',
+      password: '',
+      parentPhone: '',
+      parentEmail: '',
+      address: '',
+      driverPhone: '',
+      parentPassword: '',
+      photoUrl: '',
+    });
+    setShowAddModal(true);
+  };
+
+  const resolvePhotoUploadStudentId = (): string | null => {
+    if (editingStudent?.id) return editingStudent.id;
+    if (pendingStudentId) return pendingStudentId;
+    const draftId = doc(collection(db, 'students')).id;
+    setPendingStudentId(draftId);
+    return draftId;
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -450,7 +484,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         );
         toast.success('تم تحديث بيانات الطالب بنجاح');
       } else {
-        const studentId = doc(collection(db, 'students')).id;
+        const studentId = pendingStudentId || doc(collection(db, 'students')).id;
         
         // Atomic transaction for adding student and incrementing count
         await runTransaction(db, async (transaction) => {
@@ -538,12 +572,11 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         parentPassword: '',
         photoUrl: ''
       });
-      setEditingStudent(null);
-      setShowAddModal(false);
+      closeAddModal();
     } catch (error: any) {
       console.error('Error adding student:', error);
       toast.error(error.message || 'حدث خطأ أثناء المعالجة');
-      setShowAddModal(false);
+      closeAddModal();
       handleFirestoreError(error, isEditing ? OperationType.UPDATE : OperationType.WRITE, isEditing ? `students/${editingStudent.id}` : 'students');
     }
   };
@@ -564,8 +597,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
     try {
       setIsUploadingPhoto(true);
-      const studentIdOrNew = editingStudent?.id || 'new';
-      const url = await uploadStudentPhoto(file, profile.schoolId, studentIdOrNew);
+      const studentId = resolvePhotoUploadStudentId();
+      if (!studentId) {
+        toast.error('تعذر تجهيز معرف الطالب. أغلق النافذة وحاول مرة أخرى');
+        return;
+      }
+      const url = await uploadStudentPhoto(file, profile.schoolId, studentId);
       setNewStudent((prev) => ({ ...prev, photoUrl: url }));
       toast.success('تم رفع الصورة بنجاح');
     } catch (error) {
@@ -579,6 +616,8 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         toast.error('نوع الملف غير مدعوم. استخدم JPG أو PNG');
       } else if (code === 'STORAGE_UNAUTHORIZED') {
         toast.error('صلاحيات رفع الصور غير مفعّلة على الخادم. يرجى نشر قواعد Firebase Storage ثم إعادة المحاولة');
+      } else if (code === 'INVALID_STUDENT_ID') {
+        toast.error('يرجى فتح نموذج إضافة الطالب أولاً ثم رفع الصورة');
       } else {
         toast.error('فشل رفع الصورة. تحقق من الاتصال والصلاحيات');
       }
@@ -617,19 +656,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           <div className="flex gap-2">
             {!isViewOnly && (
               <button
-                onClick={() => {
-                  setEditingStudent(null);
-                  setNewStudent({
-                    name: '',
-                    classId: '',
-                    parentEmail: '',
-                    parentPhone: '',
-                    address: '',
-                    parentPassword: '',
-                    photoUrl: ''
-                  });
-                  setShowAddModal(true);
-                }}
+                onClick={openAddStudentModal}
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 md:px-8 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all font-bold shadow-lg active:scale-95 whitespace-nowrap text-sm"
               >
                 <Plus size={20} />
@@ -799,6 +826,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                         </button>
                                         <button
                                           onClick={() => {
+                                            setPendingStudentId(null);
                                             setEditingStudent(student);
                                             setNewStudent({
                                               name: student.name,
@@ -948,6 +976,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                             <button
                               type="button"
                               onClick={() => {
+                                setPendingStudentId(null);
                                 setEditingStudent(student);
                                 setNewStudent({
                                   name: student.name,
@@ -1016,19 +1045,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   <p className="text-slate-400 text-xs md:text-sm italic">جرب البحث بكلمات أخرى أو أضف طالب جديد</p>
                 </div>
                 {!isViewOnly && (
-                  <button onClick={() => {
-                    setEditingStudent(null);
-                    setNewStudent({
-                      name: '',
-                      classId: '',
-                      parentEmail: '',
-                      parentPhone: '',
-                      address: '',
-                      parentPassword: '',
-                      photoUrl: ''
-                    });
-                    setShowAddModal(true);
-                  }} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-800 transition-all text-sm">أضف طالب</button>
+                  <button onClick={openAddStudentModal} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-800 transition-all text-sm">أضف طالب</button>
                 )}
              </div>
           </div>
@@ -1273,7 +1290,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                     </h2>
                     <button 
                       type="button" 
-                      onClick={() => setShowAddModal(false)}
+                      onClick={closeAddModal}
                       className="p-1 px-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
                     >
                       <X size={18} />
@@ -1457,7 +1474,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       </button>
                       <button
                         type="button"
-                        onClick={() => setShowAddModal(false)}
+                        onClick={closeAddModal}
                         className="px-6 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 text-sm md:text-base"
                       >
                         إلغاء الأمر
