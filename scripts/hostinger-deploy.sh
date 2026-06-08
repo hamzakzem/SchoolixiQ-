@@ -6,37 +6,54 @@ set -euo pipefail
 : "${HOSTINGER_FTP_PASSWORD:?HOSTINGER_FTP_PASSWORD is required}"
 : "${HOSTINGER_FTP_REMOTE_DIR:?HOSTINGER_FTP_REMOTE_DIR is required}"
 
+# Strip accidental CR/LF from runtime values (do not alter secrets at source).
+strip_cr_lf() {
+  printf '%s' "$1" | tr -d '\r\n'
+}
+
+FTP_SERVER="$(strip_cr_lf "${HOSTINGER_FTP_SERVER}")"
+FTP_USER="$(strip_cr_lf "${HOSTINGER_FTP_USERNAME}")"
+FTP_PASSWORD="$(strip_cr_lf "${HOSTINGER_FTP_PASSWORD}")"
+REMOTE="$(strip_cr_lf "${HOSTINGER_FTP_REMOTE_DIR}")"
+REMOTE="${REMOTE%/}"
+
 LOCAL_DIR="${1:-dist}"
 SCRIPT_FILE="$(mktemp)"
 trap 'rm -f "$SCRIPT_FILE" "${SCRIPT_FILE}.run"; unset LFTP_PASSWORD' EXIT
 
-# Password via LFTP_PASSWORD + --env-password (never use -u user,pass — commas break lftp).
-# URL must be inside the script as `open ...` — passing URL on the lftp CLI with -f makes lftp
-# treat it as a script command ("Unknown command `sftp://host:65002'").
-run_lftp() {
+# Build lftp script: plain "open" + "user" lines (no printf %q — %q emits $'...' tokens lftp misparses).
+write_lftp_script() {
   local scheme="$1"
   local port="$2"
   local target="$3"
   shift 3
   local -a extra_settings=("$@")
-  local open_url="${scheme}://${HOSTINGER_FTP_SERVER}:${port}"
+  local open_url="${scheme}://${FTP_SERVER}:${port}"
 
-  echo "=== ${scheme^^} (${port}) -> '${target}' ==="
-  write_mirror_script "$target"
+  write_mirror_commands "$target"
 
   {
     for setting in "${extra_settings[@]}"; do
       printf '%s\n' "$setting"
     done
-    printf 'open --env-password -u %q %q\n' \
-      "${HOSTINGER_FTP_USERNAME}" \
-      "${open_url}"
+    printf 'open %s\n' "$open_url"
+    printf 'user %s\n' "$FTP_USER"
     cat "$SCRIPT_FILE"
   } >"${SCRIPT_FILE}.run"
+}
 
-  export LFTP_PASSWORD="${HOSTINGER_FTP_PASSWORD}"
+run_lftp() {
+  local scheme="$1"
+  local port="$2"
+  local target="$3"
+  shift 3
 
-  if lftp -f "${SCRIPT_FILE}.run"; then
+  echo "=== ${scheme^^} (${port}) -> '${target}' ==="
+  write_lftp_script "$scheme" "$port" "$target" "$@"
+
+  export LFTP_PASSWORD="${FTP_PASSWORD}"
+
+  if lftp --env-password -f "${SCRIPT_FILE}.run"; then
     echo "${scheme^^} deploy OK: ${target}"
     return 0
   fi
@@ -45,7 +62,7 @@ run_lftp() {
   return 1
 }
 
-write_mirror_script() {
+write_mirror_commands() {
   local target="$1"
   cat >"$SCRIPT_FILE" <<EOF
 set cmd:fail-exit yes
@@ -63,6 +80,11 @@ bye
 EOF
 }
 
+try_sftp() {
+  local target="$1"
+  run_lftp sftp 65002 "$target" "set sftp:auto-confirm yes"
+}
+
 try_ftps() {
   local target="$1"
   run_lftp ftps 21 "$target" \
@@ -71,13 +93,6 @@ try_ftps() {
     "set ftp:ssl-protect-data true"
 }
 
-try_sftp() {
-  local target="$1"
-  run_lftp sftp 65002 "$target" \
-    "set sftp:auto-confirm yes"
-}
-
-REMOTE="${HOSTINGER_FTP_REMOTE_DIR%/}"
 SHORT_REMOTE=""
 if [[ "$REMOTE" == *"/domains/"* ]]; then
   SHORT_REMOTE="/${REMOTE#*/domains/}"
@@ -90,14 +105,21 @@ for target in "${TARGETS[@]}"; do
   [[ -z "$target" ]] && continue
   case "$seen" in *"|${target}|"*) continue ;; esac
   seen="${seen}${target}|"
-  if try_ftps "$target"; then exit 0; fi
-  sleep 8
+  if try_sftp "$target"; then exit 0; fi
+  sleep 5
 done
 
-for target in "." "${REMOTE}"; do
-  if try_sftp "$target"; then exit 0; fi
-  sleep 8
-done
+# FTPS (21) only when explicitly enabled — Hostinger often blocks/timeouts port 21 on CI.
+if [[ "${HOSTINGER_USE_FTPS:-}" == "1" || "${HOSTINGER_USE_FTPS:-}" == "true" ]]; then
+  seen="|"
+  for target in "${TARGETS[@]}"; do
+    [[ -z "$target" ]] && continue
+    case "$seen" in *"|${target}|"*) continue ;; esac
+    seen="${seen}${target}|"
+    if try_ftps "$target"; then exit 0; fi
+    sleep 5
+  done
+fi
 
 echo "::error title=Hostinger deploy failed::Download artifact schoolixiq-dist from Actions and upload to public_html via hPanel File Manager."
 exit 1
