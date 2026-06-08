@@ -39,7 +39,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return userRole() == 'admin';
+      return userRole() in ['admin', 'school_admin'];
     }
 
     function isAssistant() {

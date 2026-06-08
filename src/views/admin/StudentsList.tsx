@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { uploadStudentPhoto } from '../../lib/imageUtils';
 
-import { adminCreateUser, adminDeleteUser, adminDeleteStudent } from '../../lib/adminApi';
+import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 
 export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit' }) {
   const { profile } = useAuth();
@@ -130,31 +130,59 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   };
 
   const handleDeleteStudent = async (id: string) => {
-    if (!profile?.schoolId) return;
+    const isSuperAdmin = profile?.role === 'superadmin';
+    if (!profile || (!profile.schoolId && !isSuperAdmin)) return;
+    if (profile.role !== 'admin' && !isSuperAdmin) {
+      toast.error('غير مصرح لك بحذف الطلاب');
+      return;
+    }
+
     setIsDeleting(id);
     const loadingToast = toast.loading('جاري حذف سجل الطالب...');
     try {
-      // Use transaction to ensure counter is decremented atomically
+      const studentRef = doc(db, 'students', id);
+
       await runTransaction(db, async (transaction) => {
-        const studentRef = doc(db, 'students', id);
-        const schoolRef = doc(db, 'schools', profile.schoolId!);
-        
+        const studentSnap = await transaction.get(studentRef);
+        if (!studentSnap.exists()) {
+          throw new Error('سجل الطالب غير موجود');
+        }
+
+        const studentData = studentSnap.data() || {};
+        const studentSchoolId = String(studentData.schoolId || '');
+        if (!isSuperAdmin && studentSchoolId !== profile.schoolId) {
+          throw new Error('غير مسموح بحذف طالب من مدرسة أخرى');
+        }
+        if (!studentSchoolId) {
+          throw new Error('سجل الطالب لا يحتوي على معرف المدرسة');
+        }
+
+        const schoolRef = doc(db, 'schools', studentSchoolId);
         transaction.delete(studentRef);
         transaction.update(schoolRef, {
-          studentCount: increment(-1)
+          studentCount: increment(-1),
         });
+
+        const userRef = doc(db, 'users', id);
+        const userSnap = await transaction.get(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data() || {};
+          if (isSuperAdmin || userData.schoolId === profile.schoolId) {
+            transaction.delete(userRef);
+          }
+        }
       });
 
-      // Also delete from Auth if applicable (Admin API)
-      await adminDeleteStudent(id);
-      
+      setStudents((prev) => prev.filter((s) => s.id !== id));
+      setConfirmDeleteId(null);
       toast.dismiss(loadingToast);
       toast.success('تم حذف الطالب نهائياً من النظام');
-      setConfirmDeleteId(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.dismiss(loadingToast);
       console.error('Delete student error:', error);
-      toast.error(error.message || 'فشل في حذف الطالب');
+      handleFirestoreError(error, OperationType.DELETE, `students/${id}`);
+      const message = error instanceof Error ? error.message : 'فشل في حذف الطالب';
+      toast.error(message);
     } finally {
       setIsDeleting(null);
     }
