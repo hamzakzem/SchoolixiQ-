@@ -143,7 +143,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       const studentRef = doc(db, 'students', id);
 
       await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', id);
+
+        // All reads before any writes (Firestore transaction requirement).
         const studentSnap = await transaction.get(studentRef);
+        const userSnap = await transaction.get(userRef);
+
         if (!studentSnap.exists()) {
           throw new Error('سجل الطالب غير موجود');
         }
@@ -158,19 +163,23 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         }
 
         const schoolRef = doc(db, 'schools', studentSchoolId);
+        const schoolSnap = await transaction.get(schoolRef);
+        if (!schoolSnap.exists()) {
+          throw new Error('سجل المدرسة غير موجود');
+        }
+
+        const shouldDeleteLinkedUser =
+          userSnap.exists() &&
+          (isSuperAdmin ||
+            (userSnap.data() || {}).schoolId === profile.schoolId);
+
         transaction.delete(studentRef);
+        if (shouldDeleteLinkedUser) {
+          transaction.delete(userRef);
+        }
         transaction.update(schoolRef, {
           studentCount: increment(-1),
         });
-
-        const userRef = doc(db, 'users', id);
-        const userSnap = await transaction.get(userRef);
-        if (userSnap.exists()) {
-          const userData = userSnap.data() || {};
-          if (isSuperAdmin || userData.schoolId === profile.schoolId) {
-            transaction.delete(userRef);
-          }
-        }
       });
 
       setStudents((prev) => prev.filter((s) => s.id !== id));
