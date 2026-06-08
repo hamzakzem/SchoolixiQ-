@@ -1,28 +1,95 @@
 import { auth } from './firebase';
-import { getApiUrl } from './apiUtils';
+import {
+  getApiUrl,
+  getBackendApiBaseUrl,
+  isProductionWebBrowser,
+} from './apiUtils';
 
-// Helper to log requests and responses for debugging
-async function logApiDebug(url: string, response: Response) {
+export const API_BACKEND_DISCONNECTED_MESSAGE =
+  'خادم الواجهة البرمجية غير متصل. تعذر الوصول إلى خادم إنشاء الحسابات. يرجى المحاولة لاحقاً أو التواصل مع الدعم الفني.';
+
+async function logApiDebug(url: string, response: Response, bodyPreview = '') {
   const headersObj: Record<string, string> = {};
   response.headers.forEach((value, name) => {
     headersObj[name] = value;
   });
-
-  let bodyText = '';
-  try {
-    const responseClone = response.clone();
-    bodyText = await responseClone.text();
-  } catch (err) {
-    bodyText = '[Unreadable body]';
-  }
 
   console.error('[API DEBUG INFO]', {
     url,
     status: response.status,
     statusText: response.statusText,
     headers: headersObj,
-    bodySummary: bodyText.length > 500 ? bodyText.substring(0, 500) + '...' : bodyText
+    bodySummary: bodyPreview.length > 500 ? `${bodyPreview.substring(0, 500)}...` : bodyPreview,
   });
+}
+
+function assertBackendReachable(endpoint: string): void {
+  const absoluteUrl = getApiUrl(endpoint);
+  if (
+    isProductionWebBrowser() &&
+    !getBackendApiBaseUrl() &&
+    absoluteUrl.startsWith('/')
+  ) {
+    throw new Error(API_BACKEND_DISCONNECTED_MESSAGE);
+  }
+}
+
+function isHtmlLikeResponse(contentType: string | null, text: string): boolean {
+  if (contentType && contentType.includes('text/html')) return true;
+  const trimmed = text.trim().toLowerCase();
+  return trimmed.startsWith('<!doctype') || trimmed.startsWith('<html');
+}
+
+async function adminApiPost(endpoint: string, body: Record<string, unknown>) {
+  assertBackendReachable(endpoint);
+
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('No auth token available');
+
+  const absoluteUrl = getApiUrl(endpoint);
+
+  const response = await fetch(absoluteUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'X-Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const contentType = response.headers.get('content-type');
+  const responseText = await response.text();
+  const isJson = Boolean(contentType && contentType.includes('application/json'));
+
+  if (isHtmlLikeResponse(contentType, responseText)) {
+    await logApiDebug(absoluteUrl, response, responseText);
+    throw new Error(API_BACKEND_DISCONNECTED_MESSAGE);
+  }
+
+  let json: Record<string, unknown> | null = null;
+  if (isJson && responseText) {
+    try {
+      json = JSON.parse(responseText) as Record<string, unknown>;
+    } catch {
+      json = null;
+    }
+  }
+
+  if (!response.ok) {
+    const errorMessage =
+      (json?.message as string) ||
+      (json?.error as string) ||
+      `Server Error (${response.status})`;
+    throw new Error(errorMessage);
+  }
+
+  if (!json) {
+    await logApiDebug(absoluteUrl, response, responseText);
+    throw new Error(API_BACKEND_DISCONNECTED_MESSAGE);
+  }
+
+  return json;
 }
 
 export async function adminCreateUser(userData: {
@@ -31,180 +98,42 @@ export async function adminCreateUser(userData: {
   displayName: string;
   role: string;
   schoolId: string;
-  additionalData?: any;
+  additionalData?: Record<string, unknown>;
 }) {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('No auth token available');
-
   const endpoint = `/api/admin/create-user?t=${Date.now()}`;
-  const absoluteUrl = getApiUrl(endpoint);
+  const json = await adminApiPost(endpoint, userData);
 
-  const response = await fetch(absoluteUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'X-Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(userData)
-  });
-
-  const contentType = response.headers.get('content-type');
-  const isJson = contentType && contentType.includes('application/json');
-
-  if (!isJson) {
-    await logApiDebug(absoluteUrl, response);
-  }
-
-  if (!response.ok) {
-    let errorMessage = 'Failed to create user';
-    try {
-      if (isJson) {
-        const error = await response.json();
-        errorMessage = error.message || error.error || errorMessage;
-      } else {
-        const responseClone = response.clone();
-        const text = await responseClone.text();
-        errorMessage = `Server Error (${response.status}): ${text.substring(0, 100)}...`;
-      }
-    } catch (e) {
-      errorMessage = `Failed to create user (Status ${response.status})`;
-    }
-    throw new Error(errorMessage);
-  }
-
-  if (isJson) {
-    const json = await response.json();
-    return {
-      success: json.success !== false,
-      message: json.message || '',
-      uid: json.data?.uid || json.uid || '',
-      data: json.data || json
-    };
-  } else {
-    const responseClone = response.clone();
-    let text = '';
-    try {
-      text = await responseClone.text();
-    } catch (_) {}
-    throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
-  }
+  const data = (json.data as Record<string, unknown> | undefined) || json;
+  return {
+    success: json.success !== false,
+    message: (json.message as string) || '',
+    uid: (data?.uid as string) || (json.uid as string) || '',
+    data,
+  };
 }
 
 export async function adminDeleteUser(uid: string) {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('No auth token available');
-
   const endpoint = `/api/admin/delete-user?t=${Date.now()}`;
-  const absoluteUrl = getApiUrl(endpoint);
+  const json = await adminApiPost(endpoint, { uid });
+  const data = (json.data as Record<string, unknown> | undefined) || json;
 
-  const response = await fetch(absoluteUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'X-Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ uid })
-  });
-
-  const contentType = response.headers.get('content-type');
-  const isJson = contentType && contentType.includes('application/json');
-
-  if (!isJson) {
-    await logApiDebug(absoluteUrl, response);
-  }
-
-  if (!response.ok) {
-    let errorMessage = 'Failed to delete user';
-    try {
-      if (isJson) {
-        const error = await response.json();
-        errorMessage = error.message || error.error || errorMessage;
-      } else {
-        const responseClone = response.clone();
-        const text = await responseClone.text();
-        errorMessage = `Server Error (${response.status}): ${text.substring(0, 100)}...`;
-      }
-    } catch (e) {
-      errorMessage = `Failed to delete user (Status ${response.status})`;
-    }
-    throw new Error(errorMessage);
-  }
-
-  if (isJson) {
-    const json = await response.json();
-    return {
-      success: json.success !== false,
-      message: json.message || '',
-      dataType: 'user',
-      data: json.data || json
-    };
-  } else {
-    const responseClone = response.clone();
-    let text = '';
-    try {
-      text = await responseClone.text();
-    } catch (_) {}
-    throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
-  }
+  return {
+    success: json.success !== false,
+    message: (json.message as string) || '',
+    dataType: 'user',
+    data,
+  };
 }
 
 export async function adminDeleteStudent(id: string) {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('No auth token available');
-
   const endpoint = `/api/admin/delete-student?t=${Date.now()}`;
-  const absoluteUrl = getApiUrl(endpoint);
+  const json = await adminApiPost(endpoint, { id });
+  const data = (json.data as Record<string, unknown> | undefined) || json;
 
-  const response = await fetch(absoluteUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'X-Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ id })
-  });
-
-  const contentType = response.headers.get('content-type');
-  const isJson = contentType && contentType.includes('application/json');
-
-  if (!isJson) {
-    await logApiDebug(absoluteUrl, response);
-  }
-
-  if (!response.ok) {
-    let errorMessage = 'Failed to delete student';
-    try {
-      if (isJson) {
-        const error = await response.json();
-        errorMessage = error.message || error.error || errorMessage;
-      } else {
-        const responseClone = response.clone();
-        const text = await responseClone.text();
-        errorMessage = `Server Error (${response.status}): ${text.substring(0, 100)}...`;
-      }
-    } catch (e) {
-      errorMessage = `Failed to delete student (Status ${response.status})`;
-    }
-    throw new Error(errorMessage);
-  }
-
-  if (isJson) {
-    const json = await response.json();
-    return {
-      success: json.success !== false,
-      message: json.message || '',
-      dataType: 'student',
-      data: json.data || json
-    };
-  } else {
-    const responseClone = response.clone();
-    let text = '';
-    try {
-      text = await responseClone.text();
-    } catch (_) {}
-    throw new Error(`Server returned non-JSON response (Status ${response.status}): ${text.substring(0, 80)}...`);
-  }
+  return {
+    success: json.success !== false,
+    message: (json.message as string) || '',
+    dataType: 'student',
+    data,
+  };
 }

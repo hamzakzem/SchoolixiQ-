@@ -54,6 +54,7 @@ const SuperAdminDashboard = lazy(() => import("./views/SuperAdminDashboard"));
 const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
 const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 
+import { isAiStudioBackendUrl, setBackendApiBaseUrl, purgeStaleApiUrlCache } from "./lib/apiUtils";
 import ScanHandler from "./components/ScanHandler";
 import SolarLoading from "./components/SolarLoading";
 import { LanguageToggle } from "./components/LanguageToggle";
@@ -142,12 +143,18 @@ const AppContent = () => {
             navigator.userAgent.includes("Capacitor") ||
             (window as { Capacitor?: unknown }).Capacitor !== undefined;
 
-          // Web browsers use same-origin /api/* — never cache AI Studio preview URLs.
+          // Production web (schoolixiq.com) is static — admin APIs must target Cloud Run, not same-origin HTML.
           if (!isNativeApp) {
-            try {
-              localStorage.removeItem("schoolix_app_api_url");
-            } catch (err) {
-              console.warn("localStorage is not writeable:", err);
+            purgeStaleApiUrlCache();
+            const backendUrl = isDevClient
+              ? data.appUrlDev || data.appUrl
+              : data.appUrlProd || data.appUrl;
+            if (backendUrl && !isAiStudioBackendUrl(backendUrl)) {
+              setBackendApiBaseUrl(backendUrl);
+              console.info(
+                "[API CONFIG] Production web backend URL:",
+                backendUrl,
+              );
             }
             return;
           }

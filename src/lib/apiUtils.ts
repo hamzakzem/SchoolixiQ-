@@ -1,4 +1,7 @@
 const AI_STUDIO_BACKEND_PATTERN = /ais-(pre|dev)|europe-west2\.run\.app/i;
+const BACKEND_STORAGE_KEY = 'schoolix_api_backend_url';
+
+let runtimeBackendBaseUrl = '';
 
 function isCapacitorNativeApp(): boolean {
   if (typeof window === 'undefined') return false;
@@ -30,7 +33,76 @@ export function isAiStudioBackendUrl(url: string): boolean {
   return AI_STUDIO_BACKEND_PATTERN.test(url);
 }
 
-/** Remove stale AI Studio preview URLs cached for production web browsers. */
+function isSameOriginAsFrontend(url: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return new URL(url).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeBaseUrl(url: string): string {
+  let clean = String(url || '').trim().replace(/\/$/, '');
+  if (
+    clean &&
+    !clean.startsWith('http://localhost') &&
+    !clean.startsWith('http://127.0.0.1')
+  ) {
+    clean = clean.replace(/^http:\/\//i, 'https://');
+  }
+  return clean;
+}
+
+function readStoredBackendUrl(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    const saved = localStorage.getItem(BACKEND_STORAGE_KEY) || '';
+    const clean = normalizeBaseUrl(saved);
+    if (!clean || isAiStudioBackendUrl(clean)) return '';
+    if (isProductionWebHost() && isSameOriginAsFrontend(clean)) return '';
+    return clean;
+  } catch {
+    return '';
+  }
+}
+
+if (typeof window !== 'undefined') {
+  const stored = readStoredBackendUrl();
+  if (stored) runtimeBackendBaseUrl = stored;
+}
+
+/** Persist Cloud Run / Node backend base URL (not the static frontend host). */
+export function setBackendApiBaseUrl(url: string): void {
+  const clean = normalizeBaseUrl(url);
+  if (!clean || isAiStudioBackendUrl(clean)) return;
+  if (isProductionWebHost() && isSameOriginAsFrontend(clean)) return;
+  runtimeBackendBaseUrl = clean;
+  try {
+    localStorage.setItem(BACKEND_STORAGE_KEY, clean);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function getBackendApiBaseUrl(): string {
+  if (runtimeBackendBaseUrl) return runtimeBackendBaseUrl;
+
+  const viteBackend = normalizeBaseUrl(
+    String(import.meta.env.VITE_API_BACKEND_URL || ''),
+  );
+  if (
+    viteBackend &&
+    !isAiStudioBackendUrl(viteBackend) &&
+    !(isProductionWebHost() && isSameOriginAsFrontend(viteBackend))
+  ) {
+    return viteBackend;
+  }
+
+  return readStoredBackendUrl();
+}
+
+/** Remove legacy AI Studio preview URLs cached for production web browsers. */
 export function purgeStaleApiUrlCache(): void {
   if (typeof window === 'undefined') return;
   try {
@@ -44,65 +116,46 @@ export function purgeStaleApiUrlCache(): void {
   }
 }
 
-// Clear polluted cache as early as possible on production web.
 if (typeof window !== 'undefined' && isProductionWebHost()) {
   purgeStaleApiUrlCache();
+}
+
+/** Paths that require Firebase Admin / Node backend (never static Hostinger HTML). */
+export function requiresRemoteBackend(path: string): boolean {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return (
+    cleanPath.startsWith('/api/admin/') ||
+    cleanPath.startsWith('/api/upload')
+  );
+}
+
+export function isProductionWebBrowser(): boolean {
+  return typeof window !== 'undefined' && isProductionWebHost() && !isCapacitorNativeApp();
 }
 
 // Helper to determine the backend API server URL dynamically
 export function getApiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const needsRemote = requiresRemoteBackend(cleanPath);
+  const isNative = isCapacitorNativeApp();
 
-  // All browser web clients use same-origin API routes (no cross-origin CORS).
-  if (typeof window !== 'undefined' && !isCapacitorNativeApp()) {
+  if (needsRemote || isNative) {
+    const backendBase = getBackendApiBaseUrl();
+    if (backendBase) {
+      return `${backendBase}${cleanPath}`;
+    }
+  }
+
+  // Local dev may proxy /api/* to a local Node server.
+  if (typeof window !== 'undefined' && !isNative) {
     purgeStaleApiUrlCache();
     return cleanPath;
   }
 
-  // Native/Capacitor apps may target an external backend.
-  let savedUrl = '';
-  if (typeof window !== 'undefined') {
-    try {
-      savedUrl = window.localStorage.getItem('schoolix_app_api_url') || '';
-    } catch {
-      savedUrl = '';
-    }
+  const fallbackBase = getBackendApiBaseUrl();
+  if (fallbackBase) {
+    return `${fallbackBase}${cleanPath}`;
   }
 
-  const isDevClient = isLocalDevHost();
-  let targetUrl = '';
-
-  if (savedUrl) {
-    const isDevSavedUrl =
-      savedUrl.includes('-dev-') ||
-      savedUrl.includes('localhost') ||
-      savedUrl.includes('127.0.0.1');
-    if (!isDevClient && isDevSavedUrl) {
-      targetUrl = '';
-    } else if (!isProductionWebHost() || !isAiStudioBackendUrl(savedUrl)) {
-      targetUrl = savedUrl;
-    }
-  }
-
-  if (!targetUrl) {
-    targetUrl = process.env.APP_URL || '';
-  }
-
-  if (!targetUrl) {
-    targetUrl = isDevClient
-      ? 'https://ais-dev-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app'
-      : 'https://ais-pre-zvujfimwp5qybst5dz4x6n-99877674137.europe-west2.run.app';
-  }
-
-  let cleanSavedUrl = targetUrl.replace(/\/$/, '');
-
-  if (
-    cleanSavedUrl &&
-    !cleanSavedUrl.startsWith('http://localhost') &&
-    !cleanSavedUrl.startsWith('http://127.0.0.1')
-  ) {
-    cleanSavedUrl = cleanSavedUrl.replace(/^http:\/\//i, 'https://');
-  }
-
-  return `${cleanSavedUrl}${cleanPath}`;
+  return cleanPath;
 }
