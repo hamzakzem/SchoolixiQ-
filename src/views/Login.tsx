@@ -46,6 +46,10 @@ import { UserRole } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import {
+  getAndroidApkDownloadUrl,
+  hasConfiguredAndroidApkUrl,
+} from '../lib/androidApk';
+import {
   classifyAuthError,
   getAuthErrorMessage,
   isInAppWebView,
@@ -201,6 +205,8 @@ export default function Login() {
   const [installProgress, setInstallProgress] = useState(0);
   const [showInstallSuccess, setShowInstallSuccess] = useState(false);
   const [isAndroidUser, setIsAndroidUser] = useState(false);
+  const androidApkUrl = getAndroidApkDownloadUrl();
+  const androidApkConfigured = hasConfiguredAndroidApkUrl();
 
   useEffect(() => {
     const userAgent = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || "";
@@ -584,23 +590,16 @@ export default function Login() {
             </button>
           </div>
 
-          {/* Golden/Navy Download Link - Persistent on both login and signup screens */}
+          {/* Android APK download — direct browser download */}
           <div className="mb-6 text-center">
             <a
-              href="#download-app-section"
-              onClick={(e) => {
-                e.preventDefault();
-                const section = document.getElementById("download-app-section");
-                if (section) {
-                  section.scrollIntoView({ behavior: "smooth" });
-                }
-                startDirectInstall("android");
-              }}
+              href={androidApkUrl}
+              download="schoolixiq.apk"
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-[#D4A64A]/40 bg-gradient-to-r from-[#0B2345]/5 to-[#D4A64A]/5 hover:from-[#0B2345]/15 hover:to-[#D4A64A]/15 text-[#0B2345] dark:text-[#D4A64A] font-black text-xs sm:text-sm transition-all hover:border-[#D4A64A] hover:scale-[1.02] active:scale-[0.98] shadow-sm select-none"
             >
               <Smartphone size={16} className="text-[#0B2345] dark:text-[#D4A64A] animate-pulse shrink-0" />
               <span>
-                {isRtl ? "لتحميل التطبيق على هاتفك المحمول اضغط هنا 📱" : "Click here to download/install the Mobile App 📱"}
+                {isRtl ? "تحميل تطبيق أندرويد 📱" : "Download Android App 📱"}
               </span>
             </a>
           </div>
@@ -1001,15 +1000,26 @@ export default function Login() {
 
             {installingPlatform === null ? (
               <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => startDirectInstall("android")}
+                <a
+                  href={androidApkUrl}
+                  download="schoolixiq.apk"
                   className="w-full py-4 bg-[#D4A64A] hover:bg-[#0B2345] text-[#0B2345] hover:text-[#D4A64A] border border-[#D4A64A] hover:border-[#0B2345] font-black rounded-2xl text-sm sm:text-base flex items-center justify-center gap-3 transition-all shadow-lg shadow-[#D4A64A]/10 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                 >
-                  <Smartphone className="w-5 h-5" />
-                  <span>{isRtl ? "تحميل وتثبيت التطبيق فوراً 📱" : "Download & Install Android App 📱"}</span>
-                </button>
-                <p className="text-[10px] text-slate-400 mt-2.5 font-bold">{isRtl ? "تثبيت تلقائي آمن وموثوق 100٪ لأجهزة الأندرويد" : "100% Secure & Fast Android Direct Installation"}</p>
+                  <Download className="w-5 h-5" />
+                  <span>{isRtl ? "تحميل تطبيق أندرويد (APK) 📱" : "Download Android App (APK) 📱"}</span>
+                </a>
+                <p className="text-[10px] text-slate-400 mt-2.5 font-bold">
+                  {isRtl
+                    ? "حمّل ملف APK ثم ثبّته من مدير الملفات على هاتف أندرويد"
+                    : "Download the APK file, then open it on your Android phone to install"}
+                </p>
+                {!androidApkConfigured && (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-2 font-bold leading-relaxed">
+                    {isRtl
+                      ? "إذا لم يبدأ التحميل، قد يكون ملف التطبيق غير مرفوع بعد على الخادم. تواصل مع الدعم الفني."
+                      : "If download does not start, the app file may not be uploaded to the server yet. Contact support."}
+                  </p>
+                )}
               </div>
             ) : (
               /* Progress view */
@@ -1080,18 +1090,14 @@ export default function Login() {
                           {isRtl ? "تثبيت الآن (شاشة الهاتف)" : "Install Now"}
                         </button>
                         
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Direct download fallback
-                            toast.success(isRtl ? "جاري بدء تحميل ملف APK المباشر..." : "Starting direct APK download...");
-                            window.location.href = "/public/manifest.json"; // Direct fallback
-                          }}
+                        <a
+                          href={androidApkUrl}
+                          download="schoolixiq.apk"
                           className="flex-1 py-3 bg-[#D4A64A] hover:bg-[#0B2345] text-[#0B2345] hover:text-[#D4A64A] font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#D4A64A]/10 border border-[#D4A64A]"
                         >
                           <Download size={13} />
                           {isRtl ? "تحميل ملف APK المباشر" : "Download Direct APK"}
-                        </button>
+                        </a>
                       </div>
                     </div>
 
