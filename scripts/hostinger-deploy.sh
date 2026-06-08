@@ -10,15 +10,16 @@ LOCAL_DIR="${1:-dist}"
 SCRIPT_FILE="$(mktemp)"
 trap 'rm -f "$SCRIPT_FILE" "${SCRIPT_FILE}.run"; unset LFTP_PASSWORD' EXIT
 
-# lftp -u "user,pass" treats comma as a delimiter; passwords with commas/spaces/quotes
-# are parsed as extra commands (e.g. "Unknown command ',***'"). Pass the password only via
-# LFTP_PASSWORD + --env-password so it never appears in argv or script commands.
+# Password via LFTP_PASSWORD + --env-password (never use -u user,pass — commas break lftp).
+# URL must be inside the script as `open ...` — passing URL on the lftp CLI with -f makes lftp
+# treat it as a script command ("Unknown command `sftp://host:65002'").
 run_lftp() {
   local scheme="$1"
   local port="$2"
   local target="$3"
   shift 3
   local -a extra_settings=("$@")
+  local open_url="${scheme}://${HOSTINGER_FTP_SERVER}:${port}"
 
   echo "=== ${scheme^^} (${port}) -> '${target}' ==="
   write_mirror_script "$target"
@@ -27,15 +28,15 @@ run_lftp() {
     for setting in "${extra_settings[@]}"; do
       printf '%s\n' "$setting"
     done
+    printf 'open --env-password -u %q %q\n' \
+      "${HOSTINGER_FTP_USERNAME}" \
+      "${open_url}"
     cat "$SCRIPT_FILE"
   } >"${SCRIPT_FILE}.run"
 
   export LFTP_PASSWORD="${HOSTINGER_FTP_PASSWORD}"
 
-  if lftp --env-password \
-    -u "${HOSTINGER_FTP_USERNAME}" \
-    "${scheme}://${HOSTINGER_FTP_SERVER}:${port}" \
-    -f "${SCRIPT_FILE}.run"; then
+  if lftp -f "${SCRIPT_FILE}.run"; then
     echo "${scheme^^} deploy OK: ${target}"
     return 0
   fi
