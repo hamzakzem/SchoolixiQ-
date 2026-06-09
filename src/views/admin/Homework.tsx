@@ -166,7 +166,7 @@ export default function Homework() {
     if (confirm(isRtl ? 'هل أنت متأكد من حذف هذا الواجب؟' : 'Are you sure you want to delete this homework?')) {
       try {
         await deleteDoc(doc(db, 'homework', id));
-        await notificationService.deleteBySourceId(id);
+        await notificationService.deleteBySourceId(id, profile.schoolId);
         toast.success(isRtl ? 'تم حذف الواجب بنجاح' : 'Homework deleted successfully');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `homework/${id}`);

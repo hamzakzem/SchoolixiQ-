@@ -1,5 +1,6 @@
 import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { filterNotificationsForUser } from '../lib/notificationVisibility';
 
 export class DashboardService {
   /**
@@ -18,7 +19,11 @@ export class DashboardService {
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 
-  static async getNotifications(userId: string, limitCount = 20) {
+  static async getNotifications(
+    userId: string,
+    limitCount = 20,
+    viewer?: { role?: string; schoolId?: string },
+  ) {
     const q = query(
       collection(db, 'notifications'),
       where('userId', '==', userId),
@@ -26,6 +31,13 @@ export class DashboardService {
       limit(limitCount)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return filterNotificationsForUser(
+      snap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      {
+        uid: userId,
+        role: viewer?.role,
+        schoolId: viewer?.schoolId,
+      },
+    );
   }
 }

@@ -10,7 +10,49 @@ export interface NotificationPayload {
   message: string;
   type: NotificationType;
   schoolId: string;
+  senderId?: string;
+  recipientId?: string;
+  receiverId?: string;
+  audience?: 'school_admin' | 'teacher' | 'parent' | 'all_school';
   metadata?: any;
+}
+
+function buildNotificationDoc(
+  payload: NotificationPayload,
+  userId: string,
+): Record<string, unknown> {
+  if (!payload.schoolId || typeof payload.schoolId !== 'string') {
+    throw new Error('Notification requires a schoolId');
+  }
+  if (!userId) {
+    throw new Error('Notification requires a recipient userId');
+  }
+
+  const doc: Record<string, unknown> = {
+    ...payload,
+    userId,
+    recipientId: payload.recipientId || userId,
+    read: false,
+    createdAt: serverTimestamp(),
+  };
+
+  const senderId =
+    payload.senderId ||
+    (payload.metadata &&
+    typeof payload.metadata === 'object' &&
+    typeof payload.metadata.senderId === 'string'
+      ? payload.metadata.senderId
+      : undefined);
+  if (senderId) {
+    doc.senderId = senderId;
+  }
+  if (payload.receiverId) {
+    doc.receiverId = payload.receiverId;
+  } else {
+    doc.receiverId = userId;
+  }
+
+  return doc;
 }
 
 export const notificationService = {
@@ -19,11 +61,10 @@ export const notificationService = {
    */
   async send(payload: NotificationPayload) {
     try {
-      await addDoc(collection(db, 'notifications'), {
-        ...payload,
-        read: false,
-        createdAt: serverTimestamp()
-      });
+      await addDoc(
+        collection(db, 'notifications'),
+        buildNotificationDoc(payload, payload.userId),
+      );
       return true;
     } catch (error) {
       console.error('Error sending notification:', error);
@@ -39,12 +80,7 @@ export const notificationService = {
       const batch = writeBatch(db);
       userIds.forEach(userId => {
         const docRef = doc(collection(db, 'notifications'));
-        batch.set(docRef, {
-          ...payload,
-          userId,
-          read: false,
-          createdAt: serverTimestamp()
-        });
+        batch.set(docRef, buildNotificationDoc(payload, userId));
       });
       await batch.commit();
       return true;
@@ -129,10 +165,15 @@ export const notificationService = {
   /**
    * Delete notifications by their source ID
    */
-  async deleteBySourceId(sourceId: string) {
+  async deleteBySourceId(sourceId: string, schoolId?: string) {
     try {
+      if (!schoolId) {
+        console.warn('deleteBySourceId skipped: schoolId is required for scoped deletion');
+        return false;
+      }
       const q = query(
         collection(db, 'notifications'),
+        where('schoolId', '==', schoolId),
         where('metadata.sourceId', '==', sourceId)
       );
       const snap = await getDocs(q);

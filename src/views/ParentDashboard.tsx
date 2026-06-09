@@ -25,6 +25,7 @@ import { GlobalFooter } from "../components/GlobalFooter";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
+import { filterNotificationsForUser } from "../lib/notificationVisibility";
 import { homeworkMatchesStudent } from "../lib/schoolSync";
 import {
   getHomeworkSubjectDisplay,
@@ -729,9 +730,19 @@ export default function ParentDashboard() {
         limit(50)
       );
       unsubs.push(onSnapshot(notificationsQ, snap => {
-        const items = snap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any;
+        const items = filterNotificationsForUser(
+          snap.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
+            .sort(
+              (a: any, b: any) =>
+                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+            ) as any,
+          {
+            uid: profile.uid,
+            role: profile.role,
+            schoolId: profile.schoolId || selectedStudent.schoolId,
+          },
+        );
         if (notificationsPrimedRef.current) {
           items.forEach((notif: any) => {
             if (!knownNotificationIdsRef.current.has(notif.id)) {
@@ -741,7 +752,9 @@ export default function ParentDashboard() {
         } else {
           notificationsPrimedRef.current = true;
         }
-        knownNotificationIdsRef.current = new Set(items.map((notif: any) => notif.id));
+        knownNotificationIdsRef.current = new Set(
+          items.map((notif: any) => notif.id),
+        );
         setNotifications(items);
       }));
 

@@ -17,6 +17,7 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { NotificationCenter } from "../components/NotificationCenter";
+import { filterNotificationsForUser } from "../lib/notificationVisibility";
 import {
   Users,
   BookOpen,
@@ -449,14 +450,21 @@ export default function TeacherDashboard() {
         limit(50),
       );
       unsubs.push(onSnapshot(notificationsQ, (snap) => {
-        const notifData = snap.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .sort(
-            (a: any, b: any) =>
-              (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
-          );
+        const visibleNotifs = filterNotificationsForUser(
+          snap.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
+            .sort(
+              (a: any, b: any) =>
+                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+            ),
+          {
+            uid: profile.uid,
+            role: profile.role,
+            schoolId: profile.schoolId,
+          },
+        );
         if (notificationsPrimedRef.current) {
-          notifData.forEach((notif: any) => {
+          visibleNotifs.forEach((notif: any) => {
             if (!knownNotificationIdsRef.current.has(notif.id)) {
               alertIncomingNotification(notif, isRtl);
             }
@@ -465,9 +473,9 @@ export default function TeacherDashboard() {
           notificationsPrimedRef.current = true;
         }
         knownNotificationIdsRef.current = new Set(
-          notifData.map((notif: any) => notif.id),
+          visibleNotifs.map((notif: any) => notif.id),
         );
-        setNotifications(notifData as any);
+        setNotifications(visibleNotifs as any);
       }));
 
       setLoading(false);
@@ -649,7 +657,7 @@ export default function TeacherDashboard() {
     const loadingToast = toast.loading(t("deleting"));
     try {
       await deleteDoc(doc(db, "homework", id));
-      await notificationService.deleteBySourceId(id);
+      await notificationService.deleteBySourceId(id, profile.schoolId);
       toast.success(t("homeworkDeleted"), { id: loadingToast });
     } catch (error) {
       console.error("Error deleting homework:", error);
@@ -672,7 +680,7 @@ export default function TeacherDashboard() {
     const loadingToast = toast.loading(t("deleting"));
     try {
       await deleteDoc(doc(db, "teacher_reports", id));
-      await notificationService.deleteBySourceId(id);
+      await notificationService.deleteBySourceId(id, profile.schoolId);
       toast.success(t("reportDeleted"), { id: loadingToast });
     } catch (error) {
       console.error("Error deleting report:", error);

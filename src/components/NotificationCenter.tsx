@@ -55,6 +55,10 @@ import {
   NotificationCategory 
 } from "../lib/notificationSound";
 import { notificationService } from "../lib/notificationService";
+import {
+  filterNotificationsForUser,
+  isNotificationVisibleToUser,
+} from "../lib/notificationVisibility";
 import { getSafeHomeworkNotificationTitle } from "../lib/homeworkSubjects";
 import { buildTeacherRedactionContext } from "../lib/userProfile";
 import { toast } from "react-hot-toast";
@@ -314,61 +318,98 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     return getSafeHomeworkNotificationTitle(n.title, teacher, isArabic);
   };
 
+  const viewerContext = {
+    uid: user?.uid || profile?.uid || "",
+    role: userRole || profile?.role,
+    schoolId: profile?.schoolId,
+  };
+
   // 1. Listen to user notifications
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
 
-    // Standard notification user query
     const notifQuery = query(
       collection(db, "notifications"),
       where("userId", "==", user.uid),
     );
 
     const unsub = onSnapshot(notifQuery, (snap) => {
-      const items = snap.docs
-        .map(doc => ({
+      const items = filterNotificationsForUser(
+        snap.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
-        }))
-        .sort(
-          (a: any, b: any) =>
-            (b.createdAt?.seconds || b.createdAt?.getTime?.() || 0) -
-            (a.createdAt?.seconds || a.createdAt?.getTime?.() || 0),
-        );
+          createdAt: doc.data().createdAt?.toDate
+            ? doc.data().createdAt.toDate()
+            : new Date(),
+        })),
+        viewerContext,
+      ).sort(
+        (a: any, b: any) =>
+          (b.createdAt?.seconds || b.createdAt?.getTime?.() || 0) -
+          (a.createdAt?.seconds || a.createdAt?.getTime?.() || 0),
+      );
       setNotifications(items);
     }, (err) => {
       console.error("Notification listener failed: ", err);
     });
 
     return () => unsub();
-  }, [user]);
+  }, [user?.uid, profile?.schoolId, userRole, profile?.role]);
 
-  // 2. Fetch Administration Delivery Analytics inside 'logs' tab (Admins only)
+  // 2. Fetch scoped delivery analytics for the current school (admins only)
   useEffect(() => {
-    if (activeTab !== 'logs' || !profile || !['admin', 'superadmin'].includes(profile.role)) return;
+    if (
+      activeTab !== "logs" ||
+      !profile ||
+      !["admin", "superadmin"].includes(profile.role)
+    ) {
+      return;
+    }
 
     setIsLoadingLogs(true);
-    // Fetch latest 30 notifications logged globally in the database to showcase delivery, retries, status
-    const logsQuery = query(
-      collection(db, "notifications"),
-      orderBy("createdAt", "desc")
-    );
 
-    getDocs(logsQuery).then((snap) => {
-      const list = snap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
-      }));
-      setDeliveryLogs(list);
-      setIsLoadingLogs(false);
-    }).catch(err => {
-      console.error("Error loading delivery logs:", err);
-      setIsLoadingLogs(false);
-    });
+    const logsQuery =
+      profile.role === "superadmin"
+        ? query(
+            collection(db, "notifications"),
+            where("schoolId", "==", "system"),
+            orderBy("createdAt", "desc"),
+          )
+        : profile.schoolId
+          ? query(
+              collection(db, "notifications"),
+              where("schoolId", "==", profile.schoolId),
+              where("userId", "==", profile.uid),
+              orderBy("createdAt", "desc"),
+            )
+          : null;
 
-  }, [activeTab, profile]);
+    if (!logsQuery) {
+      setDeliveryLogs([]);
+      setIsLoadingLogs(false);
+      return;
+    }
+
+    getDocs(logsQuery)
+      .then((snap) => {
+        const list = filterNotificationsForUser(
+          snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate
+              ? doc.data().createdAt.toDate()
+              : new Date(),
+          })),
+          viewerContext,
+        );
+        setDeliveryLogs(list);
+        setIsLoadingLogs(false);
+      })
+      .catch((err) => {
+        console.error("Error loading delivery logs:", err);
+        setIsLoadingLogs(false);
+      });
+  }, [activeTab, profile, user?.uid, userRole]);
 
   // 3. Filter notifications
   useEffect(() => {
@@ -423,13 +464,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
   };
 
-  const handleMarkOneRead = async (id: string, read: boolean) => {
+  const handleMarkOneRead = async (id: string, read: boolean, notification?: any) => {
     if (read) return; // already read
+    if (notification && !isNotificationVisibleToUser(notification, viewerContext)) {
+      return;
+    }
     await notificationService.markAsRead(id);
   };
 
-  const handleDeleteOne = async (e: React.MouseEvent, id: string) => {
+  const handleDeleteOne = async (e: React.MouseEvent, id: string, notification?: any) => {
     e.stopPropagation();
+    if (notification && !isNotificationVisibleToUser(notification, viewerContext)) {
+      return;
+    }
     await notificationService.delete(id);
     toast.success(isArabic ? "تم حذف الإشعار" : "Notification deleted");
   };
@@ -457,7 +504,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   };
 
   const handleNotificationClick = async (n: any) => {
-    await handleMarkOneRead(n.id, n.read);
+    await handleMarkOneRead(n.id, n.read, n);
 
     const role = normalizeDashboardRole(userRole, profile?.role);
     const targetTab = resolveNotificationTab(n, role);
@@ -829,12 +876,30 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 <button
                   onClick={() => {
                     setIsLoadingLogs(true);
-                    getDocs(query(collection(db, "notifications"), orderBy("createdAt", "desc"))).then((snap) => {
-                      const list = snap.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data(),
-                        createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
-                      }));
+                    getDocs(
+                      profile.role === "superadmin"
+                        ? query(
+                            collection(db, "notifications"),
+                            where("schoolId", "==", "system"),
+                            orderBy("createdAt", "desc"),
+                          )
+                        : query(
+                            collection(db, "notifications"),
+                            where("schoolId", "==", profile.schoolId),
+                            where("userId", "==", profile.uid),
+                            orderBy("createdAt", "desc"),
+                          ),
+                    ).then((snap) => {
+                      const list = filterNotificationsForUser(
+                        snap.docs.map((doc) => ({
+                          id: doc.id,
+                          ...doc.data(),
+                          createdAt: doc.data().createdAt?.toDate
+                            ? doc.data().createdAt.toDate()
+                            : new Date(),
+                        })),
+                        viewerContext,
+                      );
                       setDeliveryLogs(list);
                       setIsLoadingLogs(false);
                       toast.success(isArabic ? "تم تحديث السجلات" : "Logs synced!");
@@ -1023,7 +1088,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       {/* Actions */}
                       <div className="shrink-0 self-center flex items-center gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={(e) => handleDeleteOne(e, n.id)}
+                          onClick={(e) => handleDeleteOne(e, n.id, n)}
                           className="p-2.5 text-slate-400 hover:text-red-550 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-full transition-colors active:scale-90 cursor-pointer"
                           title={isArabic ? "مسح التنبيه" : "Delete Notification"}
                         >

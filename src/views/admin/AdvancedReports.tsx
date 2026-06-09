@@ -135,7 +135,7 @@ export default function AdvancedReports() {
     if (confirm(isRtl ? 'هل أنت متأكد من حذف هذا التقرير؟' : 'Are you sure you want to delete this report?')) {
       try {
         await deleteDoc(doc(db, 'advanced_reports', id));
-        await notificationService.deleteBySourceId(id);
+        await notificationService.deleteBySourceId(id, profile.schoolId);
         toast.success(isRtl ? 'تم حذف التقرير بنجاح' : 'Report deleted successfully');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `advanced_reports/${id}`);

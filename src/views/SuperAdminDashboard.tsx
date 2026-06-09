@@ -20,6 +20,7 @@ import {
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import { filterNotificationsForUser } from "../lib/notificationVisibility";
 import {
   School,
   Building,
@@ -194,14 +195,24 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     if (!profile?.uid) return;
+    const viewer = {
+      uid: profile.uid,
+      role: profile.role,
+      schoolId: profile.schoolId,
+    };
     const qNotifications = query(
       collection(db, "notifications"),
-      where("userId", "==", profile.uid)
+      where("userId", "in", [profile.uid, "super_admin"]),
     );
     return onSnapshot(qNotifications, (snap) => {
-      setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setNotifications(
+        filterNotificationsForUser(
+          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+          viewer,
+        ),
+      );
     });
-  }, [profile?.uid]);
+  }, [profile?.uid, profile?.role, profile?.schoolId]);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [activeRequestSource, setActiveRequestSource] = useState<string | null>(
     null,

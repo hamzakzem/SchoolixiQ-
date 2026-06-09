@@ -50,6 +50,7 @@ import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
+import { filterNotificationsForUser } from "../lib/notificationVisibility";
 import SchoolixLogo from "../components/SchoolixLogo";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 
@@ -231,9 +232,18 @@ export default function AdminDashboard() {
       where("userId", "==", profile.uid)
     );
     return onSnapshot(qNotifications, (snap) => {
-      setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setNotifications(
+        filterNotificationsForUser(
+          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+          {
+            uid: profile.uid,
+            role: profile.role,
+            schoolId: profile.schoolId,
+          },
+        ),
+      );
     });
-  }, [profile?.uid]);
+  }, [profile?.uid, profile?.role, profile?.schoolId]);
 
   // Package permissions are controlled by the Super Admin via the package properties
   const perms = authSchoolData?.packagePermissions || profile?.permissions; // fallback to profile if not loaded yet

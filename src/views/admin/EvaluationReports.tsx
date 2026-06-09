@@ -138,7 +138,7 @@ export default function Evaluations() {
     if (confirm(isRtl ? 'هل أنت متأكد من حذف هذا التقييم؟' : 'Are you sure you want to delete this evaluation?')) {
       try {
         await deleteDoc(doc(db, 'teacher_reports', id));
-        await notificationService.deleteBySourceId(id);
+        await notificationService.deleteBySourceId(id, profile.schoolId);
         toast.success(isRtl ? 'تم حذف التقييم بنجاح' : 'Evaluation deleted successfully');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `teacher_reports/${id}`);

@@ -145,7 +145,7 @@ export default function Announcements() {
     const path = `announcements/${id}`;
     try {
       await deleteDoc(doc(db, 'announcements', id));
-      await notificationService.deleteBySourceId(id);
+      await notificationService.deleteBySourceId(id, profile.schoolId);
       setAnnouncements(prev => prev.filter(a => a.id !== id));
       toast.success('تم حذف الإعلان بنجاح');
       setDeleteConfirmId(null);

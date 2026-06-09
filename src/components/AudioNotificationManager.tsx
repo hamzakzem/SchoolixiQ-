@@ -9,6 +9,7 @@ import {
   playMarketplaceNotificationSound,
   playSubscriptionNotificationSound,
 } from "../lib/notificationSound";
+import { isNotificationVisibleToUser } from "../lib/notificationVisibility";
 
 export const AudioNotificationManager: React.FC = () => {
   const { user, profile } = useAuth();
@@ -73,6 +74,18 @@ export const AudioNotificationManager: React.FC = () => {
       snap.docChanges().forEach((change: any) => {
         if (change.type === "added") {
           const data = change.doc.data();
+          if (
+            !isNotificationVisibleToUser(
+              { id: change.doc.id, ...data },
+              {
+                uid: user.uid,
+                role: profile.role,
+                schoolId: profile.schoolId,
+              },
+            )
+          ) {
+            return;
+          }
           // Filter only unread or newly received ones
           if (data.read === true) return;
 
