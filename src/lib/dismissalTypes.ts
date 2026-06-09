@@ -18,7 +18,12 @@ export type DismissalStatusEvent = {
   by?: string;
   byName?: string;
   note?: string;
+  studentId?: string;
+  classId?: string;
 };
+
+export const DISMISSAL_NO_VALID_CLASS_MSG =
+  'لا يمكن إنشاء طلب تسريح لأن الطالب غير مرتبط بصف صحيح';
 
 export type DismissalRequest = {
   id: string;
@@ -27,6 +32,9 @@ export type DismissalRequest = {
   studentName: string;
   classId: string;
   className: string;
+  registrationNumber?: string;
+  photoUrl?: string;
+  parentIds?: string[];
   parentId: string;
   parentName: string;
   requestedByName: string;

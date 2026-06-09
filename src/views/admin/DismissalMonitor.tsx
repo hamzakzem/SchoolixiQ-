@@ -1,16 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { db } from '../../lib/firebase';
+import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { subscribeSchoolDismissals } from '../../lib/dismissalService';
+import { subscribeSchoolDismissals, groupDismissalsByClass } from '../../lib/dismissalService';
 import {
   DISMISSAL_STATUS_LABELS,
   type DismissalRequest,
   type DismissalStatus,
 } from '../../lib/dismissalTypes';
 import { ShieldCheck, Filter, Clock } from 'lucide-react';
+import DismissalStudentCard from '../../components/dismissal/DismissalStudentCard';
+
+type SchoolClass = { id: string; name: string };
 
 export default function DismissalMonitor() {
   const { profile } = useAuth();
   const [requests, setRequests] = useState<DismissalRequest[]>([]);
+  const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | DismissalStatus>('all');
   const [classFilter, setClassFilter] = useState('all');
 
@@ -19,10 +25,22 @@ export default function DismissalMonitor() {
     return subscribeSchoolDismissals(profile.schoolId, setRequests);
   }, [profile?.schoolId]);
 
-  const classes = useMemo(() => {
-    const names = new Set(requests.map((r) => r.className).filter(Boolean));
-    return Array.from(names).sort((a, b) => a.localeCompare(b, 'ar'));
-  }, [requests]);
+  useEffect(() => {
+    if (!profile?.schoolId) return;
+    const q = query(
+      collection(db, 'classes'),
+      where('schoolId', '==', profile.schoolId),
+      limit(200),
+    );
+    return onSnapshot(q, (snap) => {
+      setSchoolClasses(
+        snap.docs
+          .map((d) => ({ id: d.id, name: String(d.data().name || '') }))
+          .filter((c) => c.name)
+          .sort((a, b) => a.name.localeCompare(b.name, 'ar')),
+      );
+    });
+  }, [profile?.schoolId]);
 
   const todayStart = useMemo(() => {
     const d = new Date();
@@ -43,10 +61,29 @@ export default function DismissalMonitor() {
   const filtered = useMemo(() => {
     return requests.filter((r) => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
-      if (classFilter !== 'all' && r.className !== classFilter) return false;
+      if (classFilter !== 'all' && r.classId !== classFilter) return false;
       return true;
     });
   }, [requests, statusFilter, classFilter]);
+
+  const activeByClass = useMemo(() => {
+    const active = filtered.filter((r) => ['waiting', 'called', 'ready'].includes(r.status));
+    return groupDismissalsByClass(active);
+  }, [filtered]);
+
+  const completedByClass = useMemo(() => {
+    const done = filtered.filter((r) => r.status === 'completed');
+    return groupDismissalsByClass(done);
+  }, [filtered]);
+
+  const classNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    schoolClasses.forEach((c) => { map[c.id] = c.name; });
+    requests.forEach((r) => {
+      if (r.classId) map[r.classId] = r.className || map[r.classId];
+    });
+    return map;
+  }, [schoolClasses, requests]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500" dir="rtl">
@@ -56,7 +93,7 @@ export default function DismissalMonitor() {
           البوابة الذكية — مراقبة التسريح
         </h1>
         <p className="text-slate-500 font-bold mt-1">
-          متابعة طلبات تسريح الطلاب الآمنة لمدرستك
+          متابعة طلبات تسريح الطلاب حسب الصفوف المسجلة في المدرسة
         </p>
       </div>
 
@@ -91,10 +128,37 @@ export default function DismissalMonitor() {
           className="px-4 py-2 rounded-xl border font-bold text-sm bg-white"
         >
           <option value="all">كل الصفوف</option>
-          {classes.map((c) => (
-            <option key={c} value={c}>{c}</option>
+          {schoolClasses.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border p-5">
+          <h3 className="font-bold text-slate-800 mb-3">نشطة حسب الصف</h3>
+          {Object.keys(activeByClass).length === 0 ? (
+            <p className="text-sm text-slate-400 font-bold">لا توجد طلبات نشطة</p>
+          ) : (
+            Object.entries(activeByClass).map(([classId, items]) => (
+              <p key={classId} className="text-sm font-bold text-slate-600 py-1">
+                {classNameById[classId] || classId}: {items.length}
+              </p>
+            ))
+          )}
+        </div>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border p-5">
+          <h3 className="font-bold text-slate-800 mb-3">مكتملة حسب الصف</h3>
+          {Object.keys(completedByClass).length === 0 ? (
+            <p className="text-sm text-slate-400 font-bold">لا توجد طلبات مكتملة</p>
+          ) : (
+            Object.entries(completedByClass).map(([classId, items]) => (
+              <p key={classId} className="text-sm font-bold text-slate-600 py-1">
+                {classNameById[classId] || classId}: {items.length}
+              </p>
+            ))
+          )}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-3xl border overflow-hidden">
@@ -102,12 +166,11 @@ export default function DismissalMonitor() {
           {filtered.map((r) => (
             <div key={r.id} className="p-5 hover:bg-slate-50/50">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-bold text-slate-900">{r.studentName}</p>
-                  <p className="text-xs text-slate-500">{r.className} — {r.parentName}</p>
-                  <p className="text-[10px] font-mono text-indigo-600 mt-1">{r.token}</p>
+                <div className="flex-1 min-w-0">
+                  <DismissalStudentCard request={r} />
+                  <p className="text-[10px] font-mono text-indigo-600 mt-2">{r.token}</p>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600">
+                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600 shrink-0">
                   {DISMISSAL_STATUS_LABELS[r.status].ar}
                 </span>
               </div>
@@ -118,6 +181,7 @@ export default function DismissalMonitor() {
                       <Clock size={10} />
                       {DISMISSAL_STATUS_LABELS[h.status]?.ar || h.status}
                       {h.byName ? ` — ${h.byName}` : ''}
+                      {h.classId ? ` [${classNameById[h.classId] || h.classId}]` : ''}
                     </p>
                   ))}
                 </div>

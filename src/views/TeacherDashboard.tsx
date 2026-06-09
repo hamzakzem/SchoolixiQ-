@@ -1972,7 +1972,11 @@ export default function TeacherDashboard() {
 
               {activeTab === "dismissal" && (
                 <div className="animate-in fade-in duration-500">
-                  <TeacherDismissalTab assignedClassId={assignedClassId} isRtl={isRtl} />
+                  <TeacherDismissalTab
+                    assignedClassId={assignedClassId}
+                    assignedClassName={assignedClassName}
+                    isRtl={isRtl}
+                  />
                 </div>
               )}
 

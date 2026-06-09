@@ -15,8 +15,10 @@ import { toast } from 'react-hot-toast';
 import {
   subscribeSchoolDismissals,
   verifyDismissalToken,
+  verifyDismissalHandover,
   guardCompleteDismissal,
   guardCancelDismissal,
+  groupDismissalsByClass,
 } from '../lib/dismissalService';
 import {
   ACTIVE_DISMISSAL_STATUSES,
@@ -24,6 +26,7 @@ import {
   type DismissalRequest,
 } from '../lib/dismissalTypes';
 import SchoolixLogo from '../components/SchoolixLogo';
+import DismissalStudentCard from '../components/dismissal/DismissalStudentCard';
 
 export default function GuardDashboard() {
   const { profile, schoolData } = useAuth();
@@ -31,6 +34,7 @@ export default function GuardDashboard() {
   const [search, setSearch] = useState('');
   const [tokenInput, setTokenInput] = useState('');
   const [verified, setVerified] = useState<DismissalRequest | null>(null);
+  const [confirmReady, setConfirmReady] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -52,17 +56,29 @@ export default function GuardDashboard() {
       (r) =>
         r.studentName.toLowerCase().includes(q) ||
         r.className.toLowerCase().includes(q) ||
+        r.registrationNumber?.toLowerCase().includes(q) ||
         r.token.toLowerCase().includes(q),
     );
   }, [activeRequests, search]);
 
+  const groupedByClass = useMemo(() => groupDismissalsByClass(filtered), [filtered]);
+
+  const classLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    filtered.forEach((r) => {
+      map[r.classId || r.className] = r.className;
+    });
+    return map;
+  }, [filtered]);
+
   const handleVerify = async () => {
     if (!profile?.schoolId || !tokenInput.trim()) return;
     setBusy(true);
+    setConfirmReady(false);
     try {
       const req = await verifyDismissalToken(tokenInput, profile.schoolId);
       setVerified(req);
-      toast.success('تم التحقق من الرمز');
+      toast.success('تم التحقق من الرمز وبيانات الطالب');
     } catch (e: any) {
       setVerified(null);
       toast.error(e.message || 'فشل التحقق');
@@ -71,16 +87,33 @@ export default function GuardDashboard() {
     }
   };
 
-  const handleComplete = async (request: DismissalRequest) => {
-    if (!profile) return;
+  const handlePrepareComplete = async () => {
+    if (!profile?.schoolId || !verified) return;
     setBusy(true);
     try {
-      await guardCompleteDismissal(request, {
-        uid: profile.uid,
-        name: profile.name || 'حارس',
-      });
+      await verifyDismissalHandover(verified, profile.schoolId, tokenInput);
+      setConfirmReady(true);
+      toast.success('تم التحقق — راجع البيانات ثم أكّد التسليم');
+    } catch (e: any) {
+      setConfirmReady(false);
+      toast.error(e.message || 'فشل التحقق النهائي');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!profile || !verified) return;
+    setBusy(true);
+    try {
+      await guardCompleteDismissal(
+        verified,
+        { uid: profile.uid, name: profile.name || 'حارس' },
+        tokenInput,
+      );
       toast.success('تم تسليم الطالب');
       setVerified(null);
+      setConfirmReady(false);
       setTokenInput('');
     } catch (e: any) {
       toast.error(e.message || 'فشل التسليم');
@@ -102,6 +135,7 @@ export default function GuardDashboard() {
       });
       toast.success('تم إلغاء الطلب');
       setVerified(null);
+      setConfirmReady(false);
       setCancelReason('');
     } catch (e: any) {
       toast.error(e.message || 'فشل الإلغاء');
@@ -109,6 +143,9 @@ export default function GuardDashboard() {
       setBusy(false);
     }
   };
+
+  const pickupLabel = (r: DismissalRequest) =>
+    r.pickupPersonName || r.requestedByName || r.parentName || '—';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" dir="rtl">
@@ -138,7 +175,10 @@ export default function GuardDashboard() {
           <div className="flex gap-2">
             <input
               value={tokenInput}
-              onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
+              onChange={(e) => {
+                setTokenInput(e.target.value.toUpperCase());
+                setConfirmReady(false);
+              }}
               placeholder="أدخل رمز التسليم"
               className="flex-1 px-4 py-3 rounded-xl border border-slate-200 font-mono font-bold uppercase"
             />
@@ -150,23 +190,43 @@ export default function GuardDashboard() {
               تحقق
             </button>
           </div>
+
           {verified && (
-            <div className="mt-4 p-4 rounded-2xl bg-indigo-50 border border-indigo-100 space-y-3">
-              <p className="font-bold text-slate-900">{verified.studentName}</p>
-              <p className="text-sm text-slate-600">{verified.className}</p>
-              <p className="text-xs font-bold text-indigo-600">
-                {DISMISSAL_STATUS_LABELS[verified.status].ar}
-              </p>
-              <div className="flex flex-wrap gap-2">
+            <div className="mt-4 p-4 rounded-2xl bg-indigo-50 border border-indigo-100 space-y-4">
+              <DismissalStudentCard request={verified} />
+
+              <div className="grid grid-cols-1 gap-2 text-sm bg-white rounded-xl p-4 border">
+                <p><span className="font-bold text-slate-500">الطالب:</span> {verified.studentName}</p>
+                <p><span className="font-bold text-slate-500">الصف:</span> {verified.className}</p>
+                <p><span className="font-bold text-slate-500">ولي الأمر / المستلم:</span> {pickupLabel(verified)}</p>
+                <p><span className="font-bold text-slate-500">رمز التحقق:</span> <span className="font-mono">{verified.token}</span></p>
+                {verified.registrationNumber && (
+                  <p><span className="font-bold text-slate-500">الرقم التسلسلي:</span> {verified.registrationNumber}</p>
+                )}
+                <p className="text-xs font-bold text-indigo-600">
+                  {DISMISSAL_STATUS_LABELS[verified.status].ar}
+                </p>
+              </div>
+
+              {!confirmReady ? (
                 <button
-                  onClick={() => handleComplete(verified)}
+                  onClick={handlePrepareComplete}
                   disabled={busy || !['called', 'ready'].includes(verified.status)}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-50"
+                  className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm disabled:opacity-50"
+                >
+                  التحقق النهائي قبل التسليم
+                </button>
+              ) : (
+                <button
+                  onClick={handleComplete}
+                  disabled={busy}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-50"
                 >
                   <CheckCircle size={16} />
-                  تأكيد التسليم
+                  إتمام التسليم
                 </button>
-              </div>
+              )}
+
               <div className="pt-2 border-t border-indigo-100">
                 <input
                   value={cancelReason}
@@ -199,31 +259,38 @@ export default function GuardDashboard() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="بحث بالاسم أو الصف..."
+              placeholder="بحث بالاسم أو الصف أو الرقم..."
               className="w-full pr-10 pl-4 py-3 rounded-xl border border-slate-200 text-sm font-bold"
             />
           </div>
-          <div className="space-y-3 max-h-[50vh] overflow-y-auto">
-            {filtered.map((r) => (
-              <div
-                key={r.id}
-                className="p-4 rounded-2xl border border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3"
-              >
-                <div>
-                  <p className="font-bold text-slate-900">{r.studentName}</p>
-                  <p className="text-xs text-slate-500">{r.className}</p>
-                  <p className="text-[10px] font-mono text-indigo-600 mt-1">{r.token}</p>
-                </div>
-                <div className="text-left">
-                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700">
-                    {DISMISSAL_STATUS_LABELS[r.status].ar}
-                  </span>
-                  {r.createdAt?.seconds && (
-                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 justify-end">
-                      <Clock size={10} />
-                      {new Date(r.createdAt.seconds * 1000).toLocaleTimeString('ar-IQ')}
-                    </p>
-                  )}
+
+          <div className="space-y-6 max-h-[50vh] overflow-y-auto">
+            {Object.entries(groupedByClass).map(([classKey, classRequests]) => (
+              <div key={classKey}>
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2 px-1">
+                  {classLabels[classKey] || classKey} ({classRequests.length})
+                </h3>
+                <div className="space-y-2">
+                  {classRequests.map((r) => (
+                    <div
+                      key={r.id}
+                      className="p-4 rounded-2xl border border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3"
+                    >
+                      <DismissalStudentCard request={r} compact />
+                      <div className="text-left shrink-0">
+                        <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700">
+                          {DISMISSAL_STATUS_LABELS[r.status].ar}
+                        </span>
+                        <p className="text-[10px] font-mono text-indigo-600 mt-1">{r.token}</p>
+                        {r.createdAt?.seconds && (
+                          <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 justify-end">
+                            <Clock size={10} />
+                            {new Date(r.createdAt.seconds * 1000).toLocaleTimeString('ar-IQ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}

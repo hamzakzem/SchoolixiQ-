@@ -12,14 +12,17 @@ import {
   type DismissalRequest,
 } from '../../lib/dismissalTypes';
 import { teacherHasAssignedClass, TEACHER_NO_CLASS_MSG } from '../../lib/teacherClass';
+import DismissalStudentCard from '../../components/dismissal/DismissalStudentCard';
 
 type Props = {
   assignedClassId: string;
+  assignedClassName?: string;
   isRtl?: boolean;
 };
 
 export default function TeacherDismissalTab({
   assignedClassId,
+  assignedClassName,
   isRtl = true,
 }: Props) {
   const { profile } = useAuth();
@@ -44,13 +47,13 @@ export default function TeacherDismissalTab({
   );
 
   const updateStatus = async (id: string, status: 'called' | 'ready') => {
-    if (!profile) return;
+    if (!profile || !assignedClassId) return;
     setBusyId(id);
     try {
       await teacherUpdateDismissalStatus(id, status, {
         uid: profile.uid,
         name: profile.name || 'معلم',
-      });
+      }, assignedClassId);
       toast.success(status === 'called' ? 'تم النداء' : 'الطالب جاهز');
     } catch (e: any) {
       toast.error(e.message || 'فشل التحديث');
@@ -75,7 +78,9 @@ export default function TeacherDismissalTab({
           {isRtl ? 'طلبات التسريح — صفي' : 'Dismissal requests — my class'}
         </h2>
         <p className="text-sm text-slate-500 font-bold mt-1">
-          {isRtl ? 'طلبات أولياء الأمور لطلاب صفك المعين فقط' : 'Pickup requests for your assigned class only'}
+          {isRtl
+            ? `الصف المعين: ${assignedClassName || assignedClassId} — طلبات مرتبطة بهذا الصف فقط`
+            : `Assigned class: ${assignedClassName || assignedClassId}`}
         </p>
       </div>
 
@@ -85,14 +90,16 @@ export default function TeacherDismissalTab({
             key={r.id}
             className="bg-white dark:bg-slate-900 rounded-2xl border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
           >
-            <div>
-              <p className="font-bold text-lg text-slate-900 dark:text-white">{r.studentName}</p>
-              <p className="text-xs text-slate-500">{r.parentName || r.requestedByName}</p>
+            <div className="flex-1 min-w-0">
+              <DismissalStudentCard request={r} />
+              <p className="text-xs text-slate-500 mt-2">
+                ولي الأمر: {r.pickupPersonName || r.parentName || r.requestedByName}
+              </p>
               <span className="inline-block mt-2 text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700">
                 {DISMISSAL_STATUS_LABELS[r.status].ar}
               </span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               {r.status === 'waiting' && (
                 <button
                   onClick={() => updateStatus(r.id, 'called')}
