@@ -150,6 +150,15 @@ export async function adminDeleteUser(uid: string) {
   };
 }
 
+export async function adminSyncUserClaims(uid: string) {
+  const endpoint = `/api/admin/sync-claims?t=${Date.now()}`;
+  const json = await adminApiPost(endpoint, { uid });
+  return {
+    success: json.success !== false,
+    message: (json.message as string) || '',
+  };
+}
+
 export async function adminDeleteStudent(id: string) {
   const endpoint = `/api/admin/delete-student?t=${Date.now()}`;
   const json = await adminApiPost(endpoint, { id });

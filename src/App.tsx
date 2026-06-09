@@ -690,6 +690,7 @@ const AppContent = () => {
         return <AdminDashboard />;
       case UserRole.ADMIN:
       case UserRole.STAFF:
+      case "school_admin":
         return <AdminDashboard />;
       case UserRole.PARENT:
         return <ParentDashboard />;

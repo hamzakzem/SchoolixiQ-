@@ -17,6 +17,7 @@ import {
 import { UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from './firestore-errors';
 import { buildTeacherRedactionContext } from './userProfile';
+import { resolveProfilePermissions } from './staffPermissions';
 import { useLanguage } from './LanguageContext';
 
 interface AuthContextType {
@@ -131,11 +132,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               console.warn("Failed to get ID token result or session revoked, using firestore backup:", tokenError);
             }
             
-            setProfile({ 
-              uid: authUser.uid, 
+            const resolvedPermissions = resolveProfilePermissions(
+              data.permissions,
+              claims.p,
+            );
+
+            setProfile({
+              uid: authUser.uid,
               ...data,
-              permissions: claims.p || data.permissions || null
+              permissions: resolvedPermissions as UserProfile['permissions'],
             } as UserProfile);
+
+            if (
+              Array.isArray(resolvedPermissions) &&
+              JSON.stringify(resolvedPermissions) !== JSON.stringify(claims.p)
+            ) {
+              try {
+                await authUser.getIdToken(true);
+              } catch (refreshErr) {
+                console.warn('Failed to refresh token after permissions update:', refreshErr);
+              }
+            }
 
             // Active school admins can render while school/package data streams in
             if (

@@ -6,7 +6,7 @@ import { UserPlus, Mail, Phone, ShieldCheck, Trash2, Lock, Save, X, Search, Prin
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
-import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
+import { adminCreateUser, adminDeleteUser, adminSyncUserClaims } from '../../lib/adminApi';
 import { printElement } from '../../lib/printUtils';
 import {
   getTeacherSubjectDisplay,
@@ -385,6 +385,14 @@ export default function StaffList() {
 
         // Update pending payroll if exists for current month
         await updatePendingPayroll(editingStaff.id, Number(newStaff.salary), newStaff.name);
+
+        if (roleUsesPermissionPicker(newStaff.role)) {
+          try {
+            await adminSyncUserClaims(editingStaff.id);
+          } catch (syncErr) {
+            console.warn('Failed to sync claims after permission update:', syncErr);
+          }
+        }
 
         toast.success('تم تحديث بيانات الموظف والراتب');
       } else {

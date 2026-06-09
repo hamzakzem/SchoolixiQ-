@@ -51,6 +51,7 @@ import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
 import { filterNotificationsForUser } from "../lib/notificationVisibility";
+import { canAccessAdminMenuItem } from "../lib/staffPermissions";
 import SchoolixLogo from "../components/SchoolixLogo";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 
@@ -245,8 +246,10 @@ export default function AdminDashboard() {
     });
   }, [profile?.uid, profile?.role, profile?.schoolId]);
 
-  // Package permissions are controlled by the Super Admin via the package properties
-  const perms = authSchoolData?.packagePermissions || profile?.permissions; // fallback to profile if not loaded yet
+  const packagePerms = authSchoolData?.packagePermissions as
+    | Record<string, boolean | undefined>
+    | undefined;
+  const userPerms = profile?.permissions;
 
   const menuItems = [
     { id: "overview", label: t("overview"), icon: LayoutDashboard },
@@ -279,68 +282,11 @@ export default function AdminDashboard() {
     { id: "settings", label: t("settings"), icon: Settings },
   ];
 
-  const filteredMenuItems = menuItems.filter((item) => {
-    if (profile?.role === "superadmin") return true;
-    if (profile?.role === "admin" || profile?.role === "staff") {
-      if (item.id === "overview") return true;
-      if (item.adminOnly && profile.role !== "admin") return false;
-
-      // If profile has custom permissions (from package), enforce them
-      if (perms && typeof perms === "object" && !Array.isArray(perms)) {
-        if (item.id === "overview") return perms.overview !== false;
-        if (item.id === "chat") return perms.chat !== false;
-        if (item.id === "students") return perms.students_view !== false;
-        if (item.id === "students_edit") return perms.students_edit !== false;
-        if (item.id === "parents") return perms.parent_app_access !== false;
-        if (item.id === "staff") return perms.staff_manage !== false;
-        if (item.id === "tuition") return perms.tuition_fees !== false;
-        if (item.id === "payroll") return perms.staff_payroll !== false;
-        if (item.id === "attendance") return perms.attendance_track !== false;
-        if (item.id === "grades") return perms.exams_and_results !== false;
-        if (item.id === "student_archive")
-          return perms.student_archive !== false;
-        if (item.id === "inventory")
-          return perms.inventory_and_assets !== false;
-        if (item.id === "behavior") return perms.behavior_management !== false;
-        if (item.id === "evaluation_reports")
-          return perms.student_evaluation_reports !== false;
-        if (item.id === "homework") return perms.homework_and_tasks !== false;
-        if (item.id === "classes") return perms.classes !== false;
-        if (item.id === "schedules") return perms.automated_schedules !== false;
-        if (item.id === "announcements") return perms.announcements !== false;
-        if (item.id === "advanced_reports")
-          return perms.advanced_reports !== false;
-        if (item.id === "market") return perms.marketplace_ordering !== false;
-        if (item.id === "id_cards") return perms.id_card_generation !== false;
-        if (item.id === "assistants")
-          return perms.assistants_manage !== false && profile.role === "admin";
-        if (item.id === "settings") return perms.settings !== false;
-
-        return true; // Fallback for any other unmatched modules
-      } else if (profile.role === "admin" && !perms) {
-        // If it's an admin and no permissions are set yet, allow everything as a transitional state
-        // but it's better to default to a "Basic" set if we want strictness.
-        // For now, return true so they don't lose access before sync.
-        return true;
-      }
-    }
-    if (profile?.role === "assistant") {
-      if (item.id === "overview") return true;
-      if (item.id === "chat") return true;
-      if (item.adminOnly) return false;
-      // Assistant permissions are usually a legacy string array
-      if (Array.isArray(profile.permissions)) {
-        // Map students permission to both view and edit tabs for assistants
-        if (item.id === "students" || item.id === "students_edit") {
-          return profile.permissions.includes("students");
-        }
-        if (item.id === "attendance") return false;
-        return profile.permissions.includes(item.id);
-      }
-      return false;
-    }
-    return false;
-  });
+  const filteredMenuItems = menuItems.filter((item) =>
+    canAccessAdminMenuItem(item.id, profile?.role, userPerms, packagePerms, {
+      adminOnly: item.adminOnly,
+    }),
+  );
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const primaryItems = filteredMenuItems.filter((item) =>
