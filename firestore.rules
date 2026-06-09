@@ -239,9 +239,15 @@ service cloud.firestore {
       }
     }
 
-    // Students — public read preserved for QR verify & parent linking queries; writes isolated.
+    // Students — public get only (QR verify); scoped list/get for staff & linked parents.
     match /students/{studentId} {
-      allow read, get, list: if true;
+      allow get: if isSuperAdmin()
+        || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && isSchoolStaffRole())
+        || isLinkedParentData(resource.data)
+        || !signedIn();
+      allow list: if isSuperAdmin()
+        || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && isSchoolStaffRole())
+        || isLinkedParentData(resource.data);
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
       allow update: if isSuperAdmin()
