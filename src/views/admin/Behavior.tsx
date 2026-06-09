@@ -20,7 +20,13 @@ export default function Behavior() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
-  const [newReport, setNewReport] = useState({ type: 'positive', description: '' });
+  const [newReport, setNewReport] = useState({
+    type: 'positive' as 'positive' | 'warning',
+    severity: 'medium' as 'low' | 'medium' | 'high',
+    actionTaken: '',
+    description: '',
+    notifyParent: true,
+  });
 
   const [reportToDelete, setReportToDelete] = useState<string | null>(null);
 
@@ -67,7 +73,10 @@ export default function Behavior() {
         parentIds: link?.parentIds || [],
         parentEmail: link?.parentEmail || '',
         type: newReport.type,
+        severity: newReport.severity,
+        actionTaken: newReport.actionTaken.trim() || '',
         description: newReport.description,
+        notifyParent: newReport.notifyParent,
         createdAt: serverTimestamp(),
         authorId: profile.uid,
         authorName: profile.name
@@ -87,17 +96,24 @@ export default function Behavior() {
 
       setReports(prev => [newReportData, ...prev]);
 
-      // Notify parents
-      await notificationService.notifyStudentParents(selectedStudent.id, {
-        title: newReport.type === 'positive' ? 'تقرير سلوكي إيجابي' : 'تنبيه سلوكي',
-        message: `تم تسجيل تقرير سلوكي جديد: ${newReport.description}`,
-        type: 'behavior',
-        schoolId: profile.schoolId
-      });
+      if (newReport.notifyParent) {
+        await notificationService.notifyStudentParents(selectedStudent.id, {
+          title: newReport.type === 'positive' ? 'ملاحظة سلوكية إيجابية' : 'تنبيه سلوكي',
+          message: `تم تسجيل حادثة سلوكية: ${newReport.description}`,
+          type: 'behavior',
+          schoolId: profile.schoolId
+        });
+      }
 
       toast.success('تم تسجيل التقرير السلوكي بنجاح');
       setShowAddModal(false);
-      setNewReport({ type: 'positive', description: '' });
+      setNewReport({
+        type: 'positive',
+        severity: 'medium',
+        actionTaken: '',
+        description: '',
+        notifyParent: true,
+      });
       setSelectedStudent(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'behavior_reports');
@@ -130,15 +146,22 @@ export default function Behavior() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 font-sans" dir={isRtl ? 'rtl' : 'ltr'}>
       <div>
-        <h1 className="text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">تقارير السلوك</h1>
-        <p className="text-slate-500 dark:text-slate-400 font-bold mt-1">تسجيل الملاحظات السلوكية الإيجابية والتحذيرية للطلاب</p>
+        <h1 className="text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">السلوك والحوادث</h1>
+        <p className="text-slate-500 dark:text-slate-400 font-bold mt-1">
+          تسجيل حوادث سلوكية لطالب محدد — ليست للتعميمات العامة ولا للتقييمات الأكاديمية
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-amber-100 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-900/40 px-5 py-4 text-sm font-bold text-amber-900 dark:text-amber-200">
+        <span className="text-amber-600 dark:text-amber-400">متى تستخدم هذا القسم؟</span>{' '}
+        عند ملاحظة سلوك إيجابي أو مخالفة لطالب واحد. للتعميمات استخدم «الإعلانات»، وللتقييم الدراسي استخدم «التقييمات».
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="font-bold text-slate-900 dark:text-white">الطلاب</h3>
+              <h3 className="font-bold text-slate-900 dark:text-white">اختر طالباً لتسجيل حادثة</h3>
               <div className="relative w-64">
                 <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400`} size={16} />
                 <input 
@@ -180,7 +203,7 @@ export default function Behavior() {
 
         <div className="space-y-6">
           <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm h-full">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 font-display">آخر التقارير</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 font-display">آخر الحوادث السلوكية</h3>
             <div className="space-y-4 overflow-y-auto h-[600px] pr-2 custom-scrollbar">
               {reports.map(report => (
                 <div 
@@ -203,7 +226,15 @@ export default function Behavior() {
                       )}
                     </div>
                   </div>
+                  {report.severity && (
+                    <span className="inline-block mb-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">
+                      الشدة: {report.severity === 'high' ? 'عالية' : report.severity === 'low' ? 'منخفضة' : 'متوسطة'}
+                    </span>
+                  )}
                   <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{report.description}</p>
+                  {report.actionTaken && (
+                    <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">الإجراء: {report.actionTaken}</p>
+                  )}
                   <div className="mt-3 flex items-center justify-between opacity-60">
                     <span className="text-[10px] font-bold">{report.authorName}</span>
                     <span className="text-[10px] font-mono">
@@ -213,8 +244,11 @@ export default function Behavior() {
                 </div>
               ))}
               {reports.length === 0 && (
-                <div className="text-center py-20 text-slate-400 italic text-sm">
-                  لا توجد تقارير حالياً
+                <div className="text-center py-20 text-slate-400 space-y-2 px-4">
+                  <p className="font-bold text-sm">لا توجد حوادث سلوكية مسجلة</p>
+                  <p className="text-xs leading-relaxed">
+                    سجّل هنا الملاحظات السلوكية الفردية (إيجابية أو تحذيرية) مع نوع الحادثة والإجراء المتخذ.
+                  </p>
                 </div>
               )}
             </div>
@@ -266,12 +300,13 @@ export default function Behavior() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="bg-white dark:bg-slate-900 rounded-[3rem] p-10 w-full max-w-xl border border-slate-200 shadow-2xl"
             >
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">تقرير سلوكي جديد</h2>
-              <p className="text-slate-500 font-bold text-sm mb-8">تسجيل ملاحظة لـ {selectedStudent?.name}</p>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">حادثة سلوكية جديدة</h2>
+              <p className="text-slate-500 font-bold text-sm mb-2">تسجيل حادثة لطالب: {selectedStudent?.name}</p>
+              <p className="text-slate-400 text-xs mb-8">حادثة فردية — لا تُستخدم للإعلانات أو التقييمات الدراسية</p>
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">نوع السلوك</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">نوع الحادثة</label>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
@@ -293,15 +328,54 @@ export default function Behavior() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">التفاصيل / الملاحظة</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">درجة الشدة</label>
+                  <select
+                    value={newReport.severity}
+                    onChange={(e) =>
+                      setNewReport({
+                        ...newReport,
+                        severity: e.target.value as 'low' | 'medium' | 'high',
+                      })
+                    }
+                    className="w-full px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 font-bold text-slate-700"
+                  >
+                    <option value="low">منخفضة</option>
+                    <option value="medium">متوسطة</option>
+                    <option value="high">عالية</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">الإجراء المتخذ (اختياري)</label>
+                  <input
+                    type="text"
+                    value={newReport.actionTaken}
+                    onChange={(e) => setNewReport({ ...newReport, actionTaken: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 font-bold text-slate-700"
+                    placeholder="مثال: تنبيه شفهي، استدعاء ولي الأمر..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">ملاحظات الحادثة</label>
                   <textarea 
                     required
                     value={newReport.description}
                     onChange={e => setNewReport({...newReport, description: e.target.value})}
                     className="w-full h-32 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 focus:bg-white outline-none focus:ring-4 focus:ring-blue-100 transition-all font-bold text-slate-700"
-                    placeholder="اكتب ملاحظاتك هنا..."
+                    placeholder="صف ما حدث بوضوح..."
                   />
                 </div>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newReport.notifyParent}
+                    onChange={(e) => setNewReport({ ...newReport, notifyParent: e.target.checked })}
+                    className="w-4 h-4 rounded border-slate-300"
+                  />
+                  <span className="text-sm font-bold text-slate-600 dark:text-slate-300">إشعار ولي الأمر بهذه الحادثة</span>
+                </label>
 
                 <div className="flex gap-4">
                   <button 
@@ -315,7 +389,7 @@ export default function Behavior() {
                     disabled={loading || !newReport.description}
                     className="flex-[2] py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    {loading ? 'جاري الحفظ...' : 'حفظ التقرير'}
+                    {loading ? 'جاري الحفظ...' : 'حفظ الحادثة'}
                   </button>
                 </div>
               </form>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { AttendanceService } from '../../services/attendance.service';
 import { fetchStudentLinkFields } from '../../lib/schoolSync';
 import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
-import { FileText, Plus, Edit2, Trash2, Send, X, Users, BarChart } from 'lucide-react';
+import { FileText, Plus, Edit2, Trash2, Send, X, Users, BarChart, Printer, Wallet, BookOpen, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -36,6 +37,16 @@ export default function AdvancedReports({
   const [reportContent, setReportContent] = useState('');
   const [editingReport, setEditingReport] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [studentAnalytics, setStudentAnalytics] = useState<{
+    behaviorCount: number;
+    evaluationCount: number;
+    customReportCount: number;
+    homeworkCount: number;
+    absentDays: number;
+    lateDays: number;
+    tuitionBalance: number;
+  } | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   // Fetch classes
   useEffect(() => {
@@ -96,6 +107,70 @@ export default function AdvancedReports({
 
     return () => unsubscribe();
   }, [profile]);
+
+  useEffect(() => {
+    if (!profile?.schoolId || !selectedStudent?.id || !selectedStudent?.classId) {
+      setStudentAnalytics(null);
+      return;
+    }
+
+    let cancelled = false;
+    setAnalyticsLoading(true);
+
+    (async () => {
+      try {
+        const [behaviorSnap, evaluationSnap, homeworkSnap, attendance] = await Promise.all([
+          getDocs(
+            query(
+              collection(db, 'behavior_reports'),
+              where('schoolId', '==', profile.schoolId),
+              where('studentId', '==', selectedStudent.id),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, 'teacher_reports'),
+              where('schoolId', '==', profile.schoolId),
+              where('studentId', '==', selectedStudent.id),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, 'homework'),
+              where('schoolId', '==', profile.schoolId),
+              where('classId', '==', selectedStudent.classId),
+            ),
+          ),
+          AttendanceService.getStudentAttendanceSummary(
+            profile.schoolId,
+            selectedStudent.classId,
+            selectedStudent.id,
+          ),
+        ]);
+
+        if (cancelled) return;
+
+        setStudentAnalytics({
+          behaviorCount: behaviorSnap.size,
+          evaluationCount: evaluationSnap.size,
+          customReportCount: reports.filter((r) => r.studentId === selectedStudent.id).length,
+          homeworkCount: homeworkSnap.size,
+          absentDays: attendance.absent,
+          lateDays: attendance.late,
+          tuitionBalance: Number(selectedStudent.tuitionBalance || 0),
+        });
+      } catch (error) {
+        if (!cancelled) setStudentAnalytics(null);
+        handleFirestoreError(error, OperationType.LIST, 'AdvancedReports:analytics');
+      } finally {
+        if (!cancelled) setAnalyticsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.schoolId, selectedStudent, reports]);
 
   const handleSaveReport = async () => {
     if (!selectedStudent || !reportTitle.trim() || !reportContent.trim() || !profile) return;
@@ -163,12 +238,28 @@ export default function AdvancedReports({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-display">
-            {isRtl ? 'التقارير المتقدمة' : 'Advanced Reports'}
+            {isRtl ? 'التقارير المتقدمة والتحليلات' : 'Advanced Reports & Analytics'}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            {isRtl ? 'إدارة تقارير الطلاب المتقدمة والتفصيلية' : 'Manage advanced and detailed student reports'}
+            {isRtl
+              ? 'عرض تحليلي مجمّع للطالب من الحضور والسلوك والتقييمات والأقساط — للقراءة والطباعة وليس لإدخال الحوادث'
+              : 'Read-only aggregated student analytics from attendance, behavior, evaluations, and payments — for viewing and printing'}
           </p>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 dark:bg-slate-800/40 dark:border-slate-700 px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200">
+        {isRtl ? (
+          <>
+            <span className="text-slate-900 dark:text-white">هذا القسم للتحليل والتقارير:</span>{' '}
+            لا تُسجَّل هنا الحوادث السلوكية (استخدم «السلوك») ولا التقييمات المنظمة (استخدم «التقييمات») ولا التعميمات (استخدم «الإعلانات»).
+          </>
+        ) : (
+          <>
+            <span className="text-slate-900 dark:text-white">Analytics hub:</span>{' '}
+            Do not record behavior incidents, structured evaluations, or broadcasts here — use their dedicated sections.
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -242,11 +333,62 @@ export default function AdvancedReports({
                     className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
                   >
                     <Plus size={18} />
-                    <span>{isRtl ? 'تقرير جديد' : 'New Report'}</span>
+                    <span>{isRtl ? 'ملاحظة تحليلية إضافية' : 'Add analytic note'}</span>
                   </button>
                 </div>
+
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <h3 className="font-bold text-slate-900 dark:text-white">
+                      {isRtl ? 'ملخص تحليلي للطالب' : 'Student analytics summary'}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="px-3 py-1.5 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg flex items-center gap-1.5 hover:bg-slate-200 transition-colors no-print"
+                    >
+                      <Printer size={14} />
+                      {isRtl ? 'طباعة' : 'Print'}
+                    </button>
+                  </div>
+                  {analyticsLoading ? (
+                    <p className="text-sm font-bold text-slate-400">{isRtl ? 'جاري تجميع البيانات...' : 'Loading analytics...'}</p>
+                  ) : studentAnalytics ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        { label: isRtl ? 'حوادث سلوكية' : 'Behavior', value: studentAnalytics.behaviorCount, icon: AlertTriangle, tone: 'text-rose-600 bg-rose-50' },
+                        { label: isRtl ? 'تقييمات أداء' : 'Evaluations', value: studentAnalytics.evaluationCount, icon: FileText, tone: 'text-indigo-600 bg-indigo-50' },
+                        { label: isRtl ? 'غياب / تأخر' : 'Absent / late', value: `${studentAnalytics.absentDays}/${studentAnalytics.lateDays}`, icon: BarChart, tone: 'text-amber-600 bg-amber-50' },
+                        { label: isRtl ? 'رصيد الأقساط' : 'Tuition balance', value: studentAnalytics.tuitionBalance.toLocaleString(), icon: Wallet, tone: 'text-emerald-600 bg-emerald-50' },
+                        { label: isRtl ? 'واجبات الصف' : 'Class homework', value: studentAnalytics.homeworkCount, icon: BookOpen, tone: 'text-blue-600 bg-blue-50' },
+                        { label: isRtl ? 'ملاحظات محفوظة' : 'Saved notes', value: studentAnalytics.customReportCount, icon: FileText, tone: 'text-slate-600 bg-slate-100' },
+                      ].map((item) => (
+                        <div key={item.label} className={`rounded-xl p-3 border border-slate-100 dark:border-slate-800 ${item.tone.split(' ').slice(1).join(' ')}`}>
+                          <div className={`flex items-center gap-2 text-[10px] font-bold uppercase ${item.tone.split(' ')[0]}`}>
+                            <item.icon size={12} />
+                            {item.label}
+                          </div>
+                          <p className="text-lg font-black text-slate-900 dark:text-white mt-1">{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">{isRtl ? 'اختر طالباً لعرض الملخص' : 'Select a student to view summary'}</p>
+                  )}
+                  <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
+                    {isRtl
+                      ? 'البيانات مُجمّعة للقراءة فقط من أقسام الحضور والسلوك والتقييمات والأقساط والواجبات.'
+                      : 'Data is aggregated read-only from attendance, behavior, evaluations, tuition, and homework sections.'}
+                  </p>
+                </div>
                 
-                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                <div className="px-6 pt-4">
+                  <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest">
+                    {isRtl ? 'ملاحظات تحليلية محفوظة (اختياري)' : 'Saved analytic notes (optional)'}
+                  </h3>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 pt-3 space-y-4 custom-scrollbar">
                   {reports.filter(r => r.studentId === selectedStudent.id).length > 0 ? (
                     reports.filter(r => r.studentId === selectedStudent.id).map((report) => (
                       <div key={report.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 hover:shadow-md transition-shadow relative group">
@@ -290,7 +432,12 @@ export default function AdvancedReports({
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-4">
                       <BarChart size={48} className="opacity-20" />
-                      <p className="font-bold">{isRtl ? 'لا توجد تقارير متقدمة لهذا الطالب' : 'No advanced reports for this student'}</p>
+                      <p className="font-bold">{isRtl ? 'لا توجد ملاحظات تحليلية محفوظة' : 'No saved analytic notes'}</p>
+                      <p className="text-xs text-center max-w-sm leading-relaxed">
+                        {isRtl
+                          ? 'الملخص أعلاه يعرض بيانات مجمّعة. يمكنك إضافة ملاحظة تحليلية إضافية عند الحاجة.'
+                          : 'The summary above shows aggregated data. Add an optional analytic note if needed.'}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -299,7 +446,12 @@ export default function AdvancedReports({
              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-12rem)] min-h-[600px] flex items-center justify-center">
                <div className="text-center text-slate-400 space-y-4 max-w-sm px-6">
                  <Users size={64} className="mx-auto opacity-20" />
-                 <h3 className="text-xl font-bold text-slate-600 dark:text-slate-300">{isRtl ? 'اختر طالباً لعرض التقارير' : 'Select a student to view reports'}</h3>
+                 <h3 className="text-xl font-bold text-slate-600 dark:text-slate-300">{isRtl ? 'اختر طالباً لعرض التحليلات المجمّعة' : 'Select a student to view aggregated analytics'}</h3>
+                 <p className="text-sm leading-relaxed">
+                   {isRtl
+                     ? 'منطقة قراءة وتحليل — ليست لإدخال الحوادث السلوكية أو التقييمات أو التعميمات.'
+                     : 'Read-only analytics area — not for behavior incidents, evaluations, or broadcasts.'}
+                 </p>
                </div>
              </div>
            )}
@@ -324,26 +476,29 @@ export default function AdvancedReports({
               </button>
 
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                {editingReport ? (isRtl ? 'تعديل التقرير' : 'Edit Report') : (isRtl ? 'إضافة تقرير متقدم' : 'New Advanced Report')}
+                {editingReport ? (isRtl ? 'تعديل الملاحظة التحليلية' : 'Edit analytic note') : (isRtl ? 'ملاحظة تحليلية إضافية' : 'Optional analytic note')}
               </h2>
-              <p className="text-slate-500 font-bold mb-6">
-                {selectedStudent?.name}
+              <p className="text-slate-500 font-bold mb-2">{selectedStudent?.name}</p>
+              <p className="text-slate-400 text-xs mb-6">
+                {isRtl
+                  ? 'للتعليقات التحليلية التكميلية فقط — البيانات الأساسية تُسجَّل في أقسامها المخصصة'
+                  : 'Supplementary analytic comments only — core data belongs in dedicated sections'}
               </p>
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'عنوان التقرير' : 'Report Title'}</label>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'عنوان الملاحظة' : 'Note title'}</label>
                   <input
                     type="text"
                     value={reportTitle}
                     onChange={(e) => setReportTitle(e.target.value)}
                     dir="auto"
-                    placeholder={isRtl ? 'أدخل عنوان التقرير المتقدم' : 'Enter report title'}
+                    placeholder={isRtl ? 'مثال: ملخص الفصل الدراسي' : 'e.g. term summary'}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'تفاصيل التقرير' : 'Report Details'}</label>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'تفاصيل الملاحظة التحليلية' : 'Analytic note details'}</label>
                   <textarea
                     value={reportContent}
                     onChange={(e) => setReportContent(e.target.value)}

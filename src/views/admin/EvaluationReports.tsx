@@ -25,6 +25,10 @@ export default function Evaluations() {
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [reportContent, setReportContent] = useState('');
+  const [reportCriteria, setReportCriteria] = useState('');
+  const [reportRating, setReportRating] = useState<
+    'excellent' | 'good' | 'satisfactory' | 'needs_improvement'
+  >('good');
   const [reportTarget, setReportTarget] = useState<'school' | 'parents' | 'both'>('parents');
   const [editingReport, setEditingReport] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -92,6 +96,8 @@ export default function Evaluations() {
       if (editingReport) {
         await updateDoc(doc(db, 'teacher_reports', editingReport.id), {
           content: reportContent,
+          criteria: reportCriteria.trim() || '',
+          rating: reportRating,
           target: reportTarget,
           updatedAt: serverTimestamp()
         });
@@ -107,6 +113,8 @@ export default function Evaluations() {
           teacherName: profile.name,
           subject: 'إدارة المدرسة', // Meaning "School Administration"
           content: reportContent,
+          criteria: reportCriteria.trim() || '',
+          rating: reportRating,
           target: reportTarget,
           schoolId: profile.schoolId,
           createdAt: serverTimestamp()
@@ -126,6 +134,8 @@ export default function Evaluations() {
       setShowAddModal(false);
       setEditingReport(null);
       setReportContent('');
+      setReportCriteria('');
+      setReportRating('good');
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'teacher_reports');
       toast.error(isRtl ? 'فشل حفظ التقييم' : 'Failed to save evaluation');
@@ -152,12 +162,28 @@ export default function Evaluations() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-display">
-            {isRtl ? 'تقارير التقييم' : 'Evaluations'}
+            {isRtl ? 'التقييمات الأكاديمية' : 'Academic Evaluations'}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            {isRtl ? 'إدارة تقييمات الطلاب والتواصل مع أولياء الأمور' : 'Manage student evaluations and communicate with parents'}
+            {isRtl
+              ? 'تقييم أداء منظم للطالب حسب معايير ودرجات — ليس لتسجيل حوادث سلوكية أو التعميمات'
+              : 'Structured performance evaluations with criteria and ratings — not behavior incidents or broadcasts'}
           </p>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 dark:bg-indigo-950/20 dark:border-indigo-900/40 px-5 py-4 text-sm font-bold text-indigo-900 dark:text-indigo-200">
+        {isRtl ? (
+          <>
+            <span className="text-indigo-600 dark:text-indigo-400">الفرق عن الأقسام الأخرى:</span>{' '}
+            «السلوك» للحوادث السلوكية، «الإعلانات» للتعميمات، «التقارير المتقدمة» لعرض التحليلات المجمّعة.
+          </>
+        ) : (
+          <>
+            <span className="text-indigo-600 dark:text-indigo-400">Distinct from:</span>{' '}
+            Behavior (incidents), Announcements (broadcasts), Advanced Reports (aggregated analytics).
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -220,12 +246,14 @@ export default function Evaluations() {
                       setEditingReport(null);
                       setReportContent('');
                       setReportTarget('parents');
+                      setReportCriteria('');
+                      setReportRating('good');
                       setShowAddModal(true);
                     }}
                     className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
                   >
                     <Plus size={18} />
-                    <span>{isRtl ? 'تقييم جديد' : 'New Report'}</span>
+                    <span>{isRtl ? 'تقييم أداء جديد' : 'New Evaluation'}</span>
                   </button>
                 </div>
                 
@@ -252,6 +280,8 @@ export default function Evaluations() {
                                 onClick={() => {
                                   setEditingReport(report);
                                   setReportContent(report.content);
+                                  setReportCriteria(report.criteria || '');
+                                  setReportRating(report.rating || 'good');
                                   setReportTarget(report.target || 'parents');
                                   setShowAddModal(true);
                                 }}
@@ -267,6 +297,26 @@ export default function Evaluations() {
                               </button>
                            </div>
                         </div>
+                        {(report.rating || report.criteria) && (
+                          <div className="flex flex-wrap items-center gap-2 mb-3">
+                            {report.rating && (
+                              <span className="px-2 py-1 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700">
+                                {report.rating === 'excellent'
+                                  ? (isRtl ? 'ممتاز' : 'Excellent')
+                                  : report.rating === 'good'
+                                    ? (isRtl ? 'جيد' : 'Good')
+                                    : report.rating === 'satisfactory'
+                                      ? (isRtl ? 'مقبول' : 'Satisfactory')
+                                      : (isRtl ? 'يحتاج تحسين' : 'Needs improvement')}
+                              </span>
+                            )}
+                            {report.criteria && (
+                              <span className="text-[10px] font-bold text-slate-400">
+                                {isRtl ? 'المعيار:' : 'Criteria:'} {report.criteria}
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <p className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{report.content}</p>
                         <div className="mt-4 flex items-center gap-2">
                            <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${report.target === 'parents' || report.target === 'both' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
@@ -278,7 +328,12 @@ export default function Evaluations() {
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-4">
                       <FileText size={48} className="opacity-20" />
-                      <p className="font-bold">{isRtl ? 'لا توجد تقييمات سابقة لهذا الطالب' : 'No previous evaluations for this student'}</p>
+                      <p className="font-bold">{isRtl ? 'لا توجد تقييمات أداء لهذا الطالب' : 'No performance evaluations for this student'}</p>
+                      <p className="text-xs text-center max-w-xs leading-relaxed">
+                        {isRtl
+                          ? 'أضف تقييماً منظماً يتضمن معياراً ودرجة وتعليقاً — ليس ملاحظة سلوكية.'
+                          : 'Add a structured evaluation with criteria, rating, and notes — not a behavior incident.'}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -287,7 +342,12 @@ export default function Evaluations() {
              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-12rem)] min-h-[600px] flex items-center justify-center">
                <div className="text-center text-slate-400 space-y-4 max-w-sm px-6">
                  <Users size={64} className="mx-auto opacity-20" />
-                 <h3 className="text-xl font-bold text-slate-600 dark:text-slate-300">{isRtl ? 'اختر طالباً لعرض وتقييم حالته الدراسية' : 'Select a student to view and manage their evaluations'}</h3>
+                 <h3 className="text-xl font-bold text-slate-600 dark:text-slate-300">{isRtl ? 'اختر طالباً لعرض تقييمات الأداء' : 'Select a student to view performance evaluations'}</h3>
+                 <p className="text-sm leading-relaxed">
+                   {isRtl
+                     ? 'هذا القسم مخصص للتقييم الأكاديمي المنظم وليس للحوادث السلوكية أو الإعلانات.'
+                     : 'This section is for structured academic evaluation, not behavior or announcements.'}
+                 </p>
                </div>
              </div>
            )}
@@ -320,13 +380,50 @@ export default function Evaluations() {
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'نص التقييم' : 'Evaluation Content'}</label>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'معيار التقييم' : 'Evaluation criteria'}</label>
+                  <input
+                    type="text"
+                    value={reportCriteria}
+                    onChange={(e) => setReportCriteria(e.target.value)}
+                    dir="auto"
+                    placeholder={isRtl ? 'مثال: المشاركة الصفية، الواجبات، الاختبارات...' : 'e.g. participation, homework, exams...'}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{isRtl ? 'التقدير / الدرجة' : 'Rating'}</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'excellent', label: isRtl ? 'ممتاز' : 'Excellent' },
+                      { id: 'good', label: isRtl ? 'جيد' : 'Good' },
+                      { id: 'satisfactory', label: isRtl ? 'مقبول' : 'Satisfactory' },
+                      { id: 'needs_improvement', label: isRtl ? 'يحتاج تحسين' : 'Needs improvement' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setReportRating(opt.id as typeof reportRating)}
+                        className={`py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                          reportRating === opt.id
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'ملاحظات التقييم' : 'Evaluation notes'}</label>
                   <textarea
                     value={reportContent}
                     onChange={(e) => setReportContent(e.target.value)}
                     dir="auto"
                     rows={6}
-                    placeholder={isRtl ? 'اكتب تقييمك هنا مع ذكر الملاحظات الإيجابية ونقاط التحسين...' : 'Write your evaluation here...'}
+                    placeholder={isRtl ? 'اكتب تقييم الأداء مع نقاط القوة والتحسين...' : 'Write performance notes with strengths and areas to improve...'}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white resize-none"
                   ></textarea>
                 </div>

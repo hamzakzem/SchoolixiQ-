@@ -192,8 +192,10 @@ export default function Announcements() {
       </AnimatePresence>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">الإعلانات والتعليمات</h1>
-          <p className="text-slate-500 dark:text-slate-400 font-bold mt-1">تواصل مع أولياء الأمور والكادر التعليمي بضغطة زر</p>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">الإعلانات والتبليغات</h1>
+          <p className="text-slate-500 dark:text-slate-400 font-bold mt-1">
+            نظام التواصل والتعميم للمدرسة — ليس لتسجيل السلوك أو التقييمات الدراسية
+          </p>
         </div>
         <button 
           onClick={() => setShowAddModal(true)}
@@ -202,6 +204,11 @@ export default function Announcements() {
           <Plus size={20} />
           <span>إرسال تعميم جديد</span>
         </button>
+      </div>
+
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/60 dark:bg-blue-950/20 dark:border-blue-900/40 px-5 py-4 text-sm font-bold text-blue-900 dark:text-blue-200">
+        <span className="text-blue-600 dark:text-blue-400">متى تستخدم هذا القسم؟</span>{' '}
+        لنشر تعميم أو تبليغ لجمهور محدد (المدرسة، الأهالي، الكادر، أو طالب). للحوادث السلوكية استخدم «السلوك»، وللتقييم الأكاديمي استخدم «التقييمات».
       </div>
 
       <div className="grid grid-cols-1 gap-6">
@@ -263,8 +270,10 @@ export default function Announcements() {
             <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-300 mx-auto mb-4">
               <MessageSquare size={40} />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">لا توجد إعلانات بعد</h3>
-            <p className="text-slate-500">ابدأ بنشر أول تعميم لمدرستك ليصل للجميع</p>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">لا توجد إعلانات أو تبليغات بعد</h3>
+            <p className="text-slate-500 max-w-md mx-auto leading-relaxed">
+              انشر هنا التعميمات والتبليغات العامة أو الموجّهة. هذا ليس مكان تسجيل ملاحظات سلوكية أو تقييمات أداء الطلاب.
+            </p>
           </div>
         )}
       </div>
@@ -284,7 +293,10 @@ export default function Announcements() {
                   <div className="bg-slate-50 dark:bg-slate-800 w-12 h-12 rounded-2xl flex items-center justify-center text-slate-900 dark:text-white">
                     <Send size={24} />
                   </div>
-                  <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">نشر تعميم جديد</h2>
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">نشر تعميم / تبليغ</h2>
+                    <p className="text-xs font-bold text-slate-400 mt-1">رسالة تواصل جماعية — ليست تقييماً دراسياً ولا حادثة سلوكية</p>
+                  </div>
                 </div>
                 <button onClick={() => setShowAddModal(false)} className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                   إغلاق
@@ -294,7 +306,7 @@ export default function Announcements() {
               <form onSubmit={handleAdd} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div className="md:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3.5 px-1 font-display">الفئة المستهدفة</label>
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3.5 px-1 font-display">الجمهور المستهدف (تعميم)</label>
                     <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-x-auto custom-scrollbar">
                       {[
                         { id: 'all', label: 'للجميع', color: 'blue' },
@@ -603,7 +615,7 @@ export default function Announcements() {
                       required
                       rows={6}
                       className="w-full px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-slate-100 dark:focus:ring-slate-800 transition-all resize-none font-display"
-                      placeholder="اكتب تفاصيل الإعلان هنا بالتفصيل..."
+                      placeholder="اكتب نص التبليغ أو الإعلان العام (اجتماعات، عطل، تنبيهات إدارية...)"
                       value={newAnnouncement.content}
                       onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
                     ></textarea>
