@@ -507,9 +507,48 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /notifications/{notificationId} {
-      allow read, get, list: if isSuperAdmin()
-        || (signedIn() && resource.data.userId == request.auth.uid)
-        || (signedIn() && isAdmin() && hasSchoolId(resource.data) && sameSchool(resource));
+      function isNotificationRecipient() {
+        return signedIn() && (
+          resource.data.userId == request.auth.uid
+          || (resource.data.keys().hasAll(['recipientId']) && resource.data.recipientId == request.auth.uid)
+          || (resource.data.keys().hasAll(['receiverId']) && resource.data.receiverId == request.auth.uid)
+        );
+      }
+
+      function notificationSchoolMatchesViewer() {
+        return !resource.data.keys().hasAll(['schoolId'])
+          || resource.data.schoolId == 'system'
+          || (
+            request.auth.token.keys().hasAll(['schoolId'])
+            && request.auth.token.schoolId == resource.data.schoolId
+          );
+      }
+
+      function isSuperAdminInboxNotification() {
+        return signedIn()
+          && request.auth.token.keys().hasAll(['role'])
+          && request.auth.token.role in ['superadmin', 'super_admin']
+          && resource.data.userId == 'super_admin';
+      }
+
+      function isSchoolAdminAudienceNotification() {
+        return signedIn()
+          && request.auth.token.keys().hasAll(['role', 'schoolId'])
+          && request.auth.token.role in ['admin', 'school_admin', 'assistant']
+          && resource.data.keys().hasAll(['schoolId', 'audience'])
+          && resource.data.schoolId == request.auth.token.schoolId
+          && resource.data.audience in ['school_admin', 'all_school'];
+      }
+
+      function canReadNotification() {
+        return isSuperAdmin()
+          || isSuperAdminInboxNotification()
+          || (isNotificationRecipient() && notificationSchoolMatchesViewer())
+          || isSchoolAdminAudienceNotification();
+      }
+
+      allow get: if canReadNotification();
+      allow list: if canReadNotification();
       allow create: if isSuperAdmin()
         || (
           signedIn() && (
@@ -521,8 +560,8 @@ service cloud.firestore {
           )
         );
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && resource.data.userId == request.auth.uid)
-        || (signedIn() && isAdmin() && hasSchoolId(resource.data) && sameSchool(resource));
+        || (isNotificationRecipient() && notificationSchoolMatchesViewer())
+        || isSuperAdminInboxNotification();
     }
 
     match /notification_preferences/{prefId} {
