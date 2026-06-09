@@ -4,7 +4,8 @@ export enum UserRole {
   ASSISTANT = 'assistant',
   TEACHER = 'teacher',
   PARENT = 'parent',
-  STAFF = 'staff'
+  STAFF = 'staff',
+  GUARD = 'guard',
 }
 
 export interface UserProfile {

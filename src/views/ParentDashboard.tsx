@@ -71,12 +71,14 @@ import {
   Image as ImageIcon,
   QrCode,
   Building,
+  DoorOpen,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 import SolarLoading from "../components/SolarLoading";
 import ParentChatTab from "./ParentChatTab";
 import ParentSchedules from "./parent/ParentSchedules";
+import ParentDismissalTab from "./parent/ParentDismissalTab";
 import StudentCard from "../components/admin/idcards/StudentCard";
 import { IdCardTemplate } from "../types/idCardTemplate";
 import { Phone, Mail, MapPin, Save, Sparkles, ShieldAlert, ExternalLink } from "lucide-react";
@@ -926,6 +928,7 @@ export default function ParentDashboard() {
       badge: selectedStudent && idCards[selectedStudent.id] ? 1 : 0,
     },
     { id: "market", label: t("market"), icon: ShoppingBag },
+    { id: "dismissal", label: isRtl ? "طلب التسريح" : "Dismissal", icon: DoorOpen },
     { id: "chat", label: t("chat") || "الدردشة", icon: MessageSquare },
     {
       id: "inbox",
@@ -1670,6 +1673,15 @@ export default function ParentDashboard() {
                     </div>
                   </section>
 
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("dismissal")}
+                    className="w-full p-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98]"
+                  >
+                    <DoorOpen size={20} />
+                    {isRtl ? "أنا عند البوابة — طلب تسريح الطالب" : "At the gate — request dismissal"}
+                  </button>
+
                   {/* Behavioral Feed */}
                   <section>
                     <div className="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
@@ -1876,6 +1888,14 @@ export default function ParentDashboard() {
                     );
                   })}
                 </div>
+              )}
+
+              {activeTab === "dismissal" && (
+                <ParentDismissalTab
+                  students={students}
+                  selectedStudent={selectedStudent}
+                  isRtl={isRtl}
+                />
               )}
 
               {activeTab === "homework" && (

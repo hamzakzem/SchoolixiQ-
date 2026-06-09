@@ -106,7 +106,7 @@ export default function StaffList() {
       const q = query(
         collection(db, 'users'), 
         where('schoolId', '==', profile.schoolId),
-        where('role', 'in', ['admin', 'school_admin', 'assistant', 'teacher', 'staff']),
+        where('role', 'in', ['admin', 'school_admin', 'assistant', 'teacher', 'staff', 'guard']),
         limit(200)
       );
       const unsub = onSnapshot(q, snap => {
@@ -648,7 +648,9 @@ export default function StaffList() {
                             ? 'مدير المدرسة'
                             : member.role === 'assistant'
                               ? 'مساعد'
-                              : 'موظف'}
+                              : member.role === 'guard'
+                                ? 'حارس'
+                                : 'موظف'}
                     </span>
                   </div>
                   {member.role === 'teacher' && getTeacherSubjectDisplay(member) && (
@@ -970,7 +972,9 @@ export default function StaffList() {
                           role,
                           ...(role === 'teacher'
                             ? { permissions: [] }
-                            : { subjectId: '', subject: '', classId: '' }),
+                            : role === 'guard'
+                              ? { subjectId: '', subject: '', classId: '', permissions: [] }
+                              : { subjectId: '', subject: '', classId: '' }),
                         });
                       }}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900 bg-white"
@@ -980,6 +984,7 @@ export default function StaffList() {
                       <option value="school_admin">مدير المدرسة</option>
                       <option value="assistant">مساعد إداري</option>
                       <option value="staff">موظف إداري</option>
+                      <option value="guard">حارس / موظف بوابة</option>
                     </select>
                   </div>
 

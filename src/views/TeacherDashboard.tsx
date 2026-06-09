@@ -74,6 +74,8 @@ import {
 } from "../lib/userProfile";
 import { alertIncomingNotification } from "../lib/notificationAlerts";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import TeacherDismissalTab from "./teacher/TeacherDismissalTab";
+import { DoorOpen } from "lucide-react";
 import {
   filterClassesForTeacher,
   resolveTeacherClassId,
@@ -93,6 +95,7 @@ type Tab =
   | "settings"
   | "chat"
   | "schedules"
+  | "dismissal"
   | "market";
 
 import SolarLoading from "../components/SolarLoading";
@@ -928,6 +931,11 @@ export default function TeacherDashboard() {
       permission: "behavior_management",
     },
     {
+      id: "dismissal",
+      label: isRtl ? "تسريح الطلاب" : "Student dismissal",
+      icon: DoorOpen,
+    },
+    {
       id: "reports",
       label: isRtl ? "تقارير التقييم" : "Evaluation Reports",
       icon: FileText,
@@ -953,7 +961,7 @@ export default function TeacherDashboard() {
     },
     { id: "chat", label: isRtl ? "الدردشة" : "Chat", icon: MessageSquare },
   ].filter((item) => {
-    if (item.id === "home" || item.id === "chat") return true;
+    if (item.id === "home" || item.id === "chat" || item.id === "dismissal") return true;
     if (perms && typeof perms === "object" && !Array.isArray(perms)) {
       if (item.id === "homework") return perms.homework_and_tasks !== false;
       if (item.id === "grades") return perms.exams_and_results !== false;
@@ -1959,6 +1967,12 @@ export default function TeacherDashboard() {
                   </div>
                   </>
                   )}
+                </div>
+              )}
+
+              {activeTab === "dismissal" && (
+                <div className="animate-in fade-in duration-500">
+                  <TeacherDismissalTab assignedClassId={assignedClassId} isRtl={isRtl} />
                 </div>
               )}
 

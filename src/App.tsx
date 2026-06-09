@@ -49,6 +49,7 @@ import { captureException } from "./lib/sentryWrapper";
 // Views (Lazy-Loaded for Performance Optimization)
 const Login = lazy(() => import("./views/Login"));
 const AdminDashboard = lazy(() => import("./views/AdminDashboard"));
+const GuardDashboard = lazy(() => import("./views/GuardDashboard"));
 const ParentDashboard = lazy(() => import("./views/ParentDashboard"));
 const SuperAdminDashboard = lazy(() => import("./views/SuperAdminDashboard"));
 const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
@@ -696,6 +697,9 @@ const AppContent = () => {
         return <ParentDashboard />;
       case UserRole.TEACHER:
         return <TeacherDashboard />;
+      case UserRole.GUARD:
+      case "guard":
+        return <GuardDashboard />;
       default:
         return (
           <div className="p-10 text-center">

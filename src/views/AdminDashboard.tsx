@@ -128,6 +128,7 @@ import ParentsList from "./admin/ParentsList";
 import Classes from "./admin/Classes";
 import Schedules from "./admin/Schedules";
 import AssistantsManagement from "./admin/AssistantsManagement";
+import DismissalMonitor from "./admin/DismissalMonitor";
 import AdminChatTab from "./admin/AdminChatTab";
 
 import { useLanguage } from "../lib/LanguageContext";
@@ -264,6 +265,7 @@ export default function AdminDashboard() {
     { id: "payroll", label: t("payroll"), icon: Wallet },
     { id: "inventory", label: t("inventory"), icon: Package },
     { id: "behavior", label: t("behavior"), icon: MessageSquare },
+    { id: "dismissal_gate", label: isRtl ? "البوابة الذكية" : "Smart Gate", icon: ShieldCheck },
     { id: "evaluation_reports", label: t("evaluations"), icon: ClipboardCheck },
     { id: "homework", label: t("homework"), icon: Calendar },
     { id: "classes", label: t("classes") || (isRtl ? "الصفوف" : "Classes"), icon: Building },
@@ -1144,6 +1146,8 @@ export default function AdminDashboard() {
         return <Tuition />;
       case "behavior":
         return <Behavior />;
+      case "dismissal_gate":
+        return <DismissalMonitor />;
       case "attendance":
         return <Attendance />;
       case "grades":
