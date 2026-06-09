@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, serverTimestamp, setDoc, doc, getDocs, updateDoc, limit, onSnapshot, deleteField } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { UserPlus, Mail, Phone, ShieldCheck, Trash2, Lock, Save, X, Search, Printer, FileText, Send, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Mail, Phone, ShieldCheck, Trash2, Lock, Save, X, Search, Printer, FileText, Send, Eye, EyeOff, CheckSquare, Square } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -26,6 +26,28 @@ import {
   resolveTeacherClassId,
   type SchoolClassOption,
 } from '../../lib/teacherClass';
+
+const PERMISSION_OPTIONS = [
+  { id: 'classes', label: 'إدارة الصفوف' },
+  { id: 'students', label: 'إدارة الطلاب' },
+  { id: 'parents', label: 'حسابات أولياء الأمور' },
+  { id: 'staff', label: 'الموظفين والمعلمين' },
+  { id: 'tuition', label: 'أقساط الطلاب' },
+  { id: 'behavior', label: 'السلوك والتبليغات' },
+  { id: 'attendance', label: 'الحضور والغياب' },
+  { id: 'grades', label: 'النتائج والدرجات' },
+  { id: 'announcements', label: 'الإعلانات والتعليمات' },
+  { id: 'payroll', label: 'الرواتب والمالية' },
+  { id: 'inventory', label: 'مخزن المدرسة' },
+  { id: 'market', label: 'المتجر الداخلي' },
+  { id: 'settings', label: 'الإعدادات العامة' },
+];
+
+const STAFF_PERMISSION_ROLES = ['admin', 'school_admin', 'assistant', 'staff'] as const;
+
+function roleUsesPermissionPicker(role: string): boolean {
+  return (STAFF_PERMISSION_ROLES as readonly string[]).includes(role);
+}
 
 export default function StaffList() {
   const { profile } = useAuth();
@@ -59,7 +81,8 @@ export default function StaffList() {
     joiningDate: new Date().toISOString().split('T')[0],
     gender: 'male' as 'male' | 'female',
     status: 'active' as 'active' | 'on_leave' | 'inactive' | 'absent',
-    notes: ''
+    notes: '',
+    permissions: [] as string[],
   });
 
   const reportPrintRef = useRef<HTMLDivElement>(null);
@@ -83,7 +106,7 @@ export default function StaffList() {
       const q = query(
         collection(db, 'users'), 
         where('schoolId', '==', profile.schoolId),
-        where('role', 'in', ['admin', 'teacher', 'staff']),
+        where('role', 'in', ['admin', 'school_admin', 'assistant', 'teacher', 'staff']),
         limit(200)
       );
       const unsub = onSnapshot(q, snap => {
@@ -234,6 +257,15 @@ export default function StaffList() {
     window.open(whatsappUrl, '_blank');
   };
 
+  const togglePermission = (permId: string) => {
+    setNewStaff((prev) => ({
+      ...prev,
+      permissions: prev.permissions.includes(permId)
+        ? prev.permissions.filter((p) => p !== permId)
+        : [...prev.permissions, permId],
+    }));
+  };
+
   const handleUpdateStatusQuick = async (id: string, status: string) => {
     try {
       await updateDoc(doc(db, 'users', id), {
@@ -339,6 +371,9 @@ export default function StaffList() {
           gender: newStaff.gender,
           status: newStaff.status,
           notes: newStaff.notes,
+          ...(roleUsesPermissionPicker(newStaff.role)
+            ? { permissions: newStaff.permissions }
+            : { permissions: deleteField() }),
           password: deleteField(),
           parentPassword: deleteField(),
           teacherPassword: deleteField(),
@@ -374,6 +409,9 @@ export default function StaffList() {
             gender: newStaff.gender,
             status: newStaff.status,
             notes: newStaff.notes,
+            ...(roleUsesPermissionPicker(newStaff.role)
+              ? { permissions: newStaff.permissions }
+              : {}),
           }
         });
         toast.success(
@@ -469,7 +507,8 @@ export default function StaffList() {
       joiningDate: new Date().toISOString().split('T')[0],
       gender: 'male',
       status: 'active',
-      notes: ''
+      notes: '',
+      permissions: [],
     });
   };
 
@@ -593,7 +632,15 @@ export default function StaffList() {
                   <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50/50 px-2.5 py-1 rounded-full border border-blue-100">
                     <ShieldCheck size={12} className="opacity-80" />
                     <span className="text-[10px] font-black uppercase tracking-widest">
-                      {member.role === 'teacher' ? 'معلم' : (member.role === 'admin' ? 'مدير' : 'موظف')}
+                      {member.role === 'teacher'
+                        ? 'معلم'
+                        : member.role === 'admin'
+                          ? 'مدير'
+                          : member.role === 'school_admin'
+                            ? 'مدير المدرسة'
+                            : member.role === 'assistant'
+                              ? 'مساعد'
+                              : 'موظف'}
                     </span>
                   </div>
                   {member.role === 'teacher' && getTeacherSubjectDisplay(member) && (
@@ -607,6 +654,16 @@ export default function StaffList() {
                         schoolClasses.find((c) => c.id === resolveTeacherClassId(member))?.name ||
                         'بدون صف'}
                     </span>
+                  )}
+                  {roleUsesPermissionPicker(member.role) && Array.isArray(member.permissions) && member.permissions.length > 0 && (
+                    member.permissions.slice(0, 2).map((pId: string) => (
+                      <span
+                        key={pId}
+                        className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full border border-indigo-100"
+                      >
+                        {PERMISSION_OPTIONS.find((opt) => opt.id === pId)?.label || pId}
+                      </span>
+                    ))
                   )}
                   {member.status && (
                     <div className="flex gap-1">
@@ -728,7 +785,8 @@ export default function StaffList() {
                     joiningDate: member.joiningDate || new Date().toISOString().split('T')[0],
                     gender: member.gender || 'male',
                     status: member.status || 'active',
-                    notes: member.notes || ''
+                    notes: member.notes || '',
+                    permissions: Array.isArray(member.permissions) ? member.permissions : [],
                   });
                   setShowModal(true);
                 }}
@@ -822,7 +880,9 @@ export default function StaffList() {
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl relative border border-slate-200 flex flex-col max-h-[90vh]"
+              className={`bg-white rounded-[2.5rem] w-full shadow-2xl relative border border-slate-200 flex flex-col max-h-[90vh] ${
+                roleUsesPermissionPicker(newStaff.role) ? 'max-w-2xl' : 'max-w-md'
+              }`}
             >
               <div className="p-8 pb-4 shrink-0">
                 <h2 className="text-2xl font-bold text-slate-900 font-display">
@@ -900,15 +960,17 @@ export default function StaffList() {
                         setNewStaff({
                           ...newStaff,
                           role,
-                          ...(role !== 'teacher'
-                            ? { subjectId: '', subject: '', classId: '' }
-                            : {}),
+                          ...(role === 'teacher'
+                            ? { permissions: [] }
+                            : { subjectId: '', subject: '', classId: '' }),
                         });
                       }}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900 bg-white"
                     >
                       <option value="teacher">معلم / مدرس</option>
                       <option value="admin">إداري</option>
+                      <option value="school_admin">مدير المدرسة</option>
+                      <option value="assistant">مساعد إداري</option>
                       <option value="staff">موظف إداري</option>
                     </select>
                   </div>
@@ -985,6 +1047,33 @@ export default function StaffList() {
                     </div>
                   )}
 
+                  {roleUsesPermissionPicker(newStaff.role) && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest leading-none">الصلاحيات المتاحة (اختر الأقسام)</label>
+                      <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[300px] overflow-y-auto custom-scrollbar">
+                        {PERMISSION_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => togglePermission(opt.id)}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all border text-right ${
+                              newStaff.permissions.includes(opt.id)
+                                ? 'bg-indigo-600 text-white border-transparent shadow-md'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                            }`}
+                          >
+                            {newStaff.permissions.includes(opt.id) ? (
+                              <CheckSquare size={18} />
+                            ) : (
+                              <Square size={18} className="opacity-40" />
+                            )}
+                            <span className="text-sm font-bold">{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">الراتب الشهري (د.ع)</label>
                     <input
@@ -1055,7 +1144,11 @@ export default function StaffList() {
                       isSaving ||
                       (newStaff.role === 'teacher' &&
                         !subjectsLoading &&
-                        (schoolSubjects.length === 0 || !newStaff.subjectId))
+                        !classesLoading &&
+                        (schoolSubjects.length === 0 ||
+                          !newStaff.subjectId ||
+                          schoolClasses.length === 0 ||
+                          !newStaff.classId))
                     }
                     className="flex-1 min-w-[120px] py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg flex items-center justify-center gap-2"
                   >
