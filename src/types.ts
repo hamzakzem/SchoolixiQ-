@@ -20,6 +20,8 @@ export interface UserProfile {
   phone?: string;
   photoURL?: string;
   subject?: string;
+  assignedClassId?: string;
+  assignedClassName?: string;
   preferredClassId?: string;
   preferredSubject?: string;
   permissions?: Record<string, boolean>;

@@ -74,6 +74,13 @@ import {
 } from "../lib/userProfile";
 import { alertIncomingNotification } from "../lib/notificationAlerts";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import {
+  filterClassesForTeacher,
+  resolveTeacherClassId,
+  resolveTeacherClassName,
+  teacherHasAssignedClass,
+  TEACHER_NO_CLASS_MSG,
+} from "../lib/teacherClass";
 
 type Tab =
   | "home"
@@ -196,17 +203,21 @@ export default function TeacherDashboard() {
   // Homework state
   const [homework, setHomework] = useState<any[]>([]);
   const [showAddHomework, setShowAddHomework] = useState(false);
+  const assignedClassId = useMemo(
+    () => resolveTeacherClassId(profile as Record<string, unknown>),
+    [profile],
+  );
+  const hasAssignedClass = teacherHasAssignedClass(profile as Record<string, unknown>);
+
   const [newHomework, setNewHomework] = useState({
     title: "",
     content: "",
     dueDate: "",
-    classId: (profile as any)?.preferredClassId || "",
+    classId: assignedClassId,
   });
 
   // Grades state
-  const [selectedClassId, setSelectedClassId] = useState(
-    (profile as any)?.preferredClassId || "",
-  );
+  const [selectedClassId, setSelectedClassId] = useState(assignedClassId);
   const [gradeType, setGradeType] = useState("درجة الشهر الاول");
   const [shareTeacherOnlyGrades, setShareTeacherOnlyGrades] = useState(false);
   const [maxScore, setMaxScore] = useState(100);
@@ -334,7 +345,53 @@ export default function TeacherDashboard() {
     }
   };
   const [behaviorSearch, setBehaviorSearch] = useState("");
-  const [behaviorClassFilter, setBehaviorClassFilter] = useState("");
+  const [behaviorClassFilter, setBehaviorClassFilter] = useState(assignedClassId);
+
+  const teacherClasses = useMemo(
+    () => filterClassesForTeacher(classes, assignedClassId),
+    [classes, assignedClassId],
+  );
+  const assignedClassName = useMemo(
+    () =>
+      resolveTeacherClassName(profile as Record<string, unknown>, classes) ||
+      teacherClasses[0]?.name ||
+      "",
+    [profile, classes, teacherClasses],
+  );
+  const classAssignmentReady = hasAssignedClass && teacherClasses.length > 0;
+  const visibleHomework = useMemo(
+    () =>
+      assignedClassId
+        ? homework.filter((hw) => hw.classId === assignedClassId)
+        : [],
+    [homework, assignedClassId],
+  );
+
+  useEffect(() => {
+    if (assignedClassId) {
+      setSelectedClassId(assignedClassId);
+      setBehaviorClassFilter(assignedClassId);
+      setNewHomework((prev) => ({ ...prev, classId: assignedClassId }));
+    } else {
+      setSelectedClassId("");
+      setBehaviorClassFilter("");
+      setNewHomework((prev) => ({ ...prev, classId: "" }));
+    }
+  }, [assignedClassId]);
+
+  const renderTeacherClassBlocked = (message?: string) => (
+    <div className="bg-amber-50 border border-amber-200 rounded-[2rem] p-10 text-center">
+      <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+      <p className="text-lg font-black text-amber-800">
+        {message || TEACHER_NO_CLASS_MSG}
+      </p>
+      <p className="text-sm text-amber-700 mt-2 font-bold">
+        {isRtl
+          ? "يرجى التواصل مع إدارة المدرسة لتعيين الصف الدراسي من إدارة الكادر."
+          : "Please contact school administration to assign your class from Staff Management."}
+      </p>
+    </div>
+  );
 
   useEffect(() => {
     let unsubs: (() => void)[] = [];
@@ -396,19 +453,25 @@ export default function TeacherDashboard() {
           ...doc.data(),
         }));
         setClasses(classesData as any);
-        if (!(profile as any)?.preferredClassId && classesData.length > 0 && !selectedClassId) {
-          setSelectedClassId(classesData[0].id);
-        }
       }));
 
-      const studentsQ = query(
-        collection(db, "students"),
-        where("schoolId", "==", profile.schoolId),
-        limit(500),
-      );
-      unsubs.push(onSnapshot(studentsQ, (snap) => {
-        setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any);
-      }));
+      const studentsQ = assignedClassId
+        ? query(
+            collection(db, "students"),
+            where("schoolId", "==", profile.schoolId),
+            where("classId", "==", assignedClassId),
+            limit(500),
+          )
+        : null;
+      if (studentsQ) {
+        unsubs.push(onSnapshot(studentsQ, (snap) => {
+          setStudents(
+            snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any,
+          );
+        }));
+      } else {
+        setStudents([]);
+      }
 
       const homeworkQ = query(
         collection(db, "homework"),
@@ -485,9 +548,9 @@ export default function TeacherDashboard() {
     }
 
     return () => {
-      unsubs.forEach(unsub => unsub());
+      unsubs.forEach((unsub) => unsub());
     };
-  }, [profile, isRtl]);
+  }, [profile, isRtl, assignedClassId]);
 
   useEffect(() => {
     if (!profile?.schoolId) {
@@ -518,10 +581,10 @@ export default function TeacherDashboard() {
   );
 
   const homeworkSubjectOptions = useMemo(() => {
-    const classId = newHomework.classId || (profile as any)?.preferredClassId || "";
+    const classId = assignedClassId || newHomework.classId || "";
     if (!classId) return teacherAssignedSubjects;
-    return getSubjectOptionsForClass(teacherAssignedSubjects, classId, classes);
-  }, [newHomework.classId, teacherAssignedSubjects, classes, profile]);
+    return getSubjectOptionsForClass(teacherAssignedSubjects, classId, teacherClasses);
+  }, [newHomework.classId, teacherAssignedSubjects, teacherClasses, assignedClassId]);
 
   useEffect(() => {
     if (!showAddHomework) return;
@@ -547,14 +610,9 @@ export default function TeacherDashboard() {
         return;
       }
 
-      const targetClassId =
-        newHomework.classId || (profile as any)?.preferredClassId;
-      if (!targetClassId) {
-        toast.error(
-          isRtl
-            ? "يرجى اختيار الصف الدراسي أولاً"
-            : "Please select a class first",
-        );
+      const targetClassId = assignedClassId || newHomework.classId;
+      if (!targetClassId || !classAssignmentReady) {
+        toast.error(TEACHER_NO_CLASS_MSG);
         return;
       }
 
@@ -562,7 +620,7 @@ export default function TeacherDashboard() {
         homeworkPublishSubjectId,
         teacherAssignedSubjects,
         targetClassId,
-        classes,
+        teacherClasses,
         profile,
       );
 
@@ -586,7 +644,9 @@ export default function TeacherDashboard() {
       }
 
       const targetClassName =
-        classes.find((c) => c.id === targetClassId)?.name || "";
+        teacherClasses.find((c) => c.id === targetClassId)?.name ||
+        assignedClassName ||
+        "";
 
       const homeworkRef = await addDoc(collection(db, "homework"), {
         title: newHomework.title,
@@ -632,7 +692,7 @@ export default function TeacherDashboard() {
         title: "",
         content: "",
         dueDate: "",
-        classId: (profile as any)?.preferredClassId || "",
+        classId: assignedClassId,
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "homework");
@@ -838,18 +898,6 @@ export default function TeacherDashboard() {
       setSelectedStudent(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "teacher_reports");
-    }
-  };
-
-  const handleSetPreferredClass = async (classId: string) => {
-    if (!profile?.uid) return;
-    try {
-      await updateDoc(doc(db, "users", profile.uid), {
-        preferredClassId: classId,
-      });
-      toast.success("تم تعيين الصف كصف افتراضي");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, "users");
     }
   };
 
@@ -1194,26 +1242,33 @@ export default function TeacherDashboard() {
             >
               {activeTab === "home" && (
                 <div className="space-y-8 animate-in fade-in duration-500">
+                  {!classAssignmentReady ? (
+                    renderTeacherClassBlocked(
+                      hasAssignedClass
+                        ? (isRtl
+                            ? "الصف المعيّن لم يعد موجوداً في المدرسة"
+                            : "Assigned class no longer exists in this school")
+                        : undefined,
+                    )
+                  ) : (
+                  <>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {[
                       {
-                        label: "طلاب الصف الدائم",
-                        value: students.filter(
-                          (s) =>
-                            s.classId === (profile as any)?.preferredClassId,
-                        ).length,
+                        label: isRtl ? "طلاب الصف المعيّن" : "Assigned class students",
+                        value: students.length,
                         icon: Users,
                         color: "indigo",
                       },
                       {
-                        label: "الصف الدائم",
-                        value: (profile as any)?.preferredClassId ? 1 : 0,
+                        label: isRtl ? "الصف المعيّن" : "Assigned class",
+                        value: assignedClassName || 1,
                         icon: LayoutDashboard,
                         color: "orange",
                       },
                       {
                         label: "واجبات منشورة",
-                        value: homework.length,
+                        value: visibleHomework.length,
                         icon: BookOpen,
                         color: "emerald",
                       },
@@ -1246,81 +1301,37 @@ export default function TeacherDashboard() {
                   <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                     <div className="mb-8">
                       <h3 className="text-xl font-bold text-slate-900 mb-1 font-display">
-                        {t("browseClasses")}
+                        {isRtl ? "الصف المعيّن" : "Assigned class"}
                       </h3>
                       <p className="text-xs text-slate-400 font-bold">
-                        {t("browseClassesDesc")}
+                        {assignedClassName}
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                      {classes.map((c) => (
-                        <button
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {teacherClasses.map((c) => (
+                        <div
                           key={c.id}
-                          onClick={() =>
-                            setSelectedClassId(
-                              c.id === selectedClassId ? "" : c.id,
-                            )
-                          }
-                          className={`p-6 rounded-[2.5rem] border transition-all text-right relative overflow-hidden group ${
-                            selectedClassId === c.id
-                              ? "bg-slate-900 border-slate-900 text-white shadow-2xl shadow-indigo-200 scale-[1.02]"
-                              : "bg-slate-50 border-slate-100 hover:border-indigo-200 hover:bg-white"
-                          }`}
+                          className="p-6 rounded-[2.5rem] border bg-slate-900 border-slate-900 text-white shadow-2xl shadow-indigo-200 text-right relative overflow-hidden"
                         >
-                          <div
-                            className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
-                              selectedClassId === c.id
-                                ? "bg-white/10 text-white"
-                                : "bg-white text-indigo-600 shadow-sm"
-                            }`}
-                          >
+                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 bg-white/10 text-white">
                             <LayoutDashboard size={24} />
                           </div>
-                          <p
-                            className={`font-bold text-sm mb-1 ${selectedClassId === c.id ? "text-white" : "text-slate-900"}`}
-                          >
+                          <p className="font-bold text-sm mb-1 text-white">
                             {c.name}
                           </p>
                           <div className="flex items-center gap-1.5 mt-2">
-                            <Users
-                              size={12}
-                              className={
-                                selectedClassId === c.id
-                                  ? "text-indigo-300"
-                                  : "text-slate-400"
-                              }
-                            />
-                            <p
-                              className={`text-[10px] font-bold ${selectedClassId === c.id ? "text-indigo-200" : "text-slate-400"}`}
-                            >
-                              {
-                                students.filter((s) => s.classId === c.id)
-                                  .length
-                              }{" "}
-                              {t("student")}
+                            <Users size={12} className="text-indigo-300" />
+                            <p className="text-[10px] font-bold text-indigo-200">
+                              {students.length} {t("student")}
                             </p>
                           </div>
-
-                          {c.id === (profile as any)?.preferredClassId && (
-                            <div className="absolute top-4 left-4">
-                              <Star
-                                size={14}
-                                className="text-orange-400"
-                                fill="currentColor"
-                              />
-                            </div>
-                          )}
-
-                          {selectedClassId === c.id && (
-                            <div className="absolute -bottom-2 -left-2 w-12 h-12 bg-white/5 rounded-full blur-2xl"></div>
-                          )}
-                        </button>
+                        </div>
                       ))}
                     </div>
 
                     <AnimatePresence>
-                      {selectedClassId && (
+                      {assignedClassId && (
                         <motion.div
                           initial={{ opacity: 0, height: 0, marginTop: 0 }}
                           animate={{
@@ -1335,36 +1346,13 @@ export default function TeacherDashboard() {
                             <div className="flex items-center gap-3">
                               <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
                               <h4 className="font-bold text-slate-900">
-                                {t("studentList")}:{" "}
-                                {
-                                  classes.find((c) => c.id === selectedClassId)
-                                    ?.name
-                                }
+                                {t("studentList")}: {assignedClassName}
                               </h4>
                             </div>
-                            <button
-                              onClick={() =>
-                                handleSetPreferredClass(selectedClassId)
-                              }
-                              className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-bold hover:bg-indigo-100 transition-all flex items-center gap-2"
-                            >
-                              <Star
-                                size={14}
-                                fill={
-                                  (profile as any)?.preferredClassId ===
-                                  selectedClassId
-                                    ? "currentColor"
-                                    : "none"
-                                }
-                              />
-                              {t("setDefaultClass")}
-                            </button>
                           </div>
 
                           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                            {students
-                              .filter((s) => s.classId === selectedClassId)
-                              .map((student) => (
+                            {students.map((student) => (
                                 <div
                                   key={student.id}
                                   onClick={() => {
@@ -1389,9 +1377,7 @@ export default function TeacherDashboard() {
                                   </div>
                                 </div>
                               ))}
-                            {students.filter(
-                              (s) => s.classId === selectedClassId,
-                            ).length === 0 && (
+                            {students.length === 0 && (
                               <div className="col-span-full py-20 text-center bg-slate-50/50 rounded-[2.5rem] border border-dashed border-slate-200">
                                 <Users
                                   size={48}
@@ -1523,6 +1509,8 @@ export default function TeacherDashboard() {
                       </div>
                     </div>
                   </div>
+                  </>
+                  )}
                 </div>
               )}
 
@@ -1531,6 +1519,10 @@ export default function TeacherDashboard() {
                   className="space-y-8 animate-in fade-in duration-500"
                   dir={isRtl ? "rtl" : "ltr"}
                 >
+                  {!classAssignmentReady ? (
+                    renderTeacherClassBlocked()
+                  ) : (
+                  <>
                   <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-slate-900">
                       {t("homeworkManagement")}
@@ -1539,6 +1531,10 @@ export default function TeacherDashboard() {
                       onClick={() => {
                         if (!teacherHasAssignedSubject(profile)) {
                           toast.error(TEACHER_SUBJECT_REQUIRED_MSG);
+                          return;
+                        }
+                        if (!classAssignmentReady) {
+                          toast.error(TEACHER_NO_CLASS_MSG);
                           return;
                         }
                         setHomeworkPublishSubjectId(
@@ -1556,7 +1552,7 @@ export default function TeacherDashboard() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {homework.map((hw) => (
+                    {visibleHomework.map((hw) => (
                       <div
                         key={hw.id}
                         className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative group hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300"
@@ -1608,11 +1604,16 @@ export default function TeacherDashboard() {
                       </div>
                     ))}
                   </div>
+                  </>
+                  )}
                 </div>
               )}
 
               {activeTab === "grades" && (
                 <div className="space-y-8 animate-in fade-in duration-500">
+                  {!classAssignmentReady ? (
+                    renderTeacherClassBlocked()
+                  ) : (
                   <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm">
                     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
                       <div className="space-y-6 flex-1">
@@ -1620,41 +1621,15 @@ export default function TeacherDashboard() {
                           <h2 className="text-2xl font-bold text-slate-900 font-display">
                             رصد الدرجات الجديد
                           </h2>
-                          {selectedClassId &&
-                            selectedClassId !==
-                              (profile as any)?.preferredClassId && (
-                              <button
-                                onClick={() =>
-                                  handleSetPreferredClass(selectedClassId)
-                                }
-                                className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
-                              >
-                                تعيين هذا الصف كصف دائم
-                              </button>
-                            )}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div>
                             <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
                               {t("selectClassLabel")}
                             </label>
-                            <select
-                              value={selectedClassId}
-                              onChange={(e) => {
-                                setSelectedClassId(e.target.value);
-                              }}
-                              className="w-full px-5 py-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-600/10 font-bold text-slate-900 transition-all appearance-none"
-                            >
-                              <option value="">{t("selectClass")}</option>
-                              {classes.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name}{" "}
-                                  {c.id === (profile as any)?.preferredClassId
-                                    ? t("defaultSuffix")
-                                    : ""}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="w-full px-5 py-4 bg-slate-50 rounded-2xl font-bold text-slate-900">
+                              {assignedClassName}
+                            </div>
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
@@ -1896,11 +1871,16 @@ export default function TeacherDashboard() {
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
               )}
 
               {activeTab === "behavior" && (
                 <div className="space-y-8 animate-in fade-in duration-500">
+                  {!classAssignmentReady ? (
+                    renderTeacherClassBlocked()
+                  ) : (
+                  <>
                   <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-slate-900">
                       {t("studentBehaviorAndReports")}
@@ -1922,21 +1902,8 @@ export default function TeacherDashboard() {
                           className="w-full pr-14 pl-6 py-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-600/10 font-bold text-slate-900 transition-all font-display"
                         />
                       </div>
-                      <div className="w-full md:w-64">
-                        <select
-                          value={behaviorClassFilter}
-                          onChange={(e) =>
-                            setBehaviorClassFilter(e.target.value)
-                          }
-                          className="w-full px-5 py-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-600/10 font-bold text-slate-900 transition-all appearance-none"
-                        >
-                          <option value="">{t("allClasses")}</option>
-                          {classes.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="w-full md:w-64 px-5 py-4 bg-slate-50 rounded-2xl font-bold text-slate-900">
+                        {assignedClassName}
                       </div>
                     </div>
 
@@ -1946,10 +1913,7 @@ export default function TeacherDashboard() {
                           const matchesSearch = s.name
                             .toLowerCase()
                             .includes(behaviorSearch.toLowerCase());
-                          const matchesClass = behaviorClassFilter
-                            ? s.classId === behaviorClassFilter
-                            : true;
-                          return matchesSearch && matchesClass;
+                          return matchesSearch;
                         })
                         .map((student) => (
                           <div
@@ -1965,8 +1929,7 @@ export default function TeacherDashboard() {
                                   {student.name}
                                 </h4>
                                 <p className="text-[10px] text-slate-500 mt-1">
-                                  {classes.find((c) => c.id === student.classId)
-                                    ?.name || t("noClass")}
+                                  {assignedClassName || t("noClass")}
                                 </p>
                               </div>
                             </div>
@@ -1994,18 +1957,31 @@ export default function TeacherDashboard() {
                         ))}
                     </div>
                   </div>
+                  </>
+                  )}
                 </div>
               )}
 
               {activeTab === "advanced_reports" && (
                 <div className="animate-in fade-in duration-500">
-                  <AdvancedReports />
+                  {!classAssignmentReady ? (
+                    renderTeacherClassBlocked()
+                  ) : (
+                    <AdvancedReports
+                      lockedClassId={assignedClassId}
+                      lockedClassName={assignedClassName}
+                    />
+                  )}
                 </div>
               )}
 
               {activeTab === "id_cards" && (
                 <div className="animate-in fade-in duration-500">
-                  <IdCards />
+                  {!classAssignmentReady ? (
+                    renderTeacherClassBlocked()
+                  ) : (
+                    <IdCards />
+                  )}
                 </div>
               )}
 
@@ -2014,6 +1990,10 @@ export default function TeacherDashboard() {
                   className="space-y-8 animate-in fade-in duration-500"
                   dir={isRtl ? "rtl" : "ltr"}
                 >
+                  {!classAssignmentReady ? (
+                    renderTeacherClassBlocked()
+                  ) : (
+                  <>
                   <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-slate-900">
                       {t("sentDailyEvaluationReports")}
@@ -2111,10 +2091,18 @@ export default function TeacherDashboard() {
                       </div>
                     )}
                   </div>
+                  </>
+                  )}
                 </div>
               )}
 
-              {activeTab === "schedules" && <Schedules />}
+              {activeTab === "schedules" && (
+                !classAssignmentReady ? (
+                  <div className="p-6 md:p-10">{renderTeacherClassBlocked()}</div>
+                ) : (
+                  <Schedules />
+                )
+              )}
 
               {activeTab === "market" && (
                 <div className="space-y-6">
@@ -2183,7 +2171,11 @@ export default function TeacherDashboard() {
               )}
 
               {activeTab === "settings" && (
-                <TeacherSettingsTab classes={classes} />
+                <TeacherSettingsTab
+                  classes={teacherClasses}
+                  assignedClassId={assignedClassId}
+                  assignedClassName={assignedClassName}
+                />
               )}
 
               {activeTab === "chat" && <TeacherChatTab />}
@@ -2275,45 +2267,12 @@ export default function TeacherDashboard() {
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        {t("targetClass")}
-                      </label>
-                      {newHomework.classId &&
-                        newHomework.classId !==
-                          (profile as any)?.preferredClassId && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleSetPreferredClass(newHomework.classId)
-                            }
-                            className="text-[10px] font-bold text-indigo-600 hover:underline"
-                          >
-                            {t("setPermanentClass")}
-                          </button>
-                        )}
+                    <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
+                      {t("targetClass")}
+                    </label>
+                    <div className="w-full px-5 py-3.5 bg-slate-50 rounded-xl font-bold text-slate-900">
+                      {assignedClassName || TEACHER_NO_CLASS_MSG}
                     </div>
-                    <select
-                      required
-                      value={newHomework.classId}
-                      onChange={(e) =>
-                        setNewHomework({
-                          ...newHomework,
-                          classId: e.target.value,
-                        })
-                      }
-                      className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border-none font-bold outline-none appearance-none"
-                    >
-                      <option value="">{t("selectClass")}</option>
-                      {classes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}{" "}
-                          {c.id === (profile as any)?.preferredClassId
-                            ? t("defaultSuffix")
-                            : ""}
-                        </option>
-                      ))}
-                    </select>
                   </div>
 
                   <div>
@@ -2530,8 +2489,7 @@ export default function TeacherDashboard() {
                       <option value="">{t("selectStudentPlaceholder")}</option>
                       {students.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.name} (
-                          {classes.find((c) => c.id === s.classId)?.name})
+                          {s.name} ({assignedClassName || s.classId})
                         </option>
                       ))}
                     </select>

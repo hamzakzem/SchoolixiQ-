@@ -1,19 +1,28 @@
 import React, { useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { db, auth } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { updatePassword, verifyBeforeUpdateEmail } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useLanguage } from '../lib/LanguageContext';
-import { AtSign, Lock, LayoutDashboard, MessageSquare, Send, Eye, EyeOff } from 'lucide-react';
+import { AtSign, Lock, LayoutDashboard, Eye, EyeOff } from 'lucide-react';
+import { TEACHER_NO_CLASS_MSG } from '../lib/teacherClass';
 
-export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
+type TeacherSettingsTabProps = {
+  classes?: any[];
+  assignedClassId?: string;
+  assignedClassName?: string;
+};
+
+export default function TeacherSettingsTab({
+  assignedClassId,
+  assignedClassName,
+}: TeacherSettingsTabProps) {
   const { profile } = useAuth();
-  const { t, isRtl } = useLanguage();
+  const { isRtl } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedClass, setSelectedClass] = useState((profile as any)?.preferredClassId || '');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -45,7 +54,6 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
     setIsLoading(true);
     try {
       await updatePassword(auth.currentUser, password);
-      // Wait, there's no updatePassword on the profile doc. Let's do it on the user doc if they need a text match but it's not standard
       await updateDoc(doc(db, 'users', profile!.uid), {
         updatedAt: serverTimestamp()
       });
@@ -57,22 +65,6 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
       } else {
         toast.error(error.message || 'Error updating password');
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateClass = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profile?.uid || !selectedClass) return;
-    setIsLoading(true);
-    try {
-      await updateDoc(doc(db, 'users', profile.uid), {
-        preferredClassId: selectedClass
-      });
-      toast.success(isRtl ? 'تم تحديث الصف الافتراضي بنجاح' : 'Preferred class updated successfully');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'users');
     } finally {
       setIsLoading(false);
     }
@@ -159,29 +151,19 @@ export default function TeacherSettingsTab({ classes }: { classes: any[] }) {
                <LayoutDashboard size={24} />
              </div>
              <div>
-               <h3 className="font-bold text-slate-900">{isRtl ? 'الصف الافتراضي' : 'Preferred Class'}</h3>
-               <p className="text-sm text-slate-500">{isRtl ? 'الصف الذي يظهر لك أولاً' : 'Default class that appears first'}</p>
+               <h3 className="font-bold text-slate-900">{isRtl ? 'الصف المعيّن' : 'Assigned class'}</h3>
+               <p className="text-sm text-slate-500">
+                 {isRtl
+                   ? 'يتم تعيين الصف من إدارة الكادر فقط'
+                   : 'Class is assigned by school admin only'}
+               </p>
              </div>
           </div>
-          <form onSubmit={handleUpdateClass} className="space-y-4">
-             <select
-               value={selectedClass}
-               onChange={(e) => setSelectedClass(e.target.value)}
-               className="w-full px-4 py-3 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 focus:ring-orange-500/20 font-medium"
-             >
-               <option value="">{isRtl ? 'اختر الصف الافتراضي' : 'Select preferred class'}</option>
-               {classes.map(c => (
-                 <option key={c.id} value={c.id}>{c.name}</option>
-               ))}
-             </select>
-             <button
-               disabled={isLoading || !selectedClass}
-               type="submit"
-               className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 disabled:opacity-50 transition-colors"
-             >
-               {isRtl ? 'حفظ الصف الافتراضي' : 'Save Preferred Class'}
-             </button>
-          </form>
+          <div className="w-full px-4 py-3 bg-slate-50 rounded-xl font-bold text-slate-900">
+            {assignedClassId
+              ? assignedClassName || assignedClassId
+              : TEACHER_NO_CLASS_MSG}
+          </div>
         </div>
       </div>
     </div>

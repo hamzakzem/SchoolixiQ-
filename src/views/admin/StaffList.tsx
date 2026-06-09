@@ -21,6 +21,11 @@ import {
   SCHOOL_SUBJECTS_COLLECTION,
   type SchoolSubjectOption,
 } from '../../lib/schoolSubjects';
+import {
+  buildTeacherClassWriteFields,
+  resolveTeacherClassId,
+  type SchoolClassOption,
+} from '../../lib/teacherClass';
 
 export default function StaffList() {
   const { profile } = useAuth();
@@ -39,6 +44,8 @@ export default function StaffList() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubjectOption[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(true);
+  const [schoolClasses, setSchoolClasses] = useState<SchoolClassOption[]>([]);
+  const [classesLoading, setClassesLoading] = useState(true);
   const [newStaff, setNewStaff] = useState({ 
     name: '', 
     email: '', 
@@ -47,6 +54,7 @@ export default function StaffList() {
     phoneNumber: '',
     subjectId: '',
     subject: '',
+    classId: '',
     salary: 0,
     joiningDate: new Date().toISOString().split('T')[0],
     gender: 'male' as 'male' | 'female',
@@ -122,6 +130,57 @@ export default function StaffList() {
       setSubjectsLoading(false);
     }
   }, [profile?.schoolId]);
+
+  useEffect(() => {
+    if (!profile?.schoolId) {
+      setSchoolClasses([]);
+      setClassesLoading(false);
+      return;
+    }
+
+    setClassesLoading(true);
+    try {
+      const q = query(
+        collection(db, 'classes'),
+        where('schoolId', '==', profile.schoolId),
+        limit(200),
+      );
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          setSchoolClasses(
+            snap.docs
+              .map((docSnap) => ({
+                id: docSnap.id,
+                name: String(docSnap.data().name || ''),
+                schoolId: docSnap.data().schoolId,
+              }))
+              .filter((c) => c.name)
+              .sort((a, b) => a.name.localeCompare(b.name, 'ar')),
+          );
+          setClassesLoading(false);
+        },
+        () => {
+          setSchoolClasses([]);
+          setClassesLoading(false);
+        },
+      );
+      return () => unsub();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'StaffList:classes');
+      setClassesLoading(false);
+    }
+  }, [profile?.schoolId]);
+
+  useEffect(() => {
+    if (!showModal || newStaff.role !== 'teacher') return;
+    if (
+      newStaff.classId &&
+      !schoolClasses.some((schoolClass) => schoolClass.id === newStaff.classId)
+    ) {
+      setNewStaff((prev) => ({ ...prev, classId: '' }));
+    }
+  }, [schoolClasses, showModal, newStaff.role, newStaff.classId]);
 
   useEffect(() => {
     if (!showModal || newStaff.role !== 'teacher' || subjectsLoading) return;
@@ -201,6 +260,8 @@ export default function StaffList() {
       subjectName: string;
       subject: string;
     } | null = null;
+    let teacherClassFields: ReturnType<typeof buildTeacherClassWriteFields> | null =
+      null;
 
     if (newStaff.role === 'teacher') {
       if (schoolSubjects.length === 0) {
@@ -226,6 +287,19 @@ export default function StaffList() {
         subjectName,
         subject: subjectName,
       };
+      if (schoolClasses.length === 0) {
+        toast.error('لا توجد صفوف مسجلة لهذه المدرسة. أضف الصفوف من إدارة الصفوف أولاً.');
+        return;
+      }
+      const pickedClass = schoolClasses.find((c) => c.id === newStaff.classId);
+      if (!pickedClass) {
+        toast.error('يرجى اختيار صف دراسي معتمد للمعلم');
+        return;
+      }
+      teacherClassFields = buildTeacherClassWriteFields(
+        pickedClass.id,
+        pickedClass.name,
+      );
       if (
         newStaff.password.trim() &&
         subjectName === newStaff.password.trim()
@@ -248,6 +322,17 @@ export default function StaffList() {
                 subject: '',
                 subjectId: deleteField(),
                 subjectName: deleteField(),
+              }),
+          ...(newStaff.role === 'teacher' && teacherClassFields
+            ? teacherClassFields
+            : {
+                assignedClassId: deleteField(),
+                assignedClassName: deleteField(),
+                primaryClassId: deleteField(),
+                primaryClassName: deleteField(),
+                preferredClassId: deleteField(),
+                classId: deleteField(),
+                className: deleteField(),
               }),
           salary: Number(newStaff.salary),
           joiningDate: newStaff.joiningDate,
@@ -281,6 +366,9 @@ export default function StaffList() {
             ...(newStaff.role === 'teacher' && teacherSubjectFields
               ? teacherSubjectFields
               : { subject: '' }),
+            ...(newStaff.role === 'teacher' && teacherClassFields
+              ? teacherClassFields
+              : {}),
             salary: Number(newStaff.salary),
             joiningDate: newStaff.joiningDate,
             gender: newStaff.gender,
@@ -375,7 +463,8 @@ export default function StaffList() {
       role: 'teacher', 
       phoneNumber: '', 
       subjectId: '',
-      subject: '', 
+      subject: '',
+      classId: '',
       salary: 0,
       joiningDate: new Date().toISOString().split('T')[0],
       gender: 'male',
@@ -512,6 +601,13 @@ export default function StaffList() {
                       {getTeacherSubjectDisplay(member)}
                     </span>
                   )}
+                  {member.role === 'teacher' && (
+                    <span className="text-[10px] font-bold bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full border border-orange-100">
+                      {member.assignedClassName ||
+                        schoolClasses.find((c) => c.id === resolveTeacherClassId(member))?.name ||
+                        'بدون صف'}
+                    </span>
+                  )}
                   {member.status && (
                     <div className="flex gap-1">
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
@@ -627,6 +723,7 @@ export default function StaffList() {
                     phoneNumber: member.phoneNumber || '',
                     subjectId: resolveSubjectIdForMember(member, schoolSubjects),
                     subject: getTeacherSubjectDisplay(member) || '',
+                    classId: resolveTeacherClassId(member),
                     salary: member.salary || 0,
                     joiningDate: member.joiningDate || new Date().toISOString().split('T')[0],
                     gender: member.gender || 'male',
@@ -803,7 +900,9 @@ export default function StaffList() {
                         setNewStaff({
                           ...newStaff,
                           role,
-                          ...(role !== 'teacher' ? { subjectId: '', subject: '' } : {}),
+                          ...(role !== 'teacher'
+                            ? { subjectId: '', subject: '', classId: '' }
+                            : {}),
                         });
                       }}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900 bg-white"
@@ -848,6 +947,38 @@ export default function StaffList() {
                           <option value="">اختر المادة الدراسية</option>
                           {schoolSubjects.map((s) => (
                             <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+
+                  {newStaff.role === 'teacher' && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">الصف الدراسي</label>
+                      {classesLoading ? (
+                        <p className="text-xs font-bold text-slate-400 px-4 py-3 rounded-xl border border-slate-100 bg-slate-50">
+                          جاري تحميل الصفوف...
+                        </p>
+                      ) : schoolClasses.length === 0 ? (
+                        <p className="text-xs font-bold text-amber-700 px-4 py-3 rounded-xl border border-amber-100 bg-amber-50">
+                          لا توجد صفوف مسجلة لهذه المدرسة. أضف الصفوف من إدارة الصفوف أولاً.
+                        </p>
+                      ) : (
+                        <select
+                          required
+                          name="teacher-class"
+                          value={newStaff.classId}
+                          onChange={(e) =>
+                            setNewStaff({ ...newStaff, classId: e.target.value })
+                          }
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900 bg-white"
+                        >
+                          <option value="">اختر الصف الدراسي</option>
+                          {schoolClasses.map((schoolClass) => (
+                            <option key={schoolClass.id} value={schoolClass.id}>
+                              {schoolClass.name}
+                            </option>
                           ))}
                         </select>
                       )}

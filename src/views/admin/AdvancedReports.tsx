@@ -10,7 +10,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
 
-export default function AdvancedReports() {
+type AdvancedReportsProps = {
+  lockedClassId?: string;
+  lockedClassName?: string;
+};
+
+export default function AdvancedReports({
+  lockedClassId,
+  lockedClassName,
+}: AdvancedReportsProps = {}) {
   const { profile } = useAuth();
   const { t, language } = useLanguage();
   const isRtl = language === 'ar';
@@ -36,12 +44,18 @@ export default function AdvancedReports() {
     const q = query(collection(db, 'classes'), where('schoolId', '==', profile.schoolId));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const classData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (lockedClassId) {
+        const lockedOnly = classData.filter((c) => c.id === lockedClassId);
+        setClasses(lockedOnly);
+        setSelectedClassId(lockedClassId);
+        return;
+      }
       setClasses(classData);
       if (classData.length > 0 && !selectedClassId) setSelectedClassId(classData[0].id);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'classes'));
 
     return () => unsubscribe();
-  }, [profile]);
+  }, [profile, lockedClassId]);
 
   // Fetch students for selected class
   useEffect(() => {
@@ -163,15 +177,21 @@ export default function AdvancedReports() {
           <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-4">
             <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-4 px-2">{isRtl ? 'اختر الصف' : 'Select Class'}</h3>
             <div className="space-y-2 max-h-48 overflow-y-auto pl-2 pr-1 custom-scrollbar">
-              {classes.map(cls => (
-                <button
-                  key={cls.id}
-                  onClick={() => setSelectedClassId(cls.id)}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                >
-                  {cls.name}
-                </button>
-              ))}
+              {lockedClassId ? (
+                <div className="w-full text-right px-4 py-3 rounded-xl text-sm font-bold bg-indigo-50 text-indigo-700">
+                  {lockedClassName || lockedClassId}
+                </div>
+              ) : (
+                classes.map(cls => (
+                  <button
+                    key={cls.id}
+                    onClick={() => setSelectedClassId(cls.id)}
+                    className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                  >
+                    {cls.name}
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
