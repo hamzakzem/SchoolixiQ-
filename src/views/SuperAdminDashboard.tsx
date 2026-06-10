@@ -5962,6 +5962,8 @@ export default function SuperAdminDashboard() {
         setShowNotifications={setShowNotifications}
         notificationsCount={notifications.filter((n: any) => !n.read).length}
         isRtl={isRtl}
+        logoutLabel={t("sidebar_logout")}
+        onLogout={() => auth.signOut()}
       />
     </div>
   );
