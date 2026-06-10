@@ -8,9 +8,18 @@ import { handleFirestoreError, OperationType } from '../../lib/firestore-errors'
 import { notificationService } from '../../lib/notificationService';
 import { useSystemConfig } from '../../lib/SystemConfigContext';
 import { playPremiumNotificationSound } from '../../lib/notificationSound';
-import { Send, Search, Building2, Check, CheckCheck, Sparkles, SendHorizontal, Dot, ArrowRight, ArrowLeft, Paperclip, X, Image as ImageIcon, FileVideo } from 'lucide-react';
+import { Send, Search, Building2, Check, CheckCheck, Sparkles, SendHorizontal, Dot, ArrowRight, ArrowLeft, Paperclip, X, Image as ImageIcon, FileVideo, Megaphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
+
+const BROADCAST_ID = '__broadcast__';
+
+function canUsePlatformChat(profile: { role?: string; schoolId?: string } | null) {
+  return (
+    profile?.role === 'superadmin' ||
+    (profile?.role === 'assistant' && !profile?.schoolId)
+  );
+}
 
 export default function SuperAdminChatTab() {
   const { profile } = useAuth();
@@ -34,7 +43,7 @@ export default function SuperAdminChatTab() {
   const isFirstLoad = useRef<boolean>(true);
 
   useEffect(() => {
-    if (profile?.role !== 'superadmin') return;
+    if (!canUsePlatformChat(profile)) return;
 
     const q = query(collection(db, 'schools'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -87,10 +96,13 @@ export default function SuperAdminChatTab() {
     });
 
     return () => { unsubscribe(); unsubUnread(); unsubConversations(); };
-  }, [profile?.role]);
+  }, [profile?.role, profile?.schoolId]);
 
   useEffect(() => {
-    if (!profile?.uid || !activeContact) return;
+    if (!profile?.uid || !activeContact || activeContact.id === BROADCAST_ID) {
+      if (activeContact?.id === BROADCAST_ID) setMessages([]);
+      return;
+    }
 
     // conversationId is superadmin_schoolId
     const convId = `superadmin_${activeContact.id}`;
@@ -160,79 +172,121 @@ export default function SuperAdminChatTab() {
     }
   };
 
+  const sendToSchool = async (
+    school: { id: string; name?: string },
+    messageText: string,
+    file?: { fileUrl: string | null; fileType: string | null; fileName: string | null },
+  ) => {
+    if (!profile?.uid) return;
+
+    const convId = `superadmin_${school.id}`;
+    const attachmentLabel = isRtl ? 'ملف مرفق' : 'Attachment';
+
+    await addDoc(collection(db, 'system_messages'), {
+      conversationId: convId,
+      schoolId: school.id,
+      senderId: profile.uid,
+      senderName: profile.name || 'إدارة المنصة',
+      senderRole: profile.role || 'superadmin',
+      receiverId: 'admin',
+      audience: 'school_admin',
+      content: messageText || attachmentLabel,
+      fileUrl: file?.fileUrl || null,
+      fileType: file?.fileType || null,
+      fileName: file?.fileName || null,
+      createdAt: serverTimestamp(),
+      read: false,
+    });
+
+    await setDoc(
+      doc(db, 'conversations', convId),
+      {
+        conversationId: convId,
+        schoolId: school.id,
+        participants: ['super_admin', 'admin'],
+        lastMessage: messageText || attachmentLabel,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    const q = query(
+      collection(db, 'users'),
+      where('schoolId', '==', school.id),
+      where('role', 'in', ['admin', 'assistant']),
+    );
+    const adminSnaps = await getDocs(q);
+    const adminIds = adminSnaps.docs.map((d) => d.id);
+    if (adminIds.length > 0) {
+      await notificationService.sendToMultiple(adminIds, {
+        title: 'رسالة جديدة من إدارة المنصة',
+        message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
+        type: 'system',
+        schoolId: school.id,
+        metadata: { senderId: profile.uid, conversationId: convId, audience: 'school_admin' },
+      });
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newMessage.trim() && !selectedFile) || !profile?.uid || !activeContact) return;
 
     const messageText = newMessage.trim();
+    const isBroadcast = activeContact.id === BROADCAST_ID;
+
+    if (isBroadcast && selectedFile) {
+      toast.error(isRtl ? 'البث الجماعي يدعم النص فقط حالياً' : 'Broadcast supports text only');
+      return;
+    }
+
+    if (isBroadcast) {
+      const confirmed = window.confirm(
+        isRtl
+          ? `إرسال هذه الرسالة إلى ${schools.length} مدرسة؟`
+          : `Send this message to ${schools.length} schools?`,
+      );
+      if (!confirmed) return;
+    }
+
     setNewMessage('');
     setIsLoading(true);
 
-    const convId = `superadmin_${activeContact.id}`;
-
     try {
-      let fileUrl = null;
-      let fileType = null;
-      let fileName = null;
+      let filePayload: { fileUrl: string | null; fileType: string | null; fileName: string | null } | undefined;
 
-      if (selectedFile) {
+      if (selectedFile && !isBroadcast) {
+        const convId = `superadmin_${activeContact.id}`;
         const fileExt = selectedFile.name.split('.').pop();
         const path = `chat_files/${convId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const storageRef = ref(storage, path);
         await uploadBytes(storageRef, selectedFile);
-        fileUrl = await getDownloadURL(storageRef);
-        fileType = selectedFile.type.startsWith('video/') ? 'video' : 'image';
-        fileName = selectedFile.name;
+        const fileUrl = await getDownloadURL(storageRef);
+        filePayload = {
+          fileUrl,
+          fileType: selectedFile.type.startsWith('video/') ? 'video' : 'image',
+          fileName: selectedFile.name,
+        };
         setSelectedFile(null);
       }
 
-      await addDoc(collection(db, 'system_messages'), {
-        conversationId: convId,
-        schoolId: activeContact.id,
-        senderId: profile.uid,
-        senderName: profile.name || 'Super Admin',
-        senderRole: 'superadmin',
-        receiverId: 'admin',
-        content: messageText || (isRtl ? 'ملف مرفق' : 'Attachment'),
-        fileUrl,
-        fileType,
-        fileName,
-        createdAt: serverTimestamp(),
-        read: false
-      });
-
-      // Update conversation document for real-time sorting
-      await setDoc(doc(db, "conversations", convId), {
-        conversationId: convId,
-        schoolId: activeContact.id,
-        participants: ["super_admin", "admin"],
-        lastMessage: messageText || (isRtl ? 'ملف مرفق' : 'Attachment'),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      // Notify the receiver (school admins)
-      const q = query(
-        collection(db, 'users'), 
-        where('schoolId', '==', activeContact.id), 
-        where('role', 'in', ['admin', 'assistant'])
-      );
-      const adminSnaps = await getDocs(q);
-      const adminIds = adminSnaps.docs.map(d => d.id);
-      if (adminIds.length > 0) {
-        await notificationService.sendToMultiple(adminIds, {
-          title: 'رسالة جديدة من إدارة المنصة',
-          message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
-          type: 'system',
-          schoolId: activeContact.id,
-          metadata: { senderId: profile.uid, conversationId: convId }
-        });
+      if (isBroadcast) {
+        let sent = 0;
+        for (const school of schools) {
+          await sendToSchool(school, messageText);
+          sent += 1;
+        }
+        toast.success(
+          isRtl ? `تم إرسال الرسالة إلى ${sent} مدرسة` : `Message sent to ${sent} schools`,
+        );
+      } else {
+        await sendToSchool(activeContact, messageText, filePayload);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       }
-
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'system_messages');
       toast.error(isRtl ? 'فشل إرسال الرسالة' : 'Failed to send message');
-      setNewMessage(messageText); // restore
+      setNewMessage(messageText);
     } finally {
       setIsLoading(false);
     }
@@ -297,6 +351,41 @@ export default function SuperAdminChatTab() {
         </div>
 
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar space-y-1 p-2">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveContact({
+                id: BROADCAST_ID,
+                name: isRtl ? 'جميع المدارس' : 'All Schools',
+                type: 'broadcast',
+              });
+              setMobileShowChat(true);
+            }}
+            className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all duration-200 w-full mb-2 ${
+              activeContact?.id === BROADCAST_ID
+                ? 'bg-gradient-to-l from-amber-50/80 to-orange-50/60 dark:from-amber-950/40 dark:to-slate-900/20 shadow-sm border-l-4 border-amber-500'
+                : 'hover:bg-amber-50/50 dark:hover:bg-amber-950/20 border border-dashed border-amber-200/60 dark:border-amber-900/30'
+            }`}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 flex items-center justify-center shrink-0">
+              <Megaphone size={20} />
+            </div>
+            <div className="flex-1 text-right min-w-0">
+              <h3 className="font-bold text-sm text-amber-800 dark:text-amber-300 truncate">
+                {isRtl ? 'رسالة لجميع المدارس' : 'Broadcast to all schools'}
+              </h3>
+              <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 truncate mt-0.5">
+                {isRtl ? 'إرسال آمن لكل مدرسة على حدة' : 'Secure per-school delivery'}
+              </p>
+            </div>
+          </button>
+
+          {filteredSchools.length === 0 && (
+            <div className="p-6 text-center text-slate-400 text-sm font-bold">
+              {isRtl ? 'لا توجد مدارس مطابقة' : 'No matching schools'}
+            </div>
+          )}
+
           {filteredSchools.map((school) => {
              const unreadCount = unreadCounts[school.id] || 0;
              const isSelected = activeContact?.id === school.id;
@@ -364,7 +453,11 @@ export default function SuperAdminChatTab() {
               >
                 {isRtl ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
               </button>
-               {activeContact.extra?.logoUrl ? (
+               {activeContact.id === BROADCAST_ID ? (
+                 <div className="w-11 h-11 rounded-2xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100/30">
+                   <Megaphone size={20} />
+                 </div>
+               ) : activeContact.extra?.logoUrl ? (
                  <img 
                    src={activeContact.extra.logoUrl} 
                    alt={activeContact.name} 
@@ -380,7 +473,9 @@ export default function SuperAdminChatTab() {
                  <h2 className="font-bold text-slate-900 dark:text-white truncate font-display text-base">{activeContact.name}</h2>
                  <p className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 font-bold flex items-center gap-1">
                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                   {isRtl ? 'دردشة مفعّلة مباشرة' : 'Active Channel'} - {isRtl ? 'المدرسة' : 'School'}
+                   {activeContact.id === BROADCAST_ID
+                     ? (isRtl ? 'بث جماعي — مدرسة بمدرسة' : 'Broadcast — per school')
+                     : (isRtl ? 'دردشة مفعّلة مباشرة' : 'Active Channel')}
                  </p>
                </div>
             </div>
@@ -396,7 +491,23 @@ export default function SuperAdminChatTab() {
 
         {/* Messages Component list */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-[#fcfdfe] dark:bg-slate-950/20">
-          {activeContact && (
+          {activeContact?.id === BROADCAST_ID && (
+            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+              <div className="w-20 h-20 rounded-3xl bg-amber-50 dark:bg-amber-950/20 flex items-center justify-center mb-4 text-amber-600">
+                <Megaphone size={36} />
+              </div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                {isRtl ? 'مراسلة جميع المدارس' : 'Message all schools'}
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md font-bold leading-relaxed">
+                {isRtl
+                  ? 'سيتم إرسال الرسالة بشكل منفصل لكل مدرسة مع schoolId وsenderId صحيحين — دون تسريب بين المدارس.'
+                  : 'Each school receives a separate message with correct schoolId and senderId.'}
+              </p>
+            </div>
+          )}
+
+          {activeContact && activeContact.id !== BROADCAST_ID && (
             <div className="flex flex-col items-center justify-center py-8">
                {activeContact.extra?.logoUrl ? (
                  <img 
@@ -419,7 +530,7 @@ export default function SuperAdminChatTab() {
             </div>
           )}
 
-          {Object.entries(groupedMessages).map(([dateStr, dateMsgs]) => (
+          {activeContact?.id !== BROADCAST_ID && Object.entries(groupedMessages).map(([dateStr, dateMsgs]) => (
             <div key={dateStr} className="space-y-4">
               <div className="flex justify-center my-6">
                 <span className="bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-400 text-[10px] font-black tracking-widest px-4 py-1.5 rounded-full uppercase shadow-sm">
@@ -427,7 +538,7 @@ export default function SuperAdminChatTab() {
                 </span>
               </div>
               {(dateMsgs as any[]).map((msg: any) => {
-                const isMe = msg.senderRole === 'superadmin';
+                const isMe = msg.senderId === profile?.uid;
                 
                 return (
                   <motion.div 
@@ -547,7 +658,11 @@ export default function SuperAdminChatTab() {
                   }
                 }}
                 disabled={!activeContact || isLoading}
-                placeholder={isRtl ? 'اكتب رسالتك للمدرسة بشكل واضح...' : 'Write message to the school...'}
+                placeholder={
+                  activeContact?.id === BROADCAST_ID
+                    ? (isRtl ? 'اكتب رسالة البث لجميع المدارس...' : 'Write broadcast message...')
+                    : (isRtl ? 'اكتب رسالتك للمدرسة بشكل واضح...' : 'Write message to the school...')
+                }
                 className="flex-1 bg-transparent border-none outline-none resize-none max-h-32 py-2.5 px-2 my-0.5 text-sm md:text-base font-bold min-h-[44px] styled-scrollbar text-slate-900 dark:text-white"
                 rows={1}
               />

@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Download, Clock, AlertCircle, CheckCircle2, ShieldCheck, DatabaseBackup } from 'lucide-react';
+import { Download, Clock, CheckCircle2, ShieldCheck, DatabaseBackup, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { auth } from '../lib/firebase';
 import { getApiUrl } from '../lib/apiUtils';
+
+const LAST_BACKUP_KEY = 'schoolix_last_manual_backup';
 
 export function SuperAdminBackupsTab() {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [lastBackupDate, setLastBackupDate] = useState<Date | null>(null);
 
-  // You can fetch backup history from a Firestore collection if you want to store them,
-  // but for now we only support triggering manual download.
+  useEffect(() => {
+    const stored = localStorage.getItem(LAST_BACKUP_KEY);
+    if (stored) {
+      const parsed = new Date(stored);
+      if (!Number.isNaN(parsed.getTime())) {
+        setLastBackupDate(parsed);
+      }
+    }
+  }, []);
 
   const handleManualBackup = async () => {
     if (!auth.currentUser) {
@@ -21,16 +30,24 @@ export function SuperAdminBackupsTab() {
     try {
       setIsBackingUp(true);
       const token = await auth.currentUser.getIdToken(true);
-      
+
       const response = await fetch(getApiUrl('/api/admin/backup'), {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'X-Authorization': `Bearer ${token}`
-        }
+          'X-Authorization': `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
-        throw new Error('فشل في عملية النسخ الاحتياطي');
+        let detail = 'فشل في عملية النسخ الاحتياطي';
+        try {
+          const err = await response.json();
+          detail = err.error || err.message || detail;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(detail);
       }
 
       const blob = await response.blob();
@@ -43,11 +60,13 @@ export function SuperAdminBackupsTab() {
       window.URL.revokeObjectURL(url);
       a.remove();
 
+      const now = new Date();
+      localStorage.setItem(LAST_BACKUP_KEY, now.toISOString());
+      setLastBackupDate(now);
       toast.success('تم تحميل النسخة الاحتياطية بنجاح');
-      setLastBackupDate(new Date());
     } catch (error: any) {
       console.error('Backup error:', error);
-      toast.error('حدث خطأ أثناء تحميل النسخة الاحتياطية');
+      toast.error(error?.message || 'حدث خطأ أثناء تحميل النسخة الاحتياطية');
     } finally {
       setIsBackingUp(false);
     }
@@ -59,10 +78,10 @@ export function SuperAdminBackupsTab() {
         <div>
           <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight flex items-center gap-3">
             <DatabaseBackup className="text-blue-600" size={32} />
-            نظام النسخ الاحتياطي الشامل
+            نظام النسخ الاحتياطي
           </h3>
           <p className="text-slate-500 dark:text-slate-400 font-bold mt-2 opacity-80 text-sm">
-            أدوات الجدولة والمزامنة لحماية بيانات المدارس، والنظام
+            تصدير يدوي آمن لبيانات المنصة عبر الخادم الخلفي
           </p>
         </div>
       </div>
@@ -74,7 +93,7 @@ export function SuperAdminBackupsTab() {
           </div>
           <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-2 relative z-10">تحميل نسخة احتياطية فورية</h4>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 relative z-10">
-            تصدير جميع بيانات النظام (مدارس، طلاب، معلمين، أولياء أمور، حضور، ودرجات) في ملف JSON يمكن الاحتفاظ به خارج خوادم فايربيس.
+            تصدير بيانات النظام (مدارس، مستخدمين، طلاب، فصول، باقات، وغيرها) في ملف JSON عبر واجهة `/api/admin/backup` المحمية.
           </p>
           <button
             onClick={handleManualBackup}
@@ -82,50 +101,67 @@ export function SuperAdminBackupsTab() {
             className="w-full relative z-10 flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 active:scale-95 disabled:opacity-50"
           >
             {isBackingUp ? (
-               <>
-                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                 جاري توليد الملف الآمن...
-               </>
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                جاري توليد الملف الآمن...
+              </>
             ) : (
-               <>
-                 <Download size={20} />
-                 تحميل النسخة الاحتياطية (JSON)
-               </>
+              <>
+                <Download size={20} />
+                تحميل النسخة الاحتياطية (JSON)
+              </>
             )}
           </button>
         </div>
 
         <div className="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center">
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg"><Clock size={20} /></div>
-                  <div>
-                    <div className="text-xs text-slate-400 font-bold mb-1">حالة الجدولة التلقائية</div>
-                    <div className="text-sm font-black text-slate-700 dark:text-white flex items-center gap-2">
-                       <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                       يعمل تلقائياً (نسخة يومية على الخادم)
-                    </div>
-                  </div>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-lg">
+                <AlertCircle size={20} />
               </div>
-              <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 rounded-lg"><CheckCircle2 size={20} /></div>
-                  <div>
-                    <div className="text-xs text-slate-400 font-bold mb-1">آخر نسخة يدوية تم تنزيلها</div>
-                    <div className="text-sm font-black text-slate-700 dark:text-white">
-                      {lastBackupDate ? lastBackupDate.toLocaleString('ar-IQ') : '---'}
-                    </div>
-                  </div>
-              </div>
-              <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                  <div className="p-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-lg"><ShieldCheck size={20} /></div>
-                  <div>
-                    <div className="text-xs text-slate-400 font-bold mb-1">استراتيجية التعافي من الكوارث</div>
-                    <div className="text-xs font-bold text-slate-600 dark:text-slate-300 leading-relaxed">
-                       يتم تصدير نسخة مشفرة يومياً. يوفر هذا الواجهة القدرة على اخذ نسخة اضافية وتخزينها محلياً لحماية النظام من فقدان البيانات من فايربيس.
-                    </div>
-                  </div>
+              <div>
+                <div className="text-xs text-slate-400 font-bold mb-1">الجدولة التلقائية</div>
+                <div className="text-sm font-black text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  قيد الإعداد — لا تُعرض نسخ تلقائية وهمية
+                </div>
               </div>
             </div>
+            <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 rounded-lg">
+                <CheckCircle2 size={20} />
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 font-bold mb-1">آخر نسخة يدوية تم تنزيلها</div>
+                <div className="text-sm font-black text-slate-700 dark:text-white">
+                  {lastBackupDate ? lastBackupDate.toLocaleString('ar-IQ') : 'لم يتم تنزيل نسخة بعد'}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-lg">
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 font-bold mb-1">سياسة الأمان</div>
+                <div className="text-xs font-bold text-slate-600 dark:text-slate-300 leading-relaxed">
+                  التصدير يتم عبر الخادم بصلاحية Super Admin فقط. احفظ الملف محلياً في مكان آمن ولا تشاركه علناً.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg">
+                <Clock size={20} />
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 font-bold mb-1">متطلبات التشغيل</div>
+                <div className="text-xs font-bold text-slate-600 dark:text-slate-300 leading-relaxed">
+                  يتطلب اتصالاً فعّالاً بالخادم الخلفي (Cloud Run). إذا فشل التحميل، تحقق من إعدادات `backendUrl`.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>

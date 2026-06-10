@@ -185,6 +185,7 @@ export default function SuperAdminDashboard() {
     | "parents"
     | "requests"
     | "settings"
+    | "footer"
     | "accounts"
     | "team"
     | "chat"
@@ -380,7 +381,16 @@ export default function SuperAdminDashboard() {
     return unsub;
   }, []);
 
+  const hasInvalidPartnerLinks = (partners?: { link?: string }[]) =>
+    (partners || []).some(
+      (p) => p.link?.trim() && !/^https?:\/\//i.test(p.link.trim()),
+    );
+
   const handleUpdateConfig = async () => {
+    if (hasInvalidPartnerLinks(systemConfig.ourPartners)) {
+      toast.error("روابط الشركاء يجب أن تبدأ بـ http:// أو https://");
+      return;
+    }
     setIsSavingConfig(true);
     const path = "system/config";
     try {
@@ -551,14 +561,18 @@ export default function SuperAdminDashboard() {
     view_requests: t('sidebar_requests'),
     manage_users: t('sidebar_users'),
     system_settings: t('sidebar_settings'),
+    view_backups: t('sidebar_backups'),
   };
 
   const packagePermissionCheckboxes = getPackagePermissionCheckboxFeatures();
 
   const filteredSchools = schools.filter((s) => {
+    const term = searchTerm.toLowerCase();
     const matchesSearch =
-      s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.address?.toLowerCase().includes(searchTerm.toLowerCase());
+      s.name?.toLowerCase().includes(term) ||
+      s.address?.toLowerCase().includes(term) ||
+      s.adminEmail?.toLowerCase().includes(term) ||
+      s.adminPhone?.includes(searchTerm);
     const matchesGov = filterGovernorate
       ? s.governorate === filterGovernorate
       : true;
@@ -578,6 +592,32 @@ export default function SuperAdminDashboard() {
     }
 
     return matchesSearch && matchesGov && matchesDir && matchesFilter;
+  });
+
+  const userSearchTerm = searchTerm.toLowerCase();
+  const filteredManagementUsers = users.filter((u) => {
+    if (u.role === "parent") return false;
+    if (!userSearchTerm) return true;
+    return (
+      u.name?.toLowerCase().includes(userSearchTerm) ||
+      u.email?.toLowerCase().includes(userSearchTerm) ||
+      schools
+        .find((s) => s.id === u.schoolId)
+        ?.name?.toLowerCase()
+        .includes(userSearchTerm)
+    );
+  });
+  const filteredParentUsers = users.filter((u) => {
+    if (u.role !== "parent") return false;
+    if (!userSearchTerm) return true;
+    return (
+      u.name?.toLowerCase().includes(userSearchTerm) ||
+      u.email?.toLowerCase().includes(userSearchTerm) ||
+      schools
+        .find((s) => s.id === u.schoolId)
+        ?.name?.toLowerCase()
+        .includes(userSearchTerm)
+    );
   });
 
   const stats = {
@@ -1756,58 +1796,69 @@ export default function SuperAdminDashboard() {
                         </div>
                       )}
                     </button>
-                    <button
-                      onClick={() => {
-                        navigateToTab("backups");
-                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                      }}
-                      title={isSidebarCollapsed ? t('sidebar_backups') : undefined}
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "backups" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
-                    >
-                      <Save
-                        size={isSidebarCollapsed ? 24 : 20}
-                        className="shrink-0"
-                      />
-                      {!isSidebarCollapsed && (
-                        <span className="truncate">{t('sidebar_backups')}</span>
-                      )}
-                      {isSidebarCollapsed && (
-                        <div
-                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
-                        >
-                          {t('sidebar_backups')}
-                        </div>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigateToTab("diagnostics");
-                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                      }}
-                      title={
-                        isSidebarCollapsed
-                          ? t('sidebar_diagnostics')
-                          : undefined
-                      }
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "diagnostics" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
-                    >
-                      <Activity
-                        size={isSidebarCollapsed ? 24 : 20}
-                        className="shrink-0"
-                      />
-                      {!isSidebarCollapsed && (
-                        <span className="truncate">
-                          {t('sidebar_diagnostics')}
-                        </span>
-                      )}
-                      {isSidebarCollapsed && (
-                        <div
-                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
-                        >
-                          {t('sidebar_diagnostics')}
-                        </div>
-                      )}
-                    </button>
+                    {(hasPermission("view_backups") ||
+                      profile?.role === "superadmin") && (
+                      <button
+                        onClick={() => {
+                          navigateToTab("backups");
+                          if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                        }}
+                        title={
+                          isSidebarCollapsed ? t("sidebar_backups") : undefined
+                        }
+                        className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "backups" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      >
+                        <Save
+                          size={isSidebarCollapsed ? 24 : 20}
+                          className="shrink-0"
+                        />
+                        {!isSidebarCollapsed && (
+                          <span className="truncate">
+                            {t("sidebar_backups")}
+                          </span>
+                        )}
+                        {isSidebarCollapsed && (
+                          <div
+                            className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                          >
+                            {t("sidebar_backups")}
+                          </div>
+                        )}
+                      </button>
+                    )}
+                    {(profile?.role === "superadmin" ||
+                      profile?.role === "dev_agent") && (
+                      <button
+                        onClick={() => {
+                          navigateToTab("diagnostics");
+                          if (window.innerWidth < 1024)
+                            setIsSidebarOpen(false);
+                        }}
+                        title={
+                          isSidebarCollapsed
+                            ? t("sidebar_diagnostics")
+                            : undefined
+                        }
+                        className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "diagnostics" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      >
+                        <Activity
+                          size={isSidebarCollapsed ? 24 : 20}
+                          className="shrink-0"
+                        />
+                        {!isSidebarCollapsed && (
+                          <span className="truncate">
+                            {t("sidebar_diagnostics")}
+                          </span>
+                        )}
+                        {isSidebarCollapsed && (
+                          <div
+                            className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                          >
+                            {t("sidebar_diagnostics")}
+                          </div>
+                        )}
+                      </button>
+                    )}
                   </>
                 )}
               </nav>
@@ -2480,6 +2531,16 @@ export default function SuperAdminDashboard() {
                             </td>
                           </tr>
                         ))}
+                        {filteredSchools.length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={8}
+                              className="px-8 py-16 text-center text-slate-400 dark:text-slate-500 font-bold"
+                            >
+                              لا توجد مدارس مطابقة للبحث أو الفلتر
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                     </div>
@@ -2513,7 +2574,7 @@ export default function SuperAdminDashboard() {
                           نشطة الآن
                         </span>
                         <span className="text-lg font-black text-emerald-600 leading-tight tracking-tighter">
-                          {schools.length}
+                          {schools.filter((s) => s.status === "active").length}
                         </span>
                       </div>
                     </div>
@@ -2533,9 +2594,14 @@ export default function SuperAdminDashboard() {
                         className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-3.5 pr-12 pl-4 outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all font-bold text-sm text-slate-700 dark:text-slate-300"
                       />
                     </div>
-                    <button className="px-5 py-3.5 bg-slate-900 dark:bg-slate-800 text-white rounded-2xl font-black text-xs hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg shadow-slate-900/10">
+                    <button
+                      type="button"
+                      disabled
+                      title="قيد الإعداد — يتم إدارة كلمات المرور من لوحة كل مدرسة"
+                      className="px-5 py-3.5 bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl font-black text-xs flex items-center gap-2 cursor-not-allowed opacity-70"
+                    >
                       <Lock size={16} />
-                      تأمين كافة الحسابات
+                      تأمين كافة الحسابات (قيد الإعداد)
                     </button>
                   </div>
 
@@ -2603,9 +2669,7 @@ export default function SuperAdminDashboard() {
                               <td className="px-6 py-6">
                                 <div className="flex flex-col gap-2">
                                   <div className="inline-flex items-center gap-2 bg-slate-50 dark:bg-slate-950 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800 group-hover:border-blue-100 dark:group-hover:border-blue-900/30 transition-colors w-fit">
-                                    <PasswordCell
-                                      password={school.adminPassword}
-                                    />
+                                    <SecureCredentialCell hasCredential={!!school.adminPassword} />
                                   </div>
                                   <span className="text-[10px] font-bold text-slate-400 font-mono">
                                     ID: {school.id?.slice(0, 8)}
@@ -2614,9 +2678,21 @@ export default function SuperAdminDashboard() {
                               </td>
                               <td className="px-6 py-6">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest whitespace-nowrap">
-                                    نشط
+                                  <div
+                                    className={`w-1.5 h-1.5 rounded-full ${
+                                      school.status === "active"
+                                        ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                                        : "bg-red-500"
+                                    }`}
+                                  ></div>
+                                  <span
+                                    className={`text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${
+                                      school.status === "active"
+                                        ? "text-emerald-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    {school.status === "active" ? "نشط" : "موقوف"}
                                   </span>
                                 </div>
                               </td>
@@ -2677,6 +2753,16 @@ export default function SuperAdminDashboard() {
                               </td>
                             </tr>
                           ))}
+                          {filteredSchools.length === 0 && (
+                            <tr>
+                              <td
+                                colSpan={4}
+                                className="px-8 py-16 text-center text-slate-400 dark:text-slate-500 font-bold"
+                              >
+                                لا توجد حسابات مدارس مطابقة للبحث
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -2743,7 +2829,7 @@ export default function SuperAdminDashboard() {
                                   </td>
                                   <td className="px-6 py-6">
                                     <div className="inline-flex items-center gap-2 bg-orange-50/30 dark:bg-orange-950 px-3 py-2 rounded-xl border border-orange-100/50 dark:border-orange-900/30 transition-colors">
-                                      <PasswordCell password={req.password} />
+                                      <SecureCredentialCell hasCredential={!!req.password} />
                                     </div>
                                   </td>
                                   <td className="px-8 py-6 text-center">
@@ -3052,16 +3138,16 @@ export default function SuperAdminDashboard() {
                                 </span>
                               </div>
                             )}
-                            <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900/30">
-                              <Lock size={14} className="text-indigo-500" />
-                              <PasswordCell
-                                password={
-                                  request.adminPassword ||
-                                  request.password ||
-                                  request.customerInfo?.password
-                                }
-                              />
-                            </div>
+                            {(request.adminPassword ||
+                              request.password ||
+                              request.customerInfo?.password) && (
+                              <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900/30">
+                                <Lock size={14} className="text-indigo-500" />
+                                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                                  كلمة مرور مسجّلة — تُدار عند التفعيل فقط
+                                </span>
+                              </div>
+                            )}
                             {request.customerInfo?.address && (
                               <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
                                 <MapPin size={14} className="text-slate-400" />
@@ -3437,6 +3523,20 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
+                  <div className="mb-6 relative group">
+                    <Search
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors"
+                      size={18}
+                    />
+                    <input
+                      type="text"
+                      placeholder="ابحث بالاسم، البريد، أو المدرسة..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-3.5 pr-12 pl-4 outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all font-bold text-sm text-slate-700 dark:text-slate-300"
+                    />
+                  </div>
+
                   <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
                     <div className="overflow-x-auto w-full custom-scrollbar">
                       <table className="w-full text-right border-collapse min-w-[800px]">
@@ -3458,13 +3558,10 @@ export default function SuperAdminDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {users
-                          .filter((u) =>
-                            usersTab === "management"
-                              ? u.role !== "parent"
-                              : u.role === "parent",
-                          )
-                          .map((user) => {
+                        {(usersTab === "management"
+                          ? filteredManagementUsers
+                          : filteredParentUsers
+                        ).map((user) => {
                             const userSchool = schools.find(
                               (s) => s.id === user.schoolId,
                             );
@@ -3614,6 +3711,19 @@ export default function SuperAdminDashboard() {
                               </tr>
                             );
                           })}
+                        {(usersTab === "management"
+                          ? filteredManagementUsers
+                          : filteredParentUsers
+                        ).length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={usersTab === "management" ? 4 : 3}
+                              className="px-6 py-16 text-center text-slate-400 dark:text-slate-500 font-bold"
+                            >
+                              لا توجد نتائج مطابقة للبحث
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                     </div>
@@ -3632,6 +3742,20 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
+                  <div className="mb-6 relative group">
+                    <Search
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors"
+                      size={18}
+                    />
+                    <input
+                      type="text"
+                      placeholder="ابحث باسم ولي الأمر، البريد، أو المدرسة..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-3.5 pr-12 pl-4 outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all font-bold text-sm text-slate-700 dark:text-slate-300"
+                    />
+                  </div>
+
                   <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
                     <div className="overflow-x-auto w-full custom-scrollbar">
                       <table className="w-full text-right border-collapse min-w-[800px]">
@@ -3643,9 +3767,7 @@ export default function SuperAdminDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {users
-                          .filter((u) => u.role === "parent")
-                          .map((user) => {
+                        {filteredParentUsers.map((user) => {
                             const userSchool = schools.find(
                               (s) => s.id === user.schoolId,
                             );
@@ -3702,7 +3824,7 @@ export default function SuperAdminDashboard() {
                                       ))
                                     ) : (
                                       <span className="text-slate-400 italic font-medium">
-                                        لاتوجد طلبة
+                                        لا يوجد طلاب مرتبطون
                                       </span>
                                     )}
                                   </div>
@@ -3710,14 +3832,16 @@ export default function SuperAdminDashboard() {
                               </tr>
                             );
                           })}
-                        {users.filter((u) => u.role === "parent").length ===
-                          0 && (
+                        {filteredParentUsers.length === 0 && (
                           <tr>
                             <td
                               colSpan={3}
-                              className="px-6 py-10 text-center text-slate-400 italic"
+                              className="px-6 py-16 text-center text-slate-400 dark:text-slate-500 font-bold"
                             >
-                              لا يوجد أولياء أمور مسجلين حالياً
+                              {users.filter((u) => u.role === "parent").length ===
+                              0
+                                ? "لا يوجد أولياء أمور مسجلين حالياً"
+                                : "لا يوجد أولياء أمور مطابقون للبحث"}
                             </td>
                           </tr>
                         )}
@@ -4702,9 +4826,26 @@ export default function SuperAdminDashboard() {
                   </div>
                 </motion.div>
               ) : activeTab === "backups" ? (
-                <SuperAdminBackupsTab />
+                hasPermission("view_backups") ||
+                profile?.role === "superadmin" ? (
+                  <SuperAdminBackupsTab />
+                ) : (
+                  <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
+                    ليس لديك صلاحية الوصول إلى النسخ الاحتياطي
+                  </div>
+                )
               ) : activeTab === "diagnostics" ? (
-                <SuperAdminDiagnostics />
+                profile?.role === "superadmin" ||
+                profile?.role === "dev_agent" ? (
+                  <SuperAdminDiagnostics
+                    totalUsers={users.length}
+                    totalSchools={schools.length}
+                  />
+                ) : (
+                  <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
+                    ليس لديك صلاحية الوصول إلى التشخيص
+                  </div>
+                )
               ) : null}
             </motion.div>
           </AnimatePresence>
@@ -5979,21 +6120,15 @@ function PackageDetailsModal({
   );
 }
 
-function PasswordCell({ password }: { password?: string }) {
-  const [show, setShow] = React.useState(false);
-
-  if (!password) return <span className="text-slate-300">---</span>;
-
+function SecureCredentialCell({ hasCredential }: { hasCredential?: boolean }) {
+  if (!hasCredential) {
+    return <span className="text-slate-300 dark:text-slate-500 text-xs">غير متوفر</span>;
+  }
   return (
-    <div className="flex items-center gap-2">
-      <span className="font-mono text-xs">{show ? password : "••••••••"}</span>
-      <button
-        onClick={() => setShow(!show)}
-        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-all text-slate-400"
-      >
-        {show ? <EyeOff size={12} /> : <Eye size={12} />}
-      </button>
-    </div>
+    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+      <Lock size={12} className="text-emerald-500" />
+      محفوظة في النظام
+    </span>
   );
 }
 
