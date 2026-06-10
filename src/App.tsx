@@ -62,7 +62,7 @@ import {
   setBackendApiBaseUrl,
 } from "./lib/apiUtils";
 import ScanHandler from "./components/ScanHandler";
-import SolarLoading from "./components/SolarLoading";
+import { PageLoadingSkeleton } from "./components/ui/Skeleton";
 import { LanguageToggle } from "./components/LanguageToggle";
 import InstallAppBanner from "./components/InstallAppBanner";
 import { AudioNotificationManager } from "./components/AudioNotificationManager";
@@ -553,7 +553,7 @@ const AppContent = () => {
     isCreatingProfile ||
     (user && (!profile || isPendingSchoolAdmin(profile)) && onboardingState === "loading")
   ) {
-    return <SolarLoading />;
+    return <PageLoadingSkeleton />;
   }
 
   if (!user) {
@@ -1550,7 +1550,7 @@ export default function App() {
         <LanguageProvider>
           <AuthProvider>
             <BrowserRouter>
-              <Suspense fallback={<SolarLoading />}>
+              <Suspense fallback={<PageLoadingSkeleton />}>
                 <Routes>
                   <Route
                     path="/verify/:studentId"
@@ -1559,7 +1559,24 @@ export default function App() {
                   <Route path="*" element={<AppContent />} />
                 </Routes>
               </Suspense>
-              <Toaster position="top-right" />
+              <Toaster
+                position="top-center"
+                gutter={10}
+                containerClassName="sx-toast-container"
+                toastOptions={{
+                  duration: 4000,
+                  className: "sx-toast",
+                  success: {
+                    iconTheme: { primary: "#10b981", secondary: "#ffffff" },
+                  },
+                  error: {
+                    iconTheme: { primary: "#ef4444", secondary: "#ffffff" },
+                  },
+                  loading: {
+                    iconTheme: { primary: "#0B2345", secondary: "#D4A64A" },
+                  },
+                }}
+              />
               <InstallAppBanner />
               <AudioNotificationManager />
             </BrowserRouter>

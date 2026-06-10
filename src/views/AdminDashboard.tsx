@@ -31,6 +31,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { motion, AnimatePresence } from "motion/react";
+import { pageTransitionProps } from "../lib/motion";
 import {
   collection,
   addDoc,
@@ -1578,12 +1579,9 @@ export default function AdminDashboard() {
                 className={
                   activeTab === "chat"
                     ? "flex-1 flex flex-col min-h-0"
-                    : "w-full flex flex-col"
+                    : "w-full flex flex-col sx-fade-in"
                 }
-                initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: activeTab === "chat" ? 0 : -15 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
+                {...pageTransitionProps(activeTab === "chat")}
               >
                 {renderContent()}
               </motion.div>

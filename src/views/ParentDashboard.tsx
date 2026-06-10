@@ -74,6 +74,7 @@ import {
   DoorOpen,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { pageTransitionProps } from "../lib/motion";
 
 import SolarLoading from "../components/SolarLoading";
 import ParentChatTab from "./ParentChatTab";
@@ -1418,11 +1419,8 @@ export default function ParentDashboard() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-4 md:p-8 space-y-4 md:space-y-6 flex flex-col max-w-7xl mx-auto"}
-              initial={{ opacity: 0, y: activeTab === 'chat' ? 0 : 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: activeTab === 'chat' ? 0 : -10 }}
-              transition={{ duration: 0.2 }}
+              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-4 md:p-8 space-y-4 md:space-y-6 flex flex-col max-w-7xl mx-auto sx-fade-in"}
+              {...pageTransitionProps(activeTab === "chat")}
             >
               {activeTab === "home" && (
                 <div className="space-y-4 md:space-y-6">

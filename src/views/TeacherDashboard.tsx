@@ -47,6 +47,7 @@ import {
 import { updatePassword, verifyBeforeUpdateEmail } from "firebase/auth";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
+import { pageTransitionProps } from "../lib/motion";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
 import { fetchStudentLinkFields, homeworkMatchesStudent } from "../lib/schoolSync";
@@ -1235,11 +1236,8 @@ export default function TeacherDashboard() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-6 md:p-10 flex flex-col"}
-              initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: activeTab === "chat" ? 0 : -15 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
+              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-6 md:p-10 flex flex-col sx-fade-in"}
+              {...pageTransitionProps(activeTab === "chat")}
             >
               {activeTab === "home" && (
                 <div className="space-y-8 animate-in fade-in duration-500">

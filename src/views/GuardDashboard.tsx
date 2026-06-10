@@ -22,12 +22,14 @@ import {
 } from '../lib/dismissalService';
 import {
   ACTIVE_DISMISSAL_STATUSES,
-  DISMISSAL_STATUS_LABELS,
   type DismissalRequest,
 } from '../lib/dismissalTypes';
 import SchoolixLogo from '../components/SchoolixLogo';
 import DismissalStudentCard from '../components/dismissal/DismissalStudentCard';
+import { DismissalStatusBadge } from '../components/ui/DismissalStatusBadge';
 import { isPackageFeatureEnabled } from '../lib/featureRegistry';
+import { motion } from 'motion/react';
+import { pageTransitionProps } from '../lib/motion';
 
 export default function GuardDashboard() {
   const { profile, schoolData } = useAuth();
@@ -194,8 +196,11 @@ export default function GuardDashboard() {
         </button>
       </header>
 
-      <main className="max-w-3xl mx-auto p-4 md:p-8 space-y-6">
-        <section className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+      <motion.main
+        className="max-w-3xl mx-auto p-4 md:p-8 space-y-6 sx-fade-in"
+        {...pageTransitionProps()}
+      >
+        <section className="sx-card bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
           <h2 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
             <KeyRound size={18} />
             التحقق من الرمز
@@ -231,16 +236,14 @@ export default function GuardDashboard() {
                 {verified.registrationNumber && (
                   <p><span className="font-bold text-slate-500">الرقم التسلسلي:</span> {verified.registrationNumber}</p>
                 )}
-                <p className="text-xs font-bold text-indigo-600">
-                  {DISMISSAL_STATUS_LABELS[verified.status].ar}
-                </p>
+                <DismissalStatusBadge status={verified.status} size="md" />
               </div>
 
               {!confirmReady ? (
                 <button
                   onClick={handlePrepareComplete}
                   disabled={busy || !['called', 'ready'].includes(verified.status)}
-                  className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm disabled:opacity-50"
+                  className="sx-btn w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm"
                 >
                   التحقق النهائي قبل التسليم
                 </button>
@@ -248,7 +251,7 @@ export default function GuardDashboard() {
                 <button
                   onClick={handleComplete}
                   disabled={busy}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-50"
+                  className="sx-btn w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm"
                 >
                   <CheckCircle size={16} />
                   إتمام التسليم
@@ -260,7 +263,7 @@ export default function GuardDashboard() {
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   placeholder="سبب الإلغاء (إن وجد)"
-                  className="w-full px-3 py-2 rounded-lg border text-sm mb-2"
+                  className="sx-input w-full px-3 py-2 rounded-lg border text-sm mb-2"
                 />
                 <button
                   onClick={() => handleCancel(verified.id)}
@@ -275,7 +278,7 @@ export default function GuardDashboard() {
           )}
         </section>
 
-        <section className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+        <section className="sx-card bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <ShieldCheck size={18} />
@@ -302,13 +305,11 @@ export default function GuardDashboard() {
                   {classRequests.map((r) => (
                     <div
                       key={r.id}
-                      className="p-4 rounded-2xl border border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3"
+                      className="sx-table-row p-4 rounded-2xl border border-slate-100 bg-slate-50/80 dark:bg-slate-800/50 flex items-center justify-between gap-3 hover:bg-slate-100/80 dark:hover:bg-slate-800/80"
                     >
                       <DismissalStudentCard request={r} compact />
                       <div className="text-left shrink-0">
-                        <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700">
-                          {DISMISSAL_STATUS_LABELS[r.status].ar}
-                        </span>
+                        <DismissalStatusBadge status={r.status} />
                         <p className="text-[10px] font-mono text-indigo-600 mt-1">{r.token}</p>
                         {r.createdAt?.seconds && (
                           <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 justify-end">
@@ -323,13 +324,13 @@ export default function GuardDashboard() {
               </div>
             ))}
             {filtered.length === 0 && (
-              <p className="text-center text-slate-400 py-8 text-sm font-bold">
+              <p className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm font-bold sx-fade-in">
                 لا توجد طلبات نشطة حالياً
               </p>
             )}
           </div>
         </section>
-      </main>
+      </motion.main>
     </div>
   );
 }

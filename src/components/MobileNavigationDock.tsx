@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { drawerPanelProps, modalBackdropProps, MOTION_SPRING, prefersReducedMotion } from "../lib/motion";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -104,7 +105,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 <motion.div
                   layoutId="activeIndicator"
                   className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#D4A64A] rounded-full"
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={prefersReducedMotion() ? { duration: 0.01 } : MOTION_SPRING.indicator}
                 />
               )}
             </div>
@@ -136,7 +137,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   <motion.div
                     layoutId="activeIndicator"
                     className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#D4A64A] rounded-full"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    transition={prefersReducedMotion() ? { duration: 0.01 } : MOTION_SPRING.indicator}
                   />
                 )}
               </div>
@@ -195,7 +196,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   <motion.div
                     layoutId="activeIndicator"
                     className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#D4A64A] rounded-full"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    transition={prefersReducedMotion() ? { duration: 0.01 } : MOTION_SPRING.indicator}
                   />
                 )}
               </div>
@@ -232,7 +233,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 <motion.div
                   layoutId="activeIndicator"
                   className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#D4A64A] rounded-full"
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={prefersReducedMotion() ? { duration: 0.01 } : MOTION_SPRING.indicator}
                 />
               )}
             </div>
@@ -253,19 +254,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
           <div className="fixed inset-0 z-50 overflow-hidden lg:hidden">
             {/* Backdrop glass blur */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              {...modalBackdropProps()}
               onClick={() => setShowQuickAccess(false)}
               className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
             />
 
             {/* Sliding Panel */}
             <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 220 }}
+              {...drawerPanelProps(true)}
               className="absolute bottom-0 inset-x-0 bg-[#0B2345] dark:bg-slate-950 border-t border-[#D4A64A]/30 rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] text-white overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+20px)]"
             >
               {/* Header block with pull pill */}

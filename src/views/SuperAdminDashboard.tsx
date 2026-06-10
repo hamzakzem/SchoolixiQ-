@@ -60,6 +60,7 @@ import {
 import { NotificationCenter } from "../components/NotificationCenter";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
+import { pageTransitionProps } from "../lib/motion";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { GlobalFooter } from "../components/GlobalFooter";
@@ -2046,12 +2047,9 @@ export default function SuperAdminDashboard() {
               className={
                 activeTab === "chat"
                   ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden"
-                  : "w-full p-4 md:p-8 flex flex-col"
+                  : "w-full p-4 md:p-8 flex flex-col sx-fade-in"
               }
-              initial={{ opacity: 0, y: activeTab === "chat" ? 0 : 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: activeTab === "chat" ? 0 : -15 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
+              {...pageTransitionProps(activeTab === "chat")}
             >
               {activeTab === "schools" ? (
                 <>

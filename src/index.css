@@ -878,3 +878,149 @@ aside a:hover svg * {
   stroke: #D4A64A !important;
 }
 
+/* ─── Schoolix motion system (GPU: transform + opacity) ─── */
+html {
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+}
+
+.sx-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  will-change: transform;
+}
+.sx-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -8px rgba(11, 35, 69, 0.12);
+}
+.dark .sx-card:hover {
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.45);
+}
+
+.sx-btn {
+  transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.sx-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.sx-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+.sx-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sx-input {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.sx-input:focus {
+  box-shadow: 0 0 0 3px rgba(11, 35, 69, 0.08);
+}
+.dark .sx-input:focus {
+  box-shadow: 0 0 0 3px rgba(212, 166, 74, 0.12);
+}
+
+.sx-table-row {
+  transition: background-color 0.15s ease;
+}
+
+.sx-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+.dark .sx-skeleton {
+  background: #1e293b;
+}
+.sx-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.dark .sx-skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+}
+
+.sx-fade-in {
+  animation: sxFadeIn 0.25s ease both;
+}
+@keyframes sxFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sx-shake {
+  animation: sxShake 0.4s ease;
+}
+@keyframes sxShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+.sx-dropdown {
+  transform-origin: top center;
+  animation: sxDropdown 0.18s ease both;
+}
+@keyframes sxDropdown {
+  from { opacity: 0; transform: scale(0.98) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Toast motion (react-hot-toast) */
+.sx-toast {
+  animation: sxToastIn 0.22s ease both !important;
+  border-radius: 14px !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  box-shadow: 0 10px 30px -10px rgba(11, 35, 69, 0.25) !important;
+}
+.dark .sx-toast {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+  border: 1px solid #334155 !important;
+}
+@keyframes sxToastIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition-duration: 0.01ms !important;
+  }
+  .sx-card:hover,
+  .sx-btn:hover:not(:disabled),
+  .sx-btn:active:not(:disabled) {
+    transform: none;
+  }
+  .sx-skeleton::after {
+    animation: none;
+  }
+  .sx-fade-in,
+  .sx-dropdown,
+  .sx-toast,
+  .sx-shake {
+    animation: none !important;
+  }
+  .animate-marquee,
+  .solar,
+  .solar i {
+    animation: none !important;
+  }
+}
+

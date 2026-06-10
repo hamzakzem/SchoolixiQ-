@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { Users, UserRound, BookOpen, Wallet, ShoppingBag, Trash2, Settings2, MapPin, ExternalLink, Edit2, Building2, GraduationCap, Clock, Map } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
+import { AnimatedCounter } from '../../components/ui/AnimatedCounter';
 import { toast } from 'react-hot-toast';
 
 import { useLanguage } from '../../lib/LanguageContext';
@@ -851,6 +852,7 @@ function StatCard({
   tone,
   unit = '',
   emptyHint,
+  isNumericDisplay,
   action,
 }: {
   title: string;
@@ -866,12 +868,13 @@ function StatCard({
   const numericValue = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''));
   const isZero = !Number.isNaN(numericValue) && numericValue === 0;
   const Wrapper = action ? 'button' : 'div';
+  const showAnimatedNumber = isNumericDisplay && typeof value === 'number' && !Number.isNaN(value);
 
   return (
     <Wrapper
       type={action ? 'button' : undefined}
       onClick={action}
-      className={`w-full p-4 md:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm text-right transition-all ${
+      className={`sx-card w-full p-4 md:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm text-right transition-all ${
         action
           ? `cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${styles.ring}`
           : ''
@@ -890,7 +893,11 @@ function StatCard({
               isZero ? 'text-slate-300 dark:text-slate-600' : 'text-slate-900 dark:text-white'
             }`}
           >
-            {value}
+            {showAnimatedNumber ? (
+              <AnimatedCounter value={value as number} />
+            ) : (
+              value
+            )}
             {unit ? (
               <span className="text-[10px] font-bold text-slate-400 ms-1.5">{unit}</span>
             ) : null}
