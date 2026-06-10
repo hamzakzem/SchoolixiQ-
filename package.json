@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "npm run build:web && npm run build:server",
-    "build:web": "vite build",
+    "build:web": "vite build && npm run stage:apk",
+    "stage:apk": "node scripts/stage-apk.mjs",
+    "stage:apk:require": "node scripts/stage-apk.mjs --require",
     "verify:web-build": "node scripts/verify-web-build.mjs",
     "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.mjs",
     "preview": "vite preview",

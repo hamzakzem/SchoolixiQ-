@@ -73,7 +73,7 @@ try {
   console.log('OK: dist/downloads/schoolixiq.apk present');
 } catch {
   console.warn(
-    'WARN: No APK at dist/downloads/schoolixiq.apk — upload public/downloads/schoolixiq.apk or set VITE_ANDROID_APK_URL / Firestore system/config.androidApkUrl',
+    'WARN: No APK at dist/downloads/schoolixiq.apk — run npm run stage:apk or set ANDROID_APK_DOWNLOAD_URL for CI deploy',
   );
 }
 

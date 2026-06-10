@@ -71,6 +71,11 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: npm run build:web
 
+      - name: Require Android APK in dist before deploy
+        env:
+          ANDROID_APK_DOWNLOAD_URL: ${{ secrets.ANDROID_APK_DOWNLOAD_URL }}
+        run: npm run stage:apk:require
+
       - name: Verify no legacy Google auth in web bundle
         run: |
           set -e
@@ -93,7 +98,8 @@ jobs:
             echo "APK present in dist/downloads/schoolixiq.apk"
             ls -lh dist/downloads/schoolixiq.apk
           else
-            echo "::warning::No APK at public/downloads/schoolixiq.apk — download link will 404 until you upload the file or set VITE_ANDROID_APK_URL / Firestore system/config.androidApkUrl"
+            echo "::error::dist/downloads/schoolixiq.apk missing — set GitHub secret ANDROID_APK_DOWNLOAD_URL (direct HTTPS APK URL) or place public/downloads/schoolixiq.apk before build"
+            exit 1
           fi
       - name: Package dist zip (manual fallback)
         run: |
