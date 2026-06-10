@@ -134,7 +134,7 @@ createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     // Append a unique build version query to force update detection on all mobile/tablet browsers
-    const buildVersion = '2026-05-29-v8';
+    const buildVersion = '2026-06-03-v10';
     navigator.serviceWorker.register(`/sw.js?build=${buildVersion}`)
       .then((registration) => {
         console.log('Schoolix PWA ServiceWorker successfully registered with scope: ', registration.scope);

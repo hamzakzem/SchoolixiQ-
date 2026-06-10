@@ -1,10 +1,6 @@
-// Cache name with versioning
-const CACHE_NAME = 'schoolix-cache-v9';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-];
+// Bump CACHE_NAME on every production deploy that changes hashed /assets/* bundles.
+const CACHE_NAME = 'schoolix-cache-v10';
+const ASSETS_TO_CACHE = ['/manifest.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -77,20 +73,8 @@ self.addEventListener('fetch', (event) => {
     /\.(js|mjs|css)(\?|$)/i.test(event.request.url);
 
   if (isHashedBundle) {
-    // Network-first for Vite bundles — avoids stale/corrupt cached JS after deploy.
-    event.respondWith(
-      fetch(event.request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(() => caches.match(event.request)),
-    );
+    // Network-only for Vite hashed bundles — never serve a cached chunk after deploy.
+    event.respondWith(fetch(event.request));
     return;
   }
 

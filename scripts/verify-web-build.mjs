@@ -1,7 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const distAssets = path.resolve('dist/assets');
+const distDir = path.resolve('dist');
+const distAssets = path.join(distDir, 'assets');
 const forbidden = [
   'iframerpc',
   'idpiframe',
@@ -23,6 +24,46 @@ for (const file of jsFiles) {
       console.error(`FAIL ${file}: contains "${pattern}"`);
       failed = true;
     }
+  }
+}
+
+const indexHtml = await readFile(path.join(distDir, 'index.html'), 'utf8');
+const entryMatch = indexHtml.match(/src="(\/assets\/index-[^"]+\.js)"/);
+if (!entryMatch) {
+  console.error('FAIL index.html: missing entry script');
+  failed = true;
+} else {
+  const entryPath = entryMatch[1].replace(/^\//, '');
+  const entryFile = path.join(distDir, entryPath);
+  try {
+    const entryContent = await readFile(entryFile, 'utf8');
+    const chunkRefs = [...entryContent.matchAll(/assets\/[A-Za-z0-9_.-]+\.js/g)].map((m) => m[0]);
+    const uniqueChunks = [...new Set(chunkRefs)];
+    for (const chunk of uniqueChunks) {
+      const chunkPath = path.join(distDir, chunk);
+      try {
+        await readFile(chunkPath, 'utf8');
+      } catch {
+        console.error(`FAIL missing chunk referenced by entry bundle: ${chunk}`);
+        failed = true;
+      }
+    }
+    const superAdminChunk = uniqueChunks.find((c) => c.includes('SuperAdminDashboard-'));
+    if (superAdminChunk) {
+      console.log(`OK: SuperAdminDashboard chunk -> ${superAdminChunk}`);
+    }
+  } catch {
+    console.error(`FAIL entry bundle missing on disk: ${entryPath}`);
+    failed = true;
+  }
+}
+
+for (const required of ['.htaccess', 'sw.js', 'index.html']) {
+  try {
+    await readFile(path.join(distDir, required), 'utf8');
+  } catch {
+    console.error(`FAIL dist/${required} missing`);
+    failed = true;
   }
 }
 

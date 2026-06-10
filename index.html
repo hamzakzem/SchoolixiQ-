@@ -48,6 +48,39 @@
           }
         }, true); // Use useCapture=true to intercept script and css file 404s/load failures
 
+        window.addEventListener('unhandledrejection', function(e) {
+          try {
+            var reason = String((e.reason && e.reason.message) || e.reason || '');
+            if (
+              reason.indexOf('dynamically imported') !== -1 ||
+              reason.indexOf('Failed to fetch') !== -1 ||
+              reason.indexOf('ChunkLoadError') !== -1 ||
+              reason.indexOf('Loading chunk') !== -1
+            ) {
+              var lastReload = sessionStorage.getItem('schoolix_recovery_timestamp');
+              var now = Date.now();
+              if (!lastReload || (now - parseInt(lastReload, 10) > 12000)) {
+                sessionStorage.setItem('schoolix_recovery_timestamp', now.toString());
+                console.warn('SchoolixiQ: Detected dynamic import chunk failure. Clearing SW caches and reloading...');
+                if (navigator.serviceWorker) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    for (var i = 0; i < regs.length; i++) {
+                      regs[i].unregister();
+                    }
+                    purgeAndReload();
+                  }).catch(function() {
+                    purgeAndReload();
+                  });
+                } else {
+                  purgeAndReload();
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Schoolix chunk recovery error:', err);
+          }
+        });
+
         function purgeAndReload() {
           // 2. Clear application caches
           if (window.caches) {
