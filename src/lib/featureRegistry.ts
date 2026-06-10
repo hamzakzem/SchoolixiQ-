@@ -431,6 +431,49 @@ export function getFeaturesByCategory(): Record<FeatureCategory, SchoolFeature[]
   return grouped;
 }
 
+/**
+ * Flat ordered list for Super Admin package permission checkboxes.
+ * Preserves legacy permission order and appends newer module keys explicitly.
+ */
+export const PACKAGE_PERMISSION_CHECKBOX_ORDER: string[] = [
+  'overview',
+  'daily_summary',
+  'chat',
+  'students_view',
+  'students_edit',
+  'staff_manage',
+  'attendance_track',
+  'exams_and_results',
+  'student_archive',
+  'tuition_fees',
+  'staff_payroll',
+  'inventory_and_assets',
+  'behavior_management',
+  'student_evaluation_reports',
+  'homework_and_tasks',
+  'classes',
+  'automated_schedules',
+  'school_subjects',
+  'announcements',
+  'parent_app_access',
+  'advanced_reports',
+  'marketplace_ordering',
+  'id_card_generation',
+  'assistants_manage',
+  'settings',
+  'dismissal_smart_gate',
+];
+
+export function getPackagePermissionCheckboxFeatures(): SchoolFeature[] {
+  const byKey = new Map(SCHOOL_FEATURES.map((f) => [f.key, f]));
+  const ordered = PACKAGE_PERMISSION_CHECKBOX_ORDER.map((key) => byKey.get(key)).filter(
+    (f): f is SchoolFeature => Boolean(f),
+  );
+  const known = new Set(PACKAGE_PERMISSION_CHECKBOX_ORDER);
+  const extras = SCHOOL_FEATURES.filter((f) => !known.has(f.key));
+  return [...ordered, ...extras];
+}
+
 export type StaffPermissionOption = { id: string; label: string; labelEn: string };
 
 /** Staff picker options derived from registry, filtered by active package. */

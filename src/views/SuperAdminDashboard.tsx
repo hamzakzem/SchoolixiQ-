@@ -80,9 +80,7 @@ import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
 import {
   buildDefaultPackagePermissions,
   normalizePackagePermissions,
-  getFeaturesByCategory,
-  FEATURE_CATEGORIES,
-  type FeatureCategory,
+  getPackagePermissionCheckboxFeatures,
   type PackagePermissions,
 } from "../lib/featureRegistry";
 
@@ -555,7 +553,7 @@ export default function SuperAdminDashboard() {
     system_settings: t('sidebar_settings'),
   };
 
-  const packageFeaturesByCategory = getFeaturesByCategory();
+  const packagePermissionCheckboxes = getPackagePermissionCheckboxFeatures();
 
   const filteredSchools = schools.filter((s) => {
     const matchesSearch =
@@ -5573,62 +5571,46 @@ export default function SuperAdminDashboard() {
                 )}
 
                 {packageModalTab === "permissions" && (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     <h3 className="text-[10px] font-black uppercase text-blue-600 tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
                       <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-                      ميزات لوحة المدرسة (الصلاحيات)
+                      الموديولات المتاحة (الصلاحيات)
                     </h3>
-                    {(Object.entries(packageFeaturesByCategory) as [FeatureCategory, typeof packageFeaturesByCategory.core][]).map(
-                      ([category, features]) => (
-                        <div key={category} className="space-y-3">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">
-                            {isRtl
-                              ? FEATURE_CATEGORIES[category].labelAr
-                              : FEATURE_CATEGORIES[category].labelEn}
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 dark:bg-slate-800/20 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-                            {features.map((feature) => (
-                              <label
-                                key={feature.key}
-                                className="flex items-start gap-3 cursor-pointer group"
-                              >
-                                <div className="relative mt-0.5">
-                                  <input
-                                    type="checkbox"
-                                    checked={
-                                      (newPackage.permissions as PackagePermissions)?.[feature.key] !== false
-                                    }
-                                    onChange={(e) =>
-                                      setNewPackage({
-                                        ...newPackage,
-                                        permissions: {
-                                          ...(newPackage.permissions || {}),
-                                          [feature.key]: e.target.checked,
-                                        },
-                                      })
-                                    }
-                                    className="sr-only peer"
-                                  />
-                                  <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-md peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all"></div>
-                                  <CheckCircle
-                                    size={14}
-                                    className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity"
-                                  />
-                                </div>
-                                <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors">
-                                  {isRtl ? feature.labelAr : feature.labelEn}
-                                  {feature.descriptionAr && (
-                                    <span className="block text-[10px] font-medium text-slate-400 mt-0.5">
-                                      {isRtl ? feature.descriptionAr : feature.descriptionEn}
-                                    </span>
-                                  )}
-                                </span>
-                              </label>
-                            ))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 dark:bg-slate-800/20 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+                      {packagePermissionCheckboxes.map((feature) => (
+                        <label
+                          key={feature.key}
+                          className="flex items-start gap-3 cursor-pointer group"
+                        >
+                          <div className="relative mt-0.5">
+                            <input
+                              type="checkbox"
+                              checked={
+                                (newPackage.permissions as PackagePermissions)?.[feature.key] !== false
+                              }
+                              onChange={(e) =>
+                                setNewPackage({
+                                  ...newPackage,
+                                  permissions: {
+                                    ...(newPackage.permissions || {}),
+                                    [feature.key]: e.target.checked,
+                                  },
+                                })
+                              }
+                              className="sr-only peer"
+                            />
+                            <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-md peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all"></div>
+                            <CheckCircle
+                              size={14}
+                              className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity"
+                            />
                           </div>
-                        </div>
-                      ),
-                    )}
+                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors">
+                            {isRtl ? feature.labelAr : feature.labelEn}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 )}
 
