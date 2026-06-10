@@ -17,6 +17,8 @@ interface SocialLinks {
 interface SystemConfig {
   appName: string;
   appLogo?: string;
+  /** Optional override for Android APK direct download (must end with .apk). */
+  androidApkUrl?: string;
   supportPhones: string[];
   supportEmails: string[];
   successPartners: {name: string, logoUrl: string}[];

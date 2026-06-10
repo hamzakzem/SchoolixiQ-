@@ -67,6 +67,16 @@ for (const required of ['.htaccess', 'sw.js', 'index.html']) {
   }
 }
 
+const apkPath = path.join(distDir, 'downloads', 'schoolixiq.apk');
+try {
+  await readFile(apkPath);
+  console.log('OK: dist/downloads/schoolixiq.apk present');
+} catch {
+  console.warn(
+    'WARN: No APK at dist/downloads/schoolixiq.apk — upload public/downloads/schoolixiq.apk or set VITE_ANDROID_APK_URL / Firestore system/config.androidApkUrl',
+  );
+}
+
 if (failed) {
   process.exit(1);
 }

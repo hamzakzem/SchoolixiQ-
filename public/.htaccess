@@ -6,6 +6,7 @@ DirectoryIndex index.html index.php
   AddType text/css .css
   AddType application/json .json
   AddType application/manifest+json .webmanifest
+  AddType application/vnd.android.package-archive .apk
 </IfModule>
 
 # --- Hostinger HTTP/2: disable server compression on large JS/CSS bundles ---
@@ -62,6 +63,7 @@ DirectoryIndex index.html index.php
   RewriteBase /
 
   RewriteRule ^assets/ - [L]
+  RewriteRule ^downloads/ - [L]
 
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f

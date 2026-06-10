@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { db } from "../lib/firebase";
 import {
   doc,
@@ -46,8 +46,10 @@ import { UserRole } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import {
-  getAndroidApkDownloadUrl,
+  ANDROID_APK_NOT_CONFIGURED_MSG_AR,
   hasConfiguredAndroidApkUrl,
+  resolveAndroidApkUrl,
+  triggerAndroidApkDownload,
 } from '../lib/androidApk';
 import {
   classifyAuthError,
@@ -205,8 +207,24 @@ export default function Login() {
   const [installProgress, setInstallProgress] = useState(0);
   const [showInstallSuccess, setShowInstallSuccess] = useState(false);
   const [isAndroidUser, setIsAndroidUser] = useState(false);
-  const androidApkUrl = getAndroidApkDownloadUrl();
-  const androidApkConfigured = hasConfiguredAndroidApkUrl();
+  const androidApkUrl = useMemo(
+    () => resolveAndroidApkUrl(config.androidApkUrl),
+    [config.androidApkUrl],
+  );
+  const androidApkConfigured = hasConfiguredAndroidApkUrl(config.androidApkUrl);
+
+  const handleAndroidApkDownload = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      const url = resolveAndroidApkUrl(config.androidApkUrl);
+      if (!url) {
+        toast.error(ANDROID_APK_NOT_CONFIGURED_MSG_AR);
+        return;
+      }
+      triggerAndroidApkDownload(url);
+    },
+    [config.androidApkUrl],
+  );
 
   useEffect(() => {
     const userAgent = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || "";
@@ -593,8 +611,9 @@ export default function Login() {
           {/* Android APK download — direct browser download */}
           <div className="mb-6 text-center">
             <a
-              href={androidApkUrl}
+              href={androidApkUrl ?? "#"}
               download="schoolixiq.apk"
+              onClick={handleAndroidApkDownload}
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-[#D4A64A]/40 bg-gradient-to-r from-[#0B2345]/5 to-[#D4A64A]/5 hover:from-[#0B2345]/15 hover:to-[#D4A64A]/15 text-[#0B2345] dark:text-[#D4A64A] font-black text-xs sm:text-sm transition-all hover:border-[#D4A64A] hover:scale-[1.02] active:scale-[0.98] shadow-sm select-none"
             >
               <Smartphone size={16} className="text-[#0B2345] dark:text-[#D4A64A] animate-pulse shrink-0" />
@@ -1001,8 +1020,9 @@ export default function Login() {
             {installingPlatform === null ? (
               <div className="text-center">
                 <a
-                  href={androidApkUrl}
+                  href={androidApkUrl ?? "#"}
                   download="schoolixiq.apk"
+                  onClick={handleAndroidApkDownload}
                   className="w-full py-4 bg-[#D4A64A] hover:bg-[#0B2345] text-[#0B2345] hover:text-[#D4A64A] border border-[#D4A64A] hover:border-[#0B2345] font-black rounded-2xl text-sm sm:text-base flex items-center justify-center gap-3 transition-all shadow-lg shadow-[#D4A64A]/10 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                 >
                   <Download className="w-5 h-5" />
@@ -1091,8 +1111,9 @@ export default function Login() {
                         </button>
                         
                         <a
-                          href={androidApkUrl}
+                          href={androidApkUrl ?? "#"}
                           download="schoolixiq.apk"
+                          onClick={handleAndroidApkDownload}
                           className="flex-1 py-3 bg-[#D4A64A] hover:bg-[#0B2345] text-[#0B2345] hover:text-[#D4A64A] font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#D4A64A]/10 border border-[#D4A64A]"
                         >
                           <Download size={13} />
