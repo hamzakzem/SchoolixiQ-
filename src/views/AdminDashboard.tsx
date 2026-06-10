@@ -290,6 +290,12 @@ export default function AdminDashboard() {
     }),
   );
 
+  useEffect(() => {
+    if (filteredMenuItems.some((item) => item.id === activeTab)) return;
+    if (activeTab === "overview") return;
+    setActiveTab("overview");
+  }, [filteredMenuItems, activeTab]);
+
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const primaryItems = filteredMenuItems.filter((item) =>
     ["overview", "students", "tuition", "chat"].includes(item.id),
@@ -1125,6 +1131,31 @@ export default function AdminDashboard() {
   }
 
   const renderContent = () => {
+    const activeMenuItem = menuItems.find((i) => i.id === activeTab);
+    const hasTabAccess = canAccessAdminMenuItem(
+      activeTab,
+      profile?.role,
+      userPerms,
+      packagePerms,
+      { adminOnly: activeMenuItem?.adminOnly },
+    );
+
+    if (!hasTabAccess) {
+      return (
+        <div className="p-12 text-center max-w-lg mx-auto" dir={isRtl ? "rtl" : "ltr"}>
+          <ShieldCheck className="mx-auto mb-4 text-slate-300" size={48} />
+          <h3 className="text-xl font-black text-slate-700 dark:text-white mb-2">
+            {isRtl ? "هذه الميزة غير متاحة في باقتكم" : "This feature is not available in your package"}
+          </h3>
+          <p className="text-sm text-slate-500 font-bold">
+            {isRtl
+              ? "تواصل مع إدارة المنصة لتفعيل هذه الميزة."
+              : "Contact platform administration to enable this feature."}
+          </p>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case "overview":
         return <Overview setActiveTab={setActiveTab} />;

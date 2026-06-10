@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import { School } from '../../types';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import SchoolSubjectsManagement from './SchoolSubjectsManagement';
+import { isSchoolSubjectsEnabled } from '../../lib/featureRegistry';
 
 const defaultGovernorates = ["بغداد", "البصرة", "نينوى", "أربيل", "النجف", "ذي قار", "كركوك", "الأنبار", "ديالى", "المثنى", "القادسية (الديوانية)", "القادسية", "ميسان", "واسط", "صلاح الدين", "دهوك", "السليمانية", "بابل", "كربلاء", "حلبجة"];
 const defaultDirectorates = [
@@ -230,9 +231,11 @@ export default function SettingsView() {
         </button>
       </div>
 
-      <div id="school-subjects-management">
-        <SchoolSubjectsManagement />
-      </div>
+      {isSchoolSubjectsEnabled(contextSchoolData?.packagePermissions) && (
+        <div id="school-subjects-management">
+          <SchoolSubjectsManagement />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">

@@ -83,6 +83,7 @@ import {
   teacherHasAssignedClass,
   TEACHER_NO_CLASS_MSG,
 } from "../lib/teacherClass";
+import { isTeacherMenuFeatureEnabled } from "../lib/featureRegistry";
 
 type Tab =
   | "home"
@@ -961,18 +962,10 @@ export default function TeacherDashboard() {
     },
     { id: "chat", label: isRtl ? "الدردشة" : "Chat", icon: MessageSquare },
   ].filter((item) => {
-    if (item.id === "home" || item.id === "chat" || item.id === "dismissal") return true;
     if (perms && typeof perms === "object" && !Array.isArray(perms)) {
-      if (item.id === "homework") return perms.homework_and_tasks !== false;
-      if (item.id === "grades") return perms.exams_and_results !== false;
-      if (item.id === "behavior") return perms.behavior_management !== false;
-      if (item.id === "reports") return perms.student_evaluation_reports !== false;
-      if (item.id === "advanced_reports") return perms.advanced_reports !== false;
-      if (item.id === "schedules") return perms.automated_schedules !== false;
-      if (item.id === "id_cards") return perms.id_card_generation !== false;
-      if (item.id === "market") return perms.marketplace_ordering !== false;
+      return isTeacherMenuFeatureEnabled(item.id, perms);
     }
-    return true;
+    return item.id === "home" || item.id === "chat" || item.id === "dismissal";
   });
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);

@@ -26,22 +26,8 @@ import {
   resolveTeacherClassId,
   type SchoolClassOption,
 } from '../../lib/teacherClass';
-
-const PERMISSION_OPTIONS = [
-  { id: 'classes', label: 'إدارة الصفوف' },
-  { id: 'students', label: 'إدارة الطلاب' },
-  { id: 'parents', label: 'حسابات أولياء الأمور' },
-  { id: 'staff', label: 'الموظفين والمعلمين' },
-  { id: 'tuition', label: 'أقساط الطلاب' },
-  { id: 'behavior', label: 'السلوك والتبليغات' },
-  { id: 'attendance', label: 'الحضور والغياب' },
-  { id: 'grades', label: 'النتائج والدرجات' },
-  { id: 'announcements', label: 'الإعلانات والتعليمات' },
-  { id: 'payroll', label: 'الرواتب والمالية' },
-  { id: 'inventory', label: 'مخزن المدرسة' },
-  { id: 'market', label: 'المتجر الداخلي' },
-  { id: 'settings', label: 'الإعدادات العامة' },
-];
+import { getStaffPermissionOptions } from '../../lib/featureRegistry';
+import { canAssignStaffPermission } from '../../lib/staffPermissions';
 
 const STAFF_PERMISSION_ROLES = ['admin', 'school_admin', 'assistant', 'staff'] as const;
 
@@ -50,7 +36,11 @@ function roleUsesPermissionPicker(role: string): boolean {
 }
 
 export default function StaffList() {
-  const { profile } = useAuth();
+  const { profile, schoolData } = useAuth();
+  const permissionOptions = React.useMemo(
+    () => getStaffPermissionOptions(schoolData?.packagePermissions, true),
+    [schoolData?.packagePermissions],
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [staff, setStaff] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -258,12 +248,19 @@ export default function StaffList() {
   };
 
   const togglePermission = (permId: string) => {
-    setNewStaff((prev) => ({
-      ...prev,
-      permissions: prev.permissions.includes(permId)
-        ? prev.permissions.filter((p) => p !== permId)
-        : [...prev.permissions, permId],
-    }));
+    setNewStaff((prev) => {
+      if (prev.permissions.includes(permId)) {
+        return {
+          ...prev,
+          permissions: prev.permissions.filter((p) => p !== permId),
+        };
+      }
+      if (!canAssignStaffPermission(permId, schoolData?.packagePermissions)) {
+        toast.error('هذه الصلاحية غير متاحة في باقة المدرسة');
+        return prev;
+      }
+      return { ...prev, permissions: [...prev.permissions, permId] };
+    });
   };
 
   const handleUpdateStatusQuick = async (id: string, status: string) => {
@@ -286,6 +283,12 @@ export default function StaffList() {
       toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
       return;
     }
+
+    const resolvedPermissions = roleUsesPermissionPicker(newStaff.role)
+      ? newStaff.permissions.filter((p) =>
+          canAssignStaffPermission(p, schoolData?.packagePermissions),
+        )
+      : [];
 
     let teacherSubjectFields: {
       subjectId: string;
@@ -372,7 +375,7 @@ export default function StaffList() {
           status: newStaff.status,
           notes: newStaff.notes,
           ...(roleUsesPermissionPicker(newStaff.role)
-            ? { permissions: newStaff.permissions }
+            ? { permissions: resolvedPermissions }
             : { permissions: deleteField() }),
           password: deleteField(),
           parentPassword: deleteField(),
@@ -418,7 +421,7 @@ export default function StaffList() {
             status: newStaff.status,
             notes: newStaff.notes,
             ...(roleUsesPermissionPicker(newStaff.role)
-              ? { permissions: newStaff.permissions }
+              ? { permissions: resolvedPermissions }
               : {}),
           }
         });
@@ -671,7 +674,7 @@ export default function StaffList() {
                         key={pId}
                         className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full border border-indigo-100"
                       >
-                        {PERMISSION_OPTIONS.find((opt) => opt.id === pId)?.label || pId}
+                        {permissionOptions.find((opt) => opt.id === pId)?.label || pId}
                       </span>
                     ))
                   )}
@@ -1064,7 +1067,7 @@ export default function StaffList() {
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest leading-none">الصلاحيات المتاحة (اختر الأقسام)</label>
                       <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[300px] overflow-y-auto custom-scrollbar">
-                        {PERMISSION_OPTIONS.map((opt) => (
+                        {permissionOptions.map((opt) => (
                           <button
                             key={opt.id}
                             type="button"

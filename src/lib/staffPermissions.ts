@@ -1,10 +1,17 @@
+import {
+  type PackagePermissions,
+  isMenuFeatureEnabled,
+  isStaffPermissionAllowedByPackage,
+  menuIdToPackageKeys,
+} from './featureRegistry';
+
 /** Roles that use custom string[] permissions from Staff Management. */
 export const CUSTOM_PERMISSION_ROLES = ['staff', 'assistant'] as const;
 
 /** Roles with full dashboard access within the school package (custom array ignored). */
 export const PACKAGE_PERMISSION_ROLES = ['admin', 'school_admin'] as const;
 
-export type PackagePermissions = Record<string, boolean | undefined>;
+export type { PackagePermissions };
 
 /**
  * Firestore user.permissions is authoritative when it is a string[] assigned per user.
@@ -27,6 +34,13 @@ export function resolveProfilePermissions(
 const MENU_TO_STAFF_PERMISSION: Record<string, string[]> = {
   students: ['students'],
   students_edit: ['students'],
+  evaluation_reports: ['evaluation_reports'],
+  advanced_reports: ['advanced_reports'],
+  dismissal_gate: ['dismissal_gate'],
+  student_archive: ['student_archive'],
+  homework: ['homework'],
+  schedules: ['schedules'],
+  id_cards: ['id_cards'],
 };
 
 function staffPermissionAllows(itemId: string, userPerms: string[]): boolean {
@@ -34,37 +48,20 @@ function staffPermissionAllows(itemId: string, userPerms: string[]): boolean {
   return keys.some((key) => userPerms.includes(key));
 }
 
-function packagePermissionAllows(
+function packageAllowsMenuItem(
   itemId: string,
   perms: PackagePermissions,
   role: string,
 ): boolean {
-  if (itemId === 'overview') return perms.overview !== false;
-  if (itemId === 'chat') return perms.chat !== false;
-  if (itemId === 'students') return perms.students_view !== false;
-  if (itemId === 'students_edit') return perms.students_edit !== false;
-  if (itemId === 'parents') return perms.parent_app_access !== false;
-  if (itemId === 'staff') return perms.staff_manage !== false;
-  if (itemId === 'tuition') return perms.tuition_fees !== false;
-  if (itemId === 'payroll') return perms.staff_payroll !== false;
-  if (itemId === 'attendance') return perms.attendance_track !== false;
-  if (itemId === 'grades') return perms.exams_and_results !== false;
-  if (itemId === 'student_archive') return perms.student_archive !== false;
-  if (itemId === 'inventory') return perms.inventory_and_assets !== false;
-  if (itemId === 'behavior') return perms.behavior_management !== false;
-  if (itemId === 'evaluation_reports') return perms.student_evaluation_reports !== false;
-  if (itemId === 'homework') return perms.homework_and_tasks !== false;
-  if (itemId === 'classes') return perms.classes !== false;
-  if (itemId === 'schedules') return perms.automated_schedules !== false;
-  if (itemId === 'announcements') return perms.announcements !== false;
-  if (itemId === 'advanced_reports') return perms.advanced_reports !== false;
-  if (itemId === 'market') return perms.marketplace_ordering !== false;
-  if (itemId === 'id_cards') return perms.id_card_generation !== false;
   if (itemId === 'assistants') {
-    return perms.assistants_manage !== false && role === 'admin';
+    return (
+      isMenuFeatureEnabled('assistants', perms) &&
+      role === 'admin'
+    );
   }
-  if (itemId === 'settings') return perms.settings !== false;
-  return true;
+  const keys = menuIdToPackageKeys(itemId);
+  if (keys.length === 0) return true;
+  return isMenuFeatureEnabled(itemId, perms);
 }
 
 export function canAccessAdminMenuItem(
@@ -90,7 +87,7 @@ export function canAccessAdminMenuItem(
   if (PACKAGE_PERMISSION_ROLES.includes(role as (typeof PACKAGE_PERMISSION_ROLES)[number])) {
     if (options?.adminOnly && role !== 'admin') return false;
     if (packagePerms && typeof packagePerms === 'object' && !Array.isArray(packagePerms)) {
-      return packagePermissionAllows(itemId, packagePerms, role);
+      return packageAllowsMenuItem(itemId, packagePerms, role);
     }
     return true;
   }
@@ -98,8 +95,20 @@ export function canAccessAdminMenuItem(
   if (CUSTOM_PERMISSION_ROLES.includes(role as (typeof CUSTOM_PERMISSION_ROLES)[number])) {
     if (options?.adminOnly) return false;
     if (!Array.isArray(userPerms)) return false;
-    return staffPermissionAllows(itemId, userPerms);
+    if (!staffPermissionAllows(itemId, userPerms)) return false;
+    if (packagePerms && typeof packagePerms === 'object' && !Array.isArray(packagePerms)) {
+      return packageAllowsMenuItem(itemId, packagePerms, role);
+    }
+    return true;
   }
 
   return false;
+}
+
+/** Whether a staff permission id may be assigned given the school package. */
+export function canAssignStaffPermission(
+  staffPermId: string,
+  packagePerms: PackagePermissions | undefined,
+): boolean {
+  return isStaffPermissionAllowedByPackage(staffPermId, packagePerms);
 }

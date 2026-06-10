@@ -18,6 +18,7 @@ import { UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from './firestore-errors';
 import { buildTeacherRedactionContext } from './userProfile';
 import { resolveProfilePermissions } from './staffPermissions';
+import { normalizePackagePermissions } from './featureRegistry';
 import { useLanguage } from './LanguageContext';
 
 interface AuthContextType {
@@ -188,7 +189,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         if (pkgSnap.exists()) {
                           setSchoolData((currVal: any) => ({
                             ...currVal,
-                            packagePermissions: pkgSnap.data().permissions || {}
+                            packagePermissions: normalizePackagePermissions(
+                              pkgSnap.data().permissions || {},
+                            ),
                           }));
                         }
                         setLoading(false);

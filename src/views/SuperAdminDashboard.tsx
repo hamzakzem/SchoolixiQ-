@@ -77,6 +77,14 @@ import SchoolixLogo from "../components/SchoolixLogo";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
+import {
+  buildDefaultPackagePermissions,
+  normalizePackagePermissions,
+  getFeaturesByCategory,
+  FEATURE_CATEGORIES,
+  type FeatureCategory,
+  type PackagePermissions,
+} from "../lib/featureRegistry";
 
 const DEFAULT_PACKAGES = [
   {
@@ -528,31 +536,7 @@ export default function SuperAdminDashboard() {
     showSubscriptionTimer: true,
     showInRegistration: true,
     isPopular: false,
-    permissions: {
-      overview: true,
-      chat: true,
-      students_view: true,
-      students_edit: true,
-      staff_manage: true,
-      attendance_track: true,
-      exams_and_results: true,
-      student_archive: true,
-      tuition_fees: false,
-      staff_payroll: false,
-      inventory_and_assets: false,
-      behavior_management: true,
-      student_evaluation_reports: true,
-      homework_and_tasks: true,
-      classes: true,
-      automated_schedules: false,
-      announcements: true,
-      parent_app_access: true,
-      advanced_reports: false,
-      marketplace_ordering: true,
-      id_card_generation: false,
-      assistants_manage: false,
-      settings: true,
-    },
+    permissions: buildDefaultPackagePermissions(),
   });
 
   const [newUser, setNewUser] = useState({
@@ -571,32 +555,7 @@ export default function SuperAdminDashboard() {
     system_settings: t('sidebar_settings'),
   };
 
-  const PERMISSION_LABELS: Record<string, string> = {
-    overview: t('overview'),
-    daily_summary: t('dailySummary') || (isRtl ? "ملخص المدرسة اليومي" : "Daily School Summary"),
-    chat: t('chat'),
-    students_view: t('viewStudents'),
-    students_edit: t('manageStudents'),
-    staff_manage: t('manageStaff'),
-    attendance_track: t('attendance'),
-    exams_and_results: t('grades'),
-    student_archive: isRtl ? "أرشيف الطالب" : "Student Archive",
-    tuition_fees: t('tuition'),
-    staff_payroll: t('payroll'),
-    inventory_and_assets: t('inventory'),
-    behavior_management: t('behavior'),
-    student_evaluation_reports: t('evaluations'),
-    homework_and_tasks: t('homework'),
-    classes: t('classes') || (isRtl ? "الصفوف" : "Classes"),
-    automated_schedules: t('schedules'),
-    announcements: t('announcements'),
-    parent_app_access: t('parentApp'),
-    advanced_reports: t('advancedReports'),
-    marketplace_ordering: t('marketplace'),
-    id_card_generation: t('idCards'),
-    assistants_manage: t('assistants'),
-    settings: t('settings'),
-  };
+  const packageFeaturesByCategory = getFeaturesByCategory();
 
   const filteredSchools = schools.filter((s) => {
     const matchesSearch =
@@ -1136,7 +1095,9 @@ export default function SuperAdminDashboard() {
         showSubscriptionTimer: newPackage.showSubscriptionTimer,
         showInRegistration: newPackage.showInRegistration,
         isPopular: newPackage.isPopular,
-        permissions: newPackage.permissions,
+        permissions: normalizePackagePermissions(
+          newPackage.permissions as PackagePermissions,
+        ),
         features:
           typeof newPackage.features === "string"
             ? newPackage.features
@@ -1232,31 +1193,7 @@ export default function SuperAdminDashboard() {
         showSubscriptionTimer: true,
         showInRegistration: true,
         isPopular: false,
-        permissions: {
-          overview: true,
-          chat: true,
-          students_view: true,
-          students_edit: true,
-          staff_manage: true,
-          attendance_track: true,
-          exams_and_results: true,
-          student_archive: true,
-          tuition_fees: false,
-          staff_payroll: false,
-          inventory_and_assets: false,
-          behavior_management: true,
-          student_evaluation_reports: true,
-          homework_and_tasks: true,
-          classes: true,
-          automated_schedules: false,
-          announcements: true,
-          parent_app_access: true,
-          advanced_reports: false,
-          marketplace_ordering: true,
-          id_card_generation: false,
-          assistants_manage: false,
-          settings: true,
-        },
+        permissions: buildDefaultPackagePermissions(),
       });
     } catch (error: any) {
       toast.dismiss(loadingToast);
@@ -2868,11 +2805,10 @@ export default function SuperAdminDashboard() {
                   <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div>
                       <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-display tracking-tight">
-                        إدارة باقات الاشتراك
+                        إدارة الباقات والصلاحيات
                       </h3>
                       <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 opacity-80 text-xs sm:text-sm">
-                        التحكم في خيارات التسجيل المتاحة للمدارس وتخصيص صلاحيات
-                        الباقات
+                        التسعير، حد الطلاب، وميزات لوحة المدرسة — من مكان واحد
                       </p>
                     </div>
                     <button
@@ -3003,31 +2939,9 @@ export default function SuperAdminDashboard() {
                                     showInRegistration:
                                       pkg.showInRegistration !== false,
                                     isPopular: !!pkg.isPopular,
-                                    permissions: pkg.permissions || {
-                                      overview: true,
-                                      chat: true,
-                                      students_view: true,
-                                      students_edit: true,
-                                      staff_manage: true,
-                                      attendance_track: true,
-                                      exams_and_results: true,
-                                      student_archive: true,
-                                      tuition_fees: false,
-                                      staff_payroll: false,
-                                      inventory_and_assets: false,
-                                      behavior_management: true,
-                                      student_evaluation_reports: true,
-                                      homework_and_tasks: true,
-                                      classes: true,
-                                      automated_schedules: false,
-                                      announcements: true,
-                                      parent_app_access: true,
-                                      advanced_reports: false,
-                                      marketplace_ordering: true,
-                                      id_card_generation: false,
-                                      assistants_manage: false,
-                                      settings: true,
-                                    },
+                                    permissions: normalizePackagePermissions(
+                                      pkg.permissions as PackagePermissions,
+                                    ),
                                   });
                                   setShowPackageModal(true);
                                 }}
@@ -5659,46 +5573,62 @@ export default function SuperAdminDashboard() {
                 )}
 
                 {packageModalTab === "permissions" && (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <h3 className="text-[10px] font-black uppercase text-blue-600 tracking-widest border-b border-blue-50 dark:border-blue-900/30 pb-2 flex items-center gap-2">
                       <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-                      الموديولات المتاحة (الصلاحيات)
+                      ميزات لوحة المدرسة (الصلاحيات)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 dark:bg-slate-800/20 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-                      {Object.entries(PERMISSION_LABELS).map(([key, label]) => (
-                        <label
-                          key={key}
-                          className="flex items-center gap-3 cursor-pointer group"
-                        >
-                          <div className="relative">
-                            <input
-                              type="checkbox"
-                              checked={
-                                (newPackage.permissions as any)?.[key] || false
-                              }
-                              onChange={(e) =>
-                                setNewPackage({
-                                  ...newPackage,
-                                  permissions: {
-                                    ...(newPackage.permissions || {}),
-                                    [key]: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="sr-only peer"
-                            />
-                            <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-md peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all"></div>
-                            <CheckCircle
-                              size={14}
-                              className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity"
-                            />
+                    {(Object.entries(packageFeaturesByCategory) as [FeatureCategory, typeof packageFeaturesByCategory.core][]).map(
+                      ([category, features]) => (
+                        <div key={category} className="space-y-3">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">
+                            {isRtl
+                              ? FEATURE_CATEGORIES[category].labelAr
+                              : FEATURE_CATEGORIES[category].labelEn}
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 dark:bg-slate-800/20 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+                            {features.map((feature) => (
+                              <label
+                                key={feature.key}
+                                className="flex items-start gap-3 cursor-pointer group"
+                              >
+                                <div className="relative mt-0.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={
+                                      (newPackage.permissions as PackagePermissions)?.[feature.key] !== false
+                                    }
+                                    onChange={(e) =>
+                                      setNewPackage({
+                                        ...newPackage,
+                                        permissions: {
+                                          ...(newPackage.permissions || {}),
+                                          [feature.key]: e.target.checked,
+                                        },
+                                      })
+                                    }
+                                    className="sr-only peer"
+                                  />
+                                  <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-md peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all"></div>
+                                  <CheckCircle
+                                    size={14}
+                                    className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity"
+                                  />
+                                </div>
+                                <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors">
+                                  {isRtl ? feature.labelAr : feature.labelEn}
+                                  {feature.descriptionAr && (
+                                    <span className="block text-[10px] font-medium text-slate-400 mt-0.5">
+                                      {isRtl ? feature.descriptionAr : feature.descriptionEn}
+                                    </span>
+                                  )}
+                                </span>
+                              </label>
+                            ))}
                           </div>
-                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors">
-                            {label}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
+                        </div>
+                      ),
+                    )}
                   </div>
                 )}
 
@@ -5752,31 +5682,7 @@ export default function SuperAdminDashboard() {
                       showSubscriptionTimer: true,
                       showInRegistration: true,
                       isPopular: false,
-                      permissions: {
-                        overview: true,
-                        chat: true,
-                        students_view: true,
-                        students_edit: true,
-                        staff_manage: true,
-                        attendance_track: true,
-                        exams_and_results: true,
-                        student_archive: true,
-                        tuition_fees: false,
-                        staff_payroll: false,
-                        inventory_and_assets: false,
-                        behavior_management: true,
-                        student_evaluation_reports: true,
-                        homework_and_tasks: true,
-                        classes: true,
-                        automated_schedules: false,
-                        announcements: true,
-                        parent_app_access: true,
-                        advanced_reports: false,
-                        marketplace_ordering: true,
-                        id_card_generation: false,
-                        assistants_manage: false,
-                        settings: true,
-                      },
+                      permissions: buildDefaultPackagePermissions(),
                     });
                   }}
                   className="px-8 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"

@@ -27,9 +27,37 @@ import {
 } from '../lib/dismissalTypes';
 import SchoolixLogo from '../components/SchoolixLogo';
 import DismissalStudentCard from '../components/dismissal/DismissalStudentCard';
+import { isPackageFeatureEnabled } from '../lib/featureRegistry';
 
 export default function GuardDashboard() {
   const { profile, schoolData } = useAuth();
+  const smartGateEnabled = isPackageFeatureEnabled(
+    'dismissal_smart_gate',
+    schoolData?.packagePermissions,
+  );
+
+  if (!smartGateEnabled) {
+    return (
+      <div
+        className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-8 text-center"
+        dir="rtl"
+      >
+        <ShieldCheck className="text-slate-300 mb-4" size={56} />
+        <h1 className="text-xl font-black text-slate-800 dark:text-white mb-2">
+          البوابة الذكية غير متاحة
+        </h1>
+        <p className="text-sm text-slate-500 font-bold max-w-md mb-6">
+          ميزة التسريح الآمن غير مفعّلة في باقة مدرستكم. تواصل مع إدارة المدرسة.
+        </p>
+        <button
+          onClick={() => signOut(auth)}
+          className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm"
+        >
+          تسجيل الخروج
+        </button>
+      </div>
+    );
+  }
   const [requests, setRequests] = useState<DismissalRequest[]>([]);
   const [search, setSearch] = useState('');
   const [tokenInput, setTokenInput] = useState('');

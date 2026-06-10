@@ -956,6 +956,9 @@ export default function ParentDashboard() {
       if (item.id === "advanced_reports") return p.advanced_reports !== false;
       if (item.id === "id_cards") return p.id_card_generation !== false;
       if (item.id === "market") return p.marketplace_ordering !== false;
+      if (item.id === "dismissal") {
+        return p.dismissal_smart_gate !== false && p.parent_app_access !== false;
+      }
     }
     return true;
   });
@@ -1673,14 +1676,16 @@ export default function ParentDashboard() {
                     </div>
                   </section>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("dismissal")}
-                    className="w-full p-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98]"
-                  >
-                    <DoorOpen size={20} />
-                    {isRtl ? "أنا عند البوابة — طلب تسريح الطالب" : "At the gate — request dismissal"}
-                  </button>
+                  {allItems.some((item) => item.id === "dismissal") && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("dismissal")}
+                      className="w-full p-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98]"
+                    >
+                      <DoorOpen size={20} />
+                      {isRtl ? "أنا عند البوابة — طلب تسريح الطالب" : "At the gate — request dismissal"}
+                    </button>
+                  )}
 
                   {/* Behavioral Feed */}
                   <section>
@@ -1890,7 +1895,8 @@ export default function ParentDashboard() {
                 </div>
               )}
 
-              {activeTab === "dismissal" && (
+              {activeTab === "dismissal" &&
+                allItems.some((item) => item.id === "dismissal") && (
                 <ParentDismissalTab
                   students={students}
                   selectedStudent={selectedStudent}

@@ -11,6 +11,7 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
+import { isPackageFeatureEnabled } from '../../lib/featureRegistry';
 import { useLanguage } from '../../lib/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -198,11 +199,11 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
   const perms = schoolData?.packagePermissions || profile?.permissions;
   const hasDailySummary =
     perms && typeof perms === 'object' && !Array.isArray(perms)
-      ? perms.daily_summary !== false
+      ? isPackageFeatureEnabled('daily_summary', perms)
       : true;
   const hasMarketplace =
     perms && typeof perms === 'object' && !Array.isArray(perms)
-      ? perms.marketplace_ordering !== false
+      ? isPackageFeatureEnabled('marketplace_ordering', perms)
       : true;
 
   const printRef = useRef<HTMLDivElement>(null);

@@ -8,25 +8,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { UserRole } from '../../types';
-
-const PERMISSION_OPTIONS = [
-  { id: 'classes', label: 'إدارة الصفوف' },
-  { id: 'students', label: 'إدارة الطلاب' },
-  { id: 'parents', label: 'حسابات أولياء الأمور' },
-  { id: 'staff', label: 'الموظفين والمعلمين' },
-  { id: 'tuition', label: 'أقساط الطلاب' },
-  { id: 'behavior', label: 'السلوك والتبليغات' },
-  { id: 'attendance', label: 'الحضور والغياب' },
-  { id: 'grades', label: 'النتائج والدرجات' },
-  { id: 'announcements', label: 'الإعلانات والتعليمات' },
-  { id: 'payroll', label: 'الرواتب والمالية' },
-  { id: 'inventory', label: 'مخزن المدرسة' },
-  { id: 'market', label: 'المتجر الداخلي' },
-  { id: 'settings', label: 'الإعدادات العامة' },
-];
+import { getStaffPermissionOptions } from '../../lib/featureRegistry';
+import { canAssignStaffPermission } from '../../lib/staffPermissions';
 
 export default function AssistantsManagement() {
-  const { profile } = useAuth();
+  const { profile, schoolData } = useAuth();
+  const permissionOptions = React.useMemo(
+    () => getStaffPermissionOptions(schoolData?.packagePermissions, true),
+    [schoolData?.packagePermissions],
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [assistants, setAssistants] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,12 +59,19 @@ export default function AssistantsManagement() {
   }, [profile]);
 
   const togglePermission = (permId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      permissions: prev.permissions.includes(permId)
-        ? prev.permissions.filter(p => p !== permId)
-        : [...prev.permissions, permId]
-    }));
+    setFormData((prev) => {
+      if (prev.permissions.includes(permId)) {
+        return {
+          ...prev,
+          permissions: prev.permissions.filter((p) => p !== permId),
+        };
+      }
+      if (!canAssignStaffPermission(permId, schoolData?.packagePermissions)) {
+        toast.error('هذه الصلاحية غير متاحة في باقة المدرسة');
+        return prev;
+      }
+      return { ...prev, permissions: [...prev.permissions, permId] };
+    });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -86,12 +83,16 @@ export default function AssistantsManagement() {
       return;
     }
 
+    const resolvedPermissions = formData.permissions.filter((p) =>
+      canAssignStaffPermission(p, schoolData?.packagePermissions),
+    );
+
     setIsSaving(true);
     try {
       if (editingAssistant) {
         await updateDoc(doc(db, 'users', editingAssistant.id), {
           name: formData.name,
-          permissions: formData.permissions,
+          permissions: resolvedPermissions,
           salary: Number(formData.salary) || 0,
           updatedAt: serverTimestamp(),
         });
@@ -104,7 +105,7 @@ export default function AssistantsManagement() {
           role: UserRole.ASSISTANT,
           schoolId: profile.schoolId,
           additionalData: {
-            permissions: formData.permissions,
+            permissions: resolvedPermissions,
             salary: Number(formData.salary) || 0,
             status: 'active'
           }
@@ -205,7 +206,7 @@ export default function AssistantsManagement() {
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {assistant.permissions?.map((pId: string) => (
                     <span key={pId} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-md border border-indigo-100">
-                      {PERMISSION_OPTIONS.find(opt => opt.id === pId)?.label || pId}
+                      {permissionOptions.find((opt) => opt.id === pId)?.label || pId}
                     </span>
                   ))}
                   {(!assistant.permissions || assistant.permissions.length === 0) && (
@@ -326,7 +327,7 @@ export default function AssistantsManagement() {
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest leading-none">الصلاحيات المتاحة (اختر الأقسام)</label>
                       <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[300px] overflow-y-auto custom-scrollbar">
-                        {PERMISSION_OPTIONS.map((opt) => (
+                        {permissionOptions.map((opt) => (
                           <button
                             key={opt.id}
                             type="button"
