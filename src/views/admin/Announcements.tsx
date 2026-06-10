@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../lib/AuthContext';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, limit, orderBy } from 'firebase/firestore';
+import { filterActiveRecords, softDeleteDocument } from '../../lib/softDelete';
+import { logAction } from '../../lib/auditLog';
 import { MessageSquare, Plus, Trash2, Send, Bell, Filter, Users, User, ArrowRight, Search } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
@@ -45,7 +47,11 @@ export default function Announcements() {
       limit(100)
     );
     unsubs.push(onSnapshot(annQ, (snap) => {
-      setAnnouncements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setAnnouncements(
+        filterActiveRecords(
+          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; isDeleted?: boolean })),
+        ),
+      );
     }, (error) => console.error('Error fetching announcements:', error)));
 
     return () => unsubs.forEach(unsub => unsub());
@@ -144,10 +150,23 @@ export default function Announcements() {
   const handleDelete = async (id: string) => {
     const path = `announcements/${id}`;
     try {
-      await deleteDoc(doc(db, 'announcements', id));
-      await notificationService.deleteBySourceId(id, profile.schoolId);
-      setAnnouncements(prev => prev.filter(a => a.id !== id));
-      toast.success('تم حذف الإعلان بنجاح');
+      const title = announcements.find((a) => a.id === id)?.title || id;
+      await softDeleteDocument('announcements', id, {
+        uid: profile!.uid,
+        name: profile!.name || profile!.email || 'admin',
+      });
+      await logAction({
+        schoolId: profile!.schoolId!,
+        actorId: profile!.uid,
+        actorRole: profile!.role,
+        action: 'soft_delete',
+        entityType: 'announcements',
+        entityId: id,
+        beforeSummary: title,
+        afterSummary: 'محذوف إلى سلة المحذوفات',
+      });
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      toast.success('تم نقل الإعلان إلى سلة المحذوفات');
       setDeleteConfirmId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);

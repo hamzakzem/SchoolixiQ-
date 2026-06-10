@@ -625,8 +625,33 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /audit_logs/{logId} {
-      allow create: if signedIn();
-      allow read, get, list, update, delete: if isSuperAdmin();
+      allow create: if signedIn()
+        && (
+          (hasSchoolId(request.resource.data) && request.resource.data.actorId == request.auth.uid)
+          || request.resource.data.userId == request.auth.uid
+        );
+      allow read, get, list: if isSuperAdmin()
+        || (
+          signedIn()
+          && hasSchoolId(resource.data)
+          && userSchoolId() == resource.data.schoolId
+          && isSchoolManagementRole()
+        );
+      allow update, delete: if isSuperAdmin();
+    }
+
+    match /login_logs/{logId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId', 'event', 'createdAt']);
+      allow read, get, list: if isSuperAdmin()
+        || (
+          signedIn()
+          && hasSchoolId(resource.data)
+          && userSchoolId() == resource.data.schoolId
+          && isSchoolManagementRole()
+        );
+      allow update, delete: if isSuperAdmin();
     }
 
     match /system_diagnostics/{diagId} {

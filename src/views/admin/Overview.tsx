@@ -11,6 +11,7 @@ import { toast } from 'react-hot-toast';
 
 import { useLanguage } from '../../lib/LanguageContext';
 import DailySummary from './DailySummary';
+import SchoolHealthIndicators from '../../components/SchoolHealthIndicators';
 
 const translateSchoolValue = (value: string, isRtl: boolean): string => {
   if (!value) return isRtl ? 'غير محدد' : 'Not specified';
@@ -286,6 +287,8 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500" dir={isRtl ? 'rtl' : 'ltr'}>
       <DailySummary onGoToAttendance={() => setActiveTab?.('attendance')} />
+
+      <SchoolHealthIndicators onNavigate={setActiveTab} />
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-1">

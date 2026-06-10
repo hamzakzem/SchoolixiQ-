@@ -41,6 +41,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [schoolData, setSchoolData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const lastUserIdRef = useRef<string | null>(null);
+  const loginLoggedRef = useRef<string | null>(null);
+  const profileSnapshotRef = useRef<{
+    uid: string;
+    role: string;
+    schoolId?: string;
+    email?: string | null;
+  } | null>(null);
   
   const { language, setLanguage } = useLanguage();
   const languageRef = useRef(language);
@@ -72,6 +79,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (authUser) {
         lastUserIdRef.current = authUser.uid;
       } else {
+        if (profileSnapshotRef.current) {
+          import('./loginLog').then(({ writeLoginLog }) =>
+            writeLoginLog({
+              userId: profileSnapshotRef.current!.uid,
+              role: profileSnapshotRef.current!.role,
+              schoolId: profileSnapshotRef.current!.schoolId,
+              event: 'logout',
+              email: profileSnapshotRef.current!.email,
+            }),
+          );
+          profileSnapshotRef.current = null;
+        }
+        loginLoggedRef.current = null;
         if (lastUserIdRef.current) {
           try {
             const { unregisterPushToken } = await import('./pushService');
@@ -138,11 +158,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               claims.p,
             );
 
-            setProfile({
+            const nextProfile = {
               uid: authUser.uid,
               ...data,
               permissions: resolvedPermissions as UserProfile['permissions'],
-            } as UserProfile);
+            } as UserProfile;
+
+            setProfile(nextProfile);
+
+            profileSnapshotRef.current = {
+              uid: authUser.uid,
+              role: String(data.role || 'unknown'),
+              schoolId: data.schoolId ? String(data.schoolId) : undefined,
+              email: authUser.email,
+            };
+
+            if (loginLoggedRef.current !== authUser.uid) {
+              loginLoggedRef.current = authUser.uid;
+              import('./loginLog').then(({ writeLoginLog }) =>
+                writeLoginLog({
+                  userId: authUser.uid,
+                  role: String(data.role || 'unknown'),
+                  schoolId: data.schoolId ? String(data.schoolId) : undefined,
+                  event: 'login',
+                  email: authUser.email,
+                }),
+              );
+            }
 
             if (
               Array.isArray(resolvedPermissions) &&

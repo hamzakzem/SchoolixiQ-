@@ -78,6 +78,7 @@ import SchoolixLogo from "../components/SchoolixLogo";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
+import AuditLogsViewer from "./admin/AuditLogsViewer";
 import {
   buildDefaultPackagePermissions,
   normalizePackagePermissions,
@@ -192,6 +193,7 @@ export default function SuperAdminDashboard() {
     | "chat"
     | "backups"
     | "diagnostics"
+    | "audit_logs"
   >("schools");
   const [schoolFilter, setSchoolFilter] = useState<"all" | "active" | "expiring">("all");
   const [usersTab, setUsersTab] = useState<"management" | "parents">(
@@ -1857,6 +1859,21 @@ export default function SuperAdminDashboard() {
                           >
                             {t("sidebar_diagnostics")}
                           </div>
+                        )}
+                      </button>
+                    )}
+                    {profile?.role === "superadmin" && (
+                      <button
+                        onClick={() => {
+                          navigateToTab("audit_logs");
+                          if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                        }}
+                        title={isSidebarCollapsed ? (isRtl ? "سجل التدقيق" : "Audit Logs") : undefined}
+                        className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "audit_logs" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      >
+                        <ShieldCheck size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
+                        {!isSidebarCollapsed && (
+                          <span className="truncate">{isRtl ? "سجل التدقيق" : "Audit Logs"}</span>
                         )}
                       </button>
                     )}
@@ -4842,6 +4859,14 @@ export default function SuperAdminDashboard() {
                 ) : (
                   <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
                     ليس لديك صلاحية الوصول إلى التشخيص
+                  </div>
+                )
+              ) : activeTab === "audit_logs" ? (
+                profile?.role === "superadmin" ? (
+                  <AuditLogsViewer title={isRtl ? "سجل التدقيق — المنصة" : "Platform Audit Logs"} />
+                ) : (
+                  <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
+                    {isRtl ? "غير مصرح" : "Not authorized"}
                   </div>
                 )
               ) : null}

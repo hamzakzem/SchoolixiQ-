@@ -22,6 +22,7 @@ import {
   Clock,
   FileArchive,
   Bell,
+  Trash2,
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 import { sendEmailVerification, signOut } from "firebase/auth";
@@ -131,6 +132,9 @@ import Schedules from "./admin/Schedules";
 import AssistantsManagement from "./admin/AssistantsManagement";
 import DismissalMonitor from "./admin/DismissalMonitor";
 import AdminChatTab from "./admin/AdminChatTab";
+import AuditLogsViewer from "./admin/AuditLogsViewer";
+import RecycleBin from "./admin/RecycleBin";
+import GlobalSearch from "../components/GlobalSearch";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
@@ -283,6 +287,18 @@ export default function AdminDashboard() {
       adminOnly: true,
     },
     { id: "settings", label: t("settings"), icon: Settings },
+    {
+      id: "audit_logs",
+      label: isRtl ? "سجل التدقيق" : "Audit Logs",
+      icon: ShieldCheck,
+      adminOnly: true,
+    },
+    {
+      id: "recycle_bin",
+      label: isRtl ? "سلة المحذوفات" : "Recycle Bin",
+      icon: Trash2,
+      adminOnly: true,
+    },
   ];
 
   const filteredMenuItems = menuItems.filter((item) =>
@@ -1198,6 +1214,10 @@ export default function AdminDashboard() {
         return <AssistantsManagement />;
       case "settings":
         return <SettingsView />;
+      case "audit_logs":
+        return <AuditLogsViewer />;
+      case "recycle_bin":
+        return <RecycleBin />;
       case "evaluation_reports":
         return <EvaluationReports />;
       case "homework":
@@ -1434,6 +1454,8 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-4 md:gap-6">
+            <GlobalSearch onNavigate={setActiveTab} />
+
             <div>
               <LanguageToggle />
             </div>

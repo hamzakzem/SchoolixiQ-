@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, getDocs, limit } from 'firebase/firestore';
+import { filterActiveRecords, softDeleteDocument } from '../../lib/softDelete';
+import { logAction } from '../../lib/auditLog';
 import { useAuth } from '../../lib/AuthContext';
 import { Search, Plus, Filter, MoreVertical, LayoutDashboard, Trash2, AlertTriangle, X, Users, Edit2, UserPlus, ArrowRightLeft, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -37,7 +39,11 @@ export default function Classes() {
     try {
       const classesQ = query(collection(db, 'classes'), where('schoolId', '==', profile.schoolId), limit(100));
       unsubs.push(onSnapshot(classesQ, snap => {
-        setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setClasses(
+          filterActiveRecords(
+            snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; isDeleted?: boolean })),
+          ),
+        );
       }));
 
       const studentsQ = query(collection(db, 'students'), where('schoolId', '==', profile.schoolId), limit(1000));
@@ -92,9 +98,23 @@ export default function Classes() {
         return;
       }
 
-      await deleteDoc(doc(db, 'classes', id));
-      setClasses(prev => prev.filter(c => c.id !== id));
-      toast.success('تم حذف الصف بنجاح');
+      const className = classes.find((c) => c.id === id)?.name || id;
+      await softDeleteDocument('classes', id, {
+        uid: profile!.uid,
+        name: profile!.name || profile!.email || 'admin',
+      });
+      await logAction({
+        schoolId: profile!.schoolId!,
+        actorId: profile!.uid,
+        actorRole: profile!.role,
+        action: 'soft_delete',
+        entityType: 'classes',
+        entityId: id,
+        beforeSummary: className,
+        afterSummary: 'محذوف إلى سلة المحذوفات',
+      });
+      setClasses((prev) => prev.filter((c) => c.id !== id));
+      toast.success('تم نقل الصف إلى سلة المحذوفات');
       setConfirmDeleteId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `classes/${id}`);
