@@ -552,7 +552,7 @@ export default function StaffList() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 font-display text-right">الموظفين والمعلمين</h1>
-          <p className="text-slate-500 mt-1 text-right">إدارة الكادر التعليمي والإداري للمدرسة</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-right font-bold">إدارة حسابات الكادر التعليمي والإداري</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-4">
           <button 

@@ -391,7 +391,7 @@ export default function TeacherDashboard() {
       </p>
       <p className="text-sm text-amber-700 mt-2 font-bold">
         {isRtl
-          ? "يرجى التواصل مع إدارة المدرسة لتعيين الصف الدراسي من إدارة الكادر."
+          ? "يرجى التواصل مع إدارة المدرسة لتعيين الصف الدراسي من قسم إدارة حسابات الكادر."
           : "Please contact school administration to assign your class from Staff Management."}
       </p>
     </div>
@@ -921,7 +921,7 @@ export default function TeacherDashboard() {
     },
     {
       id: "grades",
-      label: isRtl ? "النتائج والدرجات" : "Results & Grades",
+      label: isRtl ? "الدرجات والشهادات" : "Grades & Certificates",
       icon: Star,
       permission: "exams_and_results",
     },
@@ -933,7 +933,7 @@ export default function TeacherDashboard() {
     },
     {
       id: "dismissal",
-      label: isRtl ? "تسريح الطلاب" : "Student dismissal",
+      label: isRtl ? "التسريح الآمن" : "Safe dismissal",
       icon: DoorOpen,
     },
     {
@@ -950,7 +950,7 @@ export default function TeacherDashboard() {
     },
     {
       id: "id_cards",
-      label: isRtl ? "هويات الطالب" : "Student ID Cards",
+      label: isRtl ? "هويات الطلاب" : "Student ID Cards",
       icon: ShieldCheck,
       permission: "id_card_generation",
     },
@@ -1041,7 +1041,7 @@ export default function TeacherDashboard() {
                 },
                 {
                   id: "id_cards",
-                  label: isRtl ? "هويات الطالب" : "ID Cards",
+                  label: isRtl ? "هويات الطلاب" : "Student ID Cards",
                   icon: ShieldCheck,
                 },
                 { id: "schedules", label: t("schedules"), icon: Calendar },

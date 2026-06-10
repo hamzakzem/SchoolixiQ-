@@ -204,7 +204,7 @@ export default function SettingsView() {
     }
   };
 
-  if (loading) return <div className="flex justify-center p-20 animate-pulse text-slate-400">جاري تحميل الإعدادات...</div>;
+  if (loading) return <div className="flex justify-center p-20 animate-pulse text-slate-400 dark:text-slate-500 font-bold">جاري تحميل الإعدادات...</div>;
 
   return (
     <motion.div 

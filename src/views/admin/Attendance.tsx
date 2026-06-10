@@ -171,7 +171,7 @@ export default function Attendance() {
           </h2>
           <p className="text-slate-500 font-medium leading-relaxed">
             {isRtl 
-              ? "تسجيل الحضور والغياب متاح حصراً لإدارة المدرسة. يرجى التواصل مع الادارة إذا كنت تعتقد أنك تملك هذا الحق."
+              ? "تسجيل الحضور والغياب متاح حصراً لإدارة المدرسة. يرجى التواصل مع الإدارة إذا كنت تعتقد أنك تملك هذا الحق."
               : "Attendance recording is exclusively available to school administration. Please contact the admin if you believe you should have access."}
           </p>
         </div>

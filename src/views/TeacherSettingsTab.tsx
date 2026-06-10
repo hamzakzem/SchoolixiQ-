@@ -154,7 +154,7 @@ export default function TeacherSettingsTab({
                <h3 className="font-bold text-slate-900">{isRtl ? 'الصف المعيّن' : 'Assigned class'}</h3>
                <p className="text-sm text-slate-500">
                  {isRtl
-                   ? 'يتم تعيين الصف من إدارة الكادر فقط'
+                   ? 'يتم تعيين الصف من قسم إدارة حسابات الكادر فقط'
                    : 'Class is assigned by school admin only'}
                </p>
              </div>

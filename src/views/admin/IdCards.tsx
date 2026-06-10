@@ -322,7 +322,7 @@ export default function IdCards() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-display">
-            {isRtl ? "هويات الطالب" : "Student ID Cards"}
+            {isRtl ? "هويات الطلاب" : "Student ID Cards"}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
             {isRtl

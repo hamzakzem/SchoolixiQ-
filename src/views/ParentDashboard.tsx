@@ -923,7 +923,7 @@ export default function ParentDashboard() {
     },
     {
       id: "id_cards",
-      label: isRtl ? "هويات الطالب" : "ID Cards",
+      label: isRtl ? "هويات الطلاب" : "Student ID Cards",
       icon: ShieldCheck,
       badge: selectedStudent && idCards[selectedStudent.id] ? 1 : 0,
     },
@@ -1113,7 +1113,7 @@ export default function ParentDashboard() {
     if (!selectedStudent && students.length === 0) {
       return (
         <div
-          className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8 text-center"
+          className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-8 text-center"
           dir="rtl"
         >
           <div className="w-20 h-20 rounded-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-600 mb-6 shadow-sm overflow-hidden">
@@ -1127,12 +1127,12 @@ export default function ParentDashboard() {
               <SchoolixLogo size={52} />
             )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
             {isRtl
               ? `مرحباً بك في ${config.appName}`
               : `Welcome to ${config.appName}`}
           </h1>
-          <p className="text-gray-500 mb-8">{t("noLinkedStudents")}</p>
+          <p className="text-slate-500 dark:text-slate-400 mb-8 font-bold leading-relaxed max-w-md">{t("noLinkedStudents")}</p>
           <div className="flex flex-col gap-3 w-full max-w-xs">
             <button
               onClick={() => setShowAddStudentModal(true)}

@@ -44,10 +44,10 @@ export default function GuardDashboard() {
       >
         <ShieldCheck className="text-slate-300 mb-4" size={56} />
         <h1 className="text-xl font-black text-slate-800 dark:text-white mb-2">
-          البوابة الذكية غير متاحة
+          البوابة الذكية / التسريح الآمن غير متاحة
         </h1>
-        <p className="text-sm text-slate-500 font-bold max-w-md mb-6">
-          ميزة التسريح الآمن غير مفعّلة في باقة مدرستكم. تواصل مع إدارة المدرسة.
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-bold max-w-md mb-6 leading-relaxed">
+          ميزة التسريح الآمن غير مفعّلة في باقة مدرستكم. يرجى التواصل مع إدارة المدرسة.
         </p>
         <button
           onClick={() => signOut(auth)}

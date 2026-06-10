@@ -397,8 +397,8 @@ export default function Grades() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 font-display">إدارة الدرجات والنتائج</h1>
-          <p className="text-slate-500 mt-1">تسجيل وتعديل نتائج الطلاب للاختبارات الشهرية والنهائية</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-display">الدرجات والشهادات</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 font-bold">تسجيل وتعديل درجات وشهادات الطلاب للاختبارات الشهرية والنهائية</p>
         </div>
       </div>
 

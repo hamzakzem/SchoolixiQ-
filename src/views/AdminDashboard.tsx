@@ -265,7 +265,7 @@ export default function AdminDashboard() {
     { id: "payroll", label: t("payroll"), icon: Wallet },
     { id: "inventory", label: t("inventory"), icon: Package },
     { id: "behavior", label: t("behavior"), icon: MessageSquare },
-    { id: "dismissal_gate", label: isRtl ? "البوابة الذكية" : "Smart Gate", icon: ShieldCheck },
+    { id: "dismissal_gate", label: isRtl ? "البوابة الذكية / التسريح الآمن" : "Smart Gate / Safe Dismissal", icon: ShieldCheck },
     { id: "evaluation_reports", label: t("evaluations"), icon: ClipboardCheck },
     { id: "homework", label: t("homework"), icon: Calendar },
     { id: "classes", label: t("classes") || (isRtl ? "الصفوف" : "Classes"), icon: Building },
@@ -1143,11 +1143,11 @@ export default function AdminDashboard() {
     if (!hasTabAccess) {
       return (
         <div className="p-12 text-center max-w-lg mx-auto" dir={isRtl ? "rtl" : "ltr"}>
-          <ShieldCheck className="mx-auto mb-4 text-slate-300" size={48} />
+          <ShieldCheck className="mx-auto mb-4 text-slate-300 dark:text-slate-600" size={48} />
           <h3 className="text-xl font-black text-slate-700 dark:text-white mb-2">
             {isRtl ? "هذه الميزة غير متاحة في باقتكم" : "This feature is not available in your package"}
           </h3>
-          <p className="text-sm text-slate-500 font-bold">
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-bold leading-relaxed">
             {isRtl
               ? "تواصل مع إدارة المنصة لتفعيل هذه الميزة."
               : "Contact platform administration to enable this feature."}
@@ -1207,8 +1207,8 @@ export default function AdminDashboard() {
         return <IdCards />;
       default:
         return (
-          <div className="p-8 text-center text-gray-500">
-            هذه الميزة قيد التطوير
+          <div className="p-12 text-center text-slate-500 dark:text-slate-400 font-bold">
+            هذه الميزة قيد التطوير حالياً
           </div>
         );
     }

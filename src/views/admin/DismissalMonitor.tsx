@@ -90,10 +90,10 @@ export default function DismissalMonitor() {
       <div>
         <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
           <ShieldCheck size={28} />
-          البوابة الذكية — مراقبة التسريح
+          البوابة الذكية / التسريح الآمن — مراقبة التسريح
         </h1>
-        <p className="text-slate-500 font-bold mt-1">
-          متابعة طلبات تسريح الطلاب حسب الصفوف المسجلة في المدرسة
+        <p className="text-slate-500 dark:text-slate-400 font-bold mt-1">
+          متابعة طلبات التسريح الآمن حسب الصفوف المسجلة في المدرسة
         </p>
       </div>
 
