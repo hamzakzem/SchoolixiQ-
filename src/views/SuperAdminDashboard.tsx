@@ -79,6 +79,7 @@ import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
 import AuditLogsViewer from "./admin/AuditLogsViewer";
+import LandingPageSettings from "./superadmin/LandingPageSettings";
 import {
   SchoolLifecycleButtons,
   SchoolStatusBadge,
@@ -195,6 +196,7 @@ export default function SuperAdminDashboard() {
     | "backups"
     | "diagnostics"
     | "audit_logs"
+    | "landing_page"
   >("schools");
   const [schoolFilter, setSchoolFilter] = useState<
     "all" | "active" | "suspended" | "archived" | "expiring"
@@ -1719,6 +1721,35 @@ export default function SuperAdminDashboard() {
                           className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                         >
                           {t('sidebar_settings')}
+                        </div>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigateToTab("landing_page");
+                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      }}
+                      title={
+                        isSidebarCollapsed
+                          ? "صفحة الهبوط"
+                          : undefined
+                      }
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "landing_page" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    >
+                      <LayoutDashboard
+                        size={isSidebarCollapsed ? 24 : 20}
+                        className="shrink-0"
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate">
+                          صفحة الهبوط
+                        </span>
+                      )}
+                      {isSidebarCollapsed && (
+                        <div
+                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                        >
+                          صفحة الهبوط
                         </div>
                       )}
                     </button>
@@ -4730,6 +4761,14 @@ export default function SuperAdminDashboard() {
               ) : activeTab === "audit_logs" ? (
                 profile?.role === "superadmin" ? (
                   <AuditLogsViewer title={isRtl ? "سجل التدقيق — المنصة" : "Platform Audit Logs"} />
+                ) : (
+                  <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
+                    {isRtl ? "غير مصرح" : "Not authorized"}
+                  </div>
+                )
+              ) : activeTab === "landing_page" ? (
+                profile?.role === "superadmin" ? (
+                  <LandingPageSettings />
                 ) : (
                   <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
                     {isRtl ? "غير مصرح" : "Not authorized"}

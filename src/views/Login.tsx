@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { db } from "../lib/firebase";
 import {
   doc,
@@ -160,8 +161,11 @@ const DEFAULT_PACKAGES = [
 export default function Login() {
   const { t, isRtl } = useLanguage();
   const { config } = useSystemConfig();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup">(
+    searchParams.get("mode") === "signup" ? "signup" : "login",
+  );
   const [role, setRole] = useState<UserRole>(UserRole.PARENT);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

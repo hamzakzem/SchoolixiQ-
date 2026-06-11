@@ -54,6 +54,7 @@ const ParentDashboard = lazy(() => import("./views/ParentDashboard"));
 const SuperAdminDashboard = lazy(() => import("./views/SuperAdminDashboard"));
 const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
 const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
+const LandingPage = lazy(() => import("./views/LandingPage"));
 
 import {
   logFirestoreBackendDebug,
@@ -62,6 +63,7 @@ import {
   setBackendApiBaseUrl,
 } from "./lib/apiUtils";
 import ScanHandler from "./components/ScanHandler";
+import { useLandingPageConfig } from "./lib/landingPageConfig";
 import { PageLoadingSkeleton } from "./components/ui/Skeleton";
 import { LanguageToggle } from "./components/LanguageToggle";
 import InstallAppBanner from "./components/InstallAppBanner";
@@ -1588,6 +1590,50 @@ function FallbackComponent({ error }: { error?: Error | null }) {
   );
 }
 
+/** Anonymous/authenticated home: landing page or legacy login-at-root. */
+function PublicHome() {
+  const { user, loading } = useAuth();
+  const { config: landingConfig, loading: landingLoading } = useLandingPageConfig();
+
+  if (loading || landingLoading) {
+    return <PageLoadingSkeleton />;
+  }
+  if (user) {
+    return <AppContent />;
+  }
+  if (landingConfig.landingEnabled) {
+    return <LandingPage />;
+  }
+  return (
+    <>
+      <Login />
+      <div className="fixed top-4 right-4 md:top-6 md:right-6 z-[9999]">
+        <LanguageToggle />
+      </div>
+    </>
+  );
+}
+
+/** Dedicated login route — preserves existing Login component. */
+function PublicLogin() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <PageLoadingSkeleton />;
+  }
+  if (user) {
+    return <AppContent />;
+  }
+  return (
+    <>
+      <Login />
+      <div className="fixed top-4 right-4 md:top-6 md:right-6 z-[9999]">
+        <LanguageToggle />
+      </div>
+    </>
+  );
+}
+
 export default function App() {
   return (
     <SafeErrorBoundary fallback={(err) => <FallbackComponent error={err} />}>
@@ -1601,6 +1647,8 @@ export default function App() {
                     path="/verify/:studentId"
                     element={<PublicStudentVerify />}
                   />
+                  <Route path="/login" element={<PublicLogin />} />
+                  <Route path="/" element={<PublicHome />} />
                   <Route path="*" element={<AppContent />} />
                 </Routes>
               </Suspense>
