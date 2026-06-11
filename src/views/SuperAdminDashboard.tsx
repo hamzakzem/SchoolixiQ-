@@ -80,6 +80,10 @@ import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
 import AuditLogsViewer from "./admin/AuditLogsViewer";
 import {
+  SchoolLifecycleButtons,
+  SchoolStatusBadge,
+} from "../components/superadmin/SchoolLifecycleButtons";
+import {
   buildDefaultPackagePermissions,
   normalizePackagePermissions,
   getPackagePermissionCheckboxFeatures,
@@ -170,9 +174,6 @@ export default function SuperAdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [subscriptionRequests, setSubscriptionRequests] = useState<any[]>([]);
-  const [schoolDeleteConfirmId, setSchoolDeleteConfirmId] = useState<
-    string | null
-  >(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [userDeleteConfirmId, setUserDeleteConfirmId] = useState<string | null>(
     null,
@@ -195,7 +196,9 @@ export default function SuperAdminDashboard() {
     | "diagnostics"
     | "audit_logs"
   >("schools");
-  const [schoolFilter, setSchoolFilter] = useState<"all" | "active" | "expiring">("all");
+  const [schoolFilter, setSchoolFilter] = useState<
+    "all" | "active" | "suspended" | "archived" | "expiring"
+  >("active");
   const [usersTab, setUsersTab] = useState<"management" | "parents">(
     "management",
   );
@@ -585,7 +588,11 @@ export default function SuperAdminDashboard() {
       
     let matchesFilter = true;
     if (schoolFilter === "active") {
-      matchesFilter = s.status === "active";
+      matchesFilter = s.status === "active" && !s.isDeleted;
+    } else if (schoolFilter === "suspended") {
+      matchesFilter = s.status === "suspended";
+    } else if (schoolFilter === "archived") {
+      matchesFilter = s.status === "archived" || Boolean(s.isDeleted);
     } else if (schoolFilter === "expiring") {
       const days = s.subscriptionExpiresAt ? Math.ceil(
         (new Date(s.subscriptionExpiresAt).getTime() - new Date().getTime()) /
@@ -625,7 +632,11 @@ export default function SuperAdminDashboard() {
 
   const stats = {
     total: schools.length,
-    active: schools.filter((s) => s.status === "active").length,
+    active: schools.filter((s) => s.status === "active" && !s.isDeleted).length,
+    suspended: schools.filter((s) => s.status === "suspended").length,
+    archived: schools.filter((s) =>
+      s.status === "archived" || Boolean(s.isDeleted),
+    ).length,
     expiringSoon: schools.filter((s) => {
       if (!s.subscriptionExpiresAt) return false;
       const days = Math.ceil(
@@ -656,31 +667,6 @@ export default function SuperAdminDashboard() {
       toast.success("تم تمديد الاشتراك بنجاح");
     } catch (error: any) {
       handleFirestoreError(error, OperationType.WRITE, path);
-    }
-  };
-
-  const handleToggleSchoolStatus = async (
-    schoolId: string,
-    currentStatus: string,
-  ) => {
-    const newStatus = currentStatus === "active" ? "inactive" : "active";
-
-    try {
-      await setDoc(
-        doc(db, "schools", schoolId),
-        {
-          status: newStatus,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-      toast.success(
-        newStatus === "active"
-          ? "تم تفعيل الاشتراك"
-          : "تم إيقاف الاشتراك بنجاح",
-      );
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `schools/${schoolId}`);
     }
   };
 
@@ -716,40 +702,6 @@ export default function SuperAdminDashboard() {
     } catch (error) {
       console.error("Error toggling featured status:", error);
       toast.error("فشل في تغيير حالة التميز للمدرسة");
-    }
-  };
-
-  const handleDeleteSchool = async (schoolId: string) => {
-    const loadingToast = toast.loading(
-      "جاري مسح بيانات المدرسة والمستخدمين...",
-    );
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      const response = await fetch(getApiUrl('/api/admin/delete-school'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'X-Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ schoolId })
-      });
-
-      if (!response.ok) {
-        let msg = 'فشل الحذف الكامل للبيانات';
-        try {
-           const errRes = await response.json();
-           msg = errRes.error || msg;
-        } catch(e) {}
-        throw new Error(msg);
-      }
-
-      toast.dismiss(loadingToast);
-      toast.success("تم حذف المدرسة وكامل بياناتها بنجاح");
-    } catch (error: any) {
-      toast.dismiss(loadingToast);
-      console.error("Full school deletion failed:", error);
-      toast.error("فشل الحذف الكامل: " + (error.message || "خطأ غير متوقع"));
     }
   };
 
@@ -2168,6 +2120,26 @@ export default function SuperAdminDashboard() {
                         </div>
                         <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
                           <select
+                            value={schoolFilter}
+                            onChange={(e) =>
+                              setSchoolFilter(
+                                e.target.value as
+                                  | "all"
+                                  | "active"
+                                  | "suspended"
+                                  | "archived"
+                                  | "expiring",
+                              )
+                            }
+                            className="w-full md:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none text-xs font-bold shadow-sm min-w-[140px]"
+                          >
+                            <option value="active">نشطة فقط</option>
+                            <option value="all">كل المدارس</option>
+                            <option value="suspended">معطّلة مؤقتاً</option>
+                            <option value="archived">مؤرشفة</option>
+                            <option value="expiring">تنتهي قريباً</option>
+                          </select>
+                          <select
                             value={filterGovernorate}
                             onChange={(e) =>
                               setFilterGovernorate(e.target.value)
@@ -2378,170 +2350,107 @@ export default function SuperAdminDashboard() {
                               </div>
                             </td>
                             <td className="px-6 py-6 text-center">
-                              <div className="flex flex-col items-center gap-1.5">
-                                <div
-                                  className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] flex items-center gap-2 ${
-                                    school.status === "active"
-                                      ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 shadow-[0_0_15px_-5px_rgba(16,185,129,0.2)]"
-                                      : "bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 shadow-[0_0_15px_-5px_rgba(239,68,68,0.2)]"
-                                  }`}
-                                >
-                                  <div className="relative flex items-center justify-center">
-                                    <span
-                                      className={`absolute w-full h-full rounded-full opacity-50 ${school.status === "active" ? "bg-emerald-400 animate-ping" : ""}`}
-                                    ></span>
-                                    <span
-                                      className={`relative w-2 h-2 rounded-full ${school.status === "active" ? "bg-emerald-500" : "bg-red-500"}`}
-                                    ></span>
-                                  </div>
-                                  {school.status === "active"
-                                    ? "System_Online"
-                                    : "System_Offline"}
-                                </div>
-                                <span className="text-[8px] font-mono text-slate-400 group-hover:text-slate-500 transition-colors uppercase tracking-widest">
-                                  Latency: Normal
-                                </span>
-                              </div>
+                              <SchoolStatusBadge school={school} isRtl={isRtl} />
                             </td>
                             <td className="px-8 py-6">
-                              <div className="flex items-center justify-center gap-2">
-                                {schoolDeleteConfirmId === school.id ? (
-                                  <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-300">
-                                    <button
-                                      onClick={() => {
-                                        handleDeleteSchool(school.id);
-                                        setSchoolDeleteConfirmId(null);
-                                      }}
-                                      className="px-4 py-2 bg-red-600 text-white rounded-xl text-[10px] font-black shadow-lg shadow-red-600/20 active:scale-95 transition-all"
-                                    >
-                                      تأكيد المسح
-                                    </button>
+                              <div className="flex flex-col items-center gap-3">
+                                <div className="flex items-center justify-center gap-2">
+                                  <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/50 p-1 rounded-2xl border border-slate-100 dark:border-slate-700 group-hover:border-blue-100 dark:group-hover:border-blue-900/30 transition-all">
                                     <button
                                       onClick={() =>
-                                        setSchoolDeleteConfirmId(null)
-                                      }
-                                      className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-xl text-[10px] font-black"
-                                    >
-                                      تراجع
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/50 p-1 rounded-2xl border border-slate-100 dark:border-slate-700 group-hover:border-blue-100 dark:group-hover:border-blue-900/30 transition-all">
-                                      <button
-                                        onClick={() =>
-                                          handleToggleFeatured(
-                                            school.id,
-                                            school.featured,
-                                          )
-                                        }
-                                        title={
-                                          school.featured
-                                            ? "إزالة المدرسة من قائمة شركاء النجاح في الصفحة الرئيسية"
-                                            : "إضافة المدرسة كشريك نجاح في الصفحة الرئيسية"
-                                        }
-                                        className={`p-2.5 rounded-xl transition-all ${school.featured ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 shadow-sm border border-amber-200 dark:border-amber-800/50" : "text-slate-400 hover:text-amber-500 hover:bg-white dark:hover:bg-slate-900"}`}
-                                      >
-                                        <Star
-                                          size={16}
-                                          fill={
-                                            school.featured
-                                              ? "currentColor"
-                                              : "none"
-                                          }
-                                        />
-                                      </button>
-                                      <button
-                                        onClick={() =>
-                                          handleToggleTimer(
-                                            school.id,
-                                            !!school.showSubscriptionTimer,
-                                          )
-                                        }
-                                        title={
-                                          school.showSubscriptionTimer
-                                            ? "إخفاء المؤقت عن المدرسة"
-                                            : "إظهار المؤقت للمدرسة"
-                                        }
-                                        className={`p-2.5 rounded-xl transition-all ${school.showSubscriptionTimer ? "bg-white dark:bg-slate-900 text-blue-600 shadow-sm border border-slate-100 dark:border-slate-800" : "text-slate-400 hover:text-slate-600 hover:bg-white dark:hover:bg-slate-900"}`}
-                                      >
-                                        {school.showSubscriptionTimer ? (
-                                          <Eye size={16} />
-                                        ) : (
-                                          <EyeOff size={16} />
-                                        )}
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          setEditingSchool(school);
-                                          setNewSchool({
-                                            name: school.name,
-                                            address: school.address,
-                                            googleMapsUrl: school.googleMapsUrl || "",
-                                            governorate:
-                                              school.governorate || "",
-                                            directorate:
-                                              school.directorate || "",
-                                            stage: school.stage || "",
-                                            shift: school.shift || "",
-                                            genderType: school.genderType || "",
-                                            approximateStudents:
-                                              school.approximateStudents || "",
-                                            adminName: school.adminName || "",
-                                            adminEmail: school.adminEmail || "",
-                                            adminPassword: "",
-                                            authUid: "",
-                                            adminPhone: school.adminPhone || "",
-                                            planId: school.planId || "",
-                                            durationDays: 365,
-                                            showSubscriptionTimer:
-                                              school.showSubscriptionTimer !==
-                                              false,
-                                          });
-                                          setSchoolModalTab("info");
-                                          setShowAddModal(true);
-                                        }}
-                                        className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
-                                      >
-                                        <SettingsIcon size={16} />
-                                      </button>
-                                      <button
-                                        onClick={() =>
-                                          handleExtendSubscription(
-                                            school.id,
-                                            school.subscriptionExpiresAt,
-                                          )
-                                        }
-                                        className="p-2.5 text-blue-600 hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
-                                      >
-                                        <Plus size={16} />
-                                      </button>
-                                    </div>
-                                    <button
-                                      onClick={() =>
-                                        handleToggleSchoolStatus(
+                                        handleToggleFeatured(
                                           school.id,
-                                          school.status,
+                                          school.featured,
                                         )
                                       }
-                                      className={`p-3 rounded-2xl transition-all ${school.status === "active" ? "bg-orange-50 dark:bg-orange-950/20 text-orange-600 hover:bg-orange-100 transition-all" : "bg-green-50 dark:bg-green-950/20 text-green-600 hover:bg-green-100"}`}
+                                      title={
+                                        school.featured
+                                          ? "إزالة المدرسة من قائمة شركاء النجاح في الصفحة الرئيسية"
+                                          : "إضافة المدرسة كشريك نجاح في الصفحة الرئيسية"
+                                      }
+                                      className={`p-2.5 rounded-xl transition-all ${school.featured ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 shadow-sm border border-amber-200 dark:border-amber-800/50" : "text-slate-400 hover:text-amber-500 hover:bg-white dark:hover:bg-slate-900"}`}
                                     >
-                                      {school.status === "active" ? (
-                                        <XCircle size={18} />
+                                      <Star
+                                        size={16}
+                                        fill={
+                                          school.featured
+                                            ? "currentColor"
+                                            : "none"
+                                        }
+                                      />
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleToggleTimer(
+                                          school.id,
+                                          !!school.showSubscriptionTimer,
+                                        )
+                                      }
+                                      title={
+                                        school.showSubscriptionTimer
+                                          ? "إخفاء المؤقت عن المدرسة"
+                                          : "إظهار المؤقت للمدرسة"
+                                      }
+                                      className={`p-2.5 rounded-xl transition-all ${school.showSubscriptionTimer ? "bg-white dark:bg-slate-900 text-blue-600 shadow-sm border border-slate-100 dark:border-slate-800" : "text-slate-400 hover:text-slate-600 hover:bg-white dark:hover:bg-slate-900"}`}
+                                    >
+                                      {school.showSubscriptionTimer ? (
+                                        <Eye size={16} />
                                       ) : (
-                                        <CheckCircle size={18} />
+                                        <EyeOff size={16} />
                                       )}
                                     </button>
                                     <button
-                                      onClick={() =>
-                                        setSchoolDeleteConfirmId(school.id)
-                                      }
-                                      className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-2xl transition-all"
+                                      onClick={() => {
+                                        setEditingSchool(school);
+                                        setNewSchool({
+                                          name: school.name,
+                                          address: school.address,
+                                          googleMapsUrl: school.googleMapsUrl || "",
+                                          governorate:
+                                            school.governorate || "",
+                                          directorate:
+                                            school.directorate || "",
+                                          stage: school.stage || "",
+                                          shift: school.shift || "",
+                                          genderType: school.genderType || "",
+                                          approximateStudents:
+                                            school.approximateStudents || "",
+                                          adminName: school.adminName || "",
+                                          adminEmail: school.adminEmail || "",
+                                          adminPassword: "",
+                                          authUid: "",
+                                          adminPhone: school.adminPhone || "",
+                                          planId: school.planId || "",
+                                          durationDays: 365,
+                                          showSubscriptionTimer:
+                                            school.showSubscriptionTimer !==
+                                            false,
+                                        });
+                                        setSchoolModalTab("info");
+                                        setShowAddModal(true);
+                                      }}
+                                      className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
                                     >
-                                      <Trash2 size={18} />
+                                      <SettingsIcon size={16} />
                                     </button>
-                                  </>
-                                )}
+                                    <button
+                                      onClick={() =>
+                                        handleExtendSubscription(
+                                          school.id,
+                                          school.subscriptionExpiresAt,
+                                        )
+                                      }
+                                      className="p-2.5 text-blue-600 hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
+                                    >
+                                      <Plus size={16} />
+                                    </button>
+                                  </div>
+                                </div>
+                                <SchoolLifecycleButtons
+                                  school={school}
+                                  isRtl={isRtl}
+                                  compact
+                                />
                               </div>
                             </td>
                           </tr>
@@ -2692,78 +2601,35 @@ export default function SuperAdminDashboard() {
                                 </div>
                               </td>
                               <td className="px-6 py-6">
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className={`w-1.5 h-1.5 rounded-full ${
-                                      school.status === "active"
-                                        ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                                        : "bg-red-500"
-                                    }`}
-                                  ></div>
-                                  <span
-                                    className={`text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${
-                                      school.status === "active"
-                                        ? "text-emerald-600"
-                                        : "text-red-600"
-                                    }`}
-                                  >
-                                    {school.status === "active" ? "نشط" : "موقوف"}
-                                  </span>
-                                </div>
+                                <SchoolStatusBadge school={school} isRtl={isRtl} />
                               </td>
                               <td className="px-8 py-6">
-                                <div className="flex justify-center gap-2">
-                                  {schoolDeleteConfirmId === school.id ? (
-                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-4 duration-300">
-                                      <button
-                                        onClick={() => {
-                                          handleDeleteSchool(school.id);
-                                          setSchoolDeleteConfirmId(null);
-                                        }}
-                                        className="px-4 py-2 bg-red-600 text-white rounded-xl text-[10px] font-black hover:bg-red-700 shadow-lg shadow-red-600/20 active:scale-95 transition-all"
-                                      >
-                                        تأكيد الحذف النهائي
-                                      </button>
-                                      <button
-                                        onClick={() =>
-                                          setSchoolDeleteConfirmId(null)
-                                        }
-                                        className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black active:scale-95 transition-all"
-                                      >
-                                        تراجع
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <>
+                                <div className="flex flex-col items-center gap-3">
+                                  <div className="flex justify-center gap-2">
+                                    <a
+                                      href={`mailto:${school.adminEmail}`}
+                                      className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl text-slate-400 hover:text-blue-600 transition-all border border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900/50 hover:shadow-lg hover:shadow-blue-500/5"
+                                      title="إرسال بريد"
+                                    >
+                                      <Mail size={16} />
+                                    </a>
+                                    {school.adminPhone && (
                                       <a
-                                        href={`mailto:${school.adminEmail}`}
-                                        className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl text-slate-400 hover:text-blue-600 transition-all border border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900/50 hover:shadow-lg hover:shadow-blue-500/5"
-                                        title="إرسال بريد"
+                                        href={`https://wa.me/${school.adminPhone.replace(/\s+/g, "")}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl text-slate-400 hover:text-green-600 transition-all border border-slate-200 dark:border-slate-800 hover:border-green-200 dark:hover:border-green-900/50 hover:shadow-lg hover:shadow-green-500/5"
+                                        title="واتساب"
                                       >
-                                        <Mail size={16} />
+                                        <Phone size={16} />
                                       </a>
-                                      {school.adminPhone && (
-                                        <a
-                                          href={`https://wa.me/${school.adminPhone.replace(/\s+/g, "")}`}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl text-slate-400 hover:text-green-600 transition-all border border-slate-200 dark:border-slate-800 hover:border-green-200 dark:hover:border-green-900/50 hover:shadow-lg hover:shadow-green-500/5"
-                                          title="واتساب"
-                                        >
-                                          <Phone size={16} />
-                                        </a>
-                                      )}
-                                      <button
-                                        onClick={() =>
-                                          setSchoolDeleteConfirmId(school.id)
-                                        }
-                                        className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl text-slate-400 hover:text-red-500 transition-all border border-slate-200 dark:border-slate-800 hover:border-red-200 dark:hover:border-red-900/50 hover:shadow-lg hover:shadow-red-500/5"
-                                        title="حذف المدرسة"
-                                      >
-                                        <Trash2 size={16} />
-                                      </button>
-                                    </>
-                                  )}
+                                    )}
+                                  </div>
+                                  <SchoolLifecycleButtons
+                                    school={school}
+                                    isRtl={isRtl}
+                                    compact
+                                  />
                                 </div>
                               </td>
                             </tr>

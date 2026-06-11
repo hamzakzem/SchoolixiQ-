@@ -33,7 +33,8 @@ export interface School {
   id: string;
   name: string;
   address: string;
-  status: 'active' | 'suspended' | 'pending_subscription' | 'pending_approval' | 'rejected';
+  status: 'active' | 'suspended' | 'archived' | 'pending_subscription' | 'pending_approval' | 'rejected' | 'inactive';
+  isDeleted?: boolean;
   ownerUid: string;
   logoUrl?: string;
   subscriptionExpiresAt?: any; // Timestamp

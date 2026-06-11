@@ -634,6 +634,51 @@ const AppContent = () => {
       );
     }
 
+    // Check school lifecycle suspension / archive (non-superadmin)
+    if (
+      profile?.role &&
+      profile.role !== UserRole.SUPERADMIN &&
+      profile?.schoolId &&
+      (schoolData?.status === 'suspended' ||
+        schoolData?.status === 'archived' ||
+        schoolData?.isDeleted)
+    ) {
+      const isSuspended = schoolData?.status === 'suspended';
+      return (
+        <div
+          className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6"
+          dir={isRtl ? 'rtl' : 'ltr'}
+        >
+          <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 text-center shadow-2xl border border-amber-100 dark:border-amber-900/30">
+            <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Clock className="text-amber-600 dark:text-amber-400" size={40} />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">
+              {isRtl
+                ? isSuspended
+                  ? 'المدرسة معطّلة مؤقتاً'
+                  : 'المدرسة مؤرشفة'
+                : isSuspended
+                  ? 'School temporarily suspended'
+                  : 'School archived'}
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-bold">
+              {isRtl
+                ? 'لا يمكن الوصول إلى لوحة التحكم حالياً. تواصل مع الدعم الفني أو إدارة المنصة.'
+                : 'Dashboard access is disabled. Contact platform support or your administrator.'}
+            </p>
+            <button
+              onClick={() => auth.signOut()}
+              className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2"
+            >
+              <LogOut size={20} />
+              {isRtl ? 'تسجيل الخروج' : 'Logout'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     // Check school expiration for everyone except super admin
     if (
       profile?.role &&

@@ -9,6 +9,7 @@ import { getStorage } from "firebase-admin/storage";
 import dotEnv from "dotenv";
 import fs from "fs";
 import crypto from "crypto";
+import { runSchoolPermanentDelete } from "./schoolPermanentDelete.mjs";
 dotEnv.config();
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
@@ -845,6 +846,41 @@ async function startServer() {
       res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   });
+  app.post(
+    "/api/admin/schools/:schoolId/permanent-delete",
+    verifyAdmin,
+    async (req, res) => {
+      const { schoolId } = req.params;
+      const { confirmName } = req.body || {};
+      if (!schoolId) {
+        return res.status(400).json({ error: "School ID required" });
+      }
+      try {
+        if (req.user.role !== "superadmin") {
+          return res.status(403).json({
+            error: "FORBIDDEN",
+            message:
+              "غير مصرح لك بحذف المدرسة نهائياً. هذا الإجراء مخصص للSuperAdmin فقط",
+          });
+        }
+        const summary = await runSchoolPermanentDelete({
+          db: getDb(),
+          authAdmin: admin.auth(),
+          schoolId,
+          confirmName: String(confirmName || ""),
+        });
+        await logAudit(req, "PERMANENT_DELETE_SCHOOL", {
+          metadata: { targetSchoolId: schoolId, summary },
+        });
+        res.json({ success: true, summary });
+      } catch (error) {
+        console.error("Permanent Delete School Error:", error);
+        res.status(error.status || 500).json({
+          error: error.message || "Internal Server Error",
+        });
+      }
+    },
+  );
   app.post("/api/admin/delete-student", verifyAdmin, async (req, res) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "Student ID required" });
