@@ -4,6 +4,10 @@ const config: CapacitorConfig = {
   appId: 'com.schoolix.app',
   appName: 'Schoolix',
   webDir: 'dist',
+  server: {
+    url: 'https://schoolixiq.com',
+    cleartext: false,
+  },
   plugins: {
     GoogleAuth: {
       scopes: ["profile", "email"],
