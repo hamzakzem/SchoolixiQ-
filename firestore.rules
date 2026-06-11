@@ -616,10 +616,10 @@ service cloud.firestore {
           signedIn()
           && hasSchoolId(request.resource.data)
           && isConversationParticipant(request.resource.data)
-        );
+      );
       allow delete: if isSuperAdmin();
     }
-
+    
     // -------------------------------------------------------------------------
     // Audit / diagnostics / logs (conservative)
     // -------------------------------------------------------------------------
