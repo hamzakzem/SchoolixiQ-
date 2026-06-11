@@ -69,6 +69,7 @@ import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { GlobalFooter } from "../components/GlobalFooter";
 import SchoolixLogo from "../components/SchoolixLogo";
+import { isCustomAppLogo } from "../lib/brandAssets";
 
 export const getLocalizedPackages = (packagesList: any[], isRtl: boolean) => {
   return packagesList.map(pkg => {
@@ -551,14 +552,14 @@ export default function Login() {
           <div className="flex flex-col items-center mb-6 sm:mb-10 text-center select-none">
             {/* Elegant Technical Logo Container - Fixed Height to prevent any layout shifts */}
             <div className="h-24 sm:h-28 w-full flex items-center justify-center mb-2 relative group">
-              {config.appLogo && config.appLogo !== "/icon.svg" ? (
+              {isCustomAppLogo(config.appLogo) ? (
                 <div className="relative">
                   {/* Tech Aura Backlight */}
                   <div className="absolute -inset-2 bg-gradient-to-r from-[#0B2345] to-[#D4A64A] rounded-full blur-xl opacity-10 group-hover:opacity-25 transition duration-500"></div>
                   <img
                     src={config.appLogo || undefined}
-                    alt="schoolixiQ Logo"
-                    className="max-h-20 sm:max-h-24 w-auto object-contain drop-shadow-sm transition-all duration-500 hover:scale-105 relative z-10"
+                    alt="SchoolixIQ logo"
+                    className="max-h-20 sm:max-h-24 w-auto object-contain drop-shadow-sm transition-all duration-500 hover:scale-[1.01] relative z-10"
                     loading="eager"
                   />
                 </div>

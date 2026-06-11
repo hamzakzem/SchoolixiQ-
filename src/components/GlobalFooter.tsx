@@ -12,6 +12,7 @@ import { db } from "../lib/firebase";
 import { School } from "../types";
 import { ArrowLeft } from "lucide-react";
 import { useSystemConfig } from "../lib/SystemConfigContext";
+import { resolveAppLogoSrc } from "../lib/brandAssets";
 
 interface DisplayPartner {
   id: string;
@@ -161,8 +162,8 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
             </span>
             {config.appLogo && (
               <img
-                src={config.appLogo || undefined}
-                alt={config.appName}
+                src={resolveAppLogoSrc(config.appLogo)}
+                alt="SchoolixIQ logo"
                 className="max-h-4 md:max-h-5 object-contain opacity-35 dark:opacity-45 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300 pointer-events-none"
               />
             )}
@@ -340,8 +341,8 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
         <div className="w-full flex flex-col items-center pt-8 border-t border-slate-200/60 dark:border-slate-800/60">
           {config.appLogo && (
             <img
-              src={config.appLogo || undefined}
-              alt={config.appName}
+              src={resolveAppLogoSrc(config.appLogo)}
+              alt="SchoolixIQ logo"
               className="max-h-6 object-contain mb-4 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all pointer-events-none"
             />
           )}

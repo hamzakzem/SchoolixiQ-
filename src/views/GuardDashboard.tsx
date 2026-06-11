@@ -181,7 +181,7 @@ export default function GuardDashboard() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" dir="rtl">
       <header className="bg-slate-900 text-white px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <SchoolixLogo className="h-8 w-auto brightness-0 invert" />
+          <SchoolixLogo size={32} surface="dark" />
           <div>
             <h1 className="font-black text-lg">بوابة التسريح الآمن</h1>
             <p className="text-xs text-slate-300">{schoolData?.name || profile?.schoolId}</p>

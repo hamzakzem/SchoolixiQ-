@@ -107,6 +107,7 @@ import Schedules from "./admin/Schedules";
 import AdvancedReports from "./admin/AdvancedReports";
 import IdCards from "./admin/IdCards";
 import SchoolixLogo from "../components/SchoolixLogo";
+import { isCustomAppLogo, isCustomSchoolLogo } from "../lib/brandAssets";
 
 import { useLanguage } from "../lib/LanguageContext";
 import { GlobalFooter } from "../components/GlobalFooter";
@@ -995,16 +996,16 @@ export default function TeacherDashboard() {
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
-                {schoolData?.logoUrl && schoolData?.logoUrl !== "/icon.svg" ? (
+                {isCustomSchoolLogo(schoolData?.logoUrl) ? (
                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
                     <img
                       src={schoolData.logoUrl}
-                      alt="Logo"
+                      alt="SchoolixIQ logo"
                       className="w-full h-full object-contain"
                     />
                   </div>
                 ) : (
-                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
+                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} surface="dark" />
                 )}
                 {!isSidebarCollapsed && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0" dir={isRtl ? "rtl" : "ltr"}>

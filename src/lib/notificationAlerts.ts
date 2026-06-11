@@ -1,4 +1,5 @@
 import { getSafeHomeworkNotificationTitle } from './homeworkSubjects';
+import { SCHOOLIXIQ_LOGO_SRC } from './brandAssets';
 import {
   playCategorizedSound,
   type NotificationCategory,
@@ -26,7 +27,7 @@ export function alertIncomingNotification(
         : notif.title || (isArabic ? 'إشعار جديد' : 'New notification');
     new Notification(title, {
       body: notif.message,
-      icon: '/icon.svg',
+      icon: SCHOOLIXIQ_LOGO_SRC,
     });
   } catch (error) {
     console.warn('Browser notification failed:', error);

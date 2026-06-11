@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from './firebase';
 import { doc, onSnapshot, getDocFromServer } from 'firebase/firestore';
+import { SCHOOLIXIQ_LOGO_SRC } from './brandAssets';
 
 interface MarketingFeature {
   title: string;
@@ -32,7 +33,7 @@ interface SystemConfig {
 
 const defaultSystemConfig: SystemConfig = {
   appName: 'SchoolixiQ',
-  appLogo: '/icon.svg',
+  appLogo: SCHOOLIXIQ_LOGO_SRC,
   supportPhones: ['+964 770 000 0000'],
   supportEmails: ['support@schoolixiq.iq'],
   successPartners: [],
@@ -89,7 +90,10 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
       if (snap.exists()) {
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
-        const appLogo = typeof data.appLogo !== 'undefined' ? data.appLogo : '';
+        const appLogo =
+          typeof data.appLogo !== 'undefined' && data.appLogo
+            ? data.appLogo
+            : defaultSystemConfig.appLogo;
         const updatedConfig = {
           ...defaultSystemConfig,
           ...data,
@@ -110,7 +114,10 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
       if (snap.exists()) {
         const data = snap.data();
         const appName = data.appName || 'SchoolixiQ';
-        const appLogo = typeof data.appLogo !== 'undefined' ? data.appLogo : '';
+        const appLogo =
+          typeof data.appLogo !== 'undefined' && data.appLogo
+            ? data.appLogo
+            : defaultSystemConfig.appLogo;
         const newConfig = {
           ...defaultSystemConfig,
           ...data,
@@ -149,11 +156,17 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
         link.rel = 'icon';
         document.getElementsByTagName('head')[0].appendChild(link);
       }
-      link.href = config.appLogo || "/icon.svg";
-      
+      link.href = config.appLogo || SCHOOLIXIQ_LOGO_SRC;
+      link.type =
+        link.href.endsWith('.png') || link.href.startsWith('data:image/png')
+          ? 'image/png'
+          : link.href.endsWith('.svg') || link.href.startsWith('data:image/svg')
+            ? 'image/svg+xml'
+            : 'image/png';
+
       let appleLink: HTMLLinkElement | null = document.querySelector("link[rel='apple-touch-icon']");
       if (appleLink) {
-        appleLink.href = config.appLogo || "/icon.svg";
+        appleLink.href = config.appLogo || SCHOOLIXIQ_LOGO_SRC;
       }
     };
     updateFavicon();

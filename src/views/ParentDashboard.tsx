@@ -87,6 +87,7 @@ import { Phone, Mail, MapPin, Save, Sparkles, ShieldAlert, ExternalLink } from "
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import SchoolixLogo from "../components/SchoolixLogo";
+import { isCustomAppLogo } from "../lib/brandAssets";
 
 export default function ParentDashboard() {
   const { profile, schoolData } = useAuth();
@@ -1118,10 +1119,10 @@ export default function ParentDashboard() {
           dir="rtl"
         >
           <div className="w-20 h-20 rounded-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-600 mb-6 shadow-sm overflow-hidden">
-            {config.appLogo && config.appLogo !== "/icon.svg" ? (
+            {isCustomAppLogo(config.appLogo) ? (
               <img
                 src={config.appLogo}
-                alt={config.appName}
+                alt="SchoolixIQ logo"
                 className="w-full h-full object-contain p-2"
               />
             ) : (
@@ -1202,16 +1203,16 @@ export default function ParentDashboard() {
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
                 <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
-                  {config.appLogo && config.appLogo !== "/icon.svg" ? (
+                  {isCustomAppLogo(config.appLogo) ? (
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
                       <img
                         src={config.appLogo}
-                        alt="Logo"
+                        alt="SchoolixIQ logo"
                         className="w-full h-full object-contain"
                       />
                     </div>
                   ) : (
-                    <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
+                    <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} surface="dark" />
                   )}
                   {!isSidebarCollapsed && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0" dir={isRtl ? "rtl" : "ltr"}>

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { db } from "../lib/firebase";
 import { collection, query, where, onSnapshot, limit, orderBy } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
+import { SCHOOLIXIQ_LOGO_SRC } from '../lib/brandAssets';
 import {
   playPremiumNotificationSound,
   playGradeNotificationSound,
@@ -40,7 +41,7 @@ export const AudioNotificationManager: React.FC = () => {
       try {
         const notif = new Notification(title, {
           body,
-          icon: "/icon.svg",
+          icon: SCHOOLIXIQ_LOGO_SRC,
           tag,
           requireInteraction: false,
         });

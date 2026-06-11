@@ -75,6 +75,7 @@ import {
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import SchoolixLogo from "../components/SchoolixLogo";
+import { isCustomAppLogo } from "../lib/brandAssets";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
@@ -1460,14 +1461,14 @@ export default function SuperAdminDashboard() {
               <div
                 className={`p-6 flex ${isSidebarCollapsed ? "justify-center border-b border-transparent" : "items-center gap-4 border-b border-slate-700 dark:border-slate-800"} pb-6`}
               >
-                {config.appLogo && config.appLogo !== "/icon.svg" ? (
+                {isCustomAppLogo(config.appLogo) ? (
                   <img
                     src={config.appLogo || undefined}
-                    alt={config.appName}
+                    alt="SchoolixIQ logo"
                     className="w-10 h-10 md:w-12 md:h-12 object-contain rounded-xl bg-white p-1 shrink-0"
                   />
                 ) : (
-                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
+                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} surface="dark" />
                 )}
                 {!isSidebarCollapsed && (
                   <motion.h1

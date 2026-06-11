@@ -55,6 +55,7 @@ import { notificationService } from "../lib/notificationService";
 import { filterNotificationsForUser } from "../lib/notificationVisibility";
 import { canAccessAdminMenuItem } from "../lib/staffPermissions";
 import SchoolixLogo from "../components/SchoolixLogo";
+import { isCustomSchoolLogo } from "../lib/brandAssets";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 
 const DEFAULT_PACKAGES = [
@@ -1304,16 +1305,16 @@ export default function AdminDashboard() {
               <div
                 className={`p-6 border-b border-slate-800/50 flex ${isSidebarCollapsed ? "justify-center" : "items-center gap-4"}`}
               >
-                {schoolData?.logoUrl && schoolData?.logoUrl !== "/icon.svg" ? (
+                {isCustomSchoolLogo(schoolData?.logoUrl) ? (
                   <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1 shadow-xl shrink-0 overflow-hidden">
                     <img
                       src={schoolData.logoUrl || undefined}
-                      alt="Logo"
+                      alt="SchoolixIQ logo"
                       className="w-full h-full object-contain"
                     />
                   </div>
                 ) : (
-                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} />
+                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} surface="dark" />
                 )}
                 {!isSidebarCollapsed && (
                   <motion.div
