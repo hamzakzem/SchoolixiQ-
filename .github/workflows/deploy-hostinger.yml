@@ -116,34 +116,10 @@ jobs:
       - name: Install lftp
         run: sudo apt-get update && sudo apt-get install -y lftp
 
-      - name: Test Hostinger ports
-        run: |
-          nc -zv "${HOSTINGER_FTP_SERVER}" 21 || true
-          nc -zv "${HOSTINGER_FTP_SERVER}" 65002 || true
+      - name: Test Hostinger SFTP port
+        run: nc -zv "${HOSTINGER_FTP_SERVER}" 65002 || true
 
-      - name: Deploy to Hostinger (FTPS server-dir ./)
-        id: ftps_root
-        continue-on-error: true
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ env.HOSTINGER_FTP_SERVER }}
-          username: ${{ env.HOSTINGER_FTP_USERNAME }}
-          password: ${{ env.HOSTINGER_FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          timeout: 300000
-          local-dir: ./dist/
-          server-dir: ./
-          dangerous-clean-slate: true
-          log-level: verbose
-          exclude: |
-            **/.git*
-            **/server.mjs
-            **/server.cjs
-            **/server.cjs.map
-
-      - name: Deploy to Hostinger (lftp FTPS/SFTP fallback)
-        if: steps.ftps_root.outcome == 'failure'
+      - name: Deploy to Hostinger (SFTP)
         run: bash scripts/hostinger-deploy.sh dist
 
       - name: Deployment summary
