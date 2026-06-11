@@ -46,14 +46,16 @@ jobs:
             exit 1
           fi
           remote="${HOSTINGER_FTP_REMOTE_DIR}"
-          if [[ "$remote" != /* ]]; then
-            echo "::error title=Invalid HOSTINGER_FTP_REMOTE_DIR::Use full path like /home/USERNAME/domains/schoolixiq.com/public_html"
+          remote="${remote%/}"
+          if [[ -z "$remote" ]] || [[ "$remote" == *".."* ]]; then
+            echo "::error title=Invalid HOSTINGER_FTP_REMOTE_DIR::Set a non-empty path such as domains/schoolixiq.com/public_html, /domains/schoolixiq.com/public_html, or /home/USERNAME/domains/schoolixiq.com/public_html"
             exit 1
           fi
           echo "SFTP server: ${HOSTINGER_FTP_SERVER}"
           echo "SFTP user: ${HOSTINGER_FTP_USERNAME}"
-          echo "SFTP remote: ${HOSTINGER_FTP_REMOTE_DIR}"
+          echo "SFTP remote (configured): ${HOSTINGER_FTP_REMOTE_DIR}"
           echo "SFTP port: 65002"
+          echo "Remote dir may be relative to SFTP login root or a full /home/USER/... path — deploy script will try fallbacks if cd fails."
 
       - uses: actions/setup-node@v4
         with:

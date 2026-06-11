@@ -14,11 +14,11 @@ strip_cr_lf() {
 FTP_SERVER="$(strip_cr_lf "${HOSTINGER_FTP_SERVER}")"
 FTP_USER="$(strip_cr_lf "${HOSTINGER_FTP_USERNAME}")"
 FTP_PASSWORD="$(strip_cr_lf "${HOSTINGER_FTP_PASSWORD}")"
-REMOTE="$(strip_cr_lf "${HOSTINGER_FTP_REMOTE_DIR}")"
-REMOTE="${REMOTE%/}"
+CONFIGURED_REMOTE="$(strip_cr_lf "${HOSTINGER_FTP_REMOTE_DIR}")"
+CONFIGURED_REMOTE="${CONFIGURED_REMOTE%/}"
 
-if [[ -z "$REMOTE" ]]; then
-  echo "::error title=Invalid HOSTINGER_FTP_REMOTE_DIR::Remote directory is empty after sanitization"
+if [[ -z "$CONFIGURED_REMOTE" ]] || [[ "$CONFIGURED_REMOTE" == *".."* ]]; then
+  echo "::error title=Invalid HOSTINGER_FTP_REMOTE_DIR::Remote directory is empty or invalid after sanitization"
   exit 1
 fi
 
@@ -28,14 +28,53 @@ trap 'rm -f "$CD_SCRIPT_FILE"' EXIT
 
 CD_TIMEOUT_SEC="${HOSTINGER_CD_TIMEOUT_SEC:-90}"
 MIRROR_TIMEOUT_SEC="${HOSTINGER_MIRROR_TIMEOUT_SEC:-8m}"
+REMOTE=""
 
 remote_path_hint() {
-  if [[ "$REMOTE" =~ ^/home/[^/]+/(.+)$ ]]; then
-    printf '%s\n' "Hint: Hostinger SFTP often lands in the account home already. If cd hangs or fails, try HOSTINGER_FTP_REMOTE_DIR='/%s' instead of '%s'." "${BASH_REMATCH[1]}" "$REMOTE"
+  cat <<EOF
+Hint: Hostinger SFTP (65002) is usually chrooted to your account home. Try one of:
+  - domains/schoolixiq.com/public_html
+  - /domains/schoolixiq.com/public_html
+  - /home/USERNAME/domains/schoolixiq.com/public_html
+Configured value was: ${CONFIGURED_REMOTE}
+EOF
+}
+
+# Build ordered cd candidates: exact path first, then Hostinger fallbacks.
+build_cd_candidates() {
+  local raw="$1"
+  local -a ordered=()
+  local candidate stripped
+
+  add_candidate() {
+    candidate="${1%/}"
+    [[ -z "$candidate" ]] && return
+    local existing
+    for existing in "${ordered[@]:-}"; do
+      [[ "$existing" == "$candidate" ]] && return
+    done
+    ordered+=("$candidate")
+  }
+
+  add_candidate "$raw"
+
+  if [[ "$raw" =~ ^/home/[^/]+/(.+)$ ]]; then
+    add_candidate "${BASH_REMATCH[1]}"
+    add_candidate "/${BASH_REMATCH[1]}"
   fi
+
+  if [[ "$raw" != /* ]]; then
+    add_candidate "/${raw}"
+  elif [[ "$raw" != /home/* ]]; then
+    stripped="${raw#/}"
+    add_candidate "$stripped"
+  fi
+
+  printf '%s\n' "${ordered[@]}"
 }
 
 write_lftp_cd_test_script() {
+  local target="$1"
   {
     printf '%s\n' 'set sftp:auto-confirm yes'
     printf '%s\n' 'set cmd:fail-exit yes'
@@ -44,20 +83,43 @@ write_lftp_cd_test_script() {
     printf '%s\n' 'set net:reconnect-interval-base 3'
     printf '%s\n' '!echo "[deploy] step: open sftp"'
     printf 'open sftp://%s:65002\n' "$FTP_SERVER"
-    printf '%s\n' '!echo "[deploy] step: open done"'
     printf '%s\n' '!echo "[deploy] step: user auth"'
     printf 'user %s %s\n' "$FTP_USER" "$FTP_PASSWORD"
-    printf '%s\n' '!echo "[deploy] step: user done"'
     printf '%s\n' '!echo "[deploy] remote pwd before cd:"'
     printf '%s\n' 'pwd'
-    printf '%s\n' "!echo \"[deploy] attempting cd to: ${REMOTE}\""
-    printf 'cd "%s"\n' "$REMOTE"
+    printf '%s\n' "!echo \"[deploy] attempting cd to: ${target}\""
+    printf 'cd "%s"\n' "$target"
     printf '%s\n' '!echo "[deploy] remote pwd after cd:"'
     printf '%s\n' 'pwd'
     printf '%s\n' '!echo "[deploy] step: cd done"'
     printf '%s\n' 'bye'
   } >"$CD_SCRIPT_FILE"
   chmod 600 "$CD_SCRIPT_FILE"
+}
+
+try_remote_cd() {
+  local target="$1"
+  write_lftp_cd_test_script "$target"
+  set +e
+  timeout "${CD_TIMEOUT_SEC}s" lftp -f "$CD_SCRIPT_FILE"
+  local exit_code=$?
+  set -e
+  return "$exit_code"
+}
+
+resolve_remote_dir() {
+  local candidate
+  while IFS= read -r candidate; do
+    [[ -z "$candidate" ]] && continue
+    echo "[deploy] cd attempt: ${candidate}"
+    if try_remote_cd "$candidate"; then
+      REMOTE="$candidate"
+      echo "[deploy] cd OK using: ${REMOTE}"
+      return 0
+    fi
+    echo "[deploy] cd failed for: ${candidate}"
+  done < <(build_cd_candidates "$CONFIGURED_REMOTE")
+  return 1
 }
 
 write_lftp_mirror_script() {
@@ -119,31 +181,20 @@ run_mirror_phase() {
 }
 
 report_cd_failure() {
-  local exit_code="$1"
-  if [[ "$exit_code" -eq 124 ]]; then
-    echo "::error title=Hostinger cd timed out::cd to HOSTINGER_FTP_REMOTE_DIR='${REMOTE}' timed out after ${CD_TIMEOUT_SEC}s. The path may be wrong for the SFTP session root."
-  else
-    echo "::error title=Hostinger cd failed::cd to HOSTINGER_FTP_REMOTE_DIR='${REMOTE}' failed (exit ${exit_code}). Use the exact path relative to the SFTP login directory."
-  fi
+  echo "::error title=Hostinger cd failed::Could not cd to HOSTINGER_FTP_REMOTE_DIR='${CONFIGURED_REMOTE}' (tried fallbacks for Hostinger chroot paths)."
   remote_path_hint
 }
 
-echo "=== SFTP (65002) -> '${REMOTE}' ==="
+echo "=== SFTP (65002) configured='${CONFIGURED_REMOTE}' ==="
 echo "[deploy] local source: ${LOCAL_DIR}/"
-echo "[deploy] phase 1: verify remote cd (${CD_TIMEOUT_SEC}s timeout)"
+echo "[deploy] phase 1: resolve remote cd (${CD_TIMEOUT_SEC}s timeout per attempt)"
 
-write_lftp_cd_test_script
-set +e
-timeout "${CD_TIMEOUT_SEC}s" lftp -f "$CD_SCRIPT_FILE"
-cd_exit=$?
-set -e
-
-if [[ "$cd_exit" -ne 0 ]]; then
-  report_cd_failure "$cd_exit"
+if ! resolve_remote_dir; then
+  report_cd_failure
   exit 1
 fi
 
-echo "[deploy] phase 2: atomic mirror upload (${MIRROR_TIMEOUT_SEC} timeout per step)"
+echo "[deploy] phase 2: atomic mirror upload (${MIRROR_TIMEOUT_SEC} timeout per step) -> '${REMOTE}'"
 for step in \
   "assets-upload:upload new hashed assets (keep old until shell updated)" \
   "body-sync:sync static files (exclude assets shell)" \
@@ -152,7 +203,7 @@ for step in \
   phase="${step%%:*}"
   label="${step#*:}"
   if ! run_mirror_phase "$phase" "$label"; then
-    echo "::error title=Hostinger deploy failed::mirror phase '${phase}' failed for HOSTINGER_FTP_REMOTE_DIR='${REMOTE}'."
+    echo "::error title=Hostinger deploy failed::mirror phase '${phase}' failed for resolved remote='${REMOTE}'."
     remote_path_hint
     exit 1
   fi
