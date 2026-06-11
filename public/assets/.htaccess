@@ -1,0 +1,4 @@
+# Vite content-hashed bundles — safe to cache forever (filename changes each build).
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>

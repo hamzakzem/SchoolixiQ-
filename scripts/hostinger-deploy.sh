@@ -24,8 +24,7 @@ fi
 
 LOCAL_DIR="${1:-dist}"
 CD_SCRIPT_FILE="$(mktemp)"
-MIRROR_SCRIPT_FILE="$(mktemp)"
-trap 'rm -f "$CD_SCRIPT_FILE" "$MIRROR_SCRIPT_FILE"' EXIT
+trap 'rm -f "$CD_SCRIPT_FILE"' EXIT
 
 CD_TIMEOUT_SEC="${HOSTINGER_CD_TIMEOUT_SEC:-90}"
 MIRROR_TIMEOUT_SEC="${HOSTINGER_MIRROR_TIMEOUT_SEC:-8m}"
@@ -62,6 +61,8 @@ write_lftp_cd_test_script() {
 }
 
 write_lftp_mirror_script() {
+  local phase="$1"
+  local script_file="$2"
   {
     printf '%s\n' 'set sftp:auto-confirm yes'
     printf '%s\n' 'set cmd:fail-exit yes'
@@ -70,23 +71,51 @@ write_lftp_mirror_script() {
     printf '%s\n' 'set net:reconnect-interval-base 5'
     printf '%s\n' '!echo "[deploy] step: open sftp"'
     printf 'open sftp://%s:65002\n' "$FTP_SERVER"
-    printf '%s\n' '!echo "[deploy] step: open done"'
-    printf '%s\n' '!echo "[deploy] step: user auth"'
     printf 'user %s %s\n' "$FTP_USER" "$FTP_PASSWORD"
-    printf '%s\n' '!echo "[deploy] step: user done"'
-    printf '%s\n' '!echo "[deploy] remote pwd before cd:"'
-    printf '%s\n' 'pwd'
-    printf '%s\n' "!echo \"[deploy] attempting cd to: ${REMOTE}\""
     printf 'cd "%s"\n' "$REMOTE"
-    printf '%s\n' '!echo "[deploy] remote pwd after cd:"'
-    printf '%s\n' 'pwd'
-    printf '%s\n' '!echo "[deploy] step: cd done"'
-    printf '%s\n' '!echo "[deploy] step: mirror start"'
-    printf 'mirror -R --delete --parallel=3 --verbose "%s/" .\n' "$LOCAL_DIR"
-    printf '%s\n' '!echo "[deploy] step: mirror done"'
+
+    case "$phase" in
+      assets-upload)
+        printf '%s\n' '!echo "[deploy] phase: upload assets (no delete)"'
+        printf 'mirror -R --parallel=4 --verbose "%s/assets/" ./assets/\n' "$LOCAL_DIR"
+        ;;
+      body-sync)
+        printf '%s\n' '!echo "[deploy] phase: sync body (exclude shell + assets)"'
+        printf 'mirror -R --delete --parallel=3 --verbose -X assets/ -X index.html -X sw.js "%s/" .\n' "$LOCAL_DIR"
+        ;;
+      shell-upload)
+        printf '%s\n' '!echo "[deploy] phase: upload index.html + sw.js last"'
+        printf 'put -O . "%s/index.html"\n' "$LOCAL_DIR"
+        printf 'put -O . "%s/sw.js"\n' "$LOCAL_DIR"
+        ;;
+      assets-prune)
+        printf '%s\n' '!echo "[deploy] phase: prune stale assets"'
+        printf 'mirror -R --delete --parallel=2 --verbose "%s/assets/" ./assets/\n' "$LOCAL_DIR"
+        ;;
+      *)
+        printf '%s\n' '!echo "[deploy] phase: full mirror (fallback)"'
+        printf 'mirror -R --delete --parallel=3 --verbose "%s/" .\n' "$LOCAL_DIR"
+        ;;
+    esac
+
     printf '%s\n' 'bye'
-  } >"$MIRROR_SCRIPT_FILE"
-  chmod 600 "$MIRROR_SCRIPT_FILE"
+  } >"$script_file"
+  chmod 600 "$script_file"
+}
+
+run_mirror_phase() {
+  local phase="$1"
+  local label="$2"
+  local script_file
+  script_file="$(mktemp)"
+  write_lftp_mirror_script "$phase" "$script_file"
+  echo "[deploy] ${label}"
+  set +e
+  timeout "$MIRROR_TIMEOUT_SEC" lftp -f "$script_file"
+  local exit_code=$?
+  set -e
+  rm -f "$script_file"
+  return "$exit_code"
 }
 
 report_cd_failure() {
@@ -114,24 +143,20 @@ if [[ "$cd_exit" -ne 0 ]]; then
   exit 1
 fi
 
-echo "[deploy] phase 2: mirror upload (${MIRROR_TIMEOUT_SEC} timeout)"
-write_lftp_mirror_script
+echo "[deploy] phase 2: atomic mirror upload (${MIRROR_TIMEOUT_SEC} timeout per step)"
+for step in \
+  "assets-upload:upload new hashed assets (keep old until shell updated)" \
+  "body-sync:sync static files (exclude assets shell)" \
+  "shell-upload:upload index.html + sw.js" \
+  "assets-prune:remove stale hashed assets"; do
+  phase="${step%%:*}"
+  label="${step#*:}"
+  if ! run_mirror_phase "$phase" "$label"; then
+    echo "::error title=Hostinger deploy failed::mirror phase '${phase}' failed for HOSTINGER_FTP_REMOTE_DIR='${REMOTE}'."
+    remote_path_hint
+    exit 1
+  fi
+done
 
-set +e
-timeout "$MIRROR_TIMEOUT_SEC" lftp -f "$MIRROR_SCRIPT_FILE"
-mirror_exit=$?
-set -e
-
-if [[ "$mirror_exit" -eq 0 ]]; then
-  echo "SFTP deploy OK: ${REMOTE}"
-  exit 0
-fi
-
-if [[ "$mirror_exit" -eq 124 ]]; then
-  echo "::error title=Hostinger deploy timed out::lftp mirror exceeded ${MIRROR_TIMEOUT_SEC} limit for HOSTINGER_FTP_REMOTE_DIR='${REMOTE}'."
-  exit 1
-fi
-
-echo "::error title=Hostinger deploy failed::SFTP mirror failed for HOSTINGER_FTP_REMOTE_DIR='${REMOTE}'."
-remote_path_hint
-exit 1
+echo "SFTP deploy OK: ${REMOTE}"
+exit 0

@@ -37,6 +37,7 @@ if (!entryMatch) {
   const entryFile = path.join(distDir, entryPath);
   try {
     const entryContent = await readFile(entryFile, 'utf8');
+    console.log(`OK: entry bundle -> ${entryMatch[1]}`);
     const chunkRefs = [...entryContent.matchAll(/assets\/[A-Za-z0-9_.-]+\.js/g)].map((m) => m[0]);
     const uniqueChunks = [...new Set(chunkRefs)];
     for (const chunk of uniqueChunks) {
@@ -58,7 +59,7 @@ if (!entryMatch) {
   }
 }
 
-for (const required of ['.htaccess', 'sw.js', 'index.html']) {
+for (const required of ['.htaccess', 'sw.js', 'index.html', 'assets/.htaccess']) {
   try {
     await readFile(path.join(distDir, required), 'utf8');
   } catch {
