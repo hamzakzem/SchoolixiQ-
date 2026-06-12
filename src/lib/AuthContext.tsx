@@ -79,25 +79,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (authUser) {
         lastUserIdRef.current = authUser.uid;
       } else {
-        if (profileSnapshotRef.current) {
+        const logoutSnapshot = profileSnapshotRef.current;
+        profileSnapshotRef.current = null;
+        loginLoggedRef.current = null;
+
+        if (logoutSnapshot) {
           import('./loginLog').then(({ writeLoginLog }) =>
             writeLoginLog({
-              userId: profileSnapshotRef.current!.uid,
-              role: profileSnapshotRef.current!.role,
-              schoolId: profileSnapshotRef.current!.schoolId,
+              userId: logoutSnapshot.uid,
+              role: logoutSnapshot.role,
+              schoolId: logoutSnapshot.schoolId,
               event: 'logout',
-              email: profileSnapshotRef.current!.email,
+              email: logoutSnapshot.email,
             }),
-          );
-          profileSnapshotRef.current = null;
+          ).catch(() => {});
         }
-        loginLoggedRef.current = null;
-        if (lastUserIdRef.current) {
+
+        const userIdForPush = lastUserIdRef.current;
+        lastUserIdRef.current = null;
+        if (userIdForPush) {
           try {
             const { unregisterPushToken } = await import('./pushService');
-            await unregisterPushToken(lastUserIdRef.current);
+            await unregisterPushToken(userIdForPush);
           } catch (e) {}
-          lastUserIdRef.current = null;
         }
       }
       
@@ -373,6 +377,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
       } else {
         setProfile(null);
+        setSchoolData(null);
         setLoading(false);
       }
     });
