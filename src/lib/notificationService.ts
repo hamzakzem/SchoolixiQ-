@@ -1,8 +1,8 @@
 import { db } from './firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, writeBatch, deleteDoc } from 'firebase/firestore';
-import { fetchStudentLinkFields } from './schoolSync';
+import { resolveStudentParentIds } from './schoolSync';
 
-export type NotificationType = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'homework' | 'report' | 'system';
+export type NotificationType = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'tuition' | 'homework' | 'report' | 'system';
 
 export interface NotificationPayload {
   userId: string;
@@ -91,20 +91,19 @@ export const notificationService = {
   },
 
   /**
-   * Send notification to all parents of a student
+   * Send notification to all parents of a student (same school only).
+   * Returns true when at least one parent was notified, false otherwise.
    */
   async notifyStudentParents(studentId: string, payload: Omit<NotificationPayload, 'userId'>) {
     try {
-      if (!studentId) return false;
-      const link = await fetchStudentLinkFields(studentId);
-      if (!link) return false;
-
-      if (link.parentIds.length === 0) {
+      if (!studentId || !payload.schoolId) return false;
+      const parentIds = await resolveStudentParentIds(studentId, payload.schoolId);
+      if (parentIds.length === 0) {
         console.log(`No parents linked to student ${studentId} for notification`);
-        return true;
+        return false;
       }
 
-      return await this.sendToMultiple(link.parentIds, payload);
+      return await this.sendToMultiple(parentIds, payload);
     } catch (error) {
       console.error('Error notifying student parents:', error);
       return false;

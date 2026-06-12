@@ -20,10 +20,12 @@ export async function fetchStudentLinkFields(
   const parentIds = [...((data.parentIds as string[]) || [])];
   const parentEmail = String(data.parentEmail || '').toLowerCase();
 
-  if (parentIds.length === 0 && parentEmail) {
+  if (parentIds.length === 0 && parentEmail && data.schoolId) {
     const pq = query(
       collection(db, 'users'),
       where('email', '==', parentEmail),
+      where('schoolId', '==', data.schoolId),
+      where('role', '==', 'parent'),
     );
     const psnap = await getDocs(pq);
     if (!psnap.empty) {
@@ -39,6 +41,32 @@ export async function fetchStudentLinkFields(
     className: String(data.class || data.className || ''),
     schoolId: String(data.schoolId || ''),
   };
+}
+
+/** Parent UIDs linked to a student, verified for the expected school only. */
+export async function resolveStudentParentIds(
+  studentId: string,
+  expectedSchoolId: string,
+): Promise<string[]> {
+  const link = await fetchStudentLinkFields(studentId);
+  if (!link || !expectedSchoolId || link.schoolId !== expectedSchoolId) {
+    return [];
+  }
+
+  const verified: string[] = [];
+  for (const parentId of link.parentIds) {
+    const userSnap = await getDoc(doc(db, 'users', parentId));
+    if (!userSnap.exists()) continue;
+    const userData = userSnap.data();
+    if (
+      userData.schoolId === expectedSchoolId &&
+      String(userData.role || '').toLowerCase() === 'parent'
+    ) {
+      verified.push(parentId);
+    }
+  }
+
+  return [...new Set(verified)];
 }
 
 export function homeworkMatchesStudent(

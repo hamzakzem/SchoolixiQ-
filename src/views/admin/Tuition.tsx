@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
+import { resolveStudentParentIds } from '../../lib/schoolSync';
 import TuitionSettingsModal from '../../components/admin/tuition/TuitionSettingsModal';
 
 export default function Tuition() {
@@ -366,17 +367,70 @@ export default function Tuition() {
 
 
 
+  const buildTuitionReminderPayload = (
+    student: { id: string; name?: string; schoolId?: string },
+    installment: { id?: string; amount?: number; dueDate?: string | Date },
+    adminUid: string,
+    schoolId: string,
+    message: string,
+  ) => ({
+    title: 'تنبيه قسط دراسي',
+    message,
+    type: 'tuition' as const,
+    schoolId,
+    senderId: adminUid,
+    metadata: {
+      source: 'tuition',
+      studentId: student.id,
+      installmentId: installment.id,
+      schoolId,
+      sourceId: installment.id || `${student.id}-tuition-reminder`,
+    },
+  });
+
+  const sendTuitionReminder = async (
+    student: { id: string; name?: string; schoolId?: string },
+    installment: { id?: string; amount?: number; dueDate?: string | Date },
+  ): Promise<'sent' | 'no_parent' | 'failed'> => {
+    if (!profile?.schoolId || !profile.uid) return 'failed';
+    if (student.schoolId && student.schoolId !== profile.schoolId) return 'failed';
+
+    const parentIds = await resolveStudentParentIds(student.id, profile.schoolId);
+    if (parentIds.length === 0) {
+      return 'no_parent';
+    }
+
+    const dueLabel = installment.dueDate
+      ? new Date(installment.dueDate).toLocaleDateString('ar-IQ')
+      : 'غير محدد';
+    const amountLabel = (installment.amount ?? 0).toLocaleString('ar-IQ');
+
+    const ok = await notificationService.notifyStudentParents(student.id, {
+      ...buildTuitionReminderPayload(
+        student,
+        installment,
+        profile.uid,
+        profile.schoolId,
+        `تذكير بقسط الطالب ${student.name || ''} بمبلغ ${amountLabel} د.ع مستحق بتاريخ ${dueLabel}.`,
+      ),
+    });
+
+    return ok ? 'sent' : 'failed';
+  };
+
   const sendReminder = async (student: any, installment: any) => {
     if (!profile?.schoolId) return;
     try {
-      await notificationService.notifyStudentParents(student.id, {
-        title: 'تنبيه: قسط مستحق',
-        message: `نود تذكيركم بموعد القسط الدراسي للطالب ${student.name} بمبلغ ${installment.amount?.toLocaleString()} د.ع المستحق بتاريخ ${new Date(installment.dueDate).toLocaleDateString()}. يرجى تسديد المبلغ لتجنب المتأخرات.`,
-        type: 'payment',
-        schoolId: profile.schoolId
-      });
-      toast.success('تم إرسال تذكير أوتوماتيكي لولي الأمر');
+      const result = await sendTuitionReminder(student, installment);
+      if (result === 'sent') {
+        toast.success('تم إرسال تذكير القسط لولي الأمر');
+      } else if (result === 'no_parent') {
+        toast.error('لا يوجد ولي أمر مرتبط بهذا الطالب');
+      } else {
+        toast.error('أخفق إرسال التذكير');
+      }
     } catch (err) {
+      console.error('Tuition reminder failed:', err);
       toast.error('أخفق إرسال التذكير');
     }
   };
@@ -412,21 +466,52 @@ export default function Tuition() {
   const sendAllReminders = async () => {
     if (lateInstallments.length === 0 || !profile?.schoolId) return;
     setLoading(true);
-    let count = 0;
+    let sentCount = 0;
+    let noParentCount = 0;
+    let failedCount = 0;
     try {
       for (const late of lateInstallments) {
-        if (late.student) {
-          await notificationService.notifyStudentParents(late.student.id, {
-            title: 'تنبيه: دفعة متأخرة',
-            message: `نود تذكيركم بتأخر سداد قسط الطالب ${late.student.name} بمبلغ ${late.amount?.toLocaleString()} د.ع وكان مستحقاً بتاريخ ${new Date(late.dueDate).toLocaleDateString()}.`,
-            type: 'payment',
-            schoolId: profile.schoolId
-          });
-          count++;
+        if (!late.student || late.student.schoolId !== profile.schoolId) continue;
+
+        const dueLabel = late.dueDate
+          ? new Date(late.dueDate).toLocaleDateString('ar-IQ')
+          : 'غير محدد';
+        const amountLabel = (late.amount ?? 0).toLocaleString('ar-IQ');
+
+        const parentIds = await resolveStudentParentIds(late.student.id, profile.schoolId);
+        if (parentIds.length === 0) {
+          noParentCount++;
+          continue;
         }
+
+        const ok = await notificationService.notifyStudentParents(late.student.id, {
+          ...buildTuitionReminderPayload(
+            late.student,
+            late,
+            profile.uid,
+            profile.schoolId,
+            `تذكير بتأخر سداد قسط الطالب ${late.student.name || ''} بمبلغ ${amountLabel} د.ع وكان مستحقاً بتاريخ ${dueLabel}.`,
+          ),
+        });
+
+        if (ok) sentCount++;
+        else failedCount++;
       }
-      toast.success(`تم إرسال ${count} إشعار تذكير للأولياء بنجاح`);
+
+      if (sentCount > 0) {
+        toast.success(`تم إرسال ${sentCount} إشعار تذكير للأولياء`);
+      }
+      if (noParentCount > 0) {
+        toast.error(`${noParentCount} طالب بدون ولي أمر مرتبط — لم يُرسل لهم تذكير`);
+      }
+      if (failedCount > 0) {
+        toast.error(`فشل إرسال ${failedCount} تذكير`);
+      }
+      if (sentCount === 0 && noParentCount === 0 && failedCount === 0) {
+        toast.error('لا توجد متأخرات صالحة للتذكير');
+      }
     } catch (err) {
+      console.error('Batch tuition reminders failed:', err);
       toast.error('حدث خطأ أثناء إرسال الإشعارات');
     } finally {
       setLoading(false);
