@@ -10,7 +10,7 @@
     "stage:apk": "node scripts/stage-apk.mjs",
     "stage:apk:require": "node scripts/stage-apk.mjs --require",
     "verify:web-build": "node scripts/verify-web-build.mjs",
-    "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.mjs",
+    "build:server": "npm run build --prefix backend && node -e \"const fs=require('fs'); fs.mkdirSync('dist',{recursive:true}); fs.copyFileSync('backend/server.mjs','dist/server.mjs')\"",
     "preview": "vite preview",
     "start": "node dist/server.mjs",
     "clean": "rm -rf dist",

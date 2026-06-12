@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build": "esbuild ../server.ts --bundle --platform=node --format=esm --packages=external --outfile=./server.mjs",
+    "build": "node -e \"require('fs').copyFileSync('../server.ts','server.ts')\" && esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=./server.mjs",
     "start": "node server.mjs",
     "verify": "node ../scripts/verify-backend-build.mjs"
   },
