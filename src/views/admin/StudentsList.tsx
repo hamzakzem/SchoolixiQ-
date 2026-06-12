@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, deleteDoc, setDoc, runTransaction, increment, arrayUnion, arrayRemove, getDoc, limit, startAfter, orderBy } from 'firebase/firestore';
@@ -148,17 +148,54 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     return draftId;
   };
 
+  type ParentLinkFields = {
+    parentEmail: string;
+    parentPassword: string;
+    parentPhone: string;
+  };
+
+  const parentAccountInFlightRef = useRef<Map<string, Promise<string | null>>>(new Map());
+
   const isValidParentEmailForCreate = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   type ParentAutoLinkResult = 'none' | 'skipped_incomplete' | 'linked' | 'failed';
 
+  const resolveOrCreateParentAccount = async (payload: {
+    email: string;
+    password: string;
+    displayName: string;
+    role: string;
+    schoolId: string;
+    additionalData: Record<string, unknown>;
+  }): Promise<string | null> => {
+    const key = `${payload.schoolId}:${payload.email}`;
+    const inFlight = parentAccountInFlightRef.current.get(key);
+    if (inFlight) return inFlight;
+
+    const task = (async () => {
+      try {
+        const result = await adminCreateUser(payload);
+        return result.uid || null;
+      } catch (autoErr) {
+        console.warn('Auto-parent creation failed:', autoErr);
+        return null;
+      } finally {
+        parentAccountInFlightRef.current.delete(key);
+      }
+    })();
+
+    parentAccountInFlightRef.current.set(key, task);
+    return task;
+  };
+
   const tryAutoLinkParentToStudent = async (
     studentDocId: string,
     schoolId: string,
+    parentFields: ParentLinkFields,
   ): Promise<ParentAutoLinkResult> => {
-    const emailRaw = (newStudent.parentEmail || '').trim();
-    const passwordRaw = (newStudent.parentPassword || '').trim();
+    const emailRaw = (parentFields.parentEmail || '').trim();
+    const passwordRaw = (parentFields.parentPassword || '').trim();
 
     if (!emailRaw && !passwordRaw) return 'none';
     if (!emailRaw || !passwordRaw) return 'skipped_incomplete';
@@ -173,7 +210,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       role: 'parent',
       schoolId,
       additionalData: {
-        phone: newStudent.parentPhone || '',
+        phone: parentFields.parentPhone || '',
         password: passwordRaw,
         updatedAt: new Date().toISOString(),
       },
@@ -183,19 +220,43 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       hasPassword: Boolean(payload.password),
       role: payload.role,
       schoolId: payload.schoolId,
+      studentDocId,
     });
 
-    try {
-      const result = await adminCreateUser(payload);
-      if (!result.uid) return 'failed';
-      await updateDoc(doc(db, 'students', studentDocId), {
-        parentIds: arrayUnion(result.uid),
-      });
-      return 'linked';
-    } catch (autoErr) {
-      console.warn('Auto-parent creation failed:', autoErr);
-      return 'failed';
-    }
+    const uid = await resolveOrCreateParentAccount(payload);
+    if (!uid) return 'failed';
+
+    await updateDoc(doc(db, 'students', studentDocId), {
+      parentIds: arrayUnion(uid),
+    });
+    return 'linked';
+  };
+
+  const scheduleBackgroundParentLink = (
+    studentDocId: string,
+    schoolId: string,
+    parentFields: ParentLinkFields,
+  ) => {
+    const emailRaw = (parentFields.parentEmail || '').trim();
+    const passwordRaw = (parentFields.parentPassword || '').trim();
+    if (!emailRaw && !passwordRaw) return;
+    if (!emailRaw || !passwordRaw) return;
+    if (!isValidParentEmailForCreate(emailRaw) || passwordRaw.length < 6) return;
+
+    console.info('ADD_STUDENT_PARENT_CREATE_SCHEDULED', {
+      studentDocId,
+      email: emailRaw.toLowerCase(),
+      schoolId,
+    });
+
+    void tryAutoLinkParentToStudent(studentDocId, schoolId, parentFields).then((result) => {
+      if (result === 'linked') {
+        toast.success('تم إنشاء حساب ولي الأمر');
+        void fetchStudents();
+      } else if (result === 'failed') {
+        toast.error('تمت إضافة الطالب، لكن تعذر إنشاء حساب ولي الأمر');
+      }
+    });
   };
 
 
@@ -488,6 +549,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     const isEditing = !!editingStudent;
 
     try {
+      const parentSnapshot: ParentLinkFields = {
+        parentEmail: newStudent.parentEmail || '',
+        parentPassword: newStudent.parentPassword || '',
+        parentPhone: newStudent.parentPhone || '',
+      };
+
       if (isEditing) {
         await updateDoc(doc(db, 'students', editingStudent.id), {
           name: newStudent.name,
@@ -501,11 +568,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           photoUrl: newStudent.photoUrl || '',
           updatedAt: serverTimestamp(),
         });
-        
-        const parentLinkResult = await tryAutoLinkParentToStudent(
-          editingStudent.id,
-          profile.schoolId,
-        );
         
         setStudents((prev) =>
           prev.map((s) =>
@@ -525,11 +587,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           ),
         );
         toast.success('تم تحديث بيانات الطالب بنجاح');
-        if (parentLinkResult === 'skipped_incomplete') {
-          toast('تم إضافة الطالب بدون إنشاء حساب ولي أمر', { icon: 'ℹ️' });
-        } else if (parentLinkResult === 'failed') {
-          toast.error('الطالب تمت إضافته، لكن تعذر إنشاء حساب ولي الأمر');
-        }
+        scheduleBackgroundParentLink(editingStudent.id, profile.schoolId, parentSnapshot);
       } else {
         const studentId = pendingStudentId || doc(collection(db, 'students')).id;
         
@@ -578,18 +636,9 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           });
         });
         
-        const parentLinkResult = await tryAutoLinkParentToStudent(
-          studentId,
-          profile.schoolId,
-        );
-        
-        await fetchStudents();
         toast.success('تمت إضافة الطالب بنجاح');
-        if (parentLinkResult === 'skipped_incomplete') {
-          toast('تم إضافة الطالب بدون إنشاء حساب ولي أمر', { icon: 'ℹ️' });
-        } else if (parentLinkResult === 'failed') {
-          toast.error('الطالب تمت إضافته، لكن تعذر إنشاء حساب ولي الأمر');
-        }
+        void fetchStudents();
+        scheduleBackgroundParentLink(studentId, profile.schoolId, parentSnapshot);
       }
       setNewStudent({ 
         name: '', 
