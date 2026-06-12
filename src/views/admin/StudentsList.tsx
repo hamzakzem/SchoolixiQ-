@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, deleteDoc, setDoc, runTransaction, increment, arrayUnion, arrayRemove, getDoc, limit, startAfter, orderBy } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
@@ -50,6 +50,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   const [targetClassId, setTargetClassId] = useState('');
   const [isMoving, setIsMoving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const addStudentFormRef = useRef<HTMLFormElement>(null);
   
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -1283,11 +1284,11 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                animate={{ scale: 1, opacity: 1, y: 0 }} 
                exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-               className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 overflow-y-auto max-h-[90vh] flex flex-col custom-scrollbar text-right"
+               className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 max-h-[90vh] flex flex-col overflow-hidden text-right"
              >
                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 dark:bg-slate-800/40 rounded-full -translate-y-32 translate-x-32 shadow-inner pointer-events-none"></div>
-               <div className="relative z-10 px-6 md:px-10">
-                 <div className="flex items-center justify-between mb-2">
+               <div className="relative z-10 flex flex-col flex-1 min-h-0 px-6 md:px-10 pt-6 md:pt-8">
+                 <div className="flex items-center justify-between mb-2 shrink-0">
                     <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display flex items-center gap-2">
                       <GraduationCap className="text-[#0B2345] dark:text-[#D4A64A]" size={28} />
                       <span>{editingStudent ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}</span>
@@ -1295,14 +1296,19 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                     <button 
                       type="button" 
                       onClick={closeAddModal}
-                      className="p-1 px-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
+                      className="p-1 px-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all touch-manipulation"
                     >
                       <X size={18} />
                     </button>
                   </div>
-                 <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm mb-6 leading-relaxed italic text-right">يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.</p>
+                 <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm mb-6 leading-relaxed italic text-right shrink-0">يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.</p>
                  
-                 <form onSubmit={handleAdd} className="space-y-6">
+                 <form
+                   ref={addStudentFormRef}
+                   onSubmit={handleAdd}
+                   className="flex flex-col flex-1 min-h-0"
+                 >
+                   <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pb-4 custom-scrollbar pointer-events-auto">
 
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60">
                      <div className="flex-1 space-y-2">
@@ -1469,17 +1475,20 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       </div>
                     </div>
 
-                    <div className="sticky bottom-0 bg-white dark:bg-slate-900 pt-4 pb-6 md:pb-8 border-t border-slate-100 dark:border-slate-800 z-20 flex gap-4 mt-6 -mx-6 md:-mx-10 px-6 md:px-10">
+                   </div>
+
+                    <div className="relative z-30 shrink-0 pointer-events-auto bg-white dark:bg-slate-900 pt-4 pb-6 md:pb-8 border-t border-slate-100 dark:border-slate-800 flex gap-4 mt-2">
                       <button
-                        type="submit"
-                        className="flex-1 px-8 py-3.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-[#071830] transition-all shadow-xl active:scale-95 text-sm md:text-base border border-transparent"
+                        type="button"
+                        onClick={() => addStudentFormRef.current?.requestSubmit()}
+                        className="flex-1 px-8 py-3.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-[#071830] transition-all shadow-xl active:scale-95 text-sm md:text-base border border-transparent touch-manipulation"
                       >
                         {editingStudent ? 'حفظ التغييرات' : 'تأكيد وإضافة السجل'}
                       </button>
                       <button
                         type="button"
                         onClick={closeAddModal}
-                        className="px-6 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 text-sm md:text-base"
+                        className="px-6 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 text-sm md:text-base touch-manipulation"
                       >
                         إلغاء الأمر
                       </button>
