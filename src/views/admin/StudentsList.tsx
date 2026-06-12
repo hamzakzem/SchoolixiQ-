@@ -148,6 +148,56 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     return draftId;
   };
 
+  const isValidParentEmailForCreate = (email: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  type ParentAutoLinkResult = 'none' | 'skipped_incomplete' | 'linked' | 'failed';
+
+  const tryAutoLinkParentToStudent = async (
+    studentDocId: string,
+    schoolId: string,
+  ): Promise<ParentAutoLinkResult> => {
+    const emailRaw = (newStudent.parentEmail || '').trim();
+    const passwordRaw = (newStudent.parentPassword || '').trim();
+
+    if (!emailRaw && !passwordRaw) return 'none';
+    if (!emailRaw || !passwordRaw) return 'skipped_incomplete';
+    if (!isValidParentEmailForCreate(emailRaw) || passwordRaw.length < 6) {
+      return 'skipped_incomplete';
+    }
+
+    const payload = {
+      email: emailRaw.toLowerCase(),
+      password: passwordRaw,
+      displayName: '??? ?????',
+      role: 'parent',
+      schoolId,
+      additionalData: {
+        phone: newStudent.parentPhone || '',
+        password: passwordRaw,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    console.info('ADD_STUDENT_PARENT_CREATE', {
+      email: payload.email,
+      hasPassword: Boolean(payload.password),
+      role: payload.role,
+      schoolId: payload.schoolId,
+    });
+
+    try {
+      const result = await adminCreateUser(payload);
+      if (!result.uid) return 'failed';
+      await updateDoc(doc(db, 'students', studentDocId), {
+        parentIds: arrayUnion(result.uid),
+      });
+      return 'linked';
+    } catch (autoErr) {
+      console.warn('Auto-parent creation failed:', autoErr);
+      return 'failed';
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -451,34 +501,10 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           updatedAt: serverTimestamp(),
         });
         
-        // Auto-create/link parent if email is provided and student is edited
-        if (newStudent.parentEmail) {
-          try {
-            const emailLower = newStudent.parentEmail.toLowerCase().trim();
-            const result = await adminCreateUser({
-              email: emailLower,
-              password: newStudent.parentPassword || undefined,
-              displayName: '??? ??? ????',
-              role: 'parent',
-              schoolId: profile.schoolId,
-              additionalData: {
-                phone: newStudent.parentPhone || '',
-                password: newStudent.parentPassword || '',
-                updatedAt: new Date().toISOString()
-              }
-            });
-            
-            // Link parent if not already linked
-            const currentParentIds = editingStudent.parentIds || [];
-            if (!currentParentIds.includes(result.uid)) {
-              await updateDoc(doc(db, 'students', editingStudent.id), {
-                parentIds: arrayUnion(result.uid)
-              });
-            }
-          } catch (autoErr) {
-            console.warn('Auto-parent creation (edit) failed:', autoErr);
-          }
-        }
+        const parentLinkResult = await tryAutoLinkParentToStudent(
+          editingStudent.id,
+          profile.schoolId,
+        );
         
         setStudents((prev) =>
           prev.map((s) =>
@@ -498,6 +524,11 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           ),
         );
         toast.success('?? ????? ?????? ?????? ?????');
+        if (parentLinkResult === 'skipped_incomplete') {
+          toast('?? ????? ?????? ???? ????? ???? ??? ???', { icon: '??' });
+        } else if (parentLinkResult === 'failed') {
+          toast.error('?????? ??? ??????? ??? ???? ????? ???? ??? ?????');
+        }
       } else {
         const studentId = pendingStudentId || doc(collection(db, 'students')).id;
         
@@ -546,35 +577,18 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           });
         });
         
-        // Auto-create/link parent if email is provided
-        if (newStudent.parentEmail) {
-          try {
-            const emailLower = newStudent.parentEmail.toLowerCase().trim();
-            const result = await adminCreateUser({
-              email: emailLower,
-              password: newStudent.parentPassword || undefined,
-              displayName: '??? ??? ????',
-              role: 'parent',
-              schoolId: profile.schoolId,
-              additionalData: {
-                phone: newStudent.parentPhone || '',
-                password: newStudent.parentPassword || '',
-                updatedAt: new Date().toISOString()
-              }
-            });
-            
-            // Link the newly created/found parent to the student
-            await updateDoc(doc(db, 'students', studentId), {
-              parentIds: arrayUnion(result.uid)
-            });
-          } catch (autoErr) {
-            console.warn('Auto-parent creation failed:', autoErr);
-            toast.error('?? ????? ?????? ???? ??? ????? ???? ??? ????? ????????. ???? ?????? ??????.');
-          }
-        }
+        const parentLinkResult = await tryAutoLinkParentToStudent(
+          studentId,
+          profile.schoolId,
+        );
         
         await fetchStudents();
         toast.success('??? ????? ?????? ?????');
+        if (parentLinkResult === 'skipped_incomplete') {
+          toast('?? ????? ?????? ???? ????? ???? ??? ???', { icon: '??' });
+        } else if (parentLinkResult === 'failed') {
+          toast.error('?????? ??? ??????? ??? ???? ????? ???? ??? ?????');
+        }
       }
       setNewStudent({ 
         name: '', 
