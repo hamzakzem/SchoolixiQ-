@@ -364,27 +364,65 @@ async function startServer() {
     }
   };
 
-  const STUDENT_PHOTO_STAFF_ROLES = [
+  const SCHOOL_IMAGE_UPLOAD_ROLES = [
     'superadmin',
     'super_admin',
     'admin',
     'school_admin',
     'assistant',
     'staff',
-    'teacher',
+  ];
+
+  const STUDENT_PHOTO_UPLOAD_ROLES = [
+    'superadmin',
+    'super_admin',
+    'admin',
+    'school_admin',
+    'assistant',
+    'staff',
   ];
 
   const isSuperAdminRole = (role: string) => role === 'superadmin' || role === 'super_admin';
+
+  function assertSafeStoragePath(storagePath: string): void {
+    if (
+      !storagePath ||
+      typeof storagePath !== 'string' ||
+      storagePath.includes('..') ||
+      storagePath.startsWith('/') ||
+      storagePath.includes('\\')
+    ) {
+      throw Object.assign(new Error('INVALID_UPLOAD_PATH'), { status: 400 });
+    }
+  }
+
+  function assertSchoolScope(
+    role: string,
+    userSchoolId: string,
+    pathSchoolId: string,
+  ): void {
+    if (!isSuperAdminRole(role) && userSchoolId !== pathSchoolId) {
+      throw Object.assign(new Error('FORBIDDEN_SCHOOL'), { status: 403 });
+    }
+  }
+
+  function assertImageExtension(fileName: string): void {
+    if (!/\.(jpe?g|png|webp|gif)$/i.test(fileName)) {
+      throw Object.assign(new Error('INVALID_FILE_TYPE'), { status: 400 });
+    }
+  }
 
   async function assertUploadPathAllowed(
     uid: string,
     storagePath: string,
     tokenUser?: { role?: string; schoolId?: string },
-  ): Promise<{ role: string; schoolId: string } | null> {
+  ): Promise<{ role: string; schoolId: string }> {
+    assertSafeStoragePath(storagePath);
+
     const db = getDb();
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists) {
-      return null;
+      throw Object.assign(new Error('FORBIDDEN'), { status: 403 });
     }
     const userData = userDoc.data() || {};
     const tokenRole = String(tokenUser?.role || '');
@@ -392,23 +430,52 @@ async function startServer() {
     const role = String(userData.role || tokenRole || '');
     const schoolId = String(userData.schoolId || tokenSchoolId || '');
 
+    const logoMatch = storagePath.match(/^schools\/([^/]+)\/logo\/([^/]+)$/);
+    if (logoMatch) {
+      const pathSchoolId = logoMatch[1];
+      const fileName = logoMatch[2];
+      if (!SCHOOL_IMAGE_UPLOAD_ROLES.includes(role)) {
+        throw Object.assign(new Error('FORBIDDEN_ROLE'), { status: 403 });
+      }
+      assertSchoolScope(role, schoolId, pathSchoolId);
+      if (!/^logo_\d+\.(jpg|jpeg|png|webp)$/i.test(fileName)) {
+        throw Object.assign(new Error('INVALID_LOGO_PATH'), { status: 400 });
+      }
+      assertImageExtension(fileName);
+      return { role, schoolId };
+    }
+
+    const storeMatch = storagePath.match(/^schools\/([^/]+)\/store\/products\/([^/]+)$/);
+    if (storeMatch) {
+      const pathSchoolId = storeMatch[1];
+      const fileName = storeMatch[2];
+      if (!SCHOOL_IMAGE_UPLOAD_ROLES.includes(role)) {
+        throw Object.assign(new Error('FORBIDDEN_ROLE'), { status: 403 });
+      }
+      assertSchoolScope(role, schoolId, pathSchoolId);
+      if (!/^\d+-[^/]+\.(jpg|jpeg|png|webp|gif)$/i.test(fileName)) {
+        throw Object.assign(new Error('INVALID_STORE_IMAGE_PATH'), { status: 400 });
+      }
+      assertImageExtension(fileName);
+      return { role, schoolId };
+    }
+
     const studentMatch = storagePath.match(/^students\/([^/]+)\/([^/]+)\/([^/]+)$/);
     if (studentMatch) {
       const pathSchoolId = studentMatch[1];
       const fileName = studentMatch[3];
-      if (!STUDENT_PHOTO_STAFF_ROLES.includes(role)) {
+      if (!STUDENT_PHOTO_UPLOAD_ROLES.includes(role)) {
         throw Object.assign(new Error('FORBIDDEN_ROLE'), { status: 403 });
       }
-      if (!isSuperAdminRole(role) && schoolId !== pathSchoolId) {
-        throw Object.assign(new Error('FORBIDDEN_SCHOOL'), { status: 403 });
-      }
+      assertSchoolScope(role, schoolId, pathSchoolId);
       if (!/^photo_\d+\.(jpg|jpeg|png|webp)$/i.test(fileName)) {
         throw Object.assign(new Error('INVALID_STUDENT_PHOTO_PATH'), { status: 400 });
       }
+      assertImageExtension(fileName);
       return { role, schoolId };
     }
 
-    return { role, schoolId };
+    throw Object.assign(new Error('INVALID_UPLOAD_PATH'), { status: 400 });
   }
 
   // Upload API using Firebase Admin Storage (Securely Authenticated)
@@ -418,13 +485,7 @@ async function startServer() {
       if (!storagePath || !base64) return res.status(400).json({ error: 'Missing path or base64' });
 
       try {
-        const allowed = await assertUploadPathAllowed(req.user.uid, storagePath, req.user);
-        if (!allowed) {
-          return res.status(403).json({
-            error: 'FORBIDDEN',
-            message: 'ملف المستخدم غير موجود أو غير مصرح له برفع الصور',
-          });
-        }
+        await assertUploadPathAllowed(req.user.uid, storagePath, req.user);
       } catch (authzError: any) {
         const status = authzError.status || 403;
         const code = authzError.message || 'FORBIDDEN';
@@ -432,8 +493,12 @@ async function startServer() {
           code === 'FORBIDDEN_SCHOOL'
             ? 'غير مسموح برفع صور لمدرسة أخرى'
             : code === 'FORBIDDEN_ROLE'
-              ? 'غير مصرح لك برفع صور الطلاب'
-              : 'مسار رفع الصورة غير صالح';
+              ? 'غير مصرح لك برفع هذه الصورة'
+              : code === 'INVALID_UPLOAD_PATH' || code === 'INVALID_STORE_IMAGE_PATH' || code === 'INVALID_LOGO_PATH'
+                ? 'مسار رفع الصورة غير صالح'
+                : code === 'INVALID_FILE_TYPE'
+                  ? 'نوع الملف غير مدعوم'
+                  : 'غير مصرح برفع الصورة';
         return res.status(status).json({ error: code, message });
       }
 
@@ -449,13 +514,13 @@ async function startServer() {
         });
       }
 
-      // 2. MIME Type / File Extension Validation
-      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.mp3', '.m4a', '.wav', '.json', '.mobileconfig'];
+      // 2. MIME Type / File Extension Validation (image uploads only)
+      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
       const ext = path.extname(storagePath).toLowerCase();
       if (!allowedExtensions.includes(ext)) {
         return res.status(400).json({
           error: 'INVALID_FILE_TYPE',
-          message: 'نوع الملف غير مدعوم على هذه المنصة لأسباب أمنية.'
+          message: 'نوع الملف غير مدعوم. يُسمح برفع صور فقط.',
         });
       }
 

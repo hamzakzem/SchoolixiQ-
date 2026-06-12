@@ -1,4 +1,4 @@
-import { db, storage } from './firebase';
+import { db } from './firebase';
 import {
   collection,
   query,
@@ -8,8 +8,7 @@ import {
   serverTimestamp,
   type Timestamp,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { uploadImageToServer } from './imageUtils';
+import { uploadImageViaStorageOrServer } from './imageUtils';
 
 /** Canonical school store collection (admin writes here). */
 export const STORE_COLLECTION = 'market' as const;
@@ -210,14 +209,7 @@ export async function uploadStoreProductImage(
   }
 
   const path = buildStoreImageStoragePath(schoolId, file.name || 'product.jpg');
-  try {
-    const storageRef = ref(storage, path);
-    const snapshot = await uploadBytes(storageRef, file);
-    return getDownloadURL(snapshot.ref);
-  } catch (clientError) {
-    console.warn('Client storage upload failed, trying server upload:', clientError);
-    return uploadImageToServer(file, path, 800, 800);
-  }
+  return uploadImageViaStorageOrServer(file, path, 800, 800);
 }
 
 export function buildStoreProductCreatePayload(

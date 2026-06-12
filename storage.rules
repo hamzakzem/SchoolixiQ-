@@ -18,12 +18,11 @@ service firebase.storage {
 
     function userData() {
       return userDocExists()
-        ? firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data
+        ? firestore.get(/databases/$(database)/documents/users/$(request.auth.uid)).data
         : {};
     }
 
     // Prefer non-empty JWT custom claims (synced by server), then Firestore users/{uid}.
-    // Empty-string claim schoolId is common after admin signup before activation — must not block Firestore fallback.
     function claimRole() {
       return isSignedIn()
         && request.auth.token.keys().hasAll(['role'])
@@ -64,42 +63,41 @@ service firebase.storage {
       return userRole() in ['superadmin', 'super_admin'];
     }
 
-    // App roles (types.ts): superadmin, admin, assistant, teacher, parent, staff
-    // Legacy aliases: school_admin, super_admin
-    function isSchoolStaffRole() {
-      return userRole() in [
-        'admin',
-        'school_admin',
-        'assistant',
-        'staff',
-        'teacher'
-      ];
-    }
-
     function sameSchool(schoolId) {
       return userSchoolId() is string
         && userSchoolId().size() > 0
         && userSchoolId() == schoolId;
     }
 
-    function canManageSchoolStudentPhotos(schoolId) {
+    function canManageSchoolAssets(schoolId) {
       return isSuperAdmin()
-        || (isSchoolStaffRole() && sameSchool(schoolId));
+        || (
+          userRole() in ['admin', 'school_admin', 'assistant', 'staff']
+          && sameSchool(schoolId)
+        );
     }
 
     function isStudentPhotoFileName(fileName) {
       return fileName.matches('photo_[0-9]+\\.(jpg|jpeg|png|webp)');
     }
 
-    function isAllowedStudentImageUpload(fileName) {
+    function isSchoolLogoFileName(fileName) {
+      return fileName.matches('logo_[0-9]+\\.(jpg|jpeg|png|webp)');
+    }
+
+    function isStoreProductFileName(fileName) {
+      return fileName.matches('[0-9]+-[^/]+\\.(jpg|jpeg|png|webp|gif)');
+    }
+
+    function isAllowedImageUpload(fileName, maxBytes) {
       return request.resource != null
         && request.resource.size > 0
-        && request.resource.size < 5 * 1024 * 1024
-        && isStudentPhotoFileName(fileName)
+        && request.resource.size < maxBytes
+        && fileName.matches('.*\\.(jpg|jpeg|png|webp|gif)')
         && (
           request.resource.contentType == null
           || request.resource.contentType == 'application/octet-stream'
-          || request.resource.contentType.matches('image/(jpeg|jpg|png|webp)')
+          || request.resource.contentType.matches('image/.*')
         );
     }
 
@@ -109,29 +107,34 @@ service firebase.storage {
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // 3. School store product images (admin/assistant of same school)
+    // 3. School store product images (school admin/staff of same school)
     match /schools/{schoolId}/store/products/{fileName} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (
-        isSuperAdmin()
-        || (
-          sameSchool(schoolId)
-          && userRole() in ['admin', 'school_admin', 'assistant']
-        )
-      );
+      allow write: if canManageSchoolAssets(schoolId)
+        && isAllowedImageUpload(fileName, 5 * 1024 * 1024)
+        && isStoreProductFileName(fileName);
     }
 
-    // 4. Schools: school-related images (logos, etc.) — staff of same school
+    // 4. School logo
+    match /schools/{schoolId}/logo/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if canManageSchoolAssets(schoolId)
+        && isAllowedImageUpload(fileName, 2 * 1024 * 1024)
+        && isSchoolLogoFileName(fileName);
+    }
+
+    // 5. Other school assets — read only; writes use explicit logo / store paths above
     match /schools/{schoolId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if canManageSchoolStudentPhotos(schoolId);
+      allow write: if false;
     }
 
-    // 5. Student photos — school-scoped, staff only, images only
+    // 6. Student photos — school-scoped, management staff only, images only
     match /students/{schoolId}/{studentId}/{fileName} {
       allow read: if isSignedIn();
-      allow write: if canManageSchoolStudentPhotos(schoolId)
-        && isAllowedStudentImageUpload(fileName);
+      allow write: if canManageSchoolAssets(schoolId)
+        && isStudentPhotoFileName(fileName)
+        && isAllowedImageUpload(fileName, 5 * 1024 * 1024);
     }
 
     // Legacy generic path (superadmin only)
@@ -150,7 +153,7 @@ service firebase.storage {
       allow read: if isSignedIn();
       allow write: if isSignedIn()
         && userDocExists()
-        && userRole() in ['admin', 'school_admin', 'assistant', 'superadmin', 'super_admin'];
+        && userRole() in ['admin', 'school_admin', 'assistant', 'staff', 'superadmin', 'super_admin'];
     }
 
     match /system/{allPaths=**} {

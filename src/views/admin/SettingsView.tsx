@@ -9,6 +9,7 @@ import { School } from '../../types';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import SchoolSubjectsManagement from './SchoolSubjectsManagement';
 import { isSchoolSubjectsEnabled } from '../../lib/featureRegistry';
+import { uploadSchoolLogo } from '../../lib/imageUtils';
 
 const defaultGovernorates = ["بغداد", "البصرة", "نينوى", "أربيل", "النجف", "ذي قار", "كركوك", "الأنبار", "ديالى", "المثنى", "القادسية (الديوانية)", "القادسية", "ميسان", "واسط", "صلاح الدين", "دهوك", "السليمانية", "بابل", "كربلاء", "حلبجة"];
 const defaultDirectorates = [
@@ -119,6 +120,10 @@ export default function SettingsView() {
   const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!profile?.schoolId) {
+      toast.error('لم يتم تحديد المدرسة');
+      return;
+    }
 
     if (file.size > 2 * 1024 * 1024) {
       toast.error('حجم الصورة يجب أن لا يتجاوز 2 ميغابايت');
@@ -127,14 +132,12 @@ export default function SettingsView() {
 
     const toastId = toast.loading('جاري رفع الشعار...');
     try {
-      const { compressImageToBase64 } = await import('../../lib/image-utils');
-      const base64Url = await compressImageToBase64(file, 200, 200, 0.8);
-      
-      setFormData({ ...formData, logoUrl: base64Url });
+      const url = await uploadSchoolLogo(file, profile.schoolId);
+      setFormData({ ...formData, logoUrl: url });
       toast.success('تم رفع الشعار بنجاح', { id: toastId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error processing school logo:', error);
-      toast.error('فشل معالجة الصورة.', { id: toastId });
+      toast.error('فشل رفع الشعار.', { id: toastId });
     } finally {
       e.target.value = '';
     }

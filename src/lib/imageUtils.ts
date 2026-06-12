@@ -1,4 +1,4 @@
-import { getApiUrl, isProductionWebBrowser } from './apiUtils';
+import { getApiUrl } from './apiUtils';
 import { auth, storage } from './firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -52,6 +52,49 @@ function resolveImageExtension(filename: string, mimeType?: string): string {
   return '.jpg';
 }
 
+/** Shared client Storage upload with server fallback (Cloud Run on production web). */
+export async function uploadImageViaStorageOrServer(
+  file: File,
+  storagePath: string,
+  maxWidth = 400,
+  maxHeight = 400,
+): Promise<string> {
+  try {
+    const storageRef = ref(storage, storagePath);
+    const snapshot = await uploadBytes(storageRef, file, {
+      contentType: file.type || 'image/jpeg',
+    });
+    return getDownloadURL(snapshot.ref);
+  } catch (clientError) {
+    console.warn('Client storage upload failed, trying server upload:', clientError);
+    return uploadImageToServer(file, storagePath, maxWidth, maxHeight);
+  }
+}
+
+export function buildSchoolLogoPath(
+  schoolId: string,
+  filename: string,
+  mimeType?: string,
+): string {
+  if (!schoolId?.trim()) {
+    throw new Error('INVALID_SCHOOL_ID');
+  }
+  const ext = resolveImageExtension(filename, mimeType);
+  return `schools/${schoolId.trim()}/logo/logo_${Date.now()}${ext}`;
+}
+
+/** Upload school logo to Storage (school-scoped path). */
+export async function uploadSchoolLogo(file: File, schoolId: string): Promise<string> {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('INVALID_IMAGE_TYPE');
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    throw new Error('FILE_TOO_LARGE');
+  }
+  const path = buildSchoolLogoPath(schoolId, file.name, file.type);
+  return uploadImageViaStorageOrServer(file, path, 400, 400);
+}
+
 /** School-scoped student photo path matching storage.rules */
 export function buildStudentPhotoPath(
   schoolId: string,
@@ -81,62 +124,37 @@ export async function uploadStudentPhoto(
   }
 
   const path = buildStudentPhotoPath(schoolId, studentId, file.name, file.type);
-
-  let clientError: unknown;
-  try {
-    const storageRef = ref(storage, path);
-    const snapshot = await uploadBytes(storageRef, file, {
-      contentType: file.type || 'image/jpeg',
-    });
-    return getDownloadURL(snapshot.ref);
-  } catch (error) {
-    clientError = error;
-    const code = (error as { code?: string })?.code || '';
-    if (code === 'storage/unauthorized') {
-      console.warn(
-        'Client student photo upload denied by Storage rules — deploy storage.rules to Firebase:',
-        error,
-      );
-    } else {
-      console.warn('Client student photo upload failed:', error);
-    }
-
-    if (isProductionWebBrowser()) {
-      if (code === 'storage/unauthorized') {
-        throw new Error('STORAGE_UNAUTHORIZED');
-      }
-      throw error instanceof Error ? error : new Error('STORAGE_UPLOAD_FAILED');
-    }
-  }
-
-  try {
-    return await uploadImageToServer(file, path, 400, 400);
-  } catch (serverError) {
-    console.error('Server student photo upload failed:', serverError, clientError);
-    const clientCode = (clientError as { code?: string })?.code || '';
-    if (clientCode === 'storage/unauthorized') {
-      throw new Error('STORAGE_UNAUTHORIZED');
-    }
-    throw serverError;
-  }
+  return uploadImageViaStorageOrServer(file, path, 400, 400);
 }
 
 export const uploadImageToServer = async (file: File, storagePath: string, maxWidth = 400, maxHeight = 400): Promise<string> => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('AUTH_REQUIRED');
+  }
   const base64 = await compressImageToBase64(file, maxWidth, maxHeight);
-  const token = await auth.currentUser?.getIdToken();
+  const token = await user.getIdToken();
   const response = await fetch(getApiUrl('/api/upload'), {
     method: 'POST',
-    headers: { 
+    headers: {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + token
+      Authorization: `Bearer ${token}`,
+      'X-Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify({ path: storagePath, base64 })
+    body: JSON.stringify({ path: storagePath, base64 }),
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || 'Failed to upload image to server');
+    const message =
+      errorData.message ||
+      errorData.error ||
+      `Failed to upload image (${response.status})`;
+    throw new Error(message);
   }
   const data = await response.json();
+  if (!data?.url) {
+    throw new Error('UPLOAD_NO_URL');
+  }
   return data.url;
 };
 
