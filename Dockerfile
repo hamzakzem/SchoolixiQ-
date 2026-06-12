@@ -4,6 +4,7 @@ FROM node:22-slim AS build
 WORKDIR /src
 COPY server.ts firebase-applet-config.json ./
 COPY backend/package.json backend/package-lock.json ./backend/
+COPY backend/schoolPermanentDelete.mjs backend/roleHierarchy.ts ./backend/
 
 WORKDIR /src/backend
 RUN npm ci
