@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "npm run build:web && npm run build:server",
+    "build": "npm run build:web",
+    "build:full": "npm run build:web && npm run build:server",
     "build:web": "vite build && npm run stage:apk",
     "stage:apk": "node scripts/stage-apk.mjs",
     "stage:apk:require": "node scripts/stage-apk.mjs --require",
