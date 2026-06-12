@@ -419,6 +419,10 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile?.schoolId) return;
+    if (!newStudent.classId) {
+      toast.error('يرجى اختيار الصف');
+      return;
+    }
     const isEditing = !!editingStudent;
 
     try {
@@ -1282,7 +1286,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 overflow-y-auto max-h-[90vh] flex flex-col custom-scrollbar text-right"
              >
                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 dark:bg-slate-800/40 rounded-full -translate-y-32 translate-x-32 shadow-inner pointer-events-none"></div>
-               <div className="relative z-10">
+               <div className="relative z-10 px-6 md:px-10">
                  <div className="flex items-center justify-between mb-2">
                     <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display flex items-center gap-2">
                       <GraduationCap className="text-[#0B2345] dark:text-[#D4A64A]" size={28} />
@@ -1332,7 +1336,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                      <div className="flex-1 space-y-2">
                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">أو رابط الصورة</label>
                        <input
-                         type="url"
+                         type="text"
                          dir="ltr"
                          value={newStudent.photoUrl}
                          onChange={e => setNewStudent({...newStudent, photoUrl: e.target.value})}
