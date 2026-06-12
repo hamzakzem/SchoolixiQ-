@@ -161,7 +161,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    toast.success('تم نسخ الرقم');
+    toast.success('?? ??? ?????');
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -169,12 +169,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     const isSuperAdmin = profile?.role === 'superadmin';
     if (!profile || (!profile.schoolId && !isSuperAdmin)) return;
     if (profile.role !== 'admin' && !isSuperAdmin) {
-      toast.error('غير مصرح لك بحذف الطلاب');
+      toast.error('??? ???? ?? ???? ??????');
       return;
     }
 
     setIsDeleting(id);
-    const loadingToast = toast.loading('جاري حذف سجل الطالب...');
+    const loadingToast = toast.loading('???? ??? ??? ??????...');
     try {
       const studentRef = doc(db, 'students', id);
 
@@ -186,22 +186,22 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         const userSnap = await transaction.get(userRef);
 
         if (!studentSnap.exists()) {
-          throw new Error('سجل الطالب غير موجود');
+          throw new Error('??? ?????? ??? ?????');
         }
 
         const studentData = studentSnap.data() || {};
         const studentSchoolId = String(studentData.schoolId || '');
         if (!isSuperAdmin && studentSchoolId !== profile.schoolId) {
-          throw new Error('غير مسموح بحذف طالب من مدرسة أخرى');
+          throw new Error('??? ????? ???? ???? ?? ????? ????');
         }
         if (!studentSchoolId) {
-          throw new Error('سجل الطالب لا يحتوي على معرف المدرسة');
+          throw new Error('??? ?????? ?? ????? ??? ???? ???????');
         }
 
         const schoolRef = doc(db, 'schools', studentSchoolId);
         const schoolSnap = await transaction.get(schoolRef);
         if (!schoolSnap.exists()) {
-          throw new Error('سجل المدرسة غير موجود');
+          throw new Error('??? ??????? ??? ?????');
         }
 
         const shouldDeleteLinkedUser =
@@ -221,12 +221,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       setStudents((prev) => prev.filter((s) => s.id !== id));
       setConfirmDeleteId(null);
       toast.dismiss(loadingToast);
-      toast.success('تم حذف الطالب نهائياً من النظام');
+      toast.success('?? ??? ?????? ??????? ?? ??????');
     } catch (error: unknown) {
       toast.dismiss(loadingToast);
       console.error('Delete student error:', error);
       handleFirestoreError(error, OperationType.DELETE, `students/${id}`);
-      const message = error instanceof Error ? error.message : 'فشل في حذف الطالب';
+      const message = error instanceof Error ? error.message : '??? ?? ??? ??????';
       toast.error(message);
     } finally {
       setIsDeleting(null);
@@ -262,7 +262,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         setLinkedParents(parentsData);
       } catch (error) {
         console.error('Error fetching linked parents:', error);
-        toast.error('فشل في تحميل بيانات أولياء الأمور');
+        toast.error('??? ?? ????? ?????? ?????? ??????');
       } finally {
         setIsLoadingParents(false);
       }
@@ -287,11 +287,11 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       setLinkedParents(prev => prev.filter(p => p.id !== parentToUnlink.parentId));
       setShowLinkedParentsModal((prev: any) => ({ ...prev, parentIds: updatedParentIds }));
       
-      toast.success('تم إلغاء الربط بنجاح');
+      toast.success('?? ????? ????? ?????');
       setParentToUnlink(null);
     } catch (error) {
       console.error('Error unlinking parent:', error);
-      toast.error('فشل في إلغاء الربط');
+      toast.error('??? ?? ????? ?????');
     } finally {
       setIsLoadingParents(false);
     }
@@ -301,7 +301,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     e.preventDefault();
     if (!profile?.schoolId || !showLinkParentModal) return;
     if (parentPassword && parentPassword.length < 6) {
-      toast.error('كلمة السر يجب أن تكون 6 أحرف على الأقل');
+      toast.error('???? ???? ??? ?? ???? 6 ???? ??? ?????');
       return;
     }
 
@@ -313,7 +313,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       const result = await adminCreateUser({
         email: emailLower,
         password: parentPassword || undefined, 
-        displayName: parentName || 'ولي أمر طالب',
+        displayName: parentName || '??? ??? ????',
         role: 'parent',
         schoolId: profile.schoolId,
         additionalData: {
@@ -336,7 +336,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         });
       }
 
-      toast.success('تم ربط ولي الأمر وتحديث البيانات بنجاح');
+      toast.success('?? ??? ??? ????? ?????? ???????? ?????');
       setShowLinkParentModal(null);
       setParentEmail('');
       setParentName('');
@@ -344,7 +344,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       setParentPassword('');
     } catch (error: any) {
       console.error('Link parent error:', error);
-      toast.error(error.message || 'فشل ربط ولي الأمر');
+      toast.error(error.message || '??? ??? ??? ?????');
     } finally {
       setIsLinking(false);
     }
@@ -353,7 +353,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   const handleDeleteParentAccount = async () => {
     if (!parentToDelete || !profile?.schoolId) return;
     setIsLoadingParents(true);
-    const loadingToast = toast.loading('جاري حذف حساب ولي الأمر نهائياً...');
+    const loadingToast = toast.loading('???? ??? ???? ??? ????? ???????...');
     
     try {
       // 1. Find all students linked to this parent in this school
@@ -384,7 +384,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       await deleteDoc(doc(db, 'users', parentToDelete.id));
       
       toast.dismiss(loadingToast);
-      toast.success('تم حذف حساب ولي الأمر نهائياً من النظام');
+      toast.success('?? ??? ???? ??? ????? ??????? ?? ??????');
       
       // Update local state if the modal is open
       setLinkedParents(prev => prev.filter(p => p.id !== parentToDelete.id));
@@ -392,7 +392,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     } catch (error: any) {
       toast.dismiss(loadingToast);
       console.error('Delete parent account error:', error);
-      toast.error(error.message || 'فشل حذف الحساب');
+      toast.error(error.message || '??? ??? ??????');
     } finally {
       setIsLoadingParents(false);
     }
@@ -407,12 +407,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         classId: targetClassId,
         updatedAt: serverTimestamp(),
       });
-      toast.success('تم نقل الطالب بنجاح');
+      toast.success('?? ??? ?????? ?????');
       setShowMoveModal(null);
       setTargetClassId('');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `students/${showMoveModal.id}`);
-      toast.error('فشل نقل الطالب');
+      toast.error('??? ??? ??????');
     } finally {
       setIsMoving(false);
     }
@@ -420,17 +420,18 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('ADD_STUDENT_SUBMIT_STARTED');
     if (!profile?.schoolId) return;
     if (!newStudent.name.trim()) {
-      toast.error('يرجى إدخال اسم الطالب');
+      toast.error('???? ????? ??? ??????');
       return;
     }
     if (!newStudent.registrationNumber.trim()) {
-      toast.error('يرجى إدخال رقم السجل الدراسي');
+      toast.error('???? ????? ??? ????? ???????');
       return;
     }
     if (!newStudent.classId) {
-      toast.error('يرجى اختيار الصف');
+      toast.error('???? ?????? ????');
       return;
     }
     const isEditing = !!editingStudent;
@@ -457,7 +458,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             const result = await adminCreateUser({
               email: emailLower,
               password: newStudent.parentPassword || undefined,
-              displayName: 'ولي أمر طالب',
+              displayName: '??? ??? ????',
               role: 'parent',
               schoolId: profile.schoolId,
               additionalData: {
@@ -496,16 +497,17 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
               : s,
           ),
         );
-        toast.success('تم تحديث بيانات الطالب بنجاح');
+        toast.success('?? ????? ?????? ?????? ?????');
       } else {
         const studentId = pendingStudentId || doc(collection(db, 'students')).id;
         
         // Atomic transaction for adding student and incrementing count
+        console.log('ADD_STUDENT_TRANSACTION_START');
         await runTransaction(db, async (transaction) => {
           const schoolRef = doc(db, 'schools', profile.schoolId!);
           const schoolSnap = await transaction.get(schoolRef);
           
-          if (!schoolSnap.exists()) throw new Error('المدرسة غير موجودة');
+          if (!schoolSnap.exists()) throw new Error('??????? ??? ??????');
           
           const schoolData = schoolSnap.data();
           const currentCount = schoolData.studentCount || 0;
@@ -516,7 +518,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           const maxStudents = planSnap.exists() ? (planSnap.data().maxStudents || 500) : 500;
           
           if (currentCount >= maxStudents) {
-            throw new Error(`لقد وصلت للحد الأقصى للطلاب المسموح به في باقتك الحالية (${maxStudents} طالب). يرجى الترقية لإضافة المزيد.`);
+            throw new Error(`??? ???? ???? ?????? ?????? ??????? ?? ?? ????? ??????? (${maxStudents} ????). ???? ??????? ?????? ??????.`);
           }
 
           const studentRef = doc(db, 'students', studentId);
@@ -551,7 +553,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             const result = await adminCreateUser({
               email: emailLower,
               password: newStudent.parentPassword || undefined,
-              displayName: 'ولي أمر طالب',
+              displayName: '??? ??? ????',
               role: 'parent',
               schoolId: profile.schoolId,
               additionalData: {
@@ -567,12 +569,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             });
           } catch (autoErr) {
             console.warn('Auto-parent creation failed:', autoErr);
-            toast.error('تم إضافة الطالب ولكن فشل إنشاء حساب ولي الأمر تلقائياً. يرجى تجربته يدوياً.');
+            toast.error('?? ????? ?????? ???? ??? ????? ???? ??? ????? ????????. ???? ?????? ??????.');
           }
         }
         
         await fetchStudents();
-        toast.success('تمت إضافة الطالب بنجاح');
+        toast.success('??? ????? ?????? ?????');
       }
       setNewStudent({ 
         name: '', 
@@ -586,10 +588,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         parentPassword: '',
         photoUrl: ''
       });
+      console.log('ADD_STUDENT_SUCCESS');
       closeAddModal();
     } catch (error: any) {
+      console.log('ADD_STUDENT_ERROR', error);
       console.error('Error adding student:', error);
-      toast.error(error.message || 'حدث خطأ أثناء المعالجة');
+      toast.error(error.message || '??? ??? ????? ????????');
       handleFirestoreError(error, isEditing ? OperationType.UPDATE : OperationType.WRITE, isEditing ? `students/${editingStudent.id}` : 'students');
     }
   };
@@ -599,12 +603,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     if (!file || !profile?.schoolId) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error('يرجى اختيار ملف صورة صحيح (JPG أو PNG)');
+      toast.error('???? ?????? ??? ???? ???? (JPG ?? PNG)');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('حجم الصورة يجب أن لا يتجاوز 5 ميجابايت');
+      toast.error('??? ?????? ??? ?? ?? ?????? 5 ????????');
       return;
     }
 
@@ -612,27 +616,27 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       setIsUploadingPhoto(true);
       const studentId = resolvePhotoUploadStudentId();
       if (!studentId) {
-        toast.error('تعذر تجهيز معرف الطالب. أغلق النافذة وحاول مرة أخرى');
+        toast.error('???? ????? ???? ??????. ???? ??????? ????? ??? ????');
         return;
       }
       const url = await uploadStudentPhoto(file, profile.schoolId, studentId);
       setNewStudent((prev) => ({ ...prev, photoUrl: url }));
-      toast.success('تم رفع الصورة بنجاح');
+      toast.success('?? ??? ?????? ?????');
     } catch (error) {
       console.error('Error uploading student photo:', error);
       const code = error instanceof Error ? error.message : '';
       if (code === 'INVALID_IMAGE_TYPE') {
-        toast.error('يرجى اختيار ملف صورة صحيح (JPG أو PNG)');
+        toast.error('???? ?????? ??? ???? ???? (JPG ?? PNG)');
       } else if (code === 'FILE_TOO_LARGE') {
-        toast.error('حجم الصورة يجب أن لا يتجاوز 5 ميجابايت');
+        toast.error('??? ?????? ??? ?? ?? ?????? 5 ????????');
       } else if (code === 'INVALID_FILE_TYPE') {
-        toast.error('نوع الملف غير مدعوم. استخدم JPG أو PNG');
+        toast.error('??? ????? ??? ?????. ?????? JPG ?? PNG');
       } else if (code === 'STORAGE_UNAUTHORIZED') {
-        toast.error('صلاحيات رفع الصور غير مفعّلة على الخادم. يرجى نشر قواعد Firebase Storage ثم إعادة المحاولة');
+        toast.error('??????? ??? ????? ??? ?????? ??? ??????. ???? ??? ????? Firebase Storage ?? ????? ????????');
       } else if (code === 'INVALID_STUDENT_ID') {
-        toast.error('يرجى فتح نموذج إضافة الطالب أولاً ثم رفع الصورة');
+        toast.error('???? ??? ????? ????? ?????? ????? ?? ??? ??????');
       } else {
-        toast.error('فشل رفع الصورة. تحقق من الاتصال والصلاحيات');
+        toast.error('??? ??? ??????. ???? ?? ??????? ??????????');
       }
     } finally {
       setIsUploadingPhoto(false);
@@ -652,15 +656,15 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     <div className="space-y-4 md:space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6">
         <div>
-          <h1 className="text-xl md:text-3xl font-bold text-slate-900 font-display">إدارة الطلاب</h1>
-          <p className="text-slate-500 text-xs md:text-sm mt-1">قائمة الطلاب المسجلين رسمياً في نظام المدرسة</p>
+          <h1 className="text-xl md:text-3xl font-bold text-slate-900 font-display">????? ??????</h1>
+          <p className="text-slate-500 text-xs md:text-sm mt-1">????? ?????? ???????? ?????? ?? ???? ???????</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
                type="text" 
-               placeholder="بحث عن طالب..." 
+               placeholder="??? ?? ????..." 
                value={searchTerm}
                onChange={(e) => setSearchTerm(e.target.value)}
                className="pr-12 pl-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none w-full lg:w-80 transition-all font-medium text-sm md:text-base"
@@ -673,7 +677,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 md:px-8 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all font-bold shadow-lg active:scale-95 whitespace-nowrap text-sm"
               >
                 <Plus size={20} />
-                <span>طالب جديد</span>
+                <span>???? ????</span>
               </button>
             )}
             <button
@@ -688,19 +692,19 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
       <div className={`bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 ${viewMode === 'cards' ? 'overflow-visible' : 'overflow-hidden'}`}>
         <div className="p-4 md:p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
-          <span className="text-[10px] md:text-xs font-extrabold text-slate-400 uppercase tracking-[0.2em]">النتائج: {filteredStudents.length}</span>
+          <span className="text-[10px] md:text-xs font-extrabold text-slate-400 uppercase tracking-[0.2em]">???????: {filteredStudents.length}</span>
           <div className="hidden md:flex bg-slate-100 p-1 rounded-xl border border-slate-200">
             <button 
               onClick={() => setViewMode('table')}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
             >
-              جدول
+              ????
             </button>
             <button 
               onClick={() => setViewMode('cards')}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
             >
-              بطاقات
+              ??????
             </button>
           </div>
         </div>
@@ -710,11 +714,11 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             <table className="w-full text-right border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-200">
-                  <th className="px-8 py-5">اسم الطالب</th>
-                  <th className="px-8 py-5">رقم الربط (السجل)</th>
-                  <th className="px-8 py-5">الصف</th>
-                  <th className="px-8 py-5">الحالة المالية</th>
-                  <th className="px-8 py-5 text-center">الإجراءات</th>
+                  <th className="px-8 py-5">??? ??????</th>
+                  <th className="px-8 py-5">??? ????? (?????)</th>
+                  <th className="px-8 py-5">????</th>
+                  <th className="px-8 py-5">?????? ???????</th>
+                  <th className="px-8 py-5 text-center">?????????</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -728,14 +732,14 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         <div className="min-w-0">
                           <span className="font-bold text-slate-900 block font-display leading-none truncate">{student.name}</span>
                           <div className="flex flex-wrap items-center gap-2 mt-1">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block whitespace-nowrap">سجل: {new Date(student.createdAt?.seconds * 1000).toLocaleDateString('ar-IQ')}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block whitespace-nowrap">???: {new Date(student.createdAt?.seconds * 1000).toLocaleDateString('ar-IQ')}</span>
                             {student.parentIds?.length > 0 && (
                               <button 
                                 onClick={() => setShowLinkedParentsModal(student)}
                                 className="text-[9px] bg-slate-900 text-white px-2 py-0.5 rounded-md font-bold hover:bg-slate-800 transition-all shadow-sm flex items-center gap-1"
                               >
                                 <Users size={10} />
-                                {student.parentIds.length} حساب
+                                {student.parentIds.length} ????
                               </button>
                             )}
                           </div>
@@ -757,12 +761,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                     </td>
                     <td className="px-8 py-5">
                       <span className="px-4 py-1.5 bg-slate-900 text-white rounded-full text-[10px] font-bold tracking-widest shadow-lg whitespace-nowrap">
-                        {classes.find(c => c.id === student.classId)?.name || 'غير محدد'}
+                        {classes.find(c => c.id === student.classId)?.name || '??? ????'}
                       </span>
                     </td>
                     <td className="px-8 py-5">
                       <span className={`font-bold text-base ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'} font-display`}>
-                        {(student.tuitionBalance || 0).toLocaleString()} <span className="text-[10px] font-normal text-slate-400">د.ع</span>
+                        {(student.tuitionBalance || 0).toLocaleString()} <span className="text-[10px] font-normal text-slate-400">?.?</span>
                       </span>
                     </td>
                     <td className="px-8 py-5 text-center">
@@ -777,7 +781,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                setParentPassword(student.parentPassword || '');
                              }}
                              className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
-                             title="ربط بولي أمر"
+                             title="??? ???? ???"
                           >
                             <UserPlus size={18} />
                           </button>
@@ -808,7 +812,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                       className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
                                     >
                                       <Users size={16} className="text-slate-400" />
-                                      عرض الحسابات المربوطة
+                                      ??? ???????? ????????
                                     </button>
                                     {!isViewOnly && (
                                       <>
@@ -824,7 +828,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                           className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all"
                                         >
                                           <UserPlus size={16} className="text-slate-400" />
-                                          ربط بولي أمر جديد
+                                          ??? ???? ??? ????
                                         </button>
                                         <button
                                           onClick={() => {
@@ -835,7 +839,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                           className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
                                         >
                                           <ArrowRightLeft size={16} className="text-slate-400" />
-                                          نقل لصف آخر
+                                          ??? ??? ???
                                         </button>
                                         <button
                                           onClick={() => {
@@ -859,7 +863,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                           className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
                                         >
                                           <GraduationCap size={16} className="text-slate-400" />
-                                          تعديل البيانات
+                                          ????? ????????
                                         </button>
                                         <div className="h-px bg-slate-100 my-2 mx-2" />
                                         <button
@@ -867,7 +871,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                           className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all"
                                         >
                                           <Trash2 size={16} className="text-red-400" />
-                                          حذف الطالب
+                                          ??? ??????
                                         </button>
                                       </>
                                     )}
@@ -896,7 +900,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-slate-900 truncate font-display">{student.name}</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{classes.find(c => c.id === student.classId)?.name || 'غير محدد'}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{classes.find(c => c.id === student.classId)?.name || '??? ????'}</p>
                   </div>
                   <div className="relative shrink-0" data-student-menu>
                     <button
@@ -918,13 +922,13 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
-                    <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">رقم الربط</span>
+                    <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">??? ?????</span>
                     <span className="text-[10px] font-mono font-bold text-slate-600">{student.registrationNumber}</span>
                   </div>
                   <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
-                    <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">الرصيد المالي</span>
+                    <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">?????? ??????</span>
                     <span className={`text-[10px] font-black ${(student.tuitionBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                      {(student.tuitionBalance || 0).toLocaleString()} د.ع
+                      {(student.tuitionBalance || 0).toLocaleString()} ?.?
                     </span>
                   </div>
                 </div>
@@ -935,7 +939,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                     className="flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-bold shadow-sm flex items-center justify-center gap-1.5"
                   >
                     <Users size={12} />
-                    <span>الحسابات ({student.parentIds?.length || 0})</span>
+                    <span>???????? ({student.parentIds?.length || 0})</span>
                   </button>
                   {!isViewOnly && (
                     <button 
@@ -967,7 +971,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                           className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
                         >
                           <Users size={16} className="text-slate-400" />
-                          عرض الحسابات المربوطة
+                          ??? ???????? ????????
                         </button>
                         {!isViewOnly && (
                           <>
@@ -984,7 +988,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                               className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all"
                             >
                               <UserPlus size={16} className="text-slate-400" />
-                              ربط بولي أمر جديد
+                              ??? ???? ??? ????
                             </button>
                             <button
                               type="button"
@@ -1010,7 +1014,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                               className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
                             >
                               <GraduationCap size={16} className="text-slate-400" />
-                              تعديل البيانات
+                              ????? ????????
                             </button>
                             <button
                               type="button"
@@ -1022,7 +1026,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                               className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
                             >
                               <ArrowRightLeft size={16} className="text-slate-400" />
-                              نقل لصف آخر
+                              ??? ??? ???
                             </button>
                             <div className="h-px bg-slate-100 my-2 mx-2" />
                             <button
@@ -1034,7 +1038,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                               className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all"
                             >
                               <Trash2 size={16} className="text-red-400" />
-                              حذف الطالب
+                              ??? ??????
                             </button>
                           </>
                         )}
@@ -1054,11 +1058,11 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                    <UserPlus size={32} />
                 </div>
                 <div>
-                  <p className="text-slate-800 font-bold text-base md:text-lg mb-1">لا يوجد نتائج</p>
-                  <p className="text-slate-400 text-xs md:text-sm italic">جرب البحث بكلمات أخرى أو أضف طالب جديد</p>
+                  <p className="text-slate-800 font-bold text-base md:text-lg mb-1">?? ???? ?????</p>
+                  <p className="text-slate-400 text-xs md:text-sm italic">??? ????? ?????? ???? ?? ??? ???? ????</p>
                 </div>
                 {!isViewOnly && (
-                  <button onClick={openAddStudentModal} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-800 transition-all text-sm">أضف طالب</button>
+                  <button onClick={openAddStudentModal} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-800 transition-all text-sm">??? ????</button>
                 )}
              </div>
           </div>
@@ -1071,7 +1075,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
               disabled={isLoadingMore}
               className="w-full md:w-auto px-10 py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-2xl transition-all disabled:opacity-50 text-xs md:text-sm shadow-sm"
             >
-              {isLoadingMore ? 'جاري التحميل...' : 'تحميل المزيد'}
+              {isLoadingMore ? '???? ???????...' : '????? ??????'}
             </button>
           </div>
         )}
@@ -1090,8 +1094,8 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             >
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900 font-display">الحسابات المربوطة</h2>
-                  <p className="text-slate-500 text-xs mt-1">أولياء الأمور الذين لديهم وصول لبيانات {showLinkedParentsModal.name}</p>
+                  <h2 className="text-2xl font-bold text-slate-900 font-display">???????? ????????</h2>
+                  <p className="text-slate-500 text-xs mt-1">?????? ?????? ????? ????? ???? ??????? {showLinkedParentsModal.name}</p>
                 </div>
                 <button 
                   onClick={() => setShowLinkedParentsModal(null)}
@@ -1105,7 +1109,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                 {isLoadingParents ? (
                   <div className="py-12 text-center">
                     <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-sm text-slate-400 font-bold">جاري تحميل البيانات...</p>
+                    <p className="text-sm text-slate-400 font-bold">???? ????? ????????...</p>
                   </div>
                 ) : linkedParents.length > 0 ? (
                   linkedParents.map(parent => (
@@ -1115,7 +1119,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                           <Users size={18} />
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-slate-900 text-sm">{parent.name || 'ولي أمر'}</p>
+                          <p className="font-bold text-slate-900 text-sm">{parent.name || '??? ???'}</p>
                           <p className="text-[10px] text-slate-400 font-mono mt-0.5">{parent.email}</p>
                         </div>
                       </div>
@@ -1123,14 +1127,14 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         <button 
                           onClick={() => setParentToUnlink({ parentId: parent.id, parentName: parent.name || parent.email })}
                           className="p-2 text-slate-300 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-all"
-                          title="إلغاء الربط فقط"
+                          title="????? ????? ???"
                         >
                           <ArrowRightLeft size={16} />
                         </button>
                         <button 
-                          onClick={() => setParentToDelete({ id: parent.id, name: parent.name || 'ولي أمر', email: parent.email })}
+                          onClick={() => setParentToDelete({ id: parent.id, name: parent.name || '??? ???', email: parent.email })}
                           className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                          title="حذف الحساب نهائياً"
+                          title="??? ?????? ???????"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -1142,7 +1146,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                     <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-200 shadow-sm">
                       <Users size={32} />
                     </div>
-                    <p className="text-sm text-slate-400 font-bold italic">لا توجد حسابات مربوطة بهذا الطالب</p>
+                    <p className="text-sm text-slate-400 font-bold italic">?? ???? ?????? ?????? ???? ??????</p>
                   </div>
                 )}
               </div>
@@ -1152,7 +1156,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   onClick={() => setShowLinkedParentsModal(null)}
                   className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all active:scale-95"
                 >
-                  إغلاق النافذة
+                  ????? ???????
                 </button>
               </div>
 
@@ -1168,23 +1172,23 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100">
                         <AlertTriangle size={32} />
                       </div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-2">تأكيد إلغاء الربط</h3>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">????? ????? ?????</h3>
                       <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                        هل أنت متأكد من رغبتك في إلغاء ربط الحساب <span className="font-bold text-slate-900">({parentToUnlink.parentName})</span> بهذا الطالب؟
+                        ?? ??? ????? ?? ????? ?? ????? ??? ?????? <span className="font-bold text-slate-900">({parentToUnlink.parentName})</span> ???? ???????
                       </p>
                       <div className="flex gap-3">
                         <button 
                           onClick={() => setParentToUnlink(null)}
                           className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all"
                         >
-                          إلغاء
+                          ?????
                         </button>
                         <button 
                           onClick={handleUnlinkParent}
                           disabled={isLoadingParents}
                           className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
                         >
-                          {isLoadingParents ? 'جاري التنفيذ...' : 'إلغاء الربط'}
+                          {isLoadingParents ? '???? ???????...' : '????? ?????'}
                         </button>
                       </div>
                     </motion.div>
@@ -1204,26 +1208,26 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       <div className="w-20 h-20 bg-red-100 text-red-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm border border-red-200">
                         <AlertTriangle size={40} />
                       </div>
-                      <h3 className="text-2xl font-bold text-slate-900 mb-2">حذف الحساب نهائياً؟</h3>
+                      <h3 className="text-2xl font-bold text-slate-900 mb-2">??? ?????? ????????</h3>
                       <p className="text-slate-500 text-sm mb-2 leading-relaxed px-4">
-                        سيتم حذف حساب <span className="font-bold text-slate-900">{parentToDelete.name}</span> نهائياً من النظام (Auth & Firestore).
+                        ???? ??? ???? <span className="font-bold text-slate-900">{parentToDelete.name}</span> ??????? ?? ?????? (Auth & Firestore).
                       </p>
                       <p className="text-red-500 text-[11px] font-bold mb-8 px-4 py-2 bg-red-50 rounded-lg inline-block border border-red-100 mx-4">
-                        تحذير: سيتم إلغاء ربط الولي من جميع الطلاب المرتبطين به في هذه المدرسة.
+                        ?????: ???? ????? ??? ????? ?? ???? ?????? ????????? ?? ?? ??? ???????.
                       </p>
                       <div className="flex gap-4">
                         <button 
                           onClick={() => setParentToDelete(null)}
                           className="flex-1 py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 transition-all active:scale-95"
                         >
-                          إلغاء
+                          ?????
                         </button>
                         <button 
                           onClick={handleDeleteParentAccount}
                           disabled={isLoadingParents}
                           className="flex-1 py-4 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 active:scale-95 disabled:opacity-50"
                         >
-                          {isLoadingParents ? 'جاري الحذف...' : 'حذف نهائي'}
+                          {isLoadingParents ? '???? ?????...' : '??? ?????'}
                         </button>
                       </div>
                     </motion.div>
@@ -1244,19 +1248,19 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                exit={{ scale: 0.95, opacity: 0, y: 20 }} 
                className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl relative border border-slate-200"
              >
-               <h2 className="text-2xl font-bold mb-2 text-slate-900 font-display">نقل الطالب لصف آخر</h2>
-               <p className="text-slate-500 text-xs mb-8 italic">سيتم نقل الطالب {showMoveModal.name} إلى الصف الدراسي الجديد المختار.</p>
+               <h2 className="text-2xl font-bold mb-2 text-slate-900 font-display">??? ?????? ??? ???</h2>
+               <p className="text-slate-500 text-xs mb-8 italic">???? ??? ?????? {showMoveModal.name} ??? ???? ??????? ?????? ???????.</p>
                
                <form onSubmit={handleMoveStudent} className="space-y-6">
                  <div>
-                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">اختر الصف الجديد</label>
+                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">???? ???? ??????</label>
                    <select
                      required
                      value={targetClassId}
                      onChange={e => setTargetClassId(e.target.value)}
                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold appearance-none"
                    >
-                     <option value="">اختر الصف...</option>
+                     <option value="">???? ????...</option>
                      {classes.map(c => (
                        <option key={c.id} value={c.id}>{c.name}</option>
                      ))}
@@ -1269,14 +1273,14 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                      type="submit"
                      className="flex-1 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50"
                    >
-                     {isMoving ? 'جاري النقل...' : 'تأكيد النقل'}
+                     {isMoving ? '???? ?????...' : '????? ?????'}
                    </button>
                    <button
                      type="button"
                      onClick={() => setShowMoveModal(null)}
                      className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
                    >
-                     إلغاء
+                     ?????
                    </button>
                  </div>
                </form>
@@ -1304,7 +1308,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   <div className="flex items-center justify-between mb-2 shrink-0">
                     <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display flex items-center gap-2">
                       <GraduationCap className="text-[#0B2345] dark:text-[#D4A64A]" size={28} />
-                      <span>{editingStudent ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}</span>
+                      <span>{editingStudent ? '????? ?????? ??????' : '????? ???? ????'}</span>
                     </h2>
                     <button
                       type="button"
@@ -1315,7 +1319,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                     </button>
                   </div>
                   <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm mb-4 leading-relaxed italic text-right shrink-0">
-                    يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.
+                    ???? ?????? ?? ??? ???????? ??????? ??? ???? ??????? ????? ?? ??????? ??????? ????????.
                   </p>
 
                   <form
@@ -1327,7 +1331,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60">
                      <div className="flex-1 space-y-2">
-                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الصورة الشخصية (اختياري)</label>
+                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">?????? ??????? (???????)</label>
                        <div className="flex items-center gap-4">
                          <div className="w-14 h-14 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
                            {newStudent.photoUrl ? (
@@ -1349,13 +1353,13 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                              className="cursor-pointer flex items-center justify-center gap-1.5 w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-dashed rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-[#0B2345] dark:hover:text-white transition-all font-bold text-xs"
                            >
                              <Upload size={14} />
-                             {isUploadingPhoto ? 'جاري الرفع...' : 'رفع صورة'}
+                             {isUploadingPhoto ? '???? ?????...' : '??? ????'}
                            </label>
                          </div>
                        </div>
                      </div>
                      <div className="flex-1 space-y-2">
-                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">أو رابط الصورة</label>
+                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">?? ???? ??????</label>
                        <input
                          type="text"
                          dir="ltr"
@@ -1369,7 +1373,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">الاسم الكامل للطالب</label>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">????? ?????? ??????</label>
                         <div className="relative">
                           <User className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <input
@@ -1378,13 +1382,13 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                             value={newStudent.name}
                             onChange={e => setNewStudent({...newStudent, name: e.target.value})}
                             className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
-                            placeholder="الاسم الرباعي واللقب..."
+                            placeholder="????? ??????? ??????..."
                           />
                         </div>
                       </div>
                       
                       <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">رقم السجل الدراسي</label>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">??? ????? ???????</label>
                         <div className="relative">
                           <Hash className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <input
@@ -1401,7 +1405,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">واتساب ولي الأمر</label>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">?????? ??? ?????</label>
                         <div className="relative">
                           <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <input
@@ -1414,7 +1418,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         </div>
                       </div>
                       <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">رقم السائق (اختياري - للبطاقة)</label>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">??? ?????? (??????? - ???????)</label>
                         <div className="relative">
                           <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <input
@@ -1430,7 +1434,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">إيميل ولي الأمر (للدخول)</label>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">????? ??? ????? (??????)</label>
                         <div className="relative">
                           <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <input
@@ -1443,7 +1447,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         </div>
                       </div>
                       <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">كلمة السر لولي الأمر</label>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">???? ???? ???? ?????</label>
                         <div className="relative">
                           <Key className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <input
@@ -1459,7 +1463,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">الصف الحالي</label>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">???? ??????</label>
                         <div className="relative">
                           <GraduationCap className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <select
@@ -1468,7 +1472,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                             onChange={e => setNewStudent({...newStudent, classId: e.target.value})}
                             className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white appearance-none"
                           >
-                            <option value="">جميع الصفوف المدرسية...</option>
+                            <option value="">???? ?????? ????????...</option>
                             {classes.map(c => (
                               <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
@@ -1476,7 +1480,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         </div>
                       </div>
                       <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">عنوان السكن</label>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">????? ?????</label>
                         <div className="relative">
                           <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <input
@@ -1484,7 +1488,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                             value={newStudent.address}
                             onChange={e => setNewStudent({...newStudent, address: e.target.value})}
                             className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-bold text-slate-900 dark:text-white"
-                            placeholder="المحافظة - القضاء - الحي"
+                            placeholder="???????? - ?????? - ????"
                           />
                         </div>
                       </div>
@@ -1497,14 +1501,17 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         type="submit"
                         className="flex-1 px-8 py-3.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-[#071830] transition-all shadow-xl active:scale-95 text-sm md:text-base border border-transparent touch-manipulation"
                       >
-                        {editingStudent ? 'حفظ التغييرات' : 'تأكيد وإضافة السجل'}
+                        {editingStudent ? '??? ?????????' : '????? ?????? ?????'}
                       </button>
                       <button
                         type="button"
-                        onClick={closeAddModal}
+                        onClick={() => {
+                          console.log('ADD_STUDENT_CANCEL_CLICKED');
+                          closeAddModal();
+                        }}
                         className="px-6 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 text-sm md:text-base touch-manipulation"
                       >
-                        إلغاء الأمر
+                        ????? ?????
                       </button>
                     </div>
                   </form>
@@ -1526,24 +1533,24 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl relative border border-slate-200 overflow-hidden"
              >
                <div className="relative z-10">
-                 <h2 className="text-2xl font-bold mb-1 text-slate-900 font-display">ربط حساب ولي أمر</h2>
-                 <p className="text-slate-500 text-xs mb-8 leading-relaxed">أدخل البريد الإلكتروني لولي أمر الطالب {showLinkParentModal.name}. سيتمكن ولي الأمر من رؤية النتائج والتبليغات عند التسجيل بهذا البريد.</p>
+                 <h2 className="text-2xl font-bold mb-1 text-slate-900 font-display">??? ???? ??? ???</h2>
+                 <p className="text-slate-500 text-xs mb-8 leading-relaxed">???? ?????? ?????????? ???? ??? ?????? {showLinkParentModal.name}. ?????? ??? ????? ?? ???? ??????? ?????????? ??? ??????? ???? ??????.</p>
                  
                  <form onSubmit={handleLinkParent} className="space-y-4">
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">اسم ولي الأمر</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">??? ??? ?????</label>
                       <input
                         required
                         type="text"
                         value={parentName}
                         onChange={e => setParentName(e.target.value)}
                         className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold text-slate-900 text-right"
-                        placeholder="الاسم الكامل لولي الأمر..."
+                        placeholder="????? ?????? ???? ?????..."
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">البريد الإلكتروني لولي الأمر</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">?????? ?????????? ???? ?????</label>
                       <input
                         required
                         type="email"
@@ -1556,7 +1563,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">رقم الهاتف</label>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">??? ??????</label>
                         <input
                           required
                           type="text"
@@ -1567,14 +1574,14 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">كلمة السر</label>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">???? ????</label>
                         <input
                           required
                           type="text"
                           value={parentPassword}
                           onChange={e => setParentPassword(e.target.value)}
                           className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-mono"
-                          placeholder="كلمة السر..."
+                          placeholder="???? ????..."
                         />
                       </div>
                     </div>
@@ -1585,7 +1592,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         type="submit"
                         className="flex-1 px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                       >
-                        {isLinking ? 'جاري الربط...' : 'إتمام عملية الربط'}
+                        {isLinking ? '???? ?????...' : '????? ????? ?????'}
                       </button>
                       <button
                         type="button"
@@ -1598,7 +1605,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         }}
                         className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
                       >
-                        إلغاء
+                        ?????
                       </button>
                     </div>
                  </form>
@@ -1621,10 +1628,10 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
               <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400 mb-6 mx-auto md:mx-0">
                 <AlertTriangle size={32} />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 font-display">تأكيد حذف الطالب</h2>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 font-display">????? ??? ??????</h2>
               <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                هل أنت متأكد من حذف سجل الطالب <span className="font-bold text-slate-900 dark:text-white">{students.find(s => s.id === confirmDeleteId)?.name}</span> نهائياً؟ 
-                <span className="block mt-2 text-red-500 font-bold text-xs">هذا الإجراء سيؤدي لحذف كافة البيانات المرتبطة ولا يمكن التراجع عنه.</span>
+                ?? ??? ????? ?? ??? ??? ?????? <span className="font-bold text-slate-900 dark:text-white">{students.find(s => s.id === confirmDeleteId)?.name}</span> ???????? 
+                <span className="block mt-2 text-red-500 font-bold text-xs">??? ??????? ????? ???? ???? ???????? ???????? ??? ???? ??????? ???.</span>
               </p>
               
               <div className="flex flex-col-reverse md:flex-row-reverse gap-4">
@@ -1633,14 +1640,14 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                   onClick={() => handleDeleteStudent(confirmDeleteId)}
                   className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 disabled:opacity-50"
                 >
-                  {isDeleting ? 'جاري الحذف...' : 'نعم، احذف السجل'}
+                  {isDeleting ? '???? ?????...' : '???? ???? ?????'}
                 </button>
                 <button
                   disabled={!!isDeleting}
                   onClick={() => setConfirmDeleteId(null)}
                   className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
                 >
-                  إلغاء
+                  ?????
                 </button>
               </div>
             </motion.div>
