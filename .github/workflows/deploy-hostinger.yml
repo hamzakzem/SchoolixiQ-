@@ -1,18 +1,9 @@
 name: Deploy Frontend to Hostinger
 
+# Manual only — production deploys via Hostinger built-in Git (main branch).
+# GitHub Actions SFTP was disabled after repeated max-retries cd failures.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "public/**"
-      - "index.html"
-      - "vite.config.mjs"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/deploy-hostinger.yml"
-      - "scripts/hostinger-deploy.sh"
 
 concurrency:
   group: hostinger-deploy-${{ github.ref }}
