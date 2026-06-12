@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, deleteDoc, setDoc, runTransaction, increment, arrayUnion, arrayRemove, getDoc, limit, startAfter, orderBy } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { Search, Plus, UserPlus, Filter, MoreVertical, GraduationCap, Copy, Check, Trash2, AlertTriangle, X, Users, ArrowRightLeft, Upload, Edit2, User, Hash, Phone, Mail, Key, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
+import { modalPanelProps } from '../../lib/motion';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { uploadStudentPhoto } from '../../lib/imageUtils';
 
@@ -50,7 +52,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   const [targetClassId, setTargetClassId] = useState('');
   const [isMoving, setIsMoving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const addStudentFormRef = useRef<HTMLFormElement>(null);
   
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -420,6 +421,14 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile?.schoolId) return;
+    if (!newStudent.name.trim()) {
+      toast.error('يرجى إدخال اسم الطالب');
+      return;
+    }
+    if (!newStudent.registrationNumber.trim()) {
+      toast.error('يرجى إدخال رقم السجل الدراسي');
+      return;
+    }
     if (!newStudent.classId) {
       toast.error('يرجى اختيار الصف');
       return;
@@ -581,7 +590,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     } catch (error: any) {
       console.error('Error adding student:', error);
       toast.error(error.message || 'حدث خطأ أثناء المعالجة');
-      closeAddModal();
       handleFirestoreError(error, isEditing ? OperationType.UPDATE : OperationType.WRITE, isEditing ? `students/${editingStudent.id}` : 'students');
     }
   };
@@ -1277,38 +1285,45 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-             <motion.div 
-               initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-               animate={{ scale: 1, opacity: 1, y: 0 }} 
-               exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-               className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 max-h-[90vh] flex flex-col overflow-hidden text-right"
-             >
-               <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 dark:bg-slate-800/40 rounded-full -translate-y-32 translate-x-32 shadow-inner pointer-events-none"></div>
-               <div className="relative z-10 flex flex-col flex-1 min-h-0 px-6 md:px-10 pt-6 md:pt-8">
-                 <div className="flex items-center justify-between mb-2 shrink-0">
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showAddModal && (
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md pointer-events-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) closeAddModal();
+              }}
+            >
+              <motion.div
+                {...modalPanelProps()}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 max-h-[min(90vh,calc(100dvh-2rem))] flex flex-col overflow-hidden text-right pointer-events-auto"
+              >
+                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 dark:bg-slate-800/40 rounded-full -translate-y-32 translate-x-32 shadow-inner pointer-events-none" />
+                <div className="relative z-10 flex flex-col flex-1 min-h-0 px-6 md:px-10 pt-6 md:pt-8 pointer-events-auto">
+                  <div className="flex items-center justify-between mb-2 shrink-0">
                     <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display flex items-center gap-2">
                       <GraduationCap className="text-[#0B2345] dark:text-[#D4A64A]" size={28} />
                       <span>{editingStudent ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}</span>
                     </h2>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={closeAddModal}
                       className="p-1 px-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all touch-manipulation"
                     >
                       <X size={18} />
                     </button>
                   </div>
-                 <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm mb-6 leading-relaxed italic text-right shrink-0">يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.</p>
-                 
-                 <form
-                   ref={addStudentFormRef}
-                   onSubmit={handleAdd}
-                   className="flex flex-col flex-1 min-h-0"
-                 >
-                   <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pb-4 custom-scrollbar pointer-events-auto">
+                  <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm mb-4 leading-relaxed italic text-right shrink-0">
+                    يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.
+                  </p>
+
+                  <form
+                    noValidate
+                    onSubmit={handleAdd}
+                    className="flex flex-col flex-1 min-h-0 pointer-events-auto"
+                  >
+                    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6 pb-4 custom-scrollbar">
 
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60">
                      <div className="flex-1 space-y-2">
@@ -1475,12 +1490,11 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       </div>
                     </div>
 
-                   </div>
+                    </div>
 
-                    <div className="relative z-30 shrink-0 pointer-events-auto bg-white dark:bg-slate-900 pt-4 pb-6 md:pb-8 border-t border-slate-100 dark:border-slate-800 flex gap-4 mt-2">
+                    <div className="relative z-50 shrink-0 pointer-events-auto bg-white dark:bg-slate-900 pt-4 pb-6 md:pb-8 border-t border-slate-100 dark:border-slate-800 flex gap-4">
                       <button
-                        type="button"
-                        onClick={() => addStudentFormRef.current?.requestSubmit()}
+                        type="submit"
                         className="flex-1 px-8 py-3.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-[#071830] transition-all shadow-xl active:scale-95 text-sm md:text-base border border-transparent touch-manipulation"
                       >
                         {editingStudent ? 'حفظ التغييرات' : 'تأكيد وإضافة السجل'}
@@ -1494,11 +1508,13 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       </button>
                     </div>
                   </form>
-               </div>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
 
       <AnimatePresence>
         {showLinkParentModal && (
