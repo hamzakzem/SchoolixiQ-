@@ -9,6 +9,14 @@ import dotEnv from 'dotenv';
 import fs from 'fs';
 import crypto from 'crypto';
 import { runSchoolPermanentDelete } from './backend/schoolPermanentDelete.mjs';
+import {
+  canActorUseAdminApi,
+  canActorCreateRole,
+  canActorDeleteUser,
+  canActorSyncClaims,
+  canActorDeleteStudent,
+  normalizeRole,
+} from './backend/roleHierarchy.ts';
 
 dotEnv.config();
 
@@ -302,10 +310,7 @@ async function startServer() {
       }
 
       // STRICT ROLE ENFORCEMENT
-      const allowedRoles = ['admin', 'superadmin', 'staff', 'assistant'];
-      const hasAdminRights = allowedRoles.includes(role);
-
-      if (!hasAdminRights) {
+      if (!canActorUseAdminApi(role, schoolId)) {
         return res.status(403).json({ error: 'Forbidden: Admin access required' });
       }
 
@@ -522,6 +527,57 @@ async function startServer() {
     }
   });
 
+  /** Public QR verify — minimal fields only; no Firestore public student get. */
+  app.get('/api/public/verify-student/:studentId', async (req: any, res: any) => {
+    try {
+      const studentId = String(req.params.studentId || '').trim();
+      if (!studentId || studentId.length > 128) {
+        return res.status(400).json({ error: 'INVALID_ID', message: 'Invalid student id' });
+      }
+
+      const db = getDb();
+      const snap = await db.collection('students').doc(studentId).get();
+      if (!snap.exists) {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Student not found' });
+      }
+
+      const data = snap.data() || {};
+      if (data.deleted === true || data.status === 'archived') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Student not found' });
+      }
+
+      let className = typeof data.className === 'string' ? data.className : '';
+      if (!className && data.classId) {
+        const classSnap = await db.collection('classes').doc(String(data.classId)).get();
+        if (classSnap.exists) {
+          className = String(classSnap.data()?.name || '');
+        }
+      }
+
+      let schoolName = '';
+      if (data.schoolId) {
+        const schoolSnap = await db.collection('schools').doc(String(data.schoolId)).get();
+        if (schoolSnap.exists) {
+          schoolName = String(schoolSnap.data()?.name || '');
+        }
+      }
+
+      res.setHeader('Cache-Control', 'public, max-age=60');
+      return res.json({
+        id: snap.id,
+        name: String(data.name || ''),
+        className,
+        dob: String(data.dob || data.dateOfBirth || ''),
+        registrationNumber: String(data.registrationNumber || ''),
+        schoolName,
+        verified: true,
+      });
+    } catch (error: any) {
+      console.error('Public verify student error:', error);
+      return res.status(500).json({ error: 'SERVER_ERROR', message: 'Unable to verify student' });
+    }
+  });
+
   // iOS Configuration Profile Download API
   app.get('/api/download/schoolixiq.mobileconfig', (req, res) => {
     const host = req.get('host') || 'schoolixiq.com';
@@ -608,9 +664,27 @@ async function startServer() {
         return res.status(400).json({ error: 'EMAIL_REQUIRED', message: 'البريد الإلكتروني مطلوب' });
       }
 
-      // 1. Enforce administrative access check (superadmin, admin, staff, assistant)
-      const allowedAdminRoles = ['superadmin', 'admin', 'staff', 'assistant'];
-      if (!allowedAdminRoles.includes(req.user.role)) {
+      const targetRole = normalizeRole(role);
+      if (!targetRole) {
+        return res.status(400).json({ error: 'ROLE_REQUIRED', message: 'دور المستخدم مطلوب' });
+      }
+
+      if (!canActorCreateRole(req.user.role, targetRole, req.user.schoolId)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'غير مسموح لك بإنشاء مستخدم بهذا الدور',
+        });
+      }
+
+      if (targetRole === 'assistant' && !schoolId && req.user.role !== 'superadmin') {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'إنشاء مساعد النظام مسموح لمدير النظام فقط',
+        });
+      }
+
+      // 1. Enforce administrative access check (superadmin, admin, school_admin, staff, assistant)
+      if (!canActorUseAdminApi(req.user.role, req.user.schoolId)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بالقيام بهذه العملية الإدارية' });
       }
 
@@ -788,8 +862,7 @@ async function startServer() {
     
     try {
       // 1. Enforce administrative access
-      const allowedAdminRoles = ['superadmin', 'admin', 'staff', 'assistant'];
-      if (!allowedAdminRoles.includes(req.user.role)) {
+      if (!canActorUseAdminApi(req.user.role, req.user.schoolId)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بالقيام بمزامنة الصلاحيات' });
       }
 
@@ -799,6 +872,13 @@ async function startServer() {
       
       const userData = userDoc.data() || {};
       const { role, schoolId } = userData;
+
+      if (!canActorSyncClaims(req.user.role, role, req.user.schoolId)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'غير مسموح لك بمزامنة صلاحيات هذا المستخدم',
+        });
+      }
 
       // 2. Enforce school boundary verification for multi-tenancy
       if (req.user.role !== 'superadmin') {
@@ -882,9 +962,7 @@ async function startServer() {
     if (!uid) return res.status(400).json({ error: 'UID required' });
     
     try {
-      // 1. Enforce administrative access check (allowed roles: superadmin, admin, staff, assistant)
-      const allowedAdminRoles = ['superadmin', 'admin', 'staff', 'assistant'];
-      if (!allowedAdminRoles.includes(req.user.role)) {
+      if (!canActorUseAdminApi(req.user.role, req.user.schoolId)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف حسابات المستخدمين' });
       }
 
@@ -896,6 +974,14 @@ async function startServer() {
 
       const beforeData = userDoc.data() || {};
       const targetSchoolId = beforeData.schoolId;
+      const targetRole = beforeData.role;
+
+      if (!canActorDeleteUser(req.user.role, targetRole, req.user.schoolId)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'غير مسموح لك بحذف مستخدم بهذا المستوى',
+        });
+      }
 
       // 2. Enforce strict multi-tenancy check
       if (req.user.role !== 'superadmin') {
@@ -1056,10 +1142,11 @@ async function startServer() {
     if (!id) return res.status(400).json({ error: 'Student ID required' });
     
     try {
-      // 1. Enforce administrative access check (allowed roles: superadmin, admin, staff, assistant)
-      const allowedAdminRoles = ['superadmin', 'admin', 'staff', 'assistant'];
-      if (!allowedAdminRoles.includes(req.user.role)) {
-        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف الطلاب' });
+      if (!canActorDeleteStudent(req.user.role, req.user.schoolId)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'غير مسموح لك بحذف الطلاب',
+        });
       }
 
       const db = getDb();

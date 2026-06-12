@@ -1,24 +1,30 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { db } from "../lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
 import { useLanguage } from "../lib/LanguageContext";
+import { getApiUrl } from "../lib/apiUtils";
 import {
   ShieldCheck,
   User,
-  MapPin,
-  Phone,
-  Mail,
   Building,
   Activity,
   Calendar,
 } from "lucide-react";
 import { motion } from "motion/react";
 
+type PublicVerifyStudent = {
+  id: string;
+  name: string;
+  className: string;
+  dob: string;
+  registrationNumber: string;
+  schoolName: string;
+  verified: boolean;
+};
+
 export default function PublicStudentVerify() {
   const { studentId } = useParams();
   const { isRtl } = useLanguage();
-  const [student, setStudent] = useState<any>(null);
+  const [student, setStudent] = useState<PublicVerifyStudent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,13 +32,15 @@ export default function PublicStudentVerify() {
     const fetchStudent = async () => {
       if (!studentId) return;
       try {
-        const docRef = doc(db, "students", studentId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setStudent({ id: docSnap.id, ...docSnap.data() });
-        } else {
+        const response = await fetch(
+          getApiUrl(`/api/public/verify-student/${encodeURIComponent(studentId)}`),
+        );
+        if (!response.ok) {
           setError(isRtl ? "لم يتم العثور على الطالب" : "Student not found");
+          return;
         }
+        const data = (await response.json()) as PublicVerifyStudent;
+        setStudent(data);
       } catch (err) {
         console.error(err);
         setError(isRtl ? "حدث خطأ أثناء تحميل البيانات" : "Error loading data");
@@ -87,7 +95,6 @@ export default function PublicStudentVerify() {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md mx-auto relative"
       >
-        {/* Verification Badge */}
         <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex flex-col items-center z-10 drop-shadow-xl">
           <div className="w-14 h-14 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-slate-100">
             <ShieldCheck size={28} />
@@ -95,21 +102,25 @@ export default function PublicStudentVerify() {
         </div>
 
         <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200 pt-10">
-          {/* Header */}
           <div className="px-8 pb-8 text-center border-b border-slate-100">
             <h1 className="text-2xl font-black text-slate-900">
               {student.name}
             </h1>
-            <p className="text-indigo-600 font-bold tracking-widest mt-1 uppercase text-sm">
-              {student.id.substring(0, 8)}
-            </p>
+            {student.registrationNumber ? (
+              <p className="text-indigo-600 font-bold tracking-widest mt-1 uppercase text-sm">
+                {student.registrationNumber}
+              </p>
+            ) : (
+              <p className="text-indigo-600 font-bold tracking-widest mt-1 uppercase text-sm">
+                {student.id.substring(0, 8)}
+              </p>
+            )}
             <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
               {isRtl ? "طالب مسجل رسمياً" : "Verified Student"}
             </div>
           </div>
 
-          {/* Details */}
           <div className="p-8 space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -134,49 +145,19 @@ export default function PublicStudentVerify() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            {student.schoolName ? (
               <div className="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
                 <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
-                  <Phone size={18} />
+                  <Building size={18} />
                 </div>
                 <div>
                   <p className="text-xs font-bold text-slate-400">
-                    {isRtl ? "ولي الأمر" : "Parent Phone"}
+                    {isRtl ? "المدرسة" : "School"}
                   </p>
-                  <p className="text-slate-900 font-mono font-bold mt-0.5">
-                    {student.parentPhone || "-"}
-                  </p>
+                  <p className="text-slate-900 font-bold mt-0.5">{student.schoolName}</p>
                 </div>
               </div>
-
-              <div className="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div className="w-10 h-10 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center shrink-0">
-                  <Mail size={18} />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400">
-                    {isRtl ? "الإيميل" : "Email"}
-                  </p>
-                  <p className="text-slate-900 font-bold mt-0.5 max-w-[200px] truncate">
-                    {student.parentEmail || "-"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center shrink-0">
-                  <MapPin size={18} />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400">
-                    {isRtl ? "العنوان" : "Address"}
-                  </p>
-                  <p className="text-slate-900 font-bold mt-0.5 leading-snug">
-                    {student.address || "-"}
-                  </p>
-                </div>
-              </div>
-            </div>
+            ) : null}
 
             <div className="mt-8 pt-6 border-t border-slate-100 text-center">
               <div className="flex items-center justify-center gap-2 text-slate-400 mb-2">
