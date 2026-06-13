@@ -1397,20 +1397,22 @@ async function startServer() {
     // START FCM BACKGROUND PUSH DISPATCH LISTENER
     try {
       const db = getDb();
-      const bootTime = admin.firestore.Timestamp.now();
       console.log('[FCM RUNTIME] Active notification-to-push FCM gateway initialized. Listening for school events...');
       
       db.collection('notifications')
-        .where('createdAt', '>=', bootTime)
         .onSnapshot(snapshot => {
           if (!snapshot) return;
           snapshot.docChanges().forEach(async change => {
             if (change.type === 'added') {
               const notif = change.doc.data();
+              if (notif.pushDispatched === true) return;
+
               const userId = notif.userId;
+              const notifSchoolId = String(notif.schoolId || '');
               const title = notif.title || 'إشعار جديد';
               const message = notif.message || notif.content || '';
               const type = notif.type || 'system';
+              const notifId = change.doc.id;
               
               if (!userId) return;
               
@@ -1426,10 +1428,20 @@ async function startServer() {
                     }
                   });
                 } else {
-                  // Fetch targeted user tokens
+                  // Fetch targeted user tokens — verify school boundary
                   const userDoc = await db.collection('users').doc(userId).get();
                   if (userDoc.exists) {
-                    const tokens = userDoc.data()?.fcmTokens;
+                    const userData = userDoc.data() || {};
+                    if (
+                      notifSchoolId &&
+                      notifSchoolId !== 'system' &&
+                      userData.schoolId &&
+                      userData.schoolId !== notifSchoolId
+                    ) {
+                      console.warn(`[FCM SKIP] School mismatch for user ${userId}`);
+                      return;
+                    }
+                    const tokens = userData.fcmTokens;
                     if (Array.isArray(tokens)) {
                       userTokens.push(...tokens);
                     }
@@ -1451,7 +1463,9 @@ async function startServer() {
                     data: {
                       type: String(type),
                       schoolId: String(notif.schoolId || ''),
-                      userId: String(userId)
+                      userId: String(userId),
+                      notificationId: String(notifId),
+                      route: String(notif.metadata?.route || type),
                     },
                     android: {
                       priority: 'high' as const,
@@ -1471,6 +1485,24 @@ async function startServer() {
                   
                   const response = await admin.messaging().sendEach(messages);
                   console.log(`[FCM SUCCESS] Delivered push successfully. Succeeded: ${response.successCount}, Failed: ${response.failureCount}`);
+
+                  // Mark dispatched + prune dead tokens
+                  await change.doc.ref.update({ pushDispatched: true, pushDispatchedAt: admin.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+
+                  if (response.failureCount > 0 && userId !== 'super_admin') {
+                    const deadTokens: string[] = [];
+                    response.responses.forEach((r, idx) => {
+                      if (!r.success && r.error?.code === 'messaging/registration-token-not-registered') {
+                        deadTokens.push(userTokens[idx]);
+                      }
+                    });
+                    if (deadTokens.length > 0) {
+                      const userRef = db.collection('users').doc(userId);
+                      await userRef.update({
+                        fcmTokens: admin.firestore.FieldValue.arrayRemove(...deadTokens),
+                      }).catch(() => {});
+                    }
+                  }
                 }
               } catch (fcmErr: any) {
                 console.error('[FCM TRANSMIT ERROR] Failed to dispatch Firebase cloud messages:', fcmErr.message);

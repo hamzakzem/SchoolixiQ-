@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
+import { NotificationBadgeProvider } from "./lib/NotificationBadgeContext";
 import {
   isPendingSchoolAdmin,
   isActiveSchoolAdmin,
@@ -1640,6 +1641,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
           <AuthProvider>
+            <NotificationBadgeProvider>
             <BrowserRouter>
               <Suspense fallback={<PageLoadingSkeleton />}>
                 <Routes>
@@ -1673,6 +1675,7 @@ export default function App() {
               <InstallAppBanner />
               <AudioNotificationManager />
             </BrowserRouter>
+            </NotificationBadgeProvider>
           </AuthProvider>
         </LanguageProvider>
       </QueryClientProvider>

@@ -23,6 +23,7 @@ import {
   FileArchive,
   Bell,
   Trash2,
+  BellRing,
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 import { sendEmailVerification, signOut } from "firebase/auth";
@@ -53,6 +54,7 @@ import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
 import { filterNotificationsForUser } from "../lib/notificationVisibility";
+import { useNotificationBadges, TabBadge } from "../lib/NotificationBadgeContext";
 import { canAccessAdminMenuItem } from "../lib/staffPermissions";
 import SchoolixLogo from "../components/SchoolixLogo";
 import { isCustomSchoolLogo } from "../lib/brandAssets";
@@ -126,6 +128,7 @@ import SettingsView from "./admin/SettingsView";
 import Announcements from "./admin/Announcements";
 import IdCards from "./admin/IdCards";
 import Tuition from "./admin/Tuition";
+import TuitionReminderDashboard from "./admin/TuitionReminderDashboard";
 import Behavior from "./admin/Behavior";
 import ParentsList from "./admin/ParentsList";
 import Classes from "./admin/Classes";
@@ -229,6 +232,7 @@ export default function AdminDashboard() {
   };
   // Filter menu items based on assistant or plan permissions
   const { profile, schoolData: authSchoolData } = useAuth();
+  const { totalUnread, tabBadges } = useNotificationBadges();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -268,6 +272,7 @@ export default function AdminDashboard() {
     { id: "grades", label: t("grades"), icon: BarChart3 },
     { id: "student_archive", label: isRtl ? "أرشيف الطالب" : "Student Archive", icon: FileArchive },
     { id: "tuition", label: t("tuition"), icon: Wallet },
+    { id: "tuition_reminders", label: isRtl ? "تذكير الأقساط" : "Tuition Reminders", icon: BellRing },
     { id: "payroll", label: t("payroll"), icon: Wallet },
     { id: "inventory", label: t("inventory"), icon: Package },
     { id: "behavior", label: t("behavior"), icon: MessageSquare },
@@ -1193,6 +1198,8 @@ export default function AdminDashboard() {
         return <StaffList />;
       case "tuition":
         return <Tuition />;
+      case "tuition_reminders":
+        return <TuitionReminderDashboard />;
       case "behavior":
         return <Behavior />;
       case "dismissal_gate":
@@ -1354,8 +1361,11 @@ export default function AdminDashboard() {
                       className="shrink-0"
                     />
                     {!isSidebarCollapsed && (
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate flex-1 text-right">{item.label}</span>
                     )}
+                    {!isSidebarCollapsed && tabBadges[item.id] ? (
+                      <TabBadge count={tabBadges[item.id]} />
+                    ) : null}
 
                     {/* Tooltip for collapsed state */}
                     {isSidebarCollapsed && (
@@ -1474,9 +1484,9 @@ export default function AdminDashboard() {
               }`}
             >
               <Bell size={18} className="transition-transform duration-300 group-hover:scale-110" />
-              {notifications.filter((n: any) => !n.read).length > 0 && (
+              {totalUnread > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-[#0B2345] rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                  {notifications.filter((n: any) => !n.read).length > 9 ? '9+' : notifications.filter((n: any) => !n.read).length}
+                  {totalUnread > 9 ? '9+' : totalUnread}
                 </span>
               )}
             </button>
@@ -1695,7 +1705,7 @@ export default function AdminDashboard() {
           setIsSidebarOpen={setIsSidebarOpen}
           showNotifications={showNotifications}
           setShowNotifications={setShowNotifications}
-          notificationsCount={notifications.filter((n: any) => !n.read).length}
+          notificationsCount={totalUnread}
           isRtl={isRtl}
         />
       </div>

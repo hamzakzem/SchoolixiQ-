@@ -99,19 +99,40 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {};
-  const title = data.title || 'Schoolix IQ Notification';
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data?.text() };
+  }
+  const data = payload.notification ? { ...payload, ...payload.data } : payload;
+  const title = data.title || payload.notification?.title || 'Schoolix IQ';
+  const body = data.body || payload.notification?.body || 'إشعار جديد';
+  const route = data.route || data.type || '/';
+  const url = data.url || `/?tab=${encodeURIComponent(route)}`;
   const options = {
-    body: data.body || 'You received a new message or update on Schoolix.',
-    icon: 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg',
-    badge: 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3eb.svg',
+    body,
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
     vibrate: [100, 50, 100],
-    data: { url: data.url || '/' },
+    tag: data.notificationId || data.dedupKey || undefined,
+    data: { url, route, notificationId: data.notificationId },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data.url));
+  const targetUrl = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if ('focus' in client) {
+          client.postMessage({ type: 'NOTIFICATION_CLICK', route: event.notification.data?.route });
+          return client.focus();
+        }
+      }
+      return clients.openWindow(targetUrl);
+    }),
+  );
 });

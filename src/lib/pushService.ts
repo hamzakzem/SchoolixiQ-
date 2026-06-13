@@ -72,7 +72,12 @@ export const registerForPushNotifications = async (userId: string, userRole: str
     // Listen for notification tapped by the user
     PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
       console.log('Push action performed: ' + JSON.stringify(notification));
-      // Could route the user to a specific tab/page based on notification data
+      const data = notification.notification?.data || {};
+      const route = data.route || data.type;
+      if (route && typeof window !== 'undefined') {
+        localStorage.setItem('schoolix_pending_tab_redirect', String(route));
+        window.dispatchEvent(new CustomEvent('schoolix-notification-route', { detail: { route } }));
+      }
     });
 
   } catch (error) {

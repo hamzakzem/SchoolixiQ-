@@ -101,6 +101,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           try {
             const { unregisterPushToken } = await import('./pushService');
             await unregisterPushToken(userIdForPush);
+            const { unregisterWebPushToken } = await import('./webPushService');
+            await unregisterWebPushToken(userIdForPush);
           } catch (e) {}
         }
       }
@@ -216,6 +218,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             try {
               const { registerForPushNotifications } = await import('./pushService');
               await registerForPushNotifications(authUser.uid, data.role, data.schoolId || '');
+              const { registerWebPushNotifications } = await import('./webPushService');
+              await registerWebPushNotifications(authUser.uid);
             } catch (err) {
               console.error('Failed to init push notifications', err);
             }

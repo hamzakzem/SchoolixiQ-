@@ -650,6 +650,43 @@ service cloud.firestore {
         || (signedIn() && resource.data.parentId == request.auth.uid);
     }
 
+    match /tuition_reminder_tracking/{trackingId} {
+      allow read, get, list: if isSuperAdmin()
+        || (
+          signedIn()
+          && hasSchoolId(resource.data)
+          && userSchoolId() == resource.data.schoolId
+          && isSchoolManagementRole()
+        );
+      allow create, update: if isSuperAdmin()
+        || (
+          signedIn()
+          && hasSchoolId(request.resource.data)
+          && userSchoolId() == request.resource.data.schoolId
+          && isSchoolManagementRole()
+        );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /tuition_reminder_logs/{logId} {
+      allow read, get, list: if isSuperAdmin()
+        || (
+          signedIn()
+          && hasSchoolId(resource.data)
+          && userSchoolId() == resource.data.schoolId
+          && isSchoolManagementRole()
+        );
+      allow create: if isSuperAdmin()
+        || (
+          signedIn()
+          && hasSchoolId(request.resource.data)
+          && userSchoolId() == request.resource.data.schoolId
+          && isSchoolManagementRole()
+          && request.resource.data.sentBy == request.auth.uid
+        );
+      allow update, delete: if isSuperAdmin();
+    }
+
     // -------------------------------------------------------------------------
     // Messaging
     // -------------------------------------------------------------------------

@@ -1,8 +1,8 @@
 import { db } from './firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, writeBatch, deleteDoc, limit } from 'firebase/firestore';
 import { resolveStudentParentIds } from './schoolSync';
 
-export type NotificationType = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'tuition' | 'homework' | 'report' | 'system';
+export type NotificationType = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'tuition' | 'homework' | 'report' | 'system' | 'message' | 'chat' | 'smart_gate' | 'dismissal';
 
 export interface NotificationPayload {
   userId: string;
@@ -56,6 +56,39 @@ function buildNotificationDoc(
 }
 
 export const notificationService = {
+  /**
+   * Send without duplicate when metadata.dedupKey matches an unread recent notification.
+   */
+  async sendWithDedup(payload: NotificationPayload): Promise<boolean> {
+    const dedupKey =
+      payload.metadata &&
+      typeof payload.metadata === 'object' &&
+      typeof payload.metadata.dedupKey === 'string'
+        ? payload.metadata.dedupKey
+        : null;
+
+    if (dedupKey) {
+      try {
+        const q = query(
+          collection(db, 'notifications'),
+          where('schoolId', '==', payload.schoolId),
+          where('userId', '==', payload.userId),
+          where('metadata.dedupKey', '==', dedupKey),
+          limit(1),
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          console.info('Notification dedup skipped:', dedupKey);
+          return true;
+        }
+      } catch (err) {
+        console.warn('Dedup check failed, sending anyway:', err);
+      }
+    }
+
+    return this.send(payload);
+  },
+
   /**
    * Send a notification to a specific user
    */

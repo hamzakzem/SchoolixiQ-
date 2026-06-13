@@ -62,6 +62,15 @@ import {
 import { getSafeHomeworkNotificationTitle } from "../lib/homeworkSubjects";
 import { buildTeacherRedactionContext } from "../lib/userProfile";
 import { toast } from "react-hot-toast";
+import {
+  NOTIFICATION_CATEGORIES,
+  resolveNotificationCategoryId,
+  getCategoryConfig,
+  getTimeGroup,
+  TIME_GROUP_LABELS,
+  type NotificationCategoryId,
+} from "../lib/notificationCategories";
+import { registerWebPushNotifications, getStoredWebPushToken } from "../lib/webPushService";
 
 type DashboardRole =
   | "parent"
@@ -256,34 +265,24 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
 
     try {
-      const permission = await Notification.requestPermission();
-      setWebPushStatus(permission);
-      
-      if (permission === 'granted') {
-        // Mock FCM Web Token generation and database sync
-        const mockToken = "fcm_web_" + Math.random().toString(36).substr(2, 16).toUpperCase();
-        setDeviceToken(mockToken);
-        localStorage.setItem('schoolix_fcm_token_web', mockToken);
-
-        // Sync token to Firestore `/users/{userId}` to show real-time persistence
-        if (user?.uid) {
-          const userRef = doc(db, 'users', user.uid);
-          await updateDoc(userRef, {
-            fcmTokens: [mockToken] // Store FCM token array
-          });
-          
-          // Log device token creation for auditing
-          await addDoc(collection(db, 'audit_logs'), {
-            userId: user.uid,
-            action: 'fcm_token_register',
-            platform: 'web',
-            token: mockToken,
-            createdAt: serverTimestamp()
-          });
-
-          toast.success(isArabic ? "تم تفعيل الإشعارات الفورية للمتصفح!" : "Web push notifications enabled successfully!");
+      if (!user?.uid) return;
+      const token = await registerWebPushNotifications(user.uid);
+      if (token) {
+        setDeviceToken(token);
+        setWebPushStatus('granted');
+        toast.success(isArabic ? "تم تفعيل الإشعارات الفورية للمتصفح!" : "Web push notifications enabled successfully!");
+      } else if (Notification.permission === 'granted') {
+        const stored = getStoredWebPushToken();
+        if (stored) {
+          setDeviceToken(stored);
+          setWebPushStatus('granted');
+          toast(isArabic ? "الإشعار مفعّل — أضف VITE_FCM_VAPID_KEY لتفعيل FCM" : "Enabled locally — set VITE_FCM_VAPID_KEY for FCM", { icon: 'ℹ️' });
+        } else {
+          setWebPushStatus(Notification.permission);
+          toast.error(isArabic ? "تعذر الحصول على رمز FCM" : "Could not obtain FCM token");
         }
       } else {
+        setWebPushStatus(Notification.permission);
         toast.error(isArabic ? "تم رفض الإذن. يرجى تفعيله من إعدادات المتصفح" : "Permission denied. Enable it in browser settings.");
       }
     } catch (err) {
@@ -422,7 +421,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
     // Filter by Specific Category Pills
     if (categoryFilter !== 'all') {
-      result = result.filter(n => n.type === categoryFilter);
+      result = result.filter(
+        (n) => resolveNotificationCategoryId(n) === categoryFilter,
+      );
     }
 
     // Keyword Search (matching title or content message)
@@ -543,37 +544,77 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
   };
 
-  const getCategoryIcon = (type: string) => {
-    switch (type) {
-      case 'homework': return <BookOpen className="w-4 h-4 text-emerald-500" />;
-      case 'grade':
-      case 'grades': return <FileText className="w-4 h-4 text-indigo-500" />;
-      case 'payment':
-      case 'tuition': return <DollarSign className="w-4 h-4 text-amber-500" />;
-      case 'attendance': return <UserCheck className="w-4 h-4 text-cyan-500" />;
-      case 'announcement': return <Bell className="w-4 h-4 text-pink-500" />;
-      case 'message': return <Mail className="w-4 h-4 text-sky-500" />;
-      case 'behavior': return <AlertTriangle className="w-4 h-4 text-rose-500" />;
-      case 'system':
-      default: return <ShieldCheck className="w-4 h-4 text-teal-500" />;
-    }
+  const getCategoryIcon = (notification: Record<string, unknown>) => {
+    const cat = getCategoryConfig(resolveNotificationCategoryId(notification));
+    const Icon = cat.icon;
+    return <Icon className={`w-4 h-4 ${cat.color}`} />;
   };
 
-  const getCategoryLabel = (type: string) => {
-    switch (type) {
-      case 'homework': return isArabic ? "الواجبات" : "Homework";
-      case 'grade':
-      case 'grades': return isArabic ? "أكاديمي" : "Grades";
-      case 'payment':
-      case 'tuition': return isArabic ? "مدفوعات" : "Financial";
-      case 'attendance': return isArabic ? "الحضور والغياب" : "Attendance";
-      case 'announcement': return isArabic ? "الإعلانات" : "Announcements";
-      case 'message': return isArabic ? "رسالة" : "Messages";
-      case 'behavior': return isArabic ? "سلوك" : "Behavior";
-      case 'system':
-      default: return isArabic ? "النظام" : "System";
-    }
+  const getCategoryLabel = (notification: Record<string, unknown>) => {
+    const cat = getCategoryConfig(resolveNotificationCategoryId(notification));
+    return isArabic ? cat.labelAr : cat.labelEn;
   };
+
+  const groupedNotifs = React.useMemo(() => {
+    const groups: Record<'today' | 'yesterday' | 'older', any[]> = {
+      today: [],
+      yesterday: [],
+      older: [],
+    };
+    filteredNotifs.forEach((n) => {
+      const d =
+        n.createdAt instanceof Date
+          ? n.createdAt
+          : n.createdAt?.toDate?.() || new Date(n.createdAt);
+      groups[getTimeGroup(d)].push(n);
+    });
+    return groups;
+  }, [filteredNotifs]);
+
+  const renderNotificationCard = (n: any) => (
+    <div
+      key={n.id}
+      onClick={() => handleNotificationClick(n)}
+      className={`group p-4.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all cursor-pointer flex items-start gap-3.5 sm:gap-4 hover:shadow-lg active:scale-[0.99] hover:border-slate-350 dark:hover:border-slate-700/80 ${
+        !n.read
+          ? 'bg-indigo-50/15 border-indigo-150/40 dark:bg-indigo-950/10 dark:border-indigo-900/30'
+          : 'bg-white border-slate-100 dark:bg-slate-950 dark:border-slate-850/50'
+      } relative`}
+    >
+      {!n.read && (
+        <span className={`absolute top-4 ${isArabic ? 'left-4' : 'right-4'} w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse`} />
+      )}
+      <div className={`p-3.5 rounded-2xl shrink-0 flex items-center justify-center border ${getCategoryConfig(resolveNotificationCategoryId(n)).bgColor} ${getCategoryConfig(resolveNotificationCategoryId(n)).borderColor}`}>
+        {getCategoryIcon(n)}
+      </div>
+      <div className="flex-1 space-y-1.5 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`text-[9px] sm:text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md border ${getCategoryConfig(resolveNotificationCategoryId(n)).bgColor} ${getCategoryConfig(resolveNotificationCategoryId(n)).color}`}>
+            {getCategoryLabel(n)}
+          </span>
+          <span className="text-[10px] text-slate-450 flex items-center gap-1 select-none font-medium">
+            <Clock className="w-3 h-3" />
+            {n.createdAt.toLocaleDateString()} {n.createdAt.toLocaleTimeString()}
+          </span>
+        </div>
+        <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-md leading-tight">
+          {getNotificationTitle(n)}
+        </h4>
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-semibold break-words">
+          {n.message}
+        </p>
+      </div>
+      <div className="shrink-0 self-center flex items-center gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={(e) => handleDeleteOne(e, n.id, n)}
+          className="p-2.5 text-slate-400 hover:text-red-550 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-full transition-colors active:scale-90 cursor-pointer"
+          title={isArabic ? 'مسح التنبيه' : 'Delete Notification'}
+        >
+          <Trash2 className="w-4.5 h-4.5" />
+        </button>
+      </div>
+    </div>
+  );
 
   return createPortal(
     <div className="fixed inset-0 bg-slate-950/60 dark:bg-slate-950/85 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ zIndex: 9999 }}>
@@ -1000,11 +1041,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 <div className="flex items-center gap-2 overflow-x-auto shrink-0 pb-2 md:pb-0 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
                   {[
                     { id: 'all', label: isArabic ? '⭐ الكل' : '⭐ All' },
-                    { id: 'announcement', label: isArabic ? '📢 الإعلانات' : '📢 Announcements' },
-                    { id: 'grade', label: isArabic ? '🎓 الأكاديمي' : '🎓 Academic' },
-                    { id: 'payment', label: isArabic ? '💰 المالية' : '💰 Financial' },
-                    { id: 'attendance', label: isArabic ? '📝 الحضور' : '📝 Attendance' },
-                    { id: 'message', label: isArabic ? '💬 الدردشات' : '💬 Chats' }
+                    ...NOTIFICATION_CATEGORIES.map((c) => ({
+                      id: c.id,
+                      label: isArabic ? c.labelAr : c.labelEn,
+                    })),
                   ].map((catPill) => (
                     <button
                       key={catPill.id}
@@ -1045,58 +1085,17 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3.5 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
-                  {filteredNotifs.map((n) => (
-                    <div
-                      key={n.id}
-                      onClick={() => handleNotificationClick(n)}
-                      className={`group p-4.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all cursor-pointer flex items-start gap-3.5 sm:gap-4 hover:shadow-lg active:scale-[0.99] hover:border-slate-350 dark:hover:border-slate-700/80 ${
-                        !n.read 
-                          ? 'bg-indigo-50/15 border-indigo-150/40 dark:bg-indigo-950/10 dark:border-indigo-900/30' 
-                          : 'bg-white border-slate-100 dark:bg-slate-950 dark:border-slate-850/50'
-                      } relative`}
-                    >
-                      {/* Read state flashing dot indicator */}
-                      {!n.read && (
-                        <span className={`absolute top-4 ${isArabic ? "left-4" : "right-4"} w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse`} />
-                      )}
-
-                      {/* Icon */}
-                      <div className={`p-3.5 rounded-2xl shrink-0 flex items-center justify-center ${!n.read ? 'bg-white dark:bg-slate-900 shadow-sm text-indigo-600' : 'bg-slate-50 dark:bg-slate-900 text-slate-400'}`}>
-                        {getCategoryIcon(n.type)}
+                <div className="space-y-5 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
+                  {(['today', 'yesterday', 'older'] as const).map((groupKey) =>
+                    groupedNotifs[groupKey].length > 0 ? (
+                      <div key={groupKey} className="space-y-3">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1 sticky top-0 bg-white/90 dark:bg-slate-900/90 py-1 z-10">
+                          {isArabic ? TIME_GROUP_LABELS[groupKey].ar : TIME_GROUP_LABELS[groupKey].en}
+                        </h3>
+                        {groupedNotifs[groupKey].map(renderNotificationCard)}
                       </div>
-
-                      {/* Msg */}
-                      <div className="flex-1 space-y-1.5 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[9px] sm:text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300 select-none">
-                            {getCategoryLabel(n.type)}
-                          </span>
-                          <span className="text-[10px] text-slate-450 flex items-center gap-1 select-none font-medium">
-                            <Clock className="w-3 h-3" />
-                            {n.createdAt.toLocaleDateString()} {n.createdAt.toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-md leading-tight">
-                          {getNotificationTitle(n)}
-                        </h4>
-                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-semibold break-words">
-                          {n.message}
-                        </p>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="shrink-0 self-center flex items-center gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => handleDeleteOne(e, n.id, n)}
-                          className="p-2.5 text-slate-400 hover:text-red-550 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-full transition-colors active:scale-90 cursor-pointer"
-                          title={isArabic ? "مسح التنبيه" : "Delete Notification"}
-                        >
-                          <Trash2 className="w-4.5 h-4.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ) : null,
+                  )}
                 </div>
               )}
             </div>

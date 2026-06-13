@@ -10,7 +10,10 @@ import {
   XCircle,
   KeyRound,
   Clock,
+  Bell,
 } from 'lucide-react';
+import { NotificationCenter } from '../components/NotificationCenter';
+import { useNotificationBadges } from '../lib/NotificationBadgeContext';
 import { toast } from 'react-hot-toast';
 import {
   subscribeSchoolDismissals,
@@ -67,6 +70,8 @@ export default function GuardDashboard() {
   const [confirmReady, setConfirmReady] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { totalUnread } = useNotificationBadges();
 
   useEffect(() => {
     if (!profile?.schoolId) return;
@@ -187,14 +192,32 @@ export default function GuardDashboard() {
             <p className="text-xs text-slate-300">{schoolData?.name || profile?.schoolId}</p>
           </div>
         </div>
-        <button
-          onClick={() => signOut(auth)}
-          className="p-2 rounded-xl bg-white/10 hover:bg-white/20"
-          title="تسجيل الخروج"
-        >
-          <LogOut size={18} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowNotifications(true)}
+            className="relative p-2 rounded-xl bg-white/10 hover:bg-white/20"
+            title="الإشعارات"
+          >
+            <Bell size={18} />
+            {totalUnread > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-black flex items-center justify-center">
+                {totalUnread > 9 ? '9+' : totalUnread}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => signOut(auth)}
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20"
+            title="تسجيل الخروج"
+          >
+            <LogOut size={18} />
+          </button>
+        </div>
       </header>
+      {showNotifications && (
+        <NotificationCenter onClose={() => setShowNotifications(false)} userRole="guard" />
+      )}
 
       <motion.main
         className="max-w-3xl mx-auto p-4 md:p-8 space-y-6 sx-fade-in"
