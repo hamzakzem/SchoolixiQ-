@@ -36,6 +36,26 @@ const NotificationBadgeContext = createContext<NotificationBadgeState>({
   loading: true,
 });
 
+function isSuperAdminRole(role?: string) {
+  return role === 'superadmin' || role === 'super_admin';
+}
+
+function logNotificationBadgeError(
+  queryName: string,
+  error: unknown,
+  meta: { uid: string; schoolId?: string; role?: string },
+) {
+  const err = error as { code?: string; message?: string };
+  console.error('[NotificationBadge] LISTENER_ERROR', {
+    QUERY_NAME: queryName,
+    uid: meta.uid,
+    schoolId: meta.schoolId ?? '(undefined)',
+    role: meta.role ?? '(undefined)',
+    code: err?.code ?? '(no code)',
+    message: err?.message ?? String(error),
+  });
+}
+
 export function NotificationBadgeProvider({ children }: { children: React.ReactNode }) {
   const { user, profile } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -48,40 +68,92 @@ export function NotificationBadgeProvider({ children }: { children: React.ReactN
       return;
     }
 
-    const isSuperAdmin = profile?.role === 'superadmin';
-    const queries = [
-      query(collection(db, 'notifications'), where('userId', '==', user.uid)),
-    ];
-    if (isSuperAdmin) {
-      queries.push(
-        query(collection(db, 'notifications'), where('userId', '==', 'super_admin')),
-      );
+    const role = profile?.role;
+    const schoolId = profile?.schoolId;
+    const isSuperAdmin = isSuperAdminRole(role);
+
+    if (!isSuperAdmin && !schoolId) {
+      setLoading(true);
+      return;
     }
 
-    const unsubs = queries.map((q) =>
+    type BadgeQuery = { queryName: string; q: ReturnType<typeof query> };
+    const queries: BadgeQuery[] = [];
+
+    if (isSuperAdmin) {
+      queries.push({
+        queryName: 'NOTIFICATION_BADGE_SUPERADMIN_USER',
+        q: query(
+          collection(db, 'notifications'),
+          where('userId', '==', user.uid),
+        ),
+      });
+      queries.push({
+        queryName: 'NOTIFICATION_BADGE_SUPERADMIN_INBOX',
+        q: query(
+          collection(db, 'notifications'),
+          where('userId', '==', 'super_admin'),
+        ),
+      });
+    } else if (schoolId) {
+      queries.push({
+        queryName: 'NOTIFICATION_BADGE_SCHOOL',
+        q: query(
+          collection(db, 'notifications'),
+          where('userId', '==', user.uid),
+          where('schoolId', '==', schoolId),
+        ),
+      });
+      queries.push({
+        queryName: 'NOTIFICATION_BADGE_SYSTEM',
+        q: query(
+          collection(db, 'notifications'),
+          where('userId', '==', user.uid),
+          where('schoolId', '==', 'system'),
+        ),
+      });
+    }
+
+    const snapshotByQuery = new Map<string, any[]>();
+
+    const mergeSnapshots = () => {
+      const merged = new Map<string, any>();
+      for (const items of snapshotByQuery.values()) {
+        for (const item of items) {
+          merged.set(item.id, item);
+        }
+      }
+      setNotifications(Array.from(merged.values()));
+      setLoading(false);
+    };
+
+    const unsubs = queries.map(({ queryName, q }) =>
       onSnapshot(
         q,
         (snap) => {
-          setNotifications((prev) => {
-            const map = new Map<string, any>();
-            prev.forEach((n) => map.set(n.id, n));
-            snap.docs.forEach((d) => {
-              map.set(d.id, {
-                id: d.id,
-                ...d.data(),
-                createdAt: d.data().createdAt?.toDate?.() ?? d.data().createdAt,
-              });
-            });
-            return Array.from(map.values());
+          snapshotByQuery.set(
+            queryName,
+            snap.docs.map((d) => ({
+              id: d.id,
+              ...d.data(),
+              createdAt: d.data().createdAt?.toDate?.() ?? d.data().createdAt,
+            })),
+          );
+          mergeSnapshots();
+        },
+        (error) => {
+          logNotificationBadgeError(queryName, error, {
+            uid: user.uid,
+            schoolId,
+            role,
           });
           setLoading(false);
         },
-        () => setLoading(false),
       ),
     );
 
     return () => unsubs.forEach((u) => u());
-  }, [user?.uid, profile?.role]);
+  }, [user?.uid, profile?.role, profile?.schoolId]);
 
   const visible = useMemo(
     () =>

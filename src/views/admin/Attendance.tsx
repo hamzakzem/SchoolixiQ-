@@ -144,7 +144,8 @@ export default function Attendance() {
             title: `${t('attendance')}: ${statusText}`,
             message: `${isRtl ? 'تم تسجيل الطالب كـ' : 'Student recorded as'} ${statusText} ${isRtl ? 'لليوم' : 'for today'} (${date})`,
             type: 'attendance',
-            schoolId: profile.schoolId
+            schoolId: profile.schoolId,
+            metadata: { studentId, status },
           });
         }
       }

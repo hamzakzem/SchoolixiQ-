@@ -69,6 +69,19 @@ export async function resolveStudentParentIds(
   return [...new Set(verified)];
 }
 
+/** Union of parent UIDs linked to students (for parent-scoped homework writes). */
+export function collectParentIdsFromStudents(
+  students: Array<{ parentIds?: string[] }>,
+): string[] {
+  const ids = new Set<string>();
+  for (const student of students) {
+    for (const parentId of student.parentIds || []) {
+      if (parentId) ids.add(parentId);
+    }
+  }
+  return Array.from(ids);
+}
+
 export function homeworkMatchesStudent(
   hwClassId: string,
   student: { classId?: string; class?: string },

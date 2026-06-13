@@ -8,7 +8,7 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
-import { homeworkMatchesStudent } from '../../lib/schoolSync';
+import { homeworkMatchesStudent, collectParentIdsFromStudents } from '../../lib/schoolSync';
 import { getHomeworkSubjectDisplay } from '../../lib/homeworkSubjects';
 import { buildTeacherRedactionContext } from '../../lib/userProfile';
 
@@ -117,6 +117,10 @@ export default function Homework() {
       } else {
         const className = classes.find((c) => c.id === selectedClassId)?.name || '';
         const adminSubjectName = isRtl ? 'إدارة المدرسة' : 'School Administration';
+        const classStudents = students.filter((s) =>
+          homeworkMatchesStudent(selectedClassId, s, classes),
+        );
+        const parentIds = collectParentIdsFromStudents(classStudents);
         const homeworkRef = await addDoc(collection(db, 'homework'), {
           ...newHomework,
           classId: selectedClassId,
@@ -127,14 +131,12 @@ export default function Homework() {
           subjectName: adminSubjectName,
           subject: adminSubjectName,
           schoolId: profile.schoolId,
+          parentIds,
           createdAt: serverTimestamp(),
           hiddenFor: []
         });
         
         // Notify parents of students in the target class only
-        const classStudents = students.filter((s) =>
-          homeworkMatchesStudent(selectedClassId, s, classes),
-        );
         for (const student of classStudents) {
           try {
             await notificationService.notifyStudentParents(student.id, {

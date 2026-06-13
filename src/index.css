@@ -8,6 +8,11 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --color-primary: #0B2345;
   --color-secondary: #D4A64A;
+  --color-accent: #D4AF37;
+  --color-surface: #F7F8FA;
+  --color-sx-card: #FFFFFF;
+  --color-sx-border: #E5E7EB;
+  --color-sx-text: #1E293B;
   
   --color-indigo-50: #F3F4F6;
   --color-indigo-100: #E1E6EE;
@@ -1022,5 +1027,43 @@ html.theme-transition *::after {
   .solar i {
     animation: none !important;
   }
+}
+
+/* ─── Schoolix SaaS layout tokens (Phase 1) ─── */
+.bg-sx-surface { background-color: var(--color-surface); }
+.bg-sx-card { background-color: var(--color-sx-card); }
+.bg-sx-primary { background-color: var(--color-primary); }
+.bg-sx-accent { background-color: var(--color-accent); }
+.text-sx-text { color: var(--color-sx-text); }
+.text-sx-primary { color: var(--color-primary); }
+.text-sx-accent { color: var(--color-accent); }
+.border-sx-border { border-color: var(--color-sx-border); }
+.border-sx-primary { border-color: var(--color-primary); }
+
+.sx-shell {
+  background-color: var(--color-surface);
+}
+.dark .sx-shell {
+  background-color: #0f172a;
+}
+.dark .bg-sx-card,
+.dark .bg-sx-surface {
+  background-color: #0f172a;
+}
+.dark .bg-sx-card {
+  background-color: #0f172a;
+}
+.dark .border-sx-border {
+  border-color: #334155;
+}
+.dark .text-sx-text {
+  color: #f1f5f9;
+}
+
+.sx-table-shell table thead th {
+  background-color: var(--color-surface);
+}
+.dark .sx-table-shell table thead th {
+  background-color: rgba(30, 41, 59, 0.8);
 }
 

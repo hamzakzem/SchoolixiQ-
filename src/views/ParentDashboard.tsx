@@ -15,8 +15,6 @@ import {
   arrayUnion,
   deleteDoc,
   getDoc,
-  or,
-  and,
 } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -25,15 +23,18 @@ import { GlobalFooter } from "../components/GlobalFooter";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
+import {
+  logParentFirestoreSetup,
+  logParentFirestoreError,
+  logParentFirestoreSnapshot,
+  type ParentFirestoreMeta,
+} from "../lib/parentQueryDebug";
 import { filterNotificationsForUser } from "../lib/notificationVisibility";
-import { homeworkMatchesStudent } from "../lib/schoolSync";
 import {
   getHomeworkSubjectDisplay,
   groupHomeworkBySubject,
 } from "../lib/homeworkSubjects";
 import {
-  buildTeacherRedactionContext,
-  getTeacherSubjectDisplay,
   isRedactedCredentialValue,
 } from "../lib/userProfile";
 import { alertIncomingNotification } from "../lib/notificationAlerts";
@@ -88,6 +89,23 @@ import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import SchoolixLogo from "../components/SchoolixLogo";
 import { isCustomAppLogo } from "../lib/brandAssets";
+
+function isParentDashboardRole(role?: string) {
+  return ["parent", "admin", "superadmin", "staff", "teacher"].includes(
+    role || "",
+  );
+}
+
+function parentSnapshotError(queryName: string, meta: ParentFirestoreMeta) {
+  return (error: unknown) => {
+    logParentFirestoreError(queryName, error, meta);
+    handleFirestoreError(
+      error,
+      OperationType.LIST,
+      `ParentDashboard:${queryName}`,
+    );
+  };
+}
 
 export default function ParentDashboard() {
   const { profile, schoolData } = useAuth();
@@ -165,17 +183,12 @@ export default function ParentDashboard() {
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentGrades, setStudentGrades] = useState<any[]>([]);
   const [loadingGrades, setLoadingGrades] = useState(false);
-  const [attendanceSummary, setAttendanceSummary] = useState({
-    absent: 0,
-    late: 0,
-  });
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [installments, setInstallments] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const notificationsPrimedRef = useRef(false);
   const knownNotificationIdsRef = useRef<Set<string>>(new Set());
-  const [teachersById, setTeachersById] = useState<Record<string, any>>({});
   const [showNotifications, setShowNotifications] = useState(false);
   const [marketItems, setMarketItems] = useState<any[]>([]);
   const [marketLoading, setMarketLoading] = useState(true);
@@ -194,8 +207,8 @@ export default function ParentDashboard() {
   );
   const [homework, setHomework] = useState<any[]>([]);
   const homeworkBySubject = useMemo(
-    () => groupHomeworkBySubject(homework, teachersById, isRtl),
-    [homework, teachersById, isRtl],
+    () => groupHomeworkBySubject(homework, {}, isRtl),
+    [homework, isRtl],
   );
   const [teacherReports, setTeacherReports] = useState<any[]>([]);
   const [advancedReports, setAdvancedReports] = useState<any[]>([]);
@@ -419,25 +432,34 @@ export default function ParentDashboard() {
       setStudentsLoading(false);
       return;
     }
-    const isParentOrAdmin = [
-      "parent",
-      "admin",
-      "superadmin",
-      "staff",
-      "teacher",
-    ].includes(profile.role || "");
-    if (!isParentOrAdmin) {
+    if (!isParentDashboardRole(profile.role)) {
       setStudentsLoading(false);
       return;
     }
-    const path = "students";
+
+    const queryName = "PARENT_STUDENTS";
+    const constraints = [`parentIds array-contains ${profile.uid}`];
+    const meta: ParentFirestoreMeta = {
+      queryName,
+      collection: "students",
+      constraints,
+      uid: profile.uid,
+      schoolId: profile.schoolId,
+    };
+    logParentFirestoreSetup(meta);
+
     const q = query(
-      collection(db, path),
+      collection(db, "students"),
       where("parentIds", "array-contains", profile.uid),
     );
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        logParentFirestoreSnapshot(
+          queryName,
+          snapshot.size,
+          snapshot.metadata.fromCache,
+        );
         const data = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -448,12 +470,10 @@ export default function ParentDashboard() {
           if (!selectedStudent) {
             setSelectedStudent(data[0]);
           } else {
-            // Keep current selected student updated with latest data from the students list
             const updated = data.find(
               (s) => (s as any).id === selectedStudent.id,
             );
             if (updated) {
-              // Only update if something actually changed to avoid effect loops
               if (
                 updated.name !== selectedStudent.name ||
                 updated.class !== selectedStudent.class ||
@@ -462,7 +482,6 @@ export default function ParentDashboard() {
                 setSelectedStudent(updated);
               }
             } else {
-              // Selected student was removed from the list
               setSelectedStudent(data[0]);
             }
           }
@@ -471,269 +490,48 @@ export default function ParentDashboard() {
         }
         setStudentsLoading(false);
       },
-      (error) => {
-        handleFirestoreError(
-          error,
-          OperationType.LIST,
-          "ParentDashboard:students",
-        );
-        setStudentsLoading(false);
-      },
+      parentSnapshotError(queryName, meta),
     );
     return unsubscribe;
   }, [profile]);
 
   useEffect(() => {
     if (!profile?.uid || !auth.currentUser) return;
-    const isParentOrAdmin = [
-      "parent",
-      "admin",
-      "superadmin",
-      "staff",
-      "teacher",
-    ].includes(profile.role || "");
-    if (!isParentOrAdmin || students.length === 0) return;
+    if (!isParentDashboardRole(profile.role)) return;
 
-    const prefsPath = "notification_preferences";
+    const schoolId = profile.schoolId || students[0]?.schoolId;
+    if (!schoolId) return;
+
+    const queryName = "PARENT_NOTIFICATIONS";
+    const constraints = [
+      `userId == ${profile.uid}`,
+      `schoolId == ${schoolId}`,
+      "limit(50)",
+    ];
+    const meta: ParentFirestoreMeta = {
+      queryName,
+      collection: "notifications",
+      constraints,
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(meta);
+
     const q = query(
-      collection(db, prefsPath),
-      where("parentId", "==", profile.uid),
+      collection(db, "notifications"),
+      where("userId", "==", profile.uid),
+      where("schoolId", "==", schoolId),
+      limit(50),
     );
 
-    const unsubscribe = onSnapshot(
+    return onSnapshot(
       q,
-      (snapshot) => {
-        const prefs: Record<string, any> = {};
-        snapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          prefs[data.studentId] = { id: doc.id, ...data };
-        });
-        setNotificationPrefs(prefs);
-      },
-      (error) => {
-        handleFirestoreError(
-          error,
-          OperationType.LIST,
-          "ParentDashboard:notification_preferences",
+      (snap) => {
+        logParentFirestoreSnapshot(
+          queryName,
+          snap.size,
+          snap.metadata.fromCache,
         );
-      },
-    );
-
-    return unsubscribe;
-  }, [profile, students]);
-
-  useEffect(() => {
-    if (!profile?.uid || !auth.currentUser) return;
-    const isParentOrAdmin = [
-      "parent",
-      "admin",
-      "superadmin",
-      "staff",
-      "teacher",
-    ].includes(profile.role || "");
-    if (!isParentOrAdmin || students.length === 0) return;
-
-    const reportsPath = "behavior_reports";
-    const studentIds = students?.map((s) => s.id) || [];
-
-    if (!studentIds || studentIds.length === 0) return;
-
-    const parentEmail =
-      auth.currentUser?.email?.toLowerCase() ||
-      profile?.email?.toLowerCase() ||
-      "";
-    const q = query(
-      collection(db, reportsPath),
-      where("studentId", "in", studentIds),
-      where("parentIds", "array-contains", profile.uid),
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const reports: Record<string, any[]> = {};
-
-        snapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          if (!reports[data.studentId]) reports[data.studentId] = [];
-          reports[data.studentId].push({ id: doc.id, ...data });
-        });
-
-        // Sort reports by date
-        Object.keys(reports).forEach((studentId) => {
-          reports[studentId].sort((a, b) => {
-            const dateA = a.createdAt?.seconds || 0;
-            const dateB = b.createdAt?.seconds || 0;
-            return dateB - dateA;
-          });
-        });
-
-        setBehaviorReports(reports);
-      },
-      (error) => {
-        handleFirestoreError(
-          error,
-          OperationType.LIST,
-          "ParentDashboard:behavior_reports",
-        );
-      },
-    );
-
-    return unsubscribe;
-  }, [profile, students]);
-
-  useEffect(() => {
-    if (!selectedStudent?.id || !auth.currentUser || !profile?.uid) return;
-    const isParentOrAdmin = [
-      "parent",
-      "admin",
-      "superadmin",
-      "staff",
-      "teacher",
-    ].includes(profile?.role || "");
-    if (!isParentOrAdmin) return;
-
-    let unsubs: (() => void)[] = [];
-
-    try {
-      setLoadingGrades(true);
-      setMarketLoading(true);
-
-      const currentClassId = selectedStudent.classId || selectedStudent.class;
-
-      // 1. Grades
-      const gradesQ = query(
-        collection(db, "grades"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("studentId", "==", selectedStudent.id),
-        where("parentIds", "array-contains", profile.uid),
-        limit(50)
-      );
-      unsubs.push(onSnapshot(gradesQ, snap => {
-        const allGrades = snap.docs.map((doc) => {
-          const data = doc.data();
-          const score = Number(data.score ?? 0);
-          const maxScore = Number(data.maxScore || 100);
-          return {
-            id: doc.id,
-            subject: data.subject,
-            score, maxScore,
-            percentage: maxScore > 0 ? Math.round((score / maxScore) * 100) : 0,
-            term: data.term || "",
-            createdAt: data.createdAt,
-          };
-        }).sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-        setStudentGrades(allGrades);
-        setLoadingGrades(false);
-      }));
-
-      // 2. Attendance
-      const attendanceQ = query(
-        collection(db, "attendance"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("class", "==", currentClassId || "none"),
-        limit(50)
-      );
-      unsubs.push(onSnapshot(attendanceQ, snap => {
-        let absentCount = 0;
-        let lateCount = 0;
-        snap.docs.forEach((doc) => {
-          const records = doc.data().records || {};
-          if (records[selectedStudent.id] === "absent") absentCount++;
-          if (records[selectedStudent.id] === "late") lateCount++;
-        });
-        setAttendanceSummary({ absent: absentCount, late: lateCount });
-      }));
-
-      // 3. Announcements
-      const annQ = query(
-        collection(db, "announcements"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("target", "in", ["all", "parents"]),
-        limit(20)
-      );
-      const indQ = query(
-        collection(db, "announcements"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("target", "==", "individual"),
-        where("targetStudentId", "==", selectedStudent.id),
-        limit(10)
-      );
-      
-      let allAnnLatest: any[] = [];
-      let allIndLatest: any[] = [];
-      const updateAnn = () => {
-        const allAnn = [...allAnnLatest, ...allIndLatest].sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-        setAnnouncements(Array.from(new Map(allAnn.map((item) => [item.id, item])).values()));
-      };
-      
-      unsubs.push(onSnapshot(annQ, snap => {
-        allAnnLatest = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        updateAnn();
-      }));
-      unsubs.push(onSnapshot(indQ, snap => {
-        allIndLatest = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        updateAnn();
-      }));
-
-      // 4. Payments
-      const paymentsQ = query(
-        collection(db, "payments"),
-        where("studentId", "==", selectedStudent.id),
-      );
-      unsubs.push(onSnapshot(paymentsQ, snap => {
-        setPayments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
-      }));
-
-      // 5. Installments
-      const installmentsQ = query(
-        collection(db, "installments"),
-        where("studentId", "==", selectedStudent.id),
-      );
-      unsubs.push(onSnapshot(installmentsQ, snap => {
-        setInstallments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (a.dueDate?.seconds || 0) - (b.dueDate?.seconds || 0)) as any);
-      }));
-
-      // 6. School store (market + legacy marketplace merge)
-      const unsubMarket = subscribeSchoolStoreProducts(
-        selectedStudent.schoolId,
-        (products) => {
-          setMarketItems(products);
-          setMarketLoading(false);
-        },
-        {
-          onError: (error) =>
-            handleFirestoreError(error, OperationType.LIST, "market"),
-        },
-      );
-      unsubs.push(unsubMarket);
-
-      // 7. School teachers (for safe homework subject labels)
-      const teachersQ = query(
-        collection(db, "users"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("role", "==", "teacher"),
-        limit(100),
-      );
-      unsubs.push(onSnapshot(teachersQ, (snap) => {
-        const map: Record<string, any> = {};
-        snap.docs.forEach((teacherDoc) => {
-          map[teacherDoc.id] =
-            buildTeacherRedactionContext({
-              id: teacherDoc.id,
-              ...teacherDoc.data(),
-            }) || { id: teacherDoc.id, ...teacherDoc.data() };
-        });
-        setTeachersById(map);
-      }));
-
-      // 8. Notifications
-      const notificationsQ = query(
-        collection(db, "notifications"),
-        where("userId", "==", profile.uid),
-        limit(50)
-      );
-      unsubs.push(onSnapshot(notificationsQ, snap => {
         const items = filterNotificationsForUser(
           snap.docs
             .map((doc) => ({ id: doc.id, ...doc.data() }))
@@ -744,7 +542,7 @@ export default function ParentDashboard() {
           {
             uid: profile.uid,
             role: profile.role,
-            schoolId: profile.schoolId || selectedStudent.schoolId,
+            schoolId,
           },
         );
         if (notificationsPrimedRef.current) {
@@ -760,109 +558,639 @@ export default function ParentDashboard() {
           items.map((notif: any) => notif.id),
         );
         setNotifications(items);
-      }));
+      },
+      parentSnapshotError(queryName, meta),
+    );
+  }, [profile?.uid, profile?.role, profile?.schoolId, students, isRtl]);
 
-      // 9. Homework (school-scoped query + client class matching for ID/name compatibility)
-      let latestClasses: Array<{ id: string; name?: string }> = [];
-      let latestHomework: any[] = [];
-      const applyHomeworkFilter = () => {
+  useEffect(() => {
+    if (!profile?.uid || !auth.currentUser) return;
+    if (!isParentDashboardRole(profile.role) || students.length === 0) return;
+
+    const queryName = "PARENT_NOTIFICATION_PREFERENCES";
+    const constraints = [`parentId == ${profile.uid}`];
+    const meta: ParentFirestoreMeta = {
+      queryName,
+      collection: "notification_preferences",
+      constraints,
+      uid: profile.uid,
+      schoolId: profile.schoolId,
+    };
+    logParentFirestoreSetup(meta);
+
+    const q = query(
+      collection(db, "notification_preferences"),
+      where("parentId", "==", profile.uid),
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        logParentFirestoreSnapshot(
+          queryName,
+          snapshot.size,
+          snapshot.metadata.fromCache,
+        );
+        const prefs: Record<string, any> = {};
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          prefs[data.studentId] = { id: doc.id, ...data };
+        });
+        setNotificationPrefs(prefs);
+      },
+      parentSnapshotError(queryName, meta),
+    );
+  }, [profile, students]);
+
+  useEffect(() => {
+    if (!profile?.uid || !auth.currentUser) return;
+    if (!isParentDashboardRole(profile.role) || students.length === 0) return;
+
+    const studentIds = students.map((s) => s.id).filter(Boolean);
+    if (studentIds.length === 0) return;
+
+    const queryName = "PARENT_BEHAVIOR_REPORTS";
+    const constraints = [
+      `studentId in [${studentIds.slice(0, 10).join(", ")}${studentIds.length > 10 ? ", …" : ""}]`,
+      `parentIds array-contains ${profile.uid}`,
+    ];
+    const meta: ParentFirestoreMeta = {
+      queryName,
+      collection: "behavior_reports",
+      constraints,
+      uid: profile.uid,
+      schoolId: profile.schoolId || students[0]?.schoolId,
+    };
+    logParentFirestoreSetup(meta);
+
+    const q = query(
+      collection(db, "behavior_reports"),
+      where("studentId", "in", studentIds.slice(0, 30)),
+      where("parentIds", "array-contains", profile.uid),
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        logParentFirestoreSnapshot(
+          queryName,
+          snapshot.size,
+          snapshot.metadata.fromCache,
+        );
+        const reports: Record<string, any[]> = {};
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          if (!reports[data.studentId]) reports[data.studentId] = [];
+          reports[data.studentId].push({ id: doc.id, ...data });
+        });
+        Object.keys(reports).forEach((studentId) => {
+          reports[studentId].sort((a, b) => {
+            const dateA = a.createdAt?.seconds || 0;
+            const dateB = b.createdAt?.seconds || 0;
+            return dateB - dateA;
+          });
+        });
+        setBehaviorReports(reports);
+      },
+      parentSnapshotError(queryName, meta),
+    );
+  }, [profile, students]);
+
+  useEffect(() => {
+    if (!selectedStudent?.id || !auth.currentUser || !profile?.uid) return;
+    if (!isParentDashboardRole(profile.role)) return;
+
+    const schoolId = selectedStudent.schoolId;
+    let unsubs: (() => void)[] = [];
+    setLoadingGrades(true);
+
+    const gradesQueryName = "PARENT_GRADES";
+    const gradesConstraints = [
+      `schoolId == ${schoolId}`,
+      `studentId == ${selectedStudent.id}`,
+      `parentIds array-contains ${profile.uid}`,
+      "limit(50)",
+    ];
+    const gradesMeta: ParentFirestoreMeta = {
+      queryName: gradesQueryName,
+      collection: "grades",
+      constraints: gradesConstraints,
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(gradesMeta);
+
+    const gradesQ = query(
+      collection(db, "grades"),
+      where("schoolId", "==", schoolId),
+      where("studentId", "==", selectedStudent.id),
+      where("parentIds", "array-contains", profile.uid),
+      limit(50),
+    );
+    unsubs.push(
+      onSnapshot(
+        gradesQ,
+        (snap) => {
+          logParentFirestoreSnapshot(
+            gradesQueryName,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          const allGrades = snap.docs
+            .map((doc) => {
+              const data = doc.data();
+              const score = Number(data.score ?? 0);
+              const maxScore = Number(data.maxScore || 100);
+              return {
+                id: doc.id,
+                subject: data.subject,
+                score,
+                maxScore,
+                percentage:
+                  maxScore > 0 ? Math.round((score / maxScore) * 100) : 0,
+                term: data.term || "",
+                createdAt: data.createdAt,
+              };
+            })
+            .sort(
+              (a: any, b: any) =>
+                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+            );
+          setStudentGrades(allGrades);
+          setLoadingGrades(false);
+        },
+        parentSnapshotError(gradesQueryName, gradesMeta),
+      ),
+    );
+
+    const annQueryName = "PARENT_ANNOUNCEMENTS_SCHOOL";
+    const annMeta: ParentFirestoreMeta = {
+      queryName: annQueryName,
+      collection: "announcements",
+      constraints: [
+        `schoolId == ${schoolId}`,
+        "target in [all, parents]",
+        "limit(20)",
+      ],
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(annMeta);
+
+    const indQueryName = "PARENT_ANNOUNCEMENTS_INDIVIDUAL";
+    const indMeta: ParentFirestoreMeta = {
+      queryName: indQueryName,
+      collection: "announcements",
+      constraints: [
+        `schoolId == ${schoolId}`,
+        "target == individual",
+        `targetStudentId == ${selectedStudent.id}`,
+        "limit(10)",
+      ],
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(indMeta);
+
+    const annQ = query(
+      collection(db, "announcements"),
+      where("schoolId", "==", schoolId),
+      where("target", "in", ["all", "parents"]),
+      limit(20),
+    );
+    const indQ = query(
+      collection(db, "announcements"),
+      where("schoolId", "==", schoolId),
+      where("target", "==", "individual"),
+      where("targetStudentId", "==", selectedStudent.id),
+      limit(10),
+    );
+
+    let allAnnLatest: any[] = [];
+    let allIndLatest: any[] = [];
+    const updateAnn = () => {
+      const allAnn = [...allAnnLatest, ...allIndLatest].sort(
+        (a: any, b: any) =>
+          (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+      );
+      setAnnouncements(
+        Array.from(new Map(allAnn.map((item) => [item.id, item])).values()),
+      );
+    };
+
+    unsubs.push(
+      onSnapshot(
+        annQ,
+        (snap) => {
+          logParentFirestoreSnapshot(
+            annQueryName,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          allAnnLatest = snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          updateAnn();
+        },
+        parentSnapshotError(annQueryName, annMeta),
+      ),
+    );
+    unsubs.push(
+      onSnapshot(
+        indQ,
+        (snap) => {
+          logParentFirestoreSnapshot(
+            indQueryName,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          allIndLatest = snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          updateAnn();
+        },
+        parentSnapshotError(indQueryName, indMeta),
+      ),
+    );
+
+    return () => unsubs.forEach((unsub) => unsub());
+  }, [selectedStudent?.id, selectedStudent?.schoolId, profile?.uid]);
+
+  useEffect(() => {
+    if (!selectedStudent?.id || !profile?.uid) return;
+    if (!isParentDashboardRole(profile.role)) return;
+    if (activeTab !== "home" && activeTab !== "homework") return;
+
+    const schoolId = selectedStudent.schoolId;
+    const classId = selectedStudent.classId || selectedStudent.class;
+    if (!schoolId || !classId) {
+      setHomework([]);
+      return;
+    }
+
+    const queryName = "PARENT_HOMEWORK";
+    const constraints = [
+      `schoolId == ${schoolId}`,
+      `classId == ${classId}`,
+      `parentIds array-contains ${profile.uid}`,
+      "limit(50)",
+    ];
+    const meta: ParentFirestoreMeta = {
+      queryName,
+      collection: "homework",
+      constraints,
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(meta);
+
+    const hwQ = query(
+      collection(db, "homework"),
+      where("schoolId", "==", schoolId),
+      where("classId", "==", classId),
+      where("parentIds", "array-contains", profile.uid),
+      limit(50),
+    );
+
+    return onSnapshot(
+      hwQ,
+      (snap) => {
+        logParentFirestoreSnapshot(
+          queryName,
+          snap.size,
+          snap.metadata.fromCache,
+        );
         setHomework(
-          latestHomework
+          snap.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
             .filter(
-              (hw: any) =>
-                homeworkMatchesStudent(hw.classId, selectedStudent, latestClasses) &&
-                !(hw.hiddenFor || []).includes(profile?.uid),
+              (hw: any) => !(hw.hiddenFor || []).includes(profile.uid),
             )
             .sort(
               (a: any, b: any) =>
                 (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
             ) as any,
         );
-      };
-      const classesQ = query(
-        collection(db, "classes"),
-        where("schoolId", "==", selectedStudent.schoolId),
-      );
-      unsubs.push(
-        onSnapshot(classesQ, (snap) => {
-          latestClasses = snap.docs.map((d) => ({
-            id: d.id,
-            name: d.data().name,
-          }));
-          applyHomeworkFilter();
-        }),
-      );
-      const hwQ = query(
-        collection(db, "homework"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        limit(50),
-      );
-      unsubs.push(
-        onSnapshot(hwQ, (snap) => {
-          latestHomework = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          applyHomeworkFilter();
-        }),
-      );
+      },
+      parentSnapshotError(queryName, meta),
+    );
+  }, [
+    selectedStudent?.id,
+    selectedStudent?.schoolId,
+    selectedStudent?.classId,
+    selectedStudent?.class,
+    profile?.uid,
+    activeTab,
+  ]);
 
-      // 9. Reports
-      const repQ = query(
-        collection(db, "teacher_reports"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("studentId", "==", selectedStudent.id),
-        where("target", "in", ["parents", "both"]),
-        where("parentIds", "array-contains", profile.uid),
-        limit(20)
-      );
-      unsubs.push(onSnapshot(repQ, snap => {
-        setTeacherReports(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
-      }));
+  useEffect(() => {
+    if (!selectedStudent?.id || !profile?.uid) return;
+    if (!isParentDashboardRole(profile.role)) return;
+    if (activeTab !== "tuition") return;
 
-      const advRepQ = query(
-        collection(db, "advanced_reports"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("studentId", "==", selectedStudent.id),
-        where("parentIds", "array-contains", profile.uid),
-        limit(20)
-      );
-      unsubs.push(onSnapshot(advRepQ, snap => {
-         setAdvancedReports(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)) as any);
-      }));
+    const schoolId = selectedStudent.schoolId;
+    let unsubs: (() => void)[] = [];
 
-      // 10. Id Cards
-      const idCardsQ = query(
-        collection(db, "id_cards"),
-        where("schoolId", "==", selectedStudent.schoolId),
-        where("studentId", "==", selectedStudent.id),
-        where("parentIds", "array-contains", profile.uid),
-        limit(1)
-      );
-      unsubs.push(onSnapshot(idCardsQ, snap => {
-        const cardsObj: Record<string, any> = {};
-        snap.docs.forEach((doc) => {
-          cardsObj[doc.data().studentId] = { id: doc.id, ...doc.data() };
-        });
-        setIdCards(cardsObj);
-      }));
+    const paymentsQueryName = "PARENT_PAYMENTS";
+    const paymentsMeta: ParentFirestoreMeta = {
+      queryName: paymentsQueryName,
+      collection: "payments",
+      constraints: [`studentId == ${selectedStudent.id}`],
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(paymentsMeta);
 
-      // Fetch template once
-      getDoc(doc(db, "schools", selectedStudent.schoolId, "settings", "idCardTemplate"))
-        .then(templateSnap => {
-          if (templateSnap.exists()) {
-            setIdCardTemplate(templateSnap.data() as any);
-          } else {
-            setIdCardTemplate(null);
-          }
-        })
-        .catch(err => console.warn("Could not fetch idCardTemplate", err));
+    const installmentsQueryName = "PARENT_INSTALLMENTS";
+    const installmentsMeta: ParentFirestoreMeta = {
+      queryName: installmentsQueryName,
+      collection: "installments",
+      constraints: [`studentId == ${selectedStudent.id}`],
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(installmentsMeta);
 
-    } catch (error) {
-      console.error("Error setting up ParentDashboard listeners:", error);
-    }
+    unsubs.push(
+      onSnapshot(
+        query(
+          collection(db, "payments"),
+          where("studentId", "==", selectedStudent.id),
+        ),
+        (snap) => {
+          logParentFirestoreSnapshot(
+            paymentsQueryName,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          setPayments(
+            snap.docs
+              .map((doc) => ({ id: doc.id, ...doc.data() }))
+              .sort(
+                (a: any, b: any) =>
+                  (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+              ) as any,
+          );
+        },
+        parentSnapshotError(paymentsQueryName, paymentsMeta),
+      ),
+    );
+    unsubs.push(
+      onSnapshot(
+        query(
+          collection(db, "installments"),
+          where("studentId", "==", selectedStudent.id),
+        ),
+        (snap) => {
+          logParentFirestoreSnapshot(
+            installmentsQueryName,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          setInstallments(
+            snap.docs
+              .map((doc) => ({ id: doc.id, ...doc.data() }))
+              .sort(
+                (a: any, b: any) =>
+                  (a.dueDate?.seconds || 0) - (b.dueDate?.seconds || 0),
+              ) as any,
+          );
+        },
+        parentSnapshotError(installmentsQueryName, installmentsMeta),
+      ),
+    );
 
-    return () => unsubs.forEach(unsub => unsub());
-  }, [selectedStudent, profile?.uid]);
+    return () => unsubs.forEach((unsub) => unsub());
+  }, [selectedStudent?.id, selectedStudent?.schoolId, profile?.uid, activeTab]);
+
+  useEffect(() => {
+    if (!selectedStudent?.schoolId || !profile?.uid) return;
+    if (!isParentDashboardRole(profile.role)) return;
+    if (activeTab !== "market") return;
+
+    setMarketLoading(true);
+    const queryName = "PARENT_MARKET";
+    const meta: ParentFirestoreMeta = {
+      queryName,
+      collection: "market + marketplace",
+      constraints: [`schoolId == ${selectedStudent.schoolId}`, "limit(200)"],
+      uid: profile.uid,
+      schoolId: selectedStudent.schoolId,
+    };
+    logParentFirestoreSetup(meta);
+
+    return subscribeSchoolStoreProducts(
+      selectedStudent.schoolId,
+      (products) => {
+        logParentFirestoreSnapshot(queryName, products.length, false);
+        setMarketItems(products);
+        setMarketLoading(false);
+      },
+      {
+        onError: (error) => {
+          logParentFirestoreError(queryName, error, meta);
+          handleFirestoreError(error, OperationType.LIST, "ParentDashboard:market");
+          setMarketLoading(false);
+        },
+      },
+    );
+  }, [selectedStudent?.schoolId, profile?.uid, activeTab]);
+
+  useEffect(() => {
+    if (!selectedStudent?.id || !profile?.uid) return;
+    if (!isParentDashboardRole(profile.role)) return;
+    if (activeTab !== "reports") return;
+
+    const schoolId = selectedStudent.schoolId;
+    const queryName = "PARENT_TEACHER_REPORTS";
+    const meta: ParentFirestoreMeta = {
+      queryName,
+      collection: "teacher_reports",
+      constraints: [
+        `schoolId == ${schoolId}`,
+        `studentId == ${selectedStudent.id}`,
+        "target in [parents, both]",
+        `parentIds array-contains ${profile.uid}`,
+        "limit(20)",
+      ],
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(meta);
+
+    const repQ = query(
+      collection(db, "teacher_reports"),
+      where("schoolId", "==", schoolId),
+      where("studentId", "==", selectedStudent.id),
+      where("target", "in", ["parents", "both"]),
+      where("parentIds", "array-contains", profile.uid),
+      limit(20),
+    );
+
+    return onSnapshot(
+      repQ,
+      (snap) => {
+        logParentFirestoreSnapshot(
+          queryName,
+          snap.size,
+          snap.metadata.fromCache,
+        );
+        setTeacherReports(
+          snap.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
+            .sort(
+              (a: any, b: any) =>
+                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+            ) as any,
+        );
+      },
+      parentSnapshotError(queryName, meta),
+    );
+  }, [
+    selectedStudent?.id,
+    selectedStudent?.schoolId,
+    profile?.uid,
+    activeTab,
+  ]);
+
+  useEffect(() => {
+    if (!selectedStudent?.id || !profile?.uid) return;
+    if (!isParentDashboardRole(profile.role)) return;
+    if (activeTab !== "advanced_reports") return;
+
+    const schoolId = selectedStudent.schoolId;
+    const queryName = "PARENT_ADVANCED_REPORTS";
+    const meta: ParentFirestoreMeta = {
+      queryName,
+      collection: "advanced_reports",
+      constraints: [
+        `schoolId == ${schoolId}`,
+        `studentId == ${selectedStudent.id}`,
+        `parentIds array-contains ${profile.uid}`,
+        "limit(20)",
+      ],
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(meta);
+
+    const advRepQ = query(
+      collection(db, "advanced_reports"),
+      where("schoolId", "==", schoolId),
+      where("studentId", "==", selectedStudent.id),
+      where("parentIds", "array-contains", profile.uid),
+      limit(20),
+    );
+
+    return onSnapshot(
+      advRepQ,
+      (snap) => {
+        logParentFirestoreSnapshot(
+          queryName,
+          snap.size,
+          snap.metadata.fromCache,
+        );
+        setAdvancedReports(
+          snap.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
+            .sort(
+              (a: any, b: any) =>
+                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+            ) as any,
+        );
+      },
+      parentSnapshotError(queryName, meta),
+    );
+  }, [
+    selectedStudent?.id,
+    selectedStudent?.schoolId,
+    profile?.uid,
+    activeTab,
+  ]);
+
+  useEffect(() => {
+    if (!selectedStudent?.id || !profile?.uid) return;
+    if (!isParentDashboardRole(profile.role)) return;
+    if (activeTab !== "id_cards") return;
+
+    const schoolId = selectedStudent.schoolId;
+    const queryName = "PARENT_ID_CARD";
+    const meta: ParentFirestoreMeta = {
+      queryName,
+      collection: `id_cards/${selectedStudent.id}`,
+      constraints: [`doc id == studentId ${selectedStudent.id}`],
+      uid: profile.uid,
+      schoolId,
+    };
+    logParentFirestoreSetup(meta);
+
+    getDoc(
+      doc(db, "schools", schoolId, "settings", "idCardTemplate"),
+    )
+      .then((templateSnap) => {
+        if (templateSnap.exists()) {
+          setIdCardTemplate(templateSnap.data() as IdCardTemplate);
+        } else {
+          setIdCardTemplate(null);
+        }
+      })
+      .catch((err) => console.warn("Could not fetch idCardTemplate", err));
+
+    return onSnapshot(
+      doc(db, "id_cards", selectedStudent.id),
+      (snap) => {
+        logParentFirestoreSnapshot(
+          queryName,
+          snap.exists() ? 1 : 0,
+          snap.metadata.fromCache,
+        );
+        if (snap.exists()) {
+          setIdCards({
+            [selectedStudent.id]: { id: snap.id, ...snap.data() },
+          });
+        } else {
+          setIdCards({});
+        }
+      },
+      parentSnapshotError(queryName, meta),
+    );
+  }, [selectedStudent?.id, selectedStudent?.schoolId, profile?.uid, activeTab]);
 
   const studentIds = useMemo(() => students.map((s) => s.id), [students]);
+
+  const attendanceSummary = useMemo(() => {
+    if (!selectedStudent?.id) return { absent: 0, late: 0 };
+    let absent = 0;
+    let late = 0;
+    for (const n of notifications) {
+      if (n.type !== "attendance") continue;
+      const metaStudentId = n.metadata?.studentId;
+      if (metaStudentId && metaStudentId !== selectedStudent.id) continue;
+      const status = String(n.metadata?.status || "").toLowerCase();
+      const title = String(n.title || "").toLowerCase();
+      const message = String(n.message || "").toLowerCase();
+      if (
+        status === "absent" ||
+        title.includes("absent") ||
+        title.includes("غائب") ||
+        message.includes("absent") ||
+        message.includes("غائب")
+      ) {
+        absent += 1;
+      } else if (
+        status === "late" ||
+        title.includes("late") ||
+        title.includes("متأخر") ||
+        message.includes("late") ||
+        message.includes("متأخر")
+      ) {
+        late += 1;
+      }
+    }
+    return { absent, late };
+  }, [notifications, selectedStudent?.id]);
 
   const installmentBanners = useMemo(
     () =>
@@ -1636,11 +1964,7 @@ export default function ParentDashboard() {
                                   </h4>
                                   <div className="text-right">
                                     <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider inline-block">
-                                      {getHomeworkSubjectDisplay(
-                                        hw,
-                                        hw.teacherId ? teachersById[hw.teacherId] : undefined,
-                                        isRtl,
-                                      )}
+                                      {getHomeworkSubjectDisplay(hw, undefined, isRtl)}
                                     </span>
                                   </div>
                                 </div>
@@ -1927,11 +2251,7 @@ export default function ParentDashboard() {
                                 <div>
                                   <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/50">
                                     <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider">
-                                      {getHomeworkSubjectDisplay(
-                                        hw,
-                                        hw.teacherId ? teachersById[hw.teacherId] : undefined,
-                                        isRtl,
-                                      )}
+                                      {getHomeworkSubjectDisplay(hw, undefined, isRtl)}
                                     </span>
                                     <div className="flex items-center gap-3">
                                       <span className="text-[10px] text-slate-500 font-mono font-bold">
@@ -2231,19 +2551,9 @@ export default function ParentDashboard() {
                         >
                           <div className="flex items-center justify-between mb-4">
                             <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                              {report.subject &&
-                              !isRedactedCredentialValue(
-                                report.subject,
-                                report.teacherId
-                                  ? teachersById[report.teacherId]
-                                  : undefined,
-                              )
+                              {report.subject && !isRedactedCredentialValue(report.subject)
                                 ? report.subject
-                                : getTeacherSubjectDisplay(
-                                    report.teacherId
-                                      ? teachersById[report.teacherId]
-                                      : undefined,
-                                  ) || "—"}
+                                : report.teacherName || "—"}
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-slate-400 font-bold">

@@ -28,14 +28,12 @@ import {
   Search,
   Calendar,
   ChevronRight,
-  LogOut,
   Bell,
   LayoutDashboard,
   FileText,
   Send,
   User,
   Trash2,
-  Menu,
   CheckCircle,
   AlertTriangle,
   Settings as SettingsIcon,
@@ -50,7 +48,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { pageTransitionProps } from "../lib/motion";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
-import { fetchStudentLinkFields, homeworkMatchesStudent } from "../lib/schoolSync";
+import { fetchStudentLinkFields, homeworkMatchesStudent, collectParentIdsFromStudents } from "../lib/schoolSync";
 import {
   TEACHER_SUBJECT_REQUIRED_MSG,
   teacherHasAssignedSubject,
@@ -74,7 +72,13 @@ import {
   isRedactedCredentialValue,
 } from "../lib/userProfile";
 import { alertIncomingNotification } from "../lib/notificationAlerts";
-import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import { DashboardShell } from "../components/layout/DashboardShell";
+import {
+  attachSectionLabels,
+  TEACHER_ITEM_SECTIONS,
+  TEACHER_NAV_SECTIONS,
+  type DashboardMenuItem,
+} from "../lib/dashboardMenu";
 import TeacherDismissalTab from "./teacher/TeacherDismissalTab";
 import { DoorOpen } from "lucide-react";
 import {
@@ -106,11 +110,8 @@ import TeacherChatTab from "./TeacherChatTab";
 import Schedules from "./admin/Schedules";
 import AdvancedReports from "./admin/AdvancedReports";
 import IdCards from "./admin/IdCards";
-import SchoolixLogo from "../components/SchoolixLogo";
-import { isCustomAppLogo, isCustomSchoolLogo } from "../lib/brandAssets";
 
 import { useLanguage } from "../lib/LanguageContext";
-import { GlobalFooter } from "../components/GlobalFooter";
 
 export const getGradeTypeLabel = (val: string, isRtl: boolean) => {
   if (isRtl) return val;
@@ -180,22 +181,6 @@ export default function TeacherDashboard() {
   const [classes, setClasses] = useState<any[]>([]);
   const [schoolName, setSchoolName] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setIsSidebarOpen(false);
-        setIsSidebarCollapsed(false);
-      } else {
-        setIsSidebarOpen(true);
-        setIsSidebarCollapsed(false);
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   // Package permissions are controlled by the Super Admin via the package properties
   const perms = schoolData?.packagePermissions || profile?.permissions; // fallback to profile if not loaded yet
@@ -654,6 +639,11 @@ export default function TeacherDashboard() {
         assignedClassName ||
         "";
 
+      const classStudents = students.filter((s) =>
+        homeworkMatchesStudent(targetClassId, s, classes),
+      );
+      const parentIds = collectParentIdsFromStudents(classStudents);
+
       const homeworkRef = await addDoc(collection(db, "homework"), {
         title: newHomework.title,
         content: newHomework.content,
@@ -666,14 +656,12 @@ export default function TeacherDashboard() {
         subjectName: subjectPayload.subjectName,
         subject: subjectPayload.subjectName,
         schoolId: profile.schoolId,
+        parentIds,
         hiddenFor: [],
         createdAt: serverTimestamp(),
       });
 
       // Notify all parents in the class about the homework
-      const classStudents = students.filter((s) =>
-        homeworkMatchesStudent(targetClassId, s, classes),
-      );
       if (classStudents.length > 0) {
         for (const student of classStudents) {
           await notificationService.notifyStudentParents(student.id, {
@@ -970,274 +958,125 @@ export default function TeacherDashboard() {
     return item.id === "home" || item.id === "chat" || item.id === "dismissal";
   });
 
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const primaryItems = sidebarItems.filter(item => ["home", "homework", "grades", "chat"].includes(item.id));
-  const moreItems = sidebarItems.filter(item => !["home", "homework", "grades", "chat"].includes(item.id));
+  const shellMenuItems = useMemo((): DashboardMenuItem[] => {
+    const withSettings: DashboardMenuItem[] = [
+      ...sidebarItems.map(({ id, label, icon }) => ({ id, label, icon })),
+      {
+        id: "settings",
+        label: t("settings") || (isRtl ? "الإعدادات" : "Settings"),
+        icon: SettingsIcon,
+      },
+    ];
+    const seen = new Set<string>();
+    const unique = withSettings.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+    return attachSectionLabels(unique, TEACHER_ITEM_SECTIONS);
+  }, [sidebarItems, t, isRtl]);
+
+  const teacherSectionLabels = useMemo(
+    () =>
+      isRtl
+        ? {
+            today: "اليوم",
+            academic: "أكاديمي",
+            communication: "التواصل",
+            services: "الخدمات",
+            system: "النظام",
+          }
+        : undefined,
+    [isRtl],
+  );
+
+  const activeTabLabel =
+    shellMenuItems.find((item) => item.id === activeTab)?.label ??
+    (isRtl ? "لوحة المعلم" : "Teacher Portal");
 
   if (loading) {
     return <SolarLoading />;
   }
 
   return (
-    <div
-      className="h-[100dvh] overflow-hidden bg-transparent flex transition-all duration-300 print:overflow-visible print:h-auto print:block"
-      dir={isRtl ? "rtl" : "ltr"}
-    >
-
-      {/* Sidebar - Desktop */}
-      <AnimatePresence mode="wait">
-        {isSidebarOpen && (
-          <motion.aside
-            initial={{ x: isRtl ? 300 : -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
-            exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`bg-white dark:bg-slate-900 flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)] hidden lg:flex`}
-          >
-            <div className="h-full flex flex-col overflow-hidden w-full">
-              <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
-                {isCustomSchoolLogo(schoolData?.logoUrl) ? (
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
-                    <img
-                      src={schoolData.logoUrl}
-                      alt="SchoolixIQ logo"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                ) : (
-                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} surface="dark" />
-                )}
-                {!isSidebarCollapsed && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0" dir={isRtl ? "rtl" : "ltr"}>
-                    <h2 className="font-bold text-slate-900 dark:text-white leading-tight truncate">
-                      {t("teacherPortal")}
-                    </h2>
-                    <div className="flex flex-col">
-                      <p className="text-[10px] uppercase tracking-widest text-indigo-600 font-bold truncate">
-                        {getTeacherSubjectDisplay(profile)}
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-
-              <nav className="flex-1 overflow-x-hidden overflow-y-auto px-3 md:px-4 py-4 space-y-1.5 custom-scrollbar">
-              {[
-                { id: "home", label: t("home"), icon: LayoutDashboard },
-                { id: "homework", label: t("dailyHomework"), icon: BookOpen },
-                { id: "grades", label: t("resultsAndGrades"), icon: Star },
+    <>
+    <DashboardShell
+      variant="light"
+      menuItems={shellMenuItems}
+      sections={TEACHER_NAV_SECTIONS}
+      sectionLabels={teacherSectionLabels}
+      activeTab={activeTab}
+      onTabChange={(tabId) => setActiveTab(tabId as Tab)}
+      isRtl={isRtl}
+      portalTitle={t("teacherPortal")}
+      portalSubtitle={getTeacherSubjectDisplay(profile)}
+      schoolLogoUrl={schoolData?.logoUrl}
+      logoutLabel={t("logout")}
+      onLogout={() => auth.signOut()}
+      headerEyebrow={t("dashboard")}
+      headerTitle={activeTabLabel}
+      headerSubtitle={schoolName || profile?.name}
+      headerTrailing={
+        <>
+          <div className="hidden lg:block text-right ml-4">
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none mb-1">
+              {t("todayDate")}
+            </p>
+            <p className="text-xs font-bold text-sx-text dark:text-white">
+              {new Date().toLocaleDateString(
+                language === "ar" ? "ar-EG" : "en-US",
                 {
-                  id: "behavior",
-                  label: t("behaviorAndStudents"),
-                  icon: Users,
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
                 },
-                {
-                  id: "reports",
-                  label: t("evaluationReports"),
-                  icon: FileText,
-                },
-                {
-                  id: "advanced_reports",
-                  label: isRtl ? "تقارير متقدمة" : "Advanced Reports",
-                  icon: BarChart3,
-                },
-                {
-                  id: "id_cards",
-                  label: isRtl ? "هويات الطلاب" : "Student ID Cards",
-                  icon: ShieldCheck,
-                },
-                { id: "schedules", label: t("schedules"), icon: Calendar },
-                {
-                  id: "market",
-                  label: t("market"),
-                  icon: ShoppingBag,
-                },
-                {
-                  id: "chat",
-                  label: t("chat") || (isRtl ? "المراسلة" : "Messages"),
-                  icon: MessageSquare,
-                },
-                {
-                  id: "settings",
-                  label: t("settings") || (isRtl ? "الإعدادات" : "Settings"),
-                  icon: SettingsIcon,
-                },
-              ]
-                .filter((item) => {
-                  if (
-                    item.id === "home" ||
-                    item.id === "settings" ||
-                    item.id === "chat"
-                  )
-                    return true;
-                  const p = perms as any;
-                  if (p && typeof p === "object" && !Array.isArray(p)) {
-                    if (item.id === "homework")
-                      return p.homework_and_tasks !== false;
-                    if (item.id === "grades")
-                      return p.exams_and_results !== false;
-                    if (item.id === "behavior")
-                      return p.behavior_management !== false;
-                    if (item.id === "reports")
-                      return p.student_evaluation_reports !== false;
-                    if (item.id === "advanced_reports")
-                      return p.advanced_reports !== false;
-                    if (item.id === "schedules") return true;
-                    if (item.id === "id_cards") return true;
-                    if (item.id === "market")
-                      return p.marketplace_ordering !== false;
-                  }
-                  return true;
-                })
-                .map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id as Tab);
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                    }}
-                    title={isSidebarCollapsed ? item.label : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${
-                      activeTab === item.id
-                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg"
-                        : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    }`}
-                    dir={isRtl ? "rtl" : "ltr"}
-                  >
-                    <item.icon size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                    {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
-                    {isSidebarCollapsed && (
-                      <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
-                        {item.label}
-                      </div>
-                    )}
-                  </button>
-                ))}
-            </nav>
-
-            <div className="p-4 md:p-6 mt-auto">
-              <button
-                onClick={() => {
-                  setIsSidebarOpen(false);
-                  setShowNotifications(false);
-                  auth.signOut();
-                }}
-                title={isSidebarCollapsed ? t("logout") : undefined}
-                className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3 px-4 md:px-5'} py-3 md:py-4 rounded-xl md:rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all font-bold text-sm`}
-              >
-                <LogOut size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
-                {!isSidebarCollapsed && <span>{t("logout")}</span>}
-              </button>
-            </div>
-            </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className="min-h-[3.5rem] md:min-h-[5rem] h-auto pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-2.5 md:pt-[calc(1.25rem+env(safe-area-inset-top,0px))] md:pb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-10 shrink-0 sticky top-0 z-40 print:hidden">
-          <div className="flex items-center gap-1.5 md:gap-6">
-            <button
-              onClick={() => {
-                if (window.innerWidth >= 1024) {
-                   setIsSidebarCollapsed(!isSidebarCollapsed);
-                } else {
-                   setIsSidebarOpen(!isSidebarOpen);
-                   if (!isSidebarOpen) {
-                     // Ensure it's not collapsed when opened as mobile drawer
-                     setIsSidebarCollapsed(false);
-                   }
-                }
-              }}
-              className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm hidden lg:block"
-            >
-              <Menu
-                size={20}
-                className={
-                  (!isSidebarOpen && window.innerWidth < 1024) || isSidebarCollapsed
-                    ? "rotate-90 transition-transform"
-                    : "transition-transform"
-                }
-              />
-            </button>
-            <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
-
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1 md:gap-2">
-                <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-wider text-indigo-600 truncate">
-                  {t("dashboard")}
-                </span>
-                {schoolName && (
-                  <div className="flex items-center gap-1">
-                    <span className="w-0.5 h-0.5 rounded-full bg-slate-300"></span>
-                    <span className="text-[7px] md:text-[10px] font-bold text-slate-400 truncate max-w-[60px] md:max-w-[120px]">
-                      {schoolName}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <h1 className="text-xs md:text-xl font-bold text-slate-900 dark:text-white truncate max-w-[100px] md:max-w-none leading-none mt-0.5">
-                {profile?.name}
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 md:gap-3">
-            <div className="hidden lg:block text-right ml-4">
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none mb-1">
-                {t("todayDate")}
-              </p>
-              <p className="text-xs font-bold text-slate-900 dark:text-white">
-                {new Date().toLocaleDateString(
-                  language === "ar" ? "ar-EG" : "en-US",
-                  {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  },
-                )}
-              </p>
-            </div>
-
-            <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-1 hidden lg:block"></div>
-
-            <div className="flex items-center gap-1.5 md:gap-3">
-              <LanguageToggle />
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl border transition-all duration-300 flex items-center justify-center relative group active:scale-95 shrink-0 ${
-                  showNotifications
-                    ? "bg-[#D4A64A] border-[#D4A64A] text-[#0B2345] shadow-lg shadow-[#D4A64A]/25"
-                    : "bg-[#0B2345] border-[#D4A64A]/30 text-[#D4A64A] hover:bg-[#D4A64A] hover:text-[#0B2345] hover:border-[#D4A64A]"
-                }`}
-              >
-                <Bell size={18} className="transition-transform duration-300 group-hover:scale-110" />
-                {notifications.filter((n) => !n.read).length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-[#0B2345] rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                    {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
-                  </span>
-                )}
-              </button>
-
-              {/* Redesigned Notification Center Modal */}
-              {showNotifications && (
-                <NotificationCenter
-                  onClose={() => setShowNotifications(false)}
-                  activeTabSetter={(tabName) => setActiveTab(tabName as any)}
-                  userRole="teacher"
-                />
               )}
-            </div>
+            </p>
           </div>
-        </header>
-
-        <div className={`flex-1 flex flex-col min-h-0 print:overflow-visible ${activeTab === 'chat' ? 'overflow-hidden h-full pb-[72px] lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-[90px] lg:pb-10'}`}>
+          <div className="h-6 w-px bg-sx-border dark:bg-slate-800 mx-1 hidden lg:block" />
+          <LanguageToggle />
+          <button
+            type="button"
+            onClick={() => setShowNotifications(!showNotifications)}
+            className={`w-10 h-10 md:w-11 md:h-11 rounded-xl border transition-all duration-300 flex items-center justify-center relative group active:scale-95 shrink-0 ${
+              showNotifications
+                ? "bg-sx-accent border-sx-accent text-sx-primary shadow-lg shadow-sx-accent/25"
+                : "bg-sx-primary border-sx-accent/30 text-sx-accent hover:bg-sx-accent hover:text-sx-primary"
+            }`}
+          >
+            <Bell size={18} />
+            {notifications.filter((n) => !n.read).length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-sx-primary rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                {notifications.filter((n) => !n.read).length > 9
+                  ? "9+"
+                  : notifications.filter((n) => !n.read).length}
+              </span>
+            )}
+          </button>
+          {showNotifications ? (
+            <NotificationCenter
+              onClose={() => setShowNotifications(false)}
+              activeTabSetter={(tabName) => setActiveTab(tabName as Tab)}
+              userRole="teacher"
+            />
+          ) : null}
+        </>
+      }
+      showFooter={activeTab !== "chat"}
+      fullHeightTab={activeTab === "chat"}
+      notificationsCount={notifications.filter((n) => !n.read).length}
+      showNotifications={showNotifications}
+      setShowNotifications={setShowNotifications}
+    >
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-6 md:p-10 flex flex-col sx-fade-in"}
+              className={
+                activeTab === "chat"
+                  ? "h-full w-full flex flex-col min-h-0 overflow-hidden"
+                  : "w-full flex flex-col sx-fade-in"
+              }
               {...pageTransitionProps(activeTab === "chat")}
             >
               {activeTab === "home" && (
@@ -2191,26 +2030,7 @@ export default function TeacherDashboard() {
               {activeTab === "chat" && <TeacherChatTab />}
             </motion.div>
           </AnimatePresence>
-          {activeTab !== "chat" && <GlobalFooter compact />}
-        </div>
-
-        {/* Floating/Sticky Mobile Navigation Dock for Teachers */}
-        <MobileNavigationDock
-          menuItems={sidebarItems}
-          activeTab={activeTab}
-          setActiveTab={(tabId) => {
-            setActiveTab(tabId);
-            setShowMoreMenu(false);
-          }}
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
-          showNotifications={showNotifications}
-          setShowNotifications={setShowNotifications}
-          notificationsCount={notifications.filter((n) => !n.read).length}
-          isRtl={isRtl}
-          logoutLabel={t("logout")}
-          onLogout={() => auth.signOut()}
-        />
+    </DashboardShell>
 
         {/* HomeWork Modal */}
         <AnimatePresence>
@@ -2577,7 +2397,6 @@ export default function TeacherDashboard() {
             </div>
           )}
         </AnimatePresence>
-      </div>
-    </div>
+    </>
   );
 }
