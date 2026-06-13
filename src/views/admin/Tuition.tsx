@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc, increment, limit, deleteDoc, writeBatch } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
@@ -34,6 +34,8 @@ export default function Tuition() {
   const [payments, setPayments] = useState<any[]>([]);
   const [installments, setInstallments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const paymentInFlightRef = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPayModal, setShowPayModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -103,33 +105,35 @@ export default function Tuition() {
 
   const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (paymentInFlightRef.current) return;
     if (!profile?.schoolId || !selectedStudent) return;
-    setLoading(true);
+
     const amountNum = parseFloat(paymentAmount);
-    
+
     if (isNaN(amountNum) || amountNum <= 0) {
       toast.error('الرجاء إدخال مبلغ صحيح وموجب');
-      setLoading(false);
       return;
     }
 
     const remainingTuition = (selectedStudent.totalTuition || 0) - (selectedStudent.tuitionBalance || 0);
     if (remainingTuition > 0 && amountNum > remainingTuition) {
       toast.error('المبلغ يتجاوز إجمالي الرسوم المتبقية للطالب');
-      setLoading(false);
       return;
     }
-    
-    try {
-      // Find the next pending installment to label the payment
-      const pendingInstallments = getPendingInstallmentsForStudent(installments, selectedStudent.id);
-      
-      const installmentToPay = pendingInstallments[0];
-      const installmentLabel = installmentToPay ? `الدفعة رقم ${installments.filter(i => i.studentId === selectedStudent.id).indexOf(installmentToPay) + 1}` : 'دفعة إضافية';
 
-      // 1. Record the payment
-      const paymentPath = 'payments';
-      const paymentRef = await addDoc(collection(db, paymentPath), {
+    paymentInFlightRef.current = true;
+    setIsProcessingPayment(true);
+
+    try {
+      const pendingInstallments = getPendingInstallmentsForStudent(installments, selectedStudent.id);
+      const installmentToPay = pendingInstallments[0];
+      const installmentLabel = installmentToPay
+        ? `الدفعة رقم ${installments.filter(i => i.studentId === selectedStudent.id).indexOf(installmentToPay) + 1}`
+        : 'دفعة إضافية';
+
+      const batch = writeBatch(db);
+      const paymentRef = doc(collection(db, 'payments'));
+      batch.set(paymentRef, {
         schoolId: profile.schoolId,
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,
@@ -137,46 +141,28 @@ export default function Tuition() {
         type: 'tuition',
         note: installmentLabel,
         createdAt: serverTimestamp(),
-        authorId: profile.uid
+        authorId: profile.uid,
       });
 
-      const newPayment = {
-        id: paymentRef.id,
-        schoolId: profile.schoolId,
-        studentId: selectedStudent.id,
-        studentName: selectedStudent.name,
-        amount: amountNum,
-        type: 'tuition',
-        note: installmentLabel,
-        createdAt: { seconds: Math.floor(Date.now() / 1000) },
-        authorId: profile.uid
-      };
-      setPayments(prev => [newPayment, ...prev]);
-
-      // 2. Update student balance
-      const studentDocRef = doc(db, 'students', selectedStudent.id);
-      await updateDoc(studentDocRef, {
-        tuitionBalance: increment(amountNum)
+      batch.update(doc(db, 'students', selectedStudent.id), {
+        tuitionBalance: increment(amountNum),
       });
-      
-      setStudents(prev => prev.map(s => s.id === selectedStudent.id ? { ...s, tuitionBalance: (s.tuitionBalance || 0) + amountNum } : s));
 
-      // 3. Mark the oldest pending installment as paid if the payment covers it or at least recorded
-      if (installmentToPay) {
-        await updateDoc(doc(db, 'installments', installmentToPay.id), {
+      if (installmentToPay?.id) {
+        batch.update(doc(db, 'installments', installmentToPay.id), {
           status: 'paid',
           paidAt: serverTimestamp(),
-          paidAmount: amountNum
+          paidAmount: amountNum,
         });
-        setInstallments(prev => prev.map(i => i.id === installmentToPay.id ? { ...i, status: 'paid', paidAt: { seconds: Math.floor(Date.now() / 1000) }, paidAmount: amountNum } : i));
       }
 
-      // Notify parents
+      await batch.commit();
+
       await notificationService.notifyStudentParents(selectedStudent.id, {
         title: 'تأكيد استلام دفعة',
         message: `تم استلام مبلغ ${amountNum.toLocaleString()} د.ع (${installmentLabel}) للأقساط الدراسية.`,
         type: 'payment',
-        schoolId: profile.schoolId
+        schoolId: profile.schoolId,
       });
 
       toast.success(`تم تسجيل ${installmentLabel} بنجاح`);
@@ -187,7 +173,8 @@ export default function Tuition() {
       handleFirestoreError(error, OperationType.WRITE, 'payments_and_students');
       toast.error('حدث خطأ أثناء معالجة الدفعة');
     } finally {
-      setLoading(false);
+      paymentInFlightRef.current = false;
+      setIsProcessingPayment(false);
     }
   };
 
@@ -894,10 +881,11 @@ export default function Tuition() {
                       إلغاء
                     </button>
                     <button 
-                      disabled={loading || !paymentAmount}
+                      type="submit"
+                      disabled={isProcessingPayment || !paymentAmount}
                       className="flex-[2] py-4 md:py-5 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/30 active:scale-95 disabled:opacity-50"
                     >
-                      {loading ? 'جاري المعالجة...' : 'تأكيد العملية'}
+                      {isProcessingPayment ? 'جاري المعالجة...' : 'تأكيد العملية'}
                     </button>
                   </div>
                 </form>
