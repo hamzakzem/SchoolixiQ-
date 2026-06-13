@@ -23,15 +23,10 @@ export function logParentFirestoreSetup(meta: ParentFirestoreMeta): void {
 export function logParentFirestoreError(
   queryName: string,
   error: unknown,
-  meta: Pick<ParentFirestoreMeta, 'collection' | 'constraints' | 'uid' | 'schoolId'>,
 ): void {
-  const err = error as { code?: string; message?: string; name?: string };
+  const err = error as { code?: string; message?: string };
   console.error('[ParentFirestore] LISTENER_ERROR', {
     QUERY_NAME: queryName,
-    collection: meta.collection,
-    constraints: meta.constraints,
-    uid: meta.uid ?? '(undefined)',
-    schoolId: meta.schoolId ?? '(undefined)',
     code: err?.code ?? '(no code)',
     message: err?.message ?? String(error),
   });
