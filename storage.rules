@@ -10,15 +10,24 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    // Inline path — some rule engines reject function-wrapped paths for cross-service calls.
+    // Inline path — cross-service Firestore reads must target the app's named database
+    // (not (default)); see firebase-applet-config.json firestoreDatabaseId.
+    function firestoreDatabaseId() {
+      return 'ai-studio-5b7cdad3-1c88-4eed-9aca-523fba814a76';
+    }
+
+    function firestoreUserPath() {
+      return /databases/$(firestoreDatabaseId())/documents/users/$(request.auth.uid);
+    }
+
     function userDocExists() {
       return isSignedIn()
-        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+        && firestore.exists(firestoreUserPath());
     }
 
     function userData() {
       return userDocExists()
-        ? firestore.get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        ? firestore.get(firestoreUserPath()).data
         : {};
     }
 

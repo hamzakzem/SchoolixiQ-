@@ -78,7 +78,12 @@ export const db = initializeFirestore(app, {
 }, firebaseConfig.firestoreDatabaseId);
 
 export const auth = getAuth(app);
-export const storage = getStorage(app);
+export const storage = getStorage(
+  app,
+  firebaseConfig.storageBucket
+    ? `gs://${firebaseConfig.storageBucket}`
+    : undefined,
+);
 
 // Initialize Analytics conditionally
 export const initAnalytics = async () => {
