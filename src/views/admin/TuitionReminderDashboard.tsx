@@ -24,8 +24,13 @@ import {
   saveSchoolTuitionReminderSettings,
   sendTuitionReminderWithTracking,
   DEFAULT_TUITION_REMINDER_SETTINGS,
+  isInstallmentUnpaid,
+  isValidWhatsAppPhone,
+  resolveLinkedParentFromCache,
+  resolveParentPhone,
   type TuitionReminderSettings,
 } from '../../lib/tuitionReminderService';
+import { parseDueDate } from '../../lib/dailySummaryUtils';
 
 type Row = {
   installmentId: string;
@@ -92,36 +97,37 @@ export default function TuitionReminderDashboard() {
 
   const rows: Row[] = useMemo(() => {
     const now = new Date();
-    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endToday = new Date(startToday);
-    endToday.setDate(endToday.getDate() + 1);
-    const endSoon = new Date(startToday);
-    endSoon.setDate(endSoon.getDate() + 7);
+    const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const upcomingDays = Math.max(1, settings.daysBeforeEscalation || 7);
 
     return installments
-      .filter((i) => i.status !== 'paid')
+      .filter((i) => isInstallmentUnpaid(i))
       .map((i) => {
         const student = students.find((s) => s.id === i.studentId);
-        const due = new Date(i.dueDate);
+        const due = parseDueDate(i.dueDate);
+        if (!due.getTime() || Number.isNaN(due.getTime())) return null;
+
+        const dueOnly = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+        const daysUntilDue = Math.floor((dueOnly.getTime() - todayOnly.getTime()) / 86400000);
+
+        let bucket: Row['bucket'] | null = null;
+        if (daysUntilDue < 0) bucket = 'overdue';
+        else if (daysUntilDue === 0) bucket = 'today';
+        else if (daysUntilDue <= upcomingDays) bucket = 'soon';
+        if (!bucket) return null;
+
         const trackKey = `${schoolId}_${i.studentId}_${i.id}`;
         const track = tracking[trackKey] || tracking[`${schoolId}_${i.studentId}`] || {};
-        const parentIds: string[] = student?.parentIds || [];
-        const parent = parentIds.length ? parents[parentIds[0]] : null;
-        const delayDays = Math.max(0, Math.floor((now.getTime() - due.getTime()) / (86400000)));
-
-        let bucket: Row['bucket'] = 'soon';
-        if (due < startToday) bucket = 'overdue';
-        else if (due >= startToday && due < endToday) bucket = 'today';
-        else if (due <= endSoon) bucket = 'soon';
-        else return null;
+        const { parentId, parent } = resolveLinkedParentFromCache(student, parents);
+        const delayDays = Math.max(0, -daysUntilDue);
 
         return {
           installmentId: i.id,
           studentId: i.studentId,
           studentName: student?.name || 'طالب',
           parentName: parent?.displayName || parent?.name || '—',
-          parentPhone: student?.parentPhone || parent?.phone || '',
-          parentId: parentIds[0],
+          parentPhone: resolveParentPhone(student, parent),
+          parentId,
           amount: i.amount || 0,
           dueDate: due,
           delayDays,
@@ -133,9 +139,22 @@ export default function TuitionReminderDashboard() {
         };
       })
       .filter(Boolean) as Row[];
-  }, [installments, students, tracking, parents, schoolId]);
+  }, [installments, students, tracking, parents, schoolId, settings.daysBeforeEscalation]);
 
   const filtered = rows.filter((r) => filter === 'all' || r.bucket === filter);
+
+  const emptyMessage = useMemo(() => {
+    if (students.length > 0 && installments.length === 0) {
+      return 'لا توجد أقساط منشأة للطلاب بعد';
+    }
+    if (rows.length === 0) {
+      return 'لا توجد أقساط غير مدفوعة أو مستحقة حالياً';
+    }
+    if (filtered.length === 0) {
+      return 'لا توجد أقساط في هذا القسم';
+    }
+    return '';
+  }, [students.length, installments.length, rows.length, filtered.length]);
 
   const handleSend = async (row: Row) => {
     if (!profile?.uid || !schoolId) return;
@@ -161,8 +180,8 @@ export default function TuitionReminderDashboard() {
   };
 
   const handleWhatsApp = (row: Row) => {
-    if (!row.parentPhone) {
-      toast.error('لا يوجد رقم هاتف');
+    if (!isValidWhatsAppPhone(row.parentPhone)) {
+      toast.error('لا يوجد رقم واتساب');
       return;
     }
     const url = buildWhatsAppUrl(
@@ -362,19 +381,46 @@ export default function TuitionReminderDashboard() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1">
-                      <button type="button" title="إرسال إشعار" disabled={busyId === row.installmentId} onClick={() => handleSend(row)} className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100">
-                        <Bell size={16} />
-                      </button>
-                      <button type="button" title="واتساب" onClick={() => handleWhatsApp(row)} className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100">
+                    <div className="flex items-center justify-center gap-1 flex-wrap">
+                      {row.parentId ? (
+                        <button
+                          type="button"
+                          title="إرسال إشعار"
+                          disabled={busyId === row.installmentId}
+                          onClick={() => handleSend(row)}
+                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50"
+                        >
+                          <Bell size={16} />
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-bold px-1 whitespace-nowrap">
+                          لا يوجد ولي أمر مرتبط
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        title={isValidWhatsAppPhone(row.parentPhone) ? 'واتساب' : 'لا يوجد رقم واتساب'}
+                        disabled={!isValidWhatsAppPhone(row.parentPhone)}
+                        onClick={() => handleWhatsApp(row)}
+                        className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
                         <MessageCircle size={16} />
                       </button>
-                      <button type="button" title="تقييد" onClick={() => handleRestrict(row)} className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100">
-                        <ShieldOff size={16} />
-                      </button>
-                      <button type="button" title="استعادة" onClick={() => handleRestore(row)} className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">
-                        <ShieldCheck size={16} />
-                      </button>
+                      {!isValidWhatsAppPhone(row.parentPhone) && (
+                        <span className="text-[10px] text-slate-400 font-bold px-1 whitespace-nowrap">
+                          لا يوجد رقم واتساب
+                        </span>
+                      )}
+                      {row.parentId && (
+                        <>
+                          <button type="button" title="تقييد" onClick={() => handleRestrict(row)} className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100">
+                            <ShieldOff size={16} />
+                          </button>
+                          <button type="button" title="استعادة" onClick={() => handleRestore(row)} className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">
+                            <ShieldCheck size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -383,7 +429,7 @@ export default function TuitionReminderDashboard() {
           </table>
         </div>
         {filtered.length === 0 && (
-          <p className="text-center py-12 text-slate-400 font-bold">لا توجد أقساط في هذا القسم</p>
+          <p className="text-center py-12 text-slate-400 font-bold">{emptyMessage}</p>
         )}
       </div>
 
