@@ -19,7 +19,13 @@ import {
 } from 'firebase/firestore';
 import { notificationService } from './notificationService';
 import { resolveStudentParentIds } from './schoolSync';
-import { parseDueDate } from './dailySummaryUtils';
+import {
+  buildTuitionReminderPayload,
+  computeInstallmentDelayDays,
+  formatTuitionAmountLabel,
+  formatTuitionDueLabel,
+  parseTuitionDueDate,
+} from './tuitionModel';
 
 export type TuitionReminderSettings = {
   enabled: boolean;
@@ -102,49 +108,6 @@ export function buildTuitionWhatsAppMessage(params: {
 export function buildWhatsAppUrl(phone: string, message: string): string {
   const normalized = normalizePhoneForWhatsApp(phone);
   return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
-}
-
-export function isInstallmentUnpaid(installment: { status?: string; isDeleted?: boolean }): boolean {
-  if (installment.isDeleted) return false;
-  return installment.status !== 'paid';
-}
-
-export function resolveParentPhone(
-  student?: { parentPhone?: string; guardianPhone?: string } | null,
-  parent?: { phone?: string; phoneNumber?: string; mobile?: string } | null,
-): string {
-  return String(
-    student?.parentPhone ||
-      student?.guardianPhone ||
-      parent?.phone ||
-      parent?.phoneNumber ||
-      parent?.mobile ||
-      '',
-  ).trim();
-}
-
-export function isValidWhatsAppPhone(phone: string): boolean {
-  return phone.replace(/\D/g, '').length >= 9;
-}
-
-export function resolveLinkedParentFromCache(
-  student: { parentIds?: string[]; parentEmail?: string } | null | undefined,
-  parents: Record<string, { id?: string; email?: string }>,
-): { parentId?: string; parent: (typeof parents)[string] | null } {
-  const ids = Array.isArray(student?.parentIds) ? student.parentIds : [];
-  for (const id of ids) {
-    const parent = parents[id];
-    if (parent) return { parentId: id, parent };
-  }
-  const email = String(student?.parentEmail || '').toLowerCase();
-  if (email) {
-    for (const parent of Object.values(parents)) {
-      if (String(parent.email || '').toLowerCase() === email) {
-        return { parentId: parent.id, parent };
-      }
-    }
-  }
-  return { parentId: undefined, parent: null };
 }
 
 export async function getSchoolTuitionReminderSettings(
@@ -383,20 +346,15 @@ export async function sendTuitionReminderWithTracking(params: {
     return 'no_parent';
   }
 
-  const dueDate = installment.dueDate ? parseDueDate(installment.dueDate) : new Date();
-  const delayDays = Math.max(
-    0,
-    Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24)),
-  );
+  const dueDate = installment.dueDate ? parseTuitionDueDate(installment.dueDate) : new Date();
+  const delayDays = computeInstallmentDelayDays(installment.dueDate ?? dueDate);
 
   const tracking = await getTuitionTracking(schoolId, student.id, installment.id);
   const newCount = tracking.reminderCount + 1;
   const escalationLevel = computeEscalationLevel(newCount, delayDays, settings);
 
-  const amountLabel = (installment.amount ?? 0).toLocaleString('ar-IQ');
-  const dueLabel = installment.dueDate
-    ? parseDueDate(installment.dueDate).toLocaleDateString('ar-IQ')
-    : '\u063a\u064a\u0631 \u0645\u062d\u062f\u062f';
+  const amountLabel = formatTuitionAmountLabel(installment.amount);
+  const dueLabel = formatTuitionDueLabel(installment.dueDate);
 
   const message = `\u062a\u0630\u0643\u064a\u0631 \u0628\u0642\u0633\u0637 \u0627\u0644\u0637\u0627\u0644\u0628 ${student.name || ''} \u0628\u0645\u0628\u0644\u063a ${amountLabel} \u062f.\u0639 \u0645\u0633\u062a\u062d\u0642 \u0628\u062a\u0627\u0631\u064a\u062e ${dueLabel}.`;
 
@@ -413,11 +371,7 @@ export async function sendTuitionReminderWithTracking(params: {
     schoolId,
     senderId,
     metadata: {
-      source: 'tuition',
-      studentId: student.id,
-      installmentId: installment.id,
-      schoolId,
-      sourceId: installment.id || `${student.id}-tuition-reminder`,
+      ...buildTuitionReminderPayload(student, installment, senderId, schoolId, message).metadata,
       dedupKey,
       escalationLevel,
       installmentAlert: true,

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, doc, onSnapshot, query, where, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../lib/AuthContext';
 import {
@@ -16,6 +16,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import {
+  buildReminderDashboardRows,
+  computeReminderStats,
+  isValidWhatsAppPhone,
+  resolveLinkedParentFromCache,
+  resolveParentPhone,
+  tuitionParentsQuery,
+} from '../../lib/tuitionModel';
+import { useTuitionSchoolData } from '../../lib/useTuitionSchoolData';
+import {
   buildTuitionWhatsAppMessage,
   buildWhatsAppUrl,
   fetchReminderLogs,
@@ -24,13 +33,8 @@ import {
   saveSchoolTuitionReminderSettings,
   sendTuitionReminderWithTracking,
   DEFAULT_TUITION_REMINDER_SETTINGS,
-  isInstallmentUnpaid,
-  isValidWhatsAppPhone,
-  resolveLinkedParentFromCache,
-  resolveParentPhone,
   type TuitionReminderSettings,
 } from '../../lib/tuitionReminderService';
-import { parseDueDate } from '../../lib/dailySummaryUtils';
 
 type Row = {
   installmentId: string;
@@ -51,8 +55,10 @@ type Row = {
 
 export default function TuitionReminderDashboard() {
   const { profile, schoolData } = useAuth();
-  const [students, setStudents] = useState<any[]>([]);
-  const [installments, setInstallments] = useState<any[]>([]);
+  const schoolId = profile?.schoolId || '';
+  const schoolName = schoolData?.name || profile?.schoolName || 'المدرسة';
+
+  const { students, installments } = useTuitionSchoolData(schoolId);
   const [tracking, setTracking] = useState<Record<string, any>>({});
   const [parents, setParents] = useState<Record<string, any>>({});
   const [settings, setSettings] = useState<TuitionReminderSettings>(DEFAULT_TUITION_REMINDER_SETTINGS);
@@ -62,21 +68,12 @@ export default function TuitionReminderDashboard() {
   const [logs, setLogs] = useState<any[]>([]);
   const [filter, setFilter] = useState<'all' | 'overdue' | 'today' | 'soon'>('all');
 
-  const schoolId = profile?.schoolId || '';
-  const schoolName = schoolData?.name || profile?.schoolName || 'المدرسة';
-
   useEffect(() => {
     if (!schoolId) return;
     getSchoolTuitionReminderSettings(schoolId).then(setSettings);
     fetchReminderLogs(schoolId, 30).then(setLogs);
 
     const unsubs = [
-      onSnapshot(query(collection(db, 'students'), where('schoolId', '==', schoolId), limit(1000)), (s) =>
-        setStudents(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
-      ),
-      onSnapshot(query(collection(db, 'installments'), where('schoolId', '==', schoolId), limit(500)), (s) =>
-        setInstallments(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
-      ),
       onSnapshot(query(collection(db, 'tuition_reminder_tracking'), where('schoolId', '==', schoolId)), (s) => {
         const map: Record<string, any> = {};
         s.docs.forEach((d) => {
@@ -84,7 +81,7 @@ export default function TuitionReminderDashboard() {
         });
         setTracking(map);
       }),
-      onSnapshot(query(collection(db, 'users'), where('schoolId', '==', schoolId), where('role', '==', 'parent')), (s) => {
+      onSnapshot(tuitionParentsQuery(schoolId), (s) => {
         const map: Record<string, any> = {};
         s.docs.forEach((d) => {
           map[d.id] = { id: d.id, ...d.data() };
@@ -96,49 +93,31 @@ export default function TuitionReminderDashboard() {
   }, [schoolId]);
 
   const rows: Row[] = useMemo(() => {
-    const now = new Date();
-    const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const upcomingDays = Math.max(1, settings.daysBeforeEscalation || 7);
+    const baseRows = buildReminderDashboardRows(installments, students, upcomingDays);
 
-    return installments
-      .filter((i) => isInstallmentUnpaid(i))
-      .map((i) => {
-        const student = students.find((s) => s.id === i.studentId);
-        const due = parseDueDate(i.dueDate);
-        if (!due.getTime() || Number.isNaN(due.getTime())) return null;
+    return baseRows.map((row) => {
+      const trackKey = `${schoolId}_${row.studentId}_${row.installmentId}`;
+      const track = tracking[trackKey] || tracking[`${schoolId}_${row.studentId}`] || {};
+      const { parentId, parent } = resolveLinkedParentFromCache(row.student, parents);
 
-        const dueOnly = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-        const daysUntilDue = Math.floor((dueOnly.getTime() - todayOnly.getTime()) / 86400000);
-
-        let bucket: Row['bucket'] | null = null;
-        if (daysUntilDue < 0) bucket = 'overdue';
-        else if (daysUntilDue === 0) bucket = 'today';
-        else if (daysUntilDue <= upcomingDays) bucket = 'soon';
-        if (!bucket) return null;
-
-        const trackKey = `${schoolId}_${i.studentId}_${i.id}`;
-        const track = tracking[trackKey] || tracking[`${schoolId}_${i.studentId}`] || {};
-        const { parentId, parent } = resolveLinkedParentFromCache(student, parents);
-        const delayDays = Math.max(0, -daysUntilDue);
-
-        return {
-          installmentId: i.id,
-          studentId: i.studentId,
-          studentName: student?.name || 'طالب',
-          parentName: parent?.displayName || parent?.name || '—',
-          parentPhone: resolveParentPhone(student, parent),
-          parentId,
-          amount: i.amount || 0,
-          dueDate: due,
-          delayDays,
-          bucket,
-          reminderCount: track.reminderCount || 0,
-          lastReminderAt: track.lastReminderAt?.toDate?.() ?? null,
-          escalationLevel: track.escalationLevel || 1,
-          parentStatus: track.parentStatus || 'active',
-        };
-      })
-      .filter(Boolean) as Row[];
+      return {
+        installmentId: row.installmentId,
+        studentId: row.studentId,
+        studentName: row.studentName,
+        parentName: parent?.displayName || parent?.name || '—',
+        parentPhone: resolveParentPhone(row.student, parent),
+        parentId,
+        amount: row.amount,
+        dueDate: row.dueDate,
+        delayDays: row.delayDays,
+        bucket: row.bucket,
+        reminderCount: track.reminderCount || 0,
+        lastReminderAt: track.lastReminderAt?.toDate?.() ?? null,
+        escalationLevel: track.escalationLevel || 1,
+        parentStatus: track.parentStatus || 'active',
+      };
+    });
   }, [installments, students, tracking, parents, schoolId, settings.daysBeforeEscalation]);
 
   const filtered = rows.filter((r) => filter === 'all' || r.bucket === filter);
@@ -247,11 +226,7 @@ export default function TuitionReminderDashboard() {
     setShowSettings(false);
   };
 
-  const stats = {
-    overdue: rows.filter((r) => r.bucket === 'overdue').length,
-    today: rows.filter((r) => r.bucket === 'today').length,
-    soon: rows.filter((r) => r.bucket === 'soon').length,
-  };
+  const stats = computeReminderStats(rows);
 
   return (
     <div className="space-y-6" dir="rtl">

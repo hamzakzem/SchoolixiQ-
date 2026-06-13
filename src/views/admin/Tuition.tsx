@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc, increment, orderBy, limit, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc, increment, limit, deleteDoc, writeBatch } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { Wallet, Receipt, Plus, Search, Filter, CheckCircle2, AlertCircle, DollarSign, Calendar, MessageSquare, ExternalLink, Trash2, Clock, Edit2, Settings2, Bell } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -8,6 +8,23 @@ import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
 import { resolveStudentParentIds } from '../../lib/schoolSync';
+import {
+  buildTuitionReminderPayload,
+  computeLateInstallments,
+  computeTotalArrears,
+  formatTuitionAmountLabel,
+  formatTuitionDueLabel,
+  getInstallmentsForStudent,
+  getPendingInstallmentsForStudent,
+  getStudentRemainingBalance,
+  isOverdueInstallment,
+  isStudentLate,
+  isUnpaidInstallment,
+  parseTuitionDueDate,
+  tuitionInstallmentsQuery,
+  tuitionPaymentsQuery,
+  tuitionStudentsQuery,
+} from '../../lib/tuitionModel';
 import TuitionSettingsModal from '../../components/admin/tuition/TuitionSettingsModal';
 
 export default function Tuition() {
@@ -46,18 +63,15 @@ export default function Tuition() {
         setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }));
 
-      const studentsQ = query(collection(db, 'students'), where('schoolId', '==', profile.schoolId), limit(1000));
-      unsubs.push(onSnapshot(studentsQ, snap => {
+      unsubs.push(onSnapshot(tuitionStudentsQuery(profile.schoolId), snap => {
         setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }));
 
-      const paymentsQ = query(collection(db, 'payments'), where('schoolId', '==', profile.schoolId), orderBy('createdAt', 'desc'), limit(100));
-      unsubs.push(onSnapshot(paymentsQ, snap => {
+      unsubs.push(onSnapshot(tuitionPaymentsQuery(profile.schoolId), snap => {
         setPayments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }));
 
-      const installmentsQ = query(collection(db, 'installments'), where('schoolId', '==', profile.schoolId), limit(500));
-      unsubs.push(onSnapshot(installmentsQ, snap => {
+      unsubs.push(onSnapshot(tuitionInstallmentsQuery(profile.schoolId), snap => {
         setInstallments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }));
 
@@ -108,9 +122,7 @@ export default function Tuition() {
     
     try {
       // Find the next pending installment to label the payment
-      const pendingInstallments = installments
-        .filter(i => i.studentId === selectedStudent.id && i.status !== 'paid')
-        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      const pendingInstallments = getPendingInstallmentsForStudent(installments, selectedStudent.id);
       
       const installmentToPay = pendingInstallments[0];
       const installmentLabel = installmentToPay ? `الدفعة رقم ${installments.filter(i => i.studentId === selectedStudent.id).indexOf(installmentToPay) + 1}` : 'دفعة إضافية';
@@ -367,27 +379,6 @@ export default function Tuition() {
 
 
 
-  const buildTuitionReminderPayload = (
-    student: { id: string; name?: string; schoolId?: string },
-    installment: { id?: string; amount?: number; dueDate?: string | Date },
-    adminUid: string,
-    schoolId: string,
-    message: string,
-  ) => ({
-    title: 'تنبيه قسط دراسي',
-    message,
-    type: 'tuition' as const,
-    schoolId,
-    senderId: adminUid,
-    metadata: {
-      source: 'tuition',
-      studentId: student.id,
-      installmentId: installment.id,
-      schoolId,
-      sourceId: installment.id || `${student.id}-tuition-reminder`,
-    },
-  });
-
   const sendTuitionReminder = async (
     student: { id: string; name?: string; schoolId?: string },
     installment: { id?: string; amount?: number; dueDate?: string | Date },
@@ -400,10 +391,8 @@ export default function Tuition() {
       return 'no_parent';
     }
 
-    const dueLabel = installment.dueDate
-      ? new Date(installment.dueDate).toLocaleDateString('ar-IQ')
-      : 'غير محدد';
-    const amountLabel = (installment.amount ?? 0).toLocaleString('ar-IQ');
+    const dueLabel = formatTuitionDueLabel(installment.dueDate);
+    const amountLabel = formatTuitionAmountLabel(installment.amount);
 
     const ok = await notificationService.notifyStudentParents(student.id, {
       ...buildTuitionReminderPayload(
@@ -441,27 +430,8 @@ export default function Tuition() {
   );
 
   const totalCollected = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-  const totalArrears = installments
-    .filter(i => i.status !== 'paid' && new Date(i.dueDate) < new Date())
-    .reduce((sum, i) => sum + (i.amount || 0), 0);
-
-  const lateInstallments = installments
-    .filter(i => i.status !== 'paid' && new Date(i.dueDate) < new Date())
-    .map(i => {
-      const student = students.find(s => s.id === i.studentId);
-      const dueDate = new Date(i.dueDate);
-      const now = new Date();
-      // Calculate delay starting from day 1
-      const diffTime = now.getTime() - dueDate.getTime();
-      const delayDays = Math.max(1, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-      
-      let delayLevel = 'early';
-      if (delayDays > 30) delayLevel = 'critical';
-      else if (delayDays > 10) delayLevel = 'medium';
-
-      return { ...i, studentName: student?.name || 'طالب مجهول', student, delayDays, delayLevel };
-    })
-    .sort((a, b) => b.delayDays - a.delayDays);
+  const totalArrears = computeTotalArrears(installments);
+  const lateInstallments = computeLateInstallments(installments, students);
 
   const sendAllReminders = async () => {
     if (lateInstallments.length === 0 || !profile?.schoolId) return;
@@ -473,10 +443,8 @@ export default function Tuition() {
       for (const late of lateInstallments) {
         if (!late.student || late.student.schoolId !== profile.schoolId) continue;
 
-        const dueLabel = late.dueDate
-          ? new Date(late.dueDate).toLocaleDateString('ar-IQ')
-          : 'غير محدد';
-        const amountLabel = (late.amount ?? 0).toLocaleString('ar-IQ');
+        const dueLabel = formatTuitionDueLabel(late.dueDate);
+        const amountLabel = formatTuitionAmountLabel(late.amount);
 
         const parentIds = await resolveStudentParentIds(late.student.id, profile.schoolId);
         if (parentIds.length === 0) {
@@ -579,8 +547,8 @@ export default function Tuition() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-2 pt-2">
               {filteredStudents.map((student) => {
-                const studentInstallments = installments.filter(i => i.studentId === student.id);
-                const isLate = studentInstallments.some(i => i.status !== 'paid' && new Date(i.dueDate) < new Date());
+                const studentInstallments = getInstallmentsForStudent(installments, student.id);
+                const isLate = isStudentLate(student, installments);
                 
                 return (
                   <div 
@@ -611,7 +579,7 @@ export default function Tuition() {
                           <div className="mt-2 flex flex-col gap-0.5">
                             <span className="text-[9px] font-bold text-rose-500 uppercase leading-none">المتبقي:</span>
                             <span className="font-black text-rose-600 text-sm font-mono tracking-tighter">
-                              {((student.totalTuition || 0) - (student.tuitionBalance || 0)).toLocaleString()} د.ع
+                              {getStudentRemainingBalance(student).toLocaleString()} د.ع
                             </span>
                           </div>
                         </div>
@@ -740,11 +708,11 @@ export default function Tuition() {
                           <button 
                             onClick={() => toggleInstallmentStatus(inst)}
                             title={inst.status === 'paid' ? "إلغاء التسديد" : "تحديد كمرفوع"}
-                            className={`w-3 h-3 rounded-full transition-all hover:scale-125 ${inst.status === 'paid' ? 'bg-emerald-500' : new Date(inst.dueDate) < new Date() ? 'bg-rose-500' : 'bg-slate-300'}`}
+                            className={`w-3 h-3 rounded-full transition-all hover:scale-125 ${inst.status === 'paid' ? 'bg-emerald-500' : isOverdueInstallment(inst) ? 'bg-rose-500' : 'bg-slate-300'}`}
                           ></button>
                           <div>
                             <p className="font-bold text-[10px] text-slate-900 dark:text-white">قسط #{idx + 1}</p>
-                            <p className="text-[9px] text-slate-400 font-bold">{new Date(inst.dueDate).toLocaleDateString()}</p>
+                            <p className="text-[9px] text-slate-400 font-bold">{parseTuitionDueDate(inst.dueDate).toLocaleDateString()}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -776,7 +744,7 @@ export default function Tuition() {
                               {inst.amount?.toLocaleString()} د.ع
                             </div>
                           )}
-                          {inst.status !== 'paid' && (
+                          {isUnpaidInstallment(inst) && (
                             <button 
                               onClick={() => sendReminder(selectedStudent, inst)}
                               className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
@@ -852,7 +820,7 @@ export default function Tuition() {
                     <div className="flex-1">
                       <h5 className="font-bold text-[10px] text-slate-900 dark:text-white line-clamp-1">{late.studentName}</h5>
                       <div className="flex items-center gap-2 mt-1">
-                        <p className={`text-[9px] font-bold uppercase tracking-tighter ${textColors}`}>{new Date(late.dueDate).toLocaleDateString()}</p>
+                        <p className={`text-[9px] font-bold uppercase tracking-tighter ${textColors}`}>{formatTuitionDueLabel(late.dueDate)}</p>
                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-black ${badgeBg}`}>
                           {labelText} ({late.delayDays} يوم)
                         </span>
