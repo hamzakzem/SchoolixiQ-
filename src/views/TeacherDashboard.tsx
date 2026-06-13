@@ -47,6 +47,12 @@ import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "motion/react";
 import { pageTransitionProps } from "../lib/motion";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
+import {
+  logTeacherFirestoreSetup,
+  logTeacherFirestoreError,
+  logTeacherFirestoreSnapshot,
+  type TeacherFirestoreMeta,
+} from "../lib/teacherQueryDebug";
 import { notificationService } from "../lib/notificationService";
 import { fetchStudentLinkFields, homeworkMatchesStudent, collectParentIdsFromStudents } from "../lib/schoolSync";
 import {
@@ -112,6 +118,12 @@ import AdvancedReports from "./admin/AdvancedReports";
 import IdCards from "./admin/IdCards";
 
 import { useLanguage } from "../lib/LanguageContext";
+
+function teacherSnapshotError(queryName: string) {
+  return (error: unknown) => {
+    logTeacherFirestoreError(queryName, error);
+  };
+}
 
 export const getGradeTypeLabel = (val: string, isRtl: boolean) => {
   if (isRtl) return val;
@@ -179,7 +191,6 @@ export default function TeacherDashboard() {
 
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
-  const [schoolName, setSchoolName] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   // Package permissions are controlled by the Super Admin via the package properties
@@ -228,8 +239,9 @@ export default function TeacherDashboard() {
   const [marketItems, setMarketItems] = useState<any[]>([]);
   const [marketLoading, setMarketLoading] = useState(true);
 
-  // Fetch existing grades when selection changes
+  // Fetch existing grades when selection changes (grades tab only)
   useEffect(() => {
+    if (activeTab !== "grades") return;
     if (
       !profile?.schoolId ||
       !selectedClassId ||
@@ -238,6 +250,20 @@ export default function TeacherDashboard() {
     )
       return;
 
+    const queryName = "TEACHER_GRADES";
+    const meta: TeacherFirestoreMeta = {
+      queryName,
+      collection: "grades",
+      constraints: [
+        `schoolId == ${profile.schoolId}`,
+        `classId == ${selectedClassId}`,
+        `subject == ${selectedSubject}`,
+        `term == ${gradeType}`,
+      ],
+      uid: profile.uid,
+      schoolId: profile.schoolId,
+    };
+    logTeacherFirestoreSetup(meta);
     setLoadingGrades(true);
     const q = query(
       collection(db, "grades"),
@@ -250,12 +276,17 @@ export default function TeacherDashboard() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        logTeacherFirestoreSnapshot(
+          queryName,
+          snapshot.size,
+          snapshot.metadata.fromCache,
+        );
         const gradesMap: Record<string, number> = {};
         let sharedMaxScore = 100;
         let anyShared = false;
 
-        snapshot.docs.forEach((doc) => {
-          const data = doc.data();
+        snapshot.docs.forEach((gradeDoc) => {
+          const data = gradeDoc.data();
           gradesMap[data.studentId] = data.score;
           if (data.maxScore) sharedMaxScore = data.maxScore;
           if (data.isTeacherOnly === false) anyShared = true;
@@ -272,17 +303,20 @@ export default function TeacherDashboard() {
         setLoadingGrades(false);
       },
       (error) => {
-        handleFirestoreError(
-          error,
-          OperationType.LIST,
-          "TeacherDashboard:grades",
-        );
+        teacherSnapshotError(queryName)(error);
         setLoadingGrades(false);
       },
     );
 
     return unsubscribe;
-  }, [profile?.schoolId, selectedClassId, selectedSubject, gradeType]);
+  }, [
+    activeTab,
+    profile?.schoolId,
+    profile?.uid,
+    selectedClassId,
+    selectedSubject,
+    gradeType,
+  ]);
 
   // Reports state
   const [showAddReport, setShowAddReport] = useState(false);
@@ -297,6 +331,20 @@ export default function TeacherDashboard() {
     type: "positive",
     description: "",
   });
+
+  const needsStudents =
+    activeTab === "home" ||
+    activeTab === "grades" ||
+    activeTab === "behavior" ||
+    activeTab === "reports" ||
+    showAddReport ||
+    showAddBehavior;
+  const needsHomework = activeTab === "home" || activeTab === "homework";
+  const needsReports = activeTab === "home" || activeTab === "reports";
+  const needsSubjects =
+    activeTab === "homework" ||
+    activeTab === "grades" ||
+    showAddHomework;
 
   const handleSendBehaviorReport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -385,168 +433,416 @@ export default function TeacherDashboard() {
   );
 
   useEffect(() => {
-    let unsubs: (() => void)[] = [];
-    if (!profile?.schoolId || !auth.currentUser) return;
-
-    try {
-      setLoading(true);
-
-      const schoolRef = doc(db, "schools", profile.schoolId);
-      unsubs.push(onSnapshot(schoolRef, (docSnap) => {
-        if (docSnap.exists() && auth.currentUser) {
-          setSchoolName(docSnap.data().name);
-        }
-      }));
-
-      const subjectsQ = query(
-        collection(db, "subjects"),
-        where("schoolId", "==", profile.schoolId),
-        limit(50),
-      );
-      unsubs.push(onSnapshot(subjectsQ, (snap) => {
-        if (auth.currentUser) {
-          const docs = snap.docs.map((docSnap) => ({
-            id: docSnap.id,
-            name: String(docSnap.data().name || ""),
-            classId: docSnap.data().classId,
-            className: docSnap.data().className,
-            schoolId: docSnap.data().schoolId,
-          }));
-          setSchoolSubjectDocs(docs);
-          const subjs = docs.map((d) => d.name).filter(Boolean);
-          const defaults = isRtl
-            ? [
-                "الرياضيات",
-                "اللغة العربية",
-                "العلوم",
-                "اللغة الإنجليزية",
-                "التربية الإسلامية",
-              ]
-            : [
-                "Mathematics",
-                "Arabic Language",
-                "Science",
-                "English Language",
-                "Islamic Education",
-              ];
-          setSchoolSubjects(Array.from(new Set([...defaults, ...subjs])));
-        }
-      }));
-
-      const classesQ = query(
-        collection(db, "classes"),
-        where("schoolId", "==", profile.schoolId),
-        limit(100),
-      );
-      unsubs.push(onSnapshot(classesQ, (snap) => {
-        const classesData = snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setClasses(classesData as any);
-      }));
-
-      const studentsQ = assignedClassId
-        ? query(
-            collection(db, "students"),
-            where("schoolId", "==", profile.schoolId),
-            where("classId", "==", assignedClassId),
-            limit(500),
-          )
-        : null;
-      if (studentsQ) {
-        unsubs.push(onSnapshot(studentsQ, (snap) => {
-          setStudents(
-            snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any,
-          );
-        }));
-      } else {
-        setStudents([]);
-      }
-
-      const homeworkQ = query(
-        collection(db, "homework"),
-        where("schoolId", "==", profile.schoolId),
-        where("teacherId", "==", profile.uid),
-        limit(50),
-      );
-      unsubs.push(onSnapshot(homeworkQ, (snap) => {
-        setHomework(
-          snap.docs
-            .map((doc) => ({ id: doc.id, ...doc.data() }))
-            .sort(
-              (a: any, b: any) =>
-                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
-            ) as any,
-        );
-      }));
-
-      const reportsQ = query(
-        collection(db, "teacher_reports"),
-        where("schoolId", "==", profile.schoolId),
-        where("teacherId", "==", profile.uid),
-        limit(50),
-      );
-      unsubs.push(onSnapshot(reportsQ, (snap) => {
-        setSentReports(
-          snap.docs
-            .map((doc) => ({ id: doc.id, ...doc.data() }))
-            .sort(
-              (a: any, b: any) =>
-                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
-            ) as any,
-        );
-      }));
-
-      const notificationsQ = query(
-        collection(db, "notifications"),
-        where("userId", "==", profile.uid),
-        limit(50),
-      );
-      unsubs.push(onSnapshot(notificationsQ, (snap) => {
-        const visibleNotifs = filterNotificationsForUser(
-          snap.docs
-            .map((doc) => ({ id: doc.id, ...doc.data() }))
-            .sort(
-              (a: any, b: any) =>
-                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
-            ),
-          {
-            uid: profile.uid,
-            role: profile.role,
-            schoolId: profile.schoolId,
-          },
-        );
-        if (notificationsPrimedRef.current) {
-          visibleNotifs.forEach((notif: any) => {
-            if (!knownNotificationIdsRef.current.has(notif.id)) {
-              alertIncomingNotification(notif, isRtl);
-            }
-          });
-        } else {
-          notificationsPrimedRef.current = true;
-        }
-        knownNotificationIdsRef.current = new Set(
-          visibleNotifs.map((notif: any) => notif.id),
-        );
-        setNotifications(visibleNotifs as any);
-      }));
-
+    if (!profile?.schoolId || !auth.currentUser) {
+      setClasses([]);
       setLoading(false);
-    } catch (error) {
-      console.error("Error setting up teacher dashboard listeners:", error);
-      setLoading(false);
+      return;
     }
 
-    return () => {
-      unsubs.forEach((unsub) => unsub());
+    if (!assignedClassId) {
+      setClasses([]);
+      setLoading(false);
+      return;
+    }
+
+    const queryName = "TEACHER_CLASS";
+    const meta: TeacherFirestoreMeta = {
+      queryName,
+      collection: "classes",
+      constraints: [`doc get ${assignedClassId}`],
+      uid: profile.uid,
+      schoolId: profile.schoolId,
     };
-  }, [profile, isRtl, assignedClassId]);
+    logTeacherFirestoreSetup(meta);
+
+    const classRef = doc(db, "classes", assignedClassId);
+    return onSnapshot(
+      classRef,
+      (classSnap) => {
+        logTeacherFirestoreSnapshot(
+          queryName,
+          classSnap.exists() ? 1 : 0,
+          classSnap.metadata.fromCache,
+        );
+        if (classSnap.exists()) {
+          setClasses([{ id: classSnap.id, ...classSnap.data() } as any]);
+        } else {
+          setClasses([]);
+        }
+        setLoading(false);
+      },
+      teacherSnapshotError(queryName),
+    );
+  }, [profile?.schoolId, profile?.uid, assignedClassId]);
 
   useEffect(() => {
-    if (!profile?.schoolId) {
-      setMarketItems([]);
-      setMarketLoading(false);
+    if (!needsSubjects || !profile?.schoolId || !auth.currentUser) return;
+
+    const queryName = "TEACHER_SUBJECTS";
+    const meta: TeacherFirestoreMeta = {
+      queryName,
+      collection: "subjects",
+      constraints: [`schoolId == ${profile.schoolId}`, "limit(50)"],
+      uid: profile.uid,
+      schoolId: profile.schoolId,
+    };
+    logTeacherFirestoreSetup(meta);
+
+    const subjectsQ = query(
+      collection(db, "subjects"),
+      where("schoolId", "==", profile.schoolId),
+      limit(50),
+    );
+    return onSnapshot(
+      subjectsQ,
+      (snap) => {
+        logTeacherFirestoreSnapshot(
+          queryName,
+          snap.size,
+          snap.metadata.fromCache,
+        );
+        const docs = snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          name: String(docSnap.data().name || ""),
+          classId: docSnap.data().classId,
+          className: docSnap.data().className,
+          schoolId: docSnap.data().schoolId,
+        }));
+        setSchoolSubjectDocs(docs);
+        const subjs = docs.map((d) => d.name).filter(Boolean);
+        const defaults = isRtl
+          ? [
+              "الرياضيات",
+              "اللغة العربية",
+              "العلوم",
+              "اللغة الإنجليزية",
+              "التربية الإسلامية",
+            ]
+          : [
+              "Mathematics",
+              "Arabic Language",
+              "Science",
+              "English Language",
+              "Islamic Education",
+            ];
+        setSchoolSubjects(Array.from(new Set([...defaults, ...subjs])));
+      },
+      teacherSnapshotError(queryName),
+    );
+  }, [needsSubjects, profile?.schoolId, profile?.uid, isRtl]);
+
+  useEffect(() => {
+    if (
+      !needsStudents ||
+      !profile?.schoolId ||
+      !assignedClassId ||
+      !auth.currentUser
+    ) {
+      if (!needsStudents) setStudents([]);
+      return;
+    }
+
+    const queryName = "TEACHER_STUDENTS";
+    const meta: TeacherFirestoreMeta = {
+      queryName,
+      collection: "students",
+      constraints: [
+        `schoolId == ${profile.schoolId}`,
+        `classId == ${assignedClassId}`,
+        "limit(500)",
+      ],
+      uid: profile.uid,
+      schoolId: profile.schoolId,
+    };
+    logTeacherFirestoreSetup(meta);
+
+    const studentsQ = query(
+      collection(db, "students"),
+      where("schoolId", "==", profile.schoolId),
+      where("classId", "==", assignedClassId),
+      limit(500),
+    );
+    return onSnapshot(
+      studentsQ,
+      (snap) => {
+        logTeacherFirestoreSnapshot(
+          queryName,
+          snap.size,
+          snap.metadata.fromCache,
+        );
+        setStudents(
+          snap.docs.map((studentDoc) => ({
+            id: studentDoc.id,
+            ...studentDoc.data(),
+          })) as any,
+        );
+      },
+      teacherSnapshotError(queryName),
+    );
+  }, [
+    needsStudents,
+    profile?.schoolId,
+    profile?.uid,
+    assignedClassId,
+  ]);
+
+  useEffect(() => {
+    if (
+      !needsHomework ||
+      !profile?.schoolId ||
+      !assignedClassId ||
+      !auth.currentUser
+    ) {
+      if (!needsHomework) setHomework([]);
+      return;
+    }
+
+    const queryName = "TEACHER_HOMEWORK";
+    const meta: TeacherFirestoreMeta = {
+      queryName,
+      collection: "homework",
+      constraints: [
+        `schoolId == ${profile.schoolId}`,
+        `classId == ${assignedClassId}`,
+        `teacherId == ${profile.uid}`,
+        "limit(50)",
+      ],
+      uid: profile.uid,
+      schoolId: profile.schoolId,
+    };
+    logTeacherFirestoreSetup(meta);
+
+    const homeworkQ = query(
+      collection(db, "homework"),
+      where("schoolId", "==", profile.schoolId),
+      where("classId", "==", assignedClassId),
+      where("teacherId", "==", profile.uid),
+      limit(50),
+    );
+    return onSnapshot(
+      homeworkQ,
+      (snap) => {
+        logTeacherFirestoreSnapshot(
+          queryName,
+          snap.size,
+          snap.metadata.fromCache,
+        );
+        setHomework(
+          snap.docs
+            .map((hwDoc) => ({ id: hwDoc.id, ...hwDoc.data() }))
+            .sort(
+              (a: any, b: any) =>
+                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+            ) as any,
+        );
+      },
+      teacherSnapshotError(queryName),
+    );
+  }, [
+    needsHomework,
+    profile?.schoolId,
+    profile?.uid,
+    assignedClassId,
+  ]);
+
+  useEffect(() => {
+    if (
+      !needsReports ||
+      !profile?.schoolId ||
+      !assignedClassId ||
+      !auth.currentUser
+    ) {
+      if (!needsReports) setSentReports([]);
+      return;
+    }
+
+    const queryName = "TEACHER_REPORTS";
+    const meta: TeacherFirestoreMeta = {
+      queryName,
+      collection: "teacher_reports",
+      constraints: [
+        `schoolId == ${profile.schoolId}`,
+        `classId == ${assignedClassId}`,
+        `teacherId == ${profile.uid}`,
+        "limit(50)",
+      ],
+      uid: profile.uid,
+      schoolId: profile.schoolId,
+    };
+    logTeacherFirestoreSetup(meta);
+
+    const reportsQ = query(
+      collection(db, "teacher_reports"),
+      where("schoolId", "==", profile.schoolId),
+      where("classId", "==", assignedClassId),
+      where("teacherId", "==", profile.uid),
+      limit(50),
+    );
+    return onSnapshot(
+      reportsQ,
+      (snap) => {
+        logTeacherFirestoreSnapshot(
+          queryName,
+          snap.size,
+          snap.metadata.fromCache,
+        );
+        setSentReports(
+          snap.docs
+            .map((reportDoc) => ({ id: reportDoc.id, ...reportDoc.data() }))
+            .sort(
+              (a: any, b: any) =>
+                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+            ) as any,
+        );
+      },
+      teacherSnapshotError(queryName),
+    );
+  }, [
+    needsReports,
+    profile?.schoolId,
+    profile?.uid,
+    assignedClassId,
+  ]);
+
+  useEffect(() => {
+    if (!profile?.uid || !auth.currentUser) return;
+
+    let cancelled = false;
+    let unsubSchool: (() => void) | undefined;
+    let unsubSystem: (() => void) | undefined;
+
+    const applyNotifications = (rawItems: any[], schoolId: string) => {
+      const visibleNotifs = filterNotificationsForUser(
+        rawItems.sort(
+          (a: any, b: any) =>
+            (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+        ),
+        {
+          uid: profile.uid,
+          role: profile.role,
+          schoolId,
+        },
+      );
+      if (notificationsPrimedRef.current) {
+        visibleNotifs.forEach((notif: any) => {
+          if (!knownNotificationIdsRef.current.has(notif.id)) {
+            alertIncomingNotification(notif, isRtl);
+          }
+        });
+      } else {
+        notificationsPrimedRef.current = true;
+      }
+      knownNotificationIdsRef.current = new Set(
+        visibleNotifs.map((notif: any) => notif.id),
+      );
+      setNotifications(visibleNotifs as any);
+    };
+
+    const setup = async () => {
+      let schoolId: string | undefined;
+      try {
+        const tokenResult = await auth.currentUser!.getIdTokenResult(true);
+        if (cancelled) return;
+        const claimSchoolId = tokenResult.claims.schoolId;
+        schoolId =
+          typeof claimSchoolId === "string" && claimSchoolId
+            ? claimSchoolId
+            : profile.schoolId;
+      } catch {
+        schoolId = profile.schoolId;
+      }
+
+      if (!schoolId || cancelled) {
+        if (!schoolId) setNotifications([]);
+        return;
+      }
+
+      const queryName = "TEACHER_NOTIFICATIONS";
+      const meta: TeacherFirestoreMeta = {
+        queryName,
+        collection: "notifications",
+        constraints: [
+          `userId == ${profile.uid}`,
+          `schoolId == ${schoolId}`,
+          `userId == ${profile.uid} && schoolId == system`,
+          "limit(50) each",
+        ],
+        uid: profile.uid,
+        schoolId,
+      };
+      logTeacherFirestoreSetup(meta);
+
+      let schoolItems: any[] = [];
+      let systemItems: any[] = [];
+
+      const mergeAndApply = () => {
+        const merged = [...schoolItems, ...systemItems];
+        const deduped = Array.from(
+          new Map(merged.map((item) => [item.id, item])).values(),
+        );
+        applyNotifications(deduped, schoolId!);
+      };
+
+      unsubSchool = onSnapshot(
+        query(
+          collection(db, "notifications"),
+          where("userId", "==", profile.uid),
+          where("schoolId", "==", schoolId),
+          limit(50),
+        ),
+        (snap) => {
+          logTeacherFirestoreSnapshot(
+            queryName,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          schoolItems = snap.docs.map((notifDoc) => ({
+            id: notifDoc.id,
+            ...notifDoc.data(),
+          }));
+          mergeAndApply();
+        },
+        teacherSnapshotError(queryName),
+      );
+
+      unsubSystem = onSnapshot(
+        query(
+          collection(db, "notifications"),
+          where("userId", "==", profile.uid),
+          where("schoolId", "==", "system"),
+          limit(50),
+        ),
+        (snap) => {
+          logTeacherFirestoreSnapshot(
+            `${queryName}_SYSTEM`,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          systemItems = snap.docs.map((notifDoc) => ({
+            id: notifDoc.id,
+            ...notifDoc.data(),
+          }));
+          mergeAndApply();
+        },
+        teacherSnapshotError(`${queryName}_SYSTEM`),
+      );
+    };
+
+    void setup();
+
+    return () => {
+      cancelled = true;
+      unsubSchool?.();
+      unsubSystem?.();
+    };
+  }, [profile?.uid, profile?.role, profile?.schoolId, isRtl]);
+
+  useEffect(() => {
+    if (activeTab !== "market" || !profile?.schoolId) {
+      if (activeTab !== "market") {
+        setMarketItems([]);
+        setMarketLoading(false);
+      }
       return;
     }
 
@@ -559,12 +855,12 @@ export default function TeacherDashboard() {
       },
       {
         onError: (error) =>
-          handleFirestoreError(error, OperationType.LIST, "market"),
+          logTeacherFirestoreError("TEACHER_MARKET", error),
       },
     );
 
     return () => unsub();
-  }, [profile?.schoolId]);
+  }, [activeTab, profile?.schoolId]);
 
   const teacherAssignedSubjects = useMemo(
     () => resolveSubjectsForTeacher(profile, schoolSubjectDocs),
@@ -865,6 +1161,7 @@ export default function TeacherDashboard() {
       const reportRef = await addDoc(collection(db, "teacher_reports"), {
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,
+        classId: selectedStudent.classId || assignedClassId || "",
         parentIds: link?.parentIds || [],
         parentEmail: link?.parentEmail || "",
         teacherId: profile.uid,
@@ -1015,7 +1312,7 @@ export default function TeacherDashboard() {
       onLogout={() => auth.signOut()}
       headerEyebrow={t("dashboard")}
       headerTitle={activeTabLabel}
-      headerSubtitle={schoolName || profile?.name}
+      headerSubtitle={schoolData?.name || profile?.name}
       headerTrailing={
         <>
           <div className="hidden lg:block text-right ml-4">
@@ -1960,7 +2257,7 @@ export default function TeacherDashboard() {
                       {t("schoolStore")}
                     </h2>
                     <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-slate-500 uppercase tracking-widest">
-                      {schoolName || t("officialStore")}
+                      {schoolData?.name || t("officialStore")}
                     </span>
                   </div>
 

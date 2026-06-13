@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { adminCreateUser, adminDeleteUser } from "../lib/adminApi";
 import { getApiUrl } from "../lib/apiUtils";
 import {
   collection,
-  onSnapshot,
   query,
   addDoc,
   serverTimestamp,
@@ -14,13 +13,20 @@ import {
   deleteDoc,
   where,
   getDocs,
+  getCountFromServer,
   updateDoc,
   limit,
 } from "firebase/firestore";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
-import { filterNotificationsForUser } from "../lib/notificationVisibility";
+import { useNotificationBadges } from "../lib/NotificationBadgeContext";
+import {
+  subscribeSuperAdminFirestore,
+  logSuperAdminFirestoreSetup,
+  logSuperAdminFirestoreFetch,
+  logSuperAdminFirestoreError,
+} from "../lib/superAdminQueryDebug";
 import {
   School,
   Building,
@@ -207,28 +213,8 @@ export default function SuperAdminDashboard() {
   );
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!profile?.uid) return;
-    const viewer = {
-      uid: profile.uid,
-      role: profile.role,
-      schoolId: profile.schoolId,
-    };
-    const qNotifications = query(
-      collection(db, "notifications"),
-      where("userId", "in", [profile.uid, "super_admin"]),
-    );
-    return onSnapshot(qNotifications, (snap) => {
-      setNotifications(
-        filterNotificationsForUser(
-          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-          viewer,
-        ),
-      );
-    });
-  }, [profile?.uid, profile?.role, profile?.schoolId]);
+  const { totalUnread } = useNotificationBadges();
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [activeRequestSource, setActiveRequestSource] = useState<string | null>(
     null,
@@ -348,47 +334,34 @@ export default function SuperAdminDashboard() {
     promotionalBanners: [],
   });
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const configFormTabRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
-    const configRef = doc(db, "system", "config");
-    const unsub = onSnapshot(
-      configRef,
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          setSystemConfig({
-            supportPhones:
-              data.supportPhones ||
-              (data.supportPhone ? [data.supportPhone] : ["+964 770 000 0000"]),
-            supportEmails:
-              data.supportEmails ||
-              (data.supportEmail
-                ? [data.supportEmail]
-                : ["support@schoolixiq.iq"]),
-            successPartners: data.successPartners || [],
-            ourPartners: data.ourPartners || [],
-            appName: data.appName || "SchoolixiQ",
-            appLogo: data.appLogo || "",
-            marketingTitle: data.marketingTitle || "",
-            marketingSubtitle: data.marketingSubtitle || "",
-            marketingFeatures: data.marketingFeatures || [],
-            socialLinks: data.socialLinks || {
-              instagram: "",
-              twitter: "",
-              linkedin: "",
-              whatsapp: "",
-            },
-            promotionalBanners: data.promotionalBanners || [],
-          });
-        }
+    if (activeTab !== "settings" && activeTab !== "footer") {
+      configFormTabRef.current = null;
+      return;
+    }
+    if (configFormTabRef.current === activeTab) return;
+    configFormTabRef.current = activeTab;
+    setSystemConfig({
+      supportPhones: config.supportPhones || ["+964 770 000 0000"],
+      supportEmails: config.supportEmails || ["support@schoolixiq.iq"],
+      successPartners: config.successPartners || [],
+      ourPartners: config.ourPartners || [],
+      appName: config.appName || "SchoolixiQ",
+      appLogo: config.appLogo || "",
+      marketingTitle: config.marketingTitle || "",
+      marketingSubtitle: config.marketingSubtitle || "",
+      marketingFeatures: config.marketingFeatures || [],
+      socialLinks: config.socialLinks || {
+        instagram: "",
+        twitter: "",
+        linkedin: "",
+        whatsapp: "",
       },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, "system/config");
-      },
-    );
-    return unsub;
-  }, []);
+      promotionalBanners: config.promotionalBanners || [],
+    });
+  }, [activeTab, config]);
 
   const hasInvalidPartnerLinks = (partners?: { link?: string }[]) =>
     (partners || []).some(
@@ -709,14 +682,114 @@ export default function SuperAdminDashboard() {
   };
 
   useEffect(() => {
-    let unsubs: (() => void)[] = [];
     if (!auth.currentUser) return;
 
-    try {
-      const schoolsQ = query(collection(db, "schools"), limit(100));
-      const packagesQ = query(collection(db, "packages"), limit(50));
-      const usersQ = query(collection(db, "users"), limit(1000));
-      const studentsQ = query(collection(db, "students"), limit(1000));
+    const needsSchools = ["schools", "accounts", "requests"].includes(activeTab);
+    const needsPackages = ["schools", "packages", "requests"].includes(activeTab);
+    const needsUsers = ["schools", "users", "parents", "team", "accounts"].includes(
+      activeTab,
+    );
+    const needsStudents = ["users", "parents"].includes(activeTab);
+    const needsRequests = activeTab === "requests";
+
+    const unsubs: (() => void)[] = [];
+    const uid = profile?.uid;
+
+    if (needsSchools) {
+      unsubs.push(
+        subscribeSuperAdminFirestore(
+          {
+            queryName: "SUPERADMIN_SCHOOLS",
+            collection: "schools",
+            constraints: ["limit(100)"],
+            uid,
+          },
+          query(collection(db, "schools"), limit(100)),
+          (items) => setSchools(items),
+          (error) => {
+            handleFirestoreError(error, OperationType.GET, "schools", false);
+          },
+        ),
+      );
+    } else {
+      setSchools([]);
+    }
+
+    if (needsPackages) {
+      unsubs.push(
+        subscribeSuperAdminFirestore(
+          {
+            queryName: "SUPERADMIN_PACKAGES",
+            collection: "packages",
+            constraints: ["limit(50)"],
+            uid,
+          },
+          query(collection(db, "packages"), limit(50)),
+          (items) => {
+            if (items.length > 0) {
+              setPackages(items);
+            } else {
+              setPackages(DEFAULT_PACKAGES);
+            }
+          },
+          (error) => {
+            handleFirestoreError(error, OperationType.GET, "packages", false);
+            setPackages(DEFAULT_PACKAGES);
+          },
+        ),
+      );
+    } else {
+      setPackages([]);
+    }
+
+    if (needsUsers) {
+      unsubs.push(
+        subscribeSuperAdminFirestore(
+          {
+            queryName: "SUPERADMIN_USERS",
+            collection: "users",
+            constraints: ["limit(1000)"],
+            uid,
+          },
+          query(collection(db, "users"), limit(1000)),
+          (items) => setUsers(items),
+          (error) => {
+            handleFirestoreError(error, OperationType.GET, "users", false);
+          },
+        ),
+      );
+    } else {
+      setUsers([]);
+    }
+
+    if (needsStudents) {
+      unsubs.push(
+        subscribeSuperAdminFirestore(
+          {
+            queryName: "SUPERADMIN_STUDENTS",
+            collection: "students",
+            constraints: ["limit(1000)"],
+            uid,
+          },
+          query(collection(db, "students"), limit(1000)),
+          (items) => setStudents(items),
+          (error) => {
+            handleFirestoreError(error, OperationType.GET, "students", false);
+          },
+        ),
+      );
+    } else {
+      setStudents([]);
+    }
+
+    if (needsRequests) {
+      let currentReg: any[] = [];
+      let currentSubReq: any[] = [];
+      let currentOrders: any[] = [];
+
+      const updateRequests = () => {
+        setSubscriptionRequests([...currentReg, ...currentSubReq, ...currentOrders]);
+      };
 
       const regQ = query(
         collection(db, "registrations"),
@@ -734,126 +807,138 @@ export default function SuperAdminDashboard() {
         limit(50),
       );
 
-      // Separate references to combine requests properly
-      let currentReg: any[] = [];
-      let currentSubReq: any[] = [];
-      let currentOrders: any[] = [];
-
-      const updateRequests = () => {
-        setSubscriptionRequests([
-          ...currentReg,
-          ...currentSubReq,
-          ...currentOrders,
-        ]);
-      };
-
       unsubs.push(
-        onSnapshot(
-          schoolsQ,
-          (snap) => setSchools(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
-          (error) => {
-            console.error("SuperAdminDashboard: Failed to listen to schools:", error);
-            handleFirestoreError(error, OperationType.GET, "schools", false);
-          }
-        ),
-      );
-      unsubs.push(
-        onSnapshot(
-          packagesQ,
-          (snap) => {
-            if (!snap.empty) {
-              setPackages(
-                snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-              );
-            } else {
-              setPackages(DEFAULT_PACKAGES);
-            }
+        subscribeSuperAdminFirestore(
+          {
+            queryName: "SUPERADMIN_REGISTRATIONS",
+            collection: "registrations",
+            constraints: ['status in ["pending","needs_review"]', "limit(50)"],
+            uid,
           },
-          (err) => {
-            console.warn("Packages subscription failed, using defaults", err);
-            handleFirestoreError(err, OperationType.GET, "packages", false);
-            setPackages(DEFAULT_PACKAGES);
-          },
-        ),
-      );
-      unsubs.push(
-        onSnapshot(
-          usersQ,
-          (snap) => setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
-          (error) => {
-            console.error("SuperAdminDashboard: Failed to listen to users:", error);
-            handleFirestoreError(error, OperationType.GET, "users", false);
-          }
-        ),
-      );
-      unsubs.push(
-        onSnapshot(
-          studentsQ,
-          (snap) => setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
-          (error) => {
-            console.error("SuperAdminDashboard: Failed to listen to students:", error);
-            handleFirestoreError(error, OperationType.GET, "students", false);
-          }
-        ),
-      );
-
-      unsubs.push(
-        onSnapshot(
           regQ,
-          (snap) => {
-            currentReg = snap.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
+          (items) => {
+            currentReg = items.map((item) => ({
+              ...item,
               _source: "registrations",
             }));
             updateRequests();
           },
           (error) => {
-            console.error("SuperAdminDashboard: Failed to listen to registrations:", error);
             handleFirestoreError(error, OperationType.GET, "registrations", false);
-          }
+          },
         ),
       );
       unsubs.push(
-        onSnapshot(
+        subscribeSuperAdminFirestore(
+          {
+            queryName: "SUPERADMIN_SUBSCRIPTION_REQUESTS",
+            collection: "subscriptionRequests",
+            constraints: ['status == "pending"', "limit(50)"],
+            uid,
+          },
           subReqQ,
-          (snap) => {
-            currentSubReq = snap.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
+          (items) => {
+            currentSubReq = items.map((item) => ({
+              ...item,
               _source: "subscriptionRequests",
             }));
             updateRequests();
           },
           (error) => {
-            console.error("SuperAdminDashboard: Failed to listen to subscriptionRequests:", error);
-            handleFirestoreError(error, OperationType.GET, "subscriptionRequests", false);
-          }
+            handleFirestoreError(
+              error,
+              OperationType.GET,
+              "subscriptionRequests",
+              false,
+            );
+          },
         ),
       );
       unsubs.push(
-        onSnapshot(
+        subscribeSuperAdminFirestore(
+          {
+            queryName: "SUPERADMIN_SUBSCRIPTION_ORDERS",
+            collection: "orders",
+            constraints: [
+              'type in ["subscription_request","direct_school_signup"]',
+              "limit(50)",
+            ],
+            uid,
+          },
           ordersQ,
-          (snap) => {
-            currentOrders = snap.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
+          (items) => {
+            currentOrders = items.map((item) => ({
+              ...item,
               _source: "orders",
             }));
             updateRequests();
           },
           (error) => {
-            console.error("SuperAdminDashboard: Failed to listen to orders:", error);
             handleFirestoreError(error, OperationType.GET, "orders", false);
-          }
+          },
         ),
       );
-    } catch (error) {
-      console.error("Error setting up SuperAdmin Dashboard listeners:", error);
+    } else {
+      setSubscriptionRequests([]);
     }
 
     return () => unsubs.forEach((unsub) => unsub());
-  }, []);
+  }, [activeTab, profile?.uid]);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    if (activeTab === "requests") {
+      setPendingRequestCount(subscriptionRequests.length);
+      return;
+    }
+
+    let cancelled = false;
+    const badgeMeta = {
+      queryName: "SUPERADMIN_REQUESTS_BADGE",
+      collection: "registrations+subscriptionRequests+orders",
+      constraints: ["pending counts only"],
+      uid: profile?.uid,
+    };
+    logSuperAdminFirestoreSetup(badgeMeta);
+
+    const fetchPendingCounts = async () => {
+      try {
+        const [regSnap, subSnap, ordSnap] = await Promise.all([
+          getCountFromServer(
+            query(
+              collection(db, "registrations"),
+              where("status", "in", ["pending", "needs_review"]),
+            ),
+          ),
+          getCountFromServer(
+            query(
+              collection(db, "subscriptionRequests"),
+              where("status", "==", "pending"),
+            ),
+          ),
+          getCountFromServer(
+            query(
+              collection(db, "orders"),
+              where("type", "in", ["subscription_request", "direct_school_signup"]),
+            ),
+          ),
+        ]);
+        const total =
+          regSnap.data().count + subSnap.data().count + ordSnap.data().count;
+        logSuperAdminFirestoreFetch(badgeMeta.queryName, badgeMeta, total);
+        if (!cancelled) setPendingRequestCount(total);
+      } catch (error) {
+        logSuperAdminFirestoreError(badgeMeta.queryName, error, badgeMeta);
+      }
+    };
+
+    void fetchPendingCounts();
+    const interval = setInterval(fetchPendingCounts, 120_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeTab, profile?.uid, subscriptionRequests.length]);
 
   const syncAdminClaims = async (adminUid: string | null) => {
     if (!adminUid) return;
@@ -1604,14 +1689,14 @@ export default function SuperAdminDashboard() {
                     {!isSidebarCollapsed && (
                       <span className="truncate">{t('sidebar_requests')}</span>
                     )}
-                    {subscriptionRequests.length > 0 && !isSidebarCollapsed && (
+                    {pendingRequestCount > 0 && !isSidebarCollapsed && (
                       <span className="mr-auto bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-black animate-pulse">
-                        {subscriptionRequests.length}
+                        {pendingRequestCount}
                       </span>
                     )}
-                    {subscriptionRequests.length > 0 && isSidebarCollapsed && (
+                    {pendingRequestCount > 0 && isSidebarCollapsed && (
                       <span className="absolute top-2 right-2 bg-red-500 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black animate-pulse border-2 border-slate-900">
-                        {subscriptionRequests.length}
+                        {pendingRequestCount}
                       </span>
                     )}
                     {isSidebarCollapsed && (
@@ -1960,9 +2045,9 @@ export default function SuperAdminDashboard() {
               }`}
             >
               <Bell size={18} className="transition-transform duration-300 group-hover:scale-110" />
-              {notifications.filter((n: any) => !n.read).length > 0 && (
+              {totalUnread > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-[#0B2345] rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                  {notifications.filter((n: any) => !n.read).length > 9 ? '9+' : notifications.filter((n: any) => !n.read).length}
+                  {totalUnread > 9 ? '9+' : totalUnread}
                 </span>
               )}
             </button>
@@ -5918,7 +6003,7 @@ export default function SuperAdminDashboard() {
         setIsSidebarOpen={setIsSidebarOpen}
         showNotifications={showNotifications}
         setShowNotifications={setShowNotifications}
-        notificationsCount={notifications.filter((n: any) => !n.read).length}
+        notificationsCount={totalUnread}
         isRtl={isRtl}
         logoutLabel={t("sidebar_logout")}
         onLogout={() => auth.signOut()}

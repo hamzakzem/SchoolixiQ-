@@ -44,7 +44,6 @@ import {
   getDocs,
   query,
   where,
-  onSnapshot,
   limit,
 } from "firebase/firestore";
 import { toast } from "react-hot-toast";
@@ -52,8 +51,12 @@ import { School } from "../types";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
+import {
+  logAdminFirestoreSetup,
+  logAdminFirestoreError,
+  logAdminFirestoreFetch,
+} from "../lib/adminQueryDebug";
 import { notificationService } from "../lib/notificationService";
-import { filterNotificationsForUser } from "../lib/notificationVisibility";
 import { useNotificationBadges, TabBadge } from "../lib/NotificationBadgeContext";
 import { canAccessAdminMenuItem } from "../lib/staffPermissions";
 import SchoolixLogo from "../components/SchoolixLogo";
@@ -235,27 +238,6 @@ export default function AdminDashboard() {
   const { totalUnread, tabBadges } = useNotificationBadges();
 
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!profile?.uid) return;
-    const qNotifications = query(
-      collection(db, "notifications"),
-      where("userId", "==", profile.uid)
-    );
-    return onSnapshot(qNotifications, (snap) => {
-      setNotifications(
-        filterNotificationsForUser(
-          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-          {
-            uid: profile.uid,
-            role: profile.role,
-            schoolId: profile.schoolId,
-          },
-        ),
-      );
-    });
-  }, [profile?.uid, profile?.role, profile?.schoolId]);
 
   const packagePerms = authSchoolData?.packagePermissions as
     | Record<string, boolean | undefined>
@@ -338,7 +320,7 @@ export default function AdminDashboard() {
     approximateStudents: "",
   });
   const [isSettingUp, setIsSettingUp] = useState(false);
-  const [schoolData, setSchoolData] = useState<School | null>(null);
+  const schoolData = authSchoolData as School | null;
   const [isExpired, setIsExpired] = useState(false);
 
   const daysRemaining = schoolData?.subscriptionExpiresAt
@@ -366,8 +348,32 @@ export default function AdminDashboard() {
   const [viewingPackage, setViewingPackage] = useState<any | null>(null);
 
   useEffect(() => {
+    if (!schoolData?.subscriptionExpiresAt) {
+      setIsExpired(false);
+      return;
+    }
+    const expiry = new Date(schoolData.subscriptionExpiresAt);
+    setIsExpired(expiry < new Date());
+  }, [schoolData?.subscriptionExpiresAt]);
+
+  useEffect(() => {
     let isMounted = true;
     if (!auth.currentUser) return;
+
+    const needsPackages =
+      !profile?.schoolId ||
+      schoolData?.status === "pending_subscription";
+    if (!needsPackages) return;
+
+    const queryName = "ADMIN_PACKAGES";
+    const meta = {
+      queryName,
+      collection: "packages",
+      constraints: ["showInRegistration == true", "limit(20)"],
+      uid: profile?.uid,
+      schoolId: profile?.schoolId,
+    };
+    logAdminFirestoreSetup(meta);
 
     const fetchPackages = async () => {
       setIsLoadingPackages(true);
@@ -380,6 +386,8 @@ export default function AdminDashboard() {
         const snap = await getDocs(q);
         if (!isMounted) return;
 
+        logAdminFirestoreFetch(queryName, meta, snap.size);
+
         let pkgs = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
         if (pkgs.length === 0) {
           pkgs = DEFAULT_PACKAGES;
@@ -388,6 +396,7 @@ export default function AdminDashboard() {
         }
         setPackages(pkgs);
       } catch (error) {
+        logAdminFirestoreError(queryName, error, meta);
         console.error("Error fetching packages:", error);
         if (isMounted) {
           setPackages(DEFAULT_PACKAGES);
@@ -397,11 +406,11 @@ export default function AdminDashboard() {
       }
     };
 
-    fetchPackages();
+    void fetchPackages();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [profile?.schoolId, profile?.uid, schoolData?.status]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -486,46 +495,6 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
-
-    async function listenToSchool() {
-      if (profile?.schoolId && auth.currentUser) {
-        const path = `schools/${profile.schoolId}`;
-        try {
-          unsubscribe = onSnapshot(
-            doc(db, "schools", profile.schoolId),
-            (snap) => {
-              if (snap.exists()) {
-                const data = snap.data() as School;
-                setSchoolData({ id: snap.id, ...data });
-
-                if (data.subscriptionExpiresAt) {
-                  const expiry = new Date(data.subscriptionExpiresAt);
-                  if (expiry < new Date()) {
-                    setIsExpired(true);
-                  } else {
-                    setIsExpired(false);
-                  }
-                }
-              }
-            },
-            (error) => {
-              handleFirestoreError(error, OperationType.GET, path);
-            },
-          );
-        } catch (error) {
-          console.error("Error setting up school listener:", error);
-        }
-      }
-    }
-
-    listenToSchool();
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [profile?.schoolId]);
-
   const handleSetupSchool = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile?.uid) return;
@@ -549,8 +518,6 @@ export default function AdminDashboard() {
       });
 
       toast.success("تم إعداد المدرسة بنجاح");
-      // Real-time listener in useAuth will pick up the schoolId change
-      // and listenToSchool will pick up the school record creation.
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
       toast.error("حدث خطأ أثناء الإعداد");
