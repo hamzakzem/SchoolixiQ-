@@ -1377,6 +1377,7 @@ async function startServer() {
       maxAge: '1d',
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) {
+          res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
           // Never cache index.html so users always get the latest version immediately
           res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         } else if (filePath.match(/\.(js|css|woff2?|ico|png|jpe?g|gif|svg)$/)) {
@@ -1387,6 +1388,7 @@ async function startServer() {
     }));
 
     app.get('*', (req, res) => {
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

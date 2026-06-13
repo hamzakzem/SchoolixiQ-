@@ -39,6 +39,10 @@ DirectoryIndex index.html index.php
 </IfModule>
 
 <IfModule mod_headers.c>
+  # Firebase Google Sign-In popup must communicate with opener (window.close).
+  Header always unset Cross-Origin-Opener-Policy
+  Header always set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+
   <Files "index.html">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
     Header set Pragma "no-cache"
