@@ -25,6 +25,11 @@ import {
 } from '../../lib/tuitionModel';
 import { useTuitionSchoolData } from '../../lib/useTuitionSchoolData';
 import {
+  logTuitionListenerDebug,
+  logTuitionListenerError,
+  logTuitionListenerSnapshot,
+} from '../../lib/tuitionQueryDebug';
+import {
   buildTuitionWhatsAppMessage,
   buildWhatsAppUrl,
   fetchReminderLogs,
@@ -46,7 +51,7 @@ type Row = {
   amount: number;
   dueDate: Date;
   delayDays: number;
-  bucket: 'overdue' | 'today' | 'soon';
+  bucket: 'overdue' | 'today' | 'soon' | 'later';
   reminderCount: number;
   lastReminderAt: Date | null;
   escalationLevel: number;
@@ -66,28 +71,53 @@ export default function TuitionReminderDashboard() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
-  const [filter, setFilter] = useState<'all' | 'overdue' | 'today' | 'soon'>('all');
+  const [filter, setFilter] = useState<'all' | 'overdue' | 'today' | 'soon' | 'later'>('all');
 
   useEffect(() => {
-    if (!schoolId) return;
+    if (!schoolId) {
+      console.info('[TuitionReminderFirestore] SKIP_LISTENERS', {
+        reason: 'schoolId is empty/undefined (dashboard tracking/parents)',
+        schoolId: schoolId || '(empty string)',
+      });
+      return;
+    }
     getSchoolTuitionReminderSettings(schoolId).then(setSettings);
     fetchReminderLogs(schoolId, 30).then(setLogs);
 
+    logTuitionListenerDebug('TUITION_REMINDER_TRACKING', schoolId, 'tuition_reminder_tracking', [
+      "where('schoolId', '==', schoolId)",
+    ], { note: 'Dashboard-only listener; not used by Tuition.tsx' });
+
+    logTuitionListenerDebug('TUITION_PARENTS', schoolId, 'users', [
+      "where('schoolId', '==', schoolId)",
+      "where('role', '==', 'parent')",
+    ], { compositeIndexRequired: 'users: schoolId ASC + role ASC', note: 'Same query as ParentsList.tsx' });
+
     const unsubs = [
-      onSnapshot(query(collection(db, 'tuition_reminder_tracking'), where('schoolId', '==', schoolId)), (s) => {
-        const map: Record<string, any> = {};
-        s.docs.forEach((d) => {
-          map[d.id] = { id: d.id, ...d.data() };
-        });
-        setTracking(map);
-      }),
-      onSnapshot(tuitionParentsQuery(schoolId), (s) => {
-        const map: Record<string, any> = {};
-        s.docs.forEach((d) => {
-          map[d.id] = { id: d.id, ...d.data() };
-        });
-        setParents(map);
-      }),
+      onSnapshot(
+        query(collection(db, 'tuition_reminder_tracking'), where('schoolId', '==', schoolId)),
+        (s) => {
+          logTuitionListenerSnapshot('TUITION_REMINDER_TRACKING', s.size, s.metadata.fromCache);
+          const map: Record<string, any> = {};
+          s.docs.forEach((d) => {
+            map[d.id] = { id: d.id, ...d.data() };
+          });
+          setTracking(map);
+        },
+        (error) => logTuitionListenerError('TUITION_REMINDER_TRACKING', error),
+      ),
+      onSnapshot(
+        tuitionParentsQuery(schoolId),
+        (s) => {
+          logTuitionListenerSnapshot('TUITION_PARENTS', s.size, s.metadata.fromCache);
+          const map: Record<string, any> = {};
+          s.docs.forEach((d) => {
+            map[d.id] = { id: d.id, ...d.data() };
+          });
+          setParents(map);
+        },
+        (error) => logTuitionListenerError('TUITION_PARENTS', error),
+      ),
     ];
     return () => unsubs.forEach((u) => u());
   }, [schoolId]);
@@ -135,6 +165,17 @@ export default function TuitionReminderDashboard() {
     return '';
   }, [students.length, installments.length, rows.length, filtered.length]);
 
+  useEffect(() => {
+    console.info('[TuitionReminderFirestore] DATA_STATE', {
+      schoolId: schoolId || '(empty)',
+      studentsCount: students.length,
+      installmentsCount: installments.length,
+      rowsCount: rows.length,
+      filteredCount: filtered.length,
+      emptyMessage,
+    });
+  }, [schoolId, students.length, installments.length, rows.length, filtered.length, emptyMessage]);
+
   const handleSend = async (row: Row) => {
     if (!profile?.uid || !schoolId) return;
     setBusyId(row.installmentId);
@@ -175,11 +216,16 @@ export default function TuitionReminderDashboard() {
   };
 
   const handleBulk = async () => {
-    if (!profile?.uid || filtered.length === 0) return;
+    if (!profile?.uid) return;
+    const bulkTargets =
+      filter === 'all'
+        ? rows.filter((r) => r.bucket === 'overdue' || r.bucket === 'today' || r.bucket === 'soon')
+        : filtered;
+    if (bulkTargets.length === 0) return;
     setBulkBusy(true);
     let sent = 0;
     try {
-      for (const row of filtered.filter((r) => r.bucket === 'overdue' || r.bucket === 'today')) {
+      for (const row of bulkTargets) {
         const student = students.find((s) => s.id === row.studentId);
         const result = await sendTuitionReminderWithTracking({
           schoolId,
@@ -271,6 +317,30 @@ export default function TuitionReminderDashboard() {
             </div>
             <p className="text-2xl font-black text-slate-900">{s.count}</p>
             <p className="text-xs font-bold text-slate-500">{s.label}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: 'all', label: 'الكل', count: rows.length },
+          { key: 'overdue', label: 'متأخر', count: stats.overdue },
+          { key: 'today', label: 'مستحق اليوم', count: stats.today },
+          { key: 'soon', label: 'قريباً', count: stats.soon },
+          { key: 'later', label: 'لاحقاً', count: stats.later },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setFilter(tab.key as typeof filter)}
+            className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
+              filter === tab.key
+                ? 'bg-[#0B2345] text-white border-[#0B2345]'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            {tab.label}
+            {tab.count > 0 && <span className="mr-1.5 opacity-80">({tab.count})</span>}
           </button>
         ))}
       </div>

@@ -41,7 +41,7 @@ export type LateInstallmentView = TuitionInstallment & {
   delayLevel: 'early' | 'medium' | 'critical';
 };
 
-export type ReminderBucket = 'overdue' | 'today' | 'soon';
+export type ReminderBucket = 'overdue' | 'today' | 'soon' | 'later';
 
 export type ReminderDashboardRow = {
   installmentId: string;
@@ -176,6 +176,8 @@ export function classifyInstallmentReminderBucket(
   endSoon.setDate(endSoon.getDate() + Math.max(1, upcomingDays) + 1);
   if (due >= endToday && due < endSoon) return 'soon';
 
+  if (due >= endSoon) return 'later';
+
   return null;
 }
 
@@ -211,11 +213,13 @@ export function computeReminderStats(rows: Pick<ReminderDashboardRow, 'bucket'>[
   overdue: number;
   today: number;
   soon: number;
+  later: number;
 } {
   return {
     overdue: rows.filter((r) => r.bucket === 'overdue').length,
     today: rows.filter((r) => r.bucket === 'today').length,
     soon: rows.filter((r) => r.bucket === 'soon').length,
+    later: rows.filter((r) => r.bucket === 'later').length,
   };
 }
 
