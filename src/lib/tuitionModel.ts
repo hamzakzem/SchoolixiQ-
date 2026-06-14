@@ -104,6 +104,7 @@ export type EligibleTuitionReminderRow = ReminderDashboardRow & {
   autoReminderEligible: boolean;
   escalationEligible: boolean;
   isRestricted: boolean;
+  hasLinkedParent: boolean;
   daysSinceTimingAnchor: number;
   timingAnchor: Date;
   reminderCount: number;
@@ -141,9 +142,25 @@ export function parseTuitionDueDate(value: unknown): Date {
   return parseDueDate(value);
 }
 
-/** Tuition.tsx unpaid filter: status !== 'paid' */
+/** Tuition.tsx unpaid filter: status !== 'paid' (includes pending, undefined, overdue labels) */
 export function isUnpaidInstallment(installment: Pick<TuitionInstallment, 'status'>): boolean {
-  return installment.status !== 'paid';
+  const status = String(installment.status || '').toLowerCase();
+  return status !== 'paid';
+}
+
+/** Keep installments tied to this school (handles legacy docs missing schoolId). */
+export function filterInstallmentsForSchool(
+  installments: TuitionInstallment[],
+  students: TuitionStudent[],
+  schoolId: string,
+): TuitionInstallment[] {
+  const studentIds = new Set(students.filter((s) => s.schoolId === schoolId || !s.schoolId).map((s) => s.id));
+  return installments.filter((inst) => {
+    if (inst.isDeleted) return false;
+    if (inst.schoolId === schoolId) return true;
+    if (!inst.schoolId && studentIds.has(inst.studentId)) return true;
+    return studentIds.has(inst.studentId);
+  });
 }
 
 /** Tuition.tsx overdue filter: status !== 'paid' && new Date(dueDate) < now */
@@ -441,14 +458,19 @@ export function getEligibleTuitionReminderRows(params: {
     now = new Date(),
   } = params;
 
-  const currentInstallments = pickCurrentUnpaidInstallmentsPerStudent(installments, now);
+  const schoolInstallments = filterInstallmentsForSchool(installments, students, schoolId);
+  const currentInstallments = pickCurrentUnpaidInstallmentsPerStudent(schoolInstallments, now);
   const studentMap = new Map(students.map((s) => [s.id, s]));
   const seen = new Set<string>();
   const rows: EligibleTuitionReminderRow[] = [];
 
   for (const installment of currentInstallments) {
     if (seen.has(installment.id)) continue;
-    const student = studentMap.get(installment.studentId);
+
+    let student = studentMap.get(installment.studentId);
+    if (!student) {
+      student = students.find((s) => s.id === installment.studentId);
+    }
     if (!student) continue;
 
     const bucket = classifyInstallmentReminderBucket(
@@ -463,7 +485,9 @@ export function getEligibleTuitionReminderRows(params: {
     const dueDate = parseTuitionDueDate(installment.dueDate);
     const delayDays = bucket === 'overdue' ? computeInstallmentDelayDays(installment.dueDate, now) : 0;
     const track = readTrackingSnapshot(tracking, schoolId, installment.studentId, installment.id);
-    const { parentId } = resolveLinkedParentFromCache(student, parents || {});
+    const linked = resolveVerifiedLinkedParentSync(student, parents || {}, schoolId);
+    const parentId = linked.parentId;
+    const hasLinkedParent = linked.verified;
     const parentStatus = (track.parentStatus || 'active') as EligibleTuitionReminderRow['parentStatus'];
 
     const timingAnchor = getReminderTimingAnchor(installment, payments, installment.studentId);
@@ -474,6 +498,7 @@ export function getEligibleTuitionReminderRows(params: {
       : Number.POSITIVE_INFINITY;
 
     const autoReminderEligible =
+      hasLinkedParent &&
       settings.autoRemindersEnabled &&
       (bucket === 'overdue' || bucket === 'today' || bucket === 'soon') &&
       daysSinceTimingAnchor >= settings.reminderStartAfterDays &&
@@ -498,6 +523,7 @@ export function getEligibleTuitionReminderRows(params: {
       autoReminderEligible,
       escalationEligible,
       isRestricted,
+      hasLinkedParent,
       daysSinceTimingAnchor,
       timingAnchor,
       reminderCount: track.reminderCount || 0,
@@ -513,6 +539,17 @@ export function getEligibleTuitionReminderRows(params: {
     if (bucketDiff !== 0) return bucketDiff;
     return b.delayDays - a.delayDays;
   });
+}
+
+/** Rows ready for UI — unpaid installment + verified linked parent + actionable bucket. */
+export function getDisplayableTuitionReminderRows(
+  rows: EligibleTuitionReminderRow[],
+): { displayRows: EligibleTuitionReminderRow[]; hiddenNoParent: number; hiddenLater: number } {
+  const withParent = rows.filter((r) => r.hasLinkedParent);
+  const hiddenNoParent = rows.length - withParent.length;
+  const displayRows = withParent.filter((r) => r.bucket !== 'later');
+  const hiddenLater = withParent.length - displayRows.length;
+  return { displayRows, hiddenNoParent, hiddenLater };
 }
 
 export function filterTuitionReminderRows(
@@ -539,7 +576,7 @@ export function filterTuitionReminderRows(
       list = rows.filter((r) => r.isRestricted || r.escalationEligible);
       break;
     default:
-      list = rows.filter((r) => r.bucket !== 'later');
+      list = rows.filter((r) => r.bucket !== 'later' && r.hasLinkedParent);
       break;
   }
 
@@ -579,7 +616,7 @@ export function enrichTuitionReminderDisplayRows(
   parents: Record<string, { id?: string; displayName?: string; name?: string; email?: string; phone?: string; phoneNumber?: string; mobile?: string }>,
 ): TuitionReminderDisplayRow[] {
   return rows.map((row) => {
-    const { parentId, parent } = resolveLinkedParentFromCache(row.student, parents);
+    const { parentId, parent } = resolveVerifiedLinkedParentSync(row.student, parents, row.student?.schoolId);
     const parentPhone = resolveParentPhone(row.student, parent);
     const hasWhatsApp = isValidWhatsAppPhone(parentPhone);
     const parentEmail = String(row.student?.parentEmail || parent?.email || '').trim();
@@ -658,24 +695,72 @@ export function isValidWhatsAppPhone(phone: string): boolean {
   return phone.replace(/\D/g, '').length >= 9;
 }
 
-export function resolveLinkedParentFromCache(
+export type TuitionParentRecord = {
+  id?: string;
+  email?: string;
+  displayName?: string;
+  name?: string;
+  role?: string;
+  schoolId?: string;
+  phone?: string;
+  phoneNumber?: string;
+  mobile?: string;
+};
+
+/** Sync parent resolution — mirrors schoolSync.fetchStudentLinkFields + users/{parentId} verify. */
+export function resolveVerifiedLinkedParentSync(
   student: Pick<TuitionStudent, 'parentIds' | 'parentEmail'> | null | undefined,
-  parents: Record<string, { id?: string; email?: string; displayName?: string; name?: string }>,
-): { parentId?: string; parent: (typeof parents)[string] | null } {
-  const ids = Array.isArray(student?.parentIds) ? student.parentIds : [];
+  parents: Record<string, TuitionParentRecord>,
+  schoolId?: string,
+): { parentId?: string; parent: TuitionParentRecord | null; verified: boolean } {
+  if (!student) return { parentId: undefined, parent: null, verified: false };
+
+  const ids = Array.isArray(student.parentIds)
+    ? student.parentIds.filter((id): id is string => Boolean(id))
+    : [];
+
+  const isValidParent = (parent: TuitionParentRecord, id: string) => {
+    const role = String(parent.role || 'parent').toLowerCase();
+    if (role !== 'parent') return false;
+    if (schoolId && parent.schoolId && parent.schoolId !== schoolId) return false;
+    return parent.id === id || !parent.id;
+  };
+
   for (const id of ids) {
-    const parent = parents[id];
-    if (parent) return { parentId: id, parent };
+    const direct = parents[id];
+    if (direct && isValidParent(direct, id)) {
+      return { parentId: id, parent: { ...direct, id: direct.id || id }, verified: true };
+    }
+    const found = Object.values(parents).find((p) => p.id === id || (parents[id] === undefined && p.id === id));
+    if (found && isValidParent(found, id)) {
+      return { parentId: id, parent: found, verified: true };
+    }
   }
-  const email = String(student?.parentEmail || '').toLowerCase();
+
+  const email = String(student.parentEmail || '').toLowerCase().trim();
   if (email) {
     for (const parent of Object.values(parents)) {
-      if (String(parent.email || '').toLowerCase() === email) {
-        return { parentId: parent.id, parent };
+      if (String(parent.email || '').toLowerCase().trim() !== email) continue;
+      if (schoolId && parent.schoolId && parent.schoolId !== schoolId) continue;
+      const role = String(parent.role || 'parent').toLowerCase();
+      if (role !== 'parent') continue;
+      const parentId = parent.id || undefined;
+      if (parentId) {
+        return { parentId, parent, verified: true };
       }
     }
   }
-  return { parentId: undefined, parent: null };
+
+  return { parentId: undefined, parent: null, verified: false };
+}
+
+/** @deprecated use resolveVerifiedLinkedParentSync */
+export function resolveLinkedParentFromCache(
+  student: Pick<TuitionStudent, 'parentIds' | 'parentEmail'> | null | undefined,
+  parents: Record<string, TuitionParentRecord>,
+): { parentId?: string; parent: TuitionParentRecord | null } {
+  const resolved = resolveVerifiedLinkedParentSync(student, parents);
+  return { parentId: resolved.parentId, parent: resolved.parent };
 }
 
 /** Same Firestore queries used by Tuition.tsx */
@@ -692,7 +777,7 @@ export function tuitionPaymentsQuery(schoolId: string) {
     collection(db, 'payments'),
     where('schoolId', '==', schoolId),
     orderBy('createdAt', 'desc'),
-    limit(100),
+    limit(500),
   );
 }
 

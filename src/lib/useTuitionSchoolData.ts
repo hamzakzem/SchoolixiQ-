@@ -45,7 +45,7 @@ export function useTuitionSchoolData(schoolId: string | undefined) {
     logTuitionListenerDebug('TUITION_PAYMENTS', schoolId, 'payments', [
       "where('schoolId', '==', schoolId)",
       "orderBy('createdAt', 'desc')",
-      'limit(100)',
+      'limit(500)',
     ], { compositeIndexRequired: 'payments: schoolId ASC + createdAt DESC' });
 
     const unsubs = [

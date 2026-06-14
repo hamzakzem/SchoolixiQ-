@@ -22,8 +22,11 @@ import { resolveStudentParentIds } from './schoolSync';
 import {
   buildTuitionReminderPayload,
   computeInstallmentDelayDays,
+  enrichTuitionReminderDisplayRows,
+  filterTuitionReminderRows,
   formatTuitionAmountLabel,
   formatTuitionDueLabel,
+  getDisplayableTuitionReminderRows,
   getEligibleTuitionReminderRows,
   parseTuitionDueDate,
   tuitionInstallmentsQuery,
@@ -31,9 +34,13 @@ import {
   tuitionPaymentsQuery,
   tuitionStudentsQuery,
   toEligibilityConfigFromSettings,
+  type EligibleTuitionReminderRow,
   type TuitionInstallment,
   type TuitionPayment,
+  type TuitionReminderDisplayRow,
+  type TuitionReminderFilterKey,
   type TuitionReminderTrackingSnapshot,
+  type TuitionStudent,
 } from './tuitionModel';
 
 export type TuitionReminderSettings = {
@@ -414,6 +421,10 @@ export async function sendTuitionReminderWithTracking(params: {
 
   const parentIds = await resolveStudentParentIds(student.id, schoolId);
   if (parentIds.length === 0) {
+    console.info('[TuitionReminder] SEND_NOTIFICATION skipped — no linked parent', {
+      studentId: student.id,
+      schoolId,
+    });
     await logReminderAudit({
       schoolId,
       studentId: student.id,
@@ -499,6 +510,13 @@ export async function sendTuitionReminderWithTracking(params: {
     return 'failed';
   }
 
+  console.info('[TuitionReminder] LINKED_PARENT_FOUND', {
+    studentId: student.id,
+    parentId: parentIds[0],
+    installmentId: installment.id,
+    source: params.metadataSource || params.sentFrom,
+  });
+
   const parentStatus: TuitionTrackingRecord['parentStatus'] =
     escalationLevel >= 3 ? 'restricted' : escalationLevel >= 2 ? 'warning' : 'active';
 
@@ -534,7 +552,39 @@ export async function sendTuitionReminderWithTracking(params: {
     ...auditBase,
   });
 
+  console.info('[TuitionReminder] SEND_NOTIFICATION_SUCCESS', {
+    studentId: student.id,
+    parentId: parentIds[0],
+    installmentId: installment.id,
+    type: 'tuition',
+    routeTarget: 'tuition',
+    source: params.metadataSource || params.sentFrom,
+  });
+
   return 'sent';
+}
+
+/** Unified send entry — manual, overview, dashboard, and automatic reminders. */
+export async function sendTuitionReminder(
+  params: Parameters<typeof sendTuitionReminderWithTracking>[0],
+): Promise<'sent' | 'skipped_dedup' | 'no_parent' | 'failed'> {
+  return sendTuitionReminderWithTracking(params);
+}
+
+export function logWhatsAppQueueCreated(params: {
+  schoolId: string;
+  studentId: string;
+  parentId?: string;
+  phone: string;
+  source: string;
+}): void {
+  console.info('[TuitionReminder] WHATSAPP_QUEUE_CREATED', {
+    schoolId: params.schoolId,
+    studentId: params.studentId,
+    parentId: params.parentId,
+    phonePrefix: params.phone.replace(/\D/g, '').slice(0, 6),
+    source: params.source,
+  });
 }
 
 /** Overview quick action — parent notification only, with audit trail. */
@@ -548,7 +598,7 @@ export async function sendOverviewQuickActionReminder(params: {
   senderEmail?: string;
   senderRole?: string;
 }): Promise<'sent' | 'skipped_dedup' | 'no_parent' | 'failed'> {
-  return sendTuitionReminderWithTracking({
+  return sendTuitionReminder({
     ...params,
     channel: 'notification',
     metadataSource: 'overview_quick_action',
@@ -623,15 +673,28 @@ export async function runAutomaticTuitionRemindersForSchool(
   const { students, installments, payments, tracking, parents } =
     await loadSchoolTuitionSnapshot(schoolId);
 
-  const eligible = getEligibleTuitionReminderRows({
+  const snapshot = buildTuitionReminderRowsSnapshot({
     students,
     installments,
     payments,
-    settings: toEligibilityConfigFromSettings(settings),
+    settings,
     tracking,
-    schoolId,
     parents,
-  }).filter((row) => row.autoReminderEligible);
+    schoolId,
+    filter: 'auto_eligible',
+    search: '',
+    logContext: 'automatic',
+  });
+
+  const eligible = snapshot.eligibleRows.filter((row) => row.autoReminderEligible);
+
+  console.info('[TuitionReminder] AUTO_REMINDER_TRIGGER', {
+    schoolId,
+    candidates: eligible.length,
+    autoRemindersEnabled: settings.autoRemindersEnabled,
+    reminderStartAfterDays: settings.reminderStartAfterDays,
+    reminderRepeatEveryDays: settings.reminderRepeatEveryDays,
+  });
 
   let sent = 0;
   let skipped = 0;
@@ -639,7 +702,7 @@ export async function runAutomaticTuitionRemindersForSchool(
 
   for (const row of eligible) {
     const student = row.student || students.find((s) => s.id === row.studentId);
-    const result = await sendTuitionReminderWithTracking({
+    const result = await sendTuitionReminder({
       schoolId,
       schoolName,
       student: student || { id: row.studentId, name: row.studentName },
@@ -663,6 +726,86 @@ export async function runAutomaticTuitionRemindersForSchool(
   }
 
   return { processed: eligible.length, sent, skipped, failed };
+}
+
+export type TuitionReminderRowsSnapshot = {
+  eligibleRows: EligibleTuitionReminderRow[];
+  displayableRows: EligibleTuitionReminderRow[];
+  filteredRows: EligibleTuitionReminderRow[];
+  displayRows: TuitionReminderDisplayRow[];
+  hiddenNoParent: number;
+  hiddenLater: number;
+};
+
+/** Single row pipeline for Overview quick action + Tuition Reminder Dashboard. */
+export function buildTuitionReminderRowsSnapshot(params: {
+  students: TuitionStudent[];
+  installments: TuitionInstallment[];
+  payments: TuitionPayment[];
+  settings: TuitionReminderSettings;
+  tracking: Record<string, TuitionReminderTrackingSnapshot>;
+  parents: Record<string, any>;
+  schoolId: string;
+  filter: TuitionReminderFilterKey;
+  search: string;
+  logContext?: string;
+}): TuitionReminderRowsSnapshot {
+  const {
+    students,
+    installments,
+    payments,
+    settings,
+    tracking,
+    parents,
+    schoolId,
+    filter,
+    search,
+    logContext = 'sync',
+  } = params;
+
+  const eligibleRows = getEligibleTuitionReminderRows({
+    students,
+    installments,
+    payments,
+    settings: toEligibilityConfigFromSettings(settings),
+    tracking,
+    schoolId,
+    parents,
+  });
+
+  const { displayRows: displayableRows, hiddenNoParent, hiddenLater } =
+    getDisplayableTuitionReminderRows(eligibleRows);
+
+  const filteredRows = filterTuitionReminderRows(displayableRows, filter, search, parents);
+  const displayRows = enrichTuitionReminderDisplayRows(filteredRows, parents);
+
+  const linkedCount = eligibleRows.filter((r) => r.hasLinkedParent).length;
+  const autoCount = eligibleRows.filter((r) => r.autoReminderEligible).length;
+
+  console.info('[TuitionReminder] ELIGIBLE_ROWS', {
+    context: logContext,
+    schoolId,
+    students: students.length,
+    installments: installments.length,
+    payments: payments.length,
+    parentsLoaded: Object.keys(parents).length,
+    totalEligible: eligibleRows.length,
+    withLinkedParent: linkedCount,
+    hiddenNoParent,
+    hiddenLater,
+    displayable: displayableRows.length,
+    filtered: filteredRows.length,
+    autoReminderEligible: autoCount,
+  });
+
+  return {
+    eligibleRows,
+    displayableRows,
+    filteredRows,
+    displayRows,
+    hiddenNoParent,
+    hiddenLater,
+  };
 }
 
 export async function fetchRestrictedParentAccounts(schoolId: string): Promise<

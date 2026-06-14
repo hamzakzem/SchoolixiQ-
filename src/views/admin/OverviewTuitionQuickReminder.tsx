@@ -6,24 +6,23 @@ import { toast } from 'react-hot-toast';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../lib/AuthContext';
 import {
-  enrichTuitionReminderDisplayRows,
-  filterTuitionReminderRows,
   formatTuitionAmountLabel,
   formatTuitionDueLabel,
-  getEligibleTuitionReminderRows,
   tuitionParentsQuery,
   type TuitionReminderFilterKey,
   type TuitionReminderDisplayRow,
 } from '../../lib/tuitionModel';
 import { useTuitionSchoolData } from '../../lib/useTuitionSchoolData';
+import { useTuitionReminderRows } from '../../lib/useTuitionReminderRows';
 import {
+  buildTuitionReminderRowsSnapshot,
   buildTuitionWhatsAppMessage,
   buildWhatsAppUrl,
   getSchoolTuitionReminderSettings,
   logReminderAudit,
-  sendOverviewQuickActionReminder,
+  logWhatsAppQueueCreated,
+  sendTuitionReminder,
   DEFAULT_TUITION_REMINDER_SETTINGS,
-  toEligibilityConfigFromSettings,
   type TuitionReminderSettings,
 } from '../../lib/tuitionReminderService';
 
@@ -109,34 +108,42 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
     return () => unsubs.forEach((u) => u());
   }, [open, schoolId]);
 
-  const eligibleRows = useMemo(() => {
-    return getEligibleTuitionReminderRows({
+  const { displayRows: filteredRows, eligibleRows, hiddenNoParent } = useTuitionReminderRows({
+    students,
+    installments,
+    payments,
+    settings,
+    tracking,
+    parents,
+    schoolId,
+    filter,
+    search,
+    logContext: 'overview_quick_action',
+  });
+
+  const filterCounts = useMemo(() => {
+    const base = buildTuitionReminderRowsSnapshot({
       students,
       installments,
       payments,
-      settings: toEligibilityConfigFromSettings(settings),
+      settings,
       tracking,
-      schoolId,
       parents,
+      schoolId,
+      filter: 'all',
+      search: '',
+      logContext: 'overview_counts',
     });
-  }, [students, installments, payments, tracking, parents, schoolId, settings]);
-
-  const filteredRows: TuitionReminderDisplayRow[] = useMemo(() => {
-    const filtered = filterTuitionReminderRows(eligibleRows, filter, search, parents);
-    return enrichTuitionReminderDisplayRows(filtered, parents);
-  }, [eligibleRows, filter, search, parents]);
-
-  const filterCounts = useMemo(() => {
-    const counts: Record<TuitionReminderFilterKey, number> = {
-      all: filterTuitionReminderRows(eligibleRows, 'all', '', parents).length,
-      overdue: eligibleRows.filter((r) => r.bucket === 'overdue').length,
-      today: eligibleRows.filter((r) => r.bucket === 'today').length,
-      soon: eligibleRows.filter((r) => r.bucket === 'soon').length,
-      auto_eligible: eligibleRows.filter((r) => r.autoReminderEligible).length,
-      restricted: eligibleRows.filter((r) => r.isRestricted || r.escalationEligible).length,
+    const rows = base.displayableRows;
+    return {
+      all: rows.length,
+      overdue: rows.filter((r) => r.bucket === 'overdue').length,
+      today: rows.filter((r) => r.bucket === 'today').length,
+      soon: rows.filter((r) => r.bucket === 'soon').length,
+      auto_eligible: base.eligibleRows.filter((r) => r.autoReminderEligible).length,
+      restricted: rows.filter((r) => r.isRestricted || r.escalationEligible).length,
     };
-    return counts;
-  }, [eligibleRows, parents]);
+  }, [students, installments, payments, settings, tracking, parents, schoolId]);
 
   useEffect(() => {
     setSelected((prev) => {
@@ -190,6 +197,13 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
       }),
     );
     window.open(url, '_blank', 'noopener,noreferrer');
+    logWhatsAppQueueCreated({
+      schoolId,
+      studentId: row.studentId,
+      parentId: row.parentId,
+      phone: row.parentPhone,
+      source: 'overview_quick_action',
+    });
     if (logAudit && profile?.uid) {
       await logReminderAudit({
         schoolId,
@@ -254,7 +268,7 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
     try {
       for (const row of targets) {
         const student = students.find((s) => s.id === row.studentId);
-        const sendResult = await sendOverviewQuickActionReminder({
+        const sendResult = await sendTuitionReminder({
           schoolId,
           schoolName,
           student: student || { id: row.studentId, name: row.studentName, parentPhone: row.parentPhone },
@@ -263,6 +277,9 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
           senderName: senderName.trim(),
           senderEmail: senderEmail.trim() || profile.email,
           senderRole: profile.role,
+          metadataSource: 'overview_quick_action',
+          sentFrom: 'admin_overview_quick_action',
+          channel: 'notification',
         });
 
         if (sendResult === 'sent') result.sent++;

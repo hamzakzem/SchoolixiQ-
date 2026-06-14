@@ -18,35 +18,33 @@ import {
 import { toast } from 'react-hot-toast';
 import {
   computeReminderStats,
-  enrichTuitionReminderDisplayRows,
-  filterTuitionReminderRows,
   formatTuitionDueLabel,
-  getEligibleTuitionReminderRows,
-  isValidWhatsAppPhone,
   tuitionParentsQuery,
   type TuitionReminderDisplayRow,
   type TuitionReminderFilterKey,
 } from '../../lib/tuitionModel';
 import { useTuitionSchoolData } from '../../lib/useTuitionSchoolData';
+import { useTuitionReminderRows } from '../../lib/useTuitionReminderRows';
 import {
-  logTuitionListenerDebug,
-  logTuitionListenerError,
-  logTuitionListenerSnapshot,
-} from '../../lib/tuitionQueryDebug';
-import {
+  buildTuitionReminderRowsSnapshot,
   buildTuitionWhatsAppMessage,
   buildWhatsAppUrl,
   fetchReminderLogs,
   fetchRestrictedParentAccounts,
   getSchoolTuitionReminderSettings,
   logReminderAudit,
+  logWhatsAppQueueCreated,
   restoreParentPrivileges,
   saveSchoolTuitionReminderSettings,
-  sendTuitionReminderWithTracking,
+  sendTuitionReminder,
   DEFAULT_TUITION_REMINDER_SETTINGS,
-  toEligibilityConfigFromSettings,
   type TuitionReminderSettings,
 } from '../../lib/tuitionReminderService';
+import {
+  logTuitionListenerDebug,
+  logTuitionListenerError,
+  logTuitionListenerSnapshot,
+} from '../../lib/tuitionQueryDebug';
 
 const FILTER_TABS: { key: TuitionReminderFilterKey; label: string }[] = [
   { key: 'all', label: 'الكل' },
@@ -110,38 +108,48 @@ export default function TuitionReminderDashboard() {
     return () => unsubs.forEach((u) => u());
   }, [schoolId]);
 
-  const eligibleRows = useMemo(
-    () =>
-      getEligibleTuitionReminderRows({
-        students,
-        installments,
-        payments,
-        settings: toEligibilityConfigFromSettings(settings),
-        tracking,
-        schoolId,
-        parents,
-      }),
-    [students, installments, payments, tracking, parents, schoolId, settings],
-  );
-
-  const displayRows: TuitionReminderDisplayRow[] = useMemo(() => {
-    const filtered = filterTuitionReminderRows(eligibleRows, filter, search, parents);
-    return enrichTuitionReminderDisplayRows(filtered, parents);
-  }, [eligibleRows, filter, search, parents]);
+  const {
+    displayRows,
+    eligibleRows,
+    hiddenNoParent,
+  } = useTuitionReminderRows({
+    students,
+    installments,
+    payments,
+    settings,
+    tracking,
+    parents,
+    schoolId,
+    filter,
+    search,
+    logContext: 'tuition_reminders_dashboard',
+  });
 
   const stats = computeReminderStats(eligibleRows);
 
-  const filterCounts = useMemo(
-    () => ({
-      all: filterTuitionReminderRows(eligibleRows, 'all', '', parents).length,
-      overdue: stats.overdue,
-      today: stats.today,
-      soon: stats.soon,
-      auto_eligible: stats.autoEligible,
-      restricted: stats.restricted,
-    }),
-    [eligibleRows, parents, stats],
-  );
+  const filterCounts = useMemo(() => {
+    const base = buildTuitionReminderRowsSnapshot({
+      students,
+      installments,
+      payments,
+      settings,
+      tracking,
+      parents,
+      schoolId,
+      filter: 'all',
+      search: '',
+      logContext: 'dashboard_counts',
+    });
+    const rows = base.displayableRows;
+    return {
+      all: rows.length,
+      overdue: rows.filter((r) => r.bucket === 'overdue').length,
+      today: rows.filter((r) => r.bucket === 'today').length,
+      soon: rows.filter((r) => r.bucket === 'soon').length,
+      auto_eligible: base.eligibleRows.filter((r) => r.autoReminderEligible).length,
+      restricted: rows.filter((r) => r.isRestricted || r.escalationEligible).length,
+    };
+  }, [students, installments, payments, settings, tracking, parents, schoolId]);
 
   const emptyMessage = useMemo(() => {
     if (students.length > 0 && installments.length === 0) {
@@ -151,17 +159,20 @@ export default function TuitionReminderDashboard() {
       return 'لا توجد أقساط غير مدفوعة أو مستحقة حالياً';
     }
     if (displayRows.length === 0) {
+      if (hiddenNoParent > 0) {
+        return `لا توجد صفوف معروضة — ${hiddenNoParent} طالب بدون ولي أمر مرتبط في users`;
+      }
       return 'لا توجد نتائج مطابقة للبحث أو الفلتر';
     }
     return '';
-  }, [students.length, installments.length, eligibleRows.length, displayRows.length]);
+  }, [students.length, installments.length, eligibleRows.length, displayRows.length, hiddenNoParent]);
 
   const handleSend = async (row: TuitionReminderDisplayRow) => {
     if (!profile?.uid || !schoolId) return;
     setBusyId(row.installmentId);
     try {
       const student = students.find((s) => s.id === row.studentId);
-      const result = await sendTuitionReminderWithTracking({
+      const result = await sendTuitionReminder({
         schoolId,
         schoolName,
         student: student || { id: row.studentId, name: row.studentName },
@@ -184,7 +195,7 @@ export default function TuitionReminderDashboard() {
   };
 
   const handleWhatsApp = async (row: TuitionReminderDisplayRow) => {
-    if (!isValidWhatsAppPhone(row.parentPhone)) {
+    if (!row.hasWhatsApp) {
       toast.error('لا يوجد رقم واتساب');
       return;
     }
@@ -197,6 +208,13 @@ export default function TuitionReminderDashboard() {
       }),
     );
     window.open(url, '_blank', 'noopener,noreferrer');
+    logWhatsAppQueueCreated({
+      schoolId,
+      studentId: row.studentId,
+      parentId: row.parentId,
+      phone: row.parentPhone,
+      source: 'tuition_reminders',
+    });
     if (profile?.uid) {
       await logReminderAudit({
         schoolId,
@@ -229,7 +247,7 @@ export default function TuitionReminderDashboard() {
     try {
       for (const row of bulkTargets) {
         const student = students.find((s) => s.id === row.studentId);
-        const result = await sendTuitionReminderWithTracking({
+        const result = await sendTuitionReminder({
           schoolId,
           schoolName,
           student: student || { id: row.studentId, name: row.studentName },
