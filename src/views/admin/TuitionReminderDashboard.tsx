@@ -17,16 +17,18 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import {
-  computeReminderStats,
   formatTuitionDueLabel,
   tuitionParentsQuery,
   type TuitionReminderDisplayRow,
   type TuitionReminderFilterKey,
 } from '../../lib/tuitionModel';
+import {
+  computeDashboardReminderCounts,
+  TUITION_REMINDER_EMPTY_MESSAGES,
+} from '../../lib/tuitionReminderLabels';
 import { useTuitionSchoolData } from '../../lib/useTuitionSchoolData';
 import { useTuitionReminderRows } from '../../lib/useTuitionReminderRows';
 import {
-  buildTuitionReminderRowsSnapshot,
   buildTuitionWhatsAppMessage,
   buildWhatsAppUrl,
   fetchReminderLogs,
@@ -45,18 +47,16 @@ import {
   logTuitionListenerError,
   logTuitionListenerSnapshot,
 } from '../../lib/tuitionQueryDebug';
-import { formatTuitionReminderEmptyReason } from '../../lib/tuitionReminderDebug';
 import { TuitionReminderDiagnosticPanel } from '../../components/admin/tuition/TuitionReminderDiagnosticPanel';
 
+const IS_DEV = import.meta.env.DEV;
+
 const FILTER_TABS: { key: TuitionReminderFilterKey; label: string }[] = [
-  { key: 'all', label: 'الكل' },
-  { key: 'overdue', label: 'متأخر' },
-  { key: 'today', label: 'مستحق اليوم' },
+  { key: 'due_now', label: 'مستحق الآن' },
   { key: 'soon', label: 'قريباً' },
   { key: 'later', label: 'لاحقاً' },
   { key: 'no_parent', label: 'بدون ولي أمر' },
-  { key: 'auto_eligible', label: 'مؤهل للتذكير التلقائي' },
-  { key: 'restricted', label: 'مقيد / يحتاج تصعيد' },
+  { key: 'all', label: 'الكل' },
 ];
 
 export default function TuitionReminderDashboard() {
@@ -140,7 +140,6 @@ export default function TuitionReminderDashboard() {
   const {
     displayRows,
     eligibleRows,
-    hiddenNoParent,
     diagnostics,
   } = useTuitionReminderRows({
     students,
@@ -159,78 +158,39 @@ export default function TuitionReminderDashboard() {
 
   const parentsCount = Object.keys(parents).length;
 
-  const stats = computeReminderStats(eligibleRows);
+  const dashboardCounts = useMemo(
+    () => computeDashboardReminderCounts(eligibleRows),
+    [eligibleRows],
+  );
+
+  const allLaterRows = useMemo(
+    () => eligibleRows.length > 0 && eligibleRows.every((r) => r.bucket === 'later'),
+    [eligibleRows],
+  );
 
   const filterCounts = useMemo(() => {
-    const base = buildTuitionReminderRowsSnapshot({
-      students,
-      installments,
-      payments,
-      settings,
-      tracking,
-      parents,
-      schoolId,
-      filter: 'all',
-      search: '',
-      logContext: 'dashboard_counts',
-      queryErrors,
-      viewMode: 'dashboard',
-    });
-    const rows = base.displayableRows;
+    const rows = eligibleRows;
     return {
       all: rows.length,
-      overdue: rows.filter((r) => r.bucket === 'overdue').length,
-      today: rows.filter((r) => r.bucket === 'today').length,
+      due_now: rows.filter((r) => r.bucket === 'overdue' || r.bucket === 'today').length,
       soon: rows.filter((r) => r.bucket === 'soon').length,
       later: rows.filter((r) => r.bucket === 'later').length,
       no_parent: rows.filter((r) => !r.hasLinkedParent).length,
-      auto_eligible: base.eligibleRows.filter((r) => r.autoReminderEligible).length,
-      restricted: rows.filter((r) => r.isRestricted || r.escalationEligible).length,
     };
-  }, [students, installments, payments, settings, tracking, parents, schoolId, queryErrors]);
+  }, [eligibleRows]);
 
   const emptyMessage = useMemo(() => {
     if (displayRows.length === 0 && search.trim()) {
-      return 'لا توجد نتائج مطابقة للبحث أو الفلتر';
+      return TUITION_REMINDER_EMPTY_MESSAGES.searchNoMatch;
+    }
+    if (displayRows.length === 0 && allLaterRows) {
+      return TUITION_REMINDER_EMPTY_MESSAGES.allLaterDashboard;
     }
     if (displayRows.length === 0 && eligibleRows.length === 0) {
-      return formatTuitionReminderEmptyReason(diagnostics.emptyReason, diagnostics.counts);
+      return TUITION_REMINDER_EMPTY_MESSAGES.noRows;
     }
     return '';
-  }, [diagnostics, displayRows.length, eligibleRows.length, search]);
-
-  const tableRows: TuitionReminderDisplayRow[] = debugMode
-    ? diagnostics.debugRows.map((d) => ({
-        installmentId: d.installmentId,
-        studentId: d.studentId,
-        studentName: d.studentName,
-        className: '—',
-        parentName: d.matchingParentFound ? 'مرتبط' : 'لا يوجد ولي أمر مرتبط',
-        parentEmail: d.parentEmail,
-        parentPhone: d.parentPhone,
-        parentId: d.matchingParentFound ? d.parentIds[0] : undefined,
-        amount: d.amount || 0,
-        dueDate: d.parsedDueDate ? new Date(d.parsedDueDate) : new Date(),
-        delayDays: 0,
-        bucket: (d.bucket || 'later') as TuitionReminderDisplayRow['bucket'],
-        lastReminderAt: null,
-        reminderCount: 0,
-        statusLabel: `${d.displayStatus} · ${d.reasonExcluded}`,
-        hasWhatsApp: d.parentPhone.replace(/\D/g, '').length >= 9,
-        linkedParentLabel: d.matchingParentFound ? 'مرتبط' : 'لا يوجد ولي أمر مرتبط',
-        whatsAppLabel: d.parentPhone ? 'متاح' : '—',
-        autoReminderEligible: false,
-        escalationEligible: false,
-        isRestricted: false,
-        hasLinkedParent: d.matchingParentFound,
-        daysSinceTimingAnchor: 0,
-        timingAnchor: new Date(),
-        escalationLevel: 1,
-        parentStatus: 'active' as const,
-        installment: {} as TuitionReminderDisplayRow['installment'],
-        student: undefined,
-      }))
-    : displayRows;
+  }, [displayRows.length, eligibleRows.length, allLaterRows, search]);
 
   const handleSend = async (row: TuitionReminderDisplayRow) => {
     if (!profile?.uid || !schoolId) return;
@@ -386,19 +346,19 @@ export default function TuitionReminderDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
-          { key: 'overdue', label: 'متأخر', count: stats.overdue, icon: AlertTriangle, color: 'text-rose-600 bg-rose-50' },
-          { key: 'today', label: 'مستحق اليوم', count: stats.today, icon: Calendar, color: 'text-amber-600 bg-amber-50' },
-          { key: 'soon', label: 'قريباً', count: stats.soon, icon: Clock, color: 'text-blue-600 bg-blue-50' },
-          { key: 'auto_eligible', label: 'تلقائي', count: stats.autoEligible, icon: Send, color: 'text-indigo-600 bg-indigo-50' },
-          { key: 'restricted', label: 'تصعيد', count: stats.restricted, icon: ShieldOff, color: 'text-red-600 bg-red-50' },
+          { label: 'إجمالي غير المدفوع', count: dashboardCounts.total, icon: AlertTriangle, color: 'text-slate-700 bg-slate-100', filterKey: 'all' as TuitionReminderFilterKey },
+          { label: 'مستحق الآن', count: dashboardCounts.dueNow, icon: Calendar, color: 'text-rose-600 bg-rose-50', filterKey: 'due_now' as TuitionReminderFilterKey },
+          { label: 'قريباً', count: dashboardCounts.soon, icon: Clock, color: 'text-blue-600 bg-blue-50', filterKey: 'soon' as TuitionReminderFilterKey },
+          { label: 'لاحقاً', count: dashboardCounts.later, icon: Clock, color: 'text-indigo-600 bg-indigo-50', filterKey: 'later' as TuitionReminderFilterKey },
+          { label: 'بدون ولي أمر', count: dashboardCounts.noParent, icon: ShieldOff, color: 'text-amber-700 bg-amber-50', filterKey: 'no_parent' as TuitionReminderFilterKey },
         ].map((s) => (
           <button
-            key={s.key}
+            key={s.label}
             type="button"
-            onClick={() => setFilter(s.key as TuitionReminderFilterKey)}
-            className={`p-5 rounded-2xl border text-right transition-all ${filter === s.key ? 'border-[#0B2345] shadow-md' : 'border-slate-200 bg-white'}`}
+            onClick={() => setFilter(s.filterKey)}
+            className={`p-5 rounded-2xl border text-right transition-all ${filter === s.filterKey ? 'border-[#0B2345] shadow-md' : 'border-slate-200 bg-white'}`}
           >
             <div className={`inline-flex p-2 rounded-xl ${s.color} mb-2`}>
               <s.icon size={20} />
@@ -433,8 +393,10 @@ export default function TuitionReminderDashboard() {
             }`}
           >
             {tab.label}
-            {filterCounts[tab.key] > 0 && (
-              <span className="mr-1.5 opacity-80">({filterCounts[tab.key]})</span>
+            {(filterCounts[tab.key as keyof typeof filterCounts] ?? 0) > 0 && (
+              <span className="mr-1.5 opacity-80">
+                ({filterCounts[tab.key as keyof typeof filterCounts]})
+              </span>
             )}
           </button>
         ))}
@@ -457,8 +419,12 @@ export default function TuitionReminderDashboard() {
               checked={settings.autoRemindersEnabled}
               onChange={(e) => setSettings({ ...settings, autoRemindersEnabled: e.target.checked })}
             />
-            تفعيل التذكير التلقائي (يتطلب Cloud Scheduler)
+            تفعيل التذكير التلقائي لحساب ولي الأمر (يتطلب Cloud Scheduler)
           </label>
+          <p className="text-xs text-slate-500 font-bold leading-relaxed pr-6">
+            إشعار حساب ولي الأمر: يمكن أن يُرسل تلقائياً عند تفعيل الجدولة.
+            واتساب: يتطلب فتح الرابط يدوياً — لا يُرسل تلقائياً بدون WhatsApp Business API.
+          </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { key: 'reminderStartAfterDays', label: 'بدء التذكير بعد (يوم)', min: 1 },
@@ -516,16 +482,23 @@ export default function TuitionReminderDashboard() {
 
       {parentsCount === 0 && eligibleRows.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-          تم العثور على أقساط، لكن لم يتم العثور على حسابات أولياء الأمور المرتبطة.
+          {TUITION_REMINDER_EMPTY_MESSAGES.noParentsWarning}
         </div>
       )}
 
-      <TuitionReminderDiagnosticPanel
-        diagnostics={diagnostics}
-        debugMode={debugMode}
-        onDebugModeChange={setDebugMode}
-        showWhenEmpty={displayRows.length === 0 || debugMode}
-      />
+      {allLaterRows && displayRows.length > 0 && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-900">
+          {TUITION_REMINDER_EMPTY_MESSAGES.allLaterDashboard}
+        </div>
+      )}
+
+      {IS_DEV && (
+        <TuitionReminderDiagnosticPanel
+          diagnostics={diagnostics}
+          debugMode={debugMode}
+          onDebugModeChange={setDebugMode}
+        />
+      )}
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
@@ -540,12 +513,13 @@ export default function TuitionReminderDashboard() {
                 <th className="px-4 py-3 text-right">التأخير</th>
                 <th className="px-4 py-3 text-right">آخر تذكير</th>
                 <th className="px-4 py-3 text-right">العدد</th>
-                <th className="px-4 py-3 text-right">الحالة</th>
+                <th className="px-4 py-3 text-right">حالة القسط</th>
+                <th className="px-4 py-3 text-right">الإرسال</th>
                 <th className="px-4 py-3 text-center">إجراءات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {tableRows.map((row) => (
+              {displayRows.map((row) => (
                 <tr key={row.installmentId} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 font-bold">{row.studentName}</td>
                   <td className="px-4 py-3">{row.parentName}</td>
@@ -562,21 +536,34 @@ export default function TuitionReminderDashboard() {
                   </td>
                   <td className="px-4 py-3 font-bold">{row.reminderCount}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
-                      row.isRestricted || row.parentStatus === 'restricted' ? 'bg-rose-100 text-rose-700' :
-                      row.escalationEligible ? 'bg-red-100 text-red-800' :
-                      row.parentStatus === 'warning' ? 'bg-amber-100 text-amber-700' :
+                    <span className={`px-2 py-0.5 rounded-lg text-xs font-bold block w-fit ${
+                      row.bucket === 'overdue' ? 'bg-rose-100 text-rose-700' :
+                      row.bucket === 'today' ? 'bg-amber-100 text-amber-700' :
+                      row.bucket === 'soon' ? 'bg-blue-100 text-blue-700' :
+                      row.bucket === 'later' ? 'bg-indigo-100 text-indigo-700' :
                       'bg-slate-100 text-slate-600'
                     }`}>
-                      {row.statusLabel || (row.parentStatus === 'restricted' ? 'مقيّد' : row.parentStatus === 'warning' ? 'تحذير' : 'نشط')}
+                      {row.paymentStatusLabel}
                     </span>
+                    {row.autoReminderNote && (
+                      <span className="text-[10px] text-slate-500 font-bold block mt-1">{row.autoReminderNote}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-bold block ${row.hasLinkedParent ? 'text-emerald-700' : 'text-slate-500'}`}>
+                      {row.sendStatusLabel}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-bold block mt-0.5">{row.linkedParentLabel}</span>
+                    {row.actionHint && (
+                      <span className="text-[10px] text-amber-700 font-bold block mt-0.5">{row.actionHint}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1 flex-wrap">
-                      {row.hasLinkedParent && row.parentId && !debugMode ? (
+                      {row.hasLinkedParent && row.parentId ? (
                         <button
                           type="button"
-                          title="إرسال إشعار"
+                          title="إرسال إشعار لحساب ولي الأمر"
                           disabled={busyId === row.installmentId}
                           onClick={() => handleSend(row)}
                           className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50"
@@ -584,13 +571,13 @@ export default function TuitionReminderDashboard() {
                           <Bell size={16} />
                         </button>
                       ) : (
-                        <span className="text-[10px] text-slate-400 font-bold px-1 whitespace-nowrap">
-                          لا يوجد ولي أمر مرتبط
+                        <span className="text-[10px] text-slate-400 font-bold px-1 whitespace-nowrap max-w-[100px] text-center leading-tight">
+                          {row.actionHint || 'لا يمكن إرسال إشعار حساب'}
                         </span>
                       )}
                       <button
                         type="button"
-                        title="واتساب"
+                        title={row.whatsAppLabel}
                         disabled={!row.hasWhatsApp}
                         onClick={() => void handleWhatsApp(row)}
                         className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-40"
@@ -614,8 +601,8 @@ export default function TuitionReminderDashboard() {
             </tbody>
           </table>
         </div>
-        {tableRows.length === 0 && (
-          <p className="text-center py-12 text-slate-400 font-bold">{emptyMessage}</p>
+        {displayRows.length === 0 && (
+          <p className="text-center py-12 text-slate-500 font-bold">{emptyMessage}</p>
         )}
       </div>
 

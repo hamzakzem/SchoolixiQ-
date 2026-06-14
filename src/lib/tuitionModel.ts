@@ -6,6 +6,15 @@
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { parseDueDate } from './dailySummaryUtils';
+import {
+  getActionHint,
+  getAutoReminderNote,
+  getLinkedParentLabel,
+  getSendStatusLabel,
+  getTuitionBucketLabel,
+  getTuitionPaymentStatusLabel,
+  getWhatsAppLabel,
+} from './tuitionReminderLabels';
 
 export type TuitionStudent = {
   id: string;
@@ -94,6 +103,7 @@ export function toEligibilityConfigFromSettings(
 
 export type TuitionReminderFilterKey =
   | 'all'
+  | 'due_now'
   | 'overdue'
   | 'today'
   | 'soon'
@@ -127,6 +137,10 @@ export type TuitionReminderDisplayRow = EligibleTuitionReminderRow & {
   linkedParentLabel: string;
   whatsAppLabel: string;
   statusLabel: string;
+  paymentStatusLabel: string;
+  sendStatusLabel: string;
+  actionHint: string;
+  autoReminderNote: string;
 };
 
 export type ReminderDashboardRow = {
@@ -588,6 +602,9 @@ export function filterTuitionReminderRows(
 ): EligibleTuitionReminderRow[] {
   let list = rows;
   switch (filter) {
+    case 'due_now':
+      list = rows.filter((r) => r.bucket === 'overdue' || r.bucket === 'today');
+      break;
     case 'overdue':
       list = rows.filter((r) => r.bucket === 'overdue');
       break;
@@ -659,13 +676,9 @@ export function enrichTuitionReminderDisplayRows(
     const parentEmail = String(row.student?.parentEmail || parent?.email || '').trim();
     const className = String(row.student?.class || '—');
 
-    let statusLabel = row.bucket === 'overdue' ? `متأخر ${row.delayDays} يوم` : '';
-    if (row.bucket === 'today') statusLabel = 'مستحق اليوم';
-    if (row.bucket === 'soon') statusLabel = 'قريباً';
-    if (row.bucket === 'later') statusLabel = 'لاحقاً';
-    if (row.autoReminderEligible) statusLabel += ' · مؤهل تلقائي';
+    let statusLabel = getTuitionBucketLabel(row.bucket, row.delayDays);
     if (row.isRestricted) statusLabel += ' · مقيّد';
-    if (!row.hasLinkedParent) statusLabel += ' · لا يوجد ولي أمر مرتبط';
+    if (row.parentStatus === 'warning') statusLabel += ' · تحذير';
 
     return {
       ...row,
@@ -675,9 +688,13 @@ export function enrichTuitionReminderDisplayRows(
       parentPhone,
       parentId,
       hasWhatsApp,
-      linkedParentLabel: parentId ? 'مرتبط' : 'لا يوجد ولي أمر مرتبط',
-      whatsAppLabel: hasWhatsApp ? 'متاح' : 'لا يوجد رقم واتساب',
+      linkedParentLabel: getLinkedParentLabel(row.hasLinkedParent),
+      whatsAppLabel: getWhatsAppLabel(hasWhatsApp),
       statusLabel: statusLabel.trim(),
+      paymentStatusLabel: getTuitionPaymentStatusLabel(row),
+      sendStatusLabel: getSendStatusLabel(row.hasLinkedParent),
+      actionHint: getActionHint(row.hasLinkedParent, hasWhatsApp),
+      autoReminderNote: getAutoReminderNote(row.autoReminderEligible),
     };
   });
 }

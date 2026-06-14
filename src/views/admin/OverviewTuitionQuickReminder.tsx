@@ -10,12 +10,11 @@ import {
   formatTuitionDueLabel,
   tuitionParentsQuery,
   type TuitionReminderFilterKey,
-  type TuitionReminderDisplayRow,
 } from '../../lib/tuitionModel';
+import { TUITION_REMINDER_EMPTY_MESSAGES } from '../../lib/tuitionReminderLabels';
 import { useTuitionSchoolData } from '../../lib/useTuitionSchoolData';
 import { useTuitionReminderRows } from '../../lib/useTuitionReminderRows';
 import {
-  buildTuitionReminderRowsSnapshot,
   buildTuitionWhatsAppMessage,
   buildWhatsAppUrl,
   getSchoolTuitionReminderSettings,
@@ -25,7 +24,6 @@ import {
   DEFAULT_TUITION_REMINDER_SETTINGS,
   type TuitionReminderSettings,
 } from '../../lib/tuitionReminderService';
-import { formatTuitionReminderEmptyReason } from '../../lib/tuitionReminderDebug';
 import { TuitionReminderDiagnosticPanel } from '../../components/admin/tuition/TuitionReminderDiagnosticPanel';
 import {
   logTuitionListenerError,
@@ -46,13 +44,12 @@ type Props = {
   onClose: () => void;
 };
 
+const IS_DEV = import.meta.env.DEV;
+
 const FILTER_TABS: { key: TuitionReminderFilterKey; label: string }[] = [
-  { key: 'all', label: 'الكل' },
   { key: 'overdue', label: 'متأخر' },
   { key: 'today', label: 'مستحق اليوم' },
   { key: 'soon', label: 'قريباً' },
-  { key: 'auto_eligible', label: 'مؤهل للتذكير التلقائي' },
-  { key: 'restricted', label: 'مقيد / يحتاج تصعيد' },
 ];
 
 export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
@@ -67,7 +64,7 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
   const [tracking, setTracking] = useState<Record<string, any>>({});
   const [settings, setSettings] = useState<TuitionReminderSettings>(DEFAULT_TUITION_REMINDER_SETTINGS);
 
-  const [filter, setFilter] = useState<TuitionReminderFilterKey>('all');
+  const [filter, setFilter] = useState<TuitionReminderFilterKey>('overdue');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sendLimit, setSendLimit] = useState(10);
@@ -155,86 +152,43 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
     [eligibleRows],
   );
 
+  const urgentRows = useMemo(
+    () => eligibleRows.filter((r) => r.bucket !== 'later'),
+    [eligibleRows],
+  );
+
   const emptyMessage = useMemo(() => {
     if (onlyLaterRows) {
-      return 'لا توجد أقساط مستحقة للتنبيه الآن، توجد أقساط لاحقة في صفحة تذكير الأقساط.';
+      return TUITION_REMINDER_EMPTY_MESSAGES.allLaterOverview;
+    }
+    if (filteredRows.length === 0 && urgentRows.length === 0) {
+      return TUITION_REMINDER_EMPTY_MESSAGES.noRows;
     }
     if (filteredRows.length === 0) {
-      const reason = formatTuitionReminderEmptyReason(diagnostics.emptyReason, diagnostics.counts);
-      return reason || 'لا توجد أقساط مؤهلة للتذكير حالياً';
+      return TUITION_REMINDER_EMPTY_MESSAGES.searchNoMatch;
     }
     return '';
-  }, [onlyLaterRows, filteredRows.length, diagnostics]);
-
-  const visibleRows = debugMode
-    ? diagnostics.debugRows.map((d) => ({
-        installmentId: d.installmentId,
-        studentId: d.studentId,
-        studentName: d.studentName,
-        className: '—',
-        parentName: d.matchingParentFound ? 'مرتبط' : 'لا يوجد ولي أمر مرتبط',
-        parentEmail: d.parentEmail,
-        parentPhone: d.parentPhone,
-        parentId: d.matchingParentFound ? d.parentIds[0] : undefined,
-        amount: d.amount || 0,
-        dueDate: d.parsedDueDate ? new Date(d.parsedDueDate) : new Date(),
-        delayDays: 0,
-        bucket: (d.bucket || 'later') as TuitionReminderDisplayRow['bucket'],
-        hasWhatsApp: d.parentPhone.replace(/\D/g, '').length >= 9,
-        linkedParentLabel: d.matchingParentFound ? 'مرتبط' : 'لا يوجد ولي أمر مرتبط',
-        whatsAppLabel: d.parentPhone ? 'متاح' : '—',
-        statusLabel: `${d.displayStatus} · ${d.reasonExcluded}`,
-        lastReminderAt: null,
-        autoReminderEligible: false,
-        escalationEligible: false,
-        isRestricted: false,
-        hasLinkedParent: d.matchingParentFound,
-        daysSinceTimingAnchor: 0,
-        timingAnchor: new Date(),
-        reminderCount: 0,
-        escalationLevel: 1,
-        parentStatus: 'active' as const,
-        installment: {} as TuitionReminderDisplayRow['installment'],
-        student: undefined,
-      })) as TuitionReminderDisplayRow[]
-    : filteredRows;
+  }, [onlyLaterRows, filteredRows.length, urgentRows.length]);
 
   const filterCounts = useMemo(() => {
-    const base = buildTuitionReminderRowsSnapshot({
-      students,
-      installments,
-      payments,
-      settings,
-      tracking,
-      parents,
-      schoolId,
-      filter: 'all',
-      search: '',
-      logContext: 'overview_counts',
-      queryErrors,
-      viewMode: 'overview',
-    });
-    const rows = base.displayableRows;
+    const rows = urgentRows;
     return {
-      all: rows.length,
       overdue: rows.filter((r) => r.bucket === 'overdue').length,
       today: rows.filter((r) => r.bucket === 'today').length,
       soon: rows.filter((r) => r.bucket === 'soon').length,
-      auto_eligible: base.eligibleRows.filter((r) => r.autoReminderEligible).length,
-      restricted: rows.filter((r) => r.isRestricted || r.escalationEligible).length,
     };
-  }, [students, installments, payments, settings, tracking, parents, schoolId, queryErrors]);
+  }, [urgentRows]);
 
   useEffect(() => {
     setSelected((prev) => {
-      const visible = new Set(visibleRows.map((r) => r.installmentId));
+      const visible = new Set(filteredRows.map((r) => r.installmentId));
       const next = new Set<string>();
       prev.forEach((id) => {
         if (visible.has(id)) next.add(id);
       });
       return next;
     });
-  }, [visibleRows]);
+  }, [filteredRows]);
 
   const toggleRow = (id: string) => {
     setSelected((prev) => {
@@ -246,16 +200,16 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
   };
 
   const toggleAllVisible = () => {
-    if (selected.size === visibleRows.length) {
+    if (selected.size === filteredRows.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(visibleRows.map((r) => r.installmentId)));
+      setSelected(new Set(filteredRows.map((r) => r.installmentId)));
     }
   };
 
   const selectedRows = useMemo(
-    () => visibleRows.filter((r) => selected.has(r.installmentId)),
-    [visibleRows, selected],
+    () => filteredRows.filter((r) => selected.has(r.installmentId)),
+    [filteredRows, selected],
   );
 
   const whatsAppQueue = useMemo(
@@ -435,7 +389,7 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
                         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                     }`}
                   >
-                    {tab.label} ({filterCounts[tab.key]})
+                    {tab.label} ({filterCounts[tab.key as keyof typeof filterCounts] ?? 0})
                   </button>
                 ))}
               </div>
@@ -476,11 +430,11 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={visibleRows.length > 0 && selected.size === visibleRows.length}
+                    checked={filteredRows.length > 0 && selected.size === filteredRows.length}
                     onChange={toggleAllVisible}
                     className="rounded border-slate-300"
                   />
-                  تحديد الكل ({visibleRows.length})
+                  تحديد الكل ({filteredRows.length})
                 </label>
                 <span className="text-xs font-bold text-slate-400">
                   محدد: {selected.size} — سيُرسل لـ {Math.min(selected.size, sendLimit)} كحد أقصى
@@ -491,20 +445,21 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
             <div className="flex-1 overflow-auto px-6 py-4">
               {parentsCount === 0 && eligibleRows.length > 0 && (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-                  تم العثور على أقساط، لكن لم يتم العثور على حسابات أولياء الأمور المرتبطة.
+                  {TUITION_REMINDER_EMPTY_MESSAGES.noParentsWarning}
                 </div>
               )}
 
-              <TuitionReminderDiagnosticPanel
-                diagnostics={diagnostics}
-                debugMode={debugMode}
-                onDebugModeChange={setDebugMode}
-                showWhenEmpty={filteredRows.length === 0 || debugMode}
-              />
+              {IS_DEV && (
+                <TuitionReminderDiagnosticPanel
+                  diagnostics={diagnostics}
+                  debugMode={debugMode}
+                  onDebugModeChange={setDebugMode}
+                />
+              )}
 
               {loading ? (
                 <p className="text-center text-slate-500 font-bold py-12">جاري تحميل الأقساط...</p>
-              ) : visibleRows.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <div className="text-center py-16">
                   <AlertTriangle className="mx-auto text-slate-300 mb-3" size={32} />
                   <p className="font-bold text-slate-500">{emptyMessage}</p>
@@ -520,15 +475,15 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
                         <th className="px-3 py-3 text-right">الهاتف</th>
                         <th className="px-3 py-3 text-right">المبلغ</th>
                         <th className="px-3 py-3 text-right">الاستحقاق</th>
-                        <th className="px-3 py-3 text-right">الحالة</th>
+                        <th className="px-3 py-3 text-right">حالة القسط</th>
                         <th className="px-3 py-3 text-right">آخر تذكير</th>
-                        <th className="px-3 py-3 text-right">ولي مرتبط</th>
+                        <th className="px-3 py-3 text-right">الإرسال</th>
                         <th className="px-3 py-3 text-right">واتساب</th>
                         <th className="px-3 py-3 text-right">إجراء</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleRows.map((row) => (
+                      {filteredRows.map((row) => (
                         <tr
                           key={row.installmentId}
                           className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
@@ -563,12 +518,10 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
                                   ? 'bg-rose-100 text-rose-700'
                                   : row.bucket === 'today'
                                     ? 'bg-amber-100 text-amber-700'
-                                    : row.isRestricted
-                                      ? 'bg-red-100 text-red-800'
-                                      : 'bg-blue-100 text-blue-700'
+                                    : 'bg-blue-100 text-blue-700'
                               }`}
                             >
-                              {row.statusLabel}
+                              {row.paymentStatusLabel}
                             </span>
                           </td>
                           <td className="px-3 py-3 text-xs text-slate-500">
@@ -578,16 +531,19 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
                           </td>
                           <td className="px-3 py-3 text-xs font-bold">
                             <span className={row.hasLinkedParent ? 'text-emerald-600' : 'text-rose-600'}>
-                              {row.linkedParentLabel}
+                              {row.sendStatusLabel}
                             </span>
+                            {row.actionHint && (
+                              <span className="block text-[10px] text-amber-700 mt-0.5">{row.actionHint}</span>
+                            )}
                           </td>
                           <td className="px-3 py-3 text-xs font-bold">
                             <span className={row.hasWhatsApp ? 'text-emerald-600' : 'text-slate-400'}>
-                              {row.whatsAppLabel}
+                              {row.hasWhatsApp ? 'واتساب: يتطلب فتح الرابط يدوياً' : 'لا يوجد رقم واتساب'}
                             </span>
                           </td>
                           <td className="px-3 py-3">
-                            {row.hasWhatsApp && (
+                            {row.hasWhatsApp ? (
                               <button
                                 type="button"
                                 onClick={() => void handleWhatsApp(row)}
@@ -596,6 +552,8 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
                                 <MessageCircle size={14} />
                                 واتساب
                               </button>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-bold">لا يوجد رقم واتساب</span>
                             )}
                           </td>
                         </tr>
