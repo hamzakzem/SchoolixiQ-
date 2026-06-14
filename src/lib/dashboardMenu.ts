@@ -80,7 +80,7 @@ export const ADMIN_ITEM_SECTIONS: Record<string, string> = {
   inventory: 'financial',
   chat: 'communication',
   announcements: 'communication',
-  parents: 'services',
+  parents: 'management',
   market: 'services',
   dismissal_gate: 'services',
   id_cards: 'services',

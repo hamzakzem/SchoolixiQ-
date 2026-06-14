@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Users,
   UserRound,
@@ -12,11 +12,8 @@ import {
   LayoutDashboard,
   Wallet,
   Package,
-  Menu,
-  X,
   Building,
   XCircle,
-  ArrowRight,
   ShieldCheck,
   CheckCircle,
   Clock,
@@ -24,6 +21,8 @@ import {
   Bell,
   Trash2,
   BellRing,
+  X,
+  ArrowRight,
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 import { sendEmailVerification, signOut } from "firebase/auth";
@@ -49,7 +48,6 @@ import {
 import { toast } from "react-hot-toast";
 import { School } from "../types";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
-import { GlobalFooter } from "../components/GlobalFooter";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import {
   logAdminFirestoreSetup,
@@ -57,11 +55,15 @@ import {
   logAdminFirestoreFetch,
 } from "../lib/adminQueryDebug";
 import { notificationService } from "../lib/notificationService";
-import { useNotificationBadges, TabBadge } from "../lib/NotificationBadgeContext";
+import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { canAccessAdminMenuItem } from "../lib/staffPermissions";
-import SchoolixLogo from "../components/SchoolixLogo";
-import { isCustomSchoolLogo } from "../lib/brandAssets";
-import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import { DashboardShell } from "../components/layout/DashboardShell";
+import {
+  attachSectionLabels,
+  ADMIN_NAV_SECTIONS,
+  ADMIN_ITEM_SECTIONS,
+  type DashboardMenuItem,
+} from "../lib/dashboardMenu";
 
 const DEFAULT_PACKAGES = [
   {
@@ -200,22 +202,6 @@ export default function AdminDashboard() {
   }, []);
 
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setIsSidebarOpen(false);
-        setIsSidebarCollapsed(false);
-      } else {
-        setIsSidebarOpen(true);
-        setIsSidebarCollapsed(false);
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   // Enhanced tab switcher that tracks history
   const navigateToTab = (tabId: string) => {
@@ -301,13 +287,41 @@ export default function AdminDashboard() {
     setActiveTab("overview");
   }, [filteredMenuItems, activeTab]);
 
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const primaryItems = filteredMenuItems.filter((item) =>
-    ["overview", "students", "tuition", "chat"].includes(item.id),
+  const shellMenuItems = useMemo((): DashboardMenuItem[] => {
+    return attachSectionLabels(
+      filteredMenuItems.map((item) => ({
+        ...item,
+        badge: tabBadges[item.id] || undefined,
+      })),
+      ADMIN_ITEM_SECTIONS,
+    );
+  }, [filteredMenuItems, tabBadges]);
+
+  const adminSectionLabels = useMemo(
+    () =>
+      isRtl
+        ? {
+            management: "الإدارة",
+            academic: "أكاديمي",
+            financial: "مالي",
+            communication: "التواصل",
+            services: "الخدمات",
+            reports_system: "التقارير والنظام",
+          }
+        : {
+            management: "Management",
+            academic: "Academic",
+            financial: "Financial",
+            communication: "Communication",
+            services: "Services",
+            reports_system: "Reports & System",
+          },
+    [isRtl],
   );
-  const moreItems = filteredMenuItems.filter(
-    (item) => !["overview", "students", "tuition", "chat"].includes(item.id),
-  );
+
+  const activeTabLabel =
+    menuItems.find((item) => item.id === activeTab)?.label ??
+    (isRtl ? "لوحة المدرسة" : "School Admin");
 
   const [schoolSetup, setSchoolSetup] = useState({
     name: "",
@@ -862,7 +876,6 @@ export default function AdminDashboard() {
                         );
                         if (snap.exists()) {
                           const data = snap.data() as School;
-                          setSchoolData({ id: snap.id, ...data });
 
                           if (data.status === "active") {
                             toast.success("تمت الموافقة على طلبكم بنجاح!");
@@ -1211,11 +1224,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div
-      className="h-[100dvh] overflow-hidden bg-transparent flex flex-col md:flex-row transition-colors duration-300 print:h-auto print:block"
-      dir={isRtl ? "rtl" : "ltr"}
-    >
-      {/* Expiry Overlay */}
+    <>
       {isExpired && profile?.role !== "superadmin" && (
         <div
           className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6"
@@ -1252,263 +1261,80 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Sidebar Overlay for Mobile */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Sidebar */}
-      <AnimatePresence mode="wait">
-        {isSidebarOpen && (
-          <motion.aside
-            initial={{ x: isRtl ? 300 : -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
-            exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`fixed inset-y-0 ${isRtl ? "right-0 rounded-l-[2rem] lg:rounded-none border-l" : "left-0 rounded-r-[2rem] lg:rounded-none border-r"} z-50 bg-slate-900 dark:bg-black text-white flex flex-col pt-[env(safe-area-inset-top,0px)] lg:relative border-slate-800 dark:border-slate-900 print:hidden shadow-2xl lg:shadow-none shrink-0 overflow-visible`}
-          >
-            <div className="h-full flex flex-col overflow-hidden w-full">
-              <div
-                className={`p-6 border-b border-slate-800/50 flex ${isSidebarCollapsed ? "justify-center" : "items-center gap-4"}`}
-              >
-                {isCustomSchoolLogo(schoolData?.logoUrl) ? (
-                  <div className="bg-white w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center p-1 shadow-xl shrink-0 overflow-hidden">
-                    <img
-                      src={schoolData.logoUrl || undefined}
-                      alt="SchoolixIQ logo"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                ) : (
-                  <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} surface="dark" />
-                )}
-                {!isSidebarCollapsed && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="min-w-0"
-                  >
-                    <h1 className="font-bold text-lg md:text-xl text-white font-display tracking-tight leading-none truncate">
-                      {config.appName}
-                    </h1>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1 block truncate">
-                      {t("appTagline")}
-                    </span>
-                  </motion.div>
-                )}
-              </div>
-
-              <nav className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-4 space-y-1.5 custom-scrollbar">
-                {filteredMenuItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      navigateToTab(item.id);
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                    }}
-                    title={isSidebarCollapsed ? item.label : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${
-                      activeTab === item.id
-                        ? "bg-white text-slate-900 shadow-xl"
-                        : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                    }`}
-                  >
-                    <item.icon
-                      size={isSidebarCollapsed ? 24 : 20}
-                      strokeWidth={activeTab === item.id ? 2.5 : 1.5}
-                      className="shrink-0"
-                    />
-                    {!isSidebarCollapsed && (
-                      <span className="truncate flex-1 text-right">{item.label}</span>
-                    )}
-                    {!isSidebarCollapsed && tabBadges[item.id] ? (
-                      <TabBadge count={tabBadges[item.id]} />
-                    ) : null}
-
-                    {/* Tooltip for collapsed state */}
-                    {isSidebarCollapsed && (
-                      <div
-                        className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
-                      >
-                        {item.label}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </nav>
-
-              <div className="p-4 md:p-6 mt-auto">
-                {!isSidebarCollapsed ? (
-                  <div className="bg-slate-800/50 p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] mb-3 md:mb-4 border border-slate-700/50 min-w-0">
-                    <p className="text-[9px] text-slate-500 mb-1 uppercase tracking-widest font-bold truncate">
-                      {isRtl ? "المستخدم النشط" : "Active User"}
-                    </p>
-                    <p className="text-sm font-bold text-white truncate font-display">
-                      {profile?.name}
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 mx-auto rounded-full flex items-center justify-center text-white font-bold mb-4 shadow-sm"
-                    title={profile?.name}
-                  >
-                    {profile?.name?.[0]}
-                  </div>
-                )}
-                <button
-                  onClick={() => auth.signOut()}
-                  title={isSidebarCollapsed ? (isRtl ? "تسجيل الخروج" : "Logout") : undefined}
-                  className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3 px-4 md:px-5"} py-3 md:py-4 rounded-xl md:rounded-2xl text-red-400 hover:bg-red-500/10 transition-all font-bold text-sm`}
-                >
-                  <LogOut
-                    size={isSidebarCollapsed ? 24 : 20}
-                    className="shrink-0"
-                  />
-                  {!isSidebarCollapsed && <span>{isRtl ? "تسجيل الخروج" : "Logout"}</span>}
-                </button>
-              </div>
+      <DashboardShell
+        variant="admin-dark"
+        menuItems={shellMenuItems}
+        sections={ADMIN_NAV_SECTIONS}
+        sectionLabels={adminSectionLabels}
+        activeTab={activeTab}
+        onTabChange={navigateToTab}
+        isRtl={isRtl}
+        portalTitle={schoolData?.name || config.appName}
+        portalSubtitle={t("appTagline")}
+        schoolLogoUrl={schoolData?.logoUrl}
+        logoutLabel={isRtl ? "تسجيل الخروج" : "Logout"}
+        onLogout={() => auth.signOut()}
+        headerEyebrow={isRtl ? "لوحة المدرسة" : "School Admin"}
+        headerTitle={activeTabLabel}
+        headerSubtitle={schoolData?.name || profile?.name}
+        breadcrumbs={
+          activeTab !== "overview"
+            ? [
+                {
+                  label: t("overview"),
+                  onClick: () => navigateToTab("overview"),
+                },
+                { label: activeTabLabel },
+              ]
+            : undefined
+        }
+        showBack={activeTab !== "overview"}
+        onBack={handleBack}
+        headerTrailing={
+          <>
+            <div className="hidden md:block">
+              <GlobalSearch onNavigate={navigateToTab} />
             </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-colors duration-300 print:overflow-visible print:h-auto">
-        <header className="min-h-[4rem] md:min-h-[5rem] h-auto pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-3 md:pt-[calc(1.25rem+env(safe-area-inset-top,0px))] md:pb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 md:px-8 shrink-0 sticky top-0 z-40 transition-colors print:hidden">
-          <div className="flex items-center gap-2 md:gap-6">
+            <LanguageToggle />
+            <ThemeToggle />
             <button
-              onClick={() => {
-                if (window.innerWidth >= 1024) {
-                  setIsSidebarCollapsed(!isSidebarCollapsed);
-                } else {
-                  setIsSidebarOpen(!isSidebarOpen);
-                  if (!isSidebarOpen) {
-                    // Ensure it's not collapsed when opened as mobile drawer
-                    setIsSidebarCollapsed(false);
-                  }
-                }
-              }}
-              className="w-11 h-11 hidden lg:flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
-            >
-              <Menu
-                size={20}
-                className={
-                  (!isSidebarOpen && window.innerWidth < 1024) ||
-                  isSidebarCollapsed
-                    ? "rotate-90 transition-transform"
-                    : "transition-transform"
-                }
-              />
-            </button>
-            <div className="h-5 w-px bg-slate-200 dark:bg-slate-800"></div>
-
-            {activeTab !== "overview" && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                onClick={handleBack}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all font-bold text-[10px] shadow-sm hover:shadow active:scale-95 group"
-              >
-                <ArrowRight
-                  size={14}
-                  className={`transition-transform ${isRtl ? "group-hover:translate-x-0.5" : "rotate-180 group-hover:-translate-x-0.5"}`}
-                />
-                <span className="hidden sm:inline">{t("back")}</span>
-              </motion.button>
-            )}
-
-            <h2 className="text-sm md:text-xl font-bold text-slate-800 dark:text-white truncate max-w-[120px] md:max-w-none">
-              {menuItems.find((i) => i.id === activeTab)?.label}
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-4 md:gap-6">
-            <GlobalSearch onNavigate={setActiveTab} />
-
-            <div>
-              <LanguageToggle />
-            </div>
-
-            <div className="font-bold select-none">
-              <ThemeToggle />
-            </div>
-
-            <button
+              type="button"
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all duration-300 flex items-center justify-center relative group active:scale-95 shrink-0 ${
+              className={`w-10 h-10 md:w-11 md:h-11 rounded-xl border transition-all duration-300 flex items-center justify-center relative active:scale-95 shrink-0 ${
                 showNotifications
-                  ? "bg-[#D4A64A] border-[#D4A64A] text-[#0B2345] shadow-lg shadow-[#D4A64A]/20"
-                  : "bg-[#0B2345] border-[#D4A64A]/30 text-[#D4A64A] hover:bg-[#D4A64A] hover:text-[#0B2345] hover:border-[#D4A64A]"
+                  ? "bg-sx-accent border-sx-accent text-sx-primary shadow-lg shadow-sx-accent/25"
+                  : "bg-sx-primary border-sx-accent/30 text-sx-accent hover:bg-sx-accent hover:text-sx-primary"
               }`}
             >
-              <Bell size={18} className="transition-transform duration-300 group-hover:scale-110" />
+              <Bell size={18} />
               {totalUnread > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-[#0B2345] rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                  {totalUnread > 9 ? '9+' : totalUnread}
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-sx-primary rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                  {totalUnread > 9 ? "9+" : totalUnread}
                 </span>
               )}
             </button>
-
-            {showNotifications && (
+            {showNotifications ? (
               <NotificationCenter
                 onClose={() => setShowNotifications(false)}
-                activeTabSetter={setActiveTab}
+                activeTabSetter={navigateToTab}
                 userRole={profile?.role || "admin"}
               />
-            )}
-
-            <div className="flex items-center gap-2 md:gap-4">
-              <div className="text-left hidden lg:block">
-                <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest leading-none mb-1.5">
-                  {t("todayDate")}
-                </p>
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                  <Calendar size={14} className="text-slate-400" />
-                  <p className="text-xs font-bold whitespace-nowrap">
-                    {new Date().toLocaleDateString(isRtl ? "ar-IQ" : "en-US", {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
-              </div>
-              <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-1 md:mx-2"></div>
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 md:w-11 md:h-11 bg-slate-900 dark:bg-slate-800 rounded-xl md:rounded-2xl flex items-center justify-center text-white font-bold border border-slate-800 dark:border-slate-700 shadow-md">
-                  {profile?.name?.[0]}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm(isRtl ? "هل أنت متأكد من تسجيل الخروج من منصة المدرسة؟" : "Are you sure you want to log out from the school dashboard?")) {
-                      auth.signOut();
-                    }
-                  }}
-                  title={isRtl ? "تسجيل الخروج" : "Sign Out"}
-                  className="w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/40 dark:text-rose-400 flex items-center justify-center transition-all duration-300 active:scale-95 border border-rose-100 hover:border-transparent dark:border-rose-900/30 cursor-pointer shrink-0"
-                >
-                  <LogOut size={16} />
-                </button>
+            ) : null}
+            <div className="hidden lg:flex items-center gap-2">
+              <div className="w-9 h-9 bg-sx-primary rounded-xl flex items-center justify-center text-white font-bold text-sm">
+                {profile?.name?.[0]}
               </div>
             </div>
-          </div>
-        </header>
-
+          </>
+        }
+        showFooter={activeTab !== "chat"}
+        fullHeightTab={activeTab === "chat"}
+        notificationsCount={totalUnread}
+        showNotifications={showNotifications}
+        setShowNotifications={setShowNotifications}
+      >
         {!auth.currentUser?.emailVerified && !hideVerificationBanner && (
-          <div
-            className="mx-4 md:mx-8 mt-3 md:mt-4 shrink-0"
-            dir={isRtl ? 'rtl' : 'ltr'}
-          >
+          <div className="mb-4 md:mb-6 shrink-0" dir={isRtl ? "rtl" : "ltr"}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 px-3 py-2.5 rounded-xl border border-amber-200/70 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/15 border-s-4 border-s-amber-400 dark:border-s-amber-500">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <div className="w-7 h-7 shrink-0 bg-amber-100/80 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-lg flex items-center justify-center">
@@ -1516,7 +1342,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="min-w-0 text-right">
                   <p className="text-xs font-bold text-amber-900 dark:text-amber-300 leading-tight">
-                    {isRtl ? 'تأكيد البريد الإلكتروني مطلوب' : 'Email verification required'}
+                    {isRtl ? "تأكيد البريد الإلكتروني مطلوب" : "Email verification required"}
                   </p>
                   <p className="text-[10px] text-amber-700/80 dark:text-amber-500 font-medium truncate">
                     {auth.currentUser?.email}
@@ -1535,26 +1361,31 @@ export default function AdminDashboard() {
                       }
                     }
                   }}
-                  className="px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg font-bold text-[10px] hover:bg-amber-50 dark:hover:bg-slate-700 transition-all border border-amber-200/80 dark:border-slate-700 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                  className="px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg font-bold text-[10px] hover:bg-amber-50 dark:hover:bg-slate-700 transition-all border border-amber-200/80 dark:border-slate-700 whitespace-nowrap"
                 >
-                  {isRtl ? 'تحديث' : 'Refresh'}
+                  {isRtl ? "تحديث" : "Refresh"}
                 </button>
                 <button
                   onClick={handleResendVerification}
                   disabled={isSendingVerification || verificationCooldown > 0}
-                  className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 rounded-lg font-bold text-[10px] transition-all disabled:opacity-50 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                  className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 rounded-lg font-bold text-[10px] transition-all disabled:opacity-50 whitespace-nowrap"
                 >
                   {isSendingVerification
-                    ? (isRtl ? 'جاري...' : 'Sending...')
+                    ? isRtl
+                      ? "جاري..."
+                      : "Sending..."
                     : verificationCooldown > 0
-                      ? (isRtl ? `انتظر ${verificationCooldown}ث` : `Wait ${verificationCooldown}s`)
-                      : (isRtl ? 'إعادة الإرسال' : 'Resend')}
+                      ? isRtl
+                        ? `انتظر ${verificationCooldown}ث`
+                        : `Wait ${verificationCooldown}s`
+                      : isRtl
+                        ? "إعادة الإرسال"
+                        : "Resend"}
                 </button>
                 <button
                   onClick={handleHideVerification}
-                  className="p-1.5 text-amber-700/70 hover:text-amber-900 dark:text-amber-500 dark:hover:text-amber-300 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-                  aria-label={isRtl ? 'إخفاء مؤقتاً' : 'Dismiss temporarily'}
-                  title={isRtl ? 'إخفاء مؤقتاً' : 'Dismiss temporarily'}
+                  className="p-1.5 text-amber-700/70 hover:text-amber-900 dark:text-amber-500 dark:hover:text-amber-300 rounded-lg transition-colors"
+                  aria-label={isRtl ? "إخفاء مؤقتاً" : "Dismiss temporarily"}
                 >
                   <X size={14} />
                 </button>
@@ -1563,30 +1394,22 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        <main
-          className={`flex-1 flex flex-col relative print:p-0 print:m-0 print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-20 lg:pb-0" : "overflow-y-auto pb-28 lg:pb-10"}`}
-        >
-          <div
-            className={`w-full mx-auto flex flex-col print:min-h-0 print:pb-0 print:p-0 ${
-              activeTab === "chat"
-                ? "h-full max-w-none p-0 flex-1 min-h-0"
-                : "max-w-7xl p-4 md:p-8"
-            }`}
-          >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                className={
-                  activeTab === "chat"
-                    ? "flex-1 flex flex-col min-h-0"
-                    : "w-full flex flex-col sx-fade-in"
-                }
-                {...pageTransitionProps(activeTab === "chat")}
-              >
-                {renderContent()}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+        <div className="relative flex-1 flex flex-col min-h-0 min-w-0">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              className={
+                activeTab === "chat"
+                  ? "flex-1 flex flex-col min-h-0 h-full -mx-4 md:-mx-8"
+                  : activeTab === "overview"
+                    ? "w-full flex flex-col sx-fade-in space-y-6 md:space-y-8 min-w-0"
+                    : "w-full flex flex-col sx-fade-in min-w-0"
+              }
+              {...pageTransitionProps(activeTab === "chat")}
+            >
+              {renderContent()}
+            </motion.div>
+          </AnimatePresence>
 
           <AnimatePresence>
             {isExpired && (
@@ -1595,20 +1418,20 @@ export default function AdminDashboard() {
                 animate={{ opacity: 1 }}
                 className="absolute inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-slate-900/60"
               >
-                <div className="bg-white rounded-[3rem] p-12 max-w-md w-full text-center shadow-2xl border border-slate-200">
+                <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 md:p-12 max-w-md w-full text-center shadow-2xl border border-slate-200 dark:border-slate-800">
                   <div className="w-20 h-20 bg-red-50 text-red-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
                     <X size={40} />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-900 mb-4 font-display">
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4 font-display">
                     انتهت صلاحية الاشتراك
                   </h2>
-                  <p className="text-slate-500 mb-8 leading-relaxed">
+                  <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
                     عذراً، لقد انتهت صلاحية اشتراك مدرستك. يرجى التواصل مع
                     الإدارة العامة (Super Admin) لتجديد الاشتراك ومواصلة استخدام
                     الخدمات.
                   </p>
                   <div className="space-y-4">
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between">
+                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-400">
                         تاريخ الانتهاء
                       </span>
@@ -1627,7 +1450,7 @@ export default function AdminDashboard() {
                     </button>
                     <button
                       onClick={() => auth.signOut()}
-                      className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-sx-primary text-white rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
                     >
                       <LogOut size={18} />
                       تسجيل الخروج
@@ -1637,46 +1460,27 @@ export default function AdminDashboard() {
               </motion.div>
             )}
           </AnimatePresence>
-          {activeTab !== "chat" && <GlobalFooter compact />}
-        </main>
+        </div>
+      </DashboardShell>
 
-        {/* Real-time Subscription Timer Bottom Bar */}
-        {schoolData?.subscriptionExpiresAt &&
-          schoolData?.status === "active" &&
-          schoolData?.showSubscriptionTimer !== false && (
-            <SubscriptionTimer
-              expiryDate={schoolData.subscriptionExpiresAt}
-              variant="bottom-bar"
-            />
-          )}
+      {schoolData?.subscriptionExpiresAt &&
+        schoolData?.status === "active" &&
+        schoolData?.showSubscriptionTimer !== false && (
+          <SubscriptionTimer
+            expiryDate={schoolData.subscriptionExpiresAt}
+            variant="bottom-bar"
+          />
+        )}
 
-        <AnimatePresence>
-          {viewingPackage && (
-            <PackageDetailsModal
-              pkg={viewingPackage}
-              onClose={() => setViewingPackage(null)}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* Floating/Sticky Mobile Navigation Dock */}
-        <MobileNavigationDock
-          menuItems={filteredMenuItems}
-          activeTab={activeTab}
-          setActiveTab={(tabId) => {
-            setActiveTab(tabId);
-            // also clear navigation history or append as needed
-            setNavigationHistory((prev) => [...prev, activeTab]);
-          }}
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
-          showNotifications={showNotifications}
-          setShowNotifications={setShowNotifications}
-          notificationsCount={totalUnread}
-          isRtl={isRtl}
-        />
-      </div>
-    </div>
+      <AnimatePresence>
+        {viewingPackage && (
+          <PackageDetailsModal
+            pkg={viewingPackage}
+            onClose={() => setViewingPackage(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
