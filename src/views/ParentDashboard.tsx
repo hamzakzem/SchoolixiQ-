@@ -20,7 +20,8 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
-import { GlobalFooter } from "../components/GlobalFooter";
+import { useNotificationBadges } from "../lib/NotificationBadgeContext";
+import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 import {
@@ -145,59 +146,29 @@ export default function ParentDashboard() {
   const { t, isRtl, language, setLanguage } = useLanguage();
   const { config } = useSystemConfig();
   const [activeTab, setActiveTab] = useState("home");
+  const { totalUnread: badgeTotalUnread, tabBadges } = useNotificationBadges();
+  useNotificationRouteRedirect(normalizeDashboardRole(undefined, profile?.role), setActiveTab);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
-
-  useEffect(() => {
-    const handlePendingRedirect = () => {
-      const pendingType = localStorage.getItem('schoolix_pending_tab_redirect');
-      if (pendingType) {
-        localStorage.removeItem('schoolix_pending_tab_redirect');
-        
-        switch (pendingType) {
-          case 'homework':
-            setActiveTab('homework');
-            break;
-          case 'grade':
-          case 'grades':
-            setActiveTab('grades');
-            break;
-          case 'payment':
-          case 'tuition':
-            setActiveTab('tuition');
-            break;
-          case 'behavior':
-            setActiveTab('behavior');
-            break;
-          case 'announcement':
-            setActiveTab('home');
-            break;
-          case 'message':
-          case 'chat':
-            setActiveTab('chat');
-            break;
-          case 'attendance':
-            setActiveTab('home');
-            break;
-          case 'report':
-            setActiveTab('reports');
-            break;
-          default:
-            setActiveTab('home');
-            break;
-        }
-      }
-    };
-
-    handlePendingRedirect();
-    window.addEventListener('schoolix_tab_redirect', handlePendingRedirect);
-    return () => {
-      window.removeEventListener('schoolix_tab_redirect', handlePendingRedirect);
-    };
-  }, []);
 
   // Enhanced tab switcher that tracks history
   const navigateToTab = (tabId: string) => {
+    const restrictions = profile?.privilegeRestrictions;
+    const restricted = Boolean(restrictions?.parentPrivilegesRestricted);
+    const blocked = restrictions?.restrictedFeatures ?? [];
+    if (restricted) {
+      if (tabId === "market" && blocked.includes("marketplace")) {
+        toast.error("تم تقييد المتجر — يرجى سداد الأقساط المستحقة");
+        return;
+      }
+      if (tabId === "chat" && blocked.includes("chat")) {
+        toast.error("تم تقييد المحادثات — يرجى سداد الأقساط المستحقة");
+        return;
+      }
+      if (tabId === "homework" && blocked.includes("homework_submit")) {
+        toast.error("تم تقييد الواجبات — يرجى سداد الأقساط المستحقة");
+        return;
+      }
+    }
     if (tabId === activeTab) return;
     setNavigationHistory((prev) => [...prev, activeTab]);
     setActiveTab(tabId);
@@ -213,6 +184,7 @@ export default function ParentDashboard() {
     }
   };
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [students, setStudents] = useState<any[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentGrades, setStudentGrades] = useState<any[]>([]);
   const [loadingGrades, setLoadingGrades] = useState(false);
@@ -1268,13 +1240,50 @@ export default function ParentDashboard() {
     () =>
       notifications.filter(
         (n) =>
-          n.type === "payment" &&
-          n.metadata?.banner &&
+          (n.type === "payment" || n.type === "tuition") &&
+          (n.metadata?.banner || n.metadata?.installmentAlert) &&
           !n.dismissed &&
           (!n.metadata?.studentId || studentIds.includes(n.metadata.studentId)),
       ),
     [notifications, studentIds],
   );
+
+  const tuitionEscalationAlert = useMemo(() => {
+    const restrictions = profile?.privilegeRestrictions;
+    const until = restrictions?.tuitionWarningUntil as
+      | { toDate?: () => Date; seconds?: number }
+      | null
+      | undefined;
+    let warningActive = (restrictions?.tuitionEscalationLevel ?? 0) >= 2;
+    if (until?.toDate) warningActive = Date.now() < until.toDate().getTime();
+    else if (until?.seconds) warningActive = Date.now() < until.seconds * 1000;
+
+    const alertNotif = notifications.find(
+      (n) =>
+        !n.dismissed &&
+        n.type === "tuition" &&
+        ((n.metadata?.escalationLevel ?? 0) >= 2 || n.metadata?.installmentAlert),
+    );
+
+    if (!warningActive && !restrictions?.parentPrivilegesRestricted && !alertNotif) {
+      return null;
+    }
+
+    return {
+      studentName:
+        alertNotif?.metadata?.studentName ||
+        selectedStudent?.name ||
+        students[0]?.name ||
+        "الطالب",
+      amount: alertNotif?.metadata?.amount,
+      dueDate: alertNotif?.metadata?.dueDate,
+      message:
+        alertNotif?.message ||
+        "يوجد قسط دراسي متأخر. يرجى مراجعة إدارة المدرسة وسداد المبلغ المستحق.",
+      restricted: Boolean(restrictions?.parentPrivilegesRestricted),
+      schoolPhone: schoolData?.phone || schoolData?.contactPhone,
+    };
+  }, [profile?.privilegeRestrictions, notifications, selectedStudent, students, schoolData]);
 
   const dismissInstallmentBanner = async (notificationId: string) => {
     try {
@@ -1298,11 +1307,11 @@ export default function ParentDashboard() {
       id: "homework",
       label: t("homework"),
       icon: BookOpen,
-      badge: homework.length,
+      badge: tabBadges.homework || homework.length || undefined,
     },
     { id: "grades", label: t("grades"), icon: Star },
     { id: "schedules", label: "الجدول الأسبوعي", icon: Calendar },
-    { id: "tuition", label: t("tuition"), icon: Wallet },
+    { id: "tuition", label: t("tuition"), icon: Wallet, badge: tabBadges.tuition || undefined },
     {
       id: "behavior",
       label: t("behavior"),
@@ -1331,7 +1340,7 @@ export default function ParentDashboard() {
     },
     { id: "market", label: t("market"), icon: ShoppingBag },
     { id: "dismissal", label: isRtl ? "طلب التسريح" : "Dismissal", icon: DoorOpen },
-    { id: "chat", label: t("chat") || "الدردشة", icon: MessageSquare },
+    { id: "chat", label: t("chat") || "الدردشة", icon: MessageSquare, badge: tabBadges.chat || undefined },
     {
       id: "inbox",
       label: t("inbox"),
@@ -1811,6 +1820,77 @@ export default function ParentDashboard() {
         </header>
 
         <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-20 lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
+          {tuitionEscalationAlert && (
+            <div className="px-4 md:px-8 pt-4 max-w-7xl mx-auto w-full">
+              <div
+                className={`rounded-[1.5rem] border p-5 shadow-lg ${
+                  tuitionEscalationAlert.restricted
+                    ? "border-red-300 bg-gradient-to-l from-red-50 via-white to-red-50 dark:from-red-950/40 dark:via-slate-900 dark:to-slate-900"
+                    : "border-amber-300 bg-gradient-to-l from-amber-50 via-white to-orange-50 dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900"
+                }`}
+                dir={isRtl ? "rtl" : "ltr"}
+              >
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                      tuitionEscalationAlert.restricted
+                        ? "bg-red-100 text-red-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div className="flex-1 min-w-0 text-right">
+                    <p
+                      className={`text-[10px] font-black uppercase tracking-widest mb-1 ${
+                        tuitionEscalationAlert.restricted ? "text-red-600" : "text-amber-600"
+                      }`}
+                    >
+                      {tuitionEscalationAlert.restricted
+                        ? "تنبيه عاجل — أقساط متأخرة"
+                        : "تذكير بقسط دراسي مستحق"}
+                    </p>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white mb-1">
+                      {tuitionEscalationAlert.studentName}
+                    </h3>
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed mb-2">
+                      {tuitionEscalationAlert.message}
+                    </p>
+                    <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-600">
+                      {tuitionEscalationAlert.amount != null && (
+                        <span>
+                          المبلغ: {Number(tuitionEscalationAlert.amount).toLocaleString("ar-IQ")} د.ع
+                        </span>
+                      )}
+                      {tuitionEscalationAlert.dueDate && (
+                        <span>الاستحقاق: {String(tuitionEscalationAlert.dueDate)}</span>
+                      )}
+                    </div>
+                    {tuitionEscalationAlert.restricted && (
+                      <p className="text-xs font-bold text-red-700 mt-2">
+                        تم تقييد بعض الخدمات (المتجر، المحادثات، تسليم الواجبات) حتى سداد المبلغ.
+                      </p>
+                    )}
+                    {tuitionEscalationAlert.schoolPhone && (
+                      <a
+                        href={`tel:${tuitionEscalationAlert.schoolPhone}`}
+                        className="inline-flex mt-3 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold"
+                      >
+                        {isRtl ? "الاتصال بالمدرسة" : "Contact school"}
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => navigateToTab("tuition")}
+                      className="inline-flex mt-3 mr-2 px-4 py-2 rounded-xl bg-[#0B2345] text-white text-xs font-bold"
+                    >
+                      {isRtl ? "عرض الأقساط" : "View tuition"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -3193,7 +3273,7 @@ export default function ParentDashboard() {
           setIsSidebarOpen={setIsSidebarOpen}
           showNotifications={showNotifications}
           setShowNotifications={setShowNotifications}
-          notificationsCount={notifications.filter((n: any) => !n.read).length}
+          notificationsCount={badgeTotalUnread}
           isRtl={isRtl}
           menuSurface="light"
         />

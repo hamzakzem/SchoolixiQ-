@@ -108,7 +108,7 @@ self.addEventListener('push', (event) => {
   const data = payload.notification ? { ...payload, ...payload.data } : payload;
   const title = data.title || payload.notification?.title || 'Schoolix IQ';
   const body = data.body || payload.notification?.body || 'إشعار جديد';
-  const route = data.route || data.type || '/';
+  const route = data.routeTarget || data.route || data.type || '/';
   const url = data.url || `/?tab=${encodeURIComponent(route)}`;
   const options = {
     body,
@@ -116,7 +116,7 @@ self.addEventListener('push', (event) => {
     badge: '/favicon.ico',
     vibrate: [100, 50, 100],
     tag: data.notificationId || data.dedupKey || undefined,
-    data: { url, route, notificationId: data.notificationId },
+    data: { url, route, routeTarget: route, notificationId: data.notificationId },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
@@ -128,7 +128,11 @@ self.addEventListener('notificationclick', (event) => {
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const client of list) {
         if ('focus' in client) {
-          client.postMessage({ type: 'NOTIFICATION_CLICK', route: event.notification.data?.route });
+          client.postMessage({
+            type: 'NOTIFICATION_CLICK',
+            route: event.notification.data?.route,
+            routeTarget: event.notification.data?.routeTarget || event.notification.data?.route,
+          });
           return client.focus();
         }
       }

@@ -36,10 +36,12 @@ export const registerForPushNotifications = async (userId: string, userRole: str
     await PushNotifications.removeAllListeners();
 
     PushNotifications.addListener('registration', async (token) => {
-      console.log('Push registration success, token: ' + token.value);
+      console.info('[Notifications] PUSH_TOKEN_REGISTERED', {
+        platform: Capacitor.getPlatform(),
+        userId,
+        tokenPrefix: token.value.slice(0, 12),
+      });
       currentPushToken = token.value;
-      // Save the token to Firestore so we can send pushes to this user
-      // arrayUnion prevents storing the exact same string twice in the array.
       if (userId) {
         try {
           const userRef = doc(db, 'users', userId);
@@ -47,7 +49,7 @@ export const registerForPushNotifications = async (userId: string, userRole: str
             fcmTokens: arrayUnion(token.value)
           });
         } catch (e) {
-          console.error('Failed to save push token to user doc: ', e);
+          console.error('[Notifications] PUSH_TOKEN_REGISTERED save failed', e);
         }
       }
     });
@@ -71,12 +73,13 @@ export const registerForPushNotifications = async (userId: string, userRole: str
 
     // Listen for notification tapped by the user
     PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-      console.log('Push action performed: ' + JSON.stringify(notification));
       const data = notification.notification?.data || {};
-      const route = data.route || data.type;
+      const route = data.routeTarget || data.route || data.type;
       if (route && typeof window !== 'undefined') {
         localStorage.setItem('schoolix_pending_tab_redirect', String(route));
+        window.dispatchEvent(new CustomEvent('schoolix_tab_redirect'));
         window.dispatchEvent(new CustomEvent('schoolix-notification-route', { detail: { route } }));
+        console.info('[Notifications] PUSH_CLICK_ROUTE', { route, platform: Capacitor.getPlatform() });
       }
     });
 

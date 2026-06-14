@@ -110,7 +110,7 @@ export const NOTIFICATION_CATEGORIES: NotificationCategoryConfig[] = [
     color: 'text-cyan-600',
     bgColor: 'bg-cyan-50',
     borderColor: 'border-cyan-200',
-    tabIds: ['dismissal', 'smart_gate'],
+    tabIds: ['dismissal', 'smart_gate', 'dismissal_gate'],
     typeAliases: ['dismissal', 'smart_gate', 'gate'],
   },
   {

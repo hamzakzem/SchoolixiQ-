@@ -43,6 +43,87 @@ export type LateInstallmentView = TuitionInstallment & {
 
 export type ReminderBucket = 'overdue' | 'today' | 'soon' | 'later';
 
+export type TuitionPayment = {
+  id?: string;
+  studentId?: string;
+  schoolId?: string;
+  amount?: number;
+  type?: string;
+  createdAt?: unknown;
+};
+
+export type TuitionReminderTrackingSnapshot = {
+  reminderCount?: number;
+  lastReminderAt?: Date | null;
+  escalationLevel?: number;
+  parentStatus?: 'active' | 'warning' | 'restricted' | string;
+};
+
+/** Timing config for eligibility (mirrors school tuitionReminderSettings). */
+export type TuitionReminderEligibilityConfig = {
+  autoRemindersEnabled: boolean;
+  reminderStartAfterDays: number;
+  reminderRepeatEveryDays: number;
+  maxReminderCountBeforeWarning: number;
+  restrictAfterDays: number;
+  upcomingDays: number;
+};
+
+/** Map persisted school settings → eligibility config (no service import). */
+export function toEligibilityConfigFromSettings(
+  settings: Partial<TuitionReminderEligibilityConfig> & {
+    daysBeforeEscalation?: number;
+    level3AfterReminders?: number;
+    intervalHours?: number;
+    level2Hours?: number;
+    redWarningDurationDays?: number;
+  },
+): TuitionReminderEligibilityConfig {
+  return {
+    autoRemindersEnabled: settings.autoRemindersEnabled ?? false,
+    reminderStartAfterDays: settings.reminderStartAfterDays ?? 25,
+    reminderRepeatEveryDays:
+      settings.reminderRepeatEveryDays ??
+      Math.max(1, Math.ceil((settings.intervalHours ?? 72) / 24)),
+    maxReminderCountBeforeWarning:
+      settings.maxReminderCountBeforeWarning ?? settings.level3AfterReminders ?? 3,
+    restrictAfterDays: settings.restrictAfterDays ?? 35,
+    upcomingDays: settings.upcomingDays ?? settings.daysBeforeEscalation ?? 7,
+  };
+}
+
+export type TuitionReminderFilterKey =
+  | 'all'
+  | 'overdue'
+  | 'today'
+  | 'soon'
+  | 'auto_eligible'
+  | 'restricted';
+
+export type EligibleTuitionReminderRow = ReminderDashboardRow & {
+  autoReminderEligible: boolean;
+  escalationEligible: boolean;
+  isRestricted: boolean;
+  daysSinceTimingAnchor: number;
+  timingAnchor: Date;
+  reminderCount: number;
+  lastReminderAt: Date | null;
+  escalationLevel: number;
+  parentStatus: 'active' | 'warning' | 'restricted';
+};
+
+export type TuitionReminderDisplayRow = EligibleTuitionReminderRow & {
+  className: string;
+  parentName: string;
+  parentEmail: string;
+  parentPhone: string;
+  parentId?: string;
+  hasWhatsApp: boolean;
+  linkedParentLabel: string;
+  whatsAppLabel: string;
+  statusLabel: string;
+};
+
 export type ReminderDashboardRow = {
   installmentId: string;
   studentId: string;
@@ -214,13 +295,316 @@ export function computeReminderStats(rows: Pick<ReminderDashboardRow, 'bucket'>[
   today: number;
   soon: number;
   later: number;
+  autoEligible: number;
+  restricted: number;
 } {
-  return {
+  const base = {
     overdue: rows.filter((r) => r.bucket === 'overdue').length,
     today: rows.filter((r) => r.bucket === 'today').length,
     soon: rows.filter((r) => r.bucket === 'soon').length,
     later: rows.filter((r) => r.bucket === 'later').length,
   };
+  const eligible = rows as EligibleTuitionReminderRow[];
+  return {
+    ...base,
+    autoEligible: eligible.filter((r) => r.autoReminderEligible).length,
+    restricted: eligible.filter((r) => r.isRestricted || r.escalationEligible).length,
+  };
+}
+
+function parsePaymentCreatedAt(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  if (typeof value === 'object' && value !== null && 'seconds' in value) {
+    return new Date((value as { seconds: number }).seconds * 1000);
+  }
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** Last tuition payment date for a student (anchor when payments exist). */
+export function getLastTuitionPaymentDate(
+  studentId: string,
+  payments: TuitionPayment[],
+): Date | null {
+  let latest: Date | null = null;
+  for (const payment of payments) {
+    if (payment.studentId !== studentId) continue;
+    if (payment.type && payment.type !== 'tuition') continue;
+    const created = parsePaymentCreatedAt(payment.createdAt);
+    if (!created) continue;
+    if (!latest || created > latest) latest = created;
+  }
+  return latest;
+}
+
+/** Reminder timing anchor: last payment date, else installment due date. */
+export function getReminderTimingAnchor(
+  installment: Pick<TuitionInstallment, 'dueDate'>,
+  payments: TuitionPayment[],
+  studentId: string,
+): Date {
+  const lastPayment = getLastTuitionPaymentDate(studentId, payments);
+  if (lastPayment) return lastPayment;
+  return parseTuitionDueDate(installment.dueDate);
+}
+
+function daysBetween(from: Date, to: Date): number {
+  return Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/** One current unpaid installment per student — earliest due first. */
+export function pickCurrentUnpaidInstallmentsPerStudent(
+  installments: TuitionInstallment[],
+  now: Date = new Date(),
+): TuitionInstallment[] {
+  const byStudent = new Map<string, TuitionInstallment>();
+  for (const inst of installments) {
+    if (!isUnpaidInstallment(inst)) continue;
+    if (inst.isDeleted) continue;
+    const due = parseTuitionDueDate(inst.dueDate);
+    if (!due.getTime() || Number.isNaN(due.getTime())) continue;
+
+    const existing = byStudent.get(inst.studentId);
+    if (!existing) {
+      byStudent.set(inst.studentId, inst);
+      continue;
+    }
+    const existingDue = parseTuitionDueDate(existing.dueDate);
+    if (due < existingDue) {
+      byStudent.set(inst.studentId, inst);
+    }
+  }
+  return Array.from(byStudent.values());
+}
+
+function readTrackingSnapshot(
+  tracking: Record<string, TuitionReminderTrackingSnapshot>,
+  schoolId: string,
+  studentId: string,
+  installmentId: string,
+): TuitionReminderTrackingSnapshot {
+  const key = `${schoolId}_${studentId}_${installmentId}`;
+  const fallback = `${schoolId}_${studentId}`;
+  const raw = tracking[key] || tracking[fallback] || {};
+  const last = raw.lastReminderAt;
+  let lastDate: Date | null = null;
+  if (last instanceof Date) lastDate = last;
+  else if (last && typeof last === 'object' && 'toDate' in last) {
+    lastDate = (last as { toDate: () => Date }).toDate();
+  }
+  return {
+    reminderCount: raw.reminderCount || 0,
+    lastReminderAt: lastDate,
+    escalationLevel: raw.escalationLevel || 1,
+    parentStatus: raw.parentStatus || 'active',
+  };
+}
+
+function isParentRestricted(
+  parentId: string | undefined,
+  parents: Record<string, { privilegeRestrictions?: Record<string, unknown> }> | undefined,
+  trackStatus: string,
+): boolean {
+  if (trackStatus === 'restricted') return true;
+  if (!parentId || !parents) return false;
+  const parent = parents[parentId];
+  const restrictions = parent?.privilegeRestrictions;
+  return Boolean(restrictions?.parentPrivilegesRestricted);
+}
+
+/**
+ * Shared source of truth for tuition reminder rows (Overview + Tuition Reminders page).
+ * Returns one row per student for the current unpaid installment only.
+ */
+export function getEligibleTuitionReminderRows(params: {
+  students: TuitionStudent[];
+  installments: TuitionInstallment[];
+  payments: TuitionPayment[];
+  settings: TuitionReminderEligibilityConfig;
+  tracking: Record<string, TuitionReminderTrackingSnapshot>;
+  schoolId: string;
+  parents?: Record<string, { id?: string; privilegeRestrictions?: Record<string, unknown> }>;
+  now?: Date;
+}): EligibleTuitionReminderRow[] {
+  const {
+    students,
+    installments,
+    payments,
+    settings,
+    tracking,
+    schoolId,
+    parents,
+    now = new Date(),
+  } = params;
+
+  const currentInstallments = pickCurrentUnpaidInstallmentsPerStudent(installments, now);
+  const studentMap = new Map(students.map((s) => [s.id, s]));
+  const seen = new Set<string>();
+  const rows: EligibleTuitionReminderRow[] = [];
+
+  for (const installment of currentInstallments) {
+    if (seen.has(installment.id)) continue;
+    const student = studentMap.get(installment.studentId);
+    if (!student) continue;
+
+    const bucket = classifyInstallmentReminderBucket(
+      installment,
+      settings.upcomingDays,
+      now,
+    );
+    if (!bucket) continue;
+
+    seen.add(installment.id);
+
+    const dueDate = parseTuitionDueDate(installment.dueDate);
+    const delayDays = bucket === 'overdue' ? computeInstallmentDelayDays(installment.dueDate, now) : 0;
+    const track = readTrackingSnapshot(tracking, schoolId, installment.studentId, installment.id);
+    const { parentId } = resolveLinkedParentFromCache(student, parents || {});
+    const parentStatus = (track.parentStatus || 'active') as EligibleTuitionReminderRow['parentStatus'];
+
+    const timingAnchor = getReminderTimingAnchor(installment, payments, installment.studentId);
+    const daysSinceTimingAnchor = Math.max(0, daysBetween(timingAnchor, now));
+
+    const daysSinceLastReminder = track.lastReminderAt
+      ? daysBetween(track.lastReminderAt, now)
+      : Number.POSITIVE_INFINITY;
+
+    const autoReminderEligible =
+      settings.autoRemindersEnabled &&
+      (bucket === 'overdue' || bucket === 'today' || bucket === 'soon') &&
+      daysSinceTimingAnchor >= settings.reminderStartAfterDays &&
+      daysSinceLastReminder >= settings.reminderRepeatEveryDays;
+
+    const escalationEligible =
+      track.reminderCount >= settings.maxReminderCountBeforeWarning ||
+      delayDays >= settings.restrictAfterDays;
+
+    const isRestricted = isParentRestricted(parentId, parents, parentStatus);
+
+    rows.push({
+      installmentId: installment.id,
+      studentId: installment.studentId,
+      studentName: student.name || 'طالب',
+      amount: installment.amount || 0,
+      dueDate,
+      delayDays,
+      bucket,
+      installment,
+      student,
+      autoReminderEligible,
+      escalationEligible,
+      isRestricted,
+      daysSinceTimingAnchor,
+      timingAnchor,
+      reminderCount: track.reminderCount || 0,
+      lastReminderAt: track.lastReminderAt ?? null,
+      escalationLevel: track.escalationLevel || 1,
+      parentStatus,
+    });
+  }
+
+  return rows.sort((a, b) => {
+    const order: Record<ReminderBucket, number> = { overdue: 0, today: 1, soon: 2, later: 3 };
+    const bucketDiff = order[a.bucket] - order[b.bucket];
+    if (bucketDiff !== 0) return bucketDiff;
+    return b.delayDays - a.delayDays;
+  });
+}
+
+export function filterTuitionReminderRows(
+  rows: EligibleTuitionReminderRow[],
+  filter: TuitionReminderFilterKey,
+  search: string,
+  parents: Record<string, { displayName?: string; name?: string; email?: string; phone?: string; phoneNumber?: string; mobile?: string }> = {},
+): EligibleTuitionReminderRow[] {
+  let list = rows;
+  switch (filter) {
+    case 'overdue':
+      list = rows.filter((r) => r.bucket === 'overdue');
+      break;
+    case 'today':
+      list = rows.filter((r) => r.bucket === 'today');
+      break;
+    case 'soon':
+      list = rows.filter((r) => r.bucket === 'soon');
+      break;
+    case 'auto_eligible':
+      list = rows.filter((r) => r.autoReminderEligible);
+      break;
+    case 'restricted':
+      list = rows.filter((r) => r.isRestricted || r.escalationEligible);
+      break;
+    default:
+      list = rows.filter((r) => r.bucket !== 'later');
+      break;
+  }
+
+  const q = search.trim().toLowerCase();
+  if (!q) return list;
+
+  return list.filter((row) => {
+    const student = row.student;
+    const { parent } = resolveLinkedParentFromCache(student, parents);
+    const parentName = String(parent?.displayName || parent?.name || '').toLowerCase();
+    const parentEmail = String(student?.parentEmail || parent?.email || '').toLowerCase();
+    const parentPhone = resolveParentPhone(student, parent);
+    const className = String(student?.class || '').toLowerCase();
+    const amountStr = String(row.amount);
+    const statusLabel =
+      row.bucket === 'overdue'
+        ? `متأخر ${row.delayDays} يوم`
+        : row.bucket === 'today'
+          ? 'مستحق اليوم'
+          : row.bucket;
+
+    return (
+      row.studentName.toLowerCase().includes(q) ||
+      className.includes(q) ||
+      parentName.includes(q) ||
+      parentEmail.includes(q) ||
+      parentPhone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
+      amountStr.includes(q) ||
+      statusLabel.includes(q) ||
+      row.bucket.includes(q)
+    );
+  });
+}
+
+export function enrichTuitionReminderDisplayRows(
+  rows: EligibleTuitionReminderRow[],
+  parents: Record<string, { id?: string; displayName?: string; name?: string; email?: string; phone?: string; phoneNumber?: string; mobile?: string }>,
+): TuitionReminderDisplayRow[] {
+  return rows.map((row) => {
+    const { parentId, parent } = resolveLinkedParentFromCache(row.student, parents);
+    const parentPhone = resolveParentPhone(row.student, parent);
+    const hasWhatsApp = isValidWhatsAppPhone(parentPhone);
+    const parentEmail = String(row.student?.parentEmail || parent?.email || '').trim();
+    const className = String(row.student?.class || '—');
+
+    let statusLabel = row.bucket === 'overdue' ? `متأخر ${row.delayDays} يوم` : '';
+    if (row.bucket === 'today') statusLabel = 'مستحق اليوم';
+    if (row.bucket === 'soon') statusLabel = 'قريباً';
+    if (row.bucket === 'later') statusLabel = 'لاحقاً';
+    if (row.autoReminderEligible) statusLabel += ' · مؤهل تلقائي';
+    if (row.isRestricted) statusLabel += ' · مقيّد';
+
+    return {
+      ...row,
+      className,
+      parentName: parent?.displayName || parent?.name || '—',
+      parentEmail,
+      parentPhone,
+      parentId,
+      hasWhatsApp,
+      linkedParentLabel: parentId ? 'مرتبط' : 'لا يوجد ولي أمر مرتبط',
+      whatsAppLabel: hasWhatsApp ? 'متاح' : 'لا يوجد رقم واتساب',
+      statusLabel: statusLabel.trim(),
+    };
+  });
 }
 
 export function formatTuitionDueLabel(dueDate: unknown): string {
@@ -247,6 +631,7 @@ export function buildTuitionReminderPayload(
     senderId: adminUid,
     metadata: {
       source: 'tuition',
+      routeTarget: 'tuition',
       studentId: student.id,
       installmentId: installment.id,
       schoolId,

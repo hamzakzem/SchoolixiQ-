@@ -56,6 +56,7 @@ import {
 } from "../lib/adminQueryDebug";
 import { notificationService } from "../lib/notificationService";
 import { useNotificationBadges } from "../lib/NotificationBadgeContext";
+import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import { canAccessAdminMenuItem } from "../lib/staffPermissions";
 import { DashboardShell } from "../components/layout/DashboardShell";
 import {
@@ -153,54 +154,6 @@ export default function AdminDashboard() {
   const { config } = useSystemConfig();
   const [activeTab, setActiveTab] = useState("overview");
 
-  useEffect(() => {
-    const handlePendingRedirect = () => {
-      const pendingType = localStorage.getItem('schoolix_pending_tab_redirect');
-      if (pendingType) {
-        localStorage.removeItem('schoolix_pending_tab_redirect');
-        
-        switch (pendingType) {
-          case 'homework':
-            setActiveTab('homework');
-            break;
-          case 'grade':
-          case 'grades':
-            setActiveTab('grades');
-            break;
-          case 'payment':
-          case 'tuition':
-            setActiveTab('tuition');
-            break;
-          case 'behavior':
-            setActiveTab('behavior');
-            break;
-          case 'announcement':
-            setActiveTab('announcements');
-            break;
-          case 'message':
-          case 'chat':
-            setActiveTab('chat');
-            break;
-          case 'attendance':
-            setActiveTab('attendance');
-            break;
-          case 'report':
-            setActiveTab('evaluation_reports');
-            break;
-          default:
-            setActiveTab('overview');
-            break;
-        }
-      }
-    };
-
-    handlePendingRedirect();
-    window.addEventListener('schoolix_tab_redirect', handlePendingRedirect);
-    return () => {
-      window.removeEventListener('schoolix_tab_redirect', handlePendingRedirect);
-    };
-  }, []);
-
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
 
   // Enhanced tab switcher that tracks history
@@ -222,6 +175,7 @@ export default function AdminDashboard() {
   // Filter menu items based on assistant or plan permissions
   const { profile, schoolData: authSchoolData } = useAuth();
   const { totalUnread, tabBadges } = useNotificationBadges();
+  useNotificationRouteRedirect(normalizeDashboardRole(undefined, profile?.role), setActiveTab);
 
   const [showNotifications, setShowNotifications] = useState(false);
 

@@ -223,7 +223,7 @@ export default function SuperAdminChatTab() {
         message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
         type: 'system',
         schoolId: school.id,
-        metadata: { senderId: profile.uid, conversationId: convId, audience: 'school_admin' },
+        metadata: { senderId: profile.uid, conversationId: convId, audience: 'school_admin', routeTarget: 'chat' },
       });
     }
   };

@@ -98,6 +98,8 @@ import {
   TEACHER_NO_CLASS_MSG,
 } from "../lib/teacherClass";
 import { isTeacherMenuFeatureEnabled } from "../lib/featureRegistry";
+import { useNotificationBadges } from "../lib/NotificationBadgeContext";
+import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 
 type Tab =
   | "home"
@@ -150,48 +152,10 @@ export default function TeacherDashboard() {
   const { profile, schoolData } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>("home");
-
-  useEffect(() => {
-    const handlePendingRedirect = () => {
-      const pendingType = localStorage.getItem('schoolix_pending_tab_redirect');
-      if (pendingType) {
-        localStorage.removeItem('schoolix_pending_tab_redirect');
-        
-        switch (pendingType) {
-          case 'homework':
-            setActiveTab('homework');
-            break;
-          case 'grade':
-          case 'grades':
-            setActiveTab('grades');
-            break;
-          case 'behavior':
-            setActiveTab('behavior');
-            break;
-          case 'announcement':
-            setActiveTab('home');
-            break;
-          case 'message':
-          case 'chat':
-            setActiveTab('chat');
-            break;
-          case 'report':
-            setActiveTab('reports');
-            break;
-          default:
-            setActiveTab('home');
-            break;
-        }
-      }
-    };
-
-    handlePendingRedirect();
-    window.addEventListener('schoolix_tab_redirect', handlePendingRedirect);
-    return () => {
-      window.removeEventListener('schoolix_tab_redirect', handlePendingRedirect);
-    };
-  }, []);
-
+  const { totalUnread: badgeTotalUnread, tabBadges } = useNotificationBadges();
+  useNotificationRouteRedirect(normalizeDashboardRole(undefined, profile?.role), (tab) =>
+    setActiveTab(tab as Tab),
+  );
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1057,7 +1021,7 @@ export default function TeacherDashboard() {
             message: `${newHomework.title} - ${t("deliveryDate")}: ${newHomework.dueDate}`,
             type: "homework",
             schoolId: profile.schoolId,
-            metadata: { sourceId: homeworkRef.id },
+            metadata: { sourceId: homeworkRef.id, routeTarget: 'homework' },
           });
         }
       } else {
@@ -1349,7 +1313,12 @@ export default function TeacherDashboard() {
 
   const shellMenuItems = useMemo((): DashboardMenuItem[] => {
     const withSettings: DashboardMenuItem[] = [
-      ...sidebarItems.map(({ id, label, icon }) => ({ id, label, icon })),
+      ...sidebarItems.map(({ id, label, icon }) => ({
+        id,
+        label,
+        icon,
+        badge: tabBadges[id] || undefined,
+      })),
       {
         id: "settings",
         label: t("settings") || (isRtl ? "الإعدادات" : "Settings"),
@@ -1363,7 +1332,7 @@ export default function TeacherDashboard() {
       return true;
     });
     return attachSectionLabels(unique, TEACHER_ITEM_SECTIONS);
-  }, [sidebarItems, t, isRtl]);
+  }, [sidebarItems, t, isRtl, tabBadges]);
 
   const teacherSectionLabels = useMemo(
     () =>
@@ -1437,9 +1406,9 @@ export default function TeacherDashboard() {
             <Bell size={18} />
             {notifications.filter((n) => !n.read).length > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-sx-primary rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                {notifications.filter((n) => !n.read).length > 9
+                {(badgeTotalUnread || notifications.filter((n) => !n.read).length) > 9
                   ? "9+"
-                  : notifications.filter((n) => !n.read).length}
+                  : badgeTotalUnread || notifications.filter((n) => !n.read).length}
               </span>
             )}
           </button>
@@ -1454,7 +1423,7 @@ export default function TeacherDashboard() {
       }
       showFooter={activeTab !== "chat"}
       fullHeightTab={activeTab === "chat"}
-      notificationsCount={notifications.filter((n) => !n.read).length}
+      notificationsCount={badgeTotalUnread || notifications.filter((n) => !n.read).length}
       showNotifications={showNotifications}
       setShowNotifications={setShowNotifications}
     >

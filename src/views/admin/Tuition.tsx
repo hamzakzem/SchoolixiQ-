@@ -163,6 +163,7 @@ export default function Tuition() {
         message: `تم استلام مبلغ ${amountNum.toLocaleString()} د.ع (${installmentLabel}) للأقساط الدراسية.`,
         type: 'payment',
         schoolId: profile.schoolId,
+        metadata: { routeTarget: 'tuition' },
       });
 
       toast.success(`تم تسجيل ${installmentLabel} بنجاح`);

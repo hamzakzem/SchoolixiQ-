@@ -95,7 +95,7 @@ export default function Announcements() {
           message: newAnnouncement.content,
           type: 'announcement',
           schoolId: profile.schoolId,
-          metadata: { sourceId: annRef.id }
+          metadata: { sourceId: annRef.id, routeTarget: 'announcements' }
         });
       } else if (newAnnouncement.target === 'parents') {
         await notificationService.notifyAllParents(profile.schoolId, {
@@ -103,7 +103,7 @@ export default function Announcements() {
           message: newAnnouncement.content,
           type: 'announcement',
           schoolId: profile.schoolId,
-          metadata: { sourceId: annRef.id }
+          metadata: { sourceId: annRef.id, routeTarget: 'announcements' }
         });
       } else if (newAnnouncement.target === 'staff') {
         await notificationService.notifyAllStaff(profile.schoolId, {
@@ -111,7 +111,7 @@ export default function Announcements() {
           message: newAnnouncement.content,
           type: 'announcement',
           schoolId: profile.schoolId,
-          metadata: { sourceId: annRef.id }
+          metadata: { sourceId: annRef.id, routeTarget: 'announcements' }
         });
       } else if (newAnnouncement.target === 'all') {
         await notificationService.notifyAllSchool(profile.schoolId, {
@@ -119,7 +119,7 @@ export default function Announcements() {
           message: newAnnouncement.content,
           type: 'announcement',
           schoolId: profile.schoolId,
-          metadata: { sourceId: annRef.id }
+          metadata: { sourceId: annRef.id, routeTarget: 'announcements' }
         });
       }
 

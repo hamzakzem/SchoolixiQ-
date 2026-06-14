@@ -68,7 +68,7 @@ import { useLandingPageConfig } from "./lib/landingPageConfig";
 import { PageLoadingSkeleton } from "./components/ui/Skeleton";
 import { LanguageToggle } from "./components/LanguageToggle";
 import InstallAppBanner from "./components/InstallAppBanner";
-import { AudioNotificationManager } from "./components/AudioNotificationManager";
+import { setupGlobalNotificationClickRouting } from "./lib/notificationRouting";
 
 const DEFAULT_PACKAGES = [
   {
@@ -126,6 +126,10 @@ const AppContent = () => {
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [autoLinkChecked, setAutoLinkChecked] = useState(false);
+
+  useEffect(() => {
+    return setupGlobalNotificationClickRouting();
+  }, []);
 
   // Reset chunk error reload and IndexedDb reload counters on successful render/mount
   useEffect(() => {

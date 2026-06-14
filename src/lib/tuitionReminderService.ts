@@ -24,27 +24,55 @@ import {
   computeInstallmentDelayDays,
   formatTuitionAmountLabel,
   formatTuitionDueLabel,
+  getEligibleTuitionReminderRows,
   parseTuitionDueDate,
+  tuitionInstallmentsQuery,
+  tuitionParentsQuery,
+  tuitionPaymentsQuery,
+  tuitionStudentsQuery,
+  toEligibilityConfigFromSettings,
+  type TuitionInstallment,
+  type TuitionPayment,
+  type TuitionReminderTrackingSnapshot,
 } from './tuitionModel';
 
 export type TuitionReminderSettings = {
   enabled: boolean;
+  autoRemindersEnabled: boolean;
+  reminderStartAfterDays: number;
+  reminderRepeatEveryDays: number;
+  maxReminderCountBeforeWarning: number;
+  restrictAfterDays: number;
+  redWarningDurationDays: number;
+  upcomingDays: number;
+  /** @deprecated use reminderRepeatEveryDays */
   repeatEnabled: boolean;
+  /** @deprecated use reminderRepeatEveryDays */
   intervalHours: number;
   timesPerDay: number;
+  /** @deprecated use upcomingDays */
   daysBeforeEscalation: number;
+  /** @deprecated use redWarningDurationDays */
   level2Hours: number;
+  /** @deprecated use maxReminderCountBeforeWarning */
   level3AfterReminders: number;
 };
 
 export const DEFAULT_TUITION_REMINDER_SETTINGS: TuitionReminderSettings = {
   enabled: true,
+  autoRemindersEnabled: false,
+  reminderStartAfterDays: 25,
+  reminderRepeatEveryDays: 3,
+  maxReminderCountBeforeWarning: 3,
+  restrictAfterDays: 35,
+  redWarningDurationDays: 2,
+  upcomingDays: 7,
   repeatEnabled: false,
-  intervalHours: 24,
+  intervalHours: 72,
   timesPerDay: 1,
   daysBeforeEscalation: 7,
   level2Hours: 48,
-  level3AfterReminders: 5,
+  level3AfterReminders: 3,
 };
 
 export type EscalationLevel = 1 | 2 | 3 | 4;
@@ -70,15 +98,40 @@ export type ReminderAuditEntry = {
   sentByName?: string;
   senderEmail?: string;
   senderRole?: string;
+  senderUid?: string;
   sentFrom?: string;
-  channel: 'notification' | 'whatsapp_link' | 'bulk';
-  deliveryResult: 'sent' | 'skipped_dedup' | 'no_parent' | 'failed' | 'restored';
+  source?: string;
+  channel: 'notification' | 'whatsapp_link' | 'bulk' | 'automatic';
+  deliveryResult: 'sent' | 'skipped_dedup' | 'no_parent' | 'failed' | 'restored' | 'skipped_auto';
   escalationLevel?: EscalationLevel;
   amount?: number;
   dueDate?: string;
   messagePreview?: string;
+  skippedReason?: string;
+  sentAt?: ReturnType<typeof serverTimestamp>;
   createdAt: ReturnType<typeof serverTimestamp>;
 };
+
+function normalizeSettings(raw: Record<string, unknown> | undefined): TuitionReminderSettings {
+  const base = { ...DEFAULT_TUITION_REMINDER_SETTINGS };
+  if (!raw || typeof raw !== 'object') return base;
+  const merged = { ...base, ...raw } as TuitionReminderSettings;
+  if (merged.reminderRepeatEveryDays == null && merged.intervalHours) {
+    merged.reminderRepeatEveryDays = Math.max(1, Math.ceil(merged.intervalHours / 24));
+  }
+  if (merged.maxReminderCountBeforeWarning == null && merged.level3AfterReminders) {
+    merged.maxReminderCountBeforeWarning = merged.level3AfterReminders;
+  }
+  if (merged.upcomingDays == null && merged.daysBeforeEscalation) {
+    merged.upcomingDays = merged.daysBeforeEscalation;
+  }
+  if (merged.redWarningDurationDays == null && merged.level2Hours) {
+    merged.redWarningDurationDays = Math.max(1, Math.ceil(merged.level2Hours / 24));
+  }
+  return merged;
+}
+
+export { toEligibilityConfigFromSettings } from './tuitionModel';
 
 function normalizePhoneForWhatsApp(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -120,15 +173,16 @@ export async function getSchoolTuitionReminderSettings(
   const snap = await getDoc(doc(db, 'schools', schoolId));
   const raw = snap.data()?.tuitionReminderSettings;
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_TUITION_REMINDER_SETTINGS };
-  return { ...DEFAULT_TUITION_REMINDER_SETTINGS, ...raw };
+  return normalizeSettings(raw as Record<string, unknown>);
 }
 
 export async function saveSchoolTuitionReminderSettings(
   schoolId: string,
   settings: Partial<TuitionReminderSettings>,
 ): Promise<void> {
+  const current = await getSchoolTuitionReminderSettings(schoolId);
   await updateDoc(doc(db, 'schools', schoolId), {
-    tuitionReminderSettings: settings,
+    tuitionReminderSettings: { ...current, ...settings },
     updatedAt: serverTimestamp(),
   });
 }
@@ -195,6 +249,7 @@ async function saveTracking(record: TuitionTrackingRecord): Promise<void> {
 export async function logReminderAudit(entry: Omit<ReminderAuditEntry, 'createdAt'>): Promise<void> {
   await addDoc(collection(db, 'tuition_reminder_logs'), {
     ...entry,
+    sentAt: entry.sentAt || serverTimestamp(),
     createdAt: serverTimestamp(),
   });
 }
@@ -204,10 +259,13 @@ function computeEscalationLevel(
   delayDays: number,
   settings: TuitionReminderSettings,
 ): EscalationLevel {
-  if (reminderCount >= settings.level3AfterReminders && delayDays >= settings.daysBeforeEscalation) {
-    return 3;
-  }
-  if (delayDays >= Math.ceil(settings.level2Hours / 24)) return 2;
+  const maxBefore =
+    settings.maxReminderCountBeforeWarning ?? settings.level3AfterReminders ?? 3;
+  const restrictDays = settings.restrictAfterDays ?? 35;
+  if (reminderCount >= maxBefore && delayDays >= restrictDays) return 3;
+  const warningDays =
+    settings.redWarningDurationDays ?? Math.ceil((settings.level2Hours || 48) / 24);
+  if (delayDays >= warningDays || reminderCount >= maxBefore) return 2;
   return 1;
 }
 
@@ -217,18 +275,14 @@ export async function shouldSkipDuplicateReminder(
   installmentId: string | undefined,
   settings: TuitionReminderSettings,
 ): Promise<boolean> {
-  if (!settings.repeatEnabled) {
-    const tracking = await getTuitionTracking(schoolId, studentId, installmentId);
-    const last = tracking.lastReminderAt;
-    if (!last) return false;
-    const hoursSince = (Date.now() - last.getTime()) / (1000 * 60 * 60);
-    return hoursSince < settings.intervalHours;
-  }
   const tracking = await getTuitionTracking(schoolId, studentId, installmentId);
   const last = tracking.lastReminderAt;
   if (!last) return false;
-  const hoursSince = (Date.now() - last.getTime()) / (1000 * 60 * 60);
-  return hoursSince < settings.intervalHours / Math.max(1, settings.timesPerDay);
+  const repeatDays =
+    settings.reminderRepeatEveryDays ??
+    Math.max(1, Math.ceil((settings.intervalHours || 72) / 24));
+  const daysSince = (Date.now() - last.getTime()) / (1000 * 60 * 60 * 24);
+  return daysSince < repeatDays;
 }
 
 export async function applyParentEscalation(
@@ -248,7 +302,8 @@ export async function applyParentEscalation(
 
   if (level >= 2) {
     const until = new Date();
-    until.setHours(until.getHours() + settings.level2Hours);
+    const warningDays = settings.redWarningDurationDays ?? Math.ceil((settings.level2Hours || 48) / 24);
+    until.setDate(until.getDate() + warningDays);
     restrictions.tuitionWarningUntil = Timestamp.fromDate(until);
   }
   if (level >= 3) {
@@ -309,22 +364,25 @@ export async function sendTuitionReminderWithTracking(params: {
   senderRole?: string;
   sentFrom?: string;
   metadataSource?: string;
-  channel?: 'notification' | 'whatsapp_link' | 'bulk';
+  channel?: 'notification' | 'whatsapp_link' | 'bulk' | 'automatic';
   skipDedup?: boolean;
 }): Promise<'sent' | 'skipped_dedup' | 'no_parent' | 'failed'> {
   const { schoolId, student, installment, senderId } = params;
   const auditBase = {
     senderEmail: params.senderEmail,
     senderRole: params.senderRole,
+    senderUid: senderId,
     sentFrom: params.sentFrom,
-    dueDate:
-      installment.dueDate instanceof Date
-        ? installment.dueDate.toISOString()
-        : typeof installment.dueDate === 'string'
-          ? installment.dueDate
-          : undefined,
+    source: params.metadataSource,
   };
   if (student.schoolId && student.schoolId !== schoolId) return 'failed';
+
+  const dueDateIso =
+    installment.dueDate instanceof Date
+      ? installment.dueDate.toISOString()
+      : typeof installment.dueDate === 'string'
+        ? installment.dueDate
+        : undefined;
 
   const settings = await getSchoolTuitionReminderSettings(schoolId);
   if (!settings.enabled) return 'failed';
@@ -346,6 +404,8 @@ export async function sendTuitionReminderWithTracking(params: {
         channel: params.channel || 'notification',
         deliveryResult: 'skipped_dedup',
         amount: installment.amount,
+        dueDate: dueDateIso,
+        skippedReason: 'dedup_window',
         ...auditBase,
       });
       return 'skipped_dedup';
@@ -362,6 +422,8 @@ export async function sendTuitionReminderWithTracking(params: {
       channel: params.channel || 'notification',
       deliveryResult: 'no_parent',
       amount: installment.amount,
+      dueDate: dueDateIso,
+      skippedReason: 'no_linked_parent',
       ...auditBase,
     });
     return 'no_parent';
@@ -401,16 +463,23 @@ export async function sendTuitionReminderWithTracking(params: {
     type: 'tuition',
     schoolId,
     senderId,
+    senderName: params.senderName,
+    senderRole: params.senderRole,
     metadata: {
       ...reminderPayload.metadata,
       source: metadataSource,
       studentId: student.id,
       installmentId: installment.id,
       amount: installment.amount,
-      dueDate: auditBase.dueDate || dueLabel,
+      dueDate: dueDateIso || dueLabel,
       dedupKey,
+      routeTarget: 'tuition',
       escalationLevel,
       installmentAlert: true,
+      senderName: params.senderName,
+      senderEmail: params.senderEmail,
+      senderUid: senderId,
+      senderRole: params.senderRole,
     },
   });
 
@@ -424,6 +493,7 @@ export async function sendTuitionReminderWithTracking(params: {
       channel: params.channel || 'notification',
       deliveryResult: 'failed',
       amount: installment.amount,
+      dueDate: dueDateIso,
       ...auditBase,
     });
     return 'failed';
@@ -459,6 +529,7 @@ export async function sendTuitionReminderWithTracking(params: {
     deliveryResult: 'sent',
     escalationLevel,
     amount: installment.amount,
+    dueDate: dueDateIso,
     messagePreview: message.slice(0, 120),
     ...auditBase,
   });
@@ -502,4 +573,131 @@ export async function fetchReminderLogs(
       return tb - ta;
     })
     .slice(0, limitCount);
+}
+
+async function loadSchoolTuitionSnapshot(schoolId: string) {
+  const [studentsSnap, installmentsSnap, paymentsSnap, trackingSnap, parentsSnap] =
+    await Promise.all([
+      getDocs(tuitionStudentsQuery(schoolId)),
+      getDocs(tuitionInstallmentsQuery(schoolId)),
+      getDocs(tuitionPaymentsQuery(schoolId)),
+      getDocs(
+        query(collection(db, 'tuition_reminder_tracking'), where('schoolId', '==', schoolId)),
+      ),
+      getDocs(tuitionParentsQuery(schoolId)),
+    ]);
+
+  const students = studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const installments = installmentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as TuitionInstallment[];
+  const payments = paymentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as TuitionPayment[];
+
+  const tracking: Record<string, TuitionReminderTrackingSnapshot> = {};
+  trackingSnap.docs.forEach((d) => {
+    const data = d.data();
+    tracking[d.id] = {
+      reminderCount: data.reminderCount,
+      escalationLevel: data.escalationLevel,
+      parentStatus: data.parentStatus,
+      lastReminderAt: data.lastReminderAt?.toDate?.() ?? null,
+    };
+  });
+
+  const parents: Record<string, any> = {};
+  parentsSnap.docs.forEach((d) => {
+    parents[d.id] = { id: d.id, ...d.data() };
+  });
+
+  return { students, installments, payments, tracking, parents };
+}
+
+/** Automatic reminders — call from Cloud Scheduler via backend endpoint (not frontend timers). */
+export async function runAutomaticTuitionRemindersForSchool(
+  schoolId: string,
+  schoolName: string,
+): Promise<{ processed: number; sent: number; skipped: number; failed: number }> {
+  const settings = await getSchoolTuitionReminderSettings(schoolId);
+  if (!settings.enabled || !settings.autoRemindersEnabled) {
+    return { processed: 0, sent: 0, skipped: 0, failed: 0 };
+  }
+
+  const { students, installments, payments, tracking, parents } =
+    await loadSchoolTuitionSnapshot(schoolId);
+
+  const eligible = getEligibleTuitionReminderRows({
+    students,
+    installments,
+    payments,
+    settings: toEligibilityConfigFromSettings(settings),
+    tracking,
+    schoolId,
+    parents,
+  }).filter((row) => row.autoReminderEligible);
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const row of eligible) {
+    const student = row.student || students.find((s) => s.id === row.studentId);
+    const result = await sendTuitionReminderWithTracking({
+      schoolId,
+      schoolName,
+      student: student || { id: row.studentId, name: row.studentName },
+      installment: {
+        id: row.installmentId,
+        amount: row.amount,
+        dueDate: row.dueDate,
+      },
+      senderId: 'system_auto_tuition',
+      senderName: 'SchoolixIQ التذكير التلقائي',
+      senderRole: 'system',
+      sentFrom: 'automatic_tuition_reminder',
+      metadataSource: 'automatic_tuition_reminder',
+      channel: 'automatic',
+    });
+
+    if (result === 'sent') sent++;
+    else if (result === 'skipped_dedup') skipped++;
+    else if (result === 'no_parent') skipped++;
+    else failed++;
+  }
+
+  return { processed: eligible.length, sent, skipped, failed };
+}
+
+export async function fetchRestrictedParentAccounts(schoolId: string): Promise<
+  Array<{
+    parentId: string;
+    name: string;
+    email?: string;
+    escalationLevel?: number;
+    restrictedFeatures?: string[];
+  }>
+> {
+  const snap = await getDocs(tuitionParentsQuery(schoolId));
+  return snap.docs
+    .map((d) => {
+      const data = d.data();
+      const restrictions = data.privilegeRestrictions;
+      if (!restrictions) return null;
+      const level = restrictions.tuitionEscalationLevel ?? 0;
+      const hasWarning = Boolean(restrictions.tuitionWarningUntil);
+      if (!restrictions.parentPrivilegesRestricted && level < 2 && !hasWarning) {
+        return null;
+      }
+      return {
+        parentId: d.id,
+        name: data.displayName || data.name || 'ولي أمر',
+        email: data.email,
+        escalationLevel: level,
+        restrictedFeatures: restrictions.restrictedFeatures || [],
+      };
+    })
+    .filter(Boolean) as Array<{
+    parentId: string;
+    name: string;
+    email?: string;
+    escalationLevel?: number;
+    restrictedFeatures?: string[];
+  }>;
 }

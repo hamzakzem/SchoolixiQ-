@@ -151,7 +151,7 @@ async function appendStatusHistory(
 
 async function notifySchoolGuards(
   schoolId: string,
-  payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId'>,
+  payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId' | 'type'>,
 ) {
   const q = query(
     collection(db, 'users'),
@@ -162,13 +162,21 @@ async function notifySchoolGuards(
   const snap = await getDocs(q);
   const ids = snap.docs.map((d) => d.id);
   if (ids.length === 0) return;
-  await notificationService.sendToMultiple(ids, { ...payload, schoolId, type: 'system' });
+  await notificationService.sendToMultiple(ids, {
+    ...payload,
+    schoolId,
+    type: 'smart_gate',
+    metadata: {
+      ...(payload.metadata || {}),
+      routeTarget: 'smart_gate',
+    },
+  });
 }
 
 async function notifyClassTeachers(
   schoolId: string,
   classId: string,
-  payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId'>,
+  payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId' | 'type'>,
 ) {
   const q = query(
     collection(db, 'users'),
@@ -181,18 +189,29 @@ async function notifyClassTeachers(
   const ids = snap.docs
     .filter((d) => {
       const data = d.data();
+      const assignedIds = Array.isArray(data.assignedClassIds) ? data.assignedClassIds : [];
+      if (assignedIds.includes(classId)) return true;
       const assigned =
         data.assignedClassId || data.primaryClassId || data.classId || data.preferredClassId;
       return assigned === classId;
     })
     .map((d) => d.id);
   if (ids.length === 0) return;
-  await notificationService.sendToMultiple(ids, { ...payload, schoolId, type: 'system' });
+  await notificationService.sendToMultiple(ids, {
+    ...payload,
+    schoolId,
+    type: 'smart_gate',
+    metadata: {
+      ...(payload.metadata || {}),
+      routeTarget: 'dismissal',
+      classId,
+    },
+  });
 }
 
 async function notifySchoolAdmins(
   schoolId: string,
-  payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId'>,
+  payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId' | 'type'>,
 ) {
   const q = query(
     collection(db, 'users'),
@@ -204,7 +223,15 @@ async function notifySchoolAdmins(
   const snap = await getDocs(q);
   const ids = snap.docs.map((d) => d.id);
   if (ids.length === 0) return;
-  await notificationService.sendToMultiple(ids, { ...payload, schoolId, type: 'system' });
+  await notificationService.sendToMultiple(ids, {
+    ...payload,
+    schoolId,
+    type: 'smart_gate',
+    metadata: {
+      ...(payload.metadata || {}),
+      routeTarget: 'dismissal_gate',
+    },
+  });
 }
 
 export async function findActiveDismissalForStudent(
@@ -380,8 +407,12 @@ export async function teacherUpdateDismissalStatus(
       title,
       message,
       schoolId,
-      type: 'system',
-      metadata: { sourceId: requestId, dismissalId: requestId },
+      type: 'smart_gate',
+      metadata: {
+        sourceId: requestId,
+        dismissalId: requestId,
+        routeTarget: 'dismissal',
+      },
     }),
   ]);
 }
@@ -455,7 +486,7 @@ export async function guardCompleteDismissal(
       message: `تم تسليم ${request.studentName} بنجاح من البوابة`,
       schoolId: request.schoolId,
       type: 'system',
-      metadata: { sourceId: request.id, dismissalId: request.id },
+      metadata: { sourceId: request.id, dismissalId: request.id, routeTarget: 'dismissal' },
     }),
     notifySchoolAdmins(request.schoolId, {
       title: 'تسليم مكتمل',

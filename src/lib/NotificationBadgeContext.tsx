@@ -183,6 +183,15 @@ export function NotificationBadgeProvider({ children }: { children: React.ReactN
     };
   }, [visible]);
 
+  useEffect(() => {
+    if (!loading) {
+      console.info('[Notifications] BADGE_UPDATE', {
+        totalUnread,
+        tabBadges,
+      });
+    }
+  }, [loading, totalUnread, tabBadges]);
+
   const value = useMemo(
     () => ({ totalUnread, categoryUnread, tabBadges, loading }),
     [totalUnread, categoryUnread, tabBadges, loading],

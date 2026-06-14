@@ -7,12 +7,25 @@ import firebaseConfig from '../../firebase-applet-config.json';
 let webMessaging: ReturnType<typeof getMessaging> | null = null;
 let currentWebToken: string | null = null;
 
-function getVapidKey(): string | undefined {
+function readVapidKey(): string | undefined {
+  const env = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
   return (
-    (import.meta as any).env?.VITE_FCM_VAPID_KEY ||
+    env.env?.VITE_FCM_VAPID_KEY ||
+    env.env?.VITE_FIREBASE_VAPID_KEY ||
     (typeof localStorage !== 'undefined' ? localStorage.getItem('VITE_FCM_VAPID_KEY') : null) ||
     undefined
-  ) as string | undefined;
+  );
+}
+
+export function isWebPushConfigured(): boolean {
+  return Boolean(readVapidKey()?.trim());
+}
+
+export function getWebPushConfigWarning(isArabic: boolean): string | null {
+  if (isWebPushConfigured()) return null;
+  return isArabic
+    ? 'مفتاح VITE_FCM_VAPID_KEY غير مُعد — الإشعارات داخل التطبيق تعمل، لكن push خارج المتصفح لن يعمل حتى إضافة المفتاح في إعدادات البناء.'
+    : 'VITE_FCM_VAPID_KEY is not configured — in-app notifications work, but background web push requires the VAPID key in build env.';
 }
 
 function getDeviceId(): string {
@@ -32,16 +45,16 @@ export async function registerWebPushNotifications(userId: string): Promise<stri
   try {
     const supported = await isSupported();
     if (!supported) {
-      console.warn('FCM web messaging not supported in this browser');
+      console.warn('[Notifications] PUSH_TOKEN_REGISTERED skipped — FCM not supported');
       return null;
     }
 
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return null;
 
-    const vapidKey = getVapidKey();
+    const vapidKey = readVapidKey();
     if (!vapidKey) {
-      console.warn('VITE_FCM_VAPID_KEY not configured — web push token unavailable');
+      console.warn('[Notifications] PUSH_TOKEN_REGISTERED blocked — VITE_FCM_VAPID_KEY missing');
       return null;
     }
 
@@ -71,8 +84,14 @@ export async function registerWebPushNotifications(userId: string): Promise<stri
       }),
     });
 
+    console.info('[Notifications] PUSH_TOKEN_REGISTERED', {
+      platform: 'web',
+      userId,
+      tokenPrefix: token.slice(0, 12),
+    });
+
     onMessage(webMessaging, (payload) => {
-      console.info('[FCM foreground]', payload);
+      console.info('[Notifications] FCM foreground', payload?.data?.type || payload?.notification?.title);
       if (payload.notification?.title) {
         new Notification(payload.notification.title, {
           body: payload.notification.body,
@@ -84,7 +103,7 @@ export async function registerWebPushNotifications(userId: string): Promise<stri
 
     return token;
   } catch (err) {
-    console.error('Web push registration failed:', err);
+    console.error('[Notifications] PUSH_TOKEN_REGISTERED error', err);
     return null;
   }
 }
@@ -103,8 +122,9 @@ export async function unregisterWebPushToken(userId: string): Promise<void> {
     });
     localStorage.removeItem('schoolix_fcm_token_web');
     currentWebToken = null;
+    console.info('[Notifications] PUSH_TOKEN_REGISTERED removed', { platform: 'web', userId });
   } catch (err) {
-    console.error('Failed to unregister web push token:', err);
+    console.error('[Notifications] PUSH_TOKEN_REGISTERED remove failed', err);
   }
 }
 

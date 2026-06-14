@@ -144,7 +144,7 @@ export default function Homework() {
               message: `${newHomework.content.substring(0, 50)}...`,
               type: 'homework',
               schoolId: profile.schoolId,
-              metadata: { sourceId: homeworkRef.id },
+              metadata: { sourceId: homeworkRef.id, routeTarget: 'homework' },
             });
           } catch (e) {
             console.error('Failed to send notification', e);

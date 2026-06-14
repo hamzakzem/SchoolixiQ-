@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { NotificationCenter } from '../components/NotificationCenter';
 import { useNotificationBadges } from '../lib/NotificationBadgeContext';
+import { useNotificationRouteRedirect } from '../lib/useNotificationRouteRedirect';
 import { toast } from 'react-hot-toast';
 import {
   subscribeSchoolDismissals,
@@ -40,6 +41,21 @@ export default function GuardDashboard() {
     'dismissal_smart_gate',
     schoolData?.packagePermissions,
   );
+  const [requests, setRequests] = useState<DismissalRequest[]>([]);
+  const [search, setSearch] = useState('');
+  const [tokenInput, setTokenInput] = useState('');
+  const [verified, setVerified] = useState<DismissalRequest | null>(null);
+  const [confirmReady, setConfirmReady] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { totalUnread } = useNotificationBadges();
+  useNotificationRouteRedirect('guard', () => {});
+
+  useEffect(() => {
+    if (!profile?.schoolId || !smartGateEnabled) return;
+    return subscribeSchoolDismissals(profile.schoolId, setRequests);
+  }, [profile?.schoolId, smartGateEnabled]);
 
   if (!smartGateEnabled) {
     return (
@@ -63,20 +79,6 @@ export default function GuardDashboard() {
       </div>
     );
   }
-  const [requests, setRequests] = useState<DismissalRequest[]>([]);
-  const [search, setSearch] = useState('');
-  const [tokenInput, setTokenInput] = useState('');
-  const [verified, setVerified] = useState<DismissalRequest | null>(null);
-  const [confirmReady, setConfirmReady] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const { totalUnread } = useNotificationBadges();
-
-  useEffect(() => {
-    if (!profile?.schoolId) return;
-    return subscribeSchoolDismissals(profile.schoolId, setRequests);
-  }, [profile?.schoolId]);
 
   const activeRequests = useMemo(
     () =>

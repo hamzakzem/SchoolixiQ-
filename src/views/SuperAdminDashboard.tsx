@@ -21,6 +21,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 import { useNotificationBadges } from "../lib/NotificationBadgeContext";
+import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import {
   subscribeSuperAdminFirestore,
   logSuperAdminFirestoreSetup,
@@ -220,6 +221,7 @@ export default function SuperAdminDashboard() {
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const { totalUnread } = useNotificationBadges();
+  useNotificationRouteRedirect(normalizeDashboardRole(undefined, profile?.role), setActiveTab);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [activeRequestSource, setActiveRequestSource] = useState<string | null>(

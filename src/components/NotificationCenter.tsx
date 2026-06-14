@@ -70,7 +70,12 @@ import {
   TIME_GROUP_LABELS,
   type NotificationCategoryId,
 } from "../lib/notificationCategories";
-import { registerWebPushNotifications, getStoredWebPushToken } from "../lib/webPushService";
+import {
+  normalizeDashboardRole,
+  resolveNotificationTab,
+  getNotificationActionLabel,
+} from "../lib/notificationRouting";
+import { registerWebPushNotifications, getStoredWebPushToken, isWebPushConfigured, getWebPushConfigWarning } from "../lib/webPushService";
 
 type DashboardRole =
   | "parent"
@@ -80,137 +85,6 @@ type DashboardRole =
   | "assistant"
   | "superadmin"
   | "super_admin";
-
-/** Normalize stored notification fields into a routing category. */
-function resolveNotificationCategory(notification: Record<string, unknown>): string {
-  const metadata =
-    notification.metadata && typeof notification.metadata === "object"
-      ? (notification.metadata as Record<string, unknown>)
-      : {};
-
-  const routeHints = [
-    notification.route,
-    notification.link,
-    notification.targetType,
-    metadata.route,
-    metadata.link,
-    metadata.targetType,
-  ];
-  for (const hint of routeHints) {
-    if (typeof hint === "string" && hint.trim()) {
-      return hint.trim().toLowerCase();
-    }
-  }
-
-  const rawType = String(notification.type || "").toLowerCase();
-
-  if (
-    rawType === "system" &&
-    (metadata.conversationId ||
-      metadata.chat === true ||
-      metadata.senderId ||
-      String(notification.title || "").includes("رسالة") ||
-      String(notification.title || "").toLowerCase().includes("message"))
-  ) {
-    return "chat";
-  }
-
-  if (metadata.installmentAlert || metadata.installmentId) {
-    return "payment";
-  }
-
-  if (
-    metadata.orderId ||
-    metadata.store === true ||
-    metadata.market === true ||
-    rawType === "inventory" ||
-    rawType === "order" ||
-    rawType === "market" ||
-    rawType === "store"
-  ) {
-    return "market";
-  }
-
-  return rawType;
-}
-
-function normalizeDashboardRole(
-  userRole?: string,
-  profileRole?: string,
-): DashboardRole | "" {
-  const role = (userRole || profileRole || "").toLowerCase();
-  if (role === "super_admin") return "superadmin";
-  return role as DashboardRole;
-}
-
-/** Map notification category + role to an existing dashboard tab id, or null to stay put. */
-function resolveNotificationTab(
-  notification: Record<string, unknown>,
-  role: DashboardRole | "",
-): string | null {
-  const category = resolveNotificationCategory(notification);
-  const isSchoolAdmin =
-    role === "admin" || role === "staff" || role === "assistant";
-
-  switch (category) {
-    case "homework":
-      if (role === "superadmin") return null;
-      return "homework";
-
-    case "grade":
-    case "grades":
-      if (role === "superadmin") return null;
-      return "grades";
-
-    case "payment":
-    case "tuition":
-    case "installment":
-      if (role === "parent" || isSchoolAdmin) return "tuition";
-      if (role === "teacher") return "home";
-      return null;
-
-    case "behavior":
-      if (role === "superadmin") return null;
-      return "behavior";
-
-    case "announcement":
-      if (isSchoolAdmin) return "announcements";
-      if (role === "parent" || role === "teacher") return "home";
-      if (role === "superadmin") return "schools";
-      return null;
-
-    case "message":
-    case "chat":
-      return "chat";
-
-    case "attendance":
-      if (isSchoolAdmin) return "attendance";
-      if (role === "parent" || role === "teacher") return "home";
-      return null;
-
-    case "report":
-    case "evaluation":
-    case "evaluation_reports":
-      if (isSchoolAdmin) return "evaluation_reports";
-      if (role === "parent" || role === "teacher") return "reports";
-      return null;
-
-    case "market":
-    case "store":
-    case "inventory":
-    case "order":
-      if (role === "parent" || role === "teacher" || isSchoolAdmin) {
-        return "market";
-      }
-      return null;
-
-    case "system":
-      return null;
-
-    default:
-      return null;
-  }
-}
 
 interface NotificationCenterProps {
   onClose: () => void;
@@ -244,10 +118,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   // Simulated push states
   const [webPushStatus, setWebPushStatus] = useState<'default' | 'granted' | 'denied'>('default');
   const [deviceToken, setDeviceToken] = useState<string>('');
-  
-  const isArabic = profile?.language === 'ar';
+  const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
 
-  // Check notification permission upon opening
+  const isArabic = profile?.language === 'ar';
+  const webPushConfigured = isWebPushConfigured();
+  const webPushWarning = getWebPushConfigWarning(isArabic);
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setWebPushStatus(Notification.permission);
@@ -323,36 +199,79 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     schoolId: profile?.schoolId,
   };
 
-  // 1. Listen to user notifications
+  // 1. Listen to user notifications (includes super_admin inbox for super admins)
   useEffect(() => {
     if (!user?.uid) return;
 
-    const notifQuery = query(
-      collection(db, "notifications"),
-      where("userId", "==", user.uid),
-    );
+    const role = normalizeDashboardRole(userRole, profile?.role);
+    const isSuperAdmin = role === 'superadmin';
+    const schoolId = profile?.schoolId;
 
-    const unsub = onSnapshot(notifQuery, (snap) => {
-      const items = filterNotificationsForUser(
-        snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate
-            ? doc.data().createdAt.toDate()
-            : new Date(),
-        })),
-        viewerContext,
-      ).sort(
+    type InboxQuery = { name: string; q: ReturnType<typeof query> };
+    const queries: InboxQuery[] = [
+      {
+        name: 'inbox_user',
+        q: query(collection(db, 'notifications'), where('userId', '==', user.uid)),
+      },
+    ];
+
+    if (isSuperAdmin) {
+      queries.push({
+        name: 'inbox_super_admin',
+        q: query(collection(db, 'notifications'), where('userId', '==', 'super_admin')),
+      });
+    } else if (schoolId) {
+      queries.push({
+        name: 'inbox_system',
+        q: query(
+          collection(db, 'notifications'),
+          where('userId', '==', user.uid),
+          where('schoolId', '==', 'system'),
+        ),
+      });
+    }
+
+    const snapshotByQuery = new Map<string, any[]>();
+
+    const mergeAndSet = () => {
+      const merged = new Map<string, any>();
+      for (const items of snapshotByQuery.values()) {
+        for (const item of items) merged.set(item.id, item);
+      }
+      const items = filterNotificationsForUser(Array.from(merged.values()), viewerContext).sort(
         (a: any, b: any) =>
-          (b.createdAt?.seconds || b.createdAt?.getTime?.() || 0) -
-          (a.createdAt?.seconds || a.createdAt?.getTime?.() || 0),
+          (b.createdAt?.getTime?.() || b.createdAt?.seconds * 1000 || 0) -
+          (a.createdAt?.getTime?.() || a.createdAt?.seconds * 1000 || 0),
       );
       setNotifications(items);
-    }, (err) => {
-      console.error("Notification listener failed: ", err);
-    });
+      setLoadingNotifications(false);
+    };
 
-    return () => unsub();
+    setLoadingNotifications(true);
+    const unsubs = queries.map(({ name, q }) =>
+      onSnapshot(
+        q,
+        (snap) => {
+          snapshotByQuery.set(
+            name,
+            snap.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+              createdAt: docSnap.data().createdAt?.toDate
+                ? docSnap.data().createdAt.toDate()
+                : new Date(),
+            })),
+          );
+          mergeAndSet();
+        },
+        (err) => {
+          console.error('[Notifications] inbox listener failed:', err);
+          setLoadingNotifications(false);
+        },
+      ),
+    );
+
+    return () => unsubs.forEach((u) => u());
   }, [user?.uid, profile?.schoolId, userRole, profile?.role]);
 
   // 2. Fetch scoped delivery analytics for the current school (admins only)
@@ -504,17 +423,35 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     playCategorizedSound(testCategory, soundSettings);
   };
 
-  const handleNotificationClick = async (n: any) => {
+  const handleNotificationClick = async (n: any, openDetailsOnly = false) => {
     await handleMarkOneRead(n.id, n.read, n);
+
+    if (openDetailsOnly) {
+      setSelectedNotification(n);
+      return;
+    }
 
     const role = normalizeDashboardRole(userRole, profile?.role);
     const targetTab = resolveNotificationTab(n, role);
 
     if (targetTab && activeTabSetter) {
       activeTabSetter(targetTab);
+      onClose();
+      return;
     }
 
-    onClose();
+    setSelectedNotification(n);
+  };
+
+  const handleNotificationAction = async (n: any) => {
+    const role = normalizeDashboardRole(userRole, profile?.role);
+    const targetTab = resolveNotificationTab(n, role);
+    await handleMarkOneRead(n.id, n.read, n);
+    if (targetTab && activeTabSetter) {
+      activeTabSetter(targetTab);
+      setSelectedNotification(null);
+      onClose();
+    }
   };
 
   // Admin delivery simulation tool
@@ -571,7 +508,17 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     return groups;
   }, [filteredNotifs]);
 
-  const renderNotificationCard = (n: any) => (
+  const renderNotificationCard = (n: any) => {
+    const actionLabel = getNotificationActionLabel(n, isArabic);
+    const metadata =
+      n.metadata && typeof n.metadata === 'object' ? n.metadata : {};
+    const studentName =
+      typeof metadata.studentName === 'string' ? metadata.studentName : '';
+    const senderName =
+      n.senderName ||
+      (typeof metadata.senderName === 'string' ? metadata.senderName : '');
+
+    return (
     <div
       key={n.id}
       onClick={() => handleNotificationClick(n)}
@@ -603,6 +550,33 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-semibold break-words">
           {n.message}
         </p>
+        {(senderName || studentName) && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {senderName ? (
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                {isArabic ? 'المرسل:' : 'From:'} {senderName}
+              </span>
+            ) : null}
+            {studentName ? (
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                {isArabic ? 'الطالب:' : 'Student:'} {studentName}
+              </span>
+            ) : null}
+          </div>
+        )}
+        {actionLabel && resolveNotificationTab(n, normalizeDashboardRole(userRole, profile?.role)) ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNotificationAction(n);
+            }}
+            className="mt-2 inline-flex items-center gap-1 text-[11px] font-black text-indigo-600 hover:text-indigo-800"
+          >
+            {actionLabel}
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        ) : null}
       </div>
       <div className="shrink-0 self-center flex items-center gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
         <button
@@ -614,7 +588,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         </button>
       </div>
     </div>
-  );
+    );
+  };
 
   return createPortal(
     <div className="fixed inset-0 bg-slate-950/60 dark:bg-slate-950/85 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ zIndex: 9999 }}>
@@ -736,10 +711,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                         {isArabic ? "رمز الجهاز النشط (Active Token):" : "Active Device Token:"} {deviceToken}
                       </div>
                     )}
+                    {webPushWarning && (
+                      <div className="mt-3 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                        {webPushWarning}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="shrink-0">
-                  {webPushStatus === 'granted' ? (
+                  {!webPushConfigured ? (
+                    <span className="shrink-0 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-xl">
+                      {isArabic ? "VAPID غير مُعد" : "VAPID missing"}
+                    </span>
+                  ) : webPushStatus === 'granted' ? (
                     <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20 px-3.5 py-2 rounded-xl">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                       {isArabic ? "مفعل ونشط" : "Granted & Enabled"}
@@ -1071,6 +1055,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
               {/* Grid content feed list */}
               {filteredNotifs.length === 0 ? (
+                loadingNotifications ? (
+                  <div className="h-[45vh] flex flex-col items-center justify-center text-slate-450 space-y-4 p-10">
+                    <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
+                    <p className="font-bold text-slate-600">{isArabic ? "جاري تحميل الإشعارات..." : "Loading notifications..."}</p>
+                  </div>
+                ) : (
                 <div className="h-[45vh] flex flex-col items-center justify-center text-slate-450 space-y-4 p-10 select-none">
                   <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-850 flex items-center justify-center text-slate-300">
                     <VolumeX className="w-8 h-8" />
@@ -1084,6 +1074,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     </p>
                   </div>
                 </div>
+                )
               ) : (
                 <div className="space-y-5 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
                   {(['today', 'yesterday', 'older'] as const).map((groupKey) =>
@@ -1103,6 +1094,34 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         </div>
 
         {/* Global Footer banner */}
+        {selectedNotification && (
+          <div className="absolute inset-0 z-[110] bg-slate-950/50 flex items-end sm:items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <h3 className="font-black text-lg text-slate-900 dark:text-white">{selectedNotification.title}</h3>
+                <button onClick={() => setSelectedNotification(null)} className="p-2 rounded-full hover:bg-slate-100">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-sm text-slate-600 dark:text-slate-300 font-semibold mb-4">{selectedNotification.message}</p>
+              <div className="flex flex-wrap gap-2 mb-4 text-[10px] font-bold text-slate-500">
+                <span>{getCategoryLabel(selectedNotification)}</span>
+                <span>•</span>
+                <span>{selectedNotification.createdAt?.toLocaleString?.() || ''}</span>
+              </div>
+              {getNotificationActionLabel(selectedNotification, isArabic) && (
+                <button
+                  type="button"
+                  onClick={() => handleNotificationAction(selectedNotification)}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm"
+                >
+                  {getNotificationActionLabel(selectedNotification, isArabic)}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400 bg-slate-50/50 dark:bg-slate-900/50 select-none shrink-0 font-bold">
           <span className="flex items-center gap-1.5">
             <Wifi className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />

@@ -29,6 +29,15 @@ export interface UserProfile {
   preferredSubject?: string;
   permissions?: Record<string, boolean>;
   salary?: number;
+  privilegeRestrictions?: {
+    tuitionEscalationLevel?: number;
+    tuitionEscalationUpdatedAt?: unknown;
+    tuitionWarningUntil?: { toDate?: () => Date; seconds?: number } | null;
+    parentPrivilegesRestricted?: boolean;
+    restrictedFeatures?: string[];
+    restoredAt?: unknown;
+    restoredBy?: string;
+  };
 }
 
 export interface School {

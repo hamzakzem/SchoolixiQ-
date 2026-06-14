@@ -1340,6 +1340,55 @@ async function startServer() {
     }
   });
 
+  // Cloud Scheduler: POST /api/internal/tuition-reminders/run with header X-Cron-Secret
+  // Processes schools where tuitionReminderSettings.autoRemindersEnabled === true.
+  // Full eligibility logic lives in src/lib/tuitionReminderService.ts (runAutomaticTuitionRemindersForSchool).
+  app.post('/api/internal/tuition-reminders/run', express.json(), async (req: any, res: any) => {
+    const secret = process.env.TUITION_CRON_SECRET || process.env.CRON_SECRET;
+    if (!secret || req.headers['x-cron-secret'] !== secret) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    try {
+      const db = getDb();
+      const targetSchoolId = req.body?.schoolId as string | undefined;
+      let schoolDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+      if (targetSchoolId) {
+        const snap = await db.collection('schools').doc(targetSchoolId).get();
+        if (snap.exists) schoolDocs = [snap as any];
+      } else {
+        const snap = await db.collection('schools').where('status', '==', 'active').limit(200).get();
+        schoolDocs = snap.docs;
+      }
+
+      const scheduled: Array<{ schoolId: string; autoEnabled: boolean }> = [];
+      for (const doc of schoolDocs) {
+        const settings = doc.data()?.tuitionReminderSettings || {};
+        scheduled.push({
+          schoolId: doc.id,
+          autoEnabled: Boolean(settings.autoRemindersEnabled && settings.enabled !== false),
+        });
+      }
+
+      res.json({
+        success: true,
+        message:
+          'Scheduler endpoint ready. Deploy Cloud Scheduler (daily) POST with X-Cron-Secret. ' +
+          'Automatic sends execute via runAutomaticTuitionRemindersForSchool (Firestore client) ' +
+          'or extend this endpoint with firebase-admin send pipeline.',
+        schoolsChecked: scheduled.length,
+        autoEnabledSchools: scheduled.filter((s) => s.autoEnabled).map((s) => s.schoolId),
+        setupRequired: [
+          'Set TUITION_CRON_SECRET on Cloud Run',
+          'Cloud Scheduler → POST /api/internal/tuition-reminders/run',
+          'Enable autoRemindersEnabled per school in Tuition Reminders settings',
+        ],
+      });
+    } catch (error: any) {
+      console.error('[TuitionCron] error', error);
+      res.status(500).json({ success: false, error: error.message || 'Cron handler failed' });
+    }
+  });
+
   // Global API 404 handler - MUST be before Vite middleware
   app.all('/api/*', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -1407,7 +1456,7 @@ async function startServer() {
     // START FCM BACKGROUND PUSH DISPATCH LISTENER
     try {
       const db = getDb();
-      console.log('[FCM RUNTIME] Active notification-to-push FCM gateway initialized. Listening for school events...');
+      console.log('[Notifications] SEND_START FCM gateway initialized');
       
       db.collection('notifications')
         .onSnapshot(snapshot => {
@@ -1415,7 +1464,7 @@ async function startServer() {
           snapshot.docChanges().forEach(async change => {
             if (change.type === 'added') {
               const notif = change.doc.data();
-              if (notif.pushDispatched === true) return;
+              if (notif.pushDispatched === true || notif.pushDelivery?.status === 'sent') return;
 
               const userId = notif.userId;
               const notifSchoolId = String(notif.schoolId || '');
@@ -1423,10 +1472,16 @@ async function startServer() {
               const message = notif.message || notif.content || '';
               const type = notif.type || 'system';
               const notifId = change.doc.id;
+              const routeTarget =
+                notif.routeTarget ||
+                notif.metadata?.routeTarget ||
+                notif.metadata?.route ||
+                type;
               
               if (!userId) return;
               
               try {
+                console.log('[Notifications] SEND_START', { notifId, userId, type, schoolId: notifSchoolId });
                 let userTokens: string[] = [];
                 if (userId === 'super_admin') {
                   // Notify all super admins
@@ -1461,9 +1516,11 @@ async function startServer() {
                 userTokens = Array.from(new Set(userTokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
                 
                 if (userTokens.length > 0) {
-                  console.log(`[FCM PUSH] Event "${title}" matched for user "${userId}". Dispatching to ${userTokens.length} active devices...`);
-                  
-                  // Build payloads for each token
+                  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+                  const clickUrl = appUrl
+                    ? `${appUrl}/?tab=${encodeURIComponent(routeTarget)}`
+                    : `/?tab=${encodeURIComponent(routeTarget)}`;
+
                   const messages = userTokens.map(token => ({
                     token,
                     notification: {
@@ -1475,8 +1532,11 @@ async function startServer() {
                       schoolId: String(notif.schoolId || ''),
                       userId: String(userId),
                       notificationId: String(notifId),
-                      route: String(notif.metadata?.route || type),
+                      routeTarget: String(routeTarget),
+                      route: String(routeTarget),
+                      url: clickUrl,
                     },
+                    webpush: appUrl ? { fcmOptions: { link: clickUrl } } : undefined,
                     android: {
                       priority: 'high' as const,
                       notification: {
@@ -1494,10 +1554,22 @@ async function startServer() {
                   }));
                   
                   const response = await admin.messaging().sendEach(messages);
-                  console.log(`[FCM SUCCESS] Delivered push successfully. Succeeded: ${response.successCount}, Failed: ${response.failureCount}`);
+                  console.log('[Notifications] SEND_SUCCESS', {
+                    notifId,
+                    successCount: response.successCount,
+                    failureCount: response.failureCount,
+                  });
 
-                  // Mark dispatched + prune dead tokens
-                  await change.doc.ref.update({ pushDispatched: true, pushDispatchedAt: admin.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+                  await change.doc.ref.set({
+                    pushDispatched: true,
+                    pushDispatchedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    pushDelivery: {
+                      status: response.failureCount === 0 ? 'sent' : 'partial',
+                      successCount: response.successCount,
+                      failureCount: response.failureCount,
+                      at: admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                  }, { merge: true }).catch(() => {});
 
                   if (response.failureCount > 0 && userId !== 'super_admin') {
                     const deadTokens: string[] = [];
