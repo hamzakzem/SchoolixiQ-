@@ -32,6 +32,8 @@ interface MobileNavigationDockProps {
   isRtl?: boolean;
   onLogout?: () => void;
   logoutLabel?: string;
+  /** Light = high-contrast white menu (parent portal). Dark = navy hub (default). */
+  menuSurface?: "dark" | "light";
 }
 
 export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
@@ -46,7 +48,9 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   isRtl = true,
   onLogout,
   logoutLabel,
+  menuSurface = "dark",
 }) => {
+  const isLightMenu = menuSurface === "light";
   const [showQuickAccess, setShowQuickAccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -81,6 +85,36 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
     }
     onLogout?.();
   };
+
+  const menuItemClasses = (isActive: boolean) => {
+    if (isActive) {
+      return "bg-[#D4A64A] text-[#0B2345] border-[#D4A64A] shadow-lg shadow-[#D4A64A]/10";
+    }
+    if (isLightMenu) {
+      return "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600";
+    }
+    return "bg-slate-900/50 hover:bg-[#0B2345]/50 border-slate-800/80 hover:border-slate-700/80 text-slate-300 hover:text-white";
+  };
+
+  const menuIconClasses = (isActive: boolean) => {
+    if (isActive) {
+      return "bg-[#0B2345] text-[#D4A64A]";
+    }
+    if (isLightMenu) {
+      return "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/30 group-hover:text-[#D4A64A] transition-all";
+    }
+    return "bg-[#0B2345] text-slate-400 group-hover:text-white group-hover:bg-[#D4A64A] group-hover:text-[#0B2345] transition-all";
+  };
+
+  const menuLabelClasses = (isActive: boolean) => {
+    if (isActive) return "text-[#0B2345]";
+    if (isLightMenu) return "text-slate-800 dark:text-slate-100";
+    return "text-white";
+  };
+
+  const menuPanelShellClasses = isLightMenu
+    ? "bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
+    : "bg-[#0B2345] dark:bg-slate-950 border-t border-[#D4A64A]/30 text-white";
 
   return (
     <>
@@ -262,24 +296,39 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
             {/* Sliding Panel */}
             <motion.div
               {...drawerPanelProps(true)}
-              className="absolute bottom-0 inset-x-0 bg-[#0B2345] dark:bg-slate-950 border-t border-[#D4A64A]/30 rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] text-white overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+20px)]"
+              className={`absolute bottom-0 inset-x-0 rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+20px)] ${menuPanelShellClasses}`}
             >
               {/* Header block with pull pill */}
               <div className="p-6 pb-3 shrink-0 relative flex flex-col items-center">
-                <div className="w-12 h-1.5 bg-slate-500/30 rounded-full mb-5 cursor-pointer hover:bg-slate-500/50" onClick={() => setShowQuickAccess(false)} />
+                <div
+                  className={`w-12 h-1.5 rounded-full mb-5 cursor-pointer ${
+                    isLightMenu
+                      ? "bg-slate-200 hover:bg-slate-300"
+                      : "bg-slate-500/30 hover:bg-slate-500/50"
+                  }`}
+                  onClick={() => setShowQuickAccess(false)}
+                />
                 <div className="w-full flex items-center justify-between" dir={isRtl ? "rtl" : "ltr"}>
                   <div>
-                    <h3 className="text-xl font-black text-white font-display tracking-tight flex items-center gap-2">
+                    <h3
+                      className={`text-xl font-black font-display tracking-tight flex items-center gap-2 ${
+                        isLightMenu ? "text-slate-800 dark:text-slate-100" : "text-white"
+                      }`}
+                    >
                       <Grid className="text-[#D4A64A] w-5 h-5" />
                       <span>{isRtl ? "بوابة الصلاحيات والوصول السريع" : "Quick Access Gateway"}</span>
                     </h3>
-                    <p className="text-slate-400 text-xs mt-0.5">
+                    <p className={`text-xs mt-0.5 ${isLightMenu ? "text-slate-500" : "text-slate-400"}`}>
                       {isRtl ? "الوصول السريع والآمن لكافة أقسام المنصة" : "Secure quick-access portal to all components"}
                     </p>
                   </div>
                   <button
                     onClick={() => setShowQuickAccess(false)}
-                    className="w-10 h-10 bg-slate-800/60 text-slate-300 hover:text-white rounded-full flex items-center justify-center border border-slate-700/50 hover:bg-slate-800 transition-all active:scale-95"
+                    className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all active:scale-95 ${
+                      isLightMenu
+                        ? "bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 border-slate-200"
+                        : "bg-slate-800/60 text-slate-300 hover:text-white border-slate-700/50 hover:bg-slate-800"
+                    }`}
                   >
                     <X size={18} />
                   </button>
@@ -287,18 +336,25 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
 
                 {/* Instant Filter Search input */}
                 <div className="w-full mt-4 relative" dir={isRtl ? "rtl" : "ltr"}>
-                  <Search className={`absolute top-1/2 -translate-y-1/2 text-slate-400 ${isRtl ? "right-4" : "left-4"}`} size={16} />
+                  <Search
+                    className={`absolute top-1/2 -translate-y-1/2 ${isLightMenu ? "text-slate-400" : "text-slate-400"} ${isRtl ? "right-4" : "left-4"}`}
+                    size={16}
+                  />
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder={isRtl ? "البحث عن صلاحية أو قسم معين..." : "Search permissions & details..."}
-                    className={`w-full h-11 bg-slate-900/60 rounded-xl ${isRtl ? "pr-11 pl-4" : "pl-11 pr-4"} text-sm focus:outline-none focus:ring-1 focus:ring-[#D4A64A] text-white placeholder-slate-500 border border-slate-800/80`}
+                    className={`w-full h-11 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#D4A64A] border ${
+                      isLightMenu
+                        ? `bg-slate-50 text-slate-800 placeholder-slate-400 border-slate-200 ${isRtl ? "pr-11 pl-4" : "pl-11 pr-4"}`
+                        : `bg-slate-900/60 text-white placeholder-slate-500 border-slate-800/80 ${isRtl ? "pr-11 pl-4" : "pl-11 pr-4"}`
+                    }`}
                   />
                   {searchTerm && (
                     <button
                       onClick={() => setSearchTerm("")}
-                      className={`absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-white ${isRtl ? "left-4" : "right-4"}`}
+                      className={`absolute top-1/2 -translate-y-1/2 hover:text-slate-800 ${isLightMenu ? "text-slate-400" : "text-slate-400 hover:text-white"} ${isRtl ? "left-4" : "right-4"}`}
                     >
                       <X size={14} />
                     </button>
@@ -320,23 +376,19 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.03 }}
                           onClick={() => handleTabClick(item.id)}
-                          className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] select-none text-right group min-h-[4.5rem] justify-between ${
-                            isActive
-                              ? "bg-[#D4A64A] text-[#0B2345] border-[#D4A64A] shadow-lg shadow-[#D4A64A]/10"
-                              : "bg-slate-900/50 hover:bg-[#0B2345]/50 border-slate-800/80 hover:border-slate-700/80 text-slate-300 hover:text-white"
-                          }`}
+                          className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] select-none text-right group min-h-[4.5rem] justify-between ${menuItemClasses(isActive)}`}
                         >
-                          <div className={`p-2.5 rounded-xl ${isActive ? "bg-[#0B2345] text-[#D4A64A]" : "bg-[#0B2345] text-slate-400 group-hover:text-white group-hover:bg-[#D4A64A] group-hover:text-[#0B2345] transition-all"} shrink-0 flex items-center justify-center`}>
+                          <div className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
                             <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
                           </div>
                           
                           <div className="w-full">
-                            <p className={`text-xs font-black tracking-tight leading-snug break-words ${isActive ? "text-[#0B2345]" : "text-white"}`}>
+                            <p className={`text-xs font-black tracking-tight leading-snug break-words ${menuLabelClasses(isActive)}`}>
                               {item.label}
                             </p>
                           </div>
                           
-                          <div className={`absolute ${isRtl ? "left-3" : "right-3"} bottom-3 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                          <div className={`absolute ${isRtl ? "left-3" : "right-3"} bottom-3 opacity-0 group-hover:opacity-100 transition-opacity ${isLightMenu ? "text-slate-400" : ""}`}>
                             {isRtl ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                           </div>
                         </motion.button>
@@ -370,27 +422,39 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="absolute bottom-0 inset-x-0 bg-[#0B2345] border-t border-[#D4A64A]/30 rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] text-white overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+20px)]"
+              className={`absolute bottom-0 inset-x-0 rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+20px)] ${menuPanelShellClasses}`}
               dir={isRtl ? "rtl" : "ltr"}
             >
               <div className="p-6 pb-3 shrink-0 relative flex flex-col items-center">
                 <div
-                  className="w-12 h-1.5 bg-slate-500/30 rounded-full mb-5 cursor-pointer hover:bg-slate-500/50"
+                  className={`w-12 h-1.5 rounded-full mb-5 cursor-pointer ${
+                    isLightMenu
+                      ? "bg-slate-200 hover:bg-slate-300"
+                      : "bg-slate-500/30 hover:bg-slate-500/50"
+                  }`}
                   onClick={() => setIsSidebarOpen(false)}
                 />
                 <div className="w-full flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-black text-white font-display tracking-tight flex items-center gap-2">
+                    <h3
+                      className={`text-xl font-black font-display tracking-tight flex items-center gap-2 ${
+                        isLightMenu ? "text-slate-800 dark:text-slate-100" : "text-white"
+                      }`}
+                    >
                       <Menu className="text-[#D4A64A] w-5 h-5" />
-                      <span>{isRtl ? "خدمات المعلم" : "Teacher Services"}</span>
+                      <span>{isRtl ? "خدمات ولي الأمر" : "Parent Services"}</span>
                     </h3>
-                    <p className="text-slate-400 text-xs mt-0.5">
+                    <p className={`text-xs mt-0.5 ${isLightMenu ? "text-slate-500 dark:text-slate-400" : "text-slate-400"}`}>
                       {isRtl ? "جميع أقسام لوحة التحكم" : "All dashboard sections"}
                     </p>
                   </div>
                   <button
                     onClick={() => setIsSidebarOpen(false)}
-                    className="w-10 h-10 bg-slate-800/60 text-slate-300 hover:text-white rounded-full flex items-center justify-center border border-slate-700/50 hover:bg-slate-800 transition-all active:scale-95"
+                    className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all active:scale-95 ${
+                      isLightMenu
+                        ? "bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 border-slate-200"
+                        : "bg-slate-800/60 text-slate-300 hover:text-white border-slate-700/50 hover:bg-slate-800"
+                    }`}
                   >
                     <X size={18} />
                   </button>
@@ -409,26 +473,12 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.03 }}
                           onClick={() => handleTabClick(item.id)}
-                          className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] min-h-[4.5rem] justify-between ${
-                            isActive
-                              ? "bg-[#D4A64A] text-[#0B2345] border-[#D4A64A] shadow-lg shadow-[#D4A64A]/10"
-                              : "bg-slate-900/50 hover:bg-[#0B2345]/50 border-slate-800/80 hover:border-slate-700/80 text-slate-300 hover:text-white"
-                          }`}
+                          className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] min-h-[4.5rem] justify-between ${menuItemClasses(isActive)}`}
                         >
-                          <div
-                            className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${
-                              isActive
-                                ? "bg-[#0B2345] text-[#D4A64A]"
-                                : "bg-[#0B2345] text-slate-400"
-                            }`}
-                          >
+                          <div className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
                             <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
                           </div>
-                          <p
-                            className={`text-xs font-black tracking-tight leading-snug break-words w-full ${
-                              isActive ? "text-[#0B2345]" : "text-white"
-                            }`}
-                          >
+                          <p className={`text-xs font-black tracking-tight leading-snug break-words w-full ${menuLabelClasses(isActive)}`}>
                             {item.label}
                           </p>
                         </motion.button>
@@ -444,11 +494,19 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 )}
               </div>
               {onLogout && (
-                <div className="shrink-0 px-6 pt-2 pb-1 border-t border-slate-800/80">
+                <div
+                  className={`shrink-0 px-6 pt-2 pb-1 border-t ${
+                    isLightMenu ? "border-slate-200 dark:border-slate-700" : "border-slate-800/80"
+                  }`}
+                >
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 font-black text-sm transition-all active:scale-[0.98]"
+                    className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] ${
+                      isLightMenu
+                        ? "text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-red-200 dark:border-red-900/40"
+                        : "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300"
+                    }`}
                   >
                     <LogOut size={18} className="shrink-0" />
                     <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>

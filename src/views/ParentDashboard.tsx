@@ -3191,6 +3191,7 @@ export default function ParentDashboard() {
           setShowNotifications={setShowNotifications}
           notificationsCount={notifications.filter((n: any) => !n.read).length}
           isRtl={isRtl}
+          menuSurface="light"
         />
       </div>
       </div>
