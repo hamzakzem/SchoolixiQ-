@@ -1067,3 +1067,265 @@ html.theme-transition *::after {
   background-color: rgba(30, 41, 59, 0.8);
 }
 
+/* ==========================================================================
+   Parent dashboard menu — opt out of global aside/header navy + white-text rules
+   ========================================================================== */
+aside.parent-dashboard-menu {
+  background-color: #ffffff !important;
+  border-right-color: #e2e8f0 !important;
+  border-left-color: #e2e8f0 !important;
+  color: #0b2345 !important;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08) !important;
+}
+
+html.dark aside.parent-dashboard-menu {
+  background-color: #0f172a !important;
+  border-right-color: #334155 !important;
+  border-left-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+aside.parent-dashboard-menu .parent-sidebar-heading {
+  color: #0b2345 !important;
+}
+
+aside.parent-dashboard-menu .parent-sidebar-subheading {
+  color: #64748b !important;
+}
+
+html.dark aside.parent-dashboard-menu .parent-sidebar-heading {
+  color: #f1f5f9 !important;
+}
+
+html.dark aside.parent-dashboard-menu .parent-sidebar-subheading {
+  color: #94a3b8 !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-item {
+  color: #64748b !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-label {
+  color: #1e293b !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-icon,
+aside.parent-dashboard-menu .parent-nav-item svg {
+  color: #475569 !important;
+  stroke: #475569 !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-item:hover {
+  background-color: #fff7e0 !important;
+  color: #0b2345 !important;
+  border-color: #e2e8f0 !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-item:hover .parent-nav-label,
+aside.parent-dashboard-menu .parent-nav-item:hover .parent-nav-icon,
+aside.parent-dashboard-menu .parent-nav-item:hover svg {
+  color: #0b2345 !important;
+  stroke: #0b2345 !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-item--active {
+  background-color: #d4af37 !important;
+  color: #0b2345 !important;
+  border-color: #d4af37 !important;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.25) !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-item--active .parent-nav-label,
+aside.parent-dashboard-menu .parent-nav-item--active .parent-nav-icon,
+aside.parent-dashboard-menu .parent-nav-item--active svg {
+  color: #0b2345 !important;
+  stroke: #0b2345 !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-item:focus-visible {
+  outline: 2px solid #d4af37 !important;
+  outline-offset: 2px !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-logout {
+  color: #dc2626 !important;
+  background-color: transparent !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-logout:hover {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+}
+
+aside.parent-dashboard-menu .parent-nav-logout svg {
+  color: #dc2626 !important;
+  stroke: #dc2626 !important;
+}
+
+html.dark aside.parent-dashboard-menu .parent-nav-item {
+  color: #94a3b8 !important;
+}
+
+html.dark aside.parent-dashboard-menu .parent-nav-label {
+  color: #e2e8f0 !important;
+}
+
+html.dark aside.parent-dashboard-menu .parent-nav-icon,
+html.dark aside.parent-dashboard-menu .parent-nav-item svg {
+  color: #94a3b8 !important;
+  stroke: #94a3b8 !important;
+}
+
+html.dark aside.parent-dashboard-menu .parent-nav-item:hover {
+  background-color: rgba(212, 175, 55, 0.12) !important;
+  color: #fde68a !important;
+  border-color: #334155 !important;
+}
+
+html.dark aside.parent-dashboard-menu .parent-nav-item:hover .parent-nav-label,
+html.dark aside.parent-dashboard-menu .parent-nav-item:hover .parent-nav-icon,
+html.dark aside.parent-dashboard-menu .parent-nav-item:hover svg {
+  color: #fde68a !important;
+  stroke: #fde68a !important;
+}
+
+html.dark aside.parent-dashboard-menu .parent-nav-item--active {
+  background-color: #d4af37 !important;
+  color: #0b2345 !important;
+}
+
+html.dark aside.parent-dashboard-menu .parent-nav-item--active .parent-nav-label,
+html.dark aside.parent-dashboard-menu .parent-nav-item--active .parent-nav-icon,
+html.dark aside.parent-dashboard-menu .parent-nav-item--active svg {
+  color: #0b2345 !important;
+  stroke: #0b2345 !important;
+}
+
+/* Parent mobile slide-up panels (MobileNavigationDock light surface) */
+.parent-dashboard-menu.parent-menu-panel {
+  background-color: #ffffff !important;
+  border-top-color: #e2e8f0 !important;
+  color: #0b2345 !important;
+  box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.12) !important;
+}
+
+html.dark .parent-dashboard-menu.parent-menu-panel {
+  background-color: #0f172a !important;
+  border-top-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+.parent-dashboard-menu.parent-menu-panel .parent-menu-title {
+  color: #0b2345 !important;
+}
+
+.parent-dashboard-menu.parent-menu-panel .parent-menu-subtitle {
+  color: #64748b !important;
+}
+
+html.dark .parent-dashboard-menu.parent-menu-panel .parent-menu-title {
+  color: #f1f5f9 !important;
+}
+
+html.dark .parent-dashboard-menu.parent-menu-panel .parent-menu-subtitle {
+  color: #94a3b8 !important;
+}
+
+.parent-dashboard-menu .parent-menu-item {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+.parent-dashboard-menu .parent-menu-label {
+  color: #1e293b !important;
+}
+
+.parent-dashboard-menu .parent-menu-icon,
+.parent-dashboard-menu .parent-menu-item svg {
+  color: #475569 !important;
+  stroke: #475569 !important;
+}
+
+.parent-dashboard-menu .parent-menu-item:hover {
+  background-color: #fff7e0 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.parent-dashboard-menu .parent-menu-item:hover .parent-menu-label,
+.parent-dashboard-menu .parent-menu-item:hover .parent-menu-icon,
+.parent-dashboard-menu .parent-menu-item:hover svg {
+  color: #0b2345 !important;
+  stroke: #0b2345 !important;
+}
+
+.parent-dashboard-menu .parent-menu-item--active {
+  background-color: #d4af37 !important;
+  border-color: #d4af37 !important;
+  color: #0b2345 !important;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.25) !important;
+}
+
+.parent-dashboard-menu .parent-menu-item--active .parent-menu-label,
+.parent-dashboard-menu .parent-menu-item--active .parent-menu-icon,
+.parent-dashboard-menu .parent-menu-item--active svg {
+  color: #0b2345 !important;
+  stroke: #0b2345 !important;
+}
+
+.parent-dashboard-menu .parent-menu-item:focus-visible {
+  outline: 2px solid #d4af37 !important;
+  outline-offset: 2px !important;
+}
+
+html.dark .parent-dashboard-menu .parent-menu-item {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html.dark .parent-dashboard-menu .parent-menu-label {
+  color: #e2e8f0 !important;
+}
+
+html.dark .parent-dashboard-menu .parent-menu-icon,
+html.dark .parent-dashboard-menu .parent-menu-item svg {
+  color: #94a3b8 !important;
+  stroke: #94a3b8 !important;
+}
+
+html.dark .parent-dashboard-menu .parent-menu-item:hover {
+  background-color: rgba(212, 175, 55, 0.12) !important;
+}
+
+html.dark .parent-dashboard-menu .parent-menu-item:hover .parent-menu-label,
+html.dark .parent-dashboard-menu .parent-menu-item:hover .parent-menu-icon,
+html.dark .parent-dashboard-menu .parent-menu-item:hover svg {
+  color: #fde68a !important;
+  stroke: #fde68a !important;
+}
+
+.parent-dashboard-menu .parent-menu-search {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+html.dark .parent-dashboard-menu .parent-menu-search {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+.parent-dashboard-menu .parent-menu-logout {
+  color: #dc2626 !important;
+  border-color: #fecaca !important;
+  background-color: transparent !important;
+}
+
+.parent-dashboard-menu .parent-menu-logout:hover {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+}
+

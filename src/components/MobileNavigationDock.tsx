@@ -87,33 +87,35 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   };
 
   const menuItemClasses = (isActive: boolean) => {
+    if (isLightMenu) {
+      return `parent-menu-item border rounded-2xl ${isActive ? "parent-menu-item--active" : ""}`;
+    }
     if (isActive) {
       return "bg-[#D4A64A] text-[#0B2345] border-[#D4A64A] shadow-lg shadow-[#D4A64A]/10";
-    }
-    if (isLightMenu) {
-      return "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600";
     }
     return "bg-slate-900/50 hover:bg-[#0B2345]/50 border-slate-800/80 hover:border-slate-700/80 text-slate-300 hover:text-white";
   };
 
   const menuIconClasses = (isActive: boolean) => {
+    if (isLightMenu) {
+      return `parent-menu-icon p-2.5 rounded-xl shrink-0 flex items-center justify-center ${
+        isActive ? "bg-[#0B2345]/10" : "bg-slate-100 dark:bg-slate-700"
+      }`;
+    }
     if (isActive) {
       return "bg-[#0B2345] text-[#D4A64A]";
-    }
-    if (isLightMenu) {
-      return "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/30 group-hover:text-[#D4A64A] transition-all";
     }
     return "bg-[#0B2345] text-slate-400 group-hover:text-white group-hover:bg-[#D4A64A] group-hover:text-[#0B2345] transition-all";
   };
 
   const menuLabelClasses = (isActive: boolean) => {
+    if (isLightMenu) return "parent-menu-label";
     if (isActive) return "text-[#0B2345]";
-    if (isLightMenu) return "text-slate-800 dark:text-slate-100";
     return "text-white";
   };
 
   const menuPanelShellClasses = isLightMenu
-    ? "bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
+    ? "parent-dashboard-menu parent-menu-panel"
     : "bg-[#0B2345] dark:bg-slate-950 border-t border-[#D4A64A]/30 text-white";
 
   return (
@@ -311,14 +313,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 <div className="w-full flex items-center justify-between" dir={isRtl ? "rtl" : "ltr"}>
                   <div>
                     <h3
-                      className={`text-xl font-black font-display tracking-tight flex items-center gap-2 ${
-                        isLightMenu ? "text-slate-800 dark:text-slate-100" : "text-white"
+                      className={`parent-menu-title text-xl font-black font-display tracking-tight flex items-center gap-2 ${
+                        isLightMenu ? "" : "text-white"
                       }`}
                     >
                       <Grid className="text-[#D4A64A] w-5 h-5" />
                       <span>{isRtl ? "بوابة الصلاحيات والوصول السريع" : "Quick Access Gateway"}</span>
                     </h3>
-                    <p className={`text-xs mt-0.5 ${isLightMenu ? "text-slate-500" : "text-slate-400"}`}>
+                    <p className={`parent-menu-subtitle text-xs mt-0.5 ${isLightMenu ? "" : "text-slate-400"}`}>
                       {isRtl ? "الوصول السريع والآمن لكافة أقسام المنصة" : "Secure quick-access portal to all components"}
                     </p>
                   </div>
@@ -347,7 +349,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                     placeholder={isRtl ? "البحث عن صلاحية أو قسم معين..." : "Search permissions & details..."}
                     className={`w-full h-11 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#D4A64A] border ${
                       isLightMenu
-                        ? `bg-slate-50 text-slate-800 placeholder-slate-400 border-slate-200 ${isRtl ? "pr-11 pl-4" : "pl-11 pr-4"}`
+                        ? `parent-menu-search ${isRtl ? "pr-11 pl-4" : "pl-11 pr-4"}`
                         : `bg-slate-900/60 text-white placeholder-slate-500 border-slate-800/80 ${isRtl ? "pr-11 pl-4" : "pl-11 pr-4"}`
                     }`}
                   />
@@ -379,7 +381,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                           className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] select-none text-right group min-h-[4.5rem] justify-between ${menuItemClasses(isActive)}`}
                         >
                           <div className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
-                            <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
+                            <Icon className={isLightMenu ? "parent-menu-icon" : undefined} size={20} strokeWidth={isActive ? 2.5 : 1.5} />
                           </div>
                           
                           <div className="w-full">
@@ -437,14 +439,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 <div className="w-full flex items-center justify-between">
                   <div>
                     <h3
-                      className={`text-xl font-black font-display tracking-tight flex items-center gap-2 ${
-                        isLightMenu ? "text-slate-800 dark:text-slate-100" : "text-white"
+                      className={`parent-menu-title text-xl font-black font-display tracking-tight flex items-center gap-2 ${
+                        isLightMenu ? "" : "text-white"
                       }`}
                     >
                       <Menu className="text-[#D4A64A] w-5 h-5" />
                       <span>{isRtl ? "خدمات ولي الأمر" : "Parent Services"}</span>
                     </h3>
-                    <p className={`text-xs mt-0.5 ${isLightMenu ? "text-slate-500 dark:text-slate-400" : "text-slate-400"}`}>
+                    <p className={`text-xs mt-0.5 ${isLightMenu ? "parent-menu-subtitle" : "text-slate-400"}`}>
                       {isRtl ? "جميع أقسام لوحة التحكم" : "All dashboard sections"}
                     </p>
                   </div>
@@ -476,7 +478,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                           className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] min-h-[4.5rem] justify-between ${menuItemClasses(isActive)}`}
                         >
                           <div className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
-                            <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
+                            <Icon className={isLightMenu ? "parent-menu-icon" : undefined} size={20} strokeWidth={isActive ? 2.5 : 1.5} />
                           </div>
                           <p className={`text-xs font-black tracking-tight leading-snug break-words w-full ${menuLabelClasses(isActive)}`}>
                             {item.label}
@@ -504,7 +506,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                     onClick={handleLogout}
                     className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] ${
                       isLightMenu
-                        ? "text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-red-200 dark:border-red-900/40"
+                        ? "parent-menu-logout border"
                         : "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300"
                     }`}
                   >

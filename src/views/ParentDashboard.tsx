@@ -283,6 +283,12 @@ export default function ParentDashboard() {
   }, [selectedStudent?.schoolId]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log("[ParentMenu] active surface: light");
+    }
+  }, []);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
@@ -1589,7 +1595,7 @@ export default function ParentDashboard() {
               animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
               exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className={`bg-white dark:bg-slate-900 flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)]`}
+              className={`parent-dashboard-menu flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)]`}
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
                 <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
@@ -1606,11 +1612,11 @@ export default function ParentDashboard() {
                   )}
                   {!isSidebarCollapsed && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0" dir={isRtl ? "rtl" : "ltr"}>
-                      <h2 className="font-bold text-slate-900 dark:text-white leading-tight truncate">
+                      <h2 className="parent-sidebar-heading font-bold leading-tight truncate">
                          {t("parentWelcome")}
                       </h2>
                       <div className="flex flex-col">
-                        <p className="text-[10px] uppercase tracking-widest text-indigo-600 font-bold truncate">
+                        <p className="parent-sidebar-subheading text-[10px] uppercase tracking-widest font-bold truncate">
                           {profile?.name}
                         </p>
                       </div>
@@ -1627,22 +1633,20 @@ export default function ParentDashboard() {
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
                       title={isSidebarCollapsed ? item.label : undefined}
-                      className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${
-                        activeTab === item.id
-                          ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg"
-                          : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className={`parent-nav-item w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${
+                        activeTab === item.id ? "parent-nav-item--active" : ""
                       }`}
                       dir={isRtl ? "rtl" : "ltr"}
                     >
                       <div className="relative shrink-0">
-                        <item.icon size={isSidebarCollapsed ? 24 : 20} />
+                        <item.icon className="parent-nav-icon" size={isSidebarCollapsed ? 24 : 20} />
                         {item.badge > 0 && (
                            <span className="absolute -top-1 -right-0.5 w-4 h-4 bg-red-500 text-white text-[8px] font-mono font-black rounded flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
                              {item.badge}
                            </span>
                         )}
                       </div>
-                      {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      {!isSidebarCollapsed && <span className="parent-nav-label truncate">{item.label}</span>}
                       {isSidebarCollapsed && (
                         <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
                           {item.label}
@@ -1656,9 +1660,9 @@ export default function ParentDashboard() {
                   <button
                     onClick={() => auth.signOut()}
                     title={isSidebarCollapsed ? t("logout") : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3 px-4 md:px-5'} py-3 md:py-4 rounded-xl md:rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all font-bold text-sm`}
+                    className={`parent-nav-logout w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3 px-4 md:px-5'} py-3 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm`}
                   >
-                    <LogOut size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
+                    <LogOut size={isSidebarCollapsed ? 24 : 20} className="shrink-0 parent-nav-icon" />
                     {!isSidebarCollapsed && <span>{t("logout")}</span>}
                   </button>
                 </div>
