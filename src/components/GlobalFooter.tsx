@@ -1,24 +1,12 @@
-import React, { useEffect, useState } from "react";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  limit,
-  doc,
-  getDoc,
-} from "firebase/firestore";
-import { db } from "../lib/firebase";
-import { School } from "../types";
+import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { resolveAppLogoSrc } from "../lib/brandAssets";
-
-interface DisplayPartner {
-  id: string;
-  name: string;
-  logoUrl: string;
-}
+import {
+  normalizeOurPartners,
+  normalizeSuccessPartners,
+  type FooterPartner,
+} from "../lib/footerPartners";
 
 function PromotionalBannerSlider({
   banners,
@@ -31,7 +19,7 @@ function PromotionalBannerSlider({
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % banners.length);
-    }, 5000); // 5 seconds
+    }, 5000);
     return () => clearInterval(interval);
   }, [banners.length]);
 
@@ -41,12 +29,17 @@ function PromotionalBannerSlider({
     <div className="relative w-full aspect-[21/9] md:aspect-[3/1] overflow-hidden group">
       {banners.map((banner, index) => {
         const isActive = index === currentIndex;
+        const Wrapper = banner.link ? "a" : "div";
         return (
-          <a
+          <Wrapper
             key={banner.id}
-            href={banner.link || "#"}
-            target={banner.link ? "_blank" : undefined}
-            rel={banner.link ? "noopener noreferrer" : undefined}
+            {...(banner.link
+              ? {
+                  href: banner.link,
+                  target: "_blank",
+                  rel: "noopener noreferrer",
+                }
+              : {})}
             className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"}`}
             aria-hidden={!isActive}
           >
@@ -55,11 +48,10 @@ function PromotionalBannerSlider({
               alt={`Promotional Banner ${index + 1}`}
               className="w-full h-full object-cover"
             />
-          </a>
+          </Wrapper>
         );
       })}
 
-      {/* Navigation Dots */}
       {banners.length > 1 && (
         <div className="absolute bottom-4 left-0 right-0 z-20 flex justify-center gap-2">
           {banners.map((_, index) => (
@@ -79,81 +71,95 @@ function PromotionalBannerSlider({
   );
 }
 
+function PartnerLogoCircle({
+  partner,
+  sizeClass = "w-14 h-14 md:w-16 md:h-16",
+}: {
+  partner: FooterPartner;
+  sizeClass?: string;
+}) {
+  const image = (
+    <div
+      className={`${sizeClass} rounded-full border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center justify-center p-1.5 overflow-hidden hover:border-blue-500/60 dark:hover:border-blue-500/60 transition-all duration-300`}
+    >
+      <img
+        src={partner.logoUrl}
+        alt={partner.name || "Partner"}
+        className="w-full h-full object-cover rounded-full"
+      />
+    </div>
+  );
+
+  if (partner.link) {
+    return (
+      <a
+        href={partner.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group relative flex flex-col items-center justify-center transition-all duration-300 active:scale-95"
+        title={partner.name || undefined}
+      >
+        {image}
+      </a>
+    );
+  }
+
+  return (
+    <div
+      className="group relative flex flex-col items-center justify-center"
+      title={partner.name || undefined}
+    >
+      {image}
+    </div>
+  );
+}
+
+function CompactPartnerRow({
+  partners,
+  label,
+}: {
+  partners: FooterPartner[];
+  label: string;
+}) {
+  if (!partners.length) return null;
+  return (
+    <div className="flex flex-col items-center justify-center mb-5 mt-2 gap-2.5">
+      <span className="text-[10px] font-black text-slate-400/70 dark:text-slate-500/70 tracking-widest uppercase">
+        {label}
+      </span>
+      <div className="flex flex-wrap justify-center items-center gap-4">
+        {partners.map((partner) => (
+          <PartnerLogoCircle
+            key={partner.id}
+            partner={partner}
+            sizeClass="w-10 h-10"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function GlobalFooter({ compact = false }: { compact?: boolean }) {
   const { config } = useSystemConfig();
-  const [partnersList, setPartnersList] = useState<DisplayPartner[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (compact) {
-      setLoading(false);
-      return;
-    }
-    const fetchFooterData = async () => {
-      try {
-        const schoolsQ = query(
-          collection(db, "schools"),
-          where("featured", "==", true),
-          where("status", "==", "active"),
-          limit(8),
-        );
-        const schoolsSnap = await getDocs(schoolsQ);
-        const schoolsData = schoolsSnap.docs
-          .map((d) => ({ id: d.id, ...d.data() }) as School)
-          .filter((s) => s.logoUrl);
-
-        const formattedList = schoolsData.map((s) => ({
-          id: s.id,
-          name: s.name,
-          logoUrl: s.logoUrl!,
-        }));
-
-        setPartnersList(formattedList);
-      } catch (error) {
-        console.error("Error fetching footer data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchFooterData();
-  }, [compact]);
-
-  if (loading) return null;
+  const successPartners = useMemo(
+    () => normalizeSuccessPartners(config.successPartners),
+    [config.successPartners],
+  );
+  const ourPartners = useMemo(
+    () => normalizeOurPartners(config.ourPartners),
+    [config.ourPartners],
+  );
 
   if (compact) {
     return (
       <footer className="mt-auto shrink-0 relative w-full py-4 bg-transparent print:hidden select-none">
         <div className="max-w-7xl mx-auto px-6">
           <div className="w-full h-px bg-slate-200/20 dark:bg-slate-800/25 mb-3" />
-          
-          {config.ourPartners && config.ourPartners.length > 0 && (
-            <div className="flex flex-col items-center justify-center mb-5 mt-2 gap-2.5">
-              <span className="text-[10px] font-black text-slate-400/70 dark:text-slate-500/70 tracking-widest uppercase">
-                شركاؤنا
-              </span>
-              <div className="flex flex-wrap justify-center items-center gap-4">
-                {config.ourPartners.map((partner, idx) => (
-                  <a
-                    key={idx}
-                    href={partner.link || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative transition-all duration-300 active:scale-95"
-                    title={partner.name}
-                  >
-                    <div className="w-10 h-10 rounded-full border border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-center p-1 overflow-hidden hover:border-blue-500/50 transition-all duration-200 shadow-sm">
-                      <img
-                        src={partner.logoUrl}
-                        alt={partner.name}
-                        className="w-full h-full object-cover rounded-full"
-                      />
-                    </div>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
+
+          <CompactPartnerRow partners={successPartners} label="شركاء النجاح" />
+          <CompactPartnerRow partners={ourPartners} label="شركاؤنا" />
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
             <span className="text-[10px] md:text-xs font-semibold text-slate-400 dark:text-slate-500 select-none">
@@ -176,7 +182,6 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
   return (
     <footer className="bg-slate-50 dark:bg-slate-950 border-t border-slate-200/40 dark:border-slate-800/40 mt-auto shrink-0 relative w-full pt-16 md:pt-24 pb-8 overflow-hidden transition-all duration-300 select-none">
       <div className="max-w-7xl mx-auto px-4 md:px-8 relative">
-        {/* PROMOTIONAL BANNERS SECTION */}
         {config.promotionalBanners &&
           config.promotionalBanners.filter((b) => b.active).length > 0 && (
             <div className="mb-16 md:mb-24 w-full flex justify-center">
@@ -188,38 +193,54 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
             </div>
           )}
 
-        {/* PARTNERS GRID */}
-        {partnersList.length > 0 && (
+        {successPartners.length > 0 && (
           <div className="mb-16 md:mb-24 text-center">
             <div className="mb-10">
               <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white mb-3">
-                مدارس تستخدم {config.appName}
+                شركاء النجاح
               </h3>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 max-w-4xl mx-auto px-4">
-              {partnersList.map((partner) => (
-                <div
-                  key={partner.id}
-                  className="group relative flex flex-col items-center justify-center p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 hover:border-indigo-100 dark:hover:border-indigo-500/20 transition-all duration-200"
-                >
-                  <div className="h-14 md:h-16 flex items-center justify-center mb-4 opacity-75 group-hover:opacity-100 transition-opacity duration-200">
-                    <img
-                      src={partner.logoUrl || undefined}
-                      alt={partner.name}
-                      className="max-h-full max-w-full object-contain filter grayscale group-hover:grayscale-0 group-hover:scale-[1.03] transition-all duration-200"
-                    />
+              {successPartners.map((partner) => {
+                const card = (
+                  <div className="group relative flex flex-col items-center justify-center p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 hover:border-indigo-100 dark:hover:border-indigo-500/20 transition-all duration-200">
+                    <div className="h-14 md:h-16 flex items-center justify-center mb-4 opacity-75 group-hover:opacity-100 transition-opacity duration-200">
+                      <img
+                        src={partner.logoUrl}
+                        alt={partner.name || "Partner"}
+                        className="max-h-full max-w-full object-contain filter grayscale group-hover:grayscale-0 group-hover:scale-[1.03] transition-all duration-200"
+                      />
+                    </div>
+                    {partner.name ? (
+                      <span className="text-xs md:text-sm font-bold text-slate-400 dark:text-slate-500 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors duration-200 opacity-0 group-hover:opacity-100 absolute bottom-3">
+                        {partner.name}
+                      </span>
+                    ) : null}
                   </div>
-                  <span className="text-xs md:text-sm font-bold text-slate-400 dark:text-slate-500 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors duration-200 opacity-0 group-hover:opacity-100 absolute bottom-3">
-                    {partner.name}
-                  </span>
-                </div>
-              ))}
+                );
+
+                if (partner.link) {
+                  return (
+                    <a
+                      key={partner.id}
+                      href={partner.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={partner.name || undefined}
+                      className="block"
+                    >
+                      {card}
+                    </a>
+                  );
+                }
+
+                return <div key={partner.id}>{card}</div>;
+              })}
             </div>
           </div>
         )}
 
-        {/* CTA SECTION */}
         <div className="text-center mb-16 px-4">
           <div className="inline-block bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 p-8 md:p-12 rounded-3xl border border-indigo-100/50 dark:border-indigo-500/10 w-full max-w-4xl">
             <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white mb-4">
@@ -245,7 +266,6 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
           </div>
         </div>
 
-        {/* SOCIAL LINKS */}
         {config.socialLinks &&
           (config.socialLinks.instagram ||
             config.socialLinks.twitter ||
@@ -305,39 +325,26 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
             </div>
           )}
 
-        {/* OUR PLATFORM PARTNERS */}
-        {config.ourPartners && config.ourPartners.length > 0 && (
+        {ourPartners.length > 0 && (
           <div className="w-full flex flex-col items-center mt-6 mb-12 border-t border-slate-200/40 dark:border-slate-800/40 pt-10">
             <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 mb-6 uppercase tracking-widest text-center select-none">
               شركاؤنا
             </h4>
             <div className="flex flex-wrap justify-center items-center gap-6 md:gap-8 max-w-4xl mx-auto">
-              {config.ourPartners.map((partner, idx) => (
-                <a
-                  key={idx}
-                  href={partner.link || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative flex flex-col items-center justify-center transition-all duration-300 active:scale-95"
-                  title={partner.name}
-                >
-                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-full border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center justify-center p-1.5 overflow-hidden hover:border-blue-500/60 dark:hover:border-blue-500/60 transition-all duration-300">
-                    <img
-                      src={partner.logoUrl}
-                      alt={partner.name}
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute -bottom-6 whitespace-nowrap bg-slate-900/95 text-white dark:bg-white dark:text-slate-900 px-2 py-0.5 rounded-md text-[9px] z-20 shadow-md">
-                    {partner.name}
-                  </span>
-                </a>
+              {ourPartners.map((partner) => (
+                <div key={partner.id} className="relative">
+                  <PartnerLogoCircle partner={partner} />
+                  {partner.name ? (
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute -bottom-6 whitespace-nowrap bg-slate-900/95 text-white dark:bg-white dark:text-slate-900 px-2 py-0.5 rounded-md text-[9px] z-20 shadow-md">
+                      {partner.name}
+                    </span>
+                  ) : null}
+                </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* BOTTOM FOOTER */}
         <div className="w-full flex flex-col items-center pt-8 border-t border-slate-200/60 dark:border-slate-800/60">
           {config.appLogo && (
             <img

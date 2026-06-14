@@ -31,6 +31,7 @@ import {
   type LandingFeatureCard,
 } from '../lib/landingPageConfig';
 import { useSystemConfig } from '../lib/SystemConfigContext';
+import { hasConfiguredFooterPartners } from '../lib/footerPartners';
 import { GlobalFooter } from '../components/GlobalFooter';
 import SchoolixLogo from '../components/SchoolixLogo';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -761,7 +762,9 @@ export default function LandingPage() {
             {config.footerMarketingText}
           </div>
         )}
-        {config.showPartners && <GlobalFooter />}
+        {(config.showPartners || hasConfiguredFooterPartners(systemConfig)) && (
+          <GlobalFooter />
+        )}
       </footer>
     </div>
   );

@@ -98,7 +98,12 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
           ...defaultSystemConfig,
           ...data,
           appName: appName,
-          appLogo: appLogo
+          appLogo: appLogo,
+          successPartners: Array.isArray(data.successPartners) ? data.successPartners : [],
+          ourPartners: Array.isArray(data.ourPartners) ? data.ourPartners : [],
+          promotionalBanners: Array.isArray(data.promotionalBanners)
+            ? data.promotionalBanners
+            : [],
         };
         setConfig(updatedConfig);
         try {
@@ -125,7 +130,11 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
           appLogo: appLogo,
           supportPhones: data.supportPhones || (data.supportPhone ? [data.supportPhone] : ['+964 770 000 0000']),
           supportEmails: data.supportEmails || (data.supportEmail ? [data.supportEmail] : ['support@schoolixiq.iq']),
-          successPartners: data.successPartners || [],
+          successPartners: Array.isArray(data.successPartners) ? data.successPartners : [],
+          ourPartners: Array.isArray(data.ourPartners) ? data.ourPartners : [],
+          promotionalBanners: Array.isArray(data.promotionalBanners)
+            ? data.promotionalBanners
+            : [],
           marketingTitle: data.marketingTitle || defaultSystemConfig.marketingTitle,
           marketingSubtitle: data.marketingSubtitle || defaultSystemConfig.marketingSubtitle,
           marketingFeatures: data.marketingFeatures || defaultSystemConfig.marketingFeatures
