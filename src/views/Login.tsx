@@ -55,6 +55,7 @@ import {
 import {
   classifyAuthError,
   getAuthErrorMessage,
+  getEmailAuthErrorMessage,
   isInAppWebView,
   isNativeApp,
   openAndroidChromeIntent,
@@ -514,7 +515,7 @@ export default function Login() {
         toast.success(t("welcomeBack"));
       }
     } catch (error) {
-      toast.error(getAuthErrorMessage(error, t, isRtl));
+      toast.error(getEmailAuthErrorMessage(error, t, isRtl));
     } finally {
       setLoading(false);
     }
@@ -533,7 +534,7 @@ export default function Login() {
           : "Password reset email sent",
       );
     } catch (error) {
-      toast.error(getAuthErrorMessage(error, t, isRtl));
+      toast.error(getEmailAuthErrorMessage(error, t, isRtl));
     }
   };
 

@@ -8,7 +8,6 @@ import {
 } from 'firebase/auth';
 import { auth } from '../firebase';
 import { AppError, normalizeError } from '../AppError';
-import { classifyAuthError } from './errors';
 import {
   healSchoolDataOnLogin,
   provisionUserProfile,
@@ -108,26 +107,15 @@ export async function signInWithEmail(
           emailTrimmed,
           password.trim(),
         );
+        try {
+          await healAdminActivationOnLogin(emailTrimmed, retry.user.uid);
+          await healSchoolDataOnLogin(emailTrimmed, retry.user.uid);
+        } catch (healErr) {
+          console.warn('Heal school data on login failed', healErr);
+        }
         return retry.user;
       } catch {
-        /* fall through */
-      }
-    }
-
-    const kind = classifyAuthError(signInErr);
-    if (kind === 'invalid-credential') {
-      try {
-        const activated = await createUserWithEmailAndPassword(
-          auth,
-          emailTrimmed,
-          password,
-        );
-        return activated.user;
-      } catch (signUpErr) {
-        const signUpKind = classifyAuthError(signUpErr);
-        if (signUpKind !== 'email-in-use') {
-          console.warn('Auto activation signUp failed', signUpErr);
-        }
+        /* fall through to original error */
       }
     }
 

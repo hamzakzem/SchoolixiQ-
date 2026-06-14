@@ -8,6 +8,7 @@ export {
 export {
   classifyAuthError,
   getAuthErrorMessage,
+  getEmailAuthErrorMessage,
   toAuthAppError,
   type AuthErrorKind,
 } from './errors';

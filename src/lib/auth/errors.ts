@@ -109,6 +109,46 @@ export function getAuthErrorMessage(
   }
 }
 
+export function getEmailAuthErrorMessage(
+  error: unknown,
+  t: TranslateFn,
+  isRtl: boolean,
+): string {
+  const err = normalizeError(error);
+  const code = err.code || '';
+
+  if (import.meta.env.DEV) {
+    console.error('[Auth] EMAIL_AUTH_ERROR', { code });
+  }
+
+  if (isRtl) {
+    const arByCode: Record<string, string> = {
+      'auth/invalid-credential': 'البريد أو كلمة المرور غير صحيحة',
+      'auth/user-not-found': 'لا يوجد حساب بهذا البريد',
+      'auth/wrong-password': 'كلمة المرور غير صحيحة',
+      'auth/email-already-in-use': 'هذا البريد مستخدم مسبقاً',
+      'auth/weak-password': 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
+      'auth/invalid-email': 'البريد الإلكتروني غير صالح',
+      'auth/operation-not-allowed':
+        'تسجيل الدخول بالبريد وكلمة المرور غير مفعل',
+    };
+    if (arByCode[code]) return arByCode[code];
+  } else {
+    const enByCode: Record<string, string> = {
+      'auth/invalid-credential': 'Incorrect email or password.',
+      'auth/user-not-found': 'No account found for this email.',
+      'auth/wrong-password': 'Incorrect password.',
+      'auth/email-already-in-use': 'This email is already in use.',
+      'auth/weak-password': 'Password must be at least 6 characters.',
+      'auth/invalid-email': 'Invalid email address.',
+      'auth/operation-not-allowed': 'Email/password sign-in is not enabled.',
+    };
+    if (enByCode[code]) return enByCode[code];
+  }
+
+  return getAuthErrorMessage(error, t, isRtl);
+}
+
 export function toAuthAppError(error: unknown, fallback?: string): AppError {
   return normalizeError(error, fallback ?? 'Authentication failed');
 }
