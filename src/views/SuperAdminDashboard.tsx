@@ -155,6 +155,12 @@ const DEFAULT_PACKAGES = [
   },
 ];
 
+const GUARDIAN_ACCOUNT_ROLES = new Set(["parent", "guard"]);
+
+function isGuardianAccountRole(role?: string | null): boolean {
+  return GUARDIAN_ACCOUNT_ROLES.has(String(role || ""));
+}
+
 export default function SuperAdminDashboard() {
   const { profile, logout } = useAuth();
   const { t, isRtl, setLanguage, language } = useLanguage();
@@ -594,7 +600,7 @@ export default function SuperAdminDashboard() {
     );
   });
   const filteredParentUsers = users.filter((u) => {
-    if (u.role !== "parent") return false;
+    if (!isGuardianAccountRole(u.role)) return false;
     if (!userSearchTerm) return true;
     return (
       u.name?.toLowerCase().includes(userSearchTerm) ||
@@ -1130,24 +1136,103 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async (userId: string, userRole?: string) => {
     if (userId === auth.currentUser?.uid) {
       toast.error("لا يمكنك حذف حسابك الحالي");
       return;
     }
 
-    const loadingToast = toast.loading("جاري حذف المستخدم وكافة بياناته...");
+    const targetUser = users.find((u) => u.id === userId);
+    const role = userRole || targetUser?.role;
+    const isGuardianDelete = isGuardianAccountRole(role);
+
+    if (
+      role === "superadmin" ||
+      role === "super_admin" ||
+      MASTER_ADMIN_EMAILS.includes(targetUser?.email?.toLowerCase())
+    ) {
+      toast.error("لا يمكن حذف هذا الحساب المحمي");
+      return;
+    }
+
+    console.info("[SuperAdminUsers] DELETE_PARENT_USER_START", {
+      userId,
+      role,
+      schoolId: targetUser?.schoolId ?? null,
+    });
+
+    const loadingToast = toast.loading(
+      isGuardianDelete
+        ? "جاري حذف حساب ولي الأمر..."
+        : "جاري حذف المستخدم وكافة بياناته...",
+    );
     try {
-      // Use Admin API for real Auth deletion
       await adminDeleteUser(userId);
       toast.dismiss(loadingToast);
-      toast.success("تم حذف المستخدم بنجاح");
+      console.info("[SuperAdminUsers] DELETE_PARENT_USER_SUCCESS", { userId, role });
+      toast.success(
+        isGuardianDelete
+          ? "تم حذف حساب ولي الأمر بنجاح"
+          : "تم حذف المستخدم بنجاح",
+      );
       setUserDeleteConfirmId(null);
     } catch (error: any) {
       toast.dismiss(loadingToast);
-      console.error("Delete user failed:", error);
+      console.error("[SuperAdminUsers] DELETE_PARENT_USER_ERROR", {
+        userId,
+        role,
+        message: error?.message,
+      });
       toast.error(error.message || "فشل في حذف المستخدم");
     }
+  };
+
+  const renderGuardianDeleteActions = (user: { id: string; role?: string; email?: string }) => {
+    if (
+      user.id === auth.currentUser?.uid ||
+      user.role === "superadmin" ||
+      user.role === "super_admin" ||
+      MASTER_ADMIN_EMAILS.includes(user.email?.toLowerCase())
+    ) {
+      return <span className="text-[10px] text-slate-400 font-bold">—</span>;
+    }
+
+    if (userDeleteConfirmId === user.id) {
+      return (
+        <div className="flex flex-col items-end gap-2">
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold text-right leading-relaxed max-w-[240px]">
+            هل أنت متأكد من حذف حساب ولي الأمر؟ لن يتم حذف بيانات الطالب.
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => handleDeleteUser(user.id, user.role)}
+              className="px-4 py-2 bg-red-600 text-white text-[9px] font-black rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20"
+            >
+              تأكيد الحذف
+            </button>
+            <button
+              type="button"
+              onClick={() => setUserDeleteConfirmId(null)}
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+            >
+              إلغاء
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => setUserDeleteConfirmId(user.id)}
+        className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-red-100 dark:hover:border-red-900/20"
+        title="حذف حساب ولي الأمر"
+      >
+        <Trash2 size={16} />
+      </button>
+    );
   };
 
   const handleAddPackage = async (e: React.FormEvent) => {
@@ -2200,7 +2285,10 @@ export default function SuperAdminDashboard() {
                       value={users.length}
                       hint={t('stat_users_hint')}
                       color="text-indigo-600"
-                      onClick={() => setActiveTab("users")}
+                      onClick={() => {
+                        setActiveTab("users");
+                        setUsersTab("parents");
+                      }}
                       isActive={activeTab === "users"}
                     />
                   </div>
@@ -3551,6 +3639,7 @@ export default function SuperAdminDashboard() {
                             <>
                               <th className="px-6 py-4">المدرسة المشترك بها</th>
                               <th className="px-6 py-4">الطلاب المرتبطين</th>
+                              <th className="px-6 py-4 text-center">الإجراءات</th>
                             </>
                           )}
                         </tr>
@@ -3704,6 +3793,11 @@ export default function SuperAdminDashboard() {
                                         )}
                                       </div>
                                     </td>
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center justify-center">
+                                        {renderGuardianDeleteActions(user)}
+                                      </div>
+                                    </td>
                                   </>
                                 )}
                               </tr>
@@ -3715,7 +3809,7 @@ export default function SuperAdminDashboard() {
                         ).length === 0 && (
                           <tr>
                             <td
-                              colSpan={usersTab === "management" ? 4 : 3}
+                              colSpan={usersTab === "management" ? 4 : 4}
                               className="px-6 py-16 text-center text-slate-400 dark:text-slate-500 font-bold"
                             >
                               لا توجد نتائج مطابقة للبحث
@@ -3762,6 +3856,7 @@ export default function SuperAdminDashboard() {
                             <th className="px-6 py-4">ولي الأمر</th>
                             <th className="px-6 py-4">المدرسة المشتركة</th>
                           <th className="px-6 py-4">الطلاب المرتبطين</th>
+                          <th className="px-6 py-4 text-center">الإجراءات</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -3827,16 +3922,21 @@ export default function SuperAdminDashboard() {
                                     )}
                                   </div>
                                 </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center justify-center">
+                                    {renderGuardianDeleteActions(user)}
+                                  </div>
+                                </td>
                               </tr>
                             );
                           })}
                         {filteredParentUsers.length === 0 && (
                           <tr>
                             <td
-                              colSpan={3}
+                              colSpan={4}
                               className="px-6 py-16 text-center text-slate-400 dark:text-slate-500 font-bold"
                             >
-                              {users.filter((u) => u.role === "parent").length ===
+                              {users.filter((u) => isGuardianAccountRole(u.role)).length ===
                               0
                                 ? "لا يوجد أولياء أمور مسجلين حالياً"
                                 : "لا يوجد أولياء أمور مطابقون للبحث"}

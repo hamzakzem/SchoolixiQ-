@@ -16,6 +16,7 @@ import {
   canActorSyncClaims,
   canActorDeleteStudent,
   normalizeRole,
+  isSuperAdminRole,
 } from './roleHierarchy.ts';
 
 dotEnv.config();
@@ -1041,6 +1042,13 @@ async function startServer() {
       const targetSchoolId = beforeData.schoolId;
       const targetRole = beforeData.role;
 
+      if (isSuperAdminRole(targetRole)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'لا يمكن حذف حساب Super Admin',
+        });
+      }
+
       if (!canActorDeleteUser(req.user.role, targetRole, req.user.schoolId)) {
         return res.status(403).json({
           error: 'FORBIDDEN',
@@ -1049,7 +1057,7 @@ async function startServer() {
       }
 
       // 2. Enforce strict multi-tenancy check
-      if (req.user.role !== 'superadmin') {
+      if (!isSuperAdminRole(req.user.role)) {
         if (!targetSchoolId || targetSchoolId !== req.user.schoolId) {
           return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف مستخدمى المدارس الأخرى' });
         }

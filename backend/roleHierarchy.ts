@@ -102,6 +102,7 @@ export function canActorDeleteUser(
   if (isSystemAssistant(actor, actorSchoolId)) return false;
 
   if (isSuperAdminRole(actor)) {
+    if (isSuperAdminRole(target)) return false;
     return true;
   }
 
