@@ -97,8 +97,12 @@ export type TuitionReminderFilterKey =
   | 'overdue'
   | 'today'
   | 'soon'
+  | 'later'
+  | 'no_parent'
   | 'auto_eligible'
   | 'restricted';
+
+export type TuitionReminderViewMode = 'dashboard' | 'overview';
 
 export type EligibleTuitionReminderRow = ReminderDashboardRow & {
   autoReminderEligible: boolean;
@@ -541,15 +545,38 @@ export function getEligibleTuitionReminderRows(params: {
   });
 }
 
-/** Rows ready for UI — unpaid installment + verified linked parent + actionable bucket. */
+/** Rows for UI — dashboard shows all eligible; overview excludes «later» only. */
 export function getDisplayableTuitionReminderRows(
   rows: EligibleTuitionReminderRow[],
-): { displayRows: EligibleTuitionReminderRow[]; hiddenNoParent: number; hiddenLater: number } {
-  const withParent = rows.filter((r) => r.hasLinkedParent);
-  const hiddenNoParent = rows.length - withParent.length;
-  const displayRows = withParent.filter((r) => r.bucket !== 'later');
-  const hiddenLater = withParent.length - displayRows.length;
-  return { displayRows, hiddenNoParent, hiddenLater };
+  viewMode: TuitionReminderViewMode = 'dashboard',
+): {
+  displayRows: EligibleTuitionReminderRow[];
+  hiddenNoParent: number;
+  hiddenLater: number;
+  rowsWithoutParent: number;
+  rowsLater: number;
+} {
+  const rowsWithoutParent = rows.filter((r) => !r.hasLinkedParent).length;
+  const rowsLater = rows.filter((r) => r.bucket === 'later').length;
+
+  if (viewMode === 'overview') {
+    const displayRows = rows.filter((r) => r.bucket !== 'later');
+    return {
+      displayRows,
+      hiddenNoParent: rowsWithoutParent,
+      hiddenLater: rowsLater,
+      rowsWithoutParent,
+      rowsLater,
+    };
+  }
+
+  return {
+    displayRows: rows,
+    hiddenNoParent: rowsWithoutParent,
+    hiddenLater: rowsLater,
+    rowsWithoutParent,
+    rowsLater,
+  };
 }
 
 export function filterTuitionReminderRows(
@@ -557,6 +584,7 @@ export function filterTuitionReminderRows(
   filter: TuitionReminderFilterKey,
   search: string,
   parents: Record<string, { displayName?: string; name?: string; email?: string; phone?: string; phoneNumber?: string; mobile?: string }> = {},
+  viewMode: TuitionReminderViewMode = 'dashboard',
 ): EligibleTuitionReminderRow[] {
   let list = rows;
   switch (filter) {
@@ -569,6 +597,12 @@ export function filterTuitionReminderRows(
     case 'soon':
       list = rows.filter((r) => r.bucket === 'soon');
       break;
+    case 'later':
+      list = rows.filter((r) => r.bucket === 'later');
+      break;
+    case 'no_parent':
+      list = rows.filter((r) => !r.hasLinkedParent);
+      break;
     case 'auto_eligible':
       list = rows.filter((r) => r.autoReminderEligible);
       break;
@@ -576,7 +610,10 @@ export function filterTuitionReminderRows(
       list = rows.filter((r) => r.isRestricted || r.escalationEligible);
       break;
     default:
-      list = rows.filter((r) => r.bucket !== 'later' && r.hasLinkedParent);
+      list =
+        viewMode === 'overview'
+          ? rows.filter((r) => r.bucket !== 'later')
+          : rows;
       break;
   }
 
@@ -628,11 +665,12 @@ export function enrichTuitionReminderDisplayRows(
     if (row.bucket === 'later') statusLabel = 'لاحقاً';
     if (row.autoReminderEligible) statusLabel += ' · مؤهل تلقائي';
     if (row.isRestricted) statusLabel += ' · مقيّد';
+    if (!row.hasLinkedParent) statusLabel += ' · لا يوجد ولي أمر مرتبط';
 
     return {
       ...row,
       className,
-      parentName: parent?.displayName || parent?.name || '—',
+      parentName: parent?.displayName || parent?.name || (row.hasLinkedParent ? '—' : 'لا يوجد ولي أمر مرتبط'),
       parentEmail,
       parentPhone,
       parentId,

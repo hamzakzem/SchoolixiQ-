@@ -9,6 +9,7 @@ import type {
   TuitionPayment,
   TuitionReminderFilterKey,
   TuitionReminderTrackingSnapshot,
+  TuitionReminderViewMode,
   TuitionStudent,
 } from './tuitionModel';
 
@@ -25,6 +26,8 @@ export function useTuitionReminderRows(params: {
   filter: TuitionReminderFilterKey;
   search: string;
   logContext?: string;
+  queryErrors?: Record<string, string>;
+  viewMode?: TuitionReminderViewMode;
 }): TuitionReminderRowsSnapshot {
   const {
     students,
@@ -37,6 +40,8 @@ export function useTuitionReminderRows(params: {
     filter,
     search,
     logContext,
+    queryErrors,
+    viewMode = 'dashboard',
   } = params;
 
   return useMemo(
@@ -52,6 +57,8 @@ export function useTuitionReminderRows(params: {
         filter,
         search,
         logContext,
+        queryErrors,
+        viewMode,
       }),
     [
       students,
@@ -64,6 +71,8 @@ export function useTuitionReminderRows(params: {
       filter,
       search,
       logContext,
+      queryErrors,
+      viewMode,
     ],
   );
 }

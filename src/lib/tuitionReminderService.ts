@@ -40,6 +40,7 @@ import {
   type TuitionReminderDisplayRow,
   type TuitionReminderFilterKey,
   type TuitionReminderTrackingSnapshot,
+  type TuitionReminderViewMode,
   type TuitionStudent,
 } from './tuitionModel';
 
@@ -728,6 +729,11 @@ export async function runAutomaticTuitionRemindersForSchool(
   return { processed: eligible.length, sent, skipped, failed };
 }
 
+import {
+  runTuitionReminderDiagnostics,
+  type TuitionReminderDiagnostics,
+} from './tuitionReminderDebug';
+
 export type TuitionReminderRowsSnapshot = {
   eligibleRows: EligibleTuitionReminderRow[];
   displayableRows: EligibleTuitionReminderRow[];
@@ -735,7 +741,67 @@ export type TuitionReminderRowsSnapshot = {
   displayRows: TuitionReminderDisplayRow[];
   hiddenNoParent: number;
   hiddenLater: number;
+  diagnostics: TuitionReminderDiagnostics;
 };
+
+function logEligibleRowsExpanded(
+  logContext: string,
+  schoolId: string,
+  eligibleRows: EligibleTuitionReminderRow[],
+  displayableRows: EligibleTuitionReminderRow[],
+  filteredRows: EligibleTuitionReminderRow[],
+  parentsCount: number,
+  hiddenNoParent: number,
+  viewMode: TuitionReminderViewMode,
+): void {
+  const rowsByBucket = {
+    overdue: eligibleRows.filter((r) => r.bucket === 'overdue').length,
+    today: eligibleRows.filter((r) => r.bucket === 'today').length,
+    soon: eligibleRows.filter((r) => r.bucket === 'soon').length,
+    later: eligibleRows.filter((r) => r.bucket === 'later').length,
+  };
+  const withLinkedParent = eligibleRows.filter((r) => r.hasLinkedParent).length;
+  const noParentReasons = eligibleRows
+    .filter((r) => !r.hasLinkedParent)
+    .slice(0, 10)
+    .map((r) => ({
+      studentId: r.studentId,
+      studentName: r.studentName,
+      parentIds: (r.student?.parentIds || []).join(', ') || '(none)',
+      parentEmail: r.student?.parentEmail || '(none)',
+      bucket: r.bucket,
+    }));
+
+  const summary = {
+    context: logContext,
+    schoolId,
+    viewMode,
+    rowsBeforeParentFilter: eligibleRows.length,
+    rowsAfterParentFilter: displayableRows.length,
+    displayable: displayableRows.length,
+    filtered: filteredRows.length,
+    hiddenNoParent,
+    withLinkedParent,
+    rowsByBucket,
+    parentsCount,
+  };
+
+  console.log('[TuitionReminder] ELIGIBLE_ROWS', JSON.stringify(summary, null, 2));
+  console.table(summary);
+  console.table(
+    eligibleRows.slice(0, 10).map((r) => ({
+      student: r.studentName,
+      bucket: r.bucket,
+      amount: r.amount,
+      linked: r.hasLinkedParent ? 'yes' : 'no',
+      parentIds: (r.student?.parentIds || []).length,
+      delayDays: r.delayDays,
+    })),
+  );
+  if (noParentReasons.length > 0) {
+    console.table(noParentReasons);
+  }
+}
 
 /** Single row pipeline for Overview quick action + Tuition Reminder Dashboard. */
 export function buildTuitionReminderRowsSnapshot(params: {
@@ -749,6 +815,8 @@ export function buildTuitionReminderRowsSnapshot(params: {
   filter: TuitionReminderFilterKey;
   search: string;
   logContext?: string;
+  queryErrors?: Record<string, string>;
+  viewMode?: TuitionReminderViewMode;
 }): TuitionReminderRowsSnapshot {
   const {
     students,
@@ -761,6 +829,8 @@ export function buildTuitionReminderRowsSnapshot(params: {
     filter,
     search,
     logContext = 'sync',
+    queryErrors = {},
+    viewMode = 'dashboard',
   } = params;
 
   const eligibleRows = getEligibleTuitionReminderRows({
@@ -774,28 +844,45 @@ export function buildTuitionReminderRowsSnapshot(params: {
   });
 
   const { displayRows: displayableRows, hiddenNoParent, hiddenLater } =
-    getDisplayableTuitionReminderRows(eligibleRows);
+    getDisplayableTuitionReminderRows(eligibleRows, viewMode);
 
-  const filteredRows = filterTuitionReminderRows(displayableRows, filter, search, parents);
+  const filteredRows = filterTuitionReminderRows(
+    displayableRows,
+    filter,
+    search,
+    parents,
+    viewMode,
+  );
   const displayRows = enrichTuitionReminderDisplayRows(filteredRows, parents);
 
-  const linkedCount = eligibleRows.filter((r) => r.hasLinkedParent).length;
-  const autoCount = eligibleRows.filter((r) => r.autoReminderEligible).length;
-
-  console.info('[TuitionReminder] ELIGIBLE_ROWS', {
-    context: logContext,
+  const parentsCount = Object.keys(parents).length;
+  logEligibleRowsExpanded(
+    logContext,
     schoolId,
-    students: students.length,
-    installments: installments.length,
-    payments: payments.length,
-    parentsLoaded: Object.keys(parents).length,
-    totalEligible: eligibleRows.length,
-    withLinkedParent: linkedCount,
+    eligibleRows,
+    displayableRows,
+    filteredRows,
+    parentsCount,
+    hiddenNoParent,
+    viewMode,
+  );
+
+  const diagnostics = runTuitionReminderDiagnostics({
+    students,
+    installments,
+    payments,
+    settings,
+    tracking,
+    parents,
+    schoolId,
+    eligibleRows,
+    displayableRows,
+    filteredRows,
     hiddenNoParent,
     hiddenLater,
-    displayable: displayableRows.length,
-    filtered: filteredRows.length,
-    autoReminderEligible: autoCount,
+    filter,
+    queryErrors,
+    logContext,
   });
 
   return {
@@ -805,6 +892,7 @@ export function buildTuitionReminderRowsSnapshot(params: {
     displayRows,
     hiddenNoParent,
     hiddenLater,
+    diagnostics,
   };
 }
 

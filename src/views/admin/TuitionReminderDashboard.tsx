@@ -45,12 +45,16 @@ import {
   logTuitionListenerError,
   logTuitionListenerSnapshot,
 } from '../../lib/tuitionQueryDebug';
+import { formatTuitionReminderEmptyReason } from '../../lib/tuitionReminderDebug';
+import { TuitionReminderDiagnosticPanel } from '../../components/admin/tuition/TuitionReminderDiagnosticPanel';
 
 const FILTER_TABS: { key: TuitionReminderFilterKey; label: string }[] = [
   { key: 'all', label: 'الكل' },
   { key: 'overdue', label: 'متأخر' },
   { key: 'today', label: 'مستحق اليوم' },
   { key: 'soon', label: 'قريباً' },
+  { key: 'later', label: 'لاحقاً' },
+  { key: 'no_parent', label: 'بدون ولي أمر' },
   { key: 'auto_eligible', label: 'مؤهل للتذكير التلقائي' },
   { key: 'restricted', label: 'مقيد / يحتاج تصعيد' },
 ];
@@ -60,9 +64,11 @@ export default function TuitionReminderDashboard() {
   const schoolId = profile?.schoolId || '';
   const schoolName = schoolData?.name || profile?.schoolName || 'المدرسة';
 
-  const { students, installments, payments } = useTuitionSchoolData(schoolId);
+  const { students, installments, payments, queryErrors: dataQueryErrors } = useTuitionSchoolData(schoolId);
   const [tracking, setTracking] = useState<Record<string, any>>({});
   const [parents, setParents] = useState<Record<string, any>>({});
+  const [parentQueryError, setParentQueryError] = useState<string | null>(null);
+  const [debugMode, setDebugMode] = useState(false);
   const [settings, setSettings] = useState<TuitionReminderSettings>(DEFAULT_TUITION_REMINDER_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -82,6 +88,11 @@ export default function TuitionReminderDashboard() {
       "where('schoolId', '==', schoolId)",
     ]);
 
+    logTuitionListenerDebug('TUITION_PARENTS', schoolId, 'users', [
+      "where('schoolId', '==', schoolId)",
+      "where('role', '==', 'parent')",
+    ]);
+
     const unsubs = [
       onSnapshot(
         query(collection(db, 'tuition_reminder_tracking'), where('schoolId', '==', schoolId)),
@@ -97,21 +108,40 @@ export default function TuitionReminderDashboard() {
         (error) => logTuitionListenerError('TUITION_REMINDER_TRACKING', error),
       ),
       onSnapshot(tuitionParentsQuery(schoolId), (s) => {
+        logTuitionListenerSnapshot('TUITION_PARENTS', s.size, s.metadata.fromCache);
         const map: Record<string, any> = {};
         s.docs.forEach((d) => {
           map[d.id] = { id: d.id, ...d.data() };
         });
         setParents(map);
+        setParentQueryError(null);
+        if (s.size === 0) {
+          console.warn('[TuitionReminderDebug] PARENT_QUERY_EMPTY', {
+            schoolId,
+            query: "users where schoolId==schoolId AND role=='parent'",
+          });
+        }
         fetchRestrictedParentAccounts(schoolId).then(setRestrictedParents);
+      }, (error) => {
+        logTuitionListenerError('TUITION_PARENTS', error);
+        const err = error as { message?: string };
+        setParentQueryError(err?.message || String(error));
       }),
     ];
     return () => unsubs.forEach((u) => u());
   }, [schoolId]);
 
+  const queryErrors = useMemo(() => {
+    const merged = { ...dataQueryErrors };
+    if (parentQueryError) merged.parents = parentQueryError;
+    return merged;
+  }, [dataQueryErrors, parentQueryError]);
+
   const {
     displayRows,
     eligibleRows,
     hiddenNoParent,
+    diagnostics,
   } = useTuitionReminderRows({
     students,
     installments,
@@ -123,7 +153,11 @@ export default function TuitionReminderDashboard() {
     filter,
     search,
     logContext: 'tuition_reminders_dashboard',
+    queryErrors,
+    viewMode: 'dashboard',
   });
+
+  const parentsCount = Object.keys(parents).length;
 
   const stats = computeReminderStats(eligibleRows);
 
@@ -139,6 +173,8 @@ export default function TuitionReminderDashboard() {
       filter: 'all',
       search: '',
       logContext: 'dashboard_counts',
+      queryErrors,
+      viewMode: 'dashboard',
     });
     const rows = base.displayableRows;
     return {
@@ -146,29 +182,62 @@ export default function TuitionReminderDashboard() {
       overdue: rows.filter((r) => r.bucket === 'overdue').length,
       today: rows.filter((r) => r.bucket === 'today').length,
       soon: rows.filter((r) => r.bucket === 'soon').length,
+      later: rows.filter((r) => r.bucket === 'later').length,
+      no_parent: rows.filter((r) => !r.hasLinkedParent).length,
       auto_eligible: base.eligibleRows.filter((r) => r.autoReminderEligible).length,
       restricted: rows.filter((r) => r.isRestricted || r.escalationEligible).length,
     };
-  }, [students, installments, payments, settings, tracking, parents, schoolId]);
+  }, [students, installments, payments, settings, tracking, parents, schoolId, queryErrors]);
 
   const emptyMessage = useMemo(() => {
-    if (students.length > 0 && installments.length === 0) {
-      return 'لا توجد أقساط منشأة للطلاب بعد';
-    }
-    if (eligibleRows.length === 0) {
-      return 'لا توجد أقساط غير مدفوعة أو مستحقة حالياً';
-    }
-    if (displayRows.length === 0) {
-      if (hiddenNoParent > 0) {
-        return `لا توجد صفوف معروضة — ${hiddenNoParent} طالب بدون ولي أمر مرتبط في users`;
-      }
+    if (displayRows.length === 0 && search.trim()) {
       return 'لا توجد نتائج مطابقة للبحث أو الفلتر';
     }
+    if (displayRows.length === 0 && eligibleRows.length === 0) {
+      return formatTuitionReminderEmptyReason(diagnostics.emptyReason, diagnostics.counts);
+    }
     return '';
-  }, [students.length, installments.length, eligibleRows.length, displayRows.length, hiddenNoParent]);
+  }, [diagnostics, displayRows.length, eligibleRows.length, search]);
+
+  const tableRows: TuitionReminderDisplayRow[] = debugMode
+    ? diagnostics.debugRows.map((d) => ({
+        installmentId: d.installmentId,
+        studentId: d.studentId,
+        studentName: d.studentName,
+        className: '—',
+        parentName: d.matchingParentFound ? 'مرتبط' : 'لا يوجد ولي أمر مرتبط',
+        parentEmail: d.parentEmail,
+        parentPhone: d.parentPhone,
+        parentId: d.matchingParentFound ? d.parentIds[0] : undefined,
+        amount: d.amount || 0,
+        dueDate: d.parsedDueDate ? new Date(d.parsedDueDate) : new Date(),
+        delayDays: 0,
+        bucket: (d.bucket || 'later') as TuitionReminderDisplayRow['bucket'],
+        lastReminderAt: null,
+        reminderCount: 0,
+        statusLabel: `${d.displayStatus} · ${d.reasonExcluded}`,
+        hasWhatsApp: d.parentPhone.replace(/\D/g, '').length >= 9,
+        linkedParentLabel: d.matchingParentFound ? 'مرتبط' : 'لا يوجد ولي أمر مرتبط',
+        whatsAppLabel: d.parentPhone ? 'متاح' : '—',
+        autoReminderEligible: false,
+        escalationEligible: false,
+        isRestricted: false,
+        hasLinkedParent: d.matchingParentFound,
+        daysSinceTimingAnchor: 0,
+        timingAnchor: new Date(),
+        escalationLevel: 1,
+        parentStatus: 'active' as const,
+        installment: {} as TuitionReminderDisplayRow['installment'],
+        student: undefined,
+      }))
+    : displayRows;
 
   const handleSend = async (row: TuitionReminderDisplayRow) => {
     if (!profile?.uid || !schoolId) return;
+    if (!row.hasLinkedParent || !row.parentId) {
+      toast.error('لا يوجد ولي أمر مرتبط');
+      return;
+    }
     setBusyId(row.installmentId);
     try {
       const student = students.find((s) => s.id === row.studentId);
@@ -239,7 +308,9 @@ export default function TuitionReminderDashboard() {
   const handleBulk = async () => {
     if (!profile?.uid) return;
     const bulkTargets = displayRows.filter(
-      (r) => r.bucket === 'overdue' || r.bucket === 'today' || r.bucket === 'soon' || r.autoReminderEligible,
+      (r) =>
+        r.hasLinkedParent &&
+        (r.bucket === 'overdue' || r.bucket === 'today' || r.bucket === 'soon' || r.autoReminderEligible),
     );
     if (bulkTargets.length === 0) return;
     setBulkBusy(true);
@@ -443,6 +514,19 @@ export default function TuitionReminderDashboard() {
         </div>
       )}
 
+      {parentsCount === 0 && eligibleRows.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+          تم العثور على أقساط، لكن لم يتم العثور على حسابات أولياء الأمور المرتبطة.
+        </div>
+      )}
+
+      <TuitionReminderDiagnosticPanel
+        diagnostics={diagnostics}
+        debugMode={debugMode}
+        onDebugModeChange={setDebugMode}
+        showWhenEmpty={displayRows.length === 0 || debugMode}
+      />
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -461,7 +545,7 @@ export default function TuitionReminderDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {displayRows.map((row) => (
+              {tableRows.map((row) => (
                 <tr key={row.installmentId} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 font-bold">{row.studentName}</td>
                   <td className="px-4 py-3">{row.parentName}</td>
@@ -489,7 +573,7 @@ export default function TuitionReminderDashboard() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1 flex-wrap">
-                      {row.parentId ? (
+                      {row.hasLinkedParent && row.parentId && !debugMode ? (
                         <button
                           type="button"
                           title="إرسال إشعار"
@@ -530,7 +614,7 @@ export default function TuitionReminderDashboard() {
             </tbody>
           </table>
         </div>
-        {displayRows.length === 0 && (
+        {tableRows.length === 0 && (
           <p className="text-center py-12 text-slate-400 font-bold">{emptyMessage}</p>
         )}
       </div>

@@ -19,6 +19,7 @@ export function useTuitionSchoolData(schoolId: string | undefined) {
   const [installments, setInstallments] = useState<TuitionInstallment[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [queryErrors, setQueryErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!schoolId) {
@@ -29,10 +30,12 @@ export function useTuitionSchoolData(schoolId: string | undefined) {
       setStudents([]);
       setInstallments([]);
       setPayments([]);
+      setQueryErrors({});
       return;
     }
 
     setLoading(true);
+    setQueryErrors({});
 
     logTuitionListenerDebug('TUITION_STUDENTS', schoolId, 'students', [
       "where('schoolId', '==', schoolId)",
@@ -55,7 +58,11 @@ export function useTuitionSchoolData(schoolId: string | undefined) {
           logTuitionListenerSnapshot('TUITION_STUDENTS', snap.size, snap.metadata.fromCache);
           setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as TuitionStudent));
         },
-        (error) => logTuitionListenerError('TUITION_STUDENTS', error),
+        (error) => {
+          logTuitionListenerError('TUITION_STUDENTS', error);
+          const err = error as { message?: string };
+          setQueryErrors((prev) => ({ ...prev, students: err?.message || String(error) }));
+        },
       ),
       onSnapshot(
         tuitionInstallmentsQuery(schoolId),
@@ -63,7 +70,11 @@ export function useTuitionSchoolData(schoolId: string | undefined) {
           logTuitionListenerSnapshot('TUITION_INSTALLMENTS', snap.size, snap.metadata.fromCache);
           setInstallments(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as TuitionInstallment));
         },
-        (error) => logTuitionListenerError('TUITION_INSTALLMENTS', error),
+        (error) => {
+          logTuitionListenerError('TUITION_INSTALLMENTS', error);
+          const err = error as { message?: string };
+          setQueryErrors((prev) => ({ ...prev, installments: err?.message || String(error) }));
+        },
       ),
       onSnapshot(
         tuitionPaymentsQuery(schoolId),
@@ -72,12 +83,17 @@ export function useTuitionSchoolData(schoolId: string | undefined) {
           setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
           setLoading(false);
         },
-        (error) => logTuitionListenerError('TUITION_PAYMENTS', error),
+        (error) => {
+          logTuitionListenerError('TUITION_PAYMENTS', error);
+          const err = error as { message?: string };
+          setQueryErrors((prev) => ({ ...prev, payments: err?.message || String(error) }));
+          setLoading(false);
+        },
       ),
     ];
 
     return () => unsubs.forEach((unsub) => unsub());
   }, [schoolId]);
 
-  return { students, installments, payments, loading };
+  return { students, installments, payments, loading, queryErrors };
 }
