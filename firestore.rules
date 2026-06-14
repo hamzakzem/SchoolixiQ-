@@ -77,6 +77,19 @@ service cloud.firestore {
         );
     }
 
+    function teacherCanAccessClass(classId) {
+      let u = userDoc();
+      return (
+        u.keys().hasAll(['assignedClassIds'])
+        && u.assignedClassIds is list
+        && u.assignedClassIds.size() > 0
+        && classId in u.assignedClassIds
+      ) || (
+        teacherAssignedClassId().size() > 0
+        && classId == teacherAssignedClassId()
+      );
+    }
+
     function isDismissalSchoolStaff() {
       return userRole() in ['admin', 'school_admin', 'assistant', 'staff'];
     }
@@ -149,8 +162,7 @@ service cloud.firestore {
         && hasSchoolId(resource.data)
         && userSchoolId() == resource.data.schoolId
         && resource.data.keys().hasAll(['classId'])
-        && resource.data.classId == teacherAssignedClassId()
-        && teacherAssignedClassId().size() > 0;
+        && teacherCanAccessClass(resource.data.classId);
     }
 
     // Academic reads for teachers/parents within their school (not finance/admin).
@@ -169,7 +181,7 @@ service cloud.firestore {
 
     function canReadClassDocument() {
       return canReadSchoolManagement()
-        || (signedIn() && isTeacher() && classId == teacherAssignedClassId() && teacherAssignedClassId().size() > 0)
+        || (signedIn() && isTeacher() && teacherCanAccessClass(classId))
         || (signedIn() && isParent() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId);
     }
 
@@ -186,8 +198,7 @@ service cloud.firestore {
         && hasSchoolId(resource.data)
         && userSchoolId() == resource.data.schoolId
         && resource.data.keys().hasAll(['classId'])
-        && resource.data.classId == teacherAssignedClassId()
-        && teacherAssignedClassId().size() > 0;
+        && teacherCanAccessClass(resource.data.classId);
     }
 
     function canReadStudentAsParent() {
@@ -852,8 +863,7 @@ service cloud.firestore {
         return isTeacher()
           && sameDismissalSchool()
           && dismissalData().keys().hasAll(['classId'])
-          && dismissalData().classId == teacherAssignedClassId()
-          && teacherAssignedClassId().size() > 0;
+          && teacherCanAccessClass(dismissalData().classId);
       }
 
       function teacherCanUpdateDismissal() {

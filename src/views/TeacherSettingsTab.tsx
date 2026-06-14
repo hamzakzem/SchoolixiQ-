@@ -151,7 +151,7 @@ export default function TeacherSettingsTab({
                <LayoutDashboard size={24} />
              </div>
              <div>
-               <h3 className="font-bold text-slate-900">{isRtl ? 'الصف المعيّن' : 'Assigned class'}</h3>
+               <h3 className="font-bold text-slate-900">{isRtl ? 'الصفوف المعيّنة' : 'Assigned classes'}</h3>
                <p className="text-sm text-slate-500">
                  {isRtl
                    ? 'يتم تعيين الصف من قسم إدارة حسابات الكادر فقط'
@@ -160,7 +160,7 @@ export default function TeacherSettingsTab({
              </div>
           </div>
           <div className="w-full px-4 py-3 bg-slate-50 rounded-xl font-bold text-slate-900">
-            {assignedClassId
+            {assignedClassId || assignedClassName
               ? assignedClassName || assignedClassId
               : TEACHER_NO_CLASS_MSG}
           </div>

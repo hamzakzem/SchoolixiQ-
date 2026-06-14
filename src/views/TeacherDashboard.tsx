@@ -13,6 +13,7 @@ import {
   deleteDoc,
   limit,
   getDoc,
+  documentId,
 } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 import { LanguageToggle } from "../components/LanguageToggle";
@@ -88,8 +89,10 @@ import {
 import TeacherDismissalTab from "./teacher/TeacherDismissalTab";
 import { DoorOpen } from "lucide-react";
 import {
+  chunkArray,
   filterClassesForTeacher,
   resolveTeacherClassId,
+  resolveTeacherClassIds,
   resolveTeacherClassName,
   teacherHasAssignedClass,
   TEACHER_NO_CLASS_MSG,
@@ -205,10 +208,15 @@ export default function TeacherDashboard() {
   // Homework state
   const [homework, setHomework] = useState<any[]>([]);
   const [showAddHomework, setShowAddHomework] = useState(false);
-  const assignedClassId = useMemo(
-    () => resolveTeacherClassId(profile as Record<string, unknown>),
+  const assignedClassIds = useMemo(
+    () => resolveTeacherClassIds(profile as Record<string, unknown>),
     [profile],
   );
+  const assignedClassId = useMemo(
+    () => assignedClassIds[0] || resolveTeacherClassId(profile as Record<string, unknown>),
+    [assignedClassIds, profile],
+  );
+  const assignedClassIdsKey = assignedClassIds.join(",");
   const hasAssignedClass = teacherHasAssignedClass(profile as Record<string, unknown>);
 
   const [newHomework, setNewHomework] = useState({
@@ -387,8 +395,8 @@ export default function TeacherDashboard() {
   const [behaviorClassFilter, setBehaviorClassFilter] = useState(assignedClassId);
 
   const teacherClasses = useMemo(
-    () => filterClassesForTeacher(classes, assignedClassId),
-    [classes, assignedClassId],
+    () => filterClassesForTeacher(classes, assignedClassIds),
+    [classes, assignedClassIds],
   );
   const assignedClassName = useMemo(
     () =>
@@ -398,25 +406,29 @@ export default function TeacherDashboard() {
     [profile, classes, teacherClasses],
   );
   const classAssignmentReady = hasAssignedClass && teacherClasses.length > 0;
-  const visibleHomework = useMemo(
-    () =>
-      assignedClassId
-        ? homework.filter((hw) => hw.classId === assignedClassId)
-        : [],
-    [homework, assignedClassId],
-  );
+  const visibleHomework = useMemo(() => {
+    if (!assignedClassIds.length) return [];
+    const idSet = new Set(assignedClassIds);
+    return homework.filter((hw) => idSet.has(hw.classId));
+  }, [homework, assignedClassIds]);
 
   useEffect(() => {
-    if (assignedClassId) {
-      setSelectedClassId(assignedClassId);
-      setBehaviorClassFilter(assignedClassId);
-      setNewHomework((prev) => ({ ...prev, classId: assignedClassId }));
+    const primary = assignedClassIds[0] || "";
+    if (primary) {
+      setSelectedClassId((prev) =>
+        assignedClassIds.includes(prev) ? prev : primary,
+      );
+      setBehaviorClassFilter(primary);
+      setNewHomework((prev) => ({
+        ...prev,
+        classId: assignedClassIds.includes(prev.classId) ? prev.classId : primary,
+      }));
     } else {
       setSelectedClassId("");
       setBehaviorClassFilter("");
       setNewHomework((prev) => ({ ...prev, classId: "" }));
     }
-  }, [assignedClassId]);
+  }, [assignedClassIdsKey]);
 
   const renderTeacherClassBlocked = (message?: string) => (
     <div className="bg-amber-50 border border-amber-200 rounded-[2rem] p-10 text-center">
@@ -439,41 +451,58 @@ export default function TeacherDashboard() {
       return;
     }
 
-    if (!assignedClassId) {
+    if (!assignedClassIds.length) {
       setClasses([]);
       setLoading(false);
       return;
     }
 
-    const queryName = "TEACHER_CLASS";
-    const meta: TeacherFirestoreMeta = {
+    const chunks = chunkArray(assignedClassIds);
+    const chunkResults = new Map<number, any[]>();
+
+    const rebuild = () => {
+      const all = chunks.flatMap((_, index) => chunkResults.get(index) || []);
+      setClasses(all);
+      setLoading(false);
+    };
+
+    const queryName = "TEACHER_CLASSES";
+    logTeacherFirestoreSetup({
       queryName,
       collection: "classes",
-      constraints: [`doc get ${assignedClassId}`],
+      constraints: [`documentId() in [${assignedClassIds.join(", ")}]`],
       uid: profile.uid,
       schoolId: profile.schoolId,
-    };
-    logTeacherFirestoreSetup(meta);
+    });
 
-    const classRef = doc(db, "classes", assignedClassId);
-    return onSnapshot(
-      classRef,
-      (classSnap) => {
-        logTeacherFirestoreSnapshot(
-          queryName,
-          classSnap.exists() ? 1 : 0,
-          classSnap.metadata.fromCache,
-        );
-        if (classSnap.exists()) {
-          setClasses([{ id: classSnap.id, ...classSnap.data() } as any]);
-        } else {
-          setClasses([]);
-        }
-        setLoading(false);
-      },
-      teacherSnapshotError(queryName),
-    );
-  }, [profile?.schoolId, profile?.uid, assignedClassId]);
+    const unsubscribers = chunks.map((chunk, chunkIndex) => {
+      const classQ = query(
+        collection(db, "classes"),
+        where(documentId(), "in", chunk),
+      );
+      return onSnapshot(
+        classQ,
+        (classSnap) => {
+          logTeacherFirestoreSnapshot(
+            queryName,
+            classSnap.size,
+            classSnap.metadata.fromCache,
+          );
+          chunkResults.set(
+            chunkIndex,
+            classSnap.docs.map((classDoc) => ({
+              id: classDoc.id,
+              ...classDoc.data(),
+            })),
+          );
+          rebuild();
+        },
+        teacherSnapshotError(queryName),
+      );
+    });
+
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [profile?.schoolId, profile?.uid, assignedClassIdsKey]);
 
   useEffect(() => {
     if (!needsSubjects || !profile?.schoolId || !auth.currentUser) return;
@@ -535,173 +564,236 @@ export default function TeacherDashboard() {
     if (
       !needsStudents ||
       !profile?.schoolId ||
-      !assignedClassId ||
+      !assignedClassIds.length ||
       !auth.currentUser
     ) {
       if (!needsStudents) setStudents([]);
       return;
     }
 
+    const chunks = chunkArray(assignedClassIds);
+    const chunkResults = new Map<number, Map<string, any>>();
     const queryName = "TEACHER_STUDENTS";
-    const meta: TeacherFirestoreMeta = {
+
+    const rebuild = () => {
+      const merged = new Map<string, any>();
+      chunkResults.forEach((chunkMap) => {
+        chunkMap.forEach((student, id) => merged.set(id, student));
+      });
+      setStudents(Array.from(merged.values()));
+    };
+
+    logTeacherFirestoreSetup({
       queryName,
       collection: "students",
       constraints: [
         `schoolId == ${profile.schoolId}`,
-        `classId == ${assignedClassId}`,
+        `classId in [${assignedClassIds.join(", ")}]`,
         "limit(500)",
       ],
       uid: profile.uid,
       schoolId: profile.schoolId,
-    };
-    logTeacherFirestoreSetup(meta);
+    });
 
-    const studentsQ = query(
-      collection(db, "students"),
-      where("schoolId", "==", profile.schoolId),
-      where("classId", "==", assignedClassId),
-      limit(500),
-    );
-    return onSnapshot(
-      studentsQ,
-      (snap) => {
-        logTeacherFirestoreSnapshot(
-          queryName,
-          snap.size,
-          snap.metadata.fromCache,
-        );
-        setStudents(
-          snap.docs.map((studentDoc) => ({
-            id: studentDoc.id,
-            ...studentDoc.data(),
-          })) as any,
-        );
-      },
-      teacherSnapshotError(queryName),
-    );
+    const unsubscribers = chunks.map((chunk, chunkIndex) => {
+      const studentsQ = query(
+        collection(db, "students"),
+        where("schoolId", "==", profile.schoolId),
+        where("classId", "in", chunk),
+        limit(500),
+      );
+      return onSnapshot(
+        studentsQ,
+        (snap) => {
+          logTeacherFirestoreSnapshot(
+            queryName,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          chunkResults.set(
+            chunkIndex,
+            new Map(
+              snap.docs.map((studentDoc) => [
+                studentDoc.id,
+                { id: studentDoc.id, ...studentDoc.data() },
+              ]),
+            ),
+          );
+          rebuild();
+        },
+        teacherSnapshotError(queryName),
+      );
+    });
+
+    return () => unsubscribers.forEach((unsub) => unsub());
   }, [
     needsStudents,
     profile?.schoolId,
     profile?.uid,
-    assignedClassId,
+    assignedClassIdsKey,
   ]);
 
   useEffect(() => {
     if (
       !needsHomework ||
       !profile?.schoolId ||
-      !assignedClassId ||
+      !assignedClassIds.length ||
       !auth.currentUser
     ) {
       if (!needsHomework) setHomework([]);
       return;
     }
 
+    const chunks = chunkArray(assignedClassIds);
+    const chunkResults = new Map<number, any[]>();
     const queryName = "TEACHER_HOMEWORK";
-    const meta: TeacherFirestoreMeta = {
+
+    const rebuild = () => {
+      const merged = chunkResults
+        .values()
+        .flat()
+        .sort(
+          (a: any, b: any) =>
+            (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+        );
+      const seen = new Set<string>();
+      setHomework(
+        merged.filter((item) => {
+          if (seen.has(item.id)) return false;
+          seen.add(item.id);
+          return true;
+        }) as any,
+      );
+    };
+
+    logTeacherFirestoreSetup({
       queryName,
       collection: "homework",
       constraints: [
         `schoolId == ${profile.schoolId}`,
-        `classId == ${assignedClassId}`,
+        `classId in [${assignedClassIds.join(", ")}]`,
         `teacherId == ${profile.uid}`,
         "limit(50)",
       ],
       uid: profile.uid,
       schoolId: profile.schoolId,
-    };
-    logTeacherFirestoreSetup(meta);
+    });
 
-    const homeworkQ = query(
-      collection(db, "homework"),
-      where("schoolId", "==", profile.schoolId),
-      where("classId", "==", assignedClassId),
-      where("teacherId", "==", profile.uid),
-      limit(50),
-    );
-    return onSnapshot(
-      homeworkQ,
-      (snap) => {
-        logTeacherFirestoreSnapshot(
-          queryName,
-          snap.size,
-          snap.metadata.fromCache,
-        );
-        setHomework(
-          snap.docs
-            .map((hwDoc) => ({ id: hwDoc.id, ...hwDoc.data() }))
-            .sort(
-              (a: any, b: any) =>
-                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
-            ) as any,
-        );
-      },
-      teacherSnapshotError(queryName),
-    );
+    const unsubscribers = chunks.map((chunk, chunkIndex) => {
+      const homeworkQ = query(
+        collection(db, "homework"),
+        where("schoolId", "==", profile.schoolId),
+        where("classId", "in", chunk),
+        where("teacherId", "==", profile.uid),
+        limit(50),
+      );
+      return onSnapshot(
+        homeworkQ,
+        (snap) => {
+          logTeacherFirestoreSnapshot(
+            queryName,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          chunkResults.set(
+            chunkIndex,
+            snap.docs.map((hwDoc) => ({ id: hwDoc.id, ...hwDoc.data() })),
+          );
+          rebuild();
+        },
+        teacherSnapshotError(queryName),
+      );
+    });
+
+    return () => unsubscribers.forEach((unsub) => unsub());
   }, [
     needsHomework,
     profile?.schoolId,
     profile?.uid,
-    assignedClassId,
+    assignedClassIdsKey,
   ]);
 
   useEffect(() => {
     if (
       !needsReports ||
       !profile?.schoolId ||
-      !assignedClassId ||
+      !assignedClassIds.length ||
       !auth.currentUser
     ) {
       if (!needsReports) setSentReports([]);
       return;
     }
 
+    const chunks = chunkArray(assignedClassIds);
+    const chunkResults = new Map<number, any[]>();
     const queryName = "TEACHER_REPORTS";
-    const meta: TeacherFirestoreMeta = {
+
+    const rebuild = () => {
+      const merged = chunkResults
+        .values()
+        .flat()
+        .sort(
+          (a: any, b: any) =>
+            (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+        );
+      const seen = new Set<string>();
+      setSentReports(
+        merged.filter((item) => {
+          if (seen.has(item.id)) return false;
+          seen.add(item.id);
+          return true;
+        }) as any,
+      );
+    };
+
+    logTeacherFirestoreSetup({
       queryName,
       collection: "teacher_reports",
       constraints: [
         `schoolId == ${profile.schoolId}`,
-        `classId == ${assignedClassId}`,
+        `classId in [${assignedClassIds.join(", ")}]`,
         `teacherId == ${profile.uid}`,
         "limit(50)",
       ],
       uid: profile.uid,
       schoolId: profile.schoolId,
-    };
-    logTeacherFirestoreSetup(meta);
+    });
 
-    const reportsQ = query(
-      collection(db, "teacher_reports"),
-      where("schoolId", "==", profile.schoolId),
-      where("classId", "==", assignedClassId),
-      where("teacherId", "==", profile.uid),
-      limit(50),
-    );
-    return onSnapshot(
-      reportsQ,
-      (snap) => {
-        logTeacherFirestoreSnapshot(
-          queryName,
-          snap.size,
-          snap.metadata.fromCache,
-        );
-        setSentReports(
-          snap.docs
-            .map((reportDoc) => ({ id: reportDoc.id, ...reportDoc.data() }))
-            .sort(
-              (a: any, b: any) =>
-                (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
-            ) as any,
-        );
-      },
-      teacherSnapshotError(queryName),
-    );
+    const unsubscribers = chunks.map((chunk, chunkIndex) => {
+      const reportsQ = query(
+        collection(db, "teacher_reports"),
+        where("schoolId", "==", profile.schoolId),
+        where("classId", "in", chunk),
+        where("teacherId", "==", profile.uid),
+        limit(50),
+      );
+      return onSnapshot(
+        reportsQ,
+        (snap) => {
+          logTeacherFirestoreSnapshot(
+            queryName,
+            snap.size,
+            snap.metadata.fromCache,
+          );
+          chunkResults.set(
+            chunkIndex,
+            snap.docs.map((reportDoc) => ({
+              id: reportDoc.id,
+              ...reportDoc.data(),
+            })),
+          );
+          rebuild();
+        },
+        teacherSnapshotError(queryName),
+      );
+    });
+
+    return () => unsubscribers.forEach((unsub) => unsub());
   }, [
     needsReports,
     profile?.schoolId,
     profile?.uid,
-    assignedClassId,
+    assignedClassIdsKey,
   ]);
 
   useEffect(() => {
@@ -868,7 +960,7 @@ export default function TeacherDashboard() {
   );
 
   const homeworkSubjectOptions = useMemo(() => {
-    const classId = assignedClassId || newHomework.classId || "";
+    const classId = newHomework.classId || assignedClassId || "";
     if (!classId) return teacherAssignedSubjects;
     return getSubjectOptionsForClass(teacherAssignedSubjects, classId, teacherClasses);
   }, [newHomework.classId, teacherAssignedSubjects, teacherClasses, assignedClassId]);
@@ -897,7 +989,7 @@ export default function TeacherDashboard() {
         return;
       }
 
-      const targetClassId = assignedClassId || newHomework.classId;
+      const targetClassId = newHomework.classId || assignedClassId;
       if (!targetClassId || !classAssignmentReady) {
         toast.error(TEACHER_NO_CLASS_MSG);
         return;
@@ -1397,7 +1489,7 @@ export default function TeacherDashboard() {
                         color: "indigo",
                       },
                       {
-                        label: isRtl ? "الصف المعيّن" : "Assigned class",
+                        label: isRtl ? "الصفوف المعيّنة" : "Assigned classes",
                         value: assignedClassName || 1,
                         icon: LayoutDashboard,
                         color: "orange",
@@ -1467,7 +1559,7 @@ export default function TeacherDashboard() {
                     </div>
 
                     <AnimatePresence>
-                      {assignedClassId && (
+                      {assignedClassIds.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, height: 0, marginTop: 0 }}
                           animate={{
@@ -1763,9 +1855,23 @@ export default function TeacherDashboard() {
                             <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
                               {t("selectClassLabel")}
                             </label>
-                            <div className="w-full px-5 py-4 bg-slate-50 rounded-2xl font-bold text-slate-900">
-                              {assignedClassName}
-                            </div>
+                            {teacherClasses.length > 1 ? (
+                              <select
+                                value={selectedClassId}
+                                onChange={(e) => setSelectedClassId(e.target.value)}
+                                className="w-full px-5 py-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-600/10 font-bold text-slate-900 transition-all appearance-none"
+                              >
+                                {teacherClasses.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <div className="w-full px-5 py-4 bg-slate-50 rounded-2xl font-bold text-slate-900">
+                                {assignedClassName}
+                              </div>
+                            )}
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
@@ -2101,7 +2207,7 @@ export default function TeacherDashboard() {
               {activeTab === "dismissal" && (
                 <div className="animate-in fade-in duration-500">
                   <TeacherDismissalTab
-                    assignedClassId={assignedClassId}
+                    assignedClassIds={assignedClassIds}
                     assignedClassName={assignedClassName}
                     isRtl={isRtl}
                   />
@@ -2397,9 +2503,29 @@ export default function TeacherDashboard() {
                     <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
                       {t("targetClass")}
                     </label>
-                    <div className="w-full px-5 py-3.5 bg-slate-50 rounded-xl font-bold text-slate-900">
-                      {assignedClassName || TEACHER_NO_CLASS_MSG}
-                    </div>
+                    {teacherClasses.length > 1 ? (
+                      <select
+                        required
+                        value={newHomework.classId}
+                        onChange={(e) =>
+                          setNewHomework({
+                            ...newHomework,
+                            classId: e.target.value,
+                          })
+                        }
+                        className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border-none font-bold outline-none appearance-none"
+                      >
+                        {teacherClasses.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="w-full px-5 py-3.5 bg-slate-50 rounded-xl font-bold text-slate-900">
+                        {assignedClassName || TEACHER_NO_CLASS_MSG}
+                      </div>
+                    )}
                   </div>
 
                   <div>

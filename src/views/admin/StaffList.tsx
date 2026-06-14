@@ -22,8 +22,8 @@ import {
   type SchoolSubjectOption,
 } from '../../lib/schoolSubjects';
 import {
-  buildTeacherClassWriteFields,
-  resolveTeacherClassId,
+  buildTeacherClassWriteFieldsFromIds,
+  resolveTeacherClassIds,
   type SchoolClassOption,
 } from '../../lib/teacherClass';
 import { getStaffPermissionOptions } from '../../lib/featureRegistry';
@@ -66,7 +66,7 @@ export default function StaffList() {
     phoneNumber: '',
     subjectId: '',
     subject: '',
-    classId: '',
+    classIds: [] as string[],
     salary: 0,
     joiningDate: new Date().toISOString().split('T')[0],
     gender: 'male' as 'male' | 'female',
@@ -187,13 +187,22 @@ export default function StaffList() {
 
   useEffect(() => {
     if (!showModal || newStaff.role !== 'teacher') return;
-    if (
-      newStaff.classId &&
-      !schoolClasses.some((schoolClass) => schoolClass.id === newStaff.classId)
-    ) {
-      setNewStaff((prev) => ({ ...prev, classId: '' }));
+    const validIds = newStaff.classIds.filter((id) =>
+      schoolClasses.some((schoolClass) => schoolClass.id === id),
+    );
+    if (validIds.length !== newStaff.classIds.length) {
+      setNewStaff((prev) => ({ ...prev, classIds: validIds }));
     }
-  }, [schoolClasses, showModal, newStaff.role, newStaff.classId]);
+  }, [schoolClasses, showModal, newStaff.role, newStaff.classIds]);
+
+  const toggleTeacherClass = (classId: string) => {
+    setNewStaff((prev) => {
+      const next = prev.classIds.includes(classId)
+        ? prev.classIds.filter((id) => id !== classId)
+        : [...prev.classIds, classId];
+      return { ...prev, classIds: next };
+    });
+  };
 
   useEffect(() => {
     if (!showModal || newStaff.role !== 'teacher' || subjectsLoading) return;
@@ -295,8 +304,7 @@ export default function StaffList() {
       subjectName: string;
       subject: string;
     } | null = null;
-    let teacherClassFields: ReturnType<typeof buildTeacherClassWriteFields> | null =
-      null;
+    let teacherClassFields: Record<string, string | string[]> | null = null;
 
     if (newStaff.role === 'teacher') {
       if (schoolSubjects.length === 0) {
@@ -326,14 +334,16 @@ export default function StaffList() {
         toast.error('لا توجد صفوف مسجلة لهذه المدرسة. أضف الصفوف من إدارة الصفوف أولاً.');
         return;
       }
-      const pickedClass = schoolClasses.find((c) => c.id === newStaff.classId);
-      if (!pickedClass) {
-        toast.error('يرجى اختيار صف دراسي معتمد للمعلم');
+      const validClassIds = newStaff.classIds.filter((id) =>
+        schoolClasses.some((c) => c.id === id),
+      );
+      if (validClassIds.length === 0) {
+        toast.error('يرجى اختيار صف دراسي واحد على الأقل للمعلم');
         return;
       }
-      teacherClassFields = buildTeacherClassWriteFields(
-        pickedClass.id,
-        pickedClass.name,
+      teacherClassFields = buildTeacherClassWriteFieldsFromIds(
+        validClassIds,
+        schoolClasses,
       );
       if (
         newStaff.password.trim() &&
@@ -361,6 +371,8 @@ export default function StaffList() {
           ...(newStaff.role === 'teacher' && teacherClassFields
             ? teacherClassFields
             : {
+                assignedClassIds: deleteField(),
+                assignedClassNames: deleteField(),
                 assignedClassId: deleteField(),
                 assignedClassName: deleteField(),
                 primaryClassId: deleteField(),
@@ -513,7 +525,7 @@ export default function StaffList() {
       phoneNumber: '', 
       subjectId: '',
       subject: '',
-      classId: '',
+      classIds: [] as string[],
       salary: 0,
       joiningDate: new Date().toISOString().split('T')[0],
       gender: 'male',
@@ -662,11 +674,20 @@ export default function StaffList() {
                     </span>
                   )}
                   {member.role === 'teacher' && (
-                    <span className="text-[10px] font-bold bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full border border-orange-100">
-                      {member.assignedClassName ||
-                        schoolClasses.find((c) => c.id === resolveTeacherClassId(member))?.name ||
-                        'بدون صف'}
-                    </span>
+                    resolveTeacherClassIds(member).length > 0 ? (
+                      resolveTeacherClassIds(member).map((classId) => (
+                        <span
+                          key={classId}
+                          className="text-[10px] font-bold bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full border border-orange-100"
+                        >
+                          {schoolClasses.find((c) => c.id === classId)?.name || classId}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[10px] font-bold bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full border border-orange-100">
+                        بدون صف
+                      </span>
+                    )
                   )}
                   {roleUsesPermissionPicker(member.role) && Array.isArray(member.permissions) && member.permissions.length > 0 && (
                     member.permissions.slice(0, 2).map((pId: string) => (
@@ -793,7 +814,7 @@ export default function StaffList() {
                     phoneNumber: member.phoneNumber || '',
                     subjectId: resolveSubjectIdForMember(member, schoolSubjects),
                     subject: getTeacherSubjectDisplay(member) || '',
-                    classId: resolveTeacherClassId(member),
+                    classIds: resolveTeacherClassIds(member),
                     salary: member.salary || 0,
                     joiningDate: member.joiningDate || new Date().toISOString().split('T')[0],
                     gender: member.gender || 'male',
@@ -976,8 +997,8 @@ export default function StaffList() {
                           ...(role === 'teacher'
                             ? { permissions: [] }
                             : role === 'guard'
-                              ? { subjectId: '', subject: '', classId: '', permissions: [] }
-                              : { subjectId: '', subject: '', classId: '' }),
+                              ? { subjectId: '', subject: '', classIds: [], permissions: [] }
+                              : { subjectId: '', subject: '', classIds: [] }),
                         });
                       }}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900 bg-white"
@@ -1033,7 +1054,9 @@ export default function StaffList() {
 
                   {newStaff.role === 'teacher' && (
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">الصف الدراسي</label>
+                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">
+                        الصفوف الدراسية (يمكن اختيار أكثر من صف)
+                      </label>
                       {classesLoading ? (
                         <p className="text-xs font-bold text-slate-400 px-4 py-3 rounded-xl border border-slate-100 bg-slate-50">
                           جاري تحميل الصفوف...
@@ -1043,22 +1066,58 @@ export default function StaffList() {
                           لا توجد صفوف مسجلة لهذه المدرسة. أضف الصفوف من إدارة الصفوف أولاً.
                         </p>
                       ) : (
-                        <select
-                          required
-                          name="teacher-class"
-                          value={newStaff.classId}
-                          onChange={(e) =>
-                            setNewStaff({ ...newStaff, classId: e.target.value })
-                          }
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold text-slate-900 bg-white"
-                        >
-                          <option value="">اختر الصف الدراسي</option>
-                          {schoolClasses.map((schoolClass) => (
-                            <option key={schoolClass.id} value={schoolClass.id}>
-                              {schoolClass.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="space-y-3">
+                          {newStaff.classIds.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {newStaff.classIds.map((classId) => {
+                                const picked = schoolClasses.find((c) => c.id === classId);
+                                return (
+                                  <span
+                                    key={classId}
+                                    className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full border border-orange-100"
+                                  >
+                                    {picked?.name || classId}
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleTeacherClass(classId)}
+                                      className="text-orange-400 hover:text-orange-700"
+                                      aria-label="إزالة الصف"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[220px] overflow-y-auto custom-scrollbar">
+                            {schoolClasses.map((schoolClass) => {
+                              const selected = newStaff.classIds.includes(schoolClass.id);
+                              return (
+                                <button
+                                  key={schoolClass.id}
+                                  type="button"
+                                  onClick={() => toggleTeacherClass(schoolClass.id)}
+                                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all border text-right ${
+                                    selected
+                                      ? 'bg-orange-600 text-white border-transparent shadow-md'
+                                      : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'
+                                  }`}
+                                >
+                                  {selected ? (
+                                    <CheckSquare size={18} />
+                                  ) : (
+                                    <Square size={18} className="opacity-40" />
+                                  )}
+                                  <span className="text-sm font-bold">{schoolClass.name}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-400">
+                            يجب اختيار صف واحد على الأقل للمعلم
+                          </p>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1164,7 +1223,7 @@ export default function StaffList() {
                         (schoolSubjects.length === 0 ||
                           !newStaff.subjectId ||
                           schoolClasses.length === 0 ||
-                          !newStaff.classId))
+                          newStaff.classIds.length === 0))
                     }
                     className="flex-1 min-w-[120px] py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg flex items-center justify-center gap-2"
                   >

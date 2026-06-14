@@ -23,6 +23,8 @@ export interface UserProfile {
   subject?: string;
   assignedClassId?: string;
   assignedClassName?: string;
+  assignedClassIds?: string[];
+  assignedClassNames?: string;
   preferredClassId?: string;
   preferredSubject?: string;
   permissions?: Record<string, boolean>;

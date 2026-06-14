@@ -15,13 +15,13 @@ import { teacherHasAssignedClass, TEACHER_NO_CLASS_MSG } from '../../lib/teacher
 import DismissalStudentCard from '../../components/dismissal/DismissalStudentCard';
 
 type Props = {
-  assignedClassId: string;
+  assignedClassIds: string[];
   assignedClassName?: string;
   isRtl?: boolean;
 };
 
 export default function TeacherDismissalTab({
-  assignedClassId,
+  assignedClassIds,
   assignedClassName,
   isRtl = true,
 }: Props) {
@@ -30,30 +30,31 @@ export default function TeacherDismissalTab({
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const hasClass = teacherHasAssignedClass(profile as Record<string, unknown>);
+  const classIdSet = useMemo(() => new Set(assignedClassIds), [assignedClassIds]);
 
   useEffect(() => {
-    if (!profile?.schoolId || !assignedClassId) return;
+    if (!profile?.schoolId || !assignedClassIds.length) return;
     return subscribeSchoolDismissals(profile.schoolId, setRequests);
-  }, [profile?.schoolId, assignedClassId]);
+  }, [profile?.schoolId, assignedClassIds.join(',')]);
 
   const classRequests = useMemo(
     () =>
       requests.filter(
         (r) =>
-          r.classId === assignedClassId &&
+          classIdSet.has(r.classId) &&
           ACTIVE_DISMISSAL_STATUSES.includes(r.status),
       ),
-    [requests, assignedClassId],
+    [requests, classIdSet],
   );
 
-  const updateStatus = async (id: string, status: 'called' | 'ready') => {
-    if (!profile || !assignedClassId) return;
+  const updateStatus = async (id: string, status: 'called' | 'ready', classId: string) => {
+    if (!profile || !classId) return;
     setBusyId(id);
     try {
       await teacherUpdateDismissalStatus(id, status, {
         uid: profile.uid,
         name: profile.name || 'معلم',
-      }, assignedClassId);
+      }, classId);
       toast.success(status === 'called' ? 'تم النداء' : 'الطالب جاهز');
     } catch (e: any) {
       toast.error(e.message || 'فشل التحديث');
@@ -62,7 +63,7 @@ export default function TeacherDismissalTab({
     }
   };
 
-  if (!hasClass || !assignedClassId) {
+  if (!hasClass || !assignedClassIds.length) {
     return (
       <div className="py-20 text-center text-slate-400 font-bold" dir="rtl">
         {TEACHER_NO_CLASS_MSG}
@@ -75,12 +76,12 @@ export default function TeacherDismissalTab({
       <div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
           <DoorOpen size={24} />
-          {isRtl ? 'طلبات التسريح — صفي' : 'Dismissal requests — my class'}
+          {isRtl ? 'طلبات التسريح — صفوفي' : 'Dismissal requests — my classes'}
         </h2>
         <p className="text-sm text-slate-500 font-bold mt-1">
           {isRtl
-            ? `الصف المعين: ${assignedClassName || assignedClassId} — طلبات مرتبطة بهذا الصف فقط`
-            : `Assigned class: ${assignedClassName || assignedClassId}`}
+            ? `الصفوف المعيّنة: ${assignedClassName || assignedClassIds.join('، ')} — طلبات مرتبطة بهذه الصفوف فقط`
+            : `Assigned classes: ${assignedClassName || assignedClassIds.join(', ')}`}
         </p>
       </div>
 
@@ -102,7 +103,7 @@ export default function TeacherDismissalTab({
             <div className="flex gap-2 shrink-0">
               {r.status === 'waiting' && (
                 <button
-                  onClick={() => updateStatus(r.id, 'called')}
+                  onClick={() => updateStatus(r.id, 'called', r.classId)}
                   disabled={busyId === r.id}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm disabled:opacity-50"
                 >
@@ -112,7 +113,7 @@ export default function TeacherDismissalTab({
               )}
               {(r.status === 'waiting' || r.status === 'called') && (
                 <button
-                  onClick={() => updateStatus(r.id, 'ready')}
+                  onClick={() => updateStatus(r.id, 'ready', r.classId)}
                   disabled={busyId === r.id}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-50"
                 >
@@ -125,7 +126,7 @@ export default function TeacherDismissalTab({
         ))}
         {classRequests.length === 0 && (
           <p className="text-center text-slate-400 py-16 font-bold">
-            {isRtl ? 'لا توجد طلبات تسريح نشطة لصفك' : 'No active dismissal requests for your class'}
+            {isRtl ? 'لا توجد طلبات تسريح نشطة لصفوفك' : 'No active dismissal requests for your classes'}
           </p>
         )}
       </div>
