@@ -68,10 +68,14 @@ export type ReminderAuditEntry = {
   parentId?: string;
   sentBy: string;
   sentByName?: string;
+  senderEmail?: string;
+  senderRole?: string;
+  sentFrom?: string;
   channel: 'notification' | 'whatsapp_link' | 'bulk';
   deliveryResult: 'sent' | 'skipped_dedup' | 'no_parent' | 'failed' | 'restored';
   escalationLevel?: EscalationLevel;
   amount?: number;
+  dueDate?: string;
   messagePreview?: string;
   createdAt: ReturnType<typeof serverTimestamp>;
 };
@@ -301,10 +305,25 @@ export async function sendTuitionReminderWithTracking(params: {
   installment: { id?: string; amount?: number; dueDate?: string | Date };
   senderId: string;
   senderName?: string;
+  senderEmail?: string;
+  senderRole?: string;
+  sentFrom?: string;
+  metadataSource?: string;
   channel?: 'notification' | 'whatsapp_link' | 'bulk';
   skipDedup?: boolean;
 }): Promise<'sent' | 'skipped_dedup' | 'no_parent' | 'failed'> {
   const { schoolId, student, installment, senderId } = params;
+  const auditBase = {
+    senderEmail: params.senderEmail,
+    senderRole: params.senderRole,
+    sentFrom: params.sentFrom,
+    dueDate:
+      installment.dueDate instanceof Date
+        ? installment.dueDate.toISOString()
+        : typeof installment.dueDate === 'string'
+          ? installment.dueDate
+          : undefined,
+  };
   if (student.schoolId && student.schoolId !== schoolId) return 'failed';
 
   const settings = await getSchoolTuitionReminderSettings(schoolId);
@@ -327,6 +346,7 @@ export async function sendTuitionReminderWithTracking(params: {
         channel: params.channel || 'notification',
         deliveryResult: 'skipped_dedup',
         amount: installment.amount,
+        ...auditBase,
       });
       return 'skipped_dedup';
     }
@@ -342,6 +362,7 @@ export async function sendTuitionReminderWithTracking(params: {
       channel: params.channel || 'notification',
       deliveryResult: 'no_parent',
       amount: installment.amount,
+      ...auditBase,
     });
     return 'no_parent';
   }
@@ -359,9 +380,19 @@ export async function sendTuitionReminderWithTracking(params: {
   const message = `\u062a\u0630\u0643\u064a\u0631 \u0628\u0642\u0633\u0637 \u0627\u0644\u0637\u0627\u0644\u0628 ${student.name || ''} \u0628\u0645\u0628\u0644\u063a ${amountLabel} \u062f.\u0639 \u0645\u0633\u062a\u062d\u0642 \u0628\u062a\u0627\u0631\u064a\u062e ${dueLabel}.`;
 
   const dedupKey = `tuition-${installment.id || student.id}-${newCount}-${Date.now()}`;
+  const reminderPayload = buildTuitionReminderPayload(
+    student,
+    installment,
+    senderId,
+    schoolId,
+    message,
+  );
+  const metadataSource = params.metadataSource || reminderPayload.metadata.source;
 
   const ok = await notificationService.sendWithDedup({
     userId: parentIds[0],
+    recipientId: parentIds[0],
+    receiverId: parentIds[0],
     title:
       escalationLevel >= 2
         ? `\u062a\u0646\u0628\u064a\u0647 \u0623\u0642\u0633\u0627\u0637 \u0645\u0633\u062a\u062d\u0642`
@@ -371,7 +402,12 @@ export async function sendTuitionReminderWithTracking(params: {
     schoolId,
     senderId,
     metadata: {
-      ...buildTuitionReminderPayload(student, installment, senderId, schoolId, message).metadata,
+      ...reminderPayload.metadata,
+      source: metadataSource,
+      studentId: student.id,
+      installmentId: installment.id,
+      amount: installment.amount,
+      dueDate: auditBase.dueDate || dueLabel,
       dedupKey,
       escalationLevel,
       installmentAlert: true,
@@ -388,6 +424,7 @@ export async function sendTuitionReminderWithTracking(params: {
       channel: params.channel || 'notification',
       deliveryResult: 'failed',
       amount: installment.amount,
+      ...auditBase,
     });
     return 'failed';
   }
@@ -423,9 +460,29 @@ export async function sendTuitionReminderWithTracking(params: {
     escalationLevel,
     amount: installment.amount,
     messagePreview: message.slice(0, 120),
+    ...auditBase,
   });
 
   return 'sent';
+}
+
+/** Overview quick action — parent notification only, with audit trail. */
+export async function sendOverviewQuickActionReminder(params: {
+  schoolId: string;
+  schoolName: string;
+  student: { id: string; name?: string; schoolId?: string; parentPhone?: string };
+  installment: { id?: string; amount?: number; dueDate?: string | Date };
+  senderId: string;
+  senderName?: string;
+  senderEmail?: string;
+  senderRole?: string;
+}): Promise<'sent' | 'skipped_dedup' | 'no_parent' | 'failed'> {
+  return sendTuitionReminderWithTracking({
+    ...params,
+    channel: 'notification',
+    metadataSource: 'overview_quick_action',
+    sentFrom: 'admin_overview_quick_action',
+  });
 }
 
 export async function fetchReminderLogs(

@@ -31,14 +31,13 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { notificationService } from '../../lib/notificationService';
-import { fetchStudentLinkFields } from '../../lib/schoolSync';
 import {
   buildDailyStudentRecords,
   getTodayDateStr,
   parseDueDate,
   type DailyStudentRecord,
 } from '../../lib/dailySummaryUtils';
+import { OverviewTuitionQuickReminder } from './OverviewTuitionQuickReminder';
 
 type ModalType = 'present' | 'absent' | 'market' | null;
 
@@ -211,7 +210,7 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
 
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [sendingAlerts, setSendingAlerts] = useState(false);
+  const [showTuitionQuickReminder, setShowTuitionQuickReminder] = useState(false);
   const [deletingAttendance, setDeletingAttendance] = useState(false);
   const [showDangerDelete, setShowDangerDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -452,73 +451,12 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
     }
   };
 
-  const sendInstallmentAlerts = async () => {
-    if (!profile?.schoolId) return;
-    setSendingAlerts(true);
-    const now = new Date();
-    const weekAhead = new Date();
-    weekAhead.setDate(weekAhead.getDate() + 7);
-    let sent = 0;
-
-    try {
-      const studentsMap = new Map(students.map((s) => [s.id, s]));
-
-      for (const inst of installments) {
-        if (inst.status === 'paid') continue;
-        const due = parseDueDate(inst.dueDate);
-        const isOverdue = due < now;
-        const isDueSoon = due >= now && due <= weekAhead;
-        if (!isOverdue && !isDueSoon) continue;
-
-        const student = studentsMap.get(inst.studentId);
-        if (!student) continue;
-
-        const link = await fetchStudentLinkFields(inst.studentId);
-        if (!link?.parentIds?.length) continue;
-
-        const dueLabel = due.toLocaleDateString(isRtl ? 'ar-IQ' : 'en-US');
-        const title = isOverdue
-          ? isRtl
-            ? 'تنبيه: قسط متأخر'
-            : 'Installment overdue'
-          : isRtl
-            ? 'تنبيه: استحقاق قسط'
-            : 'Installment due soon';
-
-        const message = isOverdue
-          ? isRtl
-            ? `نود تذكيركم بتأخر سداد قسط الطالب ${student.name} بمبلغ ${Number(inst.amount).toLocaleString()} د.ع (كان مستحقاً ${dueLabel}).`
-            : `Installment for ${student.name} of ${Number(inst.amount).toLocaleString()} IQD was due on ${dueLabel}.`
-          : isRtl
-            ? `قسط الطالب ${student.name} بمبلغ ${Number(inst.amount).toLocaleString()} د.ع مستحق بتاريخ ${dueLabel}.`
-            : `Installment for ${student.name} of ${Number(inst.amount).toLocaleString()} IQD is due on ${dueLabel}.`;
-
-        await notificationService.notifyStudentParents(inst.studentId, {
-          title,
-          message,
-          type: 'payment',
-          schoolId: profile.schoolId,
-          metadata: {
-            banner: true,
-            installmentAlert: true,
-            installmentId: inst.id,
-            studentId: inst.studentId,
-            sourceId: `installment_alert_${inst.id}_${todayStr}`,
-          },
-        });
-        sent++;
-      }
-
-      toast.success(
-        isRtl
-          ? `تم إرسال ${sent} تنبيه لأولياء الأمور`
-          : `Sent ${sent} parent alerts`,
-      );
-    } catch {
-      toast.error(isRtl ? 'فشل إرسال التنبيهات' : 'Failed to send alerts');
-    } finally {
-      setSendingAlerts(false);
+  const openTuitionQuickReminder = () => {
+    if (!profile?.schoolId) {
+      toast.error(isRtl ? 'معرف المدرسة غير متوفر' : 'School ID missing');
+      return;
     }
+    setShowTuitionQuickReminder(true);
   };
 
   if (!hasDailySummary) return null;
@@ -720,16 +658,11 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
             </p>
           </div>
           <button
-            onClick={sendInstallmentAlerts}
-            disabled={sendingAlerts}
+            onClick={openTuitionQuickReminder}
             aria-label={isRtl ? 'إرسال تنبيهات الأقساط لأولياء الأمور' : 'Send installment alerts to parents'}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl font-bold text-sm transition-all disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
           >
-            {sendingAlerts ? (
-              <Clock size={16} className="animate-spin" />
-            ) : (
-              <Send size={16} />
-            )}
+            <Send size={16} />
             <span className="truncate">
               {isRtl ? 'إرسال تنبيهات الأقساط' : 'Send fee alerts'}
             </span>
@@ -910,6 +843,11 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <OverviewTuitionQuickReminder
+        open={showTuitionQuickReminder}
+        onClose={() => setShowTuitionQuickReminder(false)}
+      />
     </div>
   );
 }
