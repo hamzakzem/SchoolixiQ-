@@ -64,6 +64,7 @@ import {
   setBackendApiBaseUrl,
 } from "./lib/apiUtils";
 import ScanHandler from "./components/ScanHandler";
+import { AudioNotificationManager } from "./components/AudioNotificationManager";
 import { useLandingPageConfig } from "./lib/landingPageConfig";
 import { PageLoadingSkeleton } from "./components/ui/Skeleton";
 import { LanguageToggle } from "./components/LanguageToggle";
