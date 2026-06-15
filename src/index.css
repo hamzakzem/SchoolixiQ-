@@ -1347,18 +1347,20 @@ html.dark .parent-dashboard-menu .parent-menu-search {
 
 @media (min-width: 768px) {
   .partner-logo-wrap {
-    width: 7.75rem;
-    height: 7.75rem;
+    width: 7.5rem;
+    height: 7.5rem;
   }
 }
 
 .partner-logo-ring {
   position: absolute;
-  inset: -4px;
+  inset: -6px;
   border-radius: 9999px;
   background: conic-gradient(from 0deg, #0B2345, #D4AF37, #0B2345, #D4AF37, #0B2345);
-  opacity: 0.55;
-  transition: opacity 0.3s ease;
+  opacity: 0.9;
+  animation: partner-logo-ring-spin 10s linear infinite;
+  transition: opacity 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.25);
 }
 
 .partner-logo-inner {
@@ -1368,7 +1370,7 @@ html.dark .parent-dashboard-menu .parent-menu-search {
   height: 100%;
   border-radius: 9999px;
   background: #ffffff;
-  border: 2px solid rgba(11, 35, 69, 0.08);
+  border: 2px solid rgba(11, 35, 69, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1377,7 +1379,7 @@ html.dark .parent-dashboard-menu .parent-menu-search {
 
 html.dark .partner-logo-inner {
   background: #0f172a;
-  border-color: rgba(212, 175, 55, 0.15);
+  border-color: rgba(212, 175, 55, 0.2);
 }
 
 .partner-premium-card:hover .partner-logo-ring,
@@ -1385,13 +1387,23 @@ html.dark .partner-logo-inner {
 .partner-premium-card:active .partner-logo-ring {
   opacity: 1;
   animation: partner-logo-ring-spin 4s linear infinite;
+  box-shadow:
+    0 0 20px rgba(212, 175, 55, 0.35),
+    0 0 0 2px rgba(11, 35, 69, 0.12);
+}
+
+.partner-premium-card:hover,
+.partner-premium-card:focus-within {
+  box-shadow:
+    0 28px 56px -20px rgba(11, 35, 69, 0.22),
+    0 0 0 1px rgba(212, 175, 55, 0.15);
 }
 
 .partner-card-glow:hover,
 .partner-card-glow:focus-visible {
   box-shadow:
-    0 24px 48px -16px rgba(11, 35, 69, 0.18),
-    0 0 0 1px rgba(212, 175, 55, 0.12);
+    0 28px 56px -20px rgba(11, 35, 69, 0.24),
+    0 0 0 1px rgba(212, 175, 55, 0.2);
 }
 
 html.dark .partner-success-section > div {
@@ -1404,6 +1416,10 @@ html.dark .partner-success-section > div {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .partner-logo-ring {
+    animation: none !important;
+  }
+
   .partner-premium-card:hover .partner-logo-ring,
   .partner-premium-card:focus-visible .partner-logo-ring,
   .partner-premium-card:active .partner-logo-ring {

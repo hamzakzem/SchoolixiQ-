@@ -123,6 +123,31 @@ export function normalizeFeaturedSchoolPartners(
     }));
 }
 
+export function dedupePartnersByLogo(partners: FooterPartner[]): FooterPartner[] {
+  const seen = new Set<string>();
+  const result: FooterPartner[] = [];
+  for (const partner of partners) {
+    const key = partner.logoUrl.trim().toLowerCase() || partner.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(partner);
+  }
+  return result;
+}
+
+export function excludePartnersByLogo(
+  partners: FooterPartner[],
+  exclude: FooterPartner[],
+): FooterPartner[] {
+  const excludeKeys = new Set(
+    exclude.map((partner) => partner.logoUrl.trim().toLowerCase() || partner.id),
+  );
+  return partners.filter((partner) => {
+    const key = partner.logoUrl.trim().toLowerCase() || partner.id;
+    return !excludeKeys.has(key);
+  });
+}
+
 export function hasConfiguredFooterPartners(config: {
   successPartners?: { logoUrl?: string }[];
   ourPartners?: { logoUrl?: string; active?: boolean }[];

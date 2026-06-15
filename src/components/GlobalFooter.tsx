@@ -5,6 +5,7 @@ import { db } from "../lib/firebase";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { resolveAppLogoSrc } from "../lib/brandAssets";
 import {
+  excludePartnersByLogo,
   normalizeFeaturedSchoolPartners,
   normalizeOurPartners,
   normalizeSuccessPartners,
@@ -174,11 +175,16 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
   const premiumSuccessPartners = successPartners.length
     ? successPartners
     : featuredSchoolPartners;
-  const premiumSource = successPartners.length
-    ? ("config" as const)
+  const premiumSource: "config" | "featured-schools" | null = successPartners.length
+    ? "config"
     : featuredSchoolPartners.length
-      ? ("featured-schools" as const)
+      ? "featured-schools"
       : null;
+
+  const premiumOurPartners = useMemo(
+    () => excludePartnersByLogo(ourPartners, premiumSuccessPartners),
+    [ourPartners, premiumSuccessPartners],
+  );
 
   useEffect(() => {
     console.log("[SuccessPartners] FOOTER_MODE", {
@@ -309,6 +315,15 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
           <SuccessPartnersSection
             partners={premiumSuccessPartners}
             source={premiumSource}
+            variant="success"
+          />
+        )}
+
+        {premiumOurPartners.length > 0 && (
+          <SuccessPartnersSection
+            partners={premiumOurPartners}
+            source="config"
+            variant="our"
           />
         )}
 
@@ -395,26 +410,6 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
               </div>
             </div>
           )}
-
-        {ourPartners.length > 0 && (
-          <div className="w-full flex flex-col items-center mt-6 mb-12 border-t border-slate-200/40 dark:border-slate-800/40 pt-10">
-            <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 mb-6 uppercase tracking-widest text-center select-none">
-              شركاؤنا
-            </h4>
-            <div className="flex flex-wrap justify-center items-center gap-6 md:gap-8 max-w-4xl mx-auto">
-              {ourPartners.map((partner) => (
-                <div key={partner.id} className="relative">
-                  <PartnerLogoCircle partner={partner} />
-                  {partner.name ? (
-                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute -bottom-6 whitespace-nowrap bg-slate-900/95 text-white dark:bg-white dark:text-slate-900 px-2 py-0.5 rounded-md text-[9px] z-20 shadow-md">
-                      {partner.name}
-                    </span>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="w-full flex flex-col items-center pt-8 border-t border-slate-200/60 dark:border-slate-800/60">
           {config.appLogo && (
