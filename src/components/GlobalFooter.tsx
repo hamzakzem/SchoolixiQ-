@@ -7,6 +7,7 @@ import {
   normalizeSuccessPartners,
   type FooterPartner,
 } from "../lib/footerPartners";
+import { SuccessPartnersSection } from "./SuccessPartnersSection";
 
 function PromotionalBannerSlider({
   banners,
@@ -194,51 +195,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
           )}
 
         {successPartners.length > 0 && (
-          <div className="mb-16 md:mb-24 text-center">
-            <div className="mb-10">
-              <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white mb-3">
-                شركاء النجاح
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 max-w-4xl mx-auto px-4">
-              {successPartners.map((partner) => {
-                const card = (
-                  <div className="group relative flex flex-col items-center justify-center p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 hover:border-indigo-100 dark:hover:border-indigo-500/20 transition-all duration-200">
-                    <div className="h-14 md:h-16 flex items-center justify-center mb-4 opacity-75 group-hover:opacity-100 transition-opacity duration-200">
-                      <img
-                        src={partner.logoUrl}
-                        alt={partner.name || "Partner"}
-                        className="max-h-full max-w-full object-contain filter grayscale group-hover:grayscale-0 group-hover:scale-[1.03] transition-all duration-200"
-                      />
-                    </div>
-                    {partner.name ? (
-                      <span className="text-xs md:text-sm font-bold text-slate-400 dark:text-slate-500 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors duration-200 opacity-0 group-hover:opacity-100 absolute bottom-3">
-                        {partner.name}
-                      </span>
-                    ) : null}
-                  </div>
-                );
-
-                if (partner.link) {
-                  return (
-                    <a
-                      key={partner.id}
-                      href={partner.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={partner.name || undefined}
-                      className="block"
-                    >
-                      {card}
-                    </a>
-                  );
-                }
-
-                return <div key={partner.id}>{card}</div>;
-              })}
-            </div>
-          </div>
+          <SuccessPartnersSection partners={successPartners} />
         )}
 
         <div className="text-center mb-16 px-4">

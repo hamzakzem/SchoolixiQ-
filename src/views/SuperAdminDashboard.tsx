@@ -314,7 +314,7 @@ export default function SuperAdminDashboard() {
   const [systemConfig, setSystemConfig] = useState<{
     supportPhones: string[];
     supportEmails: string[];
-    successPartners: { name: string; logoUrl: string }[];
+    successPartners: { name: string; logoUrl: string; link?: string; description?: string; active?: boolean }[];
     ourPartners?: { name: string; logoUrl: string; link: string; active?: boolean }[];
     appName: string;
     appLogo: string;
@@ -4211,7 +4211,7 @@ export default function SuperAdminDashboard() {
                               ...systemConfig,
                               successPartners: [
                                 ...systemConfig.successPartners,
-                                { name: "", logoUrl: "" },
+                                { name: "", logoUrl: "", link: "", description: "", active: true },
                               ],
                             })
                           }
@@ -4318,6 +4318,70 @@ export default function SuperAdminDashboard() {
                                 )}
                               </div>
                             </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-2">
+                                الوصف (اختياري)
+                              </label>
+                              <textarea
+                                value={partner.description || ""}
+                                onChange={(e) => {
+                                  const newPartners = [...systemConfig.successPartners];
+                                  newPartners[idx] = {
+                                    ...newPartners[idx],
+                                    description: e.target.value,
+                                  };
+                                  setSystemConfig({
+                                    ...systemConfig,
+                                    successPartners: newPartners,
+                                  });
+                                }}
+                                rows={3}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:border-blue-500 transition-all text-sm resize-none"
+                                placeholder="وصف مختصر عن الشريك"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-2">
+                                رابط الموقع (اختياري)
+                              </label>
+                              <input
+                                type="url"
+                                value={partner.link || ""}
+                                onChange={(e) => {
+                                  const newPartners = [...systemConfig.successPartners];
+                                  newPartners[idx] = {
+                                    ...newPartners[idx],
+                                    link: e.target.value,
+                                  };
+                                  setSystemConfig({
+                                    ...systemConfig,
+                                    successPartners: newPartners,
+                                  });
+                                }}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:border-blue-500 transition-all text-sm"
+                                placeholder="https://example.com"
+                                dir="ltr"
+                              />
+                            </div>
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={partner.active !== false}
+                                onChange={(e) => {
+                                  const newPartners = [...systemConfig.successPartners];
+                                  newPartners[idx] = {
+                                    ...newPartners[idx],
+                                    active: e.target.checked,
+                                  };
+                                  setSystemConfig({
+                                    ...systemConfig,
+                                    successPartners: newPartners,
+                                  });
+                                }}
+                                className="rounded border-slate-300"
+                              />
+                              ظاهر في الفوتر
+                            </label>
                           </div>
                         ))}
                         {systemConfig.successPartners.length === 0 && (

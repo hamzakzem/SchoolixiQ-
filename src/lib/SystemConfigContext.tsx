@@ -22,7 +22,7 @@ interface SystemConfig {
   androidApkUrl?: string;
   supportPhones: string[];
   supportEmails: string[];
-  successPartners: {name: string, logoUrl: string}[];
+  successPartners: { name: string; logoUrl: string; link?: string; description?: string; active?: boolean }[];
   ourPartners?: { name: string; logoUrl: string; link: string; active?: boolean }[];
   marketingTitle?: string;
   marketingSubtitle?: string;
