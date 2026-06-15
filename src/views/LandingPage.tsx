@@ -841,7 +841,7 @@ export default function LandingPage() {
             {config.footerMarketingText}
           </div>
         )}
-        {showPartners && <GlobalFooter />}
+        {showPartners && <GlobalFooter compact={false} />}
       </footer>
     </div>
   );

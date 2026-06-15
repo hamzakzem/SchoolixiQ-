@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { db } from "../lib/firebase";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { resolveAppLogoSrc } from "../lib/brandAssets";
 import {
+  normalizeFeaturedSchoolPartners,
   normalizeOurPartners,
   normalizeSuccessPartners,
   type FooterPartner,
@@ -118,10 +121,21 @@ function PartnerLogoCircle({
 function CompactPartnerRow({
   partners,
   label,
+  reason,
 }: {
   partners: FooterPartner[];
   label: string;
+  reason: string;
 }) {
+  useEffect(() => {
+    if (!partners.length) return;
+    console.log("[SuccessPartners] RENDER_OLD_ROW", {
+      reason,
+      label,
+      count: partners.length,
+    });
+  }, [partners.length, label, reason]);
+
   if (!partners.length) return null;
   return (
     <div className="flex flex-col items-center justify-center mb-5 mt-2 gap-2.5">
@@ -142,7 +156,11 @@ function CompactPartnerRow({
 }
 
 export function GlobalFooter({ compact = false }: { compact?: boolean }) {
+  const isCompact = compact === true;
   const { config } = useSystemConfig();
+  const [featuredSchoolPartners, setFeaturedSchoolPartners] = useState<
+    FooterPartner[]
+  >([]);
 
   const successPartners = useMemo(
     () => normalizeSuccessPartners(config.successPartners),
@@ -153,14 +171,104 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
     [config.ourPartners],
   );
 
-  if (compact) {
+  const premiumSuccessPartners = successPartners.length
+    ? successPartners
+    : featuredSchoolPartners;
+  const premiumSource = successPartners.length
+    ? ("config" as const)
+    : featuredSchoolPartners.length
+      ? ("featured-schools" as const)
+      : null;
+
+  useEffect(() => {
+    console.log("[SuccessPartners] FOOTER_MODE", {
+      compact: isCompact,
+      successPartnersCount: successPartners.length,
+      ourPartnersCount: ourPartners.length,
+      featuredSchoolPartnersCount: featuredSchoolPartners.length,
+      premiumSuccessPartnersCount: premiumSuccessPartners.length,
+      rawSuccessPartnersCount: Array.isArray(config.successPartners)
+        ? config.successPartners.length
+        : 0,
+    });
+  }, [
+    isCompact,
+    successPartners.length,
+    ourPartners.length,
+    featuredSchoolPartners.length,
+    premiumSuccessPartners.length,
+    config.successPartners,
+  ]);
+
+  useEffect(() => {
+    if (isCompact || successPartners.length > 0) {
+      setFeaturedSchoolPartners([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const schoolsQ = query(
+          collection(db, "schools"),
+          where("featured", "==", true),
+          where("status", "==", "active"),
+          limit(12),
+        );
+        const schoolsSnap = await getDocs(schoolsQ);
+        if (cancelled) return;
+
+        const partners = normalizeFeaturedSchoolPartners(
+          schoolsSnap.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...(docSnap.data() as {
+              name?: string;
+              logoUrl?: string;
+              googleMapsUrl?: string;
+              featured?: boolean;
+              status?: string;
+            }),
+          })),
+        );
+
+        setFeaturedSchoolPartners(partners);
+
+        if (partners.length > 0) {
+          console.log("[SuccessPartners] FALLBACK_FEATURED_SCHOOLS", {
+            count: partners.length,
+            reason: "system/config.successPartners empty — using featured schools",
+          });
+        }
+      } catch (error) {
+        console.warn("[SuccessPartners] featured schools fallback failed:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCompact, successPartners.length]);
+
+  if (isCompact) {
     return (
-      <footer className="mt-auto shrink-0 relative w-full py-4 bg-transparent print:hidden select-none">
+      <footer
+        className="mt-auto shrink-0 relative w-full py-4 bg-transparent print:hidden select-none"
+        data-footer-mode="compact"
+      >
         <div className="max-w-7xl mx-auto px-6">
           <div className="w-full h-px bg-slate-200/20 dark:bg-slate-800/25 mb-3" />
 
-          <CompactPartnerRow partners={successPartners} label="شركاء النجاح" />
-          <CompactPartnerRow partners={ourPartners} label="شركاؤنا" />
+          <CompactPartnerRow
+            partners={successPartners}
+            label="شركاء النجاح"
+            reason="compact-footer-mode"
+          />
+          <CompactPartnerRow
+            partners={ourPartners}
+            label="شركاؤنا"
+            reason="compact-footer-mode"
+          />
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
             <span className="text-[10px] md:text-xs font-semibold text-slate-400 dark:text-slate-500 select-none">
@@ -181,7 +289,10 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <footer className="bg-slate-50 dark:bg-slate-950 border-t border-slate-200/40 dark:border-slate-800/40 mt-auto shrink-0 relative w-full pt-16 md:pt-24 pb-8 overflow-hidden transition-all duration-300 select-none">
+    <footer
+      className="bg-slate-50 dark:bg-slate-950 border-t border-slate-200/40 dark:border-slate-800/40 mt-auto shrink-0 relative w-full pt-16 md:pt-24 pb-8 overflow-hidden transition-all duration-300 select-none"
+      data-footer-mode="full"
+    >
       <div className="max-w-7xl mx-auto px-4 md:px-8 relative">
         {config.promotionalBanners &&
           config.promotionalBanners.filter((b) => b.active).length > 0 && (
@@ -194,8 +305,11 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
             </div>
           )}
 
-        {successPartners.length > 0 && (
-          <SuccessPartnersSection partners={successPartners} />
+        {premiumSuccessPartners.length > 0 && premiumSource && (
+          <SuccessPartnersSection
+            partners={premiumSuccessPartners}
+            source={premiumSource}
+          />
         )}
 
         <div className="text-center mb-16 px-4">

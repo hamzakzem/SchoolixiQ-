@@ -1417,7 +1417,7 @@ export default function Login() {
       </motion.div>
 
       <div className="-mx-6 -mb-12 mt-20 w-[calc(100%+3rem)]">
-        <GlobalFooter />
+        <GlobalFooter compact={false} />
       </div>
 
       <AnimatePresence>

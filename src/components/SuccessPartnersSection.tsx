@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import {
@@ -74,8 +74,21 @@ function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
   return <article className={cardClass}>{cardBody}</article>;
 }
 
-export function SuccessPartnersSection({ partners }: { partners: FooterPartner[] }) {
+export function SuccessPartnersSection({
+  partners,
+  source = 'config',
+}: {
+  partners: FooterPartner[];
+  source?: 'config' | 'featured-schools';
+}) {
   const reduced = prefersReducedMotion();
+
+  useEffect(() => {
+    console.log('[SuccessPartners] RENDER_PREMIUM_SECTION', {
+      count: partners.length,
+      source,
+    });
+  }, [partners.length, source]);
 
   if (!partners.length) return null;
 
@@ -83,11 +96,12 @@ export function SuccessPartnersSection({ partners }: { partners: FooterPartner[]
     <section
       className="partner-success-section mb-16 md:mb-24"
       aria-labelledby="success-partners-heading"
+      data-partners-section="premium"
+      data-partners-source={source}
     >
       <motion.div
-        initial={reduced ? { opacity: 1 } : { opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-48px' }}
+        initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduced ? 0.01 : 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="rounded-3xl md:rounded-[2rem] px-6 py-12 md:px-10 md:py-16 shadow-[0_24px_64px_-32px_rgba(11,35,69,0.18)] border border-slate-200/60 dark:border-slate-800/60 overflow-hidden"
         style={{
