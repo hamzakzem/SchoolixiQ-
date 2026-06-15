@@ -9,6 +9,7 @@ import {
   formatTuitionAmountLabel,
   formatTuitionDueLabel,
   tuitionParentsQuery,
+  type TuitionReminderDisplayRow,
   type TuitionReminderFilterKey,
 } from '../../lib/tuitionModel';
 import { TUITION_REMINDER_EMPTY_MESSAGES } from '../../lib/tuitionReminderLabels';
@@ -47,9 +48,11 @@ type Props = {
 const IS_DEV = import.meta.env.DEV;
 
 const FILTER_TABS: { key: TuitionReminderFilterKey; label: string }[] = [
+  { key: 'all', label: 'الكل' },
   { key: 'overdue', label: 'متأخر' },
   { key: 'today', label: 'مستحق اليوم' },
   { key: 'soon', label: 'قريباً' },
+  { key: 'no_parent', label: 'بدون ولي أمر' },
 ];
 
 export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
@@ -64,7 +67,7 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
   const [tracking, setTracking] = useState<Record<string, any>>({});
   const [settings, setSettings] = useState<TuitionReminderSettings>(DEFAULT_TUITION_REMINDER_SETTINGS);
 
-  const [filter, setFilter] = useState<TuitionReminderFilterKey>('overdue');
+  const [filter, setFilter] = useState<TuitionReminderFilterKey>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sendLimit, setSendLimit] = useState(10);
@@ -77,6 +80,9 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    setFilter('all');
+    setSearch('');
+    setSelected(new Set());
     setSenderName(profile?.displayName || profile?.name || '');
     setSenderEmail(profile?.email || '');
     setSummary(null);
@@ -157,6 +163,22 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
     [eligibleRows],
   );
 
+  useEffect(() => {
+    if (!open) return;
+    console.info('[OverviewTuitionQuickReminder] COUNTS', {
+      totalRows: eligibleRows.length,
+      overdue: eligibleRows.filter((r) => r.bucket === 'overdue').length,
+      today: eligibleRows.filter((r) => r.bucket === 'today').length,
+      soon: eligibleRows.filter((r) => r.bucket === 'soon').length,
+      later: eligibleRows.filter((r) => r.bucket === 'later').length,
+      noParent: urgentRows.filter((r) => !r.hasLinkedParent).length,
+      afterOverviewFilter: urgentRows.length,
+      afterSearch: filteredRows.length,
+      activeFilter: filter,
+      search,
+    });
+  }, [open, eligibleRows, urgentRows, filteredRows.length, filter, search]);
+
   const emptyMessage = useMemo(() => {
     if (onlyLaterRows) {
       return TUITION_REMINDER_EMPTY_MESSAGES.allLaterOverview;
@@ -173,9 +195,11 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
   const filterCounts = useMemo(() => {
     const rows = urgentRows;
     return {
+      all: rows.length,
       overdue: rows.filter((r) => r.bucket === 'overdue').length,
       today: rows.filter((r) => r.bucket === 'today').length,
       soon: rows.filter((r) => r.bucket === 'soon').length,
+      no_parent: rows.filter((r) => !r.hasLinkedParent).length,
     };
   }, [urgentRows]);
 
