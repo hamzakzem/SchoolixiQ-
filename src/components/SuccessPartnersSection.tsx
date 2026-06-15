@@ -22,17 +22,13 @@ function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
   const title = partner.name || 'شريك';
 
   const logoBlock = (
-    <div className="partner-logo-wrap relative mx-auto mb-6 w-[7.5rem] h-[7.5rem] shrink-0">
-      {/* Gradient ring — CSS class + Tailwind fallback so ring is always visible */}
-      <div
-        className="partner-logo-ring absolute -inset-2 rounded-full pointer-events-none border-4 border-dashed border-[#D4AF37]/45"
-        aria-hidden="true"
-      />
-      <div className="partner-logo-inner absolute inset-0 rounded-full bg-white dark:bg-slate-900 border-2 border-[#0B2345]/10 dark:border-[#D4AF37]/20 shadow-inner flex items-center justify-center overflow-hidden">
+    <div className="partner-logo-wrap relative mx-auto mb-6 shrink-0">
+      <div className="partner-logo-ring" aria-hidden="true" />
+      <div className="partner-logo-inner">
         <img
           src={partner.logoUrl}
           alt={title}
-          className="w-[85%] h-[85%] object-contain"
+          className="partner-logo-image"
           loading="lazy"
         />
       </div>
@@ -43,10 +39,11 @@ function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
     <>
       {logoBlock}
 
-      <h4 className="text-lg font-black text-[#0B2345] dark:text-white mb-2 px-2">{title}</h4>
+      <h4 className="text-base font-semibold text-[#0B2345] dark:text-slate-100 mb-2 px-2">
+        {title}
+      </h4>
       <div
-        className="w-12 h-1 rounded-full mx-auto mb-4"
-        style={{ background: 'linear-gradient(90deg, #D4AF37, #0B2345)' }}
+        className="w-8 h-px rounded-full mx-auto mb-4 bg-gradient-to-r from-[#D4AF37]/70 to-[#0B2345]/30"
         aria-hidden="true"
       />
       <p className="text-sm leading-[1.85] text-slate-600 dark:text-slate-400 mb-5 px-2 flex-1">
@@ -54,9 +51,9 @@ function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
       </p>
 
       {partner.link ? (
-        <span className="mt-auto inline-flex items-center justify-center gap-1.5 text-sm font-bold text-[#0B2345] dark:text-[#D4AF37] group-hover:text-[#D4AF37] transition-colors">
+        <span className="mt-auto inline-flex items-center justify-center gap-1 text-sm font-medium text-[#0B2345] dark:text-[#D4AF37] group-hover:text-[#D4AF37] transition-colors underline-offset-4 group-hover:underline">
           زيارة الموقع
-          <ExternalLink size={14} className="opacity-80" />
+          <ExternalLink size={13} className="opacity-70" />
         </span>
       ) : (
         <span className="mt-auto h-5" aria-hidden="true" />
@@ -65,7 +62,7 @@ function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
   );
 
   const cardClass =
-    'partner-premium-card group relative flex flex-col items-center text-center p-8 md:p-9 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 shadow-md min-h-[260px] transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 hover:border-[#D4AF37]/30 focus-within:ring-2 focus-within:ring-[#D4AF37]/50 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-950';
+    'partner-premium-card group relative flex flex-col items-center text-center p-8 md:p-9 rounded-3xl bg-white dark:bg-slate-900/95 border border-slate-100 dark:border-slate-800 shadow-sm min-h-[260px] transition-all duration-300 ease-out hover:shadow-lg hover:-translate-y-1 hover:border-slate-200 focus-within:ring-2 focus-within:ring-[#D4AF37]/25 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-950';
 
   if (partner.link) {
     return (
@@ -119,7 +116,7 @@ export function SuccessPartnersSection({
         initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduced ? 0.01 : 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="rounded-3xl md:rounded-[2rem] px-6 py-12 md:px-10 md:py-16 shadow-[0_24px_64px_-32px_rgba(11,35,69,0.22)] border border-slate-200/70 dark:border-slate-800/60 overflow-hidden"
+        className="rounded-3xl md:rounded-[2rem] px-6 py-12 md:px-10 md:py-16 shadow-[0_20px_48px_-28px_rgba(11,35,69,0.14)] border border-slate-200/60 dark:border-slate-800/60 overflow-hidden"
         style={{
           background:
             'linear-gradient(165deg, #F7F8FA 0%, #ffffff 45%, rgba(212,175,55,0.08) 100%)',

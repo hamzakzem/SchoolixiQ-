@@ -1341,26 +1341,44 @@ html.dark .parent-dashboard-menu .parent-menu-search {
 
 .partner-logo-wrap {
   position: relative;
-  width: 7.5rem;
-  height: 7.5rem;
-}
-
-@media (min-width: 768px) {
-  .partner-logo-wrap {
-    width: 7.5rem;
-    height: 7.5rem;
-  }
+  width: 6.25rem;
+  height: 6.25rem;
 }
 
 .partner-logo-ring {
   position: absolute;
-  inset: -6px;
+  inset: -3px;
   border-radius: 9999px;
-  background: conic-gradient(from 0deg, #0B2345, #D4AF37, #0B2345, #D4AF37, #0B2345);
-  opacity: 0.9;
-  animation: partner-logo-ring-spin 10s linear infinite;
-  transition: opacity 0.3s ease, box-shadow 0.3s ease;
-  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.25);
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    conic-gradient(
+      from 0deg,
+      rgba(11, 35, 69, 0.35),
+      rgba(212, 175, 55, 0.5),
+      rgba(11, 35, 69, 0.35),
+      rgba(212, 175, 55, 0.5),
+      rgba(11, 35, 69, 0.35)
+    )
+    border-box;
+  opacity: 0.5;
+  animation: partner-logo-ring-spin 12s linear infinite;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+html.dark .partner-logo-ring {
+  background:
+    linear-gradient(#0f172a, #0f172a) padding-box,
+    conic-gradient(
+      from 0deg,
+      rgba(11, 35, 69, 0.45),
+      rgba(212, 175, 55, 0.55),
+      rgba(11, 35, 69, 0.45),
+      rgba(212, 175, 55, 0.55),
+      rgba(11, 35, 69, 0.45)
+    )
+    border-box;
 }
 
 .partner-logo-inner {
@@ -1370,40 +1388,49 @@ html.dark .parent-dashboard-menu .parent-menu-search {
   height: 100%;
   border-radius: 9999px;
   background: #ffffff;
-  border: 2px solid rgba(11, 35, 69, 0.1);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 1rem;
   overflow: hidden;
 }
 
 html.dark .partner-logo-inner {
-  background: #0f172a;
-  border-color: rgba(212, 175, 55, 0.2);
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.partner-logo-image {
+  width: 100%;
+  max-width: 5rem;
+  max-height: 5rem;
+  object-fit: contain;
+  object-position: center;
+  mix-blend-mode: normal;
+  background: transparent;
 }
 
 .partner-premium-card:hover .partner-logo-ring,
 .partner-premium-card:focus-visible .partner-logo-ring,
 .partner-premium-card:active .partner-logo-ring {
-  opacity: 1;
-  animation: partner-logo-ring-spin 4s linear infinite;
-  box-shadow:
-    0 0 20px rgba(212, 175, 55, 0.35),
-    0 0 0 2px rgba(11, 35, 69, 0.12);
+  opacity: 0.72;
+  animation-duration: 10s;
 }
 
 .partner-premium-card:hover,
 .partner-premium-card:focus-within {
   box-shadow:
-    0 28px 56px -20px rgba(11, 35, 69, 0.22),
-    0 0 0 1px rgba(212, 175, 55, 0.15);
+    0 16px 32px -18px rgba(11, 35, 69, 0.14),
+    0 0 0 1px rgba(226, 232, 240, 0.9);
 }
 
 .partner-card-glow:hover,
 .partner-card-glow:focus-visible {
   box-shadow:
-    0 28px 56px -20px rgba(11, 35, 69, 0.24),
-    0 0 0 1px rgba(212, 175, 55, 0.2);
+    0 16px 32px -18px rgba(11, 35, 69, 0.16),
+    0 0 0 1px rgba(212, 175, 55, 0.12);
 }
 
 html.dark .partner-success-section > div {
@@ -1411,7 +1438,7 @@ html.dark .partner-success-section > div {
     165deg,
     #0a1525 0%,
     #0f172a 45%,
-    rgba(212, 175, 55, 0.08) 100%
+    rgba(212, 175, 55, 0.06) 100%
   ) !important;
 }
 
