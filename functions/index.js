@@ -1,6 +1,7 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp, getApps, getApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 
 /** Must match firebase-applet-config.json firestoreDatabaseId — NOT (default). */
@@ -9,30 +10,38 @@ const DATABASE_ID =
 
 const PUSH_MAX_AGE_MS = 10 * 60 * 1000;
 const TERMINAL = new Set(['sent', 'partial', 'skipped', 'no_tokens', 'failed', 'error']);
+const POLL_DEFAULT_LIMIT = 50;
 
 function pushLog(event, meta = {}) {
   console.info(`[NotificationsPush] ${event}`, { databaseId: DATABASE_ID, ...meta });
 }
 
+function pollLog(event, meta = {}) {
+  console.info(`[NotificationsPushPoll] ${event}`, { databaseId: DATABASE_ID, ...meta });
+}
+
 function getAdminApp() {
-  if (getApps().length === 0) {
-    initializeApp();
+  try {
+    return getApp();
+  } catch {
+    const projectId =
+      process.env.GCLOUD_PROJECT ||
+      process.env.GCP_PROJECT ||
+      process.env.GOOGLE_CLOUD_PROJECT ||
+      undefined;
+    return initializeApp(projectId ? { projectId } : undefined);
   }
-  return getApp();
 }
 
 function getDb() {
-  getAdminApp();
   return getFirestore(getAdminApp(), DATABASE_ID);
 }
 
 function getMessagingService() {
-  getAdminApp();
   return getMessaging(getAdminApp());
 }
 
 function getAdminContext() {
-  getAdminApp();
   return {
     db: getDb(),
     FieldValue,
@@ -52,6 +61,12 @@ function isTerminal(notif) {
   if (notif.pushDispatched === true) return true;
   const s = notif.pushDelivery?.status;
   return Boolean(s && TERMINAL.has(s));
+}
+
+function isPending(notif) {
+  if (isTerminal(notif)) return false;
+  const s = notif.pushDelivery?.status;
+  return !s || s === 'pending';
 }
 
 function withinWindow(notif) {
@@ -92,7 +107,7 @@ async function dispatchPush(notifId, notif, ctx) {
 
   if (!userId) {
     await writeDelivery(docRef, { status: 'skipped', reason: 'no_userId' });
-    return;
+    return { notifId, status: 'skipped', reason: 'no_userId' };
   }
 
   let tokens = [];
@@ -107,14 +122,14 @@ async function dispatchPush(notifId, notif, ctx) {
     if (!userDoc.exists) {
       pushLog('NO_TOKENS', { notifId, userId, reason: 'user_missing' });
       await writeDelivery(docRef, { status: 'no_tokens', reason: 'user_missing' });
-      return;
+      return { notifId, status: 'no_tokens', reason: 'user_missing' };
     }
     const userData = userDoc.data() || {};
     const schoolId = String(notif.schoolId || '');
     if (schoolId && schoolId !== 'system' && userData.schoolId && userData.schoolId !== schoolId) {
       pushLog('PUSH_SEND_SKIPPED', { notifId, userId, reason: 'school_mismatch' });
       await writeDelivery(docRef, { status: 'skipped', reason: 'school_mismatch' });
-      return;
+      return { notifId, status: 'skipped', reason: 'school_mismatch' };
     }
     if (Array.isArray(userData.fcmTokens)) tokens = userData.fcmTokens;
   }
@@ -125,7 +140,7 @@ async function dispatchPush(notifId, notif, ctx) {
   if (tokens.length === 0) {
     pushLog('NO_TOKENS', { notifId, userId });
     await writeDelivery(docRef, { status: 'no_tokens' });
-    return;
+    return { notifId, status: 'no_tokens' };
   }
 
   const title = String(notif.title || 'إشعار جديد');
@@ -197,6 +212,127 @@ async function dispatchPush(notifId, notif, ctx) {
     failureCount: response.failureCount,
     errorMessage: fcmErrors.length ? fcmErrors.map((e) => e.code).join(', ') : undefined,
   });
+
+  return {
+    notifId,
+    status,
+    successCount: response.successCount,
+    failureCount: response.failureCount,
+  };
+}
+
+async function claimNotification(docRef, lockedBy) {
+  return docRef.firestore.runTransaction(async (tx) => {
+    const fresh = await tx.get(docRef);
+    if (!fresh.exists) return { claimed: false, notif: null, reason: 'missing' };
+
+    const data = fresh.data() || {};
+    if (isTerminal(data)) return { claimed: false, notif: data, reason: 'terminal' };
+
+    if (!withinWindow(data)) {
+      tx.set(
+        docRef,
+        {
+          pushDelivery: {
+            status: 'skipped',
+            reason: 'too_old',
+            at: FieldValue.serverTimestamp(),
+          },
+        },
+        { merge: true },
+      );
+      return { claimed: false, notif: data, reason: 'too_old' };
+    }
+
+    const delivery = data.pushDelivery || {};
+    if (delivery.status === 'pending' && delivery.lockedAt?.toMillis) {
+      if (Date.now() - delivery.lockedAt.toMillis() < 90_000) {
+        return { claimed: false, notif: data, reason: 'locked' };
+      }
+    }
+
+    tx.set(
+      docRef,
+      {
+        pushDelivery: {
+          status: 'pending',
+          lockedAt: FieldValue.serverTimestamp(),
+          lockedBy,
+        },
+      },
+      { merge: true },
+    );
+    return { claimed: true, notif: data };
+  });
+}
+
+async function processNotificationDocument(notifId, notif, ctx, lockedBy) {
+  const { db } = ctx;
+  const docRef = db.collection('notifications').doc(notifId);
+
+  if (isTerminal(notif)) {
+    pushLog('PUSH_SEND_SKIPPED', { notifId, reason: 'terminal_at_entry' });
+    return null;
+  }
+
+  if (!withinWindow(notif)) {
+    await writeDelivery(docRef, { status: 'skipped', reason: 'too_old' });
+    pushLog('PUSH_SEND_SKIPPED', { notifId, reason: 'too_old' });
+    return { notifId, status: 'skipped', reason: 'too_old' };
+  }
+
+  const claim = await claimNotification(docRef, lockedBy);
+  if (!claim.claimed) {
+    if (claim.reason && claim.reason !== 'locked') {
+      pushLog('PUSH_SEND_SKIPPED', { notifId, reason: claim.reason });
+    }
+    return claim.reason ? { notifId, status: 'skipped', reason: claim.reason } : null;
+  }
+
+  try {
+    return await dispatchPush(notifId, claim.notif || notif, ctx);
+  } catch (err) {
+    const msg = String(err.message || err);
+    pushLog('FCM_ERROR', { notifId, error: msg });
+    await writeDelivery(docRef, { status: 'error', errorMessage: msg });
+    return { notifId, status: 'error', errorMessage: msg };
+  }
+}
+
+async function pollPendingNotificationPushes(ctx, limit = POLL_DEFAULT_LIMIT) {
+  const { db } = ctx;
+  const cutoff = Timestamp.fromMillis(Date.now() - PUSH_MAX_AGE_MS);
+  const snap = await db
+    .collection('notifications')
+    .where('createdAt', '>=', cutoff)
+    .orderBy('createdAt', 'desc')
+    .limit(Math.min(limit, 100))
+    .get();
+
+  const pending = snap.docs.filter((d) => isPending(d.data()));
+  pollLog('FOUND_PENDING', { scanned: snap.size, pending: pending.length });
+
+  const results = [];
+  for (const docSnap of pending) {
+    const result = await processNotificationDocument(
+      docSnap.id,
+      docSnap.data(),
+      ctx,
+      'dispatchPendingNotificationPushes',
+    );
+    if (result) {
+      pollLog('DISPATCHED', result);
+      results.push(result);
+    }
+  }
+  return results;
+}
+
+function verifyCronSecret(req) {
+  const secret = process.env.NOTIFICATION_CRON_SECRET || process.env.CRON_SECRET;
+  if (!secret) return { ok: false, error: 'NOTIFICATION_CRON_SECRET not configured' };
+  if (req.headers['x-cron-secret'] !== secret) return { ok: false, error: 'Unauthorized' };
+  return { ok: true };
 }
 
 exports.dispatchNotificationPush = onDocumentCreated(
@@ -210,10 +346,8 @@ exports.dispatchNotificationPush = onDocumentCreated(
     if (!snap) return;
 
     const ctx = getAdminContext();
-    const { db } = ctx;
     const notifId = event.params.notificationId;
     const notif = snap.data();
-    const docRef = db.collection('notifications').doc(notifId);
 
     pushLog('FUNCTION_TRIGGERED', {
       notificationId: notifId,
@@ -223,52 +357,39 @@ exports.dispatchNotificationPush = onDocumentCreated(
       pushStatus: notif.pushDelivery?.status,
     });
 
-    if (isTerminal(notif)) {
-      pushLog('PUSH_SEND_SKIPPED', { notifId, reason: 'terminal_at_entry' });
+    await processNotificationDocument(notifId, notif, ctx, 'dispatchNotificationPush');
+  },
+);
+
+exports.dispatchPendingNotificationPushes = onRequest(
+  {
+    region: 'europe-west2',
+    cors: false,
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ success: false, error: 'Method not allowed. Use POST.' });
       return;
     }
 
-    if (!withinWindow(notif)) {
-      await writeDelivery(docRef, { status: 'skipped', reason: 'too_old' });
-      pushLog('PUSH_SEND_SKIPPED', { notifId, reason: 'too_old' });
+    const auth = verifyCronSecret(req);
+    if (!auth.ok) {
+      res.status(auth.error === 'Unauthorized' ? 401 : 503).json({ success: false, error: auth.error });
       return;
     }
 
-    const claimed = await db.runTransaction(async (tx) => {
-      const fresh = await tx.get(docRef);
-      const data = fresh.data() || {};
-      if (isTerminal(data)) return false;
-
-      const delivery = data.pushDelivery || {};
-      if (delivery.status === 'pending' && delivery.lockedAt?.toMillis) {
-        if (Date.now() - delivery.lockedAt.toMillis() < 90_000) return false;
-      }
-
-      tx.set(
-        docRef,
-        {
-          pushDelivery: {
-            status: 'pending',
-            lockedAt: FieldValue.serverTimestamp(),
-            lockedBy: 'dispatchNotificationPush',
-          },
-        },
-        { merge: true },
-      );
-      return true;
-    });
-
-    if (!claimed) {
-      pushLog('PUSH_SEND_SKIPPED', { notifId, reason: 'claim_failed' });
-      return;
-    }
+    pollLog('START', { limit: req.body?.limit || POLL_DEFAULT_LIMIT });
 
     try {
-      await dispatchPush(notifId, notif, ctx);
+      const ctx = getAdminContext();
+      const limit = Math.min(Number(req.body?.limit) || POLL_DEFAULT_LIMIT, 100);
+      const results = await pollPendingNotificationPushes(ctx, limit);
+      pollLog('DONE', { processed: results.length });
+      res.json({ success: true, processed: results.length, results });
     } catch (err) {
       const msg = String(err.message || err);
-      pushLog('FCM_ERROR', { notifId, error: msg });
-      await writeDelivery(docRef, { status: 'error', errorMessage: msg });
+      pollLog('DONE', { error: msg });
+      res.status(500).json({ success: false, error: msg });
     }
   },
 );
