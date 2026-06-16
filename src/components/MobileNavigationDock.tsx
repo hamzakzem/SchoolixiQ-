@@ -34,6 +34,8 @@ interface MobileNavigationDockProps {
   logoutLabel?: string;
   /** Light = high-contrast white menu (parent portal). Dark = navy hub (default). */
   menuSurface?: "dark" | "light";
+  /** Hide dock entirely (e.g. full-screen chat on mobile). */
+  hidden?: boolean;
 }
 
 export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
@@ -49,7 +51,10 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   onLogout,
   logoutLabel,
   menuSurface = "dark",
+  hidden = false,
 }) => {
+  if (hidden) return null;
+
   const isLightMenu = menuSurface === "light";
   const [showQuickAccess, setShowQuickAccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");

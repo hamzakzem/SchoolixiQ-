@@ -1283,6 +1283,7 @@ export default function AdminDashboard() {
         }
         showFooter={activeTab !== "chat"}
         fullHeightTab={activeTab === "chat"}
+        hideMobileDock={activeTab === "chat"}
         notificationsCount={totalUnread}
         showNotifications={showNotifications}
         setShowNotifications={setShowNotifications}

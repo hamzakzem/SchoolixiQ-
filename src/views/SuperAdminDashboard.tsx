@@ -2232,7 +2232,7 @@ export default function SuperAdminDashboard() {
         )}
 
         <div
-          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-20 lg:pb-0" : "overflow-y-auto custom-scrollbar pb-28 lg:pb-10"}`}
+          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0 lg:pb-0" : "overflow-y-auto custom-scrollbar pb-28 lg:pb-10"}`}
         >
           <AnimatePresence mode="wait">
             <motion.div
@@ -6217,6 +6217,7 @@ export default function SuperAdminDashboard() {
         isRtl={isRtl}
         logoutLabel={t("sidebar_logout")}
         onLogout={() => auth.signOut()}
+        hidden={activeTab === "chat"}
       />
     </div>
   );

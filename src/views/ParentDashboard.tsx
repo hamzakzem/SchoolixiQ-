@@ -1819,7 +1819,7 @@ export default function ParentDashboard() {
           </div>
         </header>
 
-        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-20 lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
+        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0 lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
           {tuitionEscalationAlert && (
             <div className="px-4 md:px-8 pt-4 max-w-7xl mx-auto w-full">
               <div
@@ -3276,6 +3276,7 @@ export default function ParentDashboard() {
           notificationsCount={badgeTotalUnread}
           isRtl={isRtl}
           menuSurface="light"
+          hidden={activeTab === "chat"}
         />
       </div>
       </div>

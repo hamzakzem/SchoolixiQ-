@@ -1451,3 +1451,175 @@ html.dark .partner-success-section > div {
   }
 }
 
+/* ── SchoolixIQ Telegram-like Chat ── */
+.sx-chat-shell {
+  background: #f7f8fa;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(11, 35, 69, 0.04) 1px, transparent 0),
+    linear-gradient(180deg, #f7f8fa 0%, #ffffff 40%, #f7f8fa 100%);
+  background-size: 22px 22px, 100% 100%;
+}
+
+html.dark .sx-chat-shell {
+  background: #0a101c;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(212, 175, 55, 0.06) 1px, transparent 0),
+    linear-gradient(180deg, #0a101c 0%, #0d1528 100%);
+  background-size: 22px 22px, 100% 100%;
+}
+
+.sx-chat-list {
+  background: #ffffff;
+}
+
+html.dark .sx-chat-list {
+  background: #0d1528;
+}
+
+.sx-chat-search {
+  background: #f7f8fa;
+  border: 1px solid rgba(11, 35, 69, 0.08);
+  color: #0b2345;
+}
+
+.sx-chat-search:focus {
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+.sx-chat-contact {
+  background: transparent;
+}
+
+.sx-chat-contact:hover {
+  background: rgba(11, 35, 69, 0.04);
+}
+
+.sx-chat-contact--active {
+  background: linear-gradient(90deg, rgba(11, 35, 69, 0.08) 0%, rgba(212, 175, 55, 0.1) 100%);
+  box-shadow: inset 3px 0 0 #d4af37;
+}
+
+[dir="rtl"] .sx-chat-contact--active {
+  box-shadow: inset -3px 0 0 #d4af37;
+}
+
+.sx-chat-thread {
+  background: transparent;
+}
+
+.sx-chat-messages {
+  scroll-behavior: smooth;
+}
+
+.sx-chat-bubble {
+  border-radius: 1.125rem;
+  word-break: break-word;
+}
+
+.sx-chat-bubble--out {
+  background: #0b2345;
+  color: #ffffff;
+  border-bottom-right-radius: 0.35rem;
+  box-shadow:
+    0 4px 14px -6px rgba(11, 35, 69, 0.45),
+    inset 0 -1px 0 rgba(212, 175, 55, 0.25);
+}
+
+[dir="rtl"] .sx-chat-bubble--out {
+  border-bottom-right-radius: 1.125rem;
+  border-bottom-left-radius: 0.35rem;
+}
+
+.sx-chat-bubble--in {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid rgba(11, 35, 69, 0.1);
+  border-bottom-left-radius: 0.35rem;
+  box-shadow: 0 2px 8px -4px rgba(11, 35, 69, 0.12);
+}
+
+html.dark .sx-chat-bubble--in {
+  background: #141c2e;
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[dir="rtl"] .sx-chat-bubble--in {
+  border-bottom-left-radius: 1.125rem;
+  border-bottom-right-radius: 0.35rem;
+}
+
+.sx-chat-date-pill {
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(11, 35, 69, 0.65);
+  border: 1px solid rgba(11, 35, 69, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+html.dark .sx-chat-date-pill {
+  background: rgba(13, 21, 40, 0.9);
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.sx-chat-input-wrap {
+  background: #f7f8fa;
+  border: 1px solid rgba(11, 35, 69, 0.1);
+  border-radius: 9999px;
+}
+
+.sx-chat-input-wrap:focus-within {
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
+  background: #ffffff;
+}
+
+.sx-chat-send {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  background: #d4af37;
+  color: #0b2345;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.sx-chat-send:not(:disabled):hover {
+  filter: brightness(1.05);
+  transform: scale(1.04);
+}
+
+.sx-chat-icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(11, 35, 69, 0.65);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sx-chat-icon-btn:hover {
+  background: rgba(11, 35, 69, 0.06);
+  color: #0b2345;
+}
+
+.sx-chat-icon-btn:focus-visible {
+  outline: 2px solid #d4af37;
+  outline-offset: 2px;
+}
+
+.sx-chat-empty-state {
+  background: #ffffff;
+  border: 1px dashed rgba(11, 35, 69, 0.12);
+  border-radius: 1.25rem;
+}
+
+html.dark .sx-chat-empty-state {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+

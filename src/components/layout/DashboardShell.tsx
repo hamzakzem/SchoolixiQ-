@@ -35,6 +35,7 @@ export type DashboardShellProps = {
   children: React.ReactNode;
   showFooter?: boolean;
   fullHeightTab?: boolean;
+  hideMobileDock?: boolean;
   /** Mobile dock */
   notificationsCount?: number;
   showNotifications?: boolean;
@@ -65,6 +66,7 @@ export function DashboardShell({
   children,
   showFooter = true,
   fullHeightTab = false,
+  hideMobileDock = false,
   notificationsCount = 0,
   showNotifications = false,
   setShowNotifications,
@@ -149,7 +151,9 @@ export function DashboardShell({
           className={clsx(
             'flex-1 flex flex-col min-h-0 print:overflow-visible',
             fullHeightTab
-              ? 'overflow-hidden pb-[72px] lg:pb-0'
+              ? hideMobileDock
+                ? 'overflow-hidden pb-0'
+                : 'overflow-hidden pb-[72px] lg:pb-0'
               : 'overflow-y-auto custom-scrollbar pb-[88px] lg:pb-8',
           )}
         >
@@ -180,6 +184,7 @@ export function DashboardShell({
           isRtl={isRtl}
           logoutLabel={logoutLabel}
           onLogout={onLogout}
+          hidden={hideMobileDock}
         />
       </div>
     </div>

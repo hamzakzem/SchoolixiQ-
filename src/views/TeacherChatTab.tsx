@@ -21,31 +21,22 @@ import { notificationService } from "../lib/notificationService";
 import { playPremiumNotificationSound } from "../lib/notificationSound";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import {
-  Send,
   MoreVertical,
-  Search,
   Phone,
   Info,
   Building2,
-  Check,
-  CheckCheck,
   X,
   MapPin,
   Mail,
   Edit2,
   Save,
   User,
-  Sparkles,
-  SendHorizontal,
   GraduationCap,
-  ArrowRight,
-  ArrowLeft,
-  Paperclip,
-  Image as ImageIcon,
-  FileVideo
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "react-hot-toast";
+import { SchoolixChatShell, type ChatShellContact } from "../components/chat/SchoolixChatShell";
+import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from "../components/chat/chatAvatars";
 
 export default function TeacherChatTab() {
   const { profile } = useAuth();
@@ -88,6 +79,8 @@ export default function TeacherChatTab() {
   const [students, setStudents] = useState<any[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [lastInteractionTimes, setLastInteractionTimes] = useState<Record<string, number>>({});
+  const [lastMessageSnippets, setLastMessageSnippets] = useState<Record<string, string>>({});
+  const [contactsLoaded, setContactsLoaded] = useState(false);
 
   const prevMessagesLength = useRef<number>(0);
   const isFirstLoad = useRef<boolean>(true);
@@ -121,6 +114,7 @@ export default function TeacherChatTab() {
           ...(doc.data() as any),
         }));
         setParents(p);
+        setContactsLoaded(true);
       });
       // Fetch students for this school
       const qStudents = query(
@@ -177,6 +171,23 @@ export default function TeacherChatTab() {
                 }
               });
             }
+          });
+          return changed ? next : prev;
+        });
+        setLastMessageSnippets(prev => {
+          const next = { ...prev };
+          let changed = false;
+          snapshot.docs.forEach(docSnap => {
+            const data = docSnap.data();
+            if (!data.lastMessage) return;
+            const otherIds = data.participants.filter((p: string) => p !== profile?.uid);
+            otherIds.forEach((otherId: string) => {
+              const key = otherId === 'admin' ? 'admin' : otherId;
+              if (next[key] !== data.lastMessage) {
+                next[key] = data.lastMessage;
+                changed = true;
+              }
+            });
           });
           return changed ? next : prev;
         });
@@ -541,440 +552,143 @@ export default function TeacherChatTab() {
     {} as Record<string, any[]>,
   );
 
+  const shellContacts: ChatShellContact[] = filteredContacts.map((c) => ({
+    id: c.id,
+    name: c.name || (c.type === 'admin' ? adminName : 'ولي أمر'),
+    type: c.type,
+    extra: c.extra,
+    subtitle: c.type === 'admin' ? (isRtl ? 'إدارة المدرسة' : 'School Management') : undefined,
+  }));
+
+  const parentStudentPhoto = (contactId: string) =>
+    students.find((st) => st.parentIds?.includes(contactId))?.photoUrl;
+
+  const renderContactAvatar = (contact: ChatShellContact, isSelected: boolean, size: 'list' | 'header' | 'message' = 'list') => {
+    if (contact.type === 'admin') {
+      if (schoolInfo?.logoUrl) {
+        return (
+          <ChatAvatarFrame selected={isSelected} size={size}>
+            <img src={schoolInfo.logoUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          </ChatAvatarFrame>
+        );
+      }
+      return <DefaultContactAvatar contact={{ ...contact, type: 'admin' }} selected={isSelected} />;
+    }
+    const photo = parentStudentPhoto(contact.id);
+    if (photo) {
+      return (
+        <ChatAvatarFrame selected={isSelected} size={size}>
+          <img src={photo} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        </ChatAvatarFrame>
+      );
+    }
+    return <DefaultContactAvatar contact={contact} selected={isSelected} />;
+  };
+
+  const activeShellContact: ChatShellContact | null = activeContact
+    ? { id: activeContact.id, name: activeContact.name, type: activeContact.type, extra: activeContact.extra }
+    : null;
+
+  const headerStatus =
+    activeContact?.type === 'admin'
+      ? isRtl ? 'إرشاد الإدارة' : 'Administration support'
+      : activeContact?.type === 'parent'
+        ? isRtl ? 'ولي أمر' : 'Parent'
+        : undefined;
+
   return (
-    <div
-      className="h-full min-h-0 w-full bg-white dark:bg-[#090d16] overflow-hidden flex"
-      dir={isRtl ? "rtl" : "ltr"}
-    >
-      {/* Sidebar - Contacts */}
-      <div className={`w-full md:w-80 border-r dark:border-l border-slate-200/50 dark:border-slate-800/40 flex flex-col bg-white dark:bg-[#0d121f] shrink-0 ${mobileShowChat ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800/50 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping mr-1" />
-              <h2 className="text-lg font-black text-slate-900 dark:text-white font-display">
-                {isRtl ? "محادثات الطلاب" : "Direct Chats"}
-              </h2>
-            </div>
-            <button
-              onClick={() => setShowTeacherContactModal(true)}
-              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors"
-            >
-              <MoreVertical size={18} />
-            </button>
-          </div>
-
-          <div className="relative">
-            <Search
-              size={16}
-              className={`absolute top-1/2 -translate-y-1/2 text-slate-400 ${isRtl ? "right-4" : "left-4"}`}
-            />
-            <input
-              type="text"
-              placeholder={
-                isRtl
-                  ? "بحث باسم ولي الأمر..."
-                  : "Search parent names..."
-              }
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full bg-slate-50 dark:bg-slate-800/40 border-0 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-950/20 rounded-2xl py-3 ${isRtl ? "pr-11 pl-4" : "pl-11 pr-4"} text-xs font-bold text-slate-800 dark:text-white outline-none transition-all`}
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto w-full custom-scrollbar space-y-1 p-2">
-          {filteredContacts.map((contact) => {
-            const isSelected = activeContact?.id === contact.id;
-
-            if (contact.type === "admin") {
-              return (
-                <button
-                  key="admin"
-                  onClick={() => {
-                    setActiveContact({ id: "admin", name: adminName, type: "admin" });
-                    setMobileShowChat(true);
-                  }}
-                  className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all duration-200 w-full relative ${
-                    isSelected
-                      ? "bg-indigo-50/70 dark:bg-indigo-950/40 shadow-sm border-l-4 border-indigo-600"
-                      : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
-                  }`}
-                >
-                  <div className="relative shrink-0">
-                    {schoolInfo?.logoUrl ? (
-                      <img 
-                        src={schoolInfo.logoUrl} 
-                        alt="School Logo" 
-                        className="w-12 h-12 rounded-2xl object-cover border-2 border-white dark:border-slate-800 shadow-md"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div
-                        className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner font-bold text-lg ${
-                          isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                        }`}
-                      >
-                        <Building2 size={18} />
-                      </div>
-                    )}
-                    <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full animate-pulse" />
-                    {unreadCounts["admin"] > 0 && !isSelected && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
-                        {unreadCounts["admin"] > 9 ? "9+" : unreadCounts["admin"]}
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 text-right min-w-0">
-                    <h3 className={`font-bold text-sm truncate ${isSelected ? "text-indigo-950 dark:text-white" : "text-slate-700 dark:text-slate-300"}`}>
-                      {adminName}
-                    </h3>
-                    <p className="text-[10px] text-slate-450 dark:text-slate-500 truncate mt-0.5 font-bold">
-                      {isRtl ? "إدارة المدرسة" : "School Management"}
-                    </p>
-                  </div>
-                </button>
-              );
-            }
-
-            const parent = contact.extra;
-            const unreadCount = unreadCounts[contact.id] || 0;
-            const parentStudents = students.filter((s) => s.parentIds?.includes(contact.id));
-            const studentWithPhoto = parentStudents.find(s => s.photoUrl);
-
-            return (
-              <button
-                key={contact.id}
-                onClick={() => {
-                  setActiveContact({
-                    id: contact.id,
-                    name: contact.name || "ولي أمر",
-                    type: "parent",
-                    extra: parent,
-                  });
-                  setMobileShowChat(true);
-                }}
-                className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all duration-200 w-full relative ${
-                  isSelected
-                    ? "bg-indigo-50/70 dark:bg-indigo-950/40 shadow-sm border-l-4 border-indigo-600"
-                    : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
-                }`}
-              >
-                <div className="relative shrink-0">
-                  {/* Display child photo in parent representation as requested */}
-                  {studentWithPhoto?.photoUrl ? (
-                    <img
-                      src={studentWithPhoto.photoUrl}
-                      alt="Student"
-                      className="w-12 h-12 rounded-2xl object-cover border-2 border-emerald-400 shadow-sm"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-base shadow-sm ${
-                        isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                      }`}
-                    >
-                      <User size={18} />
-                    </div>
-                  )}
-                  {unreadCount > 0 && !isSelected && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </div>
-
-                <div className="hidden md:block flex-1 text-right min-w-0">
-                  <h3 className={`font-bold text-sm truncate ${isSelected ? "text-indigo-950 dark:text-white" : "text-slate-700 dark:text-slate-300"}`}>
-                    {contact.name || "ولي أمر"}
-                  </h3>
-
-                  {parentStudents.length > 0 && (
-                    <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5 truncate max-w-full">
-                      <GraduationCap size={11} className="shrink-0" />
-                      <span className="truncate">
-                        {parentStudents.map(s => s.name).join(" • ")}
-                      </span>
-                    </div>
-                  )}
-                </div>
+    <>
+      <SchoolixChatShell
+        isRtl={isRtl}
+        listTitle={isRtl ? 'محادثات الطلاب' : 'Direct Chats'}
+        searchPlaceholder={isRtl ? 'بحث باسم ولي الأمر...' : 'Search parent names...'}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        contacts={shellContacts}
+        unreadCounts={unreadCounts}
+        lastInteractionTimes={lastInteractionTimes}
+        lastMessageSnippets={lastMessageSnippets}
+        activeContact={activeShellContact}
+        onSelectContact={(contact) => {
+          setActiveContact({
+            id: contact.id,
+            name: contact.name,
+            type: (contact.type as 'admin' | 'parent') || 'parent',
+            extra: contact.extra,
+          });
+          setMobileShowChat(true);
+        }}
+        mobileShowChat={mobileShowChat}
+        onMobileBack={() => setMobileShowChat(false)}
+        groupedMessages={groupedMessages}
+        isOutgoingMessage={(msg) => msg.senderId === profile?.uid}
+        formatMessageTime={formatMessageTime}
+        messagesEndRef={messagesEndRef}
+        newMessage={newMessage}
+        onNewMessageChange={setNewMessage}
+        onSendMessage={handleSendMessage}
+        isSending={isLoading}
+        selectedFile={selectedFile}
+        onClearFile={() => setSelectedFile(null)}
+        onFileChange={handleFileChange}
+        fileInputRef={fileInputRef}
+        headerStatusText={headerStatus}
+        isLoadingContacts={!contactsLoaded && !!profile?.schoolId}
+        listHeaderAction={
+          <button
+            type="button"
+            onClick={() => setShowTeacherContactModal(true)}
+            className="sx-chat-icon-btn"
+            aria-label={isRtl ? 'إعدادات التواصل' : 'Contact settings'}
+          >
+            <MoreVertical size={18} />
+          </button>
+        }
+        renderListAvatar={(contact, isSelected) => renderContactAvatar(contact, isSelected, 'list')}
+        renderHeaderAvatar={() =>
+          activeShellContact ? renderContactAvatar(activeShellContact, true, 'header') : null
+        }
+        renderIncomingMessageAvatar={() => {
+          if (!activeShellContact || activeShellContact.type !== 'admin' || !schoolInfo?.logoUrl) return null;
+          return (
+            <ChatAvatarFrame size="message">
+              <img src={schoolInfo.logoUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            </ChatAvatarFrame>
+          );
+        }}
+        renderRoleBadge={(contact) => {
+          if (contact.type === 'admin') return <RoleBadge label={isRtl ? 'إدارة' : 'Admin'} />;
+          if (contact.type === 'parent') return <RoleBadge label={isRtl ? 'ولي أمر' : 'Parent'} />;
+          return null;
+        }}
+        renderContactMeta={(contact) => {
+          if (contact.type !== 'parent') return null;
+          const parentStudents = students.filter((st) => st.parentIds?.includes(contact.id));
+          if (parentStudents.length === 0) return null;
+          return (
+            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-bold truncate max-w-full">
+              <GraduationCap size={11} className="shrink-0" />
+              <span className="truncate">{parentStudents.map((st) => st.name).join(' • ')}</span>
+            </span>
+          );
+        }}
+        headerTrailing={
+          activeContact?.type === 'admin' ? (
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={handlePhoneClick} className="sx-chat-icon-btn hidden md:inline-flex" aria-label={isRtl ? 'اتصال' : 'Call'}>
+                <Phone size={18} />
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Main Chat Frame */}
-      <div className={`flex-1 flex flex-col bg-slate-50/40 dark:bg-[#0c0f1a] w-full min-w-0 ${mobileShowChat ? 'flex' : 'hidden md:flex'}`}>
-        {/* Chat Active Banner Header */}
-        {activeContact && (
-          <div className="h-20 px-6 md:px-8 bg-white dark:bg-[#0f1524] border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between shadow-sm z-10 shrink-0">
-            <div className="flex items-center gap-4 min-w-0">
-              {/* Mobile Back Button */}
-              <button
-                type="button"
-                onClick={() => setMobileShowChat(false)}
-                className="md:hidden p-2 -mr-2 ml-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-                title={isRtl ? "رجوع" : "Back"}
-              >
-                {isRtl ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
+              <button type="button" onClick={() => setShowSchoolInfo(true)} className="sx-chat-icon-btn" aria-label={isRtl ? 'تفاصيل المدرسة' : 'School details'}>
+                <Info size={18} />
               </button>
-
-              {activeContact.type === "admin" ? (
-                schoolInfo?.logoUrl ? (
-                  <img
-                    src={schoolInfo.logoUrl}
-                    alt="School"
-                    className="w-11 h-11 rounded-2xl object-cover border-2 border-indigo-50 dark:border-indigo-950"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100/30">
-                    <Building2 size={18} />
-                  </div>
-                )
-              ) : (
-                <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100/30">
-                  <User size={18} />
-                </div>
-              )}
-              <div className="min-w-0">
-                <h2 className="font-bold text-slate-900 dark:text-white truncate font-display text-sm md:text-base">
-                  {activeContact.name}
-                  {activeContact.type === "parent" &&
-                    (() => {
-                      const parentStudents = students.filter((s) =>
-                        s.parentIds?.includes(activeContact.id),
-                      );
-                      if (parentStudents.length === 1) {
-                        return (
-                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-450 mx-1.5">
-                            ({parentStudents[0].name})
-                          </span>
-                        );
-                      } else if (parentStudents.length > 1) {
-                        return (
-                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-450 mx-1.5">
-                            ({parentStudents[0].name} +)
-                          </span>
-                        );
-                      }
-                      return null;
-                    })()}
-                </h2>
-                <p className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 font-bold flex items-center gap-1.5 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {activeContact.type === "admin"
-                    ? (isRtl ? "إرشاد الإدارة" : "Administration support")
-                    : (isRtl ? "ولي أمر مفعّل" : "Active Parent")}
-                </p>
-              </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              {activeContact.type === "admin" && (
-                <>
-                  <button
-                    onClick={handlePhoneClick}
-                    className="p-2.5 bg-slate-50 dark:bg-slate-800/40 hover:bg-indigo-50 rounded-2xl text-slate-650 transition-all hidden md:block"
-                  >
-                    <Phone size={16} className="dark:text-indigo-400" />
-                  </button>
-                  <button
-                    onClick={() => setShowSchoolInfo(true)}
-                    className="p-2.5 bg-slate-50 dark:bg-slate-800/40 hover:bg-indigo-50 rounded-2xl text-slate-650 transition-all"
-                  >
-                    <Info size={16} className="dark:text-indigo-400" />
-                  </button>
-                </>
-              )}
-              {activeContact.type === "parent" && activeContact.extra?.phone && (
-                <a
-                  href={`tel:${activeContact.extra.phone}`}
-                  className="p-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-indigo-50 rounded-2xl text-slate-650 transition-all hidden md:block"
-                >
-                  <Phone size={16} className="dark:text-indigo-450" />
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Message Streams list */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-[#fcfdfe] dark:bg-[#070b13]/60">
-          {activeContact && (
-            <div className="flex flex-col items-center justify-center py-6">
-              {activeContact.type === "admin" ? (
-                schoolInfo?.logoUrl ? (
-                  <img
-                    src={schoolInfo.logoUrl}
-                    alt="School and support"
-                    className="w-20 h-20 rounded-3xl object-cover shadow-lg border-2 border-white dark:border-slate-800 mb-2.5"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-950/20 flex items-center justify-center mb-2.5 text-indigo-600 dark:text-indigo-400 text-3xl font-bold ring-4 ring-indigo-500/5">
-                    <Building2 size={36} />
-                  </div>
-                )
-              ) : (
-                <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-950/20 flex items-center justify-center mb-2.5 text-indigo-600 dark:text-indigo-400 text-3xl font-bold">
-                  <User size={32} />
-                </div>
-              )}
-              <h3 className="text-base font-black text-slate-900 dark:text-white text-center max-w-[200px] md:max-w-none">
-                {activeContact.name}
-              </h3>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-wide">
-                {isRtl ? "مراسلة رسمية ومشفرة حية" : "Official live encrypted link"}
-              </p>
-            </div>
-          )}
-
-          {Object.entries(groupedMessages).map(
-            ([dateStr, dateMsgs]) => (
-              <div key={dateStr} className="space-y-4">
-                <div className="flex justify-center my-5">
-                  <span className="bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase shadow-sm">
-                    {dateStr}
-                  </span>
-                </div>
-                {(dateMsgs as any[]).map((msg: any) => {
-                  const isMe = msg.senderId === profile?.uid;
-
-                  return (
-                    <motion.div
-                      key={msg.id}
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className={`flex flex-col ${isMe ? "items-end" : "items-start"} mb-2`}
-                    >
-                      <div
-                        className={`max-w-[80%] md:max-w-[65%] flex gap-3 ${isMe ? "flex-row-reverse" : "flex-row"}`}
-                      >
-                        <div
-                          className={`px-4.5 py-3 rounded-2.5xl relative ${
-                            isMe
-                              ? "bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white rounded-br-sm shadow-md shadow-indigo-500/10"
-                              : "bg-white dark:bg-slate-850 border border-slate-200/50 dark:border-slate-800/80 text-slate-900 dark:text-slate-100 rounded-bl-sm shadow-sm"
-                          }`}
-                        >
-                          <p className="leading-relaxed whitespace-pre-wrap text-sm font-medium">
-                            {msg.content}
-                          </p>
-                          {msg.fileUrl && (
-                            <div className="mt-2 rounded-xl overflow-hidden border border-slate-200/20 max-w-[240px] sm:max-w-[320px]">
-                              {msg.fileType === 'image' ? (
-                                <img src={msg.fileUrl} alt={msg.fileName || 'Attachment'} className="w-full h-auto object-cover max-h-64" referrerPolicy="no-referrer" />
-                              ) : msg.fileType === 'video' ? (
-                                <video src={msg.fileUrl} controls className="w-full h-auto max-h-64" />
-                              ) : (
-                                <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg hover:underline text-sm truncate">
-                                  <Paperclip size={16} />
-                                  <span className="truncate">{msg.fileName || 'Download File'}</span>
-                                </a>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div
-                        className={`flex items-center gap-1.5 mt-1.5 px-1 ${isMe ? "justify-end" : "justify-start"}`}
-                      >
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
-                          {formatMessageTime(msg.createdAt)}
-                        </span>
-                        {isMe && (
-                          <span className="text-slate-400 dark:text-slate-650">
-                            {msg.read ? (
-                              <CheckCheck size={13} className="text-indigo-500" />
-                            ) : (
-                              <Check size={13} />
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            ),
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Action input control */}
-        <div className="p-4 md:p-6 bg-white dark:bg-[#0f1524] border-t border-slate-100 dark:border-slate-800/80 shrink-0 relative">
-          {selectedFile && (
-            <div className="absolute -top-16 left-4 md:left-6 right-4 md:right-6 max-w-5xl mx-auto flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 shadow-md p-2 rounded-xl z-20">
-               <div className="flex items-center gap-3 overflow-hidden">
-                 <div className="w-10 h-10 shrink-0 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 rounded-lg flex items-center justify-center">
-                   {selectedFile.type.startsWith('image/') ? <ImageIcon size={20} /> : <FileVideo size={20} />}
-                 </div>
-                 <div className="min-w-0">
-                   <p className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">{selectedFile.name}</p>
-                   <p className="text-xs text-slate-400">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                 </div>
-               </div>
-               <button 
-                 type="button" 
-                 onClick={() => setSelectedFile(null)}
-                 className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors shrink-0"
-               >
-                 <X size={18} />
-               </button>
-            </div>
-          )}
-          <form onSubmit={handleSendMessage} className="flex items-end gap-3 max-w-5xl mx-auto relative">
-            <div className="flex-1 bg-slate-50 dark:bg-slate-800/40 rounded-[1.75rem] flex items-center px-3 py-1.5 border border-slate-200/40 dark:border-slate-800 focus-within:bg-white dark:focus-within:bg-slate-850 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-950/20 transition-all duration-300">
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/jpeg,image/png,image/gif,video/mp4,video/webm"
-                onChange={handleFileChange}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-10 h-10 shrink-0 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded-full transition-colors"
-                title={isRtl ? 'إرفاق ملف (صورة/فيديو)' : 'Attach file (Image/Video)'}
-              >
-                <Paperclip size={18} />
-              </button>
-              <textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage(e);
-                  }
-                }}
-                disabled={!activeContact || isLoading}
-                placeholder={
-                  isRtl
-                    ? "اكتب رسالتك للمستلم بوضوح..."
-                    : "Type your message to recipient here..."
-                }
-                className="flex-1 bg-transparent border-none outline-none resize-none max-h-32 py-2.5 px-2 my-0.5 text-sm md:text-base font-bold min-h-[44px] styled-scrollbar text-slate-900 dark:text-white"
-                rows={1}
-              />
-            </div>
-            <button
-              disabled={isLoading || (!newMessage.trim() && !selectedFile) || !activeContact}
-              type="submit"
-              className="w-12 h-12 rounded-[1.25rem] bg-indigo-600 text-white flex items-center justify-center shrink-0 hover:bg-indigo-700 hover:scale-[1.04] active:scale-[0.96] disabled:opacity-40 disabled:hover:scale-100 disabled:bg-slate-250 dark:disabled:bg-slate-800 disabled:text-slate-400 shadow-lg shadow-indigo-600/10 transition-all duration-200"
-            >
-              <SendHorizontal size={18} className={isRtl ? "rotate-180 ml-0.5" : "mr-0.5"} />
-            </button>
-          </form>
-        </div>
-      </div>
+          ) : activeContact?.type === 'parent' && activeContact.extra?.phone ? (
+            <a href={'tel:' + String(activeContact.extra.phone)} className="sx-chat-icon-btn hidden md:inline-flex" aria-label={isRtl ? 'اتصال' : 'Call'}>
+              <Phone size={18} />
+            </a>
+          ) : undefined
+        }
+      />
 
       {/* School details modal (preserved & polished) */}
       <AnimatePresence>
@@ -1187,6 +901,6 @@ export default function TeacherChatTab() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
