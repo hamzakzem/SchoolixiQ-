@@ -123,6 +123,7 @@ if (typeof window !== 'undefined') {
 }
 
 import { SystemConfigProvider } from './lib/SystemConfigContext.tsx';
+import { getServiceWorkerUrl, SW_BUILD_VERSION } from './lib/serviceWorkerRegistration';
 
 createRoot(document.getElementById('root')!).render(
   <SystemConfigProvider>
@@ -134,8 +135,8 @@ createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     // Append a unique build version query to force update detection on all mobile/tablet browsers
-    const buildVersion = '2026-06-03-v11';
-    navigator.serviceWorker.register(`/sw.js?build=${buildVersion}`)
+    const buildVersion = SW_BUILD_VERSION;
+    navigator.serviceWorker.register(getServiceWorkerUrl())
       .then((registration) => {
         console.log('Schoolix PWA ServiceWorker successfully registered with scope: ', registration.scope);
         

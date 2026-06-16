@@ -2,7 +2,8 @@ import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messagi
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from './firebase';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { getServiceWorkerUrl } from './serviceWorkerRegistration';
+import { notificationDiag } from './notificationDiagnostics';
 
 let webMessaging: ReturnType<typeof getMessaging> | null = null;
 let currentWebToken: string | null = null;
@@ -54,11 +55,11 @@ export async function registerWebPushNotifications(userId: string): Promise<stri
 
     const vapidKey = readVapidKey();
     if (!vapidKey) {
-      console.warn('[Notifications] PUSH_TOKEN_REGISTERED blocked — VITE_FCM_VAPID_KEY missing');
+      notificationDiag.tokenMissing({ platform: 'web', reason: 'vapid_key_missing' });
       return null;
     }
 
-    const registration = await navigator.serviceWorker.register('/sw.js');
+    const registration = await navigator.serviceWorker.register(getServiceWorkerUrl());
     await navigator.serviceWorker.ready;
 
     const { getApp } = await import('firebase/app');
@@ -84,7 +85,7 @@ export async function registerWebPushNotifications(userId: string): Promise<stri
       }),
     });
 
-    console.info('[Notifications] PUSH_TOKEN_REGISTERED', {
+    notificationDiag.tokenRegistered({
       platform: 'web',
       userId,
       tokenPrefix: token.slice(0, 12),

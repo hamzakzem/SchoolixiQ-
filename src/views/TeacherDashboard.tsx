@@ -78,7 +78,6 @@ import {
   getTeacherSubjectDisplay,
   isRedactedCredentialValue,
 } from "../lib/userProfile";
-import { alertIncomingNotification } from "../lib/notificationAlerts";
 import { DashboardShell } from "../components/layout/DashboardShell";
 import {
   attachSectionLabels,
@@ -781,8 +780,8 @@ export default function TeacherDashboard() {
       );
       if (notificationsPrimedRef.current) {
         visibleNotifs.forEach((notif: any) => {
-          if (!knownNotificationIdsRef.current.has(notif.id)) {
-            alertIncomingNotification(notif, isRtl);
+          if (!knownNotificationIdsRef.current.has(notif.id) && !notif.read) {
+            knownNotificationIdsRef.current.add(notif.id);
           }
         });
       } else {

@@ -77,6 +77,7 @@ function buildNotificationDoc(
       category,
       routeTarget: metadata.routeTarget,
     },
+    pushDelivery: { status: 'pending' },
     createdAt: serverTimestamp(),
   };
 

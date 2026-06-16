@@ -274,6 +274,6 @@ export function getNotificationActionLabel(
     market: { ar: 'فتح المتجر', en: 'Open store' },
   };
   const label = labels[route] || labels[tab];
-  if (!label) return isArabic ? 'فتح' : 'Open';
-  return isArabic ? label.ar : label.en;
+  if (!label) return isArabic ? 'عرض' : 'View';
+  return isArabic ? 'عرض' : 'View';
 }
