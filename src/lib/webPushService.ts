@@ -1,5 +1,5 @@
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from './firebase';
 import { getServiceWorkerUrl } from './serviceWorkerRegistration';
@@ -7,6 +7,35 @@ import { notificationDiag } from './notificationDiagnostics';
 
 let webMessaging: ReturnType<typeof getMessaging> | null = null;
 let currentWebToken: string | null = null;
+let messageListenerAttached = false;
+let lastRegistrationError: string | null = null;
+
+export type WebPushRegistrationResult = {
+  ok: boolean;
+  token?: string;
+  tokenPrefix?: string;
+  error?: string;
+  reason?:
+    | 'native'
+    | 'unsupported'
+    | 'permission_denied'
+    | 'permission_default'
+    | 'vapid_key_missing'
+    | 'no_token'
+    | 'no_user'
+    | 'save_failed'
+    | 'sw_failed';
+};
+
+export type WebPushDiagnosticState = {
+  vapidConfigured: boolean;
+  permission: NotificationPermission | 'unsupported';
+  serviceWorkerActive: boolean;
+  fcmTokenGenerated: boolean;
+  tokenSavedToFirestore: boolean;
+  tokenPrefix: string | null;
+  lastError: string | null;
+};
 
 function readVapidKey(): string | undefined {
   const env = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
@@ -15,11 +44,11 @@ function readVapidKey(): string | undefined {
     env.env?.VITE_FIREBASE_VAPID_KEY ||
     (typeof localStorage !== 'undefined' ? localStorage.getItem('VITE_FCM_VAPID_KEY') : null) ||
     undefined
-  );
+  )?.trim() || undefined;
 }
 
 export function isWebPushConfigured(): boolean {
-  return Boolean(readVapidKey()?.trim());
+  return Boolean(readVapidKey());
 }
 
 export function getWebPushConfigWarning(isArabic: boolean): string | null {
@@ -27,6 +56,10 @@ export function getWebPushConfigWarning(isArabic: boolean): string | null {
   return isArabic
     ? 'مفتاح VITE_FCM_VAPID_KEY غير مُعد — الإشعارات داخل التطبيق تعمل، لكن push خارج المتصفح لن يعمل حتى إضافة المفتاح في إعدادات البناء.'
     : 'VITE_FCM_VAPID_KEY is not configured — in-app notifications work, but background web push requires the VAPID key in build env.';
+}
+
+export function getLastWebPushRegistrationError(): string | null {
+  return lastRegistrationError;
 }
 
 function getDeviceId(): string {
@@ -39,34 +72,156 @@ function getDeviceId(): string {
   return id;
 }
 
-export async function registerWebPushNotifications(userId: string): Promise<string | null> {
-  if (Capacitor.isNativePlatform()) return null;
-  if (typeof window === 'undefined' || !('Notification' in window)) return null;
+async function isServiceWorkerActive(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    return regs.some((r) => r.active?.state === 'activated');
+  } catch {
+    return false;
+  }
+}
+
+async function isTokenSavedInFirestore(userId: string, token: string): Promise<boolean> {
+  try {
+    const snap = await getDoc(doc(db, 'users', userId));
+    if (!snap.exists()) return false;
+    const tokens = snap.data()?.fcmTokens;
+    return Array.isArray(tokens) && tokens.includes(token);
+  } catch {
+    return false;
+  }
+}
+
+export async function getWebPushDiagnostics(userId?: string): Promise<WebPushDiagnosticState> {
+  const localToken = getStoredWebPushToken();
+  const permission =
+    typeof window !== 'undefined' && 'Notification' in window
+      ? Notification.permission
+      : 'unsupported';
+
+  let tokenSavedToFirestore = false;
+  if (userId && localToken) {
+    tokenSavedToFirestore = await isTokenSavedInFirestore(userId, localToken);
+  }
+
+  return {
+    vapidConfigured: isWebPushConfigured(),
+    permission,
+    serviceWorkerActive: await isServiceWorkerActive(),
+    fcmTokenGenerated: Boolean(localToken),
+    tokenSavedToFirestore,
+    tokenPrefix: localToken ? `${localToken.slice(0, 12)}…` : null,
+    lastError: lastRegistrationError,
+  };
+}
+
+function attachForegroundMessageListener() {
+  if (messageListenerAttached || !webMessaging) return;
+  messageListenerAttached = true;
+  onMessage(webMessaging, (payload) => {
+    console.info('[Notifications] FCM foreground', payload?.data?.type || payload?.notification?.title);
+    if (payload.notification?.title) {
+      new Notification(payload.notification.title, {
+        body: payload.notification.body,
+        icon: '/favicon.ico',
+        data: payload.data,
+      });
+    }
+  });
+}
+
+async function saveTokenToFirestore(userId: string, token: string): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    fcmTokens: arrayUnion(token),
+    fcmTokenUpdatedAt: serverTimestamp(),
+    fcmDevices: arrayUnion({
+      token,
+      platform: 'web',
+      deviceId: getDeviceId(),
+      updatedAt: new Date().toISOString(),
+    }),
+  });
+}
+
+export async function registerWebPushDevice(
+  userId: string,
+  options: { requestPermission?: boolean } = {},
+): Promise<WebPushRegistrationResult> {
+  const requestPermission = options.requestPermission ?? false;
+  lastRegistrationError = null;
+
+  console.info('[Notifications] REGISTER_DEVICE_START', {
+    userId,
+    requestPermission,
+    platform: Capacitor.isNativePlatform() ? 'native' : 'web',
+  });
+
+  if (Capacitor.isNativePlatform()) {
+    lastRegistrationError = 'native_platform';
+    return { ok: false, reason: 'native', error: 'Use native push on Capacitor' };
+  }
+
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    lastRegistrationError = 'unsupported_browser';
+    return { ok: false, reason: 'unsupported', error: 'Notifications not supported' };
+  }
+
+  if (!userId) {
+    lastRegistrationError = 'no_user';
+    return { ok: false, reason: 'no_user', error: 'Not signed in' };
+  }
 
   try {
     const supported = await isSupported();
     if (!supported) {
-      console.warn('[Notifications] PUSH_TOKEN_REGISTERED skipped — FCM not supported');
-      return null;
+      lastRegistrationError = 'fcm_not_supported';
+      notificationDiag.tokenMissing({ platform: 'web', reason: 'unsupported' });
+      return { ok: false, reason: 'unsupported', error: 'FCM not supported in this browser' };
     }
 
-    const permission =
-      Notification.permission === 'default'
-        ? await Notification.requestPermission()
-        : Notification.permission;
+    let permission = Notification.permission;
+    console.info('[Notifications] PERMISSION_STATUS', { permission, requestPermission });
+
+    if (permission === 'default') {
+      if (requestPermission) {
+        permission = await Notification.requestPermission();
+        console.info('[Notifications] PERMISSION_STATUS', { permission, afterRequest: true });
+      } else {
+        lastRegistrationError = 'permission_default';
+        notificationDiag.tokenMissing({ platform: 'web', reason: 'permission_default', permission });
+        return { ok: false, reason: 'permission_default', error: 'Notification permission not granted yet' };
+      }
+    }
+
     if (permission !== 'granted') {
+      lastRegistrationError = 'permission_denied';
       notificationDiag.tokenMissing({ platform: 'web', reason: 'permission_denied', permission });
-      return null;
+      return { ok: false, reason: 'permission_denied', error: 'Notification permission denied' };
     }
 
     const vapidKey = readVapidKey();
     if (!vapidKey) {
+      lastRegistrationError = 'vapid_key_missing';
       notificationDiag.tokenMissing({ platform: 'web', reason: 'vapid_key_missing' });
-      return null;
+      return { ok: false, reason: 'vapid_key_missing', error: 'VAPID key not configured in build' };
     }
 
-    const registration = await navigator.serviceWorker.register(getServiceWorkerUrl());
-    await navigator.serviceWorker.ready;
+    let registration: ServiceWorkerRegistration;
+    try {
+      registration = await navigator.serviceWorker.register(getServiceWorkerUrl());
+      await navigator.serviceWorker.ready;
+      console.info('[Notifications] SW_READY', {
+        scope: registration.scope,
+        active: Boolean(registration.active),
+      });
+    } catch (swErr) {
+      const msg = swErr instanceof Error ? swErr.message : String(swErr);
+      lastRegistrationError = `sw_failed: ${msg}`;
+      console.error('[Notifications] SW_READY', { error: msg });
+      return { ok: false, reason: 'sw_failed', error: msg };
+    }
 
     const { getApp } = await import('firebase/app');
     webMessaging = getMessaging(getApp());
@@ -75,21 +230,32 @@ export async function registerWebPushNotifications(userId: string): Promise<stri
       serviceWorkerRegistration: registration,
     });
 
-    if (!token || !userId) return null;
+    if (!token) {
+      lastRegistrationError = 'no_token_from_fcm';
+      notificationDiag.tokenMissing({ platform: 'web', reason: 'no_token' });
+      return { ok: false, reason: 'no_token', error: 'FCM returned no token' };
+    }
+
+    console.info('[Notifications] GET_TOKEN_SUCCESS', {
+      userId,
+      tokenPrefix: token.slice(0, 12),
+    });
 
     currentWebToken = token;
     localStorage.setItem('schoolix_fcm_token_web', token);
 
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      fcmTokens: arrayUnion(token),
-      fcmDevices: arrayUnion({
-        token,
-        platform: 'web',
-        deviceId: getDeviceId(),
-        updatedAt: new Date().toISOString(),
-      }),
-    });
+    try {
+      await saveTokenToFirestore(userId, token);
+      console.info('[Notifications] TOKEN_SAVE_SUCCESS', {
+        userId,
+        tokenPrefix: token.slice(0, 12),
+      });
+    } catch (saveErr) {
+      const msg = saveErr instanceof Error ? saveErr.message : String(saveErr);
+      lastRegistrationError = `save_failed: ${msg}`;
+      console.error('[Notifications] TOKEN_SAVE_ERROR', { userId, error: msg });
+      return { ok: false, reason: 'save_failed', error: msg, token, tokenPrefix: token.slice(0, 12) };
+    }
 
     notificationDiag.tokenRegistered({
       platform: 'web',
@@ -97,22 +263,35 @@ export async function registerWebPushNotifications(userId: string): Promise<stri
       tokenPrefix: token.slice(0, 12),
     });
 
-    onMessage(webMessaging, (payload) => {
-      console.info('[Notifications] FCM foreground', payload?.data?.type || payload?.notification?.title);
-      if (payload.notification?.title) {
-        new Notification(payload.notification.title, {
-          body: payload.notification.body,
-          icon: '/favicon.ico',
-          data: payload.data,
-        });
-      }
-    });
+    attachForegroundMessageListener();
 
-    return token;
+    return { ok: true, token, tokenPrefix: token.slice(0, 12) };
   } catch (err) {
-    console.error('[Notifications] PUSH_TOKEN_REGISTERED error', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    lastRegistrationError = msg;
+    console.error('[Notifications] TOKEN_SAVE_ERROR', { userId, error: msg });
+    return { ok: false, error: msg };
+  }
+}
+
+/** Silent refresh on login when permission already granted — never prompts. */
+export async function refreshWebPushTokenIfGranted(userId: string): Promise<WebPushRegistrationResult | null> {
+  if (Capacitor.isNativePlatform()) return null;
+  if (typeof window === 'undefined' || !('Notification' in window)) return null;
+  if (Notification.permission !== 'granted') {
+    console.info('[Notifications] PERMISSION_STATUS', {
+      permission: Notification.permission,
+      action: 'skip_silent_refresh',
+    });
     return null;
   }
+  return registerWebPushDevice(userId, { requestPermission: false });
+}
+
+/** @deprecated Use registerWebPushDevice with requestPermission option. */
+export async function registerWebPushNotifications(userId: string): Promise<string | null> {
+  const result = await registerWebPushDevice(userId, { requestPermission: true });
+  return result.ok && result.token ? result.token : null;
 }
 
 export async function unregisterWebPushToken(userId: string): Promise<void> {
@@ -129,14 +308,12 @@ export async function unregisterWebPushToken(userId: string): Promise<void> {
     });
     localStorage.removeItem('schoolix_fcm_token_web');
     currentWebToken = null;
-    console.info('[Notifications] PUSH_TOKEN_REGISTERED removed', { platform: 'web', userId });
+    console.info('[Notifications] TOKEN_REGISTERED removed', { platform: 'web', userId });
   } catch (err) {
-    console.error('[Notifications] PUSH_TOKEN_REGISTERED remove failed', err);
+    console.error('[Notifications] TOKEN_REGISTERED remove failed', err);
   }
 }
 
 export function getStoredWebPushToken(): string | null {
   return currentWebToken || localStorage.getItem('schoolix_fcm_token_web');
 }
-
-export { firebaseConfig };

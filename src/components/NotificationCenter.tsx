@@ -75,7 +75,13 @@ import {
   resolveNotificationTab,
   getNotificationActionLabel,
 } from "../lib/notificationRouting";
-import { registerWebPushNotifications, getStoredWebPushToken, isWebPushConfigured, getWebPushConfigWarning } from "../lib/webPushService";
+import {
+  registerWebPushDevice,
+  isWebPushConfigured,
+  getWebPushConfigWarning,
+  getWebPushDiagnostics,
+  type WebPushDiagnosticState,
+} from "../lib/webPushService";
 import { notificationDiag } from "../lib/notificationDiagnostics";
 import { sendTestPushNotification } from "../lib/pushTestNotification";
 import { Capacitor } from '@capacitor/core';
@@ -125,6 +131,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [testPushSent, setTestPushSent] = useState(false);
   const [testPushPending, setTestPushPending] = useState(false);
+  const [pushDiag, setPushDiag] = useState<WebPushDiagnosticState | null>(null);
+  const [registeringDevice, setRegisteringDevice] = useState(false);
 
   const isArabic = profile?.language === 'ar';
   const webPushConfigured = isWebPushConfigured();
@@ -145,36 +153,58 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
   }, []);
 
-  // Sync permissions & FCM
-  const requestWebPushPermission = async () => {
+  const refreshPushDiagnostics = async () => {
+    if (!user?.uid) return;
+    const diag = await getWebPushDiagnostics(user.uid);
+    setPushDiag(diag);
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setWebPushStatus(Notification.permission);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'settings' && user?.uid) {
+      void refreshPushDiagnostics();
+    }
+  }, [activeTab, user?.uid, deviceToken]);
+
+  const handleRegisterDevice = async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
       toast.error(isArabic ? "المتصفح لا يدعم هذا النوع من الإشعارات" : "Push notifications not supported by this browser");
       return;
     }
+    if (!user?.uid) return;
 
+    setRegisteringDevice(true);
     try {
-      if (!user?.uid) return;
-      const token = await registerWebPushNotifications(user.uid);
-      if (token) {
-        setDeviceToken(token);
+      const result = await registerWebPushDevice(user.uid, { requestPermission: true });
+      await refreshPushDiagnostics();
+
+      if (result.ok && result.token) {
+        setDeviceToken(result.token);
         setWebPushStatus('granted');
-        toast.success(isArabic ? "تم تفعيل الإشعارات الفورية للمتصفح!" : "Web push notifications enabled successfully!");
-      } else if (Notification.permission === 'granted') {
-        const stored = getStoredWebPushToken();
-        if (stored) {
-          setDeviceToken(stored);
-          setWebPushStatus('granted');
-          toast(isArabic ? "الإشعار مفعّل — أضف VITE_FCM_VAPID_KEY لتفعيل FCM" : "Enabled locally — set VITE_FCM_VAPID_KEY for FCM", { icon: 'ℹ️' });
-        } else {
-          setWebPushStatus(Notification.permission);
-          toast.error(isArabic ? "تعذر الحصول على رمز FCM" : "Could not obtain FCM token");
-        }
+        toast.success(
+          isArabic
+            ? `تم تسجيل الجهاز بنجاح (${result.tokenPrefix}…)`
+            : `Device registered (${result.tokenPrefix}…)`,
+        );
+      } else if (result.reason === 'permission_denied') {
+        setWebPushStatus('denied');
+        toast.error(
+          isArabic
+            ? "تم رفض الإذن. افتح إعدادات المتصفح → الإشعارات → السماح لـ schoolixiq.com"
+            : "Permission denied. Open browser settings → Notifications → Allow schoolixiq.com",
+        );
+      } else if (result.reason === 'vapid_key_missing') {
+        toast.error(isArabic ? "مفتاح VAPID غير مُعد في البناء" : "VAPID key missing from build");
       } else {
-        setWebPushStatus(Notification.permission);
-        toast.error(isArabic ? "تم رفض الإذن. يرجى تفعيله من إعدادات المتصفح" : "Permission denied. Enable it in browser settings.");
+        toast.error(result.error || (isArabic ? "تعذر تسجيل الجهاز" : "Could not register device"));
       }
     } catch (err) {
-      console.error("Error asking Web Push permissions:", err);
+      console.error("Error registering device for push:", err);
+      toast.error(isArabic ? "خطأ أثناء تسجيل الجهاز" : "Device registration error");
+    } finally {
+      setRegisteringDevice(false);
     }
   };
 
@@ -696,26 +726,51 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                         {webPushWarning}
                       </div>
                     )}
+                    {pushDiag && (
+                      <div className="mt-3 text-[11px] space-y-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl px-3 py-2 font-mono text-slate-600 dark:text-slate-300">
+                        <div>{isArabic ? 'VAPID:' : 'VAPID configured:'} {pushDiag.vapidConfigured ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}</div>
+                        <div>{isArabic ? 'إذن الإشعارات:' : 'Notification permission:'} {pushDiag.permission}</div>
+                        <div>{isArabic ? 'Service Worker:' : 'Service Worker active:'} {pushDiag.serviceWorkerActive ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}</div>
+                        <div>{isArabic ? 'رمز FCM:' : 'FCM token generated:'} {pushDiag.fcmTokenGenerated ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}{pushDiag.tokenPrefix ? ` (${pushDiag.tokenPrefix})` : ''}</div>
+                        <div>{isArabic ? 'محفوظ في Firestore:' : 'Token saved to Firestore:'} {pushDiag.tokenSavedToFirestore ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}</div>
+                        {pushDiag.lastError && (
+                          <div className="text-rose-600 dark:text-rose-400">{isArabic ? 'آخر خطأ:' : 'Last error:'} {pushDiag.lastError}</div>
+                        )}
+                      </div>
+                    )}
+                    {webPushStatus === 'denied' && (
+                      <div className="mt-3 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                        {isArabic
+                          ? 'الإذن مرفوض. افتح إعدادات المتصفح → الخصوصية → الإشعارات → السماح لـ schoolixiq.com ثم اضغط تسجيل الجهاز.'
+                          : 'Permission denied. Open browser Settings → Privacy → Notifications → Allow schoolixiq.com, then tap Register device.'}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="shrink-0">
+                <div className="shrink-0 flex flex-col gap-2">
                   {!webPushConfigured ? (
                     <span className="shrink-0 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-xl">
                       {isArabic ? "VAPID غير مُعد" : "VAPID missing"}
                     </span>
-                  ) : webPushStatus === 'granted' ? (
+                  ) : null}
+                  {!Capacitor.isNativePlatform() && (
+                    <button
+                      type="button"
+                      onClick={handleRegisterDevice}
+                      disabled={registeringDevice || webPushStatus === 'denied'}
+                      className="px-4 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer disabled:opacity-50 min-h-[44px]"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {registeringDevice
+                        ? (isArabic ? 'جاري التسجيل…' : 'Registering…')
+                        : (isArabic ? 'تسجيل هذا الجهاز لاستلام الإشعارات' : 'Register this device for notifications')}
+                    </button>
+                  )}
+                  {webPushStatus === 'granted' && pushDiag?.tokenSavedToFirestore && (
                     <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20 px-3.5 py-2 rounded-xl">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                       {isArabic ? "مفعل ونشط" : "Granted & Enabled"}
                     </span>
-                  ) : (
-                    <button
-                      onClick={requestWebPushPermission}
-                      className="px-4 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      {isArabic ? "طلب إذن المتصفح" : "Request Permission"}
-                    </button>
                   )}
                 </div>
               </div>
