@@ -92,6 +92,12 @@ import {
   SchoolLifecycleButtons,
   SchoolStatusBadge,
 } from "../components/superadmin/SchoolLifecycleButtons";
+import { SchoolPresenceBadge } from "../components/superadmin/SchoolPresenceBadge";
+import { useSchoolPresenceMap } from "../lib/useSchoolPresenceMap";
+import {
+  presenceFilterMatches,
+  resolveSchoolPresenceStatus,
+} from "../lib/schoolPresence";
 import {
   buildDefaultPackagePermissions,
   normalizePackagePermissions,
@@ -215,6 +221,11 @@ export default function SuperAdminDashboard() {
   const [schoolFilter, setSchoolFilter] = useState<
     "all" | "active" | "suspended" | "archived" | "expiring"
   >("active");
+  const [presenceFilter, setPresenceFilter] = useState<
+    "all" | "online" | "offline" | "recent"
+  >("all");
+  const presenceMap = useSchoolPresenceMap(activeTab === "schools");
+  const [, setPresenceTick] = useState(0);
   const [usersTab, setUsersTab] = useState<"management" | "parents">(
     "management",
   );
@@ -556,6 +567,12 @@ export default function SuperAdminDashboard() {
 
   const packagePermissionCheckboxes = getPackagePermissionCheckboxFeatures();
 
+  useEffect(() => {
+    if (activeTab !== "schools") return;
+    const id = window.setInterval(() => setPresenceTick((t) => t + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, [activeTab]);
+
   const filteredSchools = schools.filter((s) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
@@ -585,7 +602,10 @@ export default function SuperAdminDashboard() {
       matchesFilter = days > 0 && days <= 7;
     }
 
-    return matchesSearch && matchesGov && matchesDir && matchesFilter;
+    const presenceStatus = resolveSchoolPresenceStatus(presenceMap[s.id]);
+    const matchesPresence = presenceFilterMatches(presenceStatus, presenceFilter);
+
+    return matchesSearch && matchesGov && matchesDir && matchesFilter && matchesPresence;
   });
 
   const userSearchTerm = searchTerm.toLowerCase();
@@ -2347,6 +2367,24 @@ export default function SuperAdminDashboard() {
                             <option value="expiring">تنتهي قريباً</option>
                           </select>
                           <select
+                            value={presenceFilter}
+                            onChange={(e) =>
+                              setPresenceFilter(
+                                e.target.value as
+                                  | "all"
+                                  | "online"
+                                  | "offline"
+                                  | "recent",
+                              )
+                            }
+                            className="w-full md:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none text-xs font-bold shadow-sm min-w-[150px]"
+                          >
+                            <option value="all">كل النشاط</option>
+                            <option value="online">نشطة الآن</option>
+                            <option value="recent">نشطة مؤخراً</option>
+                            <option value="offline">غير نشطة</option>
+                          </select>
+                          <select
                             value={filterGovernorate}
                             onChange={(e) =>
                               setFilterGovernorate(e.target.value)
@@ -2421,6 +2459,7 @@ export default function SuperAdminDashboard() {
                           <th className="px-6 py-5 text-right">
                             فترة الاشتراك
                           </th>
+                          <th className="px-6 py-5 text-right">النشاط المباشر</th>
                           <th className="px-6 py-5 text-center">
                             الحالة التشغيلية
                           </th>
@@ -2555,6 +2594,11 @@ export default function SuperAdminDashboard() {
                                   </span>
                                 )}
                               </div>
+                            </td>
+                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
+                              <SchoolPresenceBadge
+                                presence={presenceMap[school.id]}
+                              />
                             </td>
                             <td className="px-6 py-6 text-center">
                               <SchoolStatusBadge school={school} isRtl={isRtl} />

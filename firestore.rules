@@ -911,6 +911,38 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
+    // School live presence (Super Admin read; school members write own school)
+    // -------------------------------------------------------------------------
+
+    match /school_presence/{schoolId} {
+      allow read: if isSuperAdmin();
+
+      allow create: if signedIn()
+        && userSchoolId() == schoolId
+        && userRole() != 'superadmin'
+        && request.resource.data.schoolId == schoolId;
+
+      allow update: if signedIn()
+        && userSchoolId() == schoolId
+        && userRole() != 'superadmin'
+        && resource.data.schoolId == schoolId
+        && request.resource.data.schoolId == schoolId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'schoolId',
+          'online',
+          'activeUsers',
+          'lastSeenAt',
+          'lastHeartbeatAt',
+          'lastActiveUserId',
+          'lastActiveUserName',
+          'lastActiveRole',
+          'updatedAt'
+        ]);
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // -------------------------------------------------------------------------
     // Default deny — no broad authenticated fallback
     // -------------------------------------------------------------------------
   }

@@ -69,6 +69,7 @@ import { useLandingPageConfig } from "./lib/landingPageConfig";
 import { PageLoadingSkeleton } from "./components/ui/Skeleton";
 import { LanguageToggle } from "./components/LanguageToggle";
 import InstallAppBanner from "./components/InstallAppBanner";
+import SchoolPresenceTracker from "./components/SchoolPresenceTracker";
 import { setupGlobalNotificationClickRouting } from "./lib/notificationRouting";
 
 const DEFAULT_PACKAGES = [
@@ -1647,6 +1648,7 @@ export default function App() {
         <LanguageProvider>
           <AuthProvider>
             <NotificationBadgeProvider>
+              <SchoolPresenceTracker />
             <BrowserRouter>
               <Suspense fallback={<PageLoadingSkeleton />}>
                 <Routes>
