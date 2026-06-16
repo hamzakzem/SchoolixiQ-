@@ -18,6 +18,10 @@ import {
   normalizeRole,
   isSuperAdminRole,
 } from './roleHierarchy.ts';
+import {
+  setupNotificationPushListener,
+  pollRecentNotificationsForPush,
+} from './notificationPushDispatch.ts';
 
 dotEnv.config();
 
@@ -1340,6 +1344,79 @@ async function startServer() {
     }
   });
 
+  // Cloud Scheduler: POST /api/internal/tuition-reminders/run with header X-Cron-Secret
+  // Processes schools where tuitionReminderSettings.autoRemindersEnabled === true.
+  // Full eligibility logic lives in src/lib/tuitionReminderService.ts (runAutomaticTuitionRemindersForSchool).
+  app.post('/api/internal/tuition-reminders/run', express.json(), async (req: any, res: any) => {
+    const secret = process.env.TUITION_CRON_SECRET || process.env.CRON_SECRET;
+    if (!secret || req.headers['x-cron-secret'] !== secret) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    try {
+      const db = getDb();
+      const targetSchoolId = req.body?.schoolId as string | undefined;
+      let schoolDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+      if (targetSchoolId) {
+        const snap = await db.collection('schools').doc(targetSchoolId).get();
+        if (snap.exists) schoolDocs = [snap as any];
+      } else {
+        const snap = await db.collection('schools').where('status', '==', 'active').limit(200).get();
+        schoolDocs = snap.docs;
+      }
+
+      const scheduled: Array<{ schoolId: string; autoEnabled: boolean }> = [];
+      for (const doc of schoolDocs) {
+        const settings = doc.data()?.tuitionReminderSettings || {};
+        scheduled.push({
+          schoolId: doc.id,
+          autoEnabled: Boolean(settings.autoRemindersEnabled && settings.enabled !== false),
+        });
+      }
+
+      res.json({
+        success: true,
+        message:
+          'Scheduler endpoint ready. Deploy Cloud Scheduler (daily) POST with X-Cron-Secret. ' +
+          'Automatic sends execute via runAutomaticTuitionRemindersForSchool (Firestore client) ' +
+          'or extend this endpoint with firebase-admin send pipeline.',
+        schoolsChecked: scheduled.length,
+        autoEnabledSchools: scheduled.filter((s) => s.autoEnabled).map((s) => s.schoolId),
+        setupRequired: [
+          'Set TUITION_CRON_SECRET on Cloud Run',
+          'Cloud Scheduler → POST /api/internal/tuition-reminders/run',
+          'Enable autoRemindersEnabled per school in Tuition Reminders settings',
+        ],
+      });
+    } catch (error: any) {
+      console.error('[TuitionCron] error', error);
+      res.status(500).json({ success: false, error: error.message || 'Cron handler failed' });
+    }
+  });
+
+  // Cloud Scheduler: POST /api/internal/notifications/push-dispatch with header X-Cron-Secret
+  // Fallback when Firebase Cloud Function trigger is not deployed (e.g. static Hostinger hosting).
+  app.post('/api/internal/notifications/push-dispatch', express.json(), async (req: any, res: any) => {
+    const secret = process.env.NOTIFICATION_CRON_SECRET || process.env.CRON_SECRET;
+    if (!secret || req.headers['x-cron-secret'] !== secret) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    try {
+      const db = getDb();
+      const limit = Math.min(Number(req.body?.limit) || 50, 100);
+      const results = await pollRecentNotificationsForPush(db, admin, limit);
+      res.json({
+        success: true,
+        processed: results.length,
+        results,
+        note:
+          'For real-time push, deploy Cloud Function onCreate(notifications) OR run this server on Cloud Run with FCM listener.',
+      });
+    } catch (error: any) {
+      console.error('[Notifications] PUSH_SEND_ERROR poll', error);
+      res.status(500).json({ success: false, error: error.message || 'Push poll failed' });
+    }
+  });
+
   // Global API 404 handler - MUST be before Vite middleware
   app.all('/api/*', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -1385,6 +1462,7 @@ async function startServer() {
       maxAge: '1d',
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) {
+          res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
           // Never cache index.html so users always get the latest version immediately
           res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         } else if (filePath.match(/\.(js|css|woff2?|ico|png|jpe?g|gif|svg)$/)) {
@@ -1395,6 +1473,7 @@ async function startServer() {
     }));
 
     app.get('*', (req, res) => {
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -1402,152 +1481,12 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Server running on http://localhost:${PORT}`);
     
-    // START FCM BACKGROUND PUSH DISPATCH LISTENER
+    // Server-driven FCM push (skips initial snapshot; 10-minute age cutoff)
     try {
       const db = getDb();
-      console.log('[Notifications] SEND_START FCM gateway initialized');
-
-      db.collection('notifications').onSnapshot(snapshot => {
-        if (!snapshot) return;
-        snapshot.docChanges().forEach(async change => {
-          if (change.type !== 'added') return;
-
-          const notifId = change.doc.id;
-          const notif = change.doc.data();
-          if (notif.pushDelivery?.status === 'sent') return;
-
-          const userId = notif.userId;
-          const title = notif.title || 'إشعار جديد';
-          const message = notif.message || notif.content || '';
-          const type = notif.type || 'system';
-          const schoolId = String(notif.schoolId || '');
-          const routeTarget =
-            notif.routeTarget ||
-            notif.metadata?.routeTarget ||
-            notif.metadata?.route ||
-            type;
-
-          if (!userId) return;
-
-          try {
-            console.log('[Notifications] SEND_START', { notifId, userId, type, schoolId });
-
-            let userTokens: string[] = [];
-            if (userId === 'super_admin') {
-              const superAdminsSnap = await db.collection('users').where('role', '==', 'superadmin').get();
-              superAdminsSnap.docs.forEach(docSnap => {
-                const tokens = docSnap.data().fcmTokens;
-                if (Array.isArray(tokens)) userTokens.push(...tokens);
-              });
-            } else {
-              const userDoc = await db.collection('users').doc(userId).get();
-              if (userDoc.exists) {
-                const userData = userDoc.data() || {};
-                if (schoolId && schoolId !== 'system' && userData.schoolId && userData.schoolId !== schoolId) {
-                  console.warn('[Notifications] SEND_ERROR school mismatch', { userId, schoolId });
-                  return;
-                }
-                const tokens = userData.fcmTokens;
-                if (Array.isArray(tokens)) userTokens.push(...tokens);
-              }
-            }
-
-            userTokens = Array.from(new Set(userTokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
-
-            if (userTokens.length === 0) {
-              await change.doc.ref.set({
-                pushDelivery: {
-                  status: 'no_tokens',
-                  successCount: 0,
-                  failureCount: 0,
-                  at: admin.firestore.FieldValue.serverTimestamp(),
-                },
-              }, { merge: true });
-              return;
-            }
-
-            const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
-            const clickUrl = appUrl ? `${appUrl}/?tab=${encodeURIComponent(routeTarget)}` : `/?tab=${encodeURIComponent(routeTarget)}`;
-
-            const messages = userTokens.map(token => ({
-              token,
-              notification: {
-                title: String(title),
-                body: String(message),
-              },
-              data: {
-                type: String(type),
-                schoolId,
-                userId: String(userId),
-                routeTarget: String(routeTarget),
-                route: String(routeTarget),
-                notificationId: notifId,
-                url: clickUrl,
-              },
-              webpush: appUrl ? {
-                fcmOptions: { link: clickUrl },
-              } : undefined,
-              android: {
-                priority: 'high' as const,
-                notification: { sound: 'default' },
-              },
-              apns: {
-                payload: {
-                  aps: { sound: 'default', badge: 1 },
-                },
-              },
-            }));
-
-            const response = await admin.messaging().sendEach(messages);
-            console.log('[Notifications] SEND_SUCCESS', {
-              notifId,
-              successCount: response.successCount,
-              failureCount: response.failureCount,
-            });
-
-            const invalidTokens: string[] = [];
-            response.responses.forEach((res, idx) => {
-              if (res.success) return;
-              const code = res.error?.code || '';
-              if (
-                code.includes('registration-token-not-registered') ||
-                code.includes('invalid-registration-token')
-              ) {
-                invalidTokens.push(userTokens[idx]);
-              }
-            });
-
-            if (invalidTokens.length && userId !== 'super_admin') {
-              const userRef = db.collection('users').doc(userId);
-              await userRef.update({
-                fcmTokens: admin.firestore.FieldValue.arrayRemove(...invalidTokens),
-              });
-            }
-
-            await change.doc.ref.set({
-              pushDelivery: {
-                status: response.failureCount === 0 ? 'sent' : 'partial',
-                successCount: response.successCount,
-                failureCount: response.failureCount,
-                at: admin.firestore.FieldValue.serverTimestamp(),
-              },
-            }, { merge: true });
-          } catch (fcmErr: any) {
-            console.error('[Notifications] SEND_ERROR', fcmErr.message);
-            await change.doc.ref.set({
-              pushDelivery: {
-                status: 'error',
-                error: String(fcmErr.message || fcmErr),
-                at: admin.firestore.FieldValue.serverTimestamp(),
-              },
-            }, { merge: true });
-          }
-        });
-      }, err => {
-        console.error('[Notifications] SEND_ERROR listener', err.message);
-      });
+      setupNotificationPushListener(db, admin);
     } catch (e: any) {
-      console.error('[Notifications] SEND_ERROR FCM gateway init failed', e.message);
+      console.error('[Notifications] PUSH_SEND_ERROR gateway init:', e.message);
     }
 
     // Save APP_URL dynamically to Firestore system config so all clients (including Mobile Apps) have access to the actual server URL

@@ -76,6 +76,8 @@ import {
   getNotificationActionLabel,
 } from "../lib/notificationRouting";
 import { registerWebPushNotifications, getStoredWebPushToken, isWebPushConfigured, getWebPushConfigWarning } from "../lib/webPushService";
+import { notificationDiag } from "../lib/notificationDiagnostics";
+import { Capacitor } from '@capacitor/core';
 
 type DashboardRole =
   | "parent"
@@ -125,9 +127,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const webPushConfigured = isWebPushConfigured();
   const webPushWarning = getWebPushConfigWarning(isArabic);
   useEffect(() => {
+    notificationDiag.centerRender({
+      count: notifications.length,
+      unread: notifications.filter((n) => !n.read).length,
+      role: userRole || profile?.role,
+    });
+  }, [notifications.length, userRole, profile?.role]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setWebPushStatus(Notification.permission);
-      // Retrieve stored token if exists
       const storedToken = localStorage.getItem('schoolix_fcm_token_web');
       if (storedToken) setDeviceToken(storedToken);
     }
@@ -354,6 +363,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       );
     }
 
+    // Unread first, then newest
+    result.sort((a, b) => {
+      if (!!a.read !== !!b.read) return a.read ? 1 : -1;
+      const ta = a.createdAt?.getTime?.() || a.createdAt?.seconds * 1000 || 0;
+      const tb = b.createdAt?.getTime?.() || b.createdAt?.seconds * 1000 || 0;
+      return tb - ta;
+    });
+
     setFilteredNotifs(result);
   }, [notifications, activeTab, categoryFilter, searchTerm]);
 
@@ -435,11 +452,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     const targetTab = resolveNotificationTab(n, role);
 
     if (targetTab && activeTabSetter) {
+      notificationDiag.clickRoute({ notifId: n.id, targetTab, type: n.type });
       activeTabSetter(targetTab);
       onClose();
       return;
     }
 
+    notificationDiag.clickRoute({ notifId: n.id, targetTab: null, type: n.type });
     setSelectedNotification(n);
   };
 
@@ -448,6 +467,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     const targetTab = resolveNotificationTab(n, role);
     await handleMarkOneRead(n.id, n.read, n);
     if (targetTab && activeTabSetter) {
+      notificationDiag.clickRoute({ notifId: n.id, targetTab, type: n.type });
       activeTabSetter(targetTab);
       setSelectedNotification(null);
       onClose();
@@ -522,48 +542,24 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     <div
       key={n.id}
       onClick={() => handleNotificationClick(n)}
-      className={`group p-4.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all cursor-pointer flex items-start gap-3.5 sm:gap-4 hover:shadow-lg active:scale-[0.99] hover:border-slate-350 dark:hover:border-slate-700/80 ${
-        !n.read
-          ? 'bg-indigo-50/15 border-indigo-150/40 dark:bg-indigo-950/10 dark:border-indigo-900/30'
-          : 'bg-white border-slate-100 dark:bg-slate-950 dark:border-slate-850/50'
-      } relative`}
+      className={`sx-notif-card group ${!n.read ? 'sx-notif-card--unread' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-label={getNotificationTitle(n)}
     >
-      {!n.read && (
-        <span className={`absolute top-4 ${isArabic ? 'left-4' : 'right-4'} w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse`} />
-      )}
-      <div className={`p-3.5 rounded-2xl shrink-0 flex items-center justify-center border ${getCategoryConfig(resolveNotificationCategoryId(n)).bgColor} ${getCategoryConfig(resolveNotificationCategoryId(n)).borderColor}`}>
+      {!n.read && <span className="sx-notif-card__dot" aria-hidden />}
+      <div className={`sx-notif-card__icon ${getCategoryConfig(resolveNotificationCategoryId(n)).bgColor}`}>
         {getCategoryIcon(n)}
       </div>
-      <div className="flex-1 space-y-1.5 min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`text-[9px] sm:text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md border ${getCategoryConfig(resolveNotificationCategoryId(n)).bgColor} ${getCategoryConfig(resolveNotificationCategoryId(n)).color}`}>
-            {getCategoryLabel(n)}
-          </span>
-          <span className="text-[10px] text-slate-450 flex items-center gap-1 select-none font-medium">
-            <Clock className="w-3 h-3" />
-            {n.createdAt.toLocaleDateString()} {n.createdAt.toLocaleTimeString()}
-          </span>
+      <div className="sx-notif-card__body min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="sx-notif-card__category">{getCategoryLabel(n)}</span>
+          <time className="sx-notif-card__time tabular-nums">
+            {n.createdAt?.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || ''}
+          </time>
         </div>
-        <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-md leading-tight">
-          {getNotificationTitle(n)}
-        </h4>
-        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-semibold break-words">
-          {n.message}
-        </p>
-        {(senderName || studentName) && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {senderName ? (
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
-                {isArabic ? 'المرسل:' : 'From:'} {senderName}
-              </span>
-            ) : null}
-            {studentName ? (
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
-                {isArabic ? 'الطالب:' : 'Student:'} {studentName}
-              </span>
-            ) : null}
-          </div>
-        )}
+        <h4 className="sx-notif-card__title">{getNotificationTitle(n)}</h4>
+        <p className="sx-notif-card__message line-clamp-2">{n.message}</p>
         {actionLabel && resolveNotificationTab(n, normalizeDashboardRole(userRole, profile?.role)) ? (
           <button
             type="button"
@@ -571,119 +567,73 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               e.stopPropagation();
               handleNotificationAction(n);
             }}
-            className="mt-2 inline-flex items-center gap-1 text-[11px] font-black text-indigo-600 hover:text-indigo-800"
+            className="sx-notif-card__action"
+            aria-label={isArabic ? 'عرض' : 'View'}
           >
-            {actionLabel}
-            <ChevronRight className="w-3.5 h-3.5" />
+            {isArabic ? 'عرض' : 'View'}
           </button>
         ) : null}
-      </div>
-      <div className="shrink-0 self-center flex items-center gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={(e) => handleDeleteOne(e, n.id, n)}
-          className="p-2.5 text-slate-400 hover:text-red-550 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-full transition-colors active:scale-90 cursor-pointer"
-          title={isArabic ? 'مسح التنبيه' : 'Delete Notification'}
-        >
-          <Trash2 className="w-4.5 h-4.5" />
-        </button>
       </div>
     </div>
     );
   };
 
   return createPortal(
-    <div className="fixed inset-0 bg-slate-950/60 dark:bg-slate-950/85 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ zIndex: 9999 }}>
-      <div className={`bg-white dark:bg-slate-900 w-full max-w-4xl h-[92vh] sm:h-[85vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border-0 sm:border border-slate-200/50 dark:border-slate-800 dir-${isArabic ? 'rtl' : 'ltr'}`}>
+    <div
+      className="sx-notif-overlay fixed inset-0 z-[100] flex items-end sm:items-stretch sm:justify-end p-0"
+      style={{ zIndex: 9999 }}
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="sx-notif-panel w-full sm:max-w-md h-[100dvh] sm:h-full flex flex-col overflow-hidden"
+        dir={isArabic ? 'rtl' : 'ltr'}
+        onClick={(e) => e.stopPropagation()}
+      >
         
-        {/* Header Section */}
-        <div className="p-5 sm:p-6 pb-4 sm:pb-6 border-b border-indigo-50/10 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/30 to-white dark:from-slate-800/10 dark:to-slate-900 relative">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
-              <Bell className="w-5 h-5 sm:w-6 sm:h-6 animate-swing" />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-1.5 sm:gap-2">
-                {isArabic ? "مركز التنبيهات المتقدم" : "Advanced Notification Hub"}
-                <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full select-none">
-                  Pro v2.0
-                </span>
-              </h2>
-              <p className="text-[11px] sm:text-xs text-slate-450 dark:text-slate-400 font-bold mt-0.5 select-none leading-none">
-                {isArabic ? "تحكم بالروابط، مستويات الصوت والتوصيل الفوري" : "Audio profiles, web-push links & robust FCM logs"}
+        {/* Header */}
+        <div className="sx-notif-header shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="sx-notif-header__title">{isArabic ? 'الإشعارات' : 'Notifications'}</h2>
+              <p className="sx-notif-header__sub">
+                {notifications.filter((n) => !n.read).length > 0
+                  ? isArabic
+                    ? `${notifications.filter((n) => !n.read).length} غير مقروء`
+                    : `${notifications.filter((n) => !n.read).length} unread`
+                  : isArabic
+                    ? 'كل شيء محدث'
+                    : 'All caught up'}
               </p>
             </div>
-          </div>
-          <button 
-            onClick={onClose}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-720 transition-all flex items-center justify-center border border-slate-200/15 active:scale-95"
-          >
-            <X className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
-          </button>
-        </div>
-
-        {/* Global Navigation Settings Tabs */}
-        <div className="px-4 sm:px-6 py-2.5 border-b border-indigo-50/5 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between bg-slate-50/40 dark:bg-slate-900/40 gap-3">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0 w-full md:w-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 md:pb-0">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0 ${activeTab === 'all' ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-            >
-              <Bell className="w-3.5 h-3.5" />
-              {isArabic ? "كل الإشعارات" : "All Alerts"}
-              <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'all' ? 'bg-[#15345d] text-white dark:bg-[#eed397] dark:text-slate-900' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                {notifications.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('unread')}
-              className={`px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0 ${activeTab === 'unread' ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-            >
-              <Check className="w-3.5 h-3.5" />
-              {isArabic ? "غير المقروءة" : "Unread"}
-              <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'unread' ? 'bg-red-500 text-white' : 'bg-red-500 text-white'}`}>
-                {notifications.filter(n => !n.read).length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0 ${activeTab === 'settings' ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-            >
-              <Settings className="w-3.5 h-3.5" />
-              {isArabic ? "الأصوات والإعدادات" : "Sound & Settings"}
-            </button>
-
-            {profile && ['admin', 'superadmin'].includes(profile.role) && (
-              <button
-                onClick={() => setActiveTab('logs')}
-                className={`px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0 ${activeTab === 'logs' ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-              >
-                <Activity className="w-3.5 h-3.5" />
-                {isArabic ? "سجلات التوصيل" : "Delivery Logs"}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 md:justify-end w-full md:w-auto">
-            {activeTab !== 'settings' && activeTab !== 'logs' && (
-              <>
+            <div className="flex items-center gap-1 shrink-0">
+              {activeTab !== 'settings' && activeTab !== 'logs' && (
                 <button
+                  type="button"
                   onClick={handleMarkAllRead}
-                  className="flex-1 md:flex-none text-center justify-center px-4 py-2 text-[11px] sm:text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-100/50 dark:border-indigo-900/40 rounded-xl hover:bg-indigo-150 transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+                  className="sx-notif-header__btn"
+                  aria-label={isArabic ? 'تحديد الكل كمقروء' : 'Mark all read'}
                 >
-                  <CheckSquare className="w-3.5 h-3.5" />
-                  {isArabic ? "تحديد الكل كمقروء" : "Mark all read"}
+                  <CheckSquare className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={handleDeleteAll}
-                  className="flex-1 md:flex-none text-center justify-center px-4 py-2 text-[11px] sm:text-xs text-red-600 dark:text-red-400 font-bold bg-red-50/50 dark:bg-red-955/20 border border-red-100/50 dark:border-red-900/40 rounded-xl hover:bg-red-150 transition-all active:scale-95 cursor-pointer flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  {isArabic ? "مسح الكل" : "Delete all"}
-                </button>
-              </>
-            )}
+              )}
+              <button
+                type="button"
+                onClick={() => setActiveTab(activeTab === 'settings' ? 'all' : 'settings')}
+                className="sx-notif-header__btn"
+                aria-label={isArabic ? 'إعدادات الإشعارات' : 'Notification settings'}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="sx-notif-header__btn"
+                aria-label={isArabic ? 'إغلاق' : 'Close'}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -707,8 +657,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       {isArabic ? "يدعم بروتوكول FCM لإرسال تنبيهات فورية حقيقية للمتصفح والأجهزة المحمولة حتى لو كان التطبيق معطلاً أو مغلقاً تماماً." : "Uses FCM technology to dispatch instant background chimes safely even when the tab is completely closed or device is terminated."}
                     </p>
                     {deviceToken && (
-                      <div className="mt-2 text-[10px] font-mono select-all bg-slate-100 dark:bg-slate-800 p-2 rounded-lg text-slate-500 overflow-x-auto truncate max-w-sm">
-                        {isArabic ? "رمز الجهاز النشط (Active Token):" : "Active Device Token:"} {deviceToken}
+                      <div className="mt-2 text-[10px] font-mono bg-slate-100 dark:bg-slate-800 p-2 rounded-lg text-slate-500">
+                        {isArabic ? 'رمز الجهاز:' : 'Device token:'} {deviceToken.slice(0, 16)}…
+                      </div>
+                    )}
+                    {Capacitor.isNativePlatform() && (
+                      <div className="mt-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                        {isArabic ? 'تطبيق أندرويد/iOS — push عبر FCM' : 'Native app — push via FCM'}
                       </div>
                     )}
                     {webPushWarning && (
@@ -1024,7 +979,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 {/* Visual Pill selection */}
                 <div className="flex items-center gap-2 overflow-x-auto shrink-0 pb-2 md:pb-0 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
                   {[
-                    { id: 'all', label: isArabic ? '⭐ الكل' : '⭐ All' },
+                    { id: 'all', label: isArabic ? 'الكل' : 'All' },
                     ...NOTIFICATION_CATEGORIES.map((c) => ({
                       id: c.id,
                       label: isArabic ? c.labelAr : c.labelEn,
@@ -1061,18 +1016,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     <p className="font-bold text-slate-600">{isArabic ? "جاري تحميل الإشعارات..." : "Loading notifications..."}</p>
                   </div>
                 ) : (
-                <div className="h-[45vh] flex flex-col items-center justify-center text-slate-450 space-y-4 p-10 select-none">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-850 flex items-center justify-center text-slate-300">
-                    <VolumeX className="w-8 h-8" />
-                  </div>
-                  <div className="text-center">
-                    <p className="font-extrabold text-slate-700 dark:text-slate-300">
-                      {isArabic ? "لا توجد أي إشعارات متوفرة" : "No Notifications matching"}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {isArabic ? "جرب تقليل كلمات البحث أو حدد فئة أخرى" : "Try relaxing filters or search terms"}
-                    </p>
-                  </div>
+                <div className="sx-notif-empty">
+                  <Bell className="w-10 h-10 text-[#D4AF37] mb-3" />
+                  <p className="font-bold text-[#0B2345] dark:text-white">
+                    {isArabic ? 'لا توجد إشعارات حالياً' : 'No notifications right now'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {isArabic ? 'كل شيء محدث' : 'All caught up'}
+                  </p>
                 </div>
                 )
               ) : (
@@ -1095,44 +1046,39 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
         {/* Global Footer banner */}
         {selectedNotification && (
-          <div className="absolute inset-0 z-[110] bg-slate-950/50 flex items-end sm:items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+          <div className="sx-notif-detail-overlay">
+            <div className="sx-notif-detail">
               <div className="flex items-start justify-between gap-3 mb-4">
-                <h3 className="font-black text-lg text-slate-900 dark:text-white">{selectedNotification.title}</h3>
-                <button onClick={() => setSelectedNotification(null)} className="p-2 rounded-full hover:bg-slate-100">
+                <div className="min-w-0">
+                  <span className="sx-notif-card__category">{getCategoryLabel(selectedNotification)}</span>
+                  <h3 className="font-black text-lg text-[#0B2345] dark:text-white mt-2">{selectedNotification.title}</h3>
+                </div>
+                <button type="button" onClick={() => setSelectedNotification(null)} className="sx-notif-header__btn" aria-label={isArabic ? 'إغلاق' : 'Close'}>
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-sm text-slate-600 dark:text-slate-300 font-semibold mb-4">{selectedNotification.message}</p>
-              <div className="flex flex-wrap gap-2 mb-4 text-[10px] font-bold text-slate-500">
-                <span>{getCategoryLabel(selectedNotification)}</span>
-                <span>•</span>
-                <span>{selectedNotification.createdAt?.toLocaleString?.() || ''}</span>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-4 whitespace-pre-wrap">{selectedNotification.message}</p>
+              <div className="space-y-2 text-xs text-slate-500 mb-4">
+                {(selectedNotification.senderName || selectedNotification.metadata?.senderName) && (
+                  <p>{isArabic ? 'المرسل:' : 'From:'} {selectedNotification.senderName || selectedNotification.metadata?.senderName}</p>
+                )}
+                {selectedNotification.metadata?.studentName && (
+                  <p>{isArabic ? 'الطالب:' : 'Student:'} {selectedNotification.metadata.studentName}</p>
+                )}
+                <p>{selectedNotification.createdAt?.toLocaleString?.() || ''}</p>
               </div>
-              {getNotificationActionLabel(selectedNotification, isArabic) && (
+              {resolveNotificationTab(selectedNotification, normalizeDashboardRole(userRole, profile?.role)) && (
                 <button
                   type="button"
                   onClick={() => handleNotificationAction(selectedNotification)}
-                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm"
+                  className="sx-notif-card__action w-full justify-center py-3"
                 >
-                  {getNotificationActionLabel(selectedNotification, isArabic)}
+                  {isArabic ? 'عرض' : 'View'}
                 </button>
               )}
             </div>
           </div>
         )}
-
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400 bg-slate-50/50 dark:bg-slate-900/50 select-none shrink-0 font-bold">
-          <span className="flex items-center gap-1.5">
-            <Wifi className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-            {isArabic ? "متصل بالنظام الرئيسي ومزامنة التنبيهات فورية" : "Unified Active WebPush & FCM connection established."}
-          </span>
-          <span className="hidden xs:flex items-center gap-1 text-[10px]">
-            <Laptop className="w-3 h-3" />
-            <Smartphone className="w-3 h-3" />
-            iOS/Android compatible
-          </span>
-        </div>
 
       </div>
     </div>,

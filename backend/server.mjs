@@ -1,4 +1,4 @@
-// ../server.ts
+// server.ts
 import express from "express";
 import compression from "compression";
 import path from "path";
@@ -9,7 +9,466 @@ import { getStorage } from "firebase-admin/storage";
 import dotEnv from "dotenv";
 import fs from "fs";
 import crypto from "crypto";
-import { runSchoolPermanentDelete } from "./schoolPermanentDelete.mjs";
+
+// schoolPermanentDelete.mjs
+var SCHOOL_SCOPED_COLLECTIONS = [
+  "students",
+  "classes",
+  "attendance",
+  "grades",
+  "homework",
+  "announcements",
+  "behavior_reports",
+  "teacher_reports",
+  "advanced_reports",
+  "installments",
+  "payments",
+  "payroll",
+  "inventory",
+  "notifications",
+  "dismissal_requests",
+  "id_cards",
+  "student_archives",
+  "staff",
+  "behavior",
+  "exams",
+  "fees",
+  "expenses",
+  "logs",
+  "market",
+  "marketplace",
+  "orders",
+  "subscriptionRequests",
+  "subjects",
+  "print_logs",
+  "audit_logs",
+  "login_logs",
+  "system_messages",
+  "conversations",
+  "notification_preferences",
+  "registrations"
+];
+async function deleteSchoolScopedCollection(db, collectionName, schoolId) {
+  let deleted = 0;
+  try {
+    const snap = await db.collection(collectionName).where("schoolId", "==", schoolId).get();
+    if (snap.empty) return 0;
+    const docs = snap.docs;
+    const batchSize = 400;
+    for (let i = 0; i < docs.length; i += batchSize) {
+      const chunk = docs.slice(i, i + batchSize);
+      const batch = db.batch();
+      chunk.forEach((docSnap) => batch.delete(docSnap.ref));
+      await batch.commit();
+      deleted += chunk.length;
+    }
+  } catch (error) {
+    console.error(`[permanent-delete] ${collectionName} cleanup failed:`, error);
+    throw new Error(`Failed to cleanup ${collectionName}: ${error.message || error}`);
+  }
+  return deleted;
+}
+async function runSchoolPermanentDelete({
+  db,
+  authAdmin,
+  schoolId,
+  confirmName
+}) {
+  const schoolRef = db.collection("schools").doc(schoolId);
+  const schoolSnap = await schoolRef.get();
+  if (!schoolSnap.exists) {
+    const err = new Error("School not found");
+    err.status = 404;
+    throw err;
+  }
+  const schoolData = schoolSnap.data() || {};
+  const schoolName = String(schoolData.name || "").trim();
+  if (!confirmName || confirmName.trim() !== schoolName) {
+    const err = new Error("School name confirmation does not match");
+    err.status = 400;
+    throw err;
+  }
+  const summary = {
+    schoolId,
+    schoolName,
+    collections: {},
+    usersDeleted: 0,
+    authUsersDeleted: 0
+  };
+  const usersSnap = await db.collection("users").where("schoolId", "==", schoolId).get();
+  for (const uDoc of usersSnap.docs) {
+    try {
+      await authAdmin.deleteUser(uDoc.id);
+      summary.authUsersDeleted += 1;
+    } catch {
+    }
+    await uDoc.ref.delete();
+    summary.usersDeleted += 1;
+  }
+  for (const colName of SCHOOL_SCOPED_COLLECTIONS) {
+    summary.collections[colName] = await deleteSchoolScopedCollection(
+      db,
+      colName,
+      schoolId
+    );
+  }
+  await schoolRef.delete();
+  summary.collections.schools = 1;
+  return summary;
+}
+
+// roleHierarchy.ts
+var ROLE_RANK = {
+  superadmin: 100,
+  super_admin: 100,
+  admin: 80,
+  school_admin: 80,
+  staff: 60,
+  assistant: 55,
+  teacher: 50,
+  parent: 40,
+  guard: 30,
+  student: 20
+};
+function normalizeRole(role) {
+  if (!role) return "";
+  return role === "super_admin" ? "superadmin" : role;
+}
+function roleRank(role) {
+  return ROLE_RANK[normalizeRole(role)] ?? 0;
+}
+function isSuperAdminRole(role) {
+  return normalizeRole(role) === "superadmin";
+}
+function isSchoolAdminRole(role) {
+  const r = normalizeRole(role);
+  return r === "admin" || r === "school_admin";
+}
+function isSystemAssistant(role, schoolId) {
+  return normalizeRole(role) === "assistant" && !schoolId;
+}
+function canActorUseAdminApi(role, schoolId) {
+  const r = normalizeRole(role);
+  if (isSuperAdminRole(r)) return true;
+  if (isSchoolAdminRole(r)) return true;
+  if (r === "staff" || r === "assistant") {
+    return !isSystemAssistant(r, schoolId);
+  }
+  return false;
+}
+function canActorCreateRole(actorRole, targetRole, actorSchoolId) {
+  const actor = normalizeRole(actorRole);
+  const target = normalizeRole(targetRole);
+  if (!target) return false;
+  if (target === "superadmin") return actor === "superadmin";
+  if (isSystemAssistant(actor, actorSchoolId)) return false;
+  if (["admin", "school_admin"].includes(target)) {
+    return actor === "superadmin";
+  }
+  if (target === "assistant" && !actorSchoolId) {
+    return actor === "superadmin";
+  }
+  if (isSuperAdminRole(actor)) return true;
+  if (isSchoolAdminRole(actor)) {
+    return ["teacher", "parent", "guard", "staff", "assistant", "student"].includes(
+      target
+    );
+  }
+  if (actor === "staff" || actor === "assistant") {
+    return target === "parent";
+  }
+  return false;
+}
+function canActorDeleteUser(actorRole, targetRole, actorSchoolId) {
+  const actor = normalizeRole(actorRole);
+  const target = normalizeRole(targetRole);
+  if (!target) return false;
+  if (isSystemAssistant(actor, actorSchoolId)) return false;
+  if (isSuperAdminRole(actor)) {
+    if (isSuperAdminRole(target)) return false;
+    return true;
+  }
+  if (isSchoolAdminRole(actor)) {
+    return roleRank(target) < roleRank("admin");
+  }
+  return false;
+}
+function canActorSyncClaims(actorRole, targetRole, actorSchoolId) {
+  const actor = normalizeRole(actorRole);
+  const target = normalizeRole(targetRole);
+  if (!target) return false;
+  if (isSuperAdminRole(actor)) return true;
+  if (isSystemAssistant(actor, actorSchoolId)) return false;
+  if (isSchoolAdminRole(actor)) {
+    return roleRank(target) < roleRank("admin");
+  }
+  return false;
+}
+function canActorDeleteStudent(actorRole, actorSchoolId) {
+  const actor = normalizeRole(actorRole);
+  if (isSuperAdminRole(actor)) return true;
+  if (isSystemAssistant(actor, actorSchoolId)) return false;
+  return isSchoolAdminRole(actor);
+}
+
+// notificationPushDispatch.ts
+var PUSH_MAX_AGE_MS = 10 * 60 * 1e3;
+var TERMINAL_STATUSES = /* @__PURE__ */ new Set(["sent", "partial", "skipped", "no_tokens", "failed", "error"]);
+function logPush(event, meta) {
+  console.info(`[Notifications] ${event}`, meta);
+}
+function getCreatedAtMs(notif) {
+  const ca = notif.createdAt;
+  if (!ca) return null;
+  if (typeof ca.toMillis === "function") {
+    return ca.toMillis();
+  }
+  if (typeof ca.seconds === "number") {
+    return ca.seconds * 1e3;
+  }
+  if (ca instanceof Date) return ca.getTime();
+  return null;
+}
+function isPushTerminal(notif) {
+  if (notif.pushDispatched === true) return true;
+  const status = notif.pushDelivery?.status;
+  return Boolean(status && TERMINAL_STATUSES.has(status));
+}
+function isWithinPushAgeWindow(notif, maxAgeMs = PUSH_MAX_AGE_MS) {
+  const ms = getCreatedAtMs(notif);
+  if (ms === null) return true;
+  return Date.now() - ms <= maxAgeMs;
+}
+async function writePushDelivery(docRef, adminSdk, payload) {
+  await docRef.set(
+    {
+      pushDispatched: payload.status === "sent" || payload.status === "partial",
+      pushDispatchedAt: adminSdk.firestore.FieldValue.serverTimestamp(),
+      pushDelivery: {
+        ...payload,
+        at: adminSdk.firestore.FieldValue.serverTimestamp()
+      }
+    },
+    { merge: true }
+  );
+}
+async function claimNotificationForPush(docRef, adminSdk) {
+  return adminSdk.firestore().runTransaction(async (tx) => {
+    const snap = await tx.get(docRef);
+    if (!snap.exists) return { claimed: false, notif: null, skipReason: "missing" };
+    const notif = snap.data();
+    if (isPushTerminal(notif)) {
+      return { claimed: false, notif, skipReason: "already_handled" };
+    }
+    if (!isWithinPushAgeWindow(notif)) {
+      tx.set(
+        docRef,
+        {
+          pushDelivery: {
+            status: "skipped",
+            reason: "too_old",
+            at: adminSdk.firestore.FieldValue.serverTimestamp()
+          }
+        },
+        { merge: true }
+      );
+      return { claimed: false, notif, skipReason: "too_old" };
+    }
+    const delivery = notif.pushDelivery;
+    if (delivery?.status === "pending" && delivery.lockedAt?.toMillis) {
+      const lockedMs = delivery.lockedAt.toMillis();
+      if (Date.now() - lockedMs < 6e4) {
+        return { claimed: false, notif, skipReason: "locked" };
+      }
+    }
+    tx.set(
+      docRef,
+      {
+        pushDelivery: {
+          status: "pending",
+          lockedAt: adminSdk.firestore.FieldValue.serverTimestamp()
+        }
+      },
+      { merge: true }
+    );
+    return { claimed: true, notif };
+  });
+}
+async function resolveUserTokens(db, userId, notifSchoolId) {
+  let userTokens = [];
+  if (userId === "super_admin") {
+    const superAdminsSnap = await db.collection("users").where("role", "==", "superadmin").get();
+    superAdminsSnap.docs.forEach((docSnap) => {
+      const tokens = docSnap.data().fcmTokens;
+      if (Array.isArray(tokens)) userTokens.push(...tokens);
+    });
+  } else {
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) return [];
+    const userData = userDoc.data() || {};
+    if (notifSchoolId && notifSchoolId !== "system" && userData.schoolId && userData.schoolId !== notifSchoolId) {
+      logPush("PUSH_SEND_SKIPPED", { userId, reason: "school_mismatch", schoolId: notifSchoolId });
+      return [];
+    }
+    const tokens = userData.fcmTokens;
+    if (Array.isArray(tokens)) userTokens.push(...tokens);
+  }
+  return Array.from(new Set(userTokens.filter((t) => typeof t === "string" && t.trim().length > 0)));
+}
+async function dispatchPushForNotificationDoc(db, adminSdk, notifId, notif) {
+  const docRef = db.collection("notifications").doc(notifId);
+  const userId = String(notif.userId || "");
+  const notifSchoolId = String(notif.schoolId || "");
+  const title = String(notif.title || "\u0625\u0634\u0639\u0627\u0631 \u062C\u062F\u064A\u062F");
+  const message = String(notif.message || notif.content || "");
+  const type = String(notif.type || "system");
+  const routeTarget = String(
+    notif.routeTarget || notif.metadata?.routeTarget || notif.metadata?.route || type
+  );
+  if (!userId) {
+    await writePushDelivery(docRef, adminSdk, { status: "skipped", reason: "no_userId" });
+    logPush("PUSH_SEND_SKIPPED", { notifId, reason: "no_userId" });
+    return { notifId, status: "skipped", reason: "no_userId" };
+  }
+  logPush("PUSH_SEND_START", { notifId, userId, type, schoolId: notifSchoolId });
+  try {
+    const userTokens = await resolveUserTokens(db, userId, notifSchoolId);
+    if (userTokens.length === 0) {
+      await writePushDelivery(docRef, adminSdk, {
+        status: "no_tokens",
+        successCount: 0,
+        failureCount: 0
+      });
+      logPush("PUSH_SEND_SKIPPED", { notifId, userId, reason: "no_tokens" });
+      return { notifId, status: "no_tokens", reason: "no_tokens" };
+    }
+    const appUrl = (process.env.APP_URL || "").replace(/\/$/, "");
+    const clickUrl = appUrl ? `${appUrl}/?tab=${encodeURIComponent(routeTarget)}` : `/?tab=${encodeURIComponent(routeTarget)}`;
+    const metadata = notif.metadata || {};
+    const dedupKey = typeof metadata.dedupKey === "string" ? metadata.dedupKey : "";
+    const messages = userTokens.map((token) => ({
+      token,
+      notification: { title, body: message },
+      data: {
+        type,
+        schoolId: notifSchoolId,
+        userId,
+        notificationId: notifId,
+        routeTarget,
+        route: routeTarget,
+        url: clickUrl,
+        ...dedupKey ? { dedupKey } : {}
+      },
+      webpush: appUrl ? { fcmOptions: { link: clickUrl } } : void 0,
+      android: {
+        priority: "high",
+        notification: { sound: "default" }
+      },
+      apns: {
+        payload: { aps: { sound: "default", badge: 1 } }
+      }
+    }));
+    const response = await adminSdk.messaging().sendEach(messages);
+    const invalidTokens = [];
+    response.responses.forEach((res, idx) => {
+      if (res.success) return;
+      const code = res.error?.code || "";
+      if (code.includes("registration-token-not-registered") || code.includes("invalid-registration-token")) {
+        invalidTokens.push(userTokens[idx]);
+      }
+    });
+    if (invalidTokens.length > 0 && userId !== "super_admin") {
+      await db.collection("users").doc(userId).update({
+        fcmTokens: adminSdk.firestore.FieldValue.arrayRemove(...invalidTokens)
+      }).catch(() => {
+      });
+      logPush("PUSH_SEND_SUCCESS", {
+        notifId,
+        prunedTokens: invalidTokens.length
+      });
+    }
+    const status = response.failureCount === 0 ? "sent" : "partial";
+    await writePushDelivery(docRef, adminSdk, {
+      status,
+      successCount: response.successCount,
+      failureCount: response.failureCount
+    });
+    logPush("PUSH_SEND_SUCCESS", {
+      notifId,
+      successCount: response.successCount,
+      failureCount: response.failureCount
+    });
+    return {
+      notifId,
+      status,
+      successCount: response.successCount,
+      failureCount: response.failureCount
+    };
+  } catch (err) {
+    const message2 = err instanceof Error ? err.message : String(err);
+    await writePushDelivery(docRef, adminSdk, { status: "error", error: message2 }).catch(() => {
+    });
+    logPush("PUSH_SEND_ERROR", { notifId, error: message2 });
+    return { notifId, status: "error", reason: message2 };
+  }
+}
+async function processNotificationPush(db, adminSdk, notifId, notif) {
+  const docRef = db.collection("notifications").doc(notifId);
+  if (isPushTerminal(notif)) {
+    logPush("PUSH_SEND_SKIPPED", { notifId, reason: "terminal_status" });
+    return null;
+  }
+  if (!isWithinPushAgeWindow(notif)) {
+    await writePushDelivery(docRef, adminSdk, { status: "skipped", reason: "too_old" });
+    logPush("PUSH_SEND_SKIPPED", { notifId, reason: "too_old" });
+    return { notifId, status: "skipped", reason: "too_old" };
+  }
+  const claim = await claimNotificationForPush(docRef, adminSdk);
+  if (!claim.claimed) {
+    if (claim.skipReason && claim.skipReason !== "locked") {
+      logPush("PUSH_SEND_SKIPPED", { notifId, reason: claim.skipReason });
+    }
+    return claim.skipReason ? { notifId, status: "skipped", reason: claim.skipReason } : null;
+  }
+  return dispatchPushForNotificationDoc(db, adminSdk, notifId, claim.notif || notif);
+}
+function setupNotificationPushListener(db, adminSdk) {
+  let isInitialSnapshot = true;
+  db.collection("notifications").onSnapshot(
+    (snapshot) => {
+      if (!snapshot) return;
+      if (isInitialSnapshot) {
+        isInitialSnapshot = false;
+        logPush("PUSH_SEND_START", { event: "listener_ready", skippedInitial: snapshot.size });
+        return;
+      }
+      for (const change of snapshot.docChanges()) {
+        if (change.type !== "added") continue;
+        const notifId = change.doc.id;
+        const notif = change.doc.data();
+        void processNotificationPush(db, adminSdk, notifId, notif);
+      }
+    },
+    (err) => {
+      logPush("PUSH_SEND_ERROR", { event: "listener", error: err.message });
+    }
+  );
+  logPush("PUSH_SEND_START", { event: "fcm_gateway_initialized" });
+}
+async function pollRecentNotificationsForPush(db, adminSdk, limit = 50) {
+  const cutoff = adminSdk.firestore.Timestamp.fromMillis(Date.now() - PUSH_MAX_AGE_MS);
+  const snap = await db.collection("notifications").where("createdAt", ">=", cutoff).orderBy("createdAt", "desc").limit(limit).get();
+  const results = [];
+  for (const docSnap of snap.docs) {
+    const notif = docSnap.data();
+    if (isPushTerminal(notif)) continue;
+    const result = await processNotificationPush(db, adminSdk, docSnap.id, notif);
+    if (result) results.push(result);
+  }
+  return results;
+}
+
+// server.ts
 dotEnv.config();
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
@@ -246,9 +705,7 @@ async function startServer() {
           return res.status(403).json({ error: "Forbidden: User profile not found" });
         }
       }
-      const allowedRoles = ["admin", "superadmin", "staff", "assistant"];
-      const hasAdminRights = allowedRoles.includes(role);
-      if (!hasAdminRights) {
+      if (!canActorUseAdminApi(role, schoolId)) {
         return res.status(403).json({ error: "Forbidden: Admin access required" });
       }
       if (role !== "superadmin" && schoolId) {
@@ -293,60 +750,104 @@ async function startServer() {
       return res.status(401).json({ error: "AuthenticationFailed", message: `\u0641\u0634\u0644 \u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0627\u0644\u0647\u0648\u064A\u0629: ${e.message}` });
     }
   };
-  const STUDENT_PHOTO_STAFF_ROLES = [
+  const SCHOOL_IMAGE_UPLOAD_ROLES = [
     "superadmin",
     "super_admin",
     "admin",
     "school_admin",
     "assistant",
-    "staff",
-    "teacher"
+    "staff"
   ];
-  const isSuperAdminRole = (role) => role === "superadmin" || role === "super_admin";
+  const STUDENT_PHOTO_UPLOAD_ROLES = [
+    "superadmin",
+    "super_admin",
+    "admin",
+    "school_admin",
+    "assistant",
+    "staff"
+  ];
+  const isSuperAdminRole3 = (role) => role === "superadmin" || role === "super_admin";
+  function assertSafeStoragePath(storagePath) {
+    if (!storagePath || typeof storagePath !== "string" || storagePath.includes("..") || storagePath.startsWith("/") || storagePath.includes("\\")) {
+      throw Object.assign(new Error("INVALID_UPLOAD_PATH"), { status: 400 });
+    }
+  }
+  function assertSchoolScope(role, userSchoolId, pathSchoolId) {
+    if (!isSuperAdminRole3(role) && userSchoolId !== pathSchoolId) {
+      throw Object.assign(new Error("FORBIDDEN_SCHOOL"), { status: 403 });
+    }
+  }
+  function assertImageExtension(fileName) {
+    if (!/\.(jpe?g|png|webp|gif)$/i.test(fileName)) {
+      throw Object.assign(new Error("INVALID_FILE_TYPE"), { status: 400 });
+    }
+  }
   async function assertUploadPathAllowed(uid, storagePath, tokenUser) {
+    assertSafeStoragePath(storagePath);
     const db = getDb();
     const userDoc = await db.collection("users").doc(uid).get();
     if (!userDoc.exists) {
-      return null;
+      throw Object.assign(new Error("FORBIDDEN"), { status: 403 });
     }
     const userData = userDoc.data() || {};
     const tokenRole = String(tokenUser?.role || "");
     const tokenSchoolId = String(tokenUser?.schoolId || "");
     const role = String(userData.role || tokenRole || "");
     const schoolId = String(userData.schoolId || tokenSchoolId || "");
+    const logoMatch = storagePath.match(/^schools\/([^/]+)\/logo\/([^/]+)$/);
+    if (logoMatch) {
+      const pathSchoolId = logoMatch[1];
+      const fileName = logoMatch[2];
+      if (!SCHOOL_IMAGE_UPLOAD_ROLES.includes(role)) {
+        throw Object.assign(new Error("FORBIDDEN_ROLE"), { status: 403 });
+      }
+      assertSchoolScope(role, schoolId, pathSchoolId);
+      if (!/^logo_\d+\.(jpg|jpeg|png|webp)$/i.test(fileName)) {
+        throw Object.assign(new Error("INVALID_LOGO_PATH"), { status: 400 });
+      }
+      assertImageExtension(fileName);
+      return { role, schoolId };
+    }
+    const storeMatch = storagePath.match(/^schools\/([^/]+)\/store\/products\/([^/]+)$/);
+    if (storeMatch) {
+      const pathSchoolId = storeMatch[1];
+      const fileName = storeMatch[2];
+      if (!SCHOOL_IMAGE_UPLOAD_ROLES.includes(role)) {
+        throw Object.assign(new Error("FORBIDDEN_ROLE"), { status: 403 });
+      }
+      assertSchoolScope(role, schoolId, pathSchoolId);
+      if (!/^\d+-[^/]+\.(jpg|jpeg|png|webp|gif)$/i.test(fileName)) {
+        throw Object.assign(new Error("INVALID_STORE_IMAGE_PATH"), { status: 400 });
+      }
+      assertImageExtension(fileName);
+      return { role, schoolId };
+    }
     const studentMatch = storagePath.match(/^students\/([^/]+)\/([^/]+)\/([^/]+)$/);
     if (studentMatch) {
       const pathSchoolId = studentMatch[1];
       const fileName = studentMatch[3];
-      if (!STUDENT_PHOTO_STAFF_ROLES.includes(role)) {
+      if (!STUDENT_PHOTO_UPLOAD_ROLES.includes(role)) {
         throw Object.assign(new Error("FORBIDDEN_ROLE"), { status: 403 });
       }
-      if (!isSuperAdminRole(role) && schoolId !== pathSchoolId) {
-        throw Object.assign(new Error("FORBIDDEN_SCHOOL"), { status: 403 });
-      }
+      assertSchoolScope(role, schoolId, pathSchoolId);
       if (!/^photo_\d+\.(jpg|jpeg|png|webp)$/i.test(fileName)) {
         throw Object.assign(new Error("INVALID_STUDENT_PHOTO_PATH"), { status: 400 });
       }
+      assertImageExtension(fileName);
       return { role, schoolId };
     }
-    return { role, schoolId };
+    throw Object.assign(new Error("INVALID_UPLOAD_PATH"), { status: 400 });
   }
   app.post("/api/upload", verifyToken, express.json({ limit: "20mb" }), async (req, res) => {
     try {
       const { path: storagePath, base64 } = req.body;
       if (!storagePath || !base64) return res.status(400).json({ error: "Missing path or base64" });
       try {
-        const allowed = await assertUploadPathAllowed(req.user.uid, storagePath, req.user);
-        if (!allowed) {
-          return res.status(403).json({
-            error: "FORBIDDEN",
-            message: "\u0645\u0644\u0641 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0623\u0648 \u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0647 \u0628\u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631"
-          });
-        }
+        await assertUploadPathAllowed(req.user.uid, storagePath, req.user);
       } catch (authzError) {
         const status = authzError.status || 403;
         const code = authzError.message || "FORBIDDEN";
-        const message = code === "FORBIDDEN_SCHOOL" ? "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0628\u0631\u0641\u0639 \u0635\u0648\u0631 \u0644\u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649" : code === "FORBIDDEN_ROLE" ? "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u0631\u0641\u0639 \u0635\u0648\u0631 \u0627\u0644\u0637\u0644\u0627\u0628" : "\u0645\u0633\u0627\u0631 \u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D";
+        const message = code === "FORBIDDEN_SCHOOL" ? "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0628\u0631\u0641\u0639 \u0635\u0648\u0631 \u0644\u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649" : code === "FORBIDDEN_ROLE" ? "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u0631\u0641\u0639 \u0647\u0630\u0647 \u0627\u0644\u0635\u0648\u0631\u0629" : code === "INVALID_UPLOAD_PATH" || code === "INVALID_STORE_IMAGE_PATH" || code === "INVALID_LOGO_PATH" ? "\u0645\u0633\u0627\u0631 \u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D" : code === "INVALID_FILE_TYPE" ? "\u0646\u0648\u0639 \u0627\u0644\u0645\u0644\u0641 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645" : "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0628\u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631\u0629";
         return res.status(status).json({ error: code, message });
       }
       const base64Data = base64.replace(/^data:[^;]+;base64,/, "");
@@ -358,12 +859,12 @@ async function startServer() {
           message: "\u062D\u062C\u0645 \u0627\u0644\u0645\u0644\u0641 \u0643\u0628\u064A\u0631 \u062C\u062F\u0627\u064B. \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649 \u0627\u0644\u0645\u0633\u0645\u0648\u062D \u0628\u0647 \u0647\u0648 10 \u0645\u064A\u062C\u0627\u0628\u0627\u064A\u062A."
         });
       }
-      const allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".mp3", ".m4a", ".wav", ".json", ".mobileconfig"];
+      const allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
       const ext = path.extname(storagePath).toLowerCase();
       if (!allowedExtensions.includes(ext)) {
         return res.status(400).json({
           error: "INVALID_FILE_TYPE",
-          message: "\u0646\u0648\u0639 \u0627\u0644\u0645\u0644\u0641 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0645\u0646\u0635\u0629 \u0644\u0623\u0633\u0628\u0627\u0628 \u0623\u0645\u0646\u064A\u0629."
+          message: "\u0646\u0648\u0639 \u0627\u0644\u0645\u0644\u0641 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645. \u064A\u064F\u0633\u0645\u062D \u0628\u0631\u0641\u0639 \u0635\u0648\u0631 \u0641\u0642\u0637."
         });
       }
       let contentType = "application/octet-stream";
@@ -422,6 +923,50 @@ async function startServer() {
     } catch (error) {
       console.error("Upload API Error:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+  app.get("/api/public/verify-student/:studentId", async (req, res) => {
+    try {
+      const studentId = String(req.params.studentId || "").trim();
+      if (!studentId || studentId.length > 128) {
+        return res.status(400).json({ error: "INVALID_ID", message: "Invalid student id" });
+      }
+      const db = getDb();
+      const snap = await db.collection("students").doc(studentId).get();
+      if (!snap.exists) {
+        return res.status(404).json({ error: "NOT_FOUND", message: "Student not found" });
+      }
+      const data = snap.data() || {};
+      if (data.deleted === true || data.status === "archived") {
+        return res.status(404).json({ error: "NOT_FOUND", message: "Student not found" });
+      }
+      let className = typeof data.className === "string" ? data.className : "";
+      if (!className && data.classId) {
+        const classSnap = await db.collection("classes").doc(String(data.classId)).get();
+        if (classSnap.exists) {
+          className = String(classSnap.data()?.name || "");
+        }
+      }
+      let schoolName = "";
+      if (data.schoolId) {
+        const schoolSnap = await db.collection("schools").doc(String(data.schoolId)).get();
+        if (schoolSnap.exists) {
+          schoolName = String(schoolSnap.data()?.name || "");
+        }
+      }
+      res.setHeader("Cache-Control", "public, max-age=60");
+      return res.json({
+        id: snap.id,
+        name: String(data.name || ""),
+        className,
+        dob: String(data.dob || data.dateOfBirth || ""),
+        registrationNumber: String(data.registrationNumber || ""),
+        schoolName,
+        verified: true
+      });
+    } catch (error) {
+      console.error("Public verify student error:", error);
+      return res.status(500).json({ error: "SERVER_ERROR", message: "Unable to verify student" });
     }
   });
   app.get("/api/download/schoolixiq.mobileconfig", (req, res) => {
@@ -503,8 +1048,23 @@ async function startServer() {
       if (!email) {
         return res.status(400).json({ error: "EMAIL_REQUIRED", message: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0645\u0637\u0644\u0648\u0628" });
       }
-      const allowedAdminRoles = ["superadmin", "admin", "staff", "assistant"];
-      if (!allowedAdminRoles.includes(req.user.role)) {
+      const targetRole = normalizeRole(role);
+      if (!targetRole) {
+        return res.status(400).json({ error: "ROLE_REQUIRED", message: "\u062F\u0648\u0631 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0645\u0637\u0644\u0648\u0628" });
+      }
+      if (!canActorCreateRole(req.user.role, targetRole, req.user.schoolId)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u0625\u0646\u0634\u0627\u0621 \u0645\u0633\u062A\u062E\u062F\u0645 \u0628\u0647\u0630\u0627 \u0627\u0644\u062F\u0648\u0631"
+        });
+      }
+      if (targetRole === "assistant" && !schoolId && req.user.role !== "superadmin") {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u0625\u0646\u0634\u0627\u0621 \u0645\u0633\u0627\u0639\u062F \u0627\u0644\u0646\u0638\u0627\u0645 \u0645\u0633\u0645\u0648\u062D \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
+        });
+      }
+      if (!canActorUseAdminApi(req.user.role, req.user.schoolId)) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u0627\u0644\u0642\u064A\u0627\u0645 \u0628\u0647\u0630\u0647 \u0627\u0644\u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u0625\u062F\u0627\u0631\u064A\u0629" });
       }
       if (req.user.role !== "superadmin") {
@@ -648,8 +1208,7 @@ async function startServer() {
     const { uid } = req.body;
     if (!uid) return res.status(400).json({ error: "UID required" });
     try {
-      const allowedAdminRoles = ["superadmin", "admin", "staff", "assistant"];
-      if (!allowedAdminRoles.includes(req.user.role)) {
+      if (!canActorUseAdminApi(req.user.role, req.user.schoolId)) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u0627\u0644\u0642\u064A\u0627\u0645 \u0628\u0645\u0632\u0627\u0645\u0646\u0629 \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A" });
       }
       const db = getDb();
@@ -657,6 +1216,12 @@ async function startServer() {
       if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
       const userData = userDoc.data() || {};
       const { role, schoolId } = userData;
+      if (!canActorSyncClaims(req.user.role, role, req.user.schoolId)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u0645\u0632\u0627\u0645\u0646\u0629 \u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645"
+        });
+      }
       if (req.user.role !== "superadmin") {
         if (!schoolId || schoolId !== req.user.schoolId) {
           return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u0645\u0632\u0627\u0645\u0646\u0629 \u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0623\u0639\u0636\u0627\u0621 \u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0627\u0644\u0623\u062E\u0631\u0649" });
@@ -726,8 +1291,7 @@ async function startServer() {
     const { uid } = req.body;
     if (!uid) return res.status(400).json({ error: "UID required" });
     try {
-      const allowedAdminRoles = ["superadmin", "admin", "staff", "assistant"];
-      if (!allowedAdminRoles.includes(req.user.role)) {
+      if (!canActorUseAdminApi(req.user.role, req.user.schoolId)) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645\u064A\u0646" });
       }
       const db = getDb();
@@ -737,7 +1301,20 @@ async function startServer() {
       }
       const beforeData = userDoc.data() || {};
       const targetSchoolId = beforeData.schoolId;
-      if (req.user.role !== "superadmin") {
+      const targetRole = beforeData.role;
+      if (isSuperAdminRole3(targetRole)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 Super Admin"
+        });
+      }
+      if (!canActorDeleteUser(req.user.role, targetRole, req.user.schoolId)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0645\u0633\u062A\u062E\u062F\u0645 \u0628\u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u062A\u0648\u0649"
+        });
+      }
+      if (!isSuperAdminRole3(req.user.role)) {
         if (!targetSchoolId || targetSchoolId !== req.user.schoolId) {
           return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0645\u0633\u062A\u062E\u062F\u0645\u0649 \u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0627\u0644\u0623\u062E\u0631\u0649" });
         }
@@ -846,48 +1423,41 @@ async function startServer() {
       res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   });
-  app.post(
-    "/api/admin/schools/:schoolId/permanent-delete",
-    verifyAdmin,
-    async (req, res) => {
-      const { schoolId } = req.params;
-      const { confirmName } = req.body || {};
-      if (!schoolId) {
-        return res.status(400).json({ error: "School ID required" });
-      }
-      try {
-        if (req.user.role !== "superadmin") {
-          return res.status(403).json({
-            error: "FORBIDDEN",
-            message:
-              "غير مصرح لك بحذف المدرسة نهائياً. هذا الإجراء مخصص للSuperAdmin فقط",
-          });
-        }
-        const summary = await runSchoolPermanentDelete({
-          db: getDb(),
-          authAdmin: admin.auth(),
-          schoolId,
-          confirmName: String(confirmName || ""),
-        });
-        await logAudit(req, "PERMANENT_DELETE_SCHOOL", {
-          metadata: { targetSchoolId: schoolId, summary },
-        });
-        res.json({ success: true, summary });
-      } catch (error) {
-        console.error("Permanent Delete School Error:", error);
-        res.status(error.status || 500).json({
-          error: error.message || "Internal Server Error",
+  app.post("/api/admin/schools/:schoolId/permanent-delete", verifyAdmin, async (req, res) => {
+    const { schoolId } = req.params;
+    const { confirmName } = req.body || {};
+    if (!schoolId) return res.status(400).json({ error: "School ID required" });
+    try {
+      if (req.user.role !== "superadmin") {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0646\u0647\u0627\u0626\u064A\u0627\u064B. \u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0645\u062E\u0635\u0635 \u0644\u0644SuperAdmin \u0641\u0642\u0637"
         });
       }
-    },
-  );
+      const summary = await runSchoolPermanentDelete({
+        db: getDb(),
+        authAdmin: admin.auth(),
+        schoolId,
+        confirmName: String(confirmName || "")
+      });
+      await logAudit(req, "PERMANENT_DELETE_SCHOOL", {
+        metadata: { targetSchoolId: schoolId, summary }
+      });
+      res.json({ success: true, summary });
+    } catch (error) {
+      console.error("Permanent Delete School Error:", error);
+      res.status(error.status || 500).json({ error: error.message || "Internal Server Error" });
+    }
+  });
   app.post("/api/admin/delete-student", verifyAdmin, async (req, res) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "Student ID required" });
     try {
-      const allowedAdminRoles = ["superadmin", "admin", "staff", "assistant"];
-      if (!allowedAdminRoles.includes(req.user.role)) {
-        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0627\u0644\u0637\u0644\u0627\u0628" });
+      if (!canActorDeleteStudent(req.user.role, req.user.schoolId)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0627\u0644\u0637\u0644\u0627\u0628"
+        });
       }
       const db = getDb();
       const studentDoc = await db.collection("students").doc(id).get();
@@ -983,6 +1553,66 @@ async function startServer() {
       }
     }
   });
+  app.post("/api/internal/tuition-reminders/run", express.json(), async (req, res) => {
+    const secret = process.env.TUITION_CRON_SECRET || process.env.CRON_SECRET;
+    if (!secret || req.headers["x-cron-secret"] !== secret) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    try {
+      const db = getDb();
+      const targetSchoolId = req.body?.schoolId;
+      let schoolDocs = [];
+      if (targetSchoolId) {
+        const snap = await db.collection("schools").doc(targetSchoolId).get();
+        if (snap.exists) schoolDocs = [snap];
+      } else {
+        const snap = await db.collection("schools").where("status", "==", "active").limit(200).get();
+        schoolDocs = snap.docs;
+      }
+      const scheduled = [];
+      for (const doc of schoolDocs) {
+        const settings = doc.data()?.tuitionReminderSettings || {};
+        scheduled.push({
+          schoolId: doc.id,
+          autoEnabled: Boolean(settings.autoRemindersEnabled && settings.enabled !== false)
+        });
+      }
+      res.json({
+        success: true,
+        message: "Scheduler endpoint ready. Deploy Cloud Scheduler (daily) POST with X-Cron-Secret. Automatic sends execute via runAutomaticTuitionRemindersForSchool (Firestore client) or extend this endpoint with firebase-admin send pipeline.",
+        schoolsChecked: scheduled.length,
+        autoEnabledSchools: scheduled.filter((s) => s.autoEnabled).map((s) => s.schoolId),
+        setupRequired: [
+          "Set TUITION_CRON_SECRET on Cloud Run",
+          "Cloud Scheduler \u2192 POST /api/internal/tuition-reminders/run",
+          "Enable autoRemindersEnabled per school in Tuition Reminders settings"
+        ]
+      });
+    } catch (error) {
+      console.error("[TuitionCron] error", error);
+      res.status(500).json({ success: false, error: error.message || "Cron handler failed" });
+    }
+  });
+  app.post("/api/internal/notifications/push-dispatch", express.json(), async (req, res) => {
+    const secret = process.env.NOTIFICATION_CRON_SECRET || process.env.CRON_SECRET;
+    if (!secret || req.headers["x-cron-secret"] !== secret) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    try {
+      const db = getDb();
+      const limit = Math.min(Number(req.body?.limit) || 50, 100);
+      const results = await pollRecentNotificationsForPush(db, admin, limit);
+      res.json({
+        success: true,
+        processed: results.length,
+        results,
+        note: "For real-time push, deploy Cloud Function onCreate(notifications) OR run this server on Cloud Run with FCM listener."
+      });
+    } catch (error) {
+      console.error("[Notifications] PUSH_SEND_ERROR poll", error);
+      res.status(500).json({ success: false, error: error.message || "Push poll failed" });
+    }
+  });
   app.all("/api/*", (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.status(404).json({
@@ -1019,6 +1649,7 @@ async function startServer() {
       maxAge: "1d",
       setHeaders: (res, filePath) => {
         if (filePath.endsWith(".html")) {
+          res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         } else if (filePath.match(/\.(js|css|woff2?|ico|png|jpe?g|gif|svg)$/)) {
           res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
@@ -1026,6 +1657,7 @@ async function startServer() {
       }
     }));
     app.get("*", (req, res) => {
+      res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
@@ -1033,79 +1665,9 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
     try {
       const db = getDb();
-      const bootTime = admin.firestore.Timestamp.now();
-      console.log("[FCM RUNTIME] Active notification-to-push FCM gateway initialized. Listening for school events...");
-      db.collection("notifications").where("createdAt", ">=", bootTime).onSnapshot((snapshot) => {
-        if (!snapshot) return;
-        snapshot.docChanges().forEach(async (change) => {
-          if (change.type === "added") {
-            const notif = change.doc.data();
-            const userId = notif.userId;
-            const title = notif.title || "\u0625\u0634\u0639\u0627\u0631 \u062C\u062F\u064A\u062F";
-            const message = notif.message || notif.content || "";
-            const type = notif.type || "system";
-            if (!userId) return;
-            try {
-              let userTokens = [];
-              if (userId === "super_admin") {
-                const superAdminsSnap = await db.collection("users").where("role", "==", "superadmin").get();
-                superAdminsSnap.docs.forEach((doc) => {
-                  const tokens = doc.data().fcmTokens;
-                  if (Array.isArray(tokens)) {
-                    userTokens.push(...tokens);
-                  }
-                });
-              } else {
-                const userDoc = await db.collection("users").doc(userId).get();
-                if (userDoc.exists) {
-                  const tokens = userDoc.data()?.fcmTokens;
-                  if (Array.isArray(tokens)) {
-                    userTokens.push(...tokens);
-                  }
-                }
-              }
-              userTokens = Array.from(new Set(userTokens.filter((t) => typeof t === "string" && t.trim().length > 0)));
-              if (userTokens.length > 0) {
-                console.log(`[FCM PUSH] Event "${title}" matched for user "${userId}". Dispatching to ${userTokens.length} active devices...`);
-                const messages = userTokens.map((token) => ({
-                  token,
-                  notification: {
-                    title: String(title),
-                    body: String(message)
-                  },
-                  data: {
-                    type: String(type),
-                    schoolId: String(notif.schoolId || ""),
-                    userId: String(userId)
-                  },
-                  android: {
-                    priority: "high",
-                    notification: {
-                      sound: "default"
-                    }
-                  },
-                  apns: {
-                    payload: {
-                      aps: {
-                        sound: "default",
-                        badge: 1
-                      }
-                    }
-                  }
-                }));
-                const response = await admin.messaging().sendEach(messages);
-                console.log(`[FCM SUCCESS] Delivered push successfully. Succeeded: ${response.successCount}, Failed: ${response.failureCount}`);
-              }
-            } catch (fcmErr) {
-              console.error("[FCM TRANSMIT ERROR] Failed to dispatch Firebase cloud messages:", fcmErr.message);
-            }
-          }
-        });
-      }, (err) => {
-        console.error("[FCM LISTENER ERROR] Active Firestore listener caught exception:", err.message);
-      });
+      setupNotificationPushListener(db, admin);
     } catch (e) {
-      console.error("[FCM SYSTEM FAILED] Could not initialize Firebase messaging gateway:", e.message);
+      console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
     }
     const isProductionEnv = process.env.NODE_ENV === "production";
     const isDevUrl = process.env.APP_URL && (process.env.APP_URL.includes("-dev-") || process.env.APP_URL.includes("localhost") || process.env.APP_URL.includes("127.0.0.1"));
