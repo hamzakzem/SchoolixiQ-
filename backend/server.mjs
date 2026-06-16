@@ -253,7 +253,7 @@ async function writePushDelivery(docRef, adminSdk, payload) {
   );
 }
 async function claimNotificationForPush(docRef, adminSdk) {
-  return adminSdk.firestore().runTransaction(async (tx) => {
+  return docRef.firestore.runTransaction(async (tx) => {
     const snap = await tx.get(docRef);
     if (!snap.exists) return { claimed: false, notif: null, skipReason: "missing" };
     const notif = snap.data();

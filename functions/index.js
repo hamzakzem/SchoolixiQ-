@@ -1,15 +1,23 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
-const admin = require('firebase-admin');
 
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+/** Must match firebase-applet-config.json firestoreDatabaseId — NOT (default). */
+const DATABASE_ID =
+  process.env.FIRESTORE_DATABASE_ID || 'ai-studio-5b7cdad3-1c88-4eed-9aca-523fba814a76';
 
 const PUSH_MAX_AGE_MS = 10 * 60 * 1000;
 const TERMINAL = new Set(['sent', 'partial', 'skipped', 'no_tokens', 'failed', 'error']);
 
-function log(event, meta) {
-  console.info(`[Notifications] ${event}`, meta);
+function pushLog(event, meta = {}) {
+  console.info(`[NotificationsPush] ${event}`, { databaseId: DATABASE_ID, ...meta });
+}
+
+function getAdmin() {
+  const admin = require('firebase-admin');
+  const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+  if (!admin.apps.length) {
+    admin.initializeApp();
+  }
+  return { admin, getFirestore, FieldValue, db: getFirestore(admin.app(), DATABASE_ID) };
 }
 
 function createdAtMs(notif) {
@@ -33,24 +41,37 @@ function withinWindow(notif) {
 }
 
 function resolveAppUrl() {
-  return String(process.env.APP_URL || '').replace(/\/$/, '');
+  return String(process.env.APP_URL || 'https://schoolixiq.com').replace(/\/$/, '');
 }
 
-async function dispatchPush(notifId, notif) {
-  const db = admin.firestore();
+async function writeDelivery(docRef, FieldValue, payload) {
+  await docRef.set(
+    {
+      pushDispatched: payload.status === 'sent' || payload.status === 'partial',
+      pushDispatchedAt: FieldValue.serverTimestamp(),
+      pushDelivery: {
+        ...payload,
+        at: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true },
+  );
+  pushLog('STATUS_WRITTEN', {
+    notifId: docRef.id,
+    status: payload.status,
+    reason: payload.reason,
+    successCount: payload.successCount,
+    failureCount: payload.failureCount,
+  });
+}
+
+async function dispatchPush(notifId, notif, ctx) {
+  const { admin, FieldValue, db } = ctx;
   const docRef = db.collection('notifications').doc(notifId);
   const userId = notif.userId;
+
   if (!userId) {
-    await docRef.set(
-      {
-        pushDelivery: {
-          status: 'skipped',
-          reason: 'no_userId',
-          at: admin.firestore.FieldValue.serverTimestamp(),
-        },
-      },
-      { merge: true },
-    );
+    await writeDelivery(docRef, FieldValue, { status: 'skipped', reason: 'no_userId' });
     return;
   }
 
@@ -64,28 +85,26 @@ async function dispatchPush(notifId, notif) {
   } else {
     const userDoc = await db.collection('users').doc(userId).get();
     if (!userDoc.exists) {
-      await docRef.set(
-        { pushDelivery: { status: 'no_tokens', at: admin.firestore.FieldValue.serverTimestamp() } },
-        { merge: true },
-      );
+      pushLog('NO_TOKENS', { notifId, userId, reason: 'user_missing' });
+      await writeDelivery(docRef, FieldValue, { status: 'no_tokens', reason: 'user_missing' });
       return;
     }
     const userData = userDoc.data() || {};
     const schoolId = String(notif.schoolId || '');
     if (schoolId && schoolId !== 'system' && userData.schoolId && userData.schoolId !== schoolId) {
-      log('PUSH_SEND_SKIPPED', { notifId, reason: 'school_mismatch' });
+      pushLog('PUSH_SEND_SKIPPED', { notifId, userId, reason: 'school_mismatch' });
+      await writeDelivery(docRef, FieldValue, { status: 'skipped', reason: 'school_mismatch' });
       return;
     }
     if (Array.isArray(userData.fcmTokens)) tokens = userData.fcmTokens;
   }
 
   tokens = [...new Set(tokens.filter((t) => typeof t === 'string' && t.trim()))];
+  pushLog('TOKEN_COUNT', { notifId, userId, tokenCount: tokens.length });
+
   if (tokens.length === 0) {
-    await docRef.set(
-      { pushDelivery: { status: 'no_tokens', at: admin.firestore.FieldValue.serverTimestamp() } },
-      { merge: true },
-    );
-    log('PUSH_SEND_SKIPPED', { notifId, reason: 'no_tokens' });
+    pushLog('NO_TOKENS', { notifId, userId });
+    await writeDelivery(docRef, FieldValue, { status: 'no_tokens' });
     return;
   }
 
@@ -99,8 +118,6 @@ async function dispatchPush(notifId, notif) {
   const clickUrl = appUrl
     ? `${appUrl}/?tab=${encodeURIComponent(routeTarget)}`
     : `/?tab=${encodeURIComponent(routeTarget)}`;
-
-  log('PUSH_SEND_START', { notifId, userId, type });
 
   const messages = tokens.map((token) => ({
     token,
@@ -121,9 +138,11 @@ async function dispatchPush(notifId, notif) {
 
   const response = await admin.messaging().sendEach(messages);
   const invalid = [];
+  const fcmErrors = [];
   response.responses.forEach((r, i) => {
     if (r.success) return;
-    const code = r.error?.code || '';
+    const code = r.error?.code || 'unknown';
+    fcmErrors.push({ code, index: i });
     if (
       code.includes('registration-token-not-registered') ||
       code.includes('invalid-registration-token')
@@ -132,76 +151,77 @@ async function dispatchPush(notifId, notif) {
     }
   });
 
+  if (fcmErrors.length) {
+    pushLog('FCM_ERROR', { notifId, userId, errors: fcmErrors.slice(0, 5) });
+  }
+
   if (invalid.length && userId !== 'super_admin') {
     await db
       .collection('users')
       .doc(userId)
-      .update({
-        fcmTokens: admin.firestore.FieldValue.arrayRemove(...invalid),
-      });
+      .update({ fcmTokens: FieldValue.arrayRemove(...invalid) });
   }
 
   const status = response.failureCount === 0 ? 'sent' : 'partial';
-  await docRef.set(
-    {
-      pushDispatched: status === 'sent' || status === 'partial',
-      pushDispatchedAt: admin.firestore.FieldValue.serverTimestamp(),
-      pushDelivery: {
-        status,
-        successCount: response.successCount,
-        failureCount: response.failureCount,
-        at: admin.firestore.FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true },
-  );
-
-  log('PUSH_SEND_SUCCESS', {
+  pushLog('SEND_RESULT', {
     notifId,
+    userId,
+    status,
     successCount: response.successCount,
     failureCount: response.failureCount,
+  });
+
+  await writeDelivery(docRef, FieldValue, {
+    status,
+    successCount: response.successCount,
+    failureCount: response.failureCount,
+    errorMessage: fcmErrors.length ? fcmErrors.map((e) => e.code).join(', ') : undefined,
   });
 }
 
 exports.dispatchNotificationPush = onDocumentCreated(
   {
     document: 'notifications/{notificationId}',
+    database: DATABASE_ID,
     region: 'europe-west2',
   },
   async (event) => {
     const snap = event.data;
     if (!snap) return;
 
+    const ctx = getAdmin();
+    const { FieldValue } = ctx;
     const notifId = event.params.notificationId;
     const notif = snap.data();
     const docRef = snap.ref;
 
-    if (isTerminal(notif)) return;
+    pushLog('FUNCTION_TRIGGERED', {
+      notificationId: notifId,
+      userId: notif.userId,
+      type: notif.type,
+      schoolId: notif.schoolId,
+      pushStatus: notif.pushDelivery?.status,
+    });
 
-    if (!withinWindow(notif)) {
-      await docRef.set(
-        {
-          pushDelivery: {
-            status: 'skipped',
-            reason: 'too_old',
-            at: admin.firestore.FieldValue.serverTimestamp(),
-          },
-        },
-        { merge: true },
-      );
-      log('PUSH_SEND_SKIPPED', { notifId, reason: 'too_old' });
+    if (isTerminal(notif)) {
+      pushLog('PUSH_SEND_SKIPPED', { notifId, reason: 'terminal_at_entry' });
       return;
     }
 
-    const claim = await admin.firestore().runTransaction(async (tx) => {
+    if (!withinWindow(notif)) {
+      await writeDelivery(docRef, FieldValue, { status: 'skipped', reason: 'too_old' });
+      pushLog('PUSH_SEND_SKIPPED', { notifId, reason: 'too_old' });
+      return;
+    }
+
+    const claimed = await docRef.firestore.runTransaction(async (tx) => {
       const fresh = await tx.get(docRef);
       const data = fresh.data() || {};
       if (isTerminal(data)) return false;
 
       const delivery = data.pushDelivery || {};
       if (delivery.status === 'pending' && delivery.lockedAt?.toMillis) {
-        const lockedMs = delivery.lockedAt.toMillis();
-        if (Date.now() - lockedMs < 60_000) return false;
+        if (Date.now() - delivery.lockedAt.toMillis() < 90_000) return false;
       }
 
       tx.set(
@@ -209,7 +229,8 @@ exports.dispatchNotificationPush = onDocumentCreated(
         {
           pushDelivery: {
             status: 'pending',
-            lockedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lockedAt: FieldValue.serverTimestamp(),
+            lockedBy: 'dispatchNotificationPush',
           },
         },
         { merge: true },
@@ -217,25 +238,17 @@ exports.dispatchNotificationPush = onDocumentCreated(
       return true;
     });
 
-    if (!claim) {
-      log('PUSH_SEND_SKIPPED', { notifId, reason: 'claim_failed' });
+    if (!claimed) {
+      pushLog('PUSH_SEND_SKIPPED', { notifId, reason: 'claim_failed' });
       return;
     }
 
     try {
-      await dispatchPush(notifId, notif);
+      await dispatchPush(notifId, notif, ctx);
     } catch (err) {
-      log('PUSH_SEND_ERROR', { notifId, error: String(err.message || err) });
-      await docRef.set(
-        {
-          pushDelivery: {
-            status: 'error',
-            error: String(err.message || err),
-            at: admin.firestore.FieldValue.serverTimestamp(),
-          },
-        },
-        { merge: true },
-      );
+      const msg = String(err.message || err);
+      pushLog('FCM_ERROR', { notifId, error: msg });
+      await writeDelivery(docRef, FieldValue, { status: 'error', errorMessage: msg });
     }
   },
 );

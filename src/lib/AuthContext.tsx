@@ -41,6 +41,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [schoolData, setSchoolData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const lastUserIdRef = useRef<string | null>(null);
+  const pushInitForUidRef = useRef<string | null>(null);
   const loginLoggedRef = useRef<string | null>(null);
   const profileSnapshotRef = useRef<{
     uid: string;
@@ -97,6 +98,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         const userIdForPush = lastUserIdRef.current;
         lastUserIdRef.current = null;
+        pushInitForUidRef.current = null;
         if (userIdForPush) {
           try {
             const { unregisterPushToken } = await import('./pushService');
@@ -214,14 +216,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setLoading(false);
             }
             
-            // Register for Push Notifications automatically (only native)
-            try {
-              const { registerForPushNotifications } = await import('./pushService');
-              await registerForPushNotifications(authUser.uid, data.role, data.schoolId || '');
-              const { registerWebPushNotifications } = await import('./webPushService');
-              await registerWebPushNotifications(authUser.uid);
-            } catch (err) {
-              console.error('Failed to init push notifications', err);
+            // Register push once per login session (avoid re-prompting on every profile snapshot)
+            if (pushInitForUidRef.current !== authUser.uid) {
+              pushInitForUidRef.current = authUser.uid;
+              try {
+                const { registerForPushNotifications } = await import('./pushService');
+                await registerForPushNotifications(authUser.uid, data.role, data.schoolId || '');
+                const { registerWebPushNotifications } = await import('./webPushService');
+                await registerWebPushNotifications(authUser.uid);
+              } catch (err) {
+                console.error('Failed to init push notifications', err);
+              }
             }
 
             // Listen to school data if schoolId exists

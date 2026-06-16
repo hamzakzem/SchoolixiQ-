@@ -76,7 +76,7 @@ export async function claimNotificationForPush(
   docRef: DocumentReference,
   adminSdk: typeof admin,
 ): Promise<{ claimed: boolean; notif: Record<string, unknown> | null; skipReason?: string }> {
-  return adminSdk.firestore().runTransaction(async (tx) => {
+  return docRef.firestore.runTransaction(async (tx) => {
     const snap = await tx.get(docRef);
     if (!snap.exists) return { claimed: false, notif: null, skipReason: 'missing' };
 

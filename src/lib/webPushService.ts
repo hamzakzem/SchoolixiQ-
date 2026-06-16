@@ -50,8 +50,14 @@ export async function registerWebPushNotifications(userId: string): Promise<stri
       return null;
     }
 
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return null;
+    const permission =
+      Notification.permission === 'default'
+        ? await Notification.requestPermission()
+        : Notification.permission;
+    if (permission !== 'granted') {
+      notificationDiag.tokenMissing({ platform: 'web', reason: 'permission_denied', permission });
+      return null;
+    }
 
     const vapidKey = readVapidKey();
     if (!vapidKey) {

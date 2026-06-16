@@ -77,6 +77,7 @@ import {
 } from "../lib/notificationRouting";
 import { registerWebPushNotifications, getStoredWebPushToken, isWebPushConfigured, getWebPushConfigWarning } from "../lib/webPushService";
 import { notificationDiag } from "../lib/notificationDiagnostics";
+import { sendTestPushNotification } from "../lib/pushTestNotification";
 import { Capacitor } from '@capacitor/core';
 
 type DashboardRole =
@@ -122,6 +123,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [deviceToken, setDeviceToken] = useState<string>('');
   const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
+  const [testPushSent, setTestPushSent] = useState(false);
+  const [testPushPending, setTestPushPending] = useState(false);
 
   const isArabic = profile?.language === 'ar';
   const webPushConfigured = isWebPushConfigured();
@@ -501,6 +504,28 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
   };
 
+  const triggerTestPush = async () => {
+    if (!user?.uid || !profile?.schoolId || testPushSent || testPushPending) return;
+    const role = normalizeDashboardRole(userRole, profile?.role);
+    if (role !== 'superadmin' && !import.meta.env.DEV) return;
+
+    setTestPushPending(true);
+    try {
+      const ok = await sendTestPushNotification(user.uid, profile.schoolId);
+      if (ok) {
+        setTestPushSent(true);
+        toast.success(isArabic ? 'تم إنشاء إشعار تجريبي — أغلق التطبيق وانتظر Push' : 'Test notification created — close app and wait for push');
+      } else {
+        toast.error(isArabic ? 'تعذر إنشاء الإشعار التجريبي' : 'Could not create test notification');
+      }
+    } catch (e) {
+      console.error('[NotificationsPush] test failed', e);
+      toast.error(isArabic ? 'فشل الاختبار' : 'Test failed');
+    } finally {
+      setTestPushPending(false);
+    }
+  };
+
   const getCategoryIcon = (notification: Record<string, unknown>) => {
     const cat = getCategoryConfig(resolveNotificationCategoryId(notification));
     const Icon = cat.icon;
@@ -694,6 +719,32 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   )}
                 </div>
               </div>
+
+              {(normalizeDashboardRole(userRole, profile?.role) === 'superadmin' || import.meta.env.DEV) && (
+                <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/80 dark:bg-amber-950/20 dark:border-amber-900/40">
+                  <h4 className="font-bold text-sm text-[#0B2345] dark:text-white mb-1">
+                    {isArabic ? 'اختبار Push (مطور / Super Admin)' : 'Push test (Dev / Super Admin)'}
+                  </h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
+                    {isArabic
+                      ? 'ينشئ إشعاراً تجريبياً ثم يغلق التطبيق/الموقع. راقب pushDelivery في Firestore وLogs.'
+                      : 'Creates one test doc — close the app/site and check pushDelivery in Firestore + function logs.'}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={testPushSent || testPushPending || !profile?.schoolId}
+                    onClick={triggerTestPush}
+                    className="px-4 py-2.5 bg-[#0B2345] text-[#D4AF37] text-xs font-bold rounded-xl disabled:opacity-50 min-h-[44px]"
+                    aria-label={isArabic ? 'إرسال push تجريبي' : 'Send test push'}
+                  >
+                    {testPushPending
+                      ? isArabic ? 'جاري الإرسال…' : 'Sending…'
+                      : testPushSent
+                        ? isArabic ? 'تم الإرسال (مرة واحدة)' : 'Sent (once)'
+                        : isArabic ? 'Send test push to current user' : 'Send test push to current user'}
+                  </button>
+                </div>
+              )}
 
               {/* Advanced Sound Profile customizer */}
               <div className="p-6 rounded-[2rem] border border-slate-200/50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-6">
