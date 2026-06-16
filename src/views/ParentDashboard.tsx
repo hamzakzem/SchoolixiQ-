@@ -24,6 +24,7 @@ import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import { GlobalFooter } from "../components/GlobalFooter";
 import {
   logParentFirestoreSetup,
   logParentFirestoreError,
@@ -38,7 +39,6 @@ import {
 import {
   isRedactedCredentialValue,
 } from "../lib/userProfile";
-import { alertIncomingNotification } from "../lib/notificationAlerts";
 import {
   getProductImageUrl,
   getProductName,
@@ -82,6 +82,11 @@ import SolarLoading from "../components/SolarLoading";
 import ParentChatTab from "./ParentChatTab";
 import ParentSchedules from "./parent/ParentSchedules";
 import ParentDismissalTab from "./parent/ParentDismissalTab";
+import { ParentHomeView } from "../components/parent/ParentHomeView";
+import { ParentHomeworkView } from "../components/parent/ParentHomeworkView";
+import { ParentGradesView } from "../components/parent/ParentGradesView";
+import { ParentTuitionView } from "../components/parent/ParentTuitionView";
+import { ParentInboxView } from "../components/parent/ParentAnnouncementsFeed";
 import StudentCard from "../components/admin/idcards/StudentCard";
 import { IdCardTemplate } from "../types/idCardTemplate";
 import { Phone, Mail, MapPin, Save, Sparkles, ShieldAlert, ExternalLink } from "lucide-react";
@@ -537,8 +542,8 @@ export default function ParentDashboard() {
       );
       if (notificationsPrimedRef.current) {
         items.forEach((notif: any) => {
-          if (!knownNotificationIdsRef.current.has(notif.id)) {
-            alertIncomingNotification(notif, isRtl);
+          if (!knownNotificationIdsRef.current.has(notif.id) && !notif.read) {
+            knownNotificationIdsRef.current.add(notif.id);
           }
         });
       } else {
@@ -1582,7 +1587,7 @@ export default function ParentDashboard() {
 
     return (
       <div
-        className="h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
+        className="parent-app h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
         dir={isRtl ? "rtl" : "ltr"}
       >
         <AnimatePresence>
@@ -1681,10 +1686,9 @@ export default function ParentDashboard() {
         </AnimatePresence>
 
         <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
-        {/* Engineered Mobile Header */}
-        <header className="bg-white dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm transition-colors print:hidden">
-          <div className="px-4 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-3">
-            <div className="flex items-center justify-between mb-4">
+        <header className="parent-app-header sticky top-0 z-40 transition-colors print:hidden">
+          <div className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-3">
+            <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <button
                   onClick={() => {
@@ -1697,75 +1701,57 @@ export default function ParentDashboard() {
                        }
                     }
                   }}
-                  className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0 hidden lg:block"
+                  className="parent-icon-btn hidden lg:flex shrink-0 bg-[#F7F8FA]"
+                  aria-label={isRtl ? "القائمة" : "Menu"}
                 >
-                  <Menu
-                    size={22}
-                    className={
-                      (!isSidebarOpen && window.innerWidth < 1024) || isSidebarCollapsed
-                        ? "rotate-90 transition-transform"
-                        : "transition-transform"
-                    }
-                  />
+                  <Menu size={20} />
                 </button>
                 {activeTab !== "home" && (
                   <motion.button
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     onClick={handleBack}
-                    className="flex items-center justify-center w-8 h-8 shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-200 transition-all shadow-sm active:scale-95 group"
+                    className="parent-icon-btn shrink-0 bg-[#F7F8FA]"
+                    aria-label={isRtl ? "رجوع" : "Back"}
                   >
                     <ArrowRight
-                      size={16}
-                      className={`transition-transform ${isRtl ? "group-hover:translate-x-0.5" : "rotate-180 group-hover:-translate-x-0.5"}`}
+                      size={18}
+                      className={isRtl ? "" : "rotate-180"}
                     />
                   </motion.button>
                 )}
-                <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded bg-slate-900 dark:bg-slate-800 flex items-center justify-center text-white font-mono font-bold text-sm sm:text-lg shadow-inner ring-1 ring-white/10">
-                  {profile?.name?.[0]}
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <h3 className={`text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 mb-0.5 ${isRtl ? "" : "uppercase tracking-wider"}`}>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-[#0B2345]/50 uppercase tracking-wide">
                     {t("parentWelcome")}
-                  </h3>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white leading-none truncate max-w-[120px] md:max-w-xs">
+                  </p>
+                  <p className="text-sm font-black text-[#0B2345] dark:text-white truncate max-w-[140px] sm:max-w-xs">
                     {profile?.name}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                <div className="flex items-center gap-1">
-                  <LanguageToggle />
-                  <ThemeToggle />
-                </div>
-                
+                <LanguageToggle />
+                <ThemeToggle />
                 <button
                   onClick={handleLogout}
-                  className="w-11 h-11 shrink-0 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center bg-white dark:bg-slate-800 text-red-500 hover:text-red-600 border border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-500/10 shadow-sm active:scale-95"
-                  title={t("logout")}
+                  className="parent-icon-btn text-rose-500"
+                  aria-label={t("logout")}
                 >
                   <LogOut size={18} />
                 </button>
-
                 <div className="relative shrink-0">
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
-                    className={`w-11 h-11 shrink-0 rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center relative group active:scale-95 ${
-                      showNotifications
-                        ? "bg-[#D4A64A] border-[#D4A64A] text-[#0B2345] shadow-lg shadow-[#D4A64A]/20"
-                        : "bg-[#0B2345] border-[#D4A64A]/30 text-[#D4A64A] hover:bg-[#D4A64A] hover:text-[#0B2345] hover:border-[#D4A64A] border"
-                    }`}
+                    className={`parent-icon-btn ${showNotifications ? "bg-[#D4AF37] text-[#0B2345]" : "bg-[#0B2345] text-[#D4AF37]"}`}
+                    aria-label={isRtl ? "الإشعارات" : "Notifications"}
                   >
-                    <Bell size={18} className="transition-transform duration-300 group-hover:scale-110" />
+                    <Bell size={18} />
                     {notifications.filter((n) => !n.read).length > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-[#0B2345] rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                        {notifications.filter((n) => !n.read).length > 9 ? '9+' : notifications.filter((n) => !n.read).length}
+                      <span className="absolute -top-1 -end-1 min-w-[1.1rem] h-[1.1rem] px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                        {notifications.filter((n) => !n.read).length > 9 ? "9+" : notifications.filter((n) => !n.read).length}
                       </span>
                     )}
                   </button>
-
-
-                {/* Notifications Center Modal */}
                 {showNotifications && (
                   <NotificationCenter
                     onClose={() => setShowNotifications(false)}
@@ -1773,124 +1759,42 @@ export default function ParentDashboard() {
                     userRole="parent"
                   />
                 )}
+                </div>
               </div>
             </div>
           </div>
-          {/* Close the px-4 pt-5 pb-3 div */}
-          </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 hide-scrollbar mt-2 px-4">
+          <div className="flex items-center gap-2 overflow-x-auto pb-3 px-4 hide-scrollbar">
             {students.map((s) => (
               <button
                 key={s.id}
                 onClick={() => setSelectedStudent(s)}
-                className={`py-1.5 px-3 rounded text-xs font-mono font-bold whitespace-nowrap transition-all flex items-center gap-2.5 shrink-0 border ${
-                  selectedStudent?.id === s.id
-                    ? "bg-indigo-600 text-white border-indigo-700 shadow-md translate-y-[-1px]"
-                    : "bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
-                }`}
+                className={`parent-child-pill ${selectedStudent?.id === s.id ? "parent-child-pill--active" : ""}`}
+                aria-label={s.name}
+                aria-current={selectedStudent?.id === s.id ? "true" : undefined}
               >
-                <div
-                  className={`w-5 h-5 rounded-[3px] flex items-center justify-center shrink-0 overflow-hidden ${selectedStudent?.id === s.id ? "bg-white/20" : "bg-white shadow-sm ring-1 ring-slate-200/50"}`}
-                >
+                <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 bg-white/20 flex items-center justify-center">
                   {s.photoUrl ? (
-                    <img
-                      src={s.photoUrl || undefined}
-                      alt={s.name}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
+                    <img src={s.photoUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
-                    <span className={`text-[9px] font-black uppercase ${selectedStudent?.id === s.id ? "text-white" : "text-indigo-600"}`}>
-                      {s.name[0]}
-                    </span>
+                    <span className="text-[10px] font-black">{s.name[0]}</span>
                   )}
                 </div>
-                <span className="truncate max-w-[90px]">{s.name}</span>
+                <span className="truncate max-w-[5rem]">{s.name}</span>
               </button>
             ))}
             <button
               onClick={() => setShowAddStudentModal(true)}
-              className="px-3 py-1.5 rounded text-xs font-mono font-bold bg-white dark:bg-slate-800 text-indigo-600 border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 transition-all flex items-center gap-2 shrink-0 border-dashed"
+              className="parent-child-pill border-dashed border-[#D4AF37]/50 text-[#0B2345]"
+              aria-label={t("linkStudent")}
             >
-              <Users size={12} />
+              <Users size={14} />
               {t("linkStudent")}
             </button>
           </div>
         </header>
 
-        <main className={`flex-1 flex flex-col print:overflow-visible min-h-0 bg-transparent ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0 lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
-          {tuitionEscalationAlert && (
-            <div className="px-4 md:px-8 pt-4 max-w-7xl mx-auto w-full">
-              <div
-                className={`rounded-[1.5rem] border p-5 shadow-lg ${
-                  tuitionEscalationAlert.restricted
-                    ? "border-red-300 bg-gradient-to-l from-red-50 via-white to-red-50 dark:from-red-950/40 dark:via-slate-900 dark:to-slate-900"
-                    : "border-amber-300 bg-gradient-to-l from-amber-50 via-white to-orange-50 dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900"
-                }`}
-                dir={isRtl ? "rtl" : "ltr"}
-              >
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                      tuitionEscalationAlert.restricted
-                        ? "bg-red-100 text-red-700"
-                        : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    <AlertTriangle size={24} />
-                  </div>
-                  <div className="flex-1 min-w-0 text-right">
-                    <p
-                      className={`text-[10px] font-black uppercase tracking-widest mb-1 ${
-                        tuitionEscalationAlert.restricted ? "text-red-600" : "text-amber-600"
-                      }`}
-                    >
-                      {tuitionEscalationAlert.restricted
-                        ? "تنبيه عاجل — أقساط متأخرة"
-                        : "تذكير بقسط دراسي مستحق"}
-                    </p>
-                    <h3 className="text-base font-black text-slate-900 dark:text-white mb-1">
-                      {tuitionEscalationAlert.studentName}
-                    </h3>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed mb-2">
-                      {tuitionEscalationAlert.message}
-                    </p>
-                    <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-600">
-                      {tuitionEscalationAlert.amount != null && (
-                        <span>
-                          المبلغ: {Number(tuitionEscalationAlert.amount).toLocaleString("ar-IQ")} د.ع
-                        </span>
-                      )}
-                      {tuitionEscalationAlert.dueDate && (
-                        <span>الاستحقاق: {String(tuitionEscalationAlert.dueDate)}</span>
-                      )}
-                    </div>
-                    {tuitionEscalationAlert.restricted && (
-                      <p className="text-xs font-bold text-red-700 mt-2">
-                        تم تقييد بعض الخدمات (المتجر، المحادثات، تسليم الواجبات) حتى سداد المبلغ.
-                      </p>
-                    )}
-                    {tuitionEscalationAlert.schoolPhone && (
-                      <a
-                        href={`tel:${tuitionEscalationAlert.schoolPhone}`}
-                        className="inline-flex mt-3 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold"
-                      >
-                        {isRtl ? "الاتصال بالمدرسة" : "Contact school"}
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => navigateToTab("tuition")}
-                      className="inline-flex mt-3 mr-2 px-4 py-2 rounded-xl bg-[#0B2345] text-white text-xs font-bold"
-                    >
-                      {isRtl ? "عرض الأقساط" : "View tuition"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+        <main className={`parent-app-main flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0 lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -1898,331 +1802,36 @@ export default function ParentDashboard() {
               {...pageTransitionProps(activeTab === "chat")}
             >
               {activeTab === "home" && (
-                <div className="space-y-4 md:space-y-6">
-                  {installmentBanners.length > 0 && (
-                    <div className="space-y-3">
-                      {installmentBanners.map((banner) => (
-                        <motion.div
-                          key={banner.id}
-                          initial={{ opacity: 0, y: -8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="relative overflow-hidden rounded-[1.5rem] border border-amber-200/80 dark:border-amber-900/40 bg-gradient-to-l from-amber-50 via-white to-orange-50/80 dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900 p-5 shadow-md"
-                          dir={isRtl ? "rtl" : "ltr"}
-                        >
-                          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-amber-400 to-orange-500" />
-                          <button
-                            type="button"
-                            onClick={() => dismissInstallmentBanner(banner.id)}
-                            className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-white transition-all z-10"
-                            aria-label={isRtl ? "إخفاء التنبيه" : "Dismiss alert"}
-                          >
-                            <X size={14} />
-                          </button>
-                          <div className="flex items-start gap-4 pr-2 pl-10">
-                            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 shrink-0">
-                              <Wallet size={22} />
-                            </div>
-                            <div className="flex-1 min-w-0 text-right">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-1">
-                                {isRtl ? "تنبيه الأقساط الدراسية" : "Tuition installment alert"}
-                              </p>
-                              <h3 className="text-base font-black text-slate-900 dark:text-white mb-1.5">
-                                {banner.title}
-                              </h3>
-                              <p className="text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
-                                {banner.message}
-                              </p>
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Detailed School Address and Google Maps Location Card */}
-                  {schoolInfo && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="p-5 md:p-6 rounded-[2rem] bg-gradient-to-br from-indigo-50/70 via-white to-blue-50/50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800/80 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-5 transition-all text-right"
-                    >
-                      <div className="flex items-start gap-4 w-full md:w-auto">
-                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-600/20">
-                          <MapPin size={24} className="animate-bounce" style={{ animationDuration: '3s' }} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{isRtl ? 'الموقع الجغرافي للمدرسة' : 'Detailed School Location & Address'}</p>
-                          <h3 className="text-lg font-black text-slate-950 dark:text-white mt-1 leading-snug">{schoolInfo.name}</h3>
-                          <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
-                            <p className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-400 font-mono text-xs">{isRtl ? 'العنوان المدرسي:' : 'Address:'}</span>
-                              <span className="font-bold text-slate-700 dark:text-slate-300">{schoolInfo.address || (isRtl ? 'غير محدد' : 'Not specified')}</span>
-                            </p>
-                            {schoolInfo.googleMapsUrl && (
-                              <p className="flex items-center gap-1.5">
-                                <span className="font-bold text-slate-400 font-mono text-xs">{isRtl ? 'الموقع التفصيلي:' : 'Location link:'}</span>
-                                <a 
-                                  href={schoolInfo.googleMapsUrl} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1 font-bold"
-                                >
-                                  {isRtl ? 'خرائط جوجل (Google Maps)' : 'Google Maps'}
-                                  <ExternalLink size={11} />
-                                </a>
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {schoolInfo.googleMapsUrl && (
-                        <a
-                          href={schoolInfo.googleMapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full md:w-auto px-5 py-3 bg-indigo-600 hover:bg-indigo-505 text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-indigo-600/10 cursor-pointer"
-                        >
-                          <MapPin size={14} />
-                          <span>{isRtl ? 'الذهاب إلى خريطة المدرسة التفصيلية' : 'Open Detailed School Google Map'}</span>
-                        </a>
-                      )}
-                    </motion.div>
-                  )}
-
-                  {/* Highlight Stats Bento */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                    <div className="bg-white dark:bg-slate-900 p-4 md:p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-                      <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <BarChart3 size={12} />
-                        {t("generalAverage")}
-                      </p>
-                      <p className="text-3xl font-mono font-black text-slate-900 dark:text-white leading-none">
-                        {studentGrades.length > 0
-                          ? Math.round(
-                              studentGrades.reduce(
-                                (sum, g) => sum + Number(g.score),
-                                0,
-                              ) / studentGrades.length,
-                            )
-                          : "--"}
-                      </p>
-                    </div>
-                    <div className="bg-white dark:bg-slate-900 p-4 md:p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-                      <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <AlertTriangle size={12} />
-                        {t("absenceDays")}
-                      </p>
-                      <div className="flex items-baseline gap-1.5 leading-none">
-                        <span className={`text-3xl font-mono font-black ${attendanceSummary.absent > 3 ? "text-red-500" : "text-slate-900 dark:text-white"}`}>
-                          {attendanceSummary.absent}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-slate-400">{t("day")}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Announcements Section */}
-                  <section>
-                    <div className="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <h2 className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                        <Bell size={14} />
-                        {t("latestAnnouncements")}
-                      </h2>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                      {announcements.length > 0 ? (
-                        announcements.slice(0, 3).map((ann) => (
-                          <div
-                            key={ann.id}
-                            className="bg-slate-900 dark:bg-slate-800 p-4 rounded-lg text-white shadow-sm border border-slate-700 relative overflow-hidden transition-all hover:border-slate-500"
-                          >
-                            <div className="relative z-10">
-                              <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider">
-                                    {t("from")}:{" "}
-                                    {ann.authorName || t("schoolAdmin")}
-                                  </p>
-                                  {ann.target === "individual" && (
-                                    <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-sm text-[8px] font-mono font-bold uppercase tracking-wider">
-                                      {t("privateMessage")}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="text-[9px] font-mono text-slate-500">
-                                  {ann.createdAt?.seconds
-                                    ? new Date(
-                                        ann.createdAt.seconds * 1000,
-                                      ).toLocaleDateString(
-                                        language === "ar" ? "ar-IQ" : "en-US",
-                                      )
-                                    : t("now")}
-                                </span>
-                              </div>
-                              <h3 className="text-sm font-bold mb-1.5 line-clamp-1">
-                                {ann.title}
-                              </h3>
-                              <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-                                {ann.content}
-                              </p>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-lg border border-slate-200 dark:border-slate-800 text-center text-xs font-mono font-bold uppercase text-slate-400">
-                          {t("noAnnouncements")}
-                        </div>
-                      )}
-                    </div>
-                  </section>
-
-                  {/* Recent Homework Section */}
-                  <section>
-                    <div className="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <h2 className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                        <BookOpen size={14} />
-                        {t("recentHomework")}
-                      </h2>
-                      <button
-                        onClick={() => setActiveTab("homework")}
-                        className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 uppercase tracking-wider flex items-center gap-1"
-                      >
-                        {t("seeAll")} <ArrowRight size={10} className={isRtl ? "rotate-180" : ""} />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                      {homework.length > 0 ? (
-                        homework.slice(0, 2).map((hw) => (
-                          <div
-                            key={hw.id}
-                            onClick={() => setActiveTab("homework")}
-                            className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between cursor-pointer hover:border-indigo-300 transition-colors group relative"
-                          >
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors border border-slate-200 dark:border-slate-700">
-                                  <BookOpen size={16} />
-                                </div>
-                                <div className="flex-1">
-                                  <h4 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-1 mb-1 text-right">
-                                    {hw.title}
-                                  </h4>
-                                  <div className="text-right">
-                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider inline-block">
-                                      {getHomeworkSubjectDisplay(hw, undefined, isRtl)}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3 mt-auto">
-                              <p className="text-[10px] font-mono font-bold text-slate-400">
-                                {t("deliveryDate")}: <span className="text-indigo-600 dark:text-indigo-400">{hw.dueDate}</span>
-                              </p>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteRecord(
-                                    "homework",
-                                    hw.id,
-                                    hw.title,
-                                  );
-                                }}
-                                className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
-                                title={t("delete")}
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-lg border border-slate-200 dark:border-slate-800 text-center text-xs font-mono font-bold uppercase text-slate-400">
-                          {t("noHomework")}
-                        </div>
-                      )}
-                    </div>
-                  </section>
-
-                  {allItems.some((item) => item.id === "dismissal") && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("dismissal")}
-                      className="w-full p-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98]"
-                    >
-                      <DoorOpen size={20} />
-                      {isRtl ? "أنا عند البوابة — طلب تسريح الطالب" : "At the gate — request dismissal"}
-                    </button>
-                  )}
-
-                  {/* Behavioral Feed */}
-                  <section>
-                    <div className="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <h2 className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                        <AlertTriangle size={14} />
-                        {t("latestBehavior")}
-                      </h2>
-                    </div>
-                    {selectedStudent &&
-                    behaviorReports[selectedStudent.id] &&
-                    behaviorReports[selectedStudent.id].length > 0 ? (
-                      <div
-                        onClick={() => setActiveTab("behavior")}
-                        className={`p-4 rounded-lg border transition-all cursor-pointer shadow-sm relative overflow-hidden group ${
-                          behaviorReports[selectedStudent.id][0].type ===
-                          "positive"
-                            ? "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/50 hover:border-emerald-400"
-                            : "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/50 hover:border-red-400"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/50 dark:border-white/5">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 flex items-center justify-center rounded ${behaviorReports[selectedStudent.id][0].type === "positive" ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400" : "bg-red-500/20 text-red-600 dark:text-red-400"}`}>
-                              {behaviorReports[selectedStudent.id][0].type === "positive" ? (
-                                <CheckCircle size={12} />
-                              ) : (
-                                <AlertTriangle size={12} />
-                              )}
-                            </div>
-                            <span
-                              className={`text-[9px] font-mono font-bold uppercase tracking-widest ${
-                                behaviorReports[selectedStudent.id][0].type ===
-                                "positive"
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : "text-red-600 dark:text-red-400"
-                              }`}
-                            >
-                              {behaviorReports[selectedStudent.id][0].type ===
-                              "positive"
-                                ? t("positiveBehavior")
-                                : t("warningBehavior")}
-                            </span>
-                          </div>
-                          <span className="text-[9px] text-slate-500 font-mono font-bold uppercase">
-                            {behaviorReports[selectedStudent.id][0].createdAt
-                              ?.seconds
-                              ? new Date(
-                                  behaviorReports[selectedStudent.id][0]
-                                    .createdAt.seconds * 1000,
-                                ).toLocaleDateString()
-                              : ""}
-                          </span>
-                        </div>
-                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300 text-right line-clamp-2">
-                          {behaviorReports[selectedStudent.id][0].description}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="bg-white dark:bg-slate-900 p-6 rounded-lg border border-slate-200 dark:border-slate-800 text-center text-xs font-mono font-bold uppercase text-slate-400">
-                        {t("noBehavior")}
-                      </div>
-                    )}
-                  </section>
-                </div>
+                <ParentHomeView
+                  isRtl={isRtl}
+                  language={language}
+                  t={t}
+                  students={students}
+                  selectedStudent={selectedStudent}
+                  onSelectStudent={setSelectedStudent}
+                  schoolInfo={schoolInfo}
+                  onAddStudent={() => setShowAddStudentModal(true)}
+                  linkStudentLabel={t("linkStudent")}
+                  studentGrades={studentGrades}
+                  loadingGrades={loadingGrades}
+                  homework={homework}
+                  announcements={announcements}
+                  attendanceSummary={attendanceSummary}
+                  installmentBanners={installmentBanners}
+                  tuitionEscalationAlert={tuitionEscalationAlert}
+                  onDismissBanner={dismissInstallmentBanner}
+                  onNavigate={navigateToTab}
+                  onDeleteHomework={(id, title) => handleDeleteRecord("homework", id, title)}
+                  showDismissal={allItems.some((item) => item.id === "dismissal")}
+                  behaviorPreview={
+                    selectedStudent && behaviorReports[selectedStudent.id]?.[0]
+                      ? behaviorReports[selectedStudent.id][0]
+                      : null
+                  }
+                />
               )}
 
-              {activeTab === "behavior" && (
+                            {activeTab === "behavior" && (
                 <div className="space-y-4 md:space-y-6">
                   <div className="flex flex-col gap-1 px-1 border-b border-slate-200 dark:border-slate-800 pb-3">
                     <h2 className="text-lg font-mono font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -2374,94 +1983,15 @@ export default function ParentDashboard() {
               )}
 
               {activeTab === "homework" && (
-                <div className="space-y-4 md:space-y-6">
-                  <div className="flex flex-col gap-1 px-1 border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <h2 className="text-lg font-mono font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <BookOpen size={18} />
-                      {t("homeworkList")}
-                    </h2>
-                  </div>
-                  <div className="space-y-6">
-                    {homeworkBySubject.length > 0 ? (
-                      homeworkBySubject.map((group) => (
-                        <div key={group.subject} className="space-y-3">
-                          <h3 className="text-sm font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider px-1 border-b border-slate-200 dark:border-slate-800 pb-2">
-                            {group.subject}
-                          </h3>
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {group.items.map((hw) => (
-                              <div
-                                key={hw.id}
-                                className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-all text-right relative overflow-hidden group hover:border-indigo-300 flex flex-col justify-between"
-                              >
-                                <div>
-                                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/50">
-                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-mono font-bold uppercase tracking-wider">
-                                      {getHomeworkSubjectDisplay(hw, undefined, isRtl)}
-                                    </span>
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-[10px] text-slate-500 font-mono font-bold">
-                                        {t("dueDateLabel")}: <span className="text-red-500 dark:text-red-400">{hw.dueDate}</span>
-                                      </span>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteRecord(
-                                            "homework",
-                                            hw.id,
-                                            hw.title,
-                                          );
-                                        }}
-                                        className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
-                                        title={t("hide")}
-                                      >
-                                        <Trash2 size={12} />
-                                      </button>
-                                    </div>
-                                  </div>
-                                  <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 leading-tight">
-                                    {hw.title}
-                                  </h3>
-                                  <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed whitespace-pre-wrap mb-4">
-                                    {hw.content}
-                                  </p>
-                                </div>
-                                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50 mt-auto opacity-80">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-mono font-bold text-slate-500">
-                                      {t("deliveredBy")}:{" "}
-                                      {hw.teacherName || t("teacher")}
-                                    </span>
-                                  </div>
-                                  <span className="text-[9px] font-mono font-bold text-slate-400">
-                                    {hw.createdAt?.seconds
-                                      ? new Date(
-                                          hw.createdAt.seconds * 1000,
-                                        ).toLocaleDateString()
-                                      : ""}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="col-span-full py-10 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-200 dark:border-slate-700">
-                        <BookOpen
-                          size={24}
-                          className="mx-auto mb-3 opacity-20"
-                        />
-                        <p className="text-slate-400 dark:text-slate-500 italic">
-                          {t("noHomework")}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ParentHomeworkView
+                  isRtl={isRtl}
+                  t={t}
+                  homework={homework}
+                  onDelete={(id, title) => handleDeleteRecord("homework", id, title)}
+                />
               )}
 
-              {activeTab === "schedules" && (
+                            {activeTab === "schedules" && (
                 <ParentSchedules selectedStudent={selectedStudent} />
               )}
 
@@ -2816,331 +2346,34 @@ export default function ParentDashboard() {
               )}
 
               {activeTab === "grades" && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display">
-                      {t("resultsFor")} {selectedStudent?.name}
-                    </h2>
-                    <div className="bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full text-[10px] font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 transition-colors uppercase tracking-widest">
-                      {t("firstSemester")}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    {studentGrades.map((grade, idx) => (
-                      <div
-                        key={`${grade.subject}-${grade.term}-${idx}`}
-                        className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between hover:scale-[1.02] transition-all"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 dark:text-slate-500 transition-colors">
-                            <BookOpen size={20} />
-                          </div>
-                          <div className="text-right">
-                            <span className="font-bold text-slate-800 dark:text-slate-200 block">
-                              {grade.subject}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-bold">
-                              {grade.term}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-left flex items-center gap-4">
-                          <div className="flex flex-col items-end">
-                            <span
-                              className={`text-2xl font-bold font-display ${grade.score < grade.maxScore * 0.5 ? "text-red-500" : "text-emerald-600"}`}
-                            >
-                              {grade.maxScore === 100
-                                ? `${grade.percentage}%`
-                                : `${grade.score} من ${grade.maxScore}`}
-                            </span>
-                            {grade.maxScore === 100 && (
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase tracking-widest text-left">
-                                {t("outOf100")}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {studentGrades.length === 0 && (
-                      <div className="bg-white dark:bg-slate-900 p-12 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm text-center transition-colors">
-                        <p className="text-slate-400 dark:text-slate-500 italic">
-                          {t("noGradesFound")}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ParentGradesView
+                  isRtl={isRtl}
+                  t={t}
+                  studentName={selectedStudent?.name}
+                  grades={studentGrades}
+                  loading={loadingGrades}
+                />
               )}
 
-              {activeTab === "tuition" && (
-                <div className="space-y-6">
-                  <div className="flex flex-col gap-4 px-2">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display text-right">
-                      {t("paymentHistory")} & {t("tuition")} -{" "}
-                      {selectedStudent?.name}
-                    </h2>
-
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right flex flex-col justify-between">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center">
-                            <Wallet size={16} />
-                          </div>
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                            {t("totalFees")}
-                          </span>
-                        </div>
-                        <p className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tighter">
-                          {(
-                            selectedStudent?.totalTuition || 0
-                          ).toLocaleString()}{" "}
-                          <span className="text-xs font-bold text-slate-400">
-                            {t("iqd")}
-                          </span>
-                        </p>
-                      </div>
-
-                      <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right flex flex-col justify-between">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-8 h-8 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg flex items-center justify-center">
-                            <CheckCircle size={16} />
-                          </div>
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                            {t("totalPaid")}
-                          </span>
-                        </div>
-                        <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tighter">
-                          {payments
-                            .reduce((sum, p) => sum + (p.amount || 0), 0)
-                            .toLocaleString()}{" "}
-                          <span className="text-xs font-bold text-slate-400">
-                            {t("iqd")}
-                          </span>
-                        </p>
-                      </div>
-
-                      <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors text-right flex flex-col justify-between">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-8 h-8 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg flex items-center justify-center">
-                            <ArrowRight size={16} className="rotate-180" />
-                          </div>
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                            {t("remaining")}
-                          </span>
-                        </div>
-                        <p className="text-2xl font-black text-red-600 dark:text-red-400 font-mono tracking-tighter">
-                          {(
-                            (selectedStudent?.totalTuition || 0) -
-                            (selectedStudent?.tuitionBalance || 0)
-                          ).toLocaleString()}{" "}
-                          <span className="text-xs font-bold text-slate-400">
-                            {t("iqd")}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    {installments.length > 0 && (
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 px-2 text-right">
-                          {t("upcomingInstallments")}
-                        </h3>
-                        <div className="space-y-3">
-                          {installments.map((inst) => (
-                            <div
-                              key={inst.id}
-                              className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between transition-colors"
-                            >
-                              <div className="flex items-center gap-4">
-                                <div
-                                  className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
-                                    inst.status === "paid"
-                                      ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600"
-                                      : inst.status === "late"
-                                        ? "bg-red-50 dark:bg-red-900/30 text-red-600"
-                                        : "bg-amber-50 dark:bg-amber-900/30 text-amber-600"
-                                  }`}
-                                >
-                                  {inst.status === "paid" ? (
-                                    <CheckCircle size={18} />
-                                  ) : inst.status === "late" ? (
-                                    <AlertTriangle size={18} />
-                                  ) : (
-                                    <Calendar size={18} />
-                                  )}
-                                </div>
-                                <div className="text-right">
-                                  <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">
-                                    {t("installmentFor")}{" "}
-                                    {inst.dueDate?.seconds
-                                      ? new Date(
-                                          inst.dueDate.seconds * 1000,
-                                        ).toLocaleDateString(
-                                          language === "ar" ? "ar-IQ" : "en-US",
-                                          { month: "long" },
-                                        )
-                                      : ""}
-                                  </h4>
-                                  <p className="text-[10px] text-slate-400 font-bold uppercase">
-                                    {t("dueDateLabel")}:{" "}
-                                    {inst.dueDate?.seconds
-                                      ? new Date(
-                                          inst.dueDate.seconds * 1000,
-                                        ).toLocaleDateString(
-                                          language === "ar" ? "ar-IQ" : "en-US",
-                                        )
-                                      : ""}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="text-left flex flex-col items-end">
-                                <span className="text-sm font-black text-slate-900 dark:text-white font-mono tracking-tighter">
-                                  {inst.amount?.toLocaleString()}{" "}
-                                  <span className="text-[9px] font-bold">
-                                    د.ع
-                                  </span>
-                                </span>
-                                <span
-                                  className={`text-[9px] font-bold px-2 py-0.5 rounded-full mt-1 ${
-                                    inst.status === "paid"
-                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400"
-                                      : inst.status === "late"
-                                        ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400"
-                                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400"
-                                  }`}
-                                >
-                                  {inst.status === "paid"
-                                    ? "تم الدفع"
-                                    : inst.status === "late"
-                                      ? "متأخر"
-                                      : "منتظر"}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 px-2 text-right">
-                        {t("paymentHistory")}
-                      </h3>
-                      <div className="space-y-4">
-                        {payments.map((payment) => (
-                          <div
-                            key={payment.id}
-                            className="bg-white/60 dark:bg-slate-900/60 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between transition-colors"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center font-bold">
-                                <Wallet size={20} />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-right">
-                                  {payment.type === "tuition"
-                                    ? "قسط دراسي"
-                                    : "دفعة مالية"}
-                                </h4>
-                                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold text-right">
-                                  {payment.createdAt?.seconds
-                                    ? new Date(
-                                        payment.createdAt.seconds * 1000,
-                                      ).toLocaleString("ar-IQ")
-                                    : "جاري العرض..."}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-left font-mono font-bold text-lg text-slate-900 dark:text-white tracking-tighter">
-                              +{payment.amount?.toLocaleString()}{" "}
-                              <span className="text-[10px] font-bold">د.ع</span>
-                            </div>
-                          </div>
-                        ))}
-                        {payments.length === 0 && (
-                          <div className="bg-white dark:bg-slate-900 p-12 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm text-center transition-colors">
-                            <p className="text-slate-400 dark:text-slate-500 italic">
-                              لا توجد دفعات مسجلة حالياً لـ{" "}
-                              {selectedStudent?.name}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                            {activeTab === "tuition" && (
+                <ParentTuitionView
+                  isRtl={isRtl}
+                  t={t}
+                  language={language}
+                  student={selectedStudent}
+                  payments={payments}
+                  installments={installments}
+                  escalation={tuitionEscalationAlert}
+                />
               )}
 
-              {activeTab === "chat" && <ParentChatTab />}
+                            {activeTab === "chat" && <ParentChatTab />}
 
               {activeTab === "inbox" && (
-                <div className="space-y-6">
-                  <h2
-                    className={`text-2xl font-bold text-slate-900 dark:text-white font-display px-2 ${isRtl ? "text-right" : "text-left"}`}
-                  >
-                    {t("messageCenter")}
-                  </h2>
-                  <div className="space-y-4">
-                    {announcements.filter((a) => a.target === "individual")
-                      .length > 0 ? (
-                      announcements
-                        .filter((a) => a.target === "individual")
-                        .map((ann) => (
-                          <div
-                            key={ann.id}
-                            className={`bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors ${isRtl ? "border-r-4 border-r-indigo-600 text-right" : "border-l-4 border-l-indigo-600 text-left"}`}
-                          >
-                            <div className="flex items-center justify-between mb-4">
-                              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                                {t("privateMessage")}
-                              </span>
-                              <span className="text-xs text-slate-400 font-bold">
-                                {ann.createdAt?.seconds
-                                  ? new Date(
-                                      ann.createdAt.seconds * 1000,
-                                    ).toLocaleDateString(
-                                      isRtl ? "ar-IQ" : "en-US",
-                                    )
-                                  : t("now")}
-                              </span>
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
-                              {ann.title}
-                            </h3>
-                            <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-                              {ann.content}
-                            </p>
-                            <div
-                              className={`mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2 ${isRtl ? "flex-row" : "flex-row-reverse justify-end"}`}
-                            >
-                              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-[10px] font-bold">
-                                {ann.authorName?.[0]}
-                              </div>
-                              <span className="text-xs text-slate-500">
-                                {isRtl ? "المرسل" : "Sender"}: {ann.authorName}
-                              </span>
-                            </div>
-                          </div>
-                        ))
-                    ) : (
-                      <div className="bg-white dark:bg-slate-900 p-12 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm text-center transition-colors">
-                        <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300 transition-colors">
-                          <MessageSquare size={32} />
-                        </div>
-                        <p className="text-slate-400 dark:text-slate-500 italic">
-                          {t("noMessages")}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ParentInboxView isRtl={isRtl} t={t} announcements={announcements} />
               )}
 
-              {activeTab === "settings" && (
+                            {activeTab === "settings" && (
                 <div className="space-y-6">
                   <div className="flex flex-col gap-2 px-2">
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display text-right">
