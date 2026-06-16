@@ -1,4 +1,7 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { initializeApp, getApps, getApp } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getMessaging } = require('firebase-admin/messaging');
 
 /** Must match firebase-applet-config.json firestoreDatabaseId — NOT (default). */
 const DATABASE_ID =
@@ -11,13 +14,30 @@ function pushLog(event, meta = {}) {
   console.info(`[NotificationsPush] ${event}`, { databaseId: DATABASE_ID, ...meta });
 }
 
-function getAdmin() {
-  const admin = require('firebase-admin');
-  const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-  if (!admin.apps.length) {
-    admin.initializeApp();
+function getAdminApp() {
+  if (getApps().length === 0) {
+    initializeApp();
   }
-  return { admin, getFirestore, FieldValue, db: getFirestore(admin.app(), DATABASE_ID) };
+  return getApp();
+}
+
+function getDb() {
+  getAdminApp();
+  return getFirestore(getAdminApp(), DATABASE_ID);
+}
+
+function getMessagingService() {
+  getAdminApp();
+  return getMessaging(getAdminApp());
+}
+
+function getAdminContext() {
+  getAdminApp();
+  return {
+    db: getDb(),
+    FieldValue,
+    messaging: getMessagingService(),
+  };
 }
 
 function createdAtMs(notif) {
@@ -44,7 +64,7 @@ function resolveAppUrl() {
   return String(process.env.APP_URL || 'https://schoolixiq.com').replace(/\/$/, '');
 }
 
-async function writeDelivery(docRef, FieldValue, payload) {
+async function writeDelivery(docRef, payload) {
   await docRef.set(
     {
       pushDispatched: payload.status === 'sent' || payload.status === 'partial',
@@ -66,12 +86,12 @@ async function writeDelivery(docRef, FieldValue, payload) {
 }
 
 async function dispatchPush(notifId, notif, ctx) {
-  const { admin, FieldValue, db } = ctx;
+  const { db, messaging } = ctx;
   const docRef = db.collection('notifications').doc(notifId);
   const userId = notif.userId;
 
   if (!userId) {
-    await writeDelivery(docRef, FieldValue, { status: 'skipped', reason: 'no_userId' });
+    await writeDelivery(docRef, { status: 'skipped', reason: 'no_userId' });
     return;
   }
 
@@ -86,14 +106,14 @@ async function dispatchPush(notifId, notif, ctx) {
     const userDoc = await db.collection('users').doc(userId).get();
     if (!userDoc.exists) {
       pushLog('NO_TOKENS', { notifId, userId, reason: 'user_missing' });
-      await writeDelivery(docRef, FieldValue, { status: 'no_tokens', reason: 'user_missing' });
+      await writeDelivery(docRef, { status: 'no_tokens', reason: 'user_missing' });
       return;
     }
     const userData = userDoc.data() || {};
     const schoolId = String(notif.schoolId || '');
     if (schoolId && schoolId !== 'system' && userData.schoolId && userData.schoolId !== schoolId) {
       pushLog('PUSH_SEND_SKIPPED', { notifId, userId, reason: 'school_mismatch' });
-      await writeDelivery(docRef, FieldValue, { status: 'skipped', reason: 'school_mismatch' });
+      await writeDelivery(docRef, { status: 'skipped', reason: 'school_mismatch' });
       return;
     }
     if (Array.isArray(userData.fcmTokens)) tokens = userData.fcmTokens;
@@ -104,7 +124,7 @@ async function dispatchPush(notifId, notif, ctx) {
 
   if (tokens.length === 0) {
     pushLog('NO_TOKENS', { notifId, userId });
-    await writeDelivery(docRef, FieldValue, { status: 'no_tokens' });
+    await writeDelivery(docRef, { status: 'no_tokens' });
     return;
   }
 
@@ -136,7 +156,7 @@ async function dispatchPush(notifId, notif, ctx) {
     apns: { payload: { aps: { sound: 'default', badge: 1 } } },
   }));
 
-  const response = await admin.messaging().sendEach(messages);
+  const response = await messaging.sendEach(messages);
   const invalid = [];
   const fcmErrors = [];
   response.responses.forEach((r, i) => {
@@ -171,7 +191,7 @@ async function dispatchPush(notifId, notif, ctx) {
     failureCount: response.failureCount,
   });
 
-  await writeDelivery(docRef, FieldValue, {
+  await writeDelivery(docRef, {
     status,
     successCount: response.successCount,
     failureCount: response.failureCount,
@@ -189,11 +209,11 @@ exports.dispatchNotificationPush = onDocumentCreated(
     const snap = event.data;
     if (!snap) return;
 
-    const ctx = getAdmin();
-    const { FieldValue } = ctx;
+    const ctx = getAdminContext();
+    const { db } = ctx;
     const notifId = event.params.notificationId;
     const notif = snap.data();
-    const docRef = snap.ref;
+    const docRef = db.collection('notifications').doc(notifId);
 
     pushLog('FUNCTION_TRIGGERED', {
       notificationId: notifId,
@@ -209,12 +229,12 @@ exports.dispatchNotificationPush = onDocumentCreated(
     }
 
     if (!withinWindow(notif)) {
-      await writeDelivery(docRef, FieldValue, { status: 'skipped', reason: 'too_old' });
+      await writeDelivery(docRef, { status: 'skipped', reason: 'too_old' });
       pushLog('PUSH_SEND_SKIPPED', { notifId, reason: 'too_old' });
       return;
     }
 
-    const claimed = await docRef.firestore.runTransaction(async (tx) => {
+    const claimed = await db.runTransaction(async (tx) => {
       const fresh = await tx.get(docRef);
       const data = fresh.data() || {};
       if (isTerminal(data)) return false;
@@ -248,7 +268,7 @@ exports.dispatchNotificationPush = onDocumentCreated(
     } catch (err) {
       const msg = String(err.message || err);
       pushLog('FCM_ERROR', { notifId, error: msg });
-      await writeDelivery(docRef, FieldValue, { status: 'error', errorMessage: msg });
+      await writeDelivery(docRef, { status: 'error', errorMessage: msg });
     }
   },
 );
