@@ -80,6 +80,9 @@ import {
   isWebPushConfigured,
   getWebPushConfigWarning,
   getWebPushDiagnostics,
+  runPushRegistrationDiagnostics,
+  getVapidMissingMessage,
+  getPermissionDeniedGuidance,
   type WebPushDiagnosticState,
 } from "../lib/webPushService";
 import { notificationDiag } from "../lib/notificationDiagnostics";
@@ -133,6 +136,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [testPushPending, setTestPushPending] = useState(false);
   const [pushDiag, setPushDiag] = useState<WebPushDiagnosticState | null>(null);
   const [registeringDevice, setRegisteringDevice] = useState(false);
+  const [runningTokenDiag, setRunningTokenDiag] = useState(false);
 
   const isArabic = profile?.language === 'ar';
   const webPushConfigured = isWebPushConfigured();
@@ -190,13 +194,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         );
       } else if (result.reason === 'permission_denied') {
         setWebPushStatus('denied');
+        toast.error(getPermissionDeniedGuidance(isArabic));
+      } else if (result.reason === 'vapid_key_missing') {
+        toast.error(getVapidMissingMessage(isArabic));
+      } else if (result.reason === 'save_failed') {
         toast.error(
           isArabic
-            ? "تم رفض الإذن. افتح إعدادات المتصفح → الإشعارات → السماح لـ schoolixiq.com"
-            : "Permission denied. Open browser settings → Notifications → Allow schoolixiq.com",
+            ? `فشل حفظ التوكن في Firestore: ${result.error || 'خطأ غير معروف'}`
+            : `Firestore token save failed: ${result.error || 'Unknown error'}`,
         );
-      } else if (result.reason === 'vapid_key_missing') {
-        toast.error(isArabic ? "مفتاح VAPID غير مُعد في البناء" : "VAPID key missing from build");
       } else {
         toast.error(result.error || (isArabic ? "تعذر تسجيل الجهاز" : "Could not register device"));
       }
@@ -205,6 +211,25 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       toast.error(isArabic ? "خطأ أثناء تسجيل الجهاز" : "Device registration error");
     } finally {
       setRegisteringDevice(false);
+    }
+  };
+
+  const handleRunTokenDiagnostics = async () => {
+    if (!user?.uid) return;
+    setRunningTokenDiag(true);
+    try {
+      const diag = await runPushRegistrationDiagnostics(user.uid);
+      setPushDiag(diag);
+      toast.success(
+        isArabic
+          ? `فحص مكتمل — Firestore tokens: ${diag.firestoreTokenCount}`
+          : `Diagnostics done — Firestore tokens: ${diag.firestoreTokenCount}`,
+      );
+    } catch (err) {
+      console.error('Token diagnostics failed', err);
+      toast.error(isArabic ? 'فشل فحص التوكن' : 'Token diagnostics failed');
+    } finally {
+      setRunningTokenDiag(false);
     }
   };
 
@@ -697,6 +722,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           {activeTab === 'settings' ? (
             /* SOUND SETTINGS TAB */
             <div className="p-8 space-y-6">
+
+              {/* Global push setup card */}
+              <div className="p-6 rounded-[1.5rem] border-2 border-indigo-200 dark:border-indigo-900/50 bg-white dark:bg-slate-900/60 space-y-4">
+                <h3 className="font-bold text-[#0B2345] dark:text-white text-base">
+                  {isArabic ? 'إعداد الإشعارات الفورية' : 'Push notification setup'}
+                </h3>
               
               {/* Web Push Banner Integration Info */}
               <div className="p-6 rounded-[1.5rem] bg-gradient-to-r from-teal-500/10 to-emerald-500/5 border border-emerald-500/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -728,11 +759,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     )}
                     {pushDiag && (
                       <div className="mt-3 text-[11px] space-y-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl px-3 py-2 font-mono text-slate-600 dark:text-slate-300">
-                        <div>{isArabic ? 'VAPID:' : 'VAPID configured:'} {pushDiag.vapidConfigured ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}</div>
+                        <div>{isArabic ? 'VAPID مُعد:' : 'VAPID configured:'} {pushDiag.vapidConfigured ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')} ({pushDiag.vapidSource}, len={pushDiag.vapidKeyLength})</div>
+                        {pushDiag.vapidKeyPrefix && (
+                          <div>{isArabic ? 'بادئة VAPID:' : 'VAPID prefix:'} {pushDiag.vapidKeyPrefix}</div>
+                        )}
+                        <div>{isArabic ? 'قاعدة البيانات:' : 'Database:'} {pushDiag.databaseId}</div>
                         <div>{isArabic ? 'إذن الإشعارات:' : 'Notification permission:'} {pushDiag.permission}</div>
                         <div>{isArabic ? 'Service Worker:' : 'Service Worker active:'} {pushDiag.serviceWorkerActive ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}</div>
                         <div>{isArabic ? 'رمز FCM:' : 'FCM token generated:'} {pushDiag.fcmTokenGenerated ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}{pushDiag.tokenPrefix ? ` (${pushDiag.tokenPrefix})` : ''}</div>
                         <div>{isArabic ? 'محفوظ في Firestore:' : 'Token saved to Firestore:'} {pushDiag.tokenSavedToFirestore ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}</div>
+                        <div>{isArabic ? 'Firestore fcmTokens:' : 'Firestore fcmTokens count:'} {pushDiag.firestoreTokenCount} ({pushDiag.firestoreUserHasTokens ? (isArabic ? 'موجود' : 'present') : (isArabic ? 'فارغ' : 'empty')})</div>
                         {pushDiag.lastError && (
                           <div className="text-rose-600 dark:text-rose-400">{isArabic ? 'آخر خطأ:' : 'Last error:'} {pushDiag.lastError}</div>
                         )}
@@ -740,9 +776,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     )}
                     {webPushStatus === 'denied' && (
                       <div className="mt-3 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
-                        {isArabic
-                          ? 'الإذن مرفوض. افتح إعدادات المتصفح → الخصوصية → الإشعارات → السماح لـ schoolixiq.com ثم اضغط تسجيل الجهاز.'
-                          : 'Permission denied. Open browser Settings → Privacy → Notifications → Allow schoolixiq.com, then tap Register device.'}
+                        {getPermissionDeniedGuidance(isArabic)}
                       </div>
                     )}
                   </div>
@@ -757,7 +791,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     <button
                       type="button"
                       onClick={handleRegisterDevice}
-                      disabled={registeringDevice || webPushStatus === 'denied'}
+                      disabled={registeringDevice}
                       className="px-4 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer disabled:opacity-50 min-h-[44px]"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
@@ -774,13 +808,24 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   )}
                 </div>
               </div>
+              </div>
 
               {(normalizeDashboardRole(userRole, profile?.role) === 'superadmin' || import.meta.env.DEV) && (
-                <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/80 dark:bg-amber-950/20 dark:border-amber-900/40">
+                <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/80 dark:bg-amber-950/20 dark:border-amber-900/40 space-y-3">
                   <h4 className="font-bold text-sm text-[#0B2345] dark:text-white mb-1">
                     {isArabic ? 'اختبار Push (مطور / Super Admin)' : 'Push test (Dev / Super Admin)'}
                   </h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
+                  <button
+                    type="button"
+                    disabled={runningTokenDiag || !user?.uid}
+                    onClick={handleRunTokenDiagnostics}
+                    className="px-4 py-2.5 bg-amber-600 text-white text-xs font-bold rounded-xl disabled:opacity-50 min-h-[44px] w-full sm:w-auto"
+                  >
+                    {runningTokenDiag
+                      ? (isArabic ? 'جاري الفحص…' : 'Running diagnostics…')
+                      : (isArabic ? 'فحص تسجيل توكن المستخدم الحالي' : 'Check current user token registration')}
+                  </button>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">
                     {isArabic
                       ? 'ينشئ إشعاراً تجريبياً ثم يغلق التطبيق/الموقع. راقب pushDelivery في Firestore وLogs.'
                       : 'Creates one test doc — close the app/site and check pushDelivery in Firestore + function logs.'}

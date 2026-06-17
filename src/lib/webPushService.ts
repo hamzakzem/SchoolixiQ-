@@ -1,9 +1,10 @@
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
-import { doc, updateDoc, getDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, getDocFromServer, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from './firebase';
 import { getServiceWorkerUrl } from './serviceWorkerRegistration';
 import { notificationDiag } from './notificationDiagnostics';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 let webMessaging: ReturnType<typeof getMessaging> | null = null;
 let currentWebToken: string | null = null;
@@ -29,10 +30,16 @@ export type WebPushRegistrationResult = {
 
 export type WebPushDiagnosticState = {
   vapidConfigured: boolean;
+  vapidSource: 'VITE_FCM_VAPID_KEY' | 'VITE_FIREBASE_VAPID_KEY' | 'localStorage' | 'none';
+  vapidKeyLength: number;
+  vapidKeyPrefix: string | null;
   permission: NotificationPermission | 'unsupported';
   serviceWorkerActive: boolean;
   fcmTokenGenerated: boolean;
   tokenSavedToFirestore: boolean;
+  firestoreUserHasTokens: boolean;
+  firestoreTokenCount: number;
+  databaseId: string;
   tokenPrefix: string | null;
   lastError: string | null;
 };
@@ -51,11 +58,73 @@ export function isWebPushConfigured(): boolean {
   return Boolean(readVapidKey());
 }
 
+export function getRuntimeVapidDiagnostics(): {
+  source: WebPushDiagnosticState['vapidSource'];
+  keyLength: number;
+  keyPrefix: string | null;
+  configured: boolean;
+} {
+  const env = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
+  const fromFcm = env.env?.VITE_FCM_VAPID_KEY?.trim();
+  const fromFirebase = env.env?.VITE_FIREBASE_VAPID_KEY?.trim();
+  const fromStorage =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('VITE_FCM_VAPID_KEY')?.trim() : null;
+
+  let source: WebPushDiagnosticState['vapidSource'] = 'none';
+  let key: string | undefined;
+  if (fromFcm) {
+    source = 'VITE_FCM_VAPID_KEY';
+    key = fromFcm;
+  } else if (fromFirebase) {
+    source = 'VITE_FIREBASE_VAPID_KEY';
+    key = fromFirebase;
+  } else if (fromStorage) {
+    source = 'localStorage';
+    key = fromStorage;
+  }
+
+  return {
+    source,
+    keyLength: key?.length ?? 0,
+    keyPrefix: key ? `${key.slice(0, 8)}…` : null,
+    configured: Boolean(key),
+  };
+}
+
+export function getPermissionDeniedGuidance(isArabic: boolean): string {
+  if (typeof navigator === 'undefined') {
+    return isArabic ? 'فعّل الإشعارات من إعدادات المتصفح.' : 'Enable notifications in browser settings.';
+  }
+  const ua = navigator.userAgent;
+  if (/Edg\//i.test(ua)) {
+    return isArabic
+      ? 'Edge: ⋯ → الإعدادات → ملفات تعريف الارتباط → schoolixiq.com → الإشعارات → السماح'
+      : 'Edge: ⋯ → Settings → Cookies → schoolixiq.com → Notifications → Allow';
+  }
+  if (/Firefox/i.test(ua)) {
+    return isArabic
+      ? 'Firefox: ☰ → الإعدادات → الخصوصية → الأذونات → الإشعارات → السماح لـ schoolixiq.com'
+      : 'Firefox: ☰ → Settings → Privacy → Permissions → Notifications → Allow schoolixiq.com';
+  }
+  if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) {
+    return isArabic
+      ? 'Safari: Safari → الإعدادات → مواقع الويب → الإشعارات → schoolixiq.com → السماح'
+      : 'Safari: Safari → Settings → Websites → Notifications → schoolixiq.com → Allow';
+  }
+  return isArabic
+    ? 'Chrome: ⋮ → الإعدادات → الخصوصية → إعدادات الموقع → الإشعارات → schoolixiq.com → السماح'
+    : 'Chrome: ⋮ → Settings → Privacy → Site settings → Notifications → schoolixiq.com → Allow';
+}
+
+export function getVapidMissingMessage(isArabic: boolean): string {
+  return isArabic
+    ? 'VAPID غير موجود في نسخة الإنتاج الحالية'
+    : 'VAPID is missing from the current production build';
+}
+
 export function getWebPushConfigWarning(isArabic: boolean): string | null {
   if (isWebPushConfigured()) return null;
-  return isArabic
-    ? 'مفتاح VITE_FCM_VAPID_KEY غير مُعد — الإشعارات داخل التطبيق تعمل، لكن push خارج المتصفح لن يعمل حتى إضافة المفتاح في إعدادات البناء.'
-    : 'VITE_FCM_VAPID_KEY is not configured — in-app notifications work, but background web push requires the VAPID key in build env.';
+  return getVapidMissingMessage(isArabic);
 }
 
 export function getLastWebPushRegistrationError(): string | null {
@@ -82,12 +151,17 @@ async function isServiceWorkerActive(): Promise<boolean> {
   }
 }
 
+async function readUserTokensFromServer(userId: string): Promise<string[]> {
+  const snap = await getDocFromServer(doc(db, 'users', userId));
+  if (!snap.exists()) return [];
+  const tokens = snap.data()?.fcmTokens;
+  return Array.isArray(tokens) ? tokens.filter((t) => typeof t === 'string') : [];
+}
+
 async function isTokenSavedInFirestore(userId: string, token: string): Promise<boolean> {
   try {
-    const snap = await getDoc(doc(db, 'users', userId));
-    if (!snap.exists()) return false;
-    const tokens = snap.data()?.fcmTokens;
-    return Array.isArray(tokens) && tokens.includes(token);
+    const tokens = await readUserTokensFromServer(userId);
+    return tokens.includes(token);
   } catch {
     return false;
   }
@@ -99,21 +173,60 @@ export async function getWebPushDiagnostics(userId?: string): Promise<WebPushDia
     typeof window !== 'undefined' && 'Notification' in window
       ? Notification.permission
       : 'unsupported';
+  const vapidRuntime = getRuntimeVapidDiagnostics();
 
   let tokenSavedToFirestore = false;
-  if (userId && localToken) {
-    tokenSavedToFirestore = await isTokenSavedInFirestore(userId, localToken);
+  let firestoreUserHasTokens = false;
+  let firestoreTokenCount = 0;
+
+  if (userId) {
+    try {
+      const tokens = await readUserTokensFromServer(userId);
+      firestoreTokenCount = tokens.length;
+      firestoreUserHasTokens = tokens.length > 0;
+      if (localToken) {
+        tokenSavedToFirestore = tokens.includes(localToken);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!lastRegistrationError) lastRegistrationError = `firestore_read: ${msg}`;
+    }
   }
 
   return {
-    vapidConfigured: isWebPushConfigured(),
+    vapidConfigured: vapidRuntime.configured,
+    vapidSource: vapidRuntime.source,
+    vapidKeyLength: vapidRuntime.keyLength,
+    vapidKeyPrefix: vapidRuntime.keyPrefix,
     permission,
     serviceWorkerActive: await isServiceWorkerActive(),
     fcmTokenGenerated: Boolean(localToken),
     tokenSavedToFirestore,
+    firestoreUserHasTokens,
+    firestoreTokenCount,
+    databaseId: firebaseConfig.firestoreDatabaseId || '(default)',
     tokenPrefix: localToken ? `${localToken.slice(0, 12)}…` : null,
     lastError: lastRegistrationError,
   };
+}
+
+export async function runPushRegistrationDiagnostics(userId: string): Promise<WebPushDiagnosticState> {
+  const diag = await getWebPushDiagnostics(userId);
+  console.info('[NotificationsDiag] uid', userId);
+  console.info('[NotificationsDiag] vapidConfigured', diag.vapidConfigured);
+  console.info('[NotificationsDiag] vapidSource', diag.vapidSource);
+  console.info('[NotificationsDiag] vapidKeyLength', diag.vapidKeyLength);
+  console.info('[NotificationsDiag] permission', diag.permission);
+  console.info('[NotificationsDiag] serviceWorkerReady', diag.serviceWorkerActive);
+  console.info('[NotificationsDiag] tokenGenerated', diag.fcmTokenGenerated);
+  console.info('[NotificationsDiag] tokenSaved', diag.tokenSavedToFirestore);
+  console.info('[NotificationsDiag] firestoreUserHasTokens', diag.firestoreUserHasTokens);
+  console.info('[NotificationsDiag] firestoreTokenCount', diag.firestoreTokenCount);
+  console.info('[NotificationsDiag] databaseId', diag.databaseId);
+  if (diag.lastError) {
+    console.info('[NotificationsDiag] lastError', diag.lastError);
+  }
+  return diag;
 }
 
 function attachForegroundMessageListener() {
@@ -205,8 +318,12 @@ export async function registerWebPushDevice(
     if (!vapidKey) {
       lastRegistrationError = 'vapid_key_missing';
       notificationDiag.tokenMissing({ platform: 'web', reason: 'vapid_key_missing' });
-      return { ok: false, reason: 'vapid_key_missing', error: 'VAPID key not configured in build' };
+      return { ok: false, reason: 'vapid_key_missing', error: getVapidMissingMessage(false) };
     }
+    console.info('[Notifications] VAPID_READY', {
+      source: getRuntimeVapidDiagnostics().source,
+      keyLength: vapidKey.length,
+    });
 
     let registration: ServiceWorkerRegistration;
     try {
@@ -246,14 +363,32 @@ export async function registerWebPushDevice(
 
     try {
       await saveTokenToFirestore(userId, token);
+      const verified = await isTokenSavedInFirestore(userId, token);
+      if (!verified) {
+        lastRegistrationError = 'save_verify_failed';
+        console.error('[Notifications] TOKEN_SAVE_ERROR', {
+          userId,
+          error: 'Token write could not be verified in Firestore',
+          databaseId: firebaseConfig.firestoreDatabaseId,
+        });
+        return {
+          ok: false,
+          reason: 'save_failed',
+          error: 'Token write could not be verified in Firestore',
+          token,
+          tokenPrefix: token.slice(0, 12),
+        };
+      }
       console.info('[Notifications] TOKEN_SAVE_SUCCESS', {
         userId,
         tokenPrefix: token.slice(0, 12),
+        databaseId: firebaseConfig.firestoreDatabaseId,
+        verified: true,
       });
     } catch (saveErr) {
       const msg = saveErr instanceof Error ? saveErr.message : String(saveErr);
       lastRegistrationError = `save_failed: ${msg}`;
-      console.error('[Notifications] TOKEN_SAVE_ERROR', { userId, error: msg });
+      console.error('[Notifications] TOKEN_SAVE_ERROR', { userId, error: msg, databaseId: firebaseConfig.firestoreDatabaseId });
       return { ok: false, reason: 'save_failed', error: msg, token, tokenPrefix: token.slice(0, 12) };
     }
 
