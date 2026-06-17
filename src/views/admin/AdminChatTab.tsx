@@ -13,6 +13,8 @@ import { toast } from 'react-hot-toast';
 import { SchoolixChatShell, type ChatShellContact } from '../../components/chat/SchoolixChatShell';
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from '../../components/chat/chatAvatars';
 
+console.info('[AdminChatTab] BUILD_MARKER', 'superadmin-recipient-expansion-2026-06-17');
+
 export default function AdminChatTab() {
   const { profile } = useAuth();
   const { isRtl } = useLanguage();

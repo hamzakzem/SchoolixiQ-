@@ -22,8 +22,20 @@ export interface NotificationPayload {
 }
 
 const SUPER_ADMIN_POOL_ID = 'super_admin';
+const BUILD_MARKER = 'superadmin-recipient-expansion-2026-06-17';
 
+console.info('[NotificationService] BUILD_MARKER', BUILD_MARKER);
 console.info('[Notifications] SUPER_ADMIN_PRODUCER_FIXED');
+
+function assertNoPoolRecipientFields(doc: Record<string, unknown>, context: string): void {
+  for (const field of ['userId', 'recipientId', 'receiverId'] as const) {
+    if (doc[field] === SUPER_ADMIN_POOL_ID) {
+      throw new Error(
+        `[Notifications] BLOCKED_POOL_RECIPIENT (${context}): notifications must use real super-admin uids, not super_admin pool id`,
+      );
+    }
+  }
+}
 
 function buildNotificationDoc(
   payload: NotificationPayload,
@@ -76,8 +88,14 @@ function buildNotificationDoc(
     type: payload.type,
     schoolId: payload.schoolId,
     userId,
-    recipientId: payload.recipientId || userId,
-    receiverId: payload.receiverId || userId,
+    recipientId:
+      payload.recipientId && !isPoolRecipientField(payload.recipientId)
+        ? payload.recipientId
+        : userId,
+    receiverId:
+      payload.receiverId && !isPoolRecipientField(payload.receiverId)
+        ? payload.receiverId
+        : userId,
     read: false,
     category,
     routeTarget: metadata.routeTarget,
@@ -95,6 +113,7 @@ function buildNotificationDoc(
   if (payload.senderRole) doc.senderRole = payload.senderRole;
   if (payload.audience) doc.audience = payload.audience;
 
+  assertNoPoolRecipientFields(doc, 'buildNotificationDoc');
   return doc;
 }
 
@@ -209,10 +228,9 @@ export const notificationService = {
         type: payload.type,
         schoolId: payload.schoolId,
       });
-      await addDoc(
-        collection(db, 'notifications'),
-        buildNotificationDoc(payload, payload.userId),
-      );
+      const notificationDoc = buildNotificationDoc(payload, payload.userId);
+      assertNoPoolRecipientFields(notificationDoc, 'send/addDoc');
+      await addDoc(collection(db, 'notifications'), notificationDoc);
       console.info('[Notifications] SEND_SUCCESS', {
         userId: payload.userId,
         type: payload.type,
@@ -246,7 +264,9 @@ export const notificationService = {
       const batch = writeBatch(db);
       realUserIds.forEach((userId) => {
         const docRef = doc(collection(db, 'notifications'));
-        batch.set(docRef, buildNotificationDoc(payload, userId));
+        const notificationDoc = buildNotificationDoc(payload, userId);
+        assertNoPoolRecipientFields(notificationDoc, 'sendToMultiple/batch.set');
+        batch.set(docRef, notificationDoc);
       });
       await batch.commit();
       console.info('[Notifications] SEND_SUCCESS batch', { count: realUserIds.length });
