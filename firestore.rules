@@ -35,7 +35,13 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return userRole() == 'superadmin';
+      return signedIn() && (
+        userRole() in ['superadmin', 'super_admin']
+        || (
+          request.auth.token.keys().hasAll(['role'])
+          && request.auth.token.role in ['superadmin', 'super_admin']
+        )
+      );
     }
 
     function isAdmin() {
@@ -256,12 +262,23 @@ service cloud.firestore {
     function canWriteUserInSchool() {
       return isSuperAdmin()
         || isOwner(userId)
+        || canOwnerUpdatePushTokens()
         || (
           signedIn()
           && isSchoolManagementRole()
           && hasSchoolId(resource.data)
           && sameSchool(resource)
         );
+    }
+
+    // Explicit owner path for FCM device registration (push token fields only).
+    function canOwnerUpdatePushTokens() {
+      return isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'fcmTokens',
+          'fcmTokenUpdatedAt',
+          'fcmDevices',
+        ]);
     }
 
     function canCreateUserInSchool() {

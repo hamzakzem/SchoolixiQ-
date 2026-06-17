@@ -152,10 +152,24 @@ async function isServiceWorkerActive(): Promise<boolean> {
 }
 
 async function readUserTokensFromServer(userId: string): Promise<string[]> {
-  const snap = await getDocFromServer(doc(db, 'users', userId));
-  if (!snap.exists()) return [];
-  const tokens = snap.data()?.fcmTokens;
-  return Array.isArray(tokens) ? tokens.filter((t) => typeof t === 'string') : [];
+  try {
+    const snap = await getDocFromServer(doc(db, 'users', userId));
+    if (!snap.exists()) return [];
+    const tokens = snap.data()?.fcmTokens;
+    return Array.isArray(tokens) ? tokens.filter((t) => typeof t === 'string') : [];
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[Notifications] TOKEN_READ_ERROR', {
+      userId,
+      path: `users/${userId}`,
+      databaseId: firebaseConfig.firestoreDatabaseId,
+      code: code ?? 'unknown',
+      error: msg,
+      likelyRulesBlock: code === 'permission-denied',
+    });
+    throw err;
+  }
 }
 
 async function isTokenSavedInFirestore(userId: string, token: string): Promise<boolean> {
@@ -189,7 +203,12 @@ export async function getWebPushDiagnostics(userId?: string): Promise<WebPushDia
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (!lastRegistrationError) lastRegistrationError = `firestore_read: ${msg}`;
+      const code = (err as { code?: string })?.code;
+      if (!lastRegistrationError) {
+        lastRegistrationError = code === 'permission-denied'
+          ? `firestore_read_denied: users/${userId}`
+          : `firestore_read: ${msg}`;
+      }
     }
   }
 
@@ -246,16 +265,36 @@ function attachForegroundMessageListener() {
 
 async function saveTokenToFirestore(userId: string, token: string): Promise<void> {
   const userRef = doc(db, 'users', userId);
-  await updateDoc(userRef, {
-    fcmTokens: arrayUnion(token),
-    fcmTokenUpdatedAt: serverTimestamp(),
-    fcmDevices: arrayUnion({
-      token,
-      platform: 'web',
-      deviceId: getDeviceId(),
-      updatedAt: new Date().toISOString(),
-    }),
-  });
+  const path = `users/${userId}`;
+  try {
+    await updateDoc(userRef, {
+      fcmTokens: arrayUnion(token),
+      fcmTokenUpdatedAt: serverTimestamp(),
+      fcmDevices: arrayUnion({
+        token,
+        platform: 'web',
+        deviceId: getDeviceId(),
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const code = (err as { code?: string })?.code ?? 'unknown';
+    console.error('[Notifications] TOKEN_SAVE_ERROR', {
+      userId,
+      path,
+      databaseId: firebaseConfig.firestoreDatabaseId,
+      code,
+      error: msg,
+      fields: ['fcmTokens', 'fcmTokenUpdatedAt', 'fcmDevices'],
+      likelyRulesBlock: code === 'permission-denied',
+      hint:
+        code === 'permission-denied'
+          ? 'Check firestore.rules canWriteUserInSchool / isOwner / canOwnerUpdatePushTokens for users/{uid}'
+          : undefined,
+    });
+    throw err;
+  }
 }
 
 export async function registerWebPushDevice(
@@ -387,8 +426,16 @@ export async function registerWebPushDevice(
       });
     } catch (saveErr) {
       const msg = saveErr instanceof Error ? saveErr.message : String(saveErr);
+      const code = (saveErr as { code?: string })?.code ?? 'unknown';
       lastRegistrationError = `save_failed: ${msg}`;
-      console.error('[Notifications] TOKEN_SAVE_ERROR', { userId, error: msg, databaseId: firebaseConfig.firestoreDatabaseId });
+      console.error('[Notifications] TOKEN_SAVE_ERROR', {
+        userId,
+        path: `users/${userId}`,
+        error: msg,
+        code,
+        databaseId: firebaseConfig.firestoreDatabaseId,
+        likelyRulesBlock: code === 'permission-denied',
+      });
       return { ok: false, reason: 'save_failed', error: msg, token, tokenPrefix: token.slice(0, 12) };
     }
 
@@ -401,12 +448,20 @@ export async function registerWebPushDevice(
     attachForegroundMessageListener();
 
     return { ok: true, token, tokenPrefix: token.slice(0, 12) };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    lastRegistrationError = msg;
-    console.error('[Notifications] TOKEN_SAVE_ERROR', { userId, error: msg });
-    return { ok: false, error: msg };
-  }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const code = (err as { code?: string })?.code ?? 'unknown';
+      lastRegistrationError = msg;
+      console.error('[Notifications] TOKEN_SAVE_ERROR', {
+        userId,
+        path: `users/${userId}`,
+        error: msg,
+        code,
+        databaseId: firebaseConfig.firestoreDatabaseId,
+        likelyRulesBlock: code === 'permission-denied',
+      });
+      return { ok: false, error: msg };
+    }
 }
 
 /** Silent refresh on login when permission already granted — never prompts. */
