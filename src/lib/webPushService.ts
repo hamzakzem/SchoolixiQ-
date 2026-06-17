@@ -266,6 +266,12 @@ function attachForegroundMessageListener() {
 async function saveTokenToFirestore(userId: string, token: string): Promise<void> {
   const userRef = doc(db, 'users', userId);
   const path = `users/${userId}`;
+  console.info('[FCM] SAVE_TOKEN_START', {
+    userId,
+    path,
+    databaseId: firebaseConfig.firestoreDatabaseId,
+    tokenPrefix: token.slice(0, 12),
+  });
   try {
     await updateDoc(userRef, {
       fcmTokens: arrayUnion(token),
@@ -277,9 +283,22 @@ async function saveTokenToFirestore(userId: string, token: string): Promise<void
         updatedAt: new Date().toISOString(),
       }),
     });
+    console.info('[FCM] SAVE_TOKEN_SUCCESS', {
+      userId,
+      path,
+      databaseId: firebaseConfig.firestoreDatabaseId,
+      tokenPrefix: token.slice(0, 12),
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const code = (err as { code?: string })?.code ?? 'unknown';
+    console.error('[FCM] SAVE_TOKEN_ERROR', {
+      userId,
+      path,
+      databaseId: firebaseConfig.firestoreDatabaseId,
+      code,
+      error: msg,
+    });
     console.error('[Notifications] TOKEN_SAVE_ERROR', {
       userId,
       path,
@@ -334,11 +353,13 @@ export async function registerWebPushDevice(
     }
 
     let permission = Notification.permission;
+    console.info('[FCM] PERMISSION_STATUS', { permission, requestPermission });
     console.info('[Notifications] PERMISSION_STATUS', { permission, requestPermission });
 
     if (permission === 'default') {
       if (requestPermission) {
         permission = await Notification.requestPermission();
+        console.info('[FCM] PERMISSION_STATUS', { permission, afterRequest: true });
         console.info('[Notifications] PERMISSION_STATUS', { permission, afterRequest: true });
       } else {
         lastRegistrationError = 'permission_default';
@@ -349,6 +370,7 @@ export async function registerWebPushDevice(
 
     if (permission !== 'granted') {
       lastRegistrationError = 'permission_denied';
+      console.info('[FCM] PERMISSION_STATUS', { permission, action: 'skip_registration' });
       notificationDiag.tokenMissing({ platform: 'web', reason: 'permission_denied', permission });
       return { ok: false, reason: 'permission_denied', error: 'Notification permission denied' };
     }
@@ -381,17 +403,37 @@ export async function registerWebPushDevice(
 
     const { getApp } = await import('firebase/app');
     webMessaging = getMessaging(getApp());
-    const token = await getToken(webMessaging, {
-      vapidKey,
-      serviceWorkerRegistration: registration,
+    console.info('[FCM] GET_TOKEN_START', {
+      userId,
+      vapidSource: getRuntimeVapidDiagnostics().source,
+      swScope: registration.scope,
     });
+    let token: string | null = null;
+    try {
+      token = await getToken(webMessaging, {
+        vapidKey,
+        serviceWorkerRegistration: registration,
+      });
+    } catch (tokenErr) {
+      const msg = tokenErr instanceof Error ? tokenErr.message : String(tokenErr);
+      const code = (tokenErr as { code?: string })?.code ?? 'unknown';
+      lastRegistrationError = `get_token: ${msg}`;
+      console.error('[FCM] GET_TOKEN_ERROR', { userId, code, error: msg });
+      notificationDiag.tokenMissing({ platform: 'web', reason: 'no_token', error: msg });
+      return { ok: false, reason: 'no_token', error: msg };
+    }
 
     if (!token) {
       lastRegistrationError = 'no_token_from_fcm';
+      console.error('[FCM] GET_TOKEN_ERROR', { userId, error: 'FCM returned empty token' });
       notificationDiag.tokenMissing({ platform: 'web', reason: 'no_token' });
       return { ok: false, reason: 'no_token', error: 'FCM returned no token' };
     }
 
+    console.info('[FCM] GET_TOKEN_SUCCESS', {
+      userId,
+      tokenPrefix: token.slice(0, 12),
+    });
     console.info('[Notifications] GET_TOKEN_SUCCESS', {
       userId,
       tokenPrefix: token.slice(0, 12),
@@ -464,18 +506,117 @@ export async function registerWebPushDevice(
     }
 }
 
-/** Silent refresh on login when permission already granted — never prompts. */
+/**
+ * Automatic web push registration after login / page load.
+ * Requests permission when still "default"; skips only when "denied".
+ */
+export async function autoRegisterWebPushToken(
+  userId: string,
+): Promise<WebPushRegistrationResult | null> {
+  if (Capacitor.isNativePlatform()) return null;
+  if (typeof window === 'undefined' || !('Notification' in window)) return null;
+  if (!userId) return null;
+
+  const permission = Notification.permission;
+  console.info('[FCM] PERMISSION_STATUS', { permission, userId, auto: true });
+
+  if (permission === 'denied') {
+    return { ok: false, reason: 'permission_denied', error: 'Notification permission denied' };
+  }
+
+  return registerWebPushDevice(userId, {
+    requestPermission: permission === 'default',
+  });
+}
+
+/** Silent refresh when permission already granted — never prompts. */
 export async function refreshWebPushTokenIfGranted(userId: string): Promise<WebPushRegistrationResult | null> {
   if (Capacitor.isNativePlatform()) return null;
   if (typeof window === 'undefined' || !('Notification' in window)) return null;
   if (Notification.permission !== 'granted') {
-    console.info('[Notifications] PERMISSION_STATUS', {
+    console.info('[FCM] PERMISSION_STATUS', {
       permission: Notification.permission,
       action: 'skip_silent_refresh',
     });
     return null;
   }
   return registerWebPushDevice(userId, { requestPermission: false });
+}
+
+let webPushAutoRegistrationStop: (() => void) | null = null;
+
+/** Start automatic registration + retries when permission becomes granted later. */
+export function startWebPushAutoRegistration(userId: string): () => void {
+  if (webPushAutoRegistrationStop) {
+    webPushAutoRegistrationStop();
+    webPushAutoRegistrationStop = null;
+  }
+
+  if (Capacitor.isNativePlatform() || typeof window === 'undefined' || !('Notification' in window)) {
+    return () => {};
+  }
+
+  let stopped = false;
+  let registered = false;
+
+  const attempt = async (reason: string) => {
+    if (stopped || registered || !userId) return;
+    if (Notification.permission === 'denied') return;
+
+    const result = await autoRegisterWebPushToken(userId);
+    if (result?.ok) {
+      registered = true;
+      console.info('[FCM] AUTO_REGISTRATION_COMPLETE', { userId, reason });
+    }
+  };
+
+  void (async () => {
+    if ('serviceWorker' in navigator) {
+      try {
+        await navigator.serviceWorker.ready;
+      } catch {
+        /* registerWebPushDevice registers SW if needed */
+      }
+    }
+    await attempt('initial');
+  })();
+
+  const onRetry = () => {
+    if (stopped || registered) return;
+    if (Notification.permission === 'granted') {
+      void attempt('retry');
+    }
+  };
+
+  document.addEventListener('visibilitychange', onRetry);
+  window.addEventListener('focus', onRetry);
+
+  const intervalId = window.setInterval(() => {
+    if (registered || stopped) {
+      window.clearInterval(intervalId);
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      void attempt('permission_granted_poll');
+    }
+  }, 3000);
+
+  const stop = () => {
+    stopped = true;
+    document.removeEventListener('visibilitychange', onRetry);
+    window.removeEventListener('focus', onRetry);
+    window.clearInterval(intervalId);
+  };
+
+  webPushAutoRegistrationStop = stop;
+  return stop;
+}
+
+export function stopWebPushAutoRegistration(): void {
+  if (webPushAutoRegistrationStop) {
+    webPushAutoRegistrationStop();
+    webPushAutoRegistrationStop = null;
+  }
 }
 
 /** @deprecated Use registerWebPushDevice with requestPermission option. */

@@ -101,10 +101,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         pushInitForUidRef.current = null;
         if (userIdForPush) {
           try {
+            const { stopWebPushAutoRegistration, unregisterWebPushToken } = await import('./webPushService');
+            stopWebPushAutoRegistration();
+            await unregisterWebPushToken(userIdForPush);
             const { unregisterPushToken } = await import('./pushService');
             await unregisterPushToken(userIdForPush);
-            const { unregisterWebPushToken } = await import('./webPushService');
-            await unregisterWebPushToken(userIdForPush);
           } catch (e) {}
         }
       }
@@ -216,16 +217,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setLoading(false);
             }
             
-            // Register push once per login session (avoid re-prompting on every profile snapshot)
+            // Register web push automatically once per login (requests permission if not denied).
             if (pushInitForUidRef.current !== authUser.uid) {
               pushInitForUidRef.current = authUser.uid;
               try {
                 const { registerForPushNotifications } = await import('./pushService');
                 await registerForPushNotifications(authUser.uid, data.role, data.schoolId || '');
-                const { refreshWebPushTokenIfGranted } = await import('./webPushService');
-                await refreshWebPushTokenIfGranted(authUser.uid);
+                const { startWebPushAutoRegistration } = await import('./webPushService');
+                startWebPushAutoRegistration(authUser.uid);
               } catch (err) {
-                console.error('Failed to init push notifications', err);
+                console.error('[FCM] AUTO_REGISTRATION_ERROR', err);
               }
             }
 

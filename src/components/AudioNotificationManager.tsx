@@ -22,15 +22,7 @@ export const AudioNotificationManager: React.FC = () => {
   const isSuperOrdersInitialLoad = useRef(true);
   const isSuperSubRequestsInitialLoad = useRef(true);
 
-  // Initialize browser permissions for desk notifications
-  useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "default") {
-        Notification.requestPermission().catch(() => {});
-      }
-    }
-  }, []);
-
+  // Native OS notification permission is handled by autoRegisterWebPushToken after login.
   // Helper trigger for HTML5 background native notification
   const triggerNativeNotification = (title: string, body: string, type: string, tag?: string) => {
     if (
