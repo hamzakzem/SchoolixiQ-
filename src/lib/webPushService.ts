@@ -545,15 +545,41 @@ export async function refreshWebPushTokenIfGranted(userId: string): Promise<WebP
 
 let webPushAutoRegistrationStop: (() => void) | null = null;
 
+export type WebPushAutoRegistrationOptions = {
+  onSettled?: (result: WebPushRegistrationResult | null) => void;
+};
+
 /** Start automatic registration + retries when permission becomes granted later. */
-export function startWebPushAutoRegistration(userId: string): () => void {
+export function startWebPushAutoRegistration(
+  userId: string,
+  options: WebPushAutoRegistrationOptions = {},
+): () => void {
+  console.info('[FCM] AUTO_REGISTRATION_ENTRY', { uid: userId });
+
+  if (Capacitor.isNativePlatform()) {
+    console.info('[FCM] AUTO_REGISTRATION_SKIPPED', { uid: userId, reason: 'native_platform' });
+    options.onSettled?.(null);
+    return () => {};
+  }
+  if (typeof window === 'undefined') {
+    console.info('[FCM] AUTO_REGISTRATION_SKIPPED', { uid: userId, reason: 'no_window' });
+    options.onSettled?.(null);
+    return () => {};
+  }
+  if (!('Notification' in window)) {
+    console.info('[FCM] AUTO_REGISTRATION_SKIPPED', { uid: userId, reason: 'notification_api_missing' });
+    options.onSettled?.(null);
+    return () => {};
+  }
+  if (!userId) {
+    console.info('[FCM] AUTO_REGISTRATION_SKIPPED', { uid: userId, reason: 'no_user_id' });
+    options.onSettled?.(null);
+    return () => {};
+  }
+
   if (webPushAutoRegistrationStop) {
     webPushAutoRegistrationStop();
     webPushAutoRegistrationStop = null;
-  }
-
-  if (Capacitor.isNativePlatform() || typeof window === 'undefined' || !('Notification' in window)) {
-    return () => {};
   }
 
   let stopped = false;
@@ -561,13 +587,29 @@ export function startWebPushAutoRegistration(userId: string): () => void {
 
   const attempt = async (reason: string) => {
     if (stopped || registered || !userId) return;
-    if (Notification.permission === 'denied') return;
+
+    if (Notification.permission === 'denied') {
+      registered = true;
+      const denied: WebPushRegistrationResult = {
+        ok: false,
+        reason: 'permission_denied',
+        error: 'Notification permission denied',
+      };
+      console.info('[FCM] AUTO_REGISTRATION_SKIPPED', { uid: userId, reason: 'permission_denied' });
+      options.onSettled?.(denied);
+      return;
+    }
 
     const result = await autoRegisterWebPushToken(userId);
     if (result?.ok) {
       registered = true;
       console.info('[FCM] AUTO_REGISTRATION_COMPLETE', { userId, reason });
+      options.onSettled?.(result);
+    } else if (result?.reason === 'permission_denied') {
+      registered = true;
+      options.onSettled?.(result);
     }
+    // permission_default / transient errors: do not mark registered — retries continue
   };
 
   void (async () => {
@@ -583,7 +625,7 @@ export function startWebPushAutoRegistration(userId: string): () => void {
 
   const onRetry = () => {
     if (stopped || registered) return;
-    if (Notification.permission === 'granted') {
+    if (Notification.permission === 'granted' || Notification.permission === 'default') {
       void attempt('retry');
     }
   };
@@ -596,8 +638,8 @@ export function startWebPushAutoRegistration(userId: string): () => void {
       window.clearInterval(intervalId);
       return;
     }
-    if (Notification.permission === 'granted') {
-      void attempt('permission_granted_poll');
+    if (Notification.permission === 'granted' || Notification.permission === 'default') {
+      void attempt('poll');
     }
   }, 3000);
 

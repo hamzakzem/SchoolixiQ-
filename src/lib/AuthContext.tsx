@@ -20,6 +20,10 @@ import { buildTeacherRedactionContext } from './userProfile';
 import { resolveProfilePermissions } from './staffPermissions';
 import { normalizePackagePermissions } from './featureRegistry';
 import { useLanguage } from './LanguageContext';
+import {
+  startWebPushAutoRegistration,
+  stopWebPushAutoRegistration,
+} from './webPushService';
 
 interface AuthContextType {
   user: User | null;
@@ -41,7 +45,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [schoolData, setSchoolData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const lastUserIdRef = useRef<string | null>(null);
-  const pushInitForUidRef = useRef<string | null>(null);
+  /** Set only after SAVE_TOKEN_SUCCESS or permission denied — never on default/skip. */
+  const pushRegistrationDoneRef = useRef<'success' | 'denied' | null>(null);
   const loginLoggedRef = useRef<string | null>(null);
   const profileSnapshotRef = useRef<{
     uid: string;
@@ -56,6 +61,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     languageRef.current = language;
   }, [language]);
+
+  const triggerWebPushRegistration = (uid: string, source: string) => {
+    if (!uid) return;
+    if (pushRegistrationDoneRef.current === 'success') {
+      console.info('[FCM] AUTH_CONTEXT_CALL_SKIP', {
+        uid,
+        source,
+        reason: 'already_registered',
+      });
+      return;
+    }
+    if (pushRegistrationDoneRef.current === 'denied') {
+      console.info('[FCM] AUTH_CONTEXT_CALL_SKIP', {
+        uid,
+        source,
+        reason: 'permission_denied',
+      });
+      return;
+    }
+    console.info('[FCM] AUTH_CONTEXT_CALL_START', { uid, source });
+    startWebPushAutoRegistration(uid, {
+      onSettled: (result) => {
+        if (result?.ok) {
+          pushRegistrationDoneRef.current = 'success';
+        } else if (result?.reason === 'permission_denied') {
+          pushRegistrationDoneRef.current = 'denied';
+        }
+      },
+    });
+  };
 
   useEffect(() => {
     // Basic connection test as per skill guidelines
@@ -98,11 +133,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         const userIdForPush = lastUserIdRef.current;
         lastUserIdRef.current = null;
-        pushInitForUidRef.current = null;
+        pushRegistrationDoneRef.current = null;
         if (userIdForPush) {
           try {
-            const { stopWebPushAutoRegistration, unregisterWebPushToken } = await import('./webPushService');
             stopWebPushAutoRegistration();
+            const { unregisterWebPushToken } = await import('./webPushService');
             await unregisterWebPushToken(userIdForPush);
             const { unregisterPushToken } = await import('./pushService');
             await unregisterPushToken(userIdForPush);
@@ -124,6 +159,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (authUser) {
+        lastUserIdRef.current = authUser.uid;
+        triggerWebPushRegistration(authUser.uid, 'auth_state_changed');
+
         const docRef = doc(db, 'users', authUser.uid);
         unsubscribeProfile = onSnapshot(docRef, async (docSnap) => {
           if (docSnap.exists()) {
@@ -217,18 +255,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setLoading(false);
             }
             
-            // Register web push automatically once per login (requests permission if not denied).
-            if (pushInitForUidRef.current !== authUser.uid) {
-              pushInitForUidRef.current = authUser.uid;
-              try {
-                const { registerForPushNotifications } = await import('./pushService');
-                await registerForPushNotifications(authUser.uid, data.role, data.schoolId || '');
-                const { startWebPushAutoRegistration } = await import('./webPushService');
-                startWebPushAutoRegistration(authUser.uid);
-              } catch (err) {
-                console.error('[FCM] AUTO_REGISTRATION_ERROR', err);
-              }
-            }
+            // Native Capacitor push (Android/iOS) — web FCM runs from auth_state_changed above.
+            void import('./pushService').then(({ registerForPushNotifications }) =>
+              registerForPushNotifications(
+                authUser.uid,
+                String(data.role || 'unknown'),
+                data.schoolId ? String(data.schoolId) : '',
+              ),
+            );
+
+            // Retry web FCM once profile is confirmed (all roles).
+            triggerWebPushRegistration(authUser.uid, 'profile_snapshot');
 
             // Listen to school data if schoolId exists
             if (data.schoolId) {
