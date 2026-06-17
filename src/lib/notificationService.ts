@@ -21,6 +21,10 @@ export interface NotificationPayload {
   metadata?: Record<string, unknown>;
 }
 
+const SUPER_ADMIN_POOL_ID = 'super_admin';
+
+console.info('[Notifications] SUPER_ADMIN_PRODUCER_FIXED');
+
 function buildNotificationDoc(
   payload: NotificationPayload,
   userId: string,
@@ -30,6 +34,11 @@ function buildNotificationDoc(
   }
   if (!userId) {
     throw new Error('Notification requires a recipient userId');
+  }
+  if (isSuperAdminPoolRecipient(userId)) {
+    throw new Error(
+      '[Notifications] BLOCKED_POOL_RECIPIENT: notifications must use real super-admin uids, not super_admin pool id',
+    );
   }
 
   const senderId =
@@ -90,7 +99,11 @@ function buildNotificationDoc(
 }
 
 function isSuperAdminPoolRecipient(userId: string | undefined): boolean {
-  return userId === 'super_admin';
+  return userId === SUPER_ADMIN_POOL_ID;
+}
+
+function isPoolRecipientField(value: string | undefined): boolean {
+  return value === SUPER_ADMIN_POOL_ID;
 }
 
 async function resolveSuperAdminUserIds(): Promise<string[]> {
@@ -108,17 +121,23 @@ async function resolveSuperAdminUserIds(): Promise<string[]> {
 function buildSuperAdminExpandedPayload(
   payload: Omit<NotificationPayload, 'userId' | 'schoolId'>,
 ): Omit<NotificationPayload, 'userId'> {
+  const metadata = {
+    ...(payload.metadata || {}),
+    audience: 'super_admin',
+    originalRecipient: SUPER_ADMIN_POOL_ID,
+    routeTarget:
+      (payload.metadata &&
+        typeof payload.metadata.routeTarget === 'string' &&
+        payload.metadata.routeTarget) ||
+      'chat',
+  };
   return {
     ...payload,
     schoolId: 'system',
     recipientId: undefined,
     receiverId: undefined,
     audience: 'super_admin',
-    metadata: {
-      ...(payload.metadata || {}),
-      audience: 'super_admin',
-      originalRecipient: 'super_admin',
-    },
+    metadata,
   };
 }
 
@@ -127,8 +146,13 @@ export const notificationService = {
    * Send without duplicate when metadata.dedupKey matches a recent notification.
    */
   async sendWithDedup(payload: NotificationPayload): Promise<boolean> {
-    if (isSuperAdminPoolRecipient(payload.userId)) {
-      const { userId: _pool, schoolId: _schoolId, ...rest } = payload;
+    if (
+      isSuperAdminPoolRecipient(payload.userId) ||
+      isPoolRecipientField(payload.recipientId) ||
+      isPoolRecipientField(payload.receiverId)
+    ) {
+      const { userId: _pool, schoolId: _schoolId, recipientId: _r, receiverId: _rv, ...rest } =
+        payload;
       return this.notifySuperAdmins(rest);
     }
 
@@ -170,8 +194,13 @@ export const notificationService = {
    */
   async send(payload: NotificationPayload) {
     try {
-      if (isSuperAdminPoolRecipient(payload.userId)) {
-        const { userId: _pool, schoolId: _schoolId, ...rest } = payload;
+      if (
+        isSuperAdminPoolRecipient(payload.userId) ||
+        isPoolRecipientField(payload.recipientId) ||
+        isPoolRecipientField(payload.receiverId)
+      ) {
+        const { userId: _pool, schoolId: _schoolId, recipientId: _r, receiverId: _rv, ...rest } =
+          payload;
         return this.notifySuperAdmins(rest);
       }
 
@@ -200,18 +229,27 @@ export const notificationService = {
    */
   async sendToMultiple(userIds: string[], payload: Omit<NotificationPayload, 'userId'>) {
     try {
+      const realUserIds = userIds.filter(
+        (id) => id && !isSuperAdminPoolRecipient(id),
+      );
+      if (realUserIds.length === 0) {
+        console.warn('[Notifications] SEND_ERROR batch: no real recipient uids', {
+          type: payload.type,
+        });
+        return false;
+      }
       console.info('[Notifications] SEND_START batch', {
-        count: userIds.length,
+        count: realUserIds.length,
         type: payload.type,
         schoolId: payload.schoolId,
       });
       const batch = writeBatch(db);
-      userIds.forEach(userId => {
+      realUserIds.forEach((userId) => {
         const docRef = doc(collection(db, 'notifications'));
         batch.set(docRef, buildNotificationDoc(payload, userId));
       });
       await batch.commit();
-      console.info('[Notifications] SEND_SUCCESS batch', { count: userIds.length });
+      console.info('[Notifications] SEND_SUCCESS batch', { count: realUserIds.length });
       return true;
     } catch (error) {
       console.error('[Notifications] SEND_ERROR batch', error);
@@ -408,6 +446,9 @@ export const notificationService = {
       const ok = await this.sendToMultiple(uids, expanded);
       if (ok) {
         uids.forEach((uid) => {
+          console.info('[Notifications] SUPER_ADMIN_NOTIFICATION_REAL_UID', {
+            uidPrefix: uid.substring(0, 8),
+          });
           console.info('[Notifications] SUPER_ADMIN_NOTIFICATION_CREATED', {
             userId: uid,
             type: payload.type,

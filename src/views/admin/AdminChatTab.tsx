@@ -273,6 +273,10 @@ export default function AdminChatTab() {
 
       // Notify the receiver
       if (activeContact.id === 'super_admin') {
+        console.info('[Notifications] SUPER_ADMIN_PRODUCER_FIXED', {
+          source: 'AdminChatTab',
+          conversationId: convId,
+        });
         await notificationService.notifySuperAdmins({
           title: 'رسالة جديدة من إدارة مدرسة',
           message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
