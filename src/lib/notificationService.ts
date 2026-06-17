@@ -89,11 +89,49 @@ function buildNotificationDoc(
   return doc;
 }
 
+function isSuperAdminPoolRecipient(userId: string | undefined): boolean {
+  return userId === 'super_admin';
+}
+
+async function resolveSuperAdminUserIds(): Promise<string[]> {
+  console.info('[Notifications] SUPER_ADMIN_RECIPIENT_EXPAND_START');
+  const q = query(
+    collection(db, 'users'),
+    where('role', 'in', ['superadmin', 'super_admin']),
+  );
+  const snap = await getDocs(q);
+  const uids = snap.docs.map((d) => d.id).filter(Boolean);
+  console.info('[Notifications] SUPER_ADMIN_RECIPIENT_EXPAND_COUNT', { count: uids.length });
+  return uids;
+}
+
+function buildSuperAdminExpandedPayload(
+  payload: Omit<NotificationPayload, 'userId' | 'schoolId'>,
+): Omit<NotificationPayload, 'userId'> {
+  return {
+    ...payload,
+    schoolId: 'system',
+    recipientId: undefined,
+    receiverId: undefined,
+    audience: 'super_admin',
+    metadata: {
+      ...(payload.metadata || {}),
+      audience: 'super_admin',
+      originalRecipient: 'super_admin',
+    },
+  };
+}
+
 export const notificationService = {
   /**
    * Send without duplicate when metadata.dedupKey matches a recent notification.
    */
   async sendWithDedup(payload: NotificationPayload): Promise<boolean> {
+    if (isSuperAdminPoolRecipient(payload.userId)) {
+      const { userId: _pool, schoolId: _schoolId, ...rest } = payload;
+      return this.notifySuperAdmins(rest);
+    }
+
     const dedupKey =
       payload.metadata &&
       typeof payload.metadata === 'object' &&
@@ -132,6 +170,11 @@ export const notificationService = {
    */
   async send(payload: NotificationPayload) {
     try {
+      if (isSuperAdminPoolRecipient(payload.userId)) {
+        const { userId: _pool, schoolId: _schoolId, ...rest } = payload;
+        return this.notifySuperAdmins(rest);
+      }
+
       console.info('[Notifications] SEND_START', {
         userId: payload.userId,
         type: payload.type,
@@ -351,17 +394,30 @@ export const notificationService = {
   },
 
   /**
-   * Notify all super admins
+   * Notify all super admins — one notification doc per real super-admin uid (not pool id).
    */
   async notifySuperAdmins(payload: Omit<NotificationPayload, 'userId' | 'schoolId'>) {
     try {
-      return await this.send({
-        ...payload,
-        userId: 'super_admin',
-        schoolId: 'system'
-      });
+      const uids = await resolveSuperAdminUserIds();
+      if (uids.length === 0) {
+        console.warn('[Notifications] SUPER_ADMIN_RECIPIENT_EXPAND_COUNT', { count: 0, action: 'skip' });
+        return false;
+      }
+
+      const expanded = buildSuperAdminExpandedPayload(payload);
+      const ok = await this.sendToMultiple(uids, expanded);
+      if (ok) {
+        uids.forEach((uid) => {
+          console.info('[Notifications] SUPER_ADMIN_NOTIFICATION_CREATED', {
+            userId: uid,
+            type: payload.type,
+            audience: 'super_admin',
+          });
+        });
+      }
+      return ok;
     } catch (error) {
-      console.error('Error notifying super admins:', error);
+      console.error('[Notifications] SEND_ERROR notifySuperAdmins', error);
       return false;
     }
   },

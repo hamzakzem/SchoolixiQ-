@@ -110,14 +110,14 @@ async function dispatchPush(notifId, notif, ctx) {
     return { notifId, status: 'skipped', reason: 'no_userId' };
   }
 
-  let tokens = [];
   if (userId === 'super_admin') {
-    const snap = await db.collection('users').where('role', '==', 'superadmin').get();
-    snap.docs.forEach((d) => {
-      const t = d.data().fcmTokens;
-      if (Array.isArray(t)) tokens.push(...t);
-    });
-  } else {
+    pushLog('INVALID_RECIPIENT_POOL', { notifId, userId, reason: 'legacy_pool_recipient' });
+    await writeDelivery(docRef, { status: 'skipped', reason: 'invalid_recipient_pool' });
+    return { notifId, status: 'skipped', reason: 'invalid_recipient_pool' };
+  }
+
+  let tokens = [];
+  {
     const userDoc = await db.collection('users').doc(userId).get();
     if (!userDoc.exists) {
       pushLog('NO_TOKENS', { notifId, userId, reason: 'user_missing' });
@@ -190,7 +190,7 @@ async function dispatchPush(notifId, notif, ctx) {
     pushLog('FCM_ERROR', { notifId, userId, errors: fcmErrors.slice(0, 5) });
   }
 
-  if (invalid.length && userId !== 'super_admin') {
+  if (invalid.length) {
     await db
       .collection('users')
       .doc(userId)
