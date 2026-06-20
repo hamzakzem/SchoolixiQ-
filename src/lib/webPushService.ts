@@ -28,9 +28,11 @@ export type WebPushRegistrationResult = {
     | 'sw_failed';
 };
 
+export type VapidKeySource = 'env_fcm' | 'env_firebase' | 'localStorage' | 'runtime_json' | 'none';
+
 export type WebPushDiagnosticState = {
   vapidConfigured: boolean;
-  vapidSource: 'VITE_FCM_VAPID_KEY' | 'VITE_FIREBASE_VAPID_KEY' | 'localStorage' | 'none';
+  vapidSource: VapidKeySource;
   vapidKeyLength: number;
   vapidKeyPrefix: string | null;
   permission: NotificationPermission | 'unsupported';
@@ -44,50 +46,103 @@ export type WebPushDiagnosticState = {
   lastError: string | null;
 };
 
-function readVapidKey(): string | undefined {
-  const env = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
-  return (
-    env.env?.VITE_FCM_VAPID_KEY ||
-    env.env?.VITE_FIREBASE_VAPID_KEY ||
-    (typeof localStorage !== 'undefined' ? localStorage.getItem('VITE_FCM_VAPID_KEY') : null) ||
-    undefined
-  )?.trim() || undefined;
+let cachedVapidKey: string | undefined | null = null;
+let cachedVapidSource: VapidKeySource = 'none';
+
+function readSyncVapidKey(): { key?: string; source: VapidKeySource } {
+  const fromFcm = import.meta.env.VITE_FCM_VAPID_KEY?.trim();
+  if (fromFcm) {
+    return { key: fromFcm, source: 'env_fcm' };
+  }
+
+  const fromFirebase = import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim();
+  if (fromFirebase) {
+    return { key: fromFirebase, source: 'env_firebase' };
+  }
+
+  const fromStorage =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('VITE_FCM_VAPID_KEY')?.trim() : undefined;
+  if (fromStorage) {
+    return { key: fromStorage, source: 'localStorage' };
+  }
+
+  return { source: 'none' };
+}
+
+function logVapidResolution(source: VapidKeySource, key: string | undefined): void {
+  console.info('[FCM] VAPID_SOURCE', source);
+  console.info('[FCM] VAPID_LENGTH', key?.length ?? 0);
+}
+
+async function fetchRuntimeVapidKey(): Promise<string | undefined> {
+  try {
+    const response = await fetch('/firebase-vapid.json', { cache: 'no-store' });
+    if (!response.ok) {
+      return undefined;
+    }
+    const data = (await response.json()) as { vapidKey?: string };
+    const key = data.vapidKey?.trim();
+    return key || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function resolveVapidKey(): Promise<{ key: string | undefined; source: VapidKeySource }> {
+  if (cachedVapidKey !== null) {
+    return { key: cachedVapidKey || undefined, source: cachedVapidSource };
+  }
+
+  const sync = readSyncVapidKey();
+  if (sync.key) {
+    cachedVapidKey = sync.key;
+    cachedVapidSource = sync.source;
+    logVapidResolution(cachedVapidSource, cachedVapidKey);
+    return { key: sync.key, source: sync.source };
+  }
+
+  const runtimeKey = await fetchRuntimeVapidKey();
+  if (runtimeKey) {
+    cachedVapidKey = runtimeKey;
+    cachedVapidSource = 'runtime_json';
+    logVapidResolution(cachedVapidSource, cachedVapidKey);
+    return { key: runtimeKey, source: 'runtime_json' };
+  }
+
+  cachedVapidKey = undefined;
+  cachedVapidSource = 'none';
+  logVapidResolution('none', undefined);
+  return { key: undefined, source: 'none' };
 }
 
 export function isWebPushConfigured(): boolean {
-  return Boolean(readVapidKey());
+  if (cachedVapidKey) {
+    return true;
+  }
+  return Boolean(readSyncVapidKey().key);
 }
 
 export function getRuntimeVapidDiagnostics(): {
-  source: WebPushDiagnosticState['vapidSource'];
+  source: VapidKeySource;
   keyLength: number;
   keyPrefix: string | null;
   configured: boolean;
 } {
-  const env = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
-  const fromFcm = env.env?.VITE_FCM_VAPID_KEY?.trim();
-  const fromFirebase = env.env?.VITE_FIREBASE_VAPID_KEY?.trim();
-  const fromStorage =
-    typeof localStorage !== 'undefined' ? localStorage.getItem('VITE_FCM_VAPID_KEY')?.trim() : null;
-
-  let source: WebPushDiagnosticState['vapidSource'] = 'none';
-  let key: string | undefined;
-  if (fromFcm) {
-    source = 'VITE_FCM_VAPID_KEY';
-    key = fromFcm;
-  } else if (fromFirebase) {
-    source = 'VITE_FIREBASE_VAPID_KEY';
-    key = fromFirebase;
-  } else if (fromStorage) {
-    source = 'localStorage';
-    key = fromStorage;
+  if (cachedVapidKey !== null) {
+    return {
+      source: cachedVapidSource,
+      keyLength: cachedVapidKey?.length ?? 0,
+      keyPrefix: cachedVapidKey ? `${cachedVapidKey.slice(0, 8)}…` : null,
+      configured: Boolean(cachedVapidKey),
+    };
   }
 
+  const sync = readSyncVapidKey();
   return {
-    source,
-    keyLength: key?.length ?? 0,
-    keyPrefix: key ? `${key.slice(0, 8)}…` : null,
-    configured: Boolean(key),
+    source: sync.source,
+    keyLength: sync.key?.length ?? 0,
+    keyPrefix: sync.key ? `${sync.key.slice(0, 8)}…` : null,
+    configured: Boolean(sync.key),
   };
 }
 
@@ -187,7 +242,13 @@ export async function getWebPushDiagnostics(userId?: string): Promise<WebPushDia
     typeof window !== 'undefined' && 'Notification' in window
       ? Notification.permission
       : 'unsupported';
-  const vapidRuntime = getRuntimeVapidDiagnostics();
+  const vapidResolved = await resolveVapidKey();
+  const vapidRuntime = {
+    source: vapidResolved.source,
+    keyLength: vapidResolved.key?.length ?? 0,
+    keyPrefix: vapidResolved.key ? `${vapidResolved.key.slice(0, 8)}…` : null,
+    configured: Boolean(vapidResolved.key),
+  };
 
   let tokenSavedToFirestore = false;
   let firestoreUserHasTokens = false;
@@ -375,14 +436,14 @@ export async function registerWebPushDevice(
       return { ok: false, reason: 'permission_denied', error: 'Notification permission denied' };
     }
 
-    const vapidKey = readVapidKey();
+    const { key: vapidKey, source: vapidSource } = await resolveVapidKey();
     if (!vapidKey) {
       lastRegistrationError = 'vapid_key_missing';
       notificationDiag.tokenMissing({ platform: 'web', reason: 'vapid_key_missing' });
       return { ok: false, reason: 'vapid_key_missing', error: getVapidMissingMessage(false) };
     }
     console.info('[Notifications] VAPID_READY', {
-      source: getRuntimeVapidDiagnostics().source,
+      source: vapidSource,
       keyLength: vapidKey.length,
     });
 
@@ -405,7 +466,7 @@ export async function registerWebPushDevice(
     webMessaging = getMessaging(getApp());
     console.info('[FCM] GET_TOKEN_START', {
       userId,
-      vapidSource: getRuntimeVapidDiagnostics().source,
+      vapidSource,
       swScope: registration.scope,
     });
     let token: string | null = null;
@@ -523,6 +584,8 @@ export async function autoRegisterWebPushToken(
   if (permission === 'denied') {
     return { ok: false, reason: 'permission_denied', error: 'Notification permission denied' };
   }
+
+  await resolveVapidKey();
 
   return registerWebPushDevice(userId, {
     requestPermission: permission === 'default',
