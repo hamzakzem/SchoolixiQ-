@@ -79,6 +79,62 @@ function resolveAppUrl() {
   return String(process.env.APP_URL || 'https://schoolixiq.com').replace(/\/$/, '');
 }
 
+function isInvalidFcmTokenError(code) {
+  if (!code) return false;
+  if (
+    code.includes('registration-token-not-registered') ||
+    code.includes('invalid-registration-token')
+  ) {
+    return true;
+  }
+  // sendEach returns one response per token — invalid-argument here is token-specific.
+  if (code.includes('invalid-argument')) {
+    return true;
+  }
+  return false;
+}
+
+async function removeInvalidFcmTokens(db, userId, invalidTokens, userData = {}) {
+  const uniqueInvalid = [...new Set(invalidTokens.filter((t) => typeof t === 'string' && t.trim()))];
+  if (uniqueInvalid.length === 0) return;
+
+  pushLog('TOKEN_CLEANUP_START', { userId, count: uniqueInvalid.length });
+
+  const update = {
+    fcmTokens: FieldValue.arrayRemove(...uniqueInvalid),
+  };
+
+  if (Array.isArray(userData.fcmDevices) && userData.fcmDevices.length > 0) {
+    const invalidSet = new Set(uniqueInvalid);
+    const filteredDevices = userData.fcmDevices.filter((device) => {
+      if (!device || typeof device !== 'object') return true;
+      const token = device.token;
+      return typeof token !== 'string' || !invalidSet.has(token);
+    });
+    if (filteredDevices.length !== userData.fcmDevices.length) {
+      update.fcmDevices = filteredDevices;
+    }
+  }
+
+  try {
+    await db.collection('users').doc(userId).update(update);
+    pushLog('TOKEN_CLEANUP_REMOVED', { userId, count: uniqueInvalid.length });
+  } catch (err) {
+    pushLog('TOKEN_CLEANUP_ERROR', {
+      userId,
+      count: uniqueInvalid.length,
+      error: String(err.message || err),
+    });
+  }
+}
+
+function resolvePushDeliveryStatus(successCount, failureCount) {
+  if (successCount > 0 && failureCount === 0) return 'sent';
+  if (successCount > 0 && failureCount > 0) return 'partial';
+  if (successCount === 0 && failureCount > 0) return 'error';
+  return 'error';
+}
+
 async function writeDelivery(docRef, payload) {
   await docRef.set(
     {
@@ -117,6 +173,7 @@ async function dispatchPush(notifId, notif, ctx) {
   }
 
   let tokens = [];
+  let userData = {};
   {
     const userDoc = await db.collection('users').doc(userId).get();
     if (!userDoc.exists) {
@@ -124,7 +181,7 @@ async function dispatchPush(notifId, notif, ctx) {
       await writeDelivery(docRef, { status: 'no_tokens', reason: 'user_missing' });
       return { notifId, status: 'no_tokens', reason: 'user_missing' };
     }
-    const userData = userDoc.data() || {};
+    userData = userDoc.data() || {};
     const schoolId = String(notif.schoolId || '');
     if (schoolId && schoolId !== 'system' && userData.schoolId && userData.schoolId !== schoolId) {
       pushLog('PUSH_SEND_SKIPPED', { notifId, userId, reason: 'school_mismatch' });
@@ -178,10 +235,7 @@ async function dispatchPush(notifId, notif, ctx) {
     if (r.success) return;
     const code = r.error?.code || 'unknown';
     fcmErrors.push({ code, index: i });
-    if (
-      code.includes('registration-token-not-registered') ||
-      code.includes('invalid-registration-token')
-    ) {
+    if (isInvalidFcmTokenError(code)) {
       invalid.push(tokens[i]);
     }
   });
@@ -191,13 +245,10 @@ async function dispatchPush(notifId, notif, ctx) {
   }
 
   if (invalid.length) {
-    await db
-      .collection('users')
-      .doc(userId)
-      .update({ fcmTokens: FieldValue.arrayRemove(...invalid) });
+    await removeInvalidFcmTokens(db, userId, invalid, userData);
   }
 
-  const status = response.failureCount === 0 ? 'sent' : 'partial';
+  const status = resolvePushDeliveryStatus(response.successCount, response.failureCount);
   pushLog('SEND_RESULT', {
     notifId,
     userId,
