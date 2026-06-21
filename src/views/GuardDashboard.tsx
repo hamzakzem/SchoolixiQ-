@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { signOutWithCleanup } from '../lib/authLogout';
 import {
   ShieldCheck,
   LogOut,
@@ -71,7 +71,7 @@ export default function GuardDashboard() {
           ميزة التسريح الآمن غير مفعّلة في باقة مدرستكم. يرجى التواصل مع إدارة المدرسة.
         </p>
         <button
-          onClick={() => signOut(auth)}
+          onClick={() => signOutWithCleanup()}
           className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm"
         >
           تسجيل الخروج
@@ -209,7 +209,7 @@ export default function GuardDashboard() {
             )}
           </button>
           <button
-            onClick={() => signOut(auth)}
+            onClick={() => signOutWithCleanup()}
             className="p-2 rounded-xl bg-white/10 hover:bg-white/20"
             title="تسجيل الخروج"
           >

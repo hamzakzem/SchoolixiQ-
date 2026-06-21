@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import React from "react";
 import { db, auth } from "../lib/firebase";
+import { signOutWithCleanup } from "../lib/authLogout";
 import {
   collection,
   query,
@@ -1468,7 +1469,7 @@ export default function ParentDashboard() {
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await signOutWithCleanup();
       toast.success(t("logoutSuccess"));
     } catch (error) {
       console.error(error);
@@ -1574,7 +1575,7 @@ export default function ParentDashboard() {
             </button>
 
             <button
-              onClick={() => auth.signOut()}
+              onClick={() => signOutWithCleanup()}
               className="px-6 py-4 bg-white text-red-600 border border-red-100 shadow-sm font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer"
             >
               <LogOut size={20} />
@@ -1672,7 +1673,7 @@ export default function ParentDashboard() {
 
                 <div className="p-4 md:p-6 mt-auto">
                   <button
-                    onClick={() => auth.signOut()}
+                    onClick={() => signOutWithCleanup()}
                     title={isSidebarCollapsed ? t("logout") : undefined}
                     className={`parent-nav-logout w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3 px-4 md:px-5'} py-3 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm`}
                   >

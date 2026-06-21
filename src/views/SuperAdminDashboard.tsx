@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
+import { signOutWithCleanup } from "../lib/authLogout";
 import { adminCreateUser, adminDeleteUser } from "../lib/adminApi";
 import { getApiUrl } from "../lib/apiUtils";
 import {
@@ -2075,7 +2076,7 @@ export default function SuperAdminDashboard() {
                   </div>
                 )}
                 <button
-                  onClick={() => auth.signOut()}
+                  onClick={() => signOutWithCleanup()}
                   title={isSidebarCollapsed ? t('sidebar_logout') : undefined}
                   className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3 px-4 md:px-5"} py-3 md:py-4 bg-slate-800 dark:bg-slate-900 rounded-xl md:rounded-2xl text-red-400 hover:bg-slate-700 dark:hover:bg-slate-800 transition-colors shadow-inner font-bold text-sm`}
                 >
@@ -6216,7 +6217,7 @@ export default function SuperAdminDashboard() {
         notificationsCount={totalUnread}
         isRtl={isRtl}
         logoutLabel={t("sidebar_logout")}
-        onLogout={() => auth.signOut()}
+        onLogout={() => signOutWithCleanup()}
         hidden={activeTab === "chat"}
       />
     </div>

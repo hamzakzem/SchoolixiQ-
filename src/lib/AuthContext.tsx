@@ -23,6 +23,8 @@ import { useLanguage } from './LanguageContext';
 import {
   startWebPushAutoRegistration,
   stopWebPushAutoRegistration,
+  setPushLogoutInProgress,
+  isPushLogoutInProgress,
 } from './webPushService';
 
 interface AuthContextType {
@@ -64,6 +66,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const triggerWebPushRegistration = (uid: string, source: string) => {
     if (!uid) return;
+    if (isPushLogoutInProgress()) {
+      console.info('[FCM] AUTH_CONTEXT_CALL_SKIP', {
+        uid,
+        source,
+        reason: 'logging_out',
+      });
+      return;
+    }
     if (pushRegistrationDoneRef.current === 'success') {
       console.info('[FCM] AUTH_CONTEXT_CALL_SKIP', {
         uid,
@@ -131,18 +141,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           ).catch(() => {});
         }
 
-        const userIdForPush = lastUserIdRef.current;
         lastUserIdRef.current = null;
         pushRegistrationDoneRef.current = null;
-        if (userIdForPush) {
-          try {
-            stopWebPushAutoRegistration();
-            const { unregisterWebPushToken } = await import('./webPushService');
-            await unregisterWebPushToken(userIdForPush);
-            const { unregisterPushToken } = await import('./pushService');
-            await unregisterPushToken(userIdForPush);
-          } catch (e) {}
-        }
+        setPushLogoutInProgress(true);
+        stopWebPushAutoRegistration('logout');
       }
       
       if (unsubscribeProfile) {
@@ -159,6 +161,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (authUser) {
+        setPushLogoutInProgress(false);
         lastUserIdRef.current = authUser.uid;
         triggerWebPushRegistration(authUser.uid, 'auth_state_changed');
 

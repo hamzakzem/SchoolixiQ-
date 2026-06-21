@@ -1,7 +1,7 @@
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { doc, updateDoc, getDocFromServer, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { getServiceWorkerUrl } from './serviceWorkerRegistration';
 import { notificationDiag } from './notificationDiagnostics';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -10,6 +10,37 @@ let webMessaging: ReturnType<typeof getMessaging> | null = null;
 let currentWebToken: string | null = null;
 let messageListenerAttached = false;
 let lastRegistrationError: string | null = null;
+let isLoggingOut = false;
+
+export function setPushLogoutInProgress(value: boolean): void {
+  isLoggingOut = value;
+}
+
+export function isPushLogoutInProgress(): boolean {
+  return isLoggingOut;
+}
+
+function canWritePushTokensForUser(userId: string): { ok: true } | { ok: false; reason: string } {
+  if (isLoggingOut) {
+    return { ok: false, reason: 'logging_out' };
+  }
+  const currentUid = auth.currentUser?.uid;
+  if (!currentUid) {
+    return { ok: false, reason: 'signed_out' };
+  }
+  if (currentUid !== userId) {
+    return { ok: false, reason: 'uid_mismatch' };
+  }
+  return { ok: true };
+}
+
+function logTokenSaveSkipped(userId: string, reason: string): void {
+  console.info('[FCM] TOKEN_SAVE_SKIPPED', { userId, reason });
+}
+
+function logTokenRemoveSkipped(userId: string, reason: string): void {
+  console.info('[FCM] TOKEN_REMOVE_SKIPPED', { userId, reason });
+}
 
 export type WebPushRegistrationResult = {
   ok: boolean;
@@ -325,6 +356,12 @@ function attachForegroundMessageListener() {
 }
 
 async function saveTokenToFirestore(userId: string, token: string): Promise<void> {
+  const gate = canWritePushTokensForUser(userId);
+  if (!gate.ok) {
+    logTokenSaveSkipped(userId, gate.reason);
+    return;
+  }
+
   const userRef = doc(db, 'users', userId);
   const path = `users/${userId}`;
   console.info('[FCM] SAVE_TOKEN_START', {
@@ -402,6 +439,12 @@ export async function registerWebPushDevice(
 
   if (!userId) {
     lastRegistrationError = 'no_user';
+    return { ok: false, reason: 'no_user', error: 'Not signed in' };
+  }
+
+  const authGate = canWritePushTokensForUser(userId);
+  if (!authGate.ok) {
+    logTokenSaveSkipped(userId, authGate.reason);
     return { ok: false, reason: 'no_user', error: 'Not signed in' };
   }
 
@@ -640,6 +683,12 @@ export function startWebPushAutoRegistration(
     return () => {};
   }
 
+  if (isLoggingOut) {
+    console.info('[FCM] AUTO_REGISTRATION_SKIPPED', { uid: userId, reason: 'logging_out' });
+    options.onSettled?.(null);
+    return () => {};
+  }
+
   if (webPushAutoRegistrationStop) {
     webPushAutoRegistrationStop();
     webPushAutoRegistrationStop = null;
@@ -649,7 +698,13 @@ export function startWebPushAutoRegistration(
   let registered = false;
 
   const attempt = async (reason: string) => {
-    if (stopped || registered || !userId) return;
+    if (stopped || registered || !userId || isLoggingOut) return;
+
+    const currentUid = auth.currentUser?.uid;
+    if (!currentUid || currentUid !== userId) {
+      console.info('[FCM] AUTO_REGISTRATION_SKIPPED', { uid: userId, reason: 'signed_out' });
+      return;
+    }
 
     if (Notification.permission === 'denied') {
       registered = true;
@@ -717,10 +772,13 @@ export function startWebPushAutoRegistration(
   return stop;
 }
 
-export function stopWebPushAutoRegistration(): void {
+export function stopWebPushAutoRegistration(reason: 'logout' | 'restart' = 'logout'): void {
   if (webPushAutoRegistrationStop) {
     webPushAutoRegistrationStop();
     webPushAutoRegistrationStop = null;
+  }
+  if (reason === 'logout') {
+    console.info('[FCM] AUTO_REGISTRATION_STOPPED', { reason: 'logout' });
   }
 }
 
@@ -736,6 +794,14 @@ export async function unregisterWebPushToken(userId: string): Promise<void> {
     if (stored) currentWebToken = stored;
   }
   if (!userId || !currentWebToken) return;
+
+  const gate = canWritePushTokensForUser(userId);
+  if (!gate.ok) {
+    logTokenRemoveSkipped(userId, gate.reason === 'logging_out' ? 'signed_out' : gate.reason);
+    localStorage.removeItem('schoolix_fcm_token_web');
+    currentWebToken = null;
+    return;
+  }
 
   try {
     const userRef = doc(db, 'users', userId);

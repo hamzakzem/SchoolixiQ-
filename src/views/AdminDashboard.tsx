@@ -25,7 +25,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
-import { sendEmailVerification, signOut } from "firebase/auth";
+import { sendEmailVerification } from "firebase/auth";
+import { signOutWithCleanup } from "../lib/authLogout";
 import { useAuth } from "../lib/AuthContext";
 import { isPendingSchoolAdmin } from "../lib/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -557,7 +558,7 @@ export default function AdminDashboard() {
             : "Dashboard access is blocked until your school subscription request is approved."}
         </p>
         <button
-          onClick={() => signOut(auth)}
+          onClick={() => signOutWithCleanup()}
           className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold"
         >
           {isRtl ? "تسجيل الخروج" : "Sign out"}
@@ -583,7 +584,7 @@ export default function AdminDashboard() {
         <div className="absolute top-8 left-8 flex items-center gap-4 z-50">
           <ThemeToggle />
           <button
-            onClick={() => signOut(auth)}
+            onClick={() => signOutWithCleanup()}
             className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-900 text-red-600 dark:text-red-400 rounded-2xl font-black text-sm shadow-xl border border-slate-100 dark:border-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all active:scale-95"
           >
             <LogOut size={18} />
@@ -884,7 +885,7 @@ export default function AdminDashboard() {
             </div>
             <button
               type="button"
-              onClick={() => signOut(auth)}
+              onClick={() => signOutWithCleanup()}
               className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-200 dark:border-slate-700 cursor-pointer"
             >
               <LogOut size={14} />
@@ -1204,7 +1205,7 @@ export default function AdminDashboard() {
                 {isRenewing ? "جاري الإرسال..." : "طلب تجديد الآن"}
               </button>
               <button
-                onClick={() => auth.signOut()}
+                onClick={() => signOutWithCleanup()}
                 className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2"
               >
                 <LogOut size={20} />
@@ -1227,7 +1228,7 @@ export default function AdminDashboard() {
         portalSubtitle={t("appTagline")}
         schoolLogoUrl={schoolData?.logoUrl}
         logoutLabel={isRtl ? "تسجيل الخروج" : "Logout"}
-        onLogout={() => auth.signOut()}
+        onLogout={() => signOutWithCleanup()}
         headerEyebrow={isRtl ? "لوحة المدرسة" : "School Admin"}
         headerTitle={activeTabLabel}
         headerSubtitle={schoolData?.name || profile?.name}
@@ -1404,7 +1405,7 @@ export default function AdminDashboard() {
                       {isRenewing ? "جاري الإرسال..." : "طلب تجديد الآن"}
                     </button>
                     <button
-                      onClick={() => auth.signOut()}
+                      onClick={() => signOutWithCleanup()}
                       className="w-full py-4 bg-sx-primary text-white rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
                     >
                       <LogOut size={18} />

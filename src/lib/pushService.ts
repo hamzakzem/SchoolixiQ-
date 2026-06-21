@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 
@@ -42,7 +42,7 @@ export const registerForPushNotifications = async (userId: string, userRole: str
         tokenPrefix: token.value.slice(0, 12),
       });
       currentPushToken = token.value;
-      if (userId) {
+      if (userId && auth.currentUser?.uid === userId) {
         try {
           const userRef = doc(db, 'users', userId);
           await updateDoc(userRef, {
@@ -51,6 +51,8 @@ export const registerForPushNotifications = async (userId: string, userRole: str
         } catch (e) {
           console.error('[Notifications] PUSH_TOKEN_REGISTERED save failed', e);
         }
+      } else if (userId) {
+        console.info('[FCM] TOKEN_SAVE_SKIPPED', { userId, reason: 'signed_out' });
       }
     });
 
@@ -90,6 +92,12 @@ export const registerForPushNotifications = async (userId: string, userRole: str
 
 export const unregisterPushToken = async (userId: string) => {
   if (!Capacitor.isNativePlatform() || !currentPushToken || !userId) {
+    return;
+  }
+
+  if (!auth.currentUser || auth.currentUser.uid !== userId) {
+    console.info('[FCM] TOKEN_REMOVE_SKIPPED', { userId, reason: 'signed_out' });
+    currentPushToken = null;
     return;
   }
   

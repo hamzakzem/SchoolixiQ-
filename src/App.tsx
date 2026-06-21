@@ -29,6 +29,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { auth, db } from "./lib/firebase";
+import { signOutWithCleanup } from "./lib/authLogout";
 import {
   setDoc,
   doc,
@@ -631,7 +632,7 @@ const AppContent = () => {
                 {isRtl ? "إعادة تحميل الصفحة" : "Retry / Reload"}
               </button>
               <button
-                onClick={() => auth.signOut()}
+                onClick={() => signOutWithCleanup()}
                 className="w-full py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogOut size={20} />
@@ -677,7 +678,7 @@ const AppContent = () => {
                 : 'Dashboard access is disabled. Contact platform support or your administrator.'}
             </p>
             <button
-              onClick={() => auth.signOut()}
+              onClick={() => signOutWithCleanup()}
               className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2"
             >
               <LogOut size={20} />
@@ -723,7 +724,7 @@ const AppContent = () => {
                     : "Your school's subscription has expired. Please contact school administration to renew and restore access."}
               </p>
               <button
-                onClick={() => auth.signOut()}
+                onClick={() => signOutWithCleanup()}
                 className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2"
               >
                 <LogOut size={20} />
@@ -798,7 +799,7 @@ const AppContent = () => {
                 </p>
                 <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
                 <button
-                  onClick={() => auth.signOut()}
+                  onClick={() => signOutWithCleanup()}
                   className="px-6 py-3 bg-transparent text-slate-400 rounded-xl font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2 mt-8 text-xs cursor-pointer"
                 >
                   <LogOut size={16} />
@@ -914,7 +915,7 @@ const AppContent = () => {
                 </div>
 
                 <button
-                  onClick={() => auth.signOut()}
+                  onClick={() => signOutWithCleanup()}
                   className="w-full px-6 py-3 bg-transparent text-red-500 rounded-xl font-bold hover:bg-red-50 transition-all flex items-center justify-center gap-2 mt-4 text-xs"
                 >
                   <LogOut size={16} />
@@ -1427,7 +1428,7 @@ const AppContent = () => {
                 </p>
                 <button
                   type="button"
-                  onClick={() => auth.signOut()}
+                  onClick={() => signOutWithCleanup()}
                   className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all cursor-pointer"
                 >
                   تسجيل الخروج مؤقتاً
@@ -1470,7 +1471,7 @@ const AppContent = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => auth.signOut()}
+                    onClick={() => signOutWithCleanup()}
                     className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all cursor-pointer"
                   >
                     تسجيل الخروج

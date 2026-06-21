@@ -38,6 +38,10 @@ import {
   RefreshCw, 
   Sliders, 
   ChevronRight,
+  ChevronLeft,
+  MoreVertical,
+  Loader2,
+  ArrowRight,
   BookOpen,
   FileText,
   DollarSign,
@@ -104,6 +108,17 @@ interface NotificationCenterProps {
   userRole?: string;
 }
 
+type MainView = 'list' | 'detail' | 'settings' | 'logs';
+
+/** Primary category tabs shown in Notification Center 2.0 */
+const DISPLAY_CATEGORY_IDS: NotificationCategoryId[] = [
+  'messages',
+  'tuition',
+  'attendance',
+  'homework',
+  'system',
+];
+
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ 
   onClose, 
   activeTabSetter,
@@ -114,10 +129,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [filteredNotifs, setFilteredNotifs] = useState<any[]>([]);
   const [teachersById, setTeachersById] = useState<Record<string, any>>({});
   
-  // Tab/Filter states
-  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'settings' | 'logs'>('all');
+  // View states
+  const [mainView, setMainView] = useState<MainView>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [loadError, setLoadError] = useState(false);
+  const [cardMenuId, setCardMenuId] = useState<string | null>(null);
   
   // Sound Settings States
   const [soundSettings, setSoundSettings] = useState<UserSoundSettings>(getSoundSettings());
@@ -141,6 +158,36 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const isArabic = profile?.language === 'ar';
   const webPushConfigured = isWebPushConfigured();
   const webPushWarning = getWebPushConfigWarning(isArabic);
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const isAdminUser =
+    profile?.role === 'admin' ||
+    profile?.role === 'superadmin' ||
+    normalizeDashboardRole(userRole, profile?.role) === 'superadmin';
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (mainView === 'detail') {
+        setMainView('list');
+        setSelectedNotification(null);
+        return;
+      }
+      if (mainView === 'settings' || mainView === 'logs') {
+        setMainView('list');
+        return;
+      }
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mainView, onClose]);
+
+  useEffect(() => {
+    if (!cardMenuId) return;
+    const closeMenu = () => setCardMenuId(null);
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, [cardMenuId]);
   useEffect(() => {
     notificationDiag.centerRender({
       count: notifications.length,
@@ -167,10 +214,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   };
 
   useEffect(() => {
-    if (activeTab === 'settings' && user?.uid) {
+    if (mainView === 'settings' && user?.uid) {
       void refreshPushDiagnostics();
     }
-  }, [activeTab, user?.uid, deviceToken]);
+  }, [mainView, user?.uid, deviceToken]);
 
   const handleRegisterDevice = async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -312,9 +359,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       );
       setNotifications(items);
       setLoadingNotifications(false);
+      setLoadError(false);
     };
 
     setLoadingNotifications(true);
+    setLoadError(false);
     const unsubs = queries.map(({ name, q }) =>
       onSnapshot(
         q,
@@ -334,6 +383,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         (err) => {
           console.error('[Notifications] inbox listener failed:', err);
           setLoadingNotifications(false);
+          setLoadError(true);
         },
       ),
     );
@@ -344,7 +394,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   // 2. Fetch scoped delivery analytics for the current school (admins only)
   useEffect(() => {
     if (
-      activeTab !== "logs" ||
+      mainView !== "logs" ||
       !profile ||
       !["admin", "superadmin"].includes(profile.role)
     ) {
@@ -394,18 +444,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         console.error("Error loading delivery logs:", err);
         setIsLoadingLogs(false);
       });
-  }, [activeTab, profile, user?.uid, userRole]);
+  }, [mainView, profile, user?.uid, userRole]);
 
   // 3. Filter notifications
   useEffect(() => {
     let result = [...notifications];
 
-    // Filter by Read/Unread Status
-    if (activeTab === 'unread') {
-      result = result.filter(n => !n.read);
-    }
-
-    // Filter by Specific Category Pills
     if (categoryFilter !== 'all') {
       result = result.filter(
         (n) => resolveNotificationCategoryId(n) === categoryFilter,
@@ -430,7 +474,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     });
 
     setFilteredNotifs(result);
-  }, [notifications, activeTab, categoryFilter, searchTerm]);
+  }, [notifications, categoryFilter, searchTerm]);
 
   // Bulk Actions
   const handleMarkAllRead = async () => {
@@ -503,6 +547,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
     if (openDetailsOnly) {
       setSelectedNotification(n);
+      setMainView('detail');
       return;
     }
 
@@ -518,6 +563,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
     notificationDiag.clickRoute({ notifId: n.id, targetTab: null, type: n.type });
     setSelectedNotification(n);
+    setMainView('detail');
   };
 
   const handleNotificationAction = async (n: any) => {
@@ -528,6 +574,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       notificationDiag.clickRoute({ notifId: n.id, targetTab, type: n.type });
       activeTabSetter(targetTab);
       setSelectedNotification(null);
+      setMainView('list');
       onClose();
     }
   };
@@ -608,631 +655,634 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     return groups;
   }, [filteredNotifs]);
 
+  const handleRefreshList = () => {
+    setLoadError(false);
+    toast.success(isArabic ? 'تم تحديث الإشعارات' : 'Notifications refreshed');
+  };
+
+  const displayCategories = NOTIFICATION_CATEGORIES.filter((c) =>
+    DISPLAY_CATEGORY_IDS.includes(c.id),
+  );
+
   const renderNotificationCard = (n: any) => {
-    const actionLabel = getNotificationActionLabel(n, isArabic);
-    const metadata =
-      n.metadata && typeof n.metadata === 'object' ? n.metadata : {};
-    const studentName =
-      typeof metadata.studentName === 'string' ? metadata.studentName : '';
-    const senderName =
-      n.senderName ||
-      (typeof metadata.senderName === 'string' ? metadata.senderName : '');
+    const role = normalizeDashboardRole(userRole, profile?.role);
+    const hasRoute = Boolean(resolveNotificationTab(n, role));
+    const catConfig = getCategoryConfig(resolveNotificationCategoryId(n));
 
     return (
-    <div
-      key={n.id}
-      onClick={() => handleNotificationClick(n)}
-      className={`sx-notif-card group ${!n.read ? 'sx-notif-card--unread' : ''}`}
-      role="button"
-      tabIndex={0}
-      aria-label={getNotificationTitle(n)}
-    >
-      {!n.read && <span className="sx-notif-card__dot" aria-hidden />}
-      <div className={`sx-notif-card__icon ${getCategoryConfig(resolveNotificationCategoryId(n)).bgColor}`}>
-        {getCategoryIcon(n)}
-      </div>
-      <div className="sx-notif-card__body min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="sx-notif-card__category">{getCategoryLabel(n)}</span>
-          <time className="sx-notif-card__time tabular-nums">
-            {n.createdAt?.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || ''}
-          </time>
+      <div
+        key={n.id}
+        onClick={() => handleNotificationClick(n, !hasRoute)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleNotificationClick(n, !hasRoute);
+          }
+        }}
+        className={`sx-notif-card group ${!n.read ? 'sx-notif-card--unread' : 'sx-notif-card--read'}`}
+        role="button"
+        tabIndex={0}
+        aria-label={getNotificationTitle(n)}
+      >
+        {!n.read && <span className="sx-notif-card__dot" aria-hidden />}
+        <div className={`sx-notif-card__icon ${catConfig.bgColor}`}>
+          {getCategoryIcon(n)}
         </div>
-        <h4 className="sx-notif-card__title">{getNotificationTitle(n)}</h4>
-        <p className="sx-notif-card__message line-clamp-2">{n.message}</p>
-        {actionLabel && resolveNotificationTab(n, normalizeDashboardRole(userRole, profile?.role)) ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleNotificationAction(n);
-            }}
-            className="sx-notif-card__action"
-            aria-label={isArabic ? 'عرض' : 'View'}
-          >
-            {isArabic ? 'عرض' : 'View'}
-          </button>
-        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="sx-notif-card__top">
+            <span className="sx-notif-card__category">{getCategoryLabel(n)}</span>
+            <time className="sx-notif-card__time">
+              {n.createdAt?.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || ''}
+            </time>
+          </div>
+          <h4 className="sx-notif-card__title">{getNotificationTitle(n)}</h4>
+          <p className="sx-notif-card__message">{n.message}</p>
+          <div className="sx-notif-card__footer">
+            {hasRoute ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNotificationAction(n);
+                }}
+                className="sx-notif-card__action"
+                aria-label={isArabic ? 'عرض' : 'View'}
+              >
+                {isArabic ? 'عرض' : 'View'}
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            ) : (
+              <span className="text-[10px] font-bold text-slate-400">
+                {isArabic ? 'اضغط للتفاصيل' : 'Tap for details'}
+              </span>
+            )}
+            <div className="sx-notif-card__menu relative">
+              <button
+                type="button"
+                className="sx-notif-card__menu-btn"
+                aria-label={isArabic ? 'المزيد' : 'More actions'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCardMenuId(cardMenuId === n.id ? null : n.id);
+                }}
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+              {cardMenuId === n.id && (
+                <div className="sx-notif-card-menu" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(e) => {
+                      void handleDeleteOne(e, n.id, n);
+                      setCardMenuId(null);
+                    }}
+                  >
+                    {isArabic ? 'حذف' : 'Delete'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
     );
   };
 
+  const renderListView = () => (
+    <>
+      <div className="sx-notif-search" dir={isArabic ? 'rtl' : 'ltr'}>
+        <div className="relative">
+          <Search
+            className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none ${isArabic ? 'right-3' : 'left-3'}`}
+          />
+          <input
+            type="search"
+            placeholder={isArabic ? 'ابحث في الإشعارات…' : 'Search notifications…'}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={isArabic ? 'pr-9 pl-3' : 'pl-9 pr-3'}
+            aria-label={isArabic ? 'بحث' : 'Search'}
+          />
+        </div>
+      </div>
+
+      {loadError ? (
+        <div className="sx-notif-state">
+          <AlertTriangle className="w-10 h-10 text-amber-500 mb-3" />
+          <p className="font-bold text-[#0B2345] dark:text-white">
+            {isArabic ? 'تعذر تحميل الإشعارات' : 'Could not load notifications'}
+          </p>
+          <button
+            type="button"
+            onClick={handleRefreshList}
+            className="sx-notif-card__action mt-4"
+          >
+            {isArabic ? 'إعادة المحاولة' : 'Retry'}
+          </button>
+        </div>
+      ) : loadingNotifications ? (
+        <div className="sx-notif-state">
+          <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37] mb-3" />
+          <p className="font-bold text-[#0B2345] dark:text-white">
+            {isArabic ? 'جاري تحميل الإشعارات…' : 'Loading notifications…'}
+          </p>
+        </div>
+      ) : filteredNotifs.length === 0 ? (
+        <div className="sx-notif-empty">
+          <Bell className="w-10 h-10 text-[#D4AF37] mb-3" />
+          <p className="font-bold text-[#0B2345] dark:text-white">
+            {isArabic ? 'لا توجد إشعارات حالياً' : 'No notifications right now'}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            {isArabic ? 'كل شيء محدث' : 'All caught up'}
+          </p>
+        </div>
+      ) : (
+        <div className="sx-notif-list">
+          {(['today', 'yesterday', 'older'] as const).map((groupKey) =>
+            groupedNotifs[groupKey].length > 0 ? (
+              <div key={groupKey} className="space-y-2">
+                <h3 className="sx-notif-group-label">
+                  {isArabic ? TIME_GROUP_LABELS[groupKey].ar : TIME_GROUP_LABELS[groupKey].en}
+                </h3>
+                {groupedNotifs[groupKey].map(renderNotificationCard)}
+              </div>
+            ) : null,
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  const renderDetailView = () => {
+    if (!selectedNotification) return null;
+    const role = normalizeDashboardRole(userRole, profile?.role);
+    const hasRoute = Boolean(resolveNotificationTab(selectedNotification, role));
+    const catConfig = getCategoryConfig(resolveNotificationCategoryId(selectedNotification));
+
+    return (
+      <div className="sx-notif-detail-view">
+        <div className={`sx-notif-detail-view__icon ${catConfig.bgColor}`}>
+          {getCategoryIcon(selectedNotification)}
+        </div>
+        <span className="sx-notif-card__category">{getCategoryLabel(selectedNotification)}</span>
+        <h3 className="sx-notif-detail-view__title">{getNotificationTitle(selectedNotification)}</h3>
+        <p className="sx-notif-detail-view__message">{selectedNotification.message}</p>
+        <div className="sx-notif-detail-view__meta">
+          {(selectedNotification.senderName || selectedNotification.metadata?.senderName) && (
+            <p>
+              {isArabic ? 'المرسل:' : 'From:'}{' '}
+              {selectedNotification.senderName || selectedNotification.metadata?.senderName}
+            </p>
+          )}
+          {selectedNotification.metadata?.studentName && (
+            <p>
+              {isArabic ? 'الطالب:' : 'Student:'} {selectedNotification.metadata.studentName}
+            </p>
+          )}
+          <p>{selectedNotification.createdAt?.toLocaleString?.() || ''}</p>
+        </div>
+        {hasRoute && (
+          <button
+            type="button"
+            onClick={() => handleNotificationAction(selectedNotification)}
+            className="sx-notif-card__action w-full justify-center mt-4 py-3"
+          >
+            {isArabic ? 'عرض' : 'View'}
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderSettingsView = () => (
+    <div className="sx-notif-settings">
+      <details className="sx-notif-settings__section" open>
+        <summary>
+          {isArabic ? 'إعداد الإشعارات الفورية' : 'Push notification setup'}
+          <Smartphone className="w-4 h-4 text-[#D4AF37]" />
+        </summary>
+        <div className="sx-notif-settings__body space-y-3">
+          <p>
+            {isArabic
+              ? 'فعّل استلام التنبيهات على هذا الجهاز حتى عند إغلاق التطبيق.'
+              : 'Enable push on this device even when the app is closed.'}
+          </p>
+          {webPushWarning && (
+            <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              {webPushWarning}
+            </p>
+          )}
+          {webPushStatus === 'denied' && (
+            <p className="text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-xs">
+              {getPermissionDeniedGuidance(isArabic)}
+            </p>
+          )}
+          {!Capacitor.isNativePlatform() && (
+            <button
+              type="button"
+              onClick={handleRegisterDevice}
+              disabled={registeringDevice}
+              className="sx-notif-footer__btn sx-notif-footer__btn--primary w-full disabled:opacity-50"
+            >
+              <Sparkles className="w-4 h-4" />
+              {registeringDevice
+                ? isArabic ? 'جاري التسجيل…' : 'Registering…'
+                : isArabic ? 'تسجيل هذا الجهاز' : 'Register this device'}
+            </button>
+          )}
+          {webPushStatus === 'granted' && pushDiag?.tokenSavedToFirestore && (
+            <p className="text-emerald-700 text-xs font-bold">
+              {isArabic ? '✓ مفعل ونشط' : '✓ Active'}
+            </p>
+          )}
+        </div>
+      </details>
+
+      <details className="sx-notif-settings__section">
+        <summary>
+          {isArabic ? 'تشخيص FCM (متقدم)' : 'FCM diagnostics (advanced)'}
+          <Activity className="w-4 h-4" />
+        </summary>
+        <div className="sx-notif-settings__body">
+          {pushDiag ? (
+            <div className="sx-notif-diag-grid">
+              <div>VAPID: {pushDiag.vapidConfigured ? 'yes' : 'no'} ({pushDiag.vapidSource})</div>
+              <div>Permission: {pushDiag.permission}</div>
+              <div>SW: {pushDiag.serviceWorkerActive ? 'active' : 'inactive'}</div>
+              <div>FCM token: {pushDiag.fcmTokenGenerated ? 'yes' : 'no'}</div>
+              <div>Firestore tokens: {pushDiag.firestoreTokenCount}</div>
+              {pushDiag.lastError && <div className="text-rose-600">Error: {pushDiag.lastError}</div>}
+            </div>
+          ) : (
+            <p>{isArabic ? 'افتح هذا القسم لتحميل التشخيص' : 'Open to load diagnostics'}</p>
+          )}
+          <button
+            type="button"
+            disabled={runningTokenDiag || !user?.uid}
+            onClick={handleRunTokenDiagnostics}
+            className="sx-notif-footer__btn sx-notif-footer__btn--secondary w-full mt-3 disabled:opacity-50"
+          >
+            {runningTokenDiag
+              ? isArabic ? 'جاري الفحص…' : 'Running…'
+              : isArabic ? 'فحص التوكن' : 'Run token check'}
+          </button>
+        </div>
+      </details>
+
+      <details className="sx-notif-settings__section">
+        <summary>
+          {isArabic ? 'الأصوات والتنبيهات' : 'Sound settings'}
+          <Volume2 className="w-4 h-4" />
+        </summary>
+        <div className="sx-notif-settings__body space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'crystal', label: isArabic ? 'كريستالي' : 'Crystal' },
+              { id: 'minimal', label: isArabic ? 'مبسّط' : 'Minimal' },
+              { id: 'relaxing', label: isArabic ? 'هادئ' : 'Relaxing' },
+              { id: 'modern', label: isArabic ? 'عصري' : 'Modern' },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleUpdateSoundSettings({ profile: p.id as UserSoundSettings['profile'] })}
+                className={`px-3 py-2 rounded-lg border text-xs font-bold ${
+                  soundSettings.profile === p.id
+                    ? 'border-[#0B2345] bg-[#0B2345] text-[#D4AF37]'
+                    : 'border-slate-200 text-[#0B2345]'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div>
+            <label className="text-xs font-bold block mb-1">
+              {isArabic ? 'مستوى الصوت' : 'Volume'}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={soundSettings.volume}
+              onChange={(e) => handleUpdateSoundSettings({ volume: parseFloat(e.target.value) })}
+              className="w-full accent-[#0B2345]"
+            />
+          </div>
+          <div className="space-y-2">
+            {[
+              { id: 'announcement' as NotificationCategory, label: isArabic ? 'الإعلانات' : 'Announcements' },
+              { id: 'message' as NotificationCategory, label: isArabic ? 'الرسائل' : 'Messages' },
+              { id: 'payment' as NotificationCategory, label: isArabic ? 'الأقساط' : 'Payments' },
+              { id: 'attendance' as NotificationCategory, label: isArabic ? 'الحضور' : 'Attendance' },
+              { id: 'grade' as NotificationCategory, label: isArabic ? 'الدرجات' : 'Grades' },
+              { id: 'system' as NotificationCategory, label: isArabic ? 'النظام' : 'System' },
+            ].map((cat) => {
+              const isMuted = soundSettings.mutedCategories.includes(cat.id);
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => toggleCategoryMute(cat.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold ${
+                    isMuted
+                      ? 'border-red-200 text-slate-400 line-through'
+                      : 'border-slate-200 text-[#0B2345]'
+                  }`}
+                >
+                  {cat.label}
+                  <span>{isMuted ? (isArabic ? 'مكتوم' : 'Muted') : (isArabic ? 'مفعّل' : 'On')}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex gap-2 items-end">
+            <select
+              value={testCategory}
+              onChange={(e) => setTestCategory(e.target.value as NotificationCategory)}
+              className="flex-1 text-xs border rounded-lg px-2 py-2"
+            >
+              <option value="announcement">{isArabic ? 'إعلان' : 'Announcement'}</option>
+              <option value="message">{isArabic ? 'رسالة' : 'Message'}</option>
+              <option value="payment">{isArabic ? 'دفع' : 'Payment'}</option>
+            </select>
+            <button type="button" onClick={triggerTestSound} className="sx-notif-card__action">
+              {isArabic ? 'استمع' : 'Play'}
+            </button>
+          </div>
+        </div>
+      </details>
+
+      {isAdminUser && (
+        <button
+          type="button"
+          onClick={() => setMainView('logs')}
+          className="sx-notif-footer__btn sx-notif-footer__btn--secondary w-full"
+        >
+          <Activity className="w-4 h-4" />
+          {isArabic ? 'سجل التوصيل' : 'Delivery logs'}
+        </button>
+      )}
+
+      {(normalizeDashboardRole(userRole, profile?.role) === 'superadmin' || import.meta.env.DEV) && (
+        <div className="sx-notif-settings__section p-4 space-y-2">
+          <p className="text-xs font-bold text-[#0B2345] dark:text-white">
+            {isArabic ? 'اختبار Push' : 'Push test'}
+          </p>
+          <button
+            type="button"
+            disabled={testPushSent || testPushPending || !profile?.schoolId}
+            onClick={triggerTestPush}
+            className="sx-notif-footer__btn sx-notif-footer__btn--primary w-full disabled:opacity-50"
+          >
+            {testPushPending
+              ? isArabic ? 'جاري الإرسال…' : 'Sending…'
+              : testPushSent
+                ? isArabic ? 'تم الإرسال' : 'Sent'
+                : isArabic ? 'إرسال push تجريبي' : 'Send test push'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderLogsView = () => (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-black text-[#0B2345] dark:text-white">
+          {isArabic ? 'سجل التوصيل' : 'Delivery logs'}
+        </h3>
+        <button
+          type="button"
+          onClick={() => {
+            setIsLoadingLogs(true);
+            if (!profile) return;
+            getDocs(
+              profile.role === 'superadmin'
+                ? query(collection(db, 'notifications'), where('schoolId', '==', 'system'), orderBy('createdAt', 'desc'))
+                : query(
+                    collection(db, 'notifications'),
+                    where('schoolId', '==', profile.schoolId),
+                    where('userId', '==', profile.uid),
+                    orderBy('createdAt', 'desc'),
+                  ),
+            ).then((snap) => {
+              const list = filterNotificationsForUser(
+                snap.docs.map((d) => ({
+                  id: d.id,
+                  ...d.data(),
+                  createdAt: d.data().createdAt?.toDate ? d.data().createdAt.toDate() : new Date(),
+                })),
+                viewerContext,
+              );
+              setDeliveryLogs(list);
+              setIsLoadingLogs(false);
+              toast.success(isArabic ? 'تم التحديث' : 'Updated');
+            });
+          }}
+          className="sx-notif-header__btn"
+          aria-label={isArabic ? 'تحديث' : 'Refresh'}
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
+      {isLoadingLogs ? (
+        <div className="sx-notif-state">
+          <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
+        </div>
+      ) : deliveryLogs.length === 0 ? (
+        <div className="sx-notif-state">
+          <p className="text-sm text-slate-500">{isArabic ? 'لا توجد سجلات' : 'No logs'}</p>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+          {deliveryLogs.slice(0, 10).map((log) => (
+            <div key={log.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40">
+              <p className="text-xs font-bold truncate">{log.title}</p>
+              <p className="text-[10px] text-slate-500 truncate mt-0.5">{log.message}</p>
+              <div className="flex items-center justify-between mt-2 gap-2">
+                <span className="text-[10px] font-mono text-slate-400">{log.type}</span>
+                <button
+                  type="button"
+                  onClick={() => triggerSimulationPush(log)}
+                  className="text-[10px] font-bold text-indigo-600 px-2 py-1 rounded-lg bg-indigo-50"
+                >
+                  {isArabic ? 'إعادة' : 'Retry'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return createPortal(
     <div
-      className="sx-notif-overlay fixed inset-0 z-[100] flex items-end sm:items-stretch sm:justify-end p-0"
+      className="sx-notif-overlay fixed inset-0"
       style={{ zIndex: 9999 }}
       onClick={onClose}
-      role="presentation"
+      role="dialog"
+      aria-modal="true"
+      aria-label={isArabic ? 'مركز الإشعارات' : 'Notification center'}
     >
       <div
-        className="sx-notif-panel w-full sm:max-w-md h-[100dvh] sm:h-full flex flex-col overflow-hidden"
+        className="sx-notif-shell"
         dir={isArabic ? 'rtl' : 'ltr'}
         onClick={(e) => e.stopPropagation()}
       >
-        
-        {/* Header */}
-        <div className="sx-notif-header shrink-0">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="sx-notif-header__title">{isArabic ? 'الإشعارات' : 'Notifications'}</h2>
-              <p className="sx-notif-header__sub">
-                {notifications.filter((n) => !n.read).length > 0
-                  ? isArabic
-                    ? `${notifications.filter((n) => !n.read).length} غير مقروء`
-                    : `${notifications.filter((n) => !n.read).length} unread`
-                  : isArabic
-                    ? 'كل شيء محدث'
-                    : 'All caught up'}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              {activeTab !== 'settings' && activeTab !== 'logs' && (
-                <button
-                  type="button"
-                  onClick={handleMarkAllRead}
-                  className="sx-notif-header__btn"
-                  aria-label={isArabic ? 'تحديد الكل كمقروء' : 'Mark all read'}
-                >
-                  <CheckSquare className="w-4 h-4" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setActiveTab(activeTab === 'settings' ? 'all' : 'settings')}
-                className="sx-notif-header__btn"
-                aria-label={isArabic ? 'إعدادات الإشعارات' : 'Notification settings'}
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="sx-notif-header__btn"
-                aria-label={isArabic ? 'إغلاق' : 'Close'}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Dynamic Canvas Container */}
-        <div className="flex-1 overflow-y-auto">
-          {activeTab === 'settings' ? (
-            /* SOUND SETTINGS TAB */
-            <div className="p-8 space-y-6">
-
-              {/* Global push setup card */}
-              <div className="p-6 rounded-[1.5rem] border-2 border-indigo-200 dark:border-indigo-900/50 bg-white dark:bg-slate-900/60 space-y-4">
-                <h3 className="font-bold text-[#0B2345] dark:text-white text-base">
-                  {isArabic ? 'إعداد الإشعارات الفورية' : 'Push notification setup'}
-                </h3>
-              
-              {/* Web Push Banner Integration Info */}
-              <div className="p-6 rounded-[1.5rem] bg-gradient-to-r from-teal-500/10 to-emerald-500/5 border border-emerald-500/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-2xl bg-teal-500/20 text-teal-600 dark:text-teal-400 shrink-0">
-                    <Smartphone className="w-6 h-6" />
+        <div className="sx-notif-panel">
+          {/* Header */}
+          <header className="sx-notif-header">
+            <div className="sx-notif-header__row">
+              <div className="sx-notif-header__title-wrap">
+                {mainView !== 'list' && (
+                  <button
+                    type="button"
+                    className="sx-notif-header__btn"
+                    onClick={() => {
+                      if (mainView === 'detail') {
+                        setSelectedNotification(null);
+                        setMainView('list');
+                      } else {
+                        setMainView('list');
+                      }
+                    }}
+                    aria-label={isArabic ? 'رجوع' : 'Back'}
+                  >
+                    {isArabic ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                  </button>
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="sx-notif-header__title">
+                      {mainView === 'detail'
+                        ? isArabic ? 'تفاصيل الإشعار' : 'Notification details'
+                        : mainView === 'settings'
+                          ? isArabic ? 'الإعدادات' : 'Settings'
+                          : mainView === 'logs'
+                            ? isArabic ? 'سجل التوصيل' : 'Delivery logs'
+                            : isArabic ? 'الإشعارات' : 'Notifications'}
+                    </h2>
+                    {mainView === 'list' && unreadCount > 0 && (
+                      <span className="sx-notif-unread-badge" aria-label={isArabic ? 'غير مقروء' : 'Unread'}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <h4 className="font-bold text-slate-800 dark:text-white text-sm">
-                      {isArabic ? "إرسال التنبيهات في الخلفية وعند إغلاق التطبيق" : "Background PWA Push Notifications"}
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-lg mt-1">
-                      {isArabic ? "يدعم بروتوكول FCM لإرسال تنبيهات فورية حقيقية للمتصفح والأجهزة المحمولة حتى لو كان التطبيق معطلاً أو مغلقاً تماماً." : "Uses FCM technology to dispatch instant background chimes safely even when the tab is completely closed or device is terminated."}
+                  {mainView === 'list' && (
+                    <p className="sx-notif-header__sub">
+                      {unreadCount > 0
+                        ? isArabic
+                          ? `${unreadCount} غير مقروء`
+                          : `${unreadCount} unread`
+                        : isArabic
+                          ? 'كل شيء محدث'
+                          : 'All caught up'}
                     </p>
-                    {deviceToken && (
-                      <div className="mt-2 text-[10px] font-mono bg-slate-100 dark:bg-slate-800 p-2 rounded-lg text-slate-500">
-                        {isArabic ? 'رمز الجهاز:' : 'Device token:'} {deviceToken.slice(0, 16)}…
-                      </div>
-                    )}
-                    {Capacitor.isNativePlatform() && (
-                      <div className="mt-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                        {isArabic ? 'تطبيق أندرويد/iOS — push عبر FCM' : 'Native app — push via FCM'}
-                      </div>
-                    )}
-                    {webPushWarning && (
-                      <div className="mt-3 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                        {webPushWarning}
-                      </div>
-                    )}
-                    {pushDiag && (
-                      <div className="mt-3 text-[11px] space-y-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl px-3 py-2 font-mono text-slate-600 dark:text-slate-300">
-                        <div>{isArabic ? 'VAPID مُعد:' : 'VAPID configured:'} {pushDiag.vapidConfigured ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')} ({pushDiag.vapidSource}, len={pushDiag.vapidKeyLength})</div>
-                        {pushDiag.vapidKeyPrefix && (
-                          <div>{isArabic ? 'بادئة VAPID:' : 'VAPID prefix:'} {pushDiag.vapidKeyPrefix}</div>
-                        )}
-                        <div>{isArabic ? 'قاعدة البيانات:' : 'Database:'} {pushDiag.databaseId}</div>
-                        <div>{isArabic ? 'إذن الإشعارات:' : 'Notification permission:'} {pushDiag.permission}</div>
-                        <div>{isArabic ? 'Service Worker:' : 'Service Worker active:'} {pushDiag.serviceWorkerActive ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}</div>
-                        <div>{isArabic ? 'رمز FCM:' : 'FCM token generated:'} {pushDiag.fcmTokenGenerated ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}{pushDiag.tokenPrefix ? ` (${pushDiag.tokenPrefix})` : ''}</div>
-                        <div>{isArabic ? 'محفوظ في Firestore:' : 'Token saved to Firestore:'} {pushDiag.tokenSavedToFirestore ? (isArabic ? 'نعم' : 'yes') : (isArabic ? 'لا' : 'no')}</div>
-                        <div>{isArabic ? 'Firestore fcmTokens:' : 'Firestore fcmTokens count:'} {pushDiag.firestoreTokenCount} ({pushDiag.firestoreUserHasTokens ? (isArabic ? 'موجود' : 'present') : (isArabic ? 'فارغ' : 'empty')})</div>
-                        {pushDiag.lastError && (
-                          <div className="text-rose-600 dark:text-rose-400">{isArabic ? 'آخر خطأ:' : 'Last error:'} {pushDiag.lastError}</div>
-                        )}
-                      </div>
-                    )}
-                    {webPushStatus === 'denied' && (
-                      <div className="mt-3 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
-                        {getPermissionDeniedGuidance(isArabic)}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
-                <div className="shrink-0 flex flex-col gap-2">
-                  {!webPushConfigured ? (
-                    <span className="shrink-0 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-xl">
-                      {isArabic ? "VAPID غير مُعد" : "VAPID missing"}
-                    </span>
-                  ) : null}
-                  {!Capacitor.isNativePlatform() && (
+              </div>
+              <div className="sx-notif-header__actions">
+                {mainView === 'list' && (
+                  <>
                     <button
                       type="button"
-                      onClick={handleRegisterDevice}
-                      disabled={registeringDevice}
-                      className="px-4 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer disabled:opacity-50 min-h-[44px]"
+                      onClick={handleRefreshList}
+                      className="sx-notif-header__btn"
+                      aria-label={isArabic ? 'تحديث' : 'Refresh'}
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      {registeringDevice
-                        ? (isArabic ? 'جاري التسجيل…' : 'Registering…')
-                        : (isArabic ? 'تسجيل هذا الجهاز لاستلام الإشعارات' : 'Register this device for notifications')}
+                      <RefreshCw className="w-4 h-4" />
                     </button>
-                  )}
-                  {webPushStatus === 'granted' && pushDiag?.tokenSavedToFirestore && (
-                    <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20 px-3.5 py-2 rounded-xl">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                      {isArabic ? "مفعل ونشط" : "Granted & Enabled"}
-                    </span>
-                  )}
-                </div>
-              </div>
-              </div>
-
-              {(normalizeDashboardRole(userRole, profile?.role) === 'superadmin' || import.meta.env.DEV) && (
-                <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/80 dark:bg-amber-950/20 dark:border-amber-900/40 space-y-3">
-                  <h4 className="font-bold text-sm text-[#0B2345] dark:text-white mb-1">
-                    {isArabic ? 'اختبار Push (مطور / Super Admin)' : 'Push test (Dev / Super Admin)'}
-                  </h4>
-                  <button
-                    type="button"
-                    disabled={runningTokenDiag || !user?.uid}
-                    onClick={handleRunTokenDiagnostics}
-                    className="px-4 py-2.5 bg-amber-600 text-white text-xs font-bold rounded-xl disabled:opacity-50 min-h-[44px] w-full sm:w-auto"
-                  >
-                    {runningTokenDiag
-                      ? (isArabic ? 'جاري الفحص…' : 'Running diagnostics…')
-                      : (isArabic ? 'فحص تسجيل توكن المستخدم الحالي' : 'Check current user token registration')}
-                  </button>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">
-                    {isArabic
-                      ? 'ينشئ إشعاراً تجريبياً ثم يغلق التطبيق/الموقع. راقب pushDelivery في Firestore وLogs.'
-                      : 'Creates one test doc — close the app/site and check pushDelivery in Firestore + function logs.'}
-                  </p>
-                  <button
-                    type="button"
-                    disabled={testPushSent || testPushPending || !profile?.schoolId}
-                    onClick={triggerTestPush}
-                    className="px-4 py-2.5 bg-[#0B2345] text-[#D4AF37] text-xs font-bold rounded-xl disabled:opacity-50 min-h-[44px]"
-                    aria-label={isArabic ? 'إرسال push تجريبي' : 'Send test push'}
-                  >
-                    {testPushPending
-                      ? isArabic ? 'جاري الإرسال…' : 'Sending…'
-                      : testPushSent
-                        ? isArabic ? 'تم الإرسال (مرة واحدة)' : 'Sent (once)'
-                        : isArabic ? 'Send test push to current user' : 'Send test push to current user'}
-                  </button>
-                </div>
-              )}
-
-              {/* Advanced Sound Profile customizer */}
-              <div className="p-6 rounded-[2rem] border border-slate-200/50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-6">
-                <div className="flex items-center justify-between border-b border-rose-50/10 pb-4">
-                  <div className="flex items-center gap-2">
-                    <Sliders className="w-5 h-5 text-indigo-500" />
-                    <h3 className="font-bold text-slate-800 dark:text-white text-sm">
-                      {isArabic ? "مهندس النغمات والمؤثرات الصوتية" : "Acoustic Tuning & Custom Audio Profiles"}
-                    </h3>
-                  </div>
-                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-400 font-mono px-2 py-1 rounded">
-                    Native Web Audio API Synth Engine
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Part 1: Select Profile and adjust parameters */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs text-slate-500 font-bold block mb-1.5">
-                        {isArabic ? "نمط النغمة الموسيقية:" : "Audio Feedback Profile:"}
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { id: 'crystal', label: isArabic ? '🔮 كريستالي نقي' : '🔮 Pure Crystal', desc: 'Resonant bell harmonic' },
-                          { id: 'minimal', label: isArabic ? '◽ نقرة مبسطة' : '◽ Minimal Tick', desc: 'Fast snappy click' },
-                          { id: 'relaxing', label: isArabic ? '🍃 قطرات ريحية' : '🍃 Ambient harp', desc: 'Slow organic water drop' },
-                          { id: 'modern', label: isArabic ? '⚡ عصري عالي التردد' : '⚡ Modern Chime', desc: 'High-tech cyber sweeps' }
-                        ].map((p) => (
-                          <button
-                            key={p.id}
-                            onClick={() => handleUpdateSoundSettings({ profile: p.id as any })}
-                            className={`p-3.5 rounded-2xl border text-right transition-all flex flex-col items-start ${soundSettings.profile === p.id ? 'border-indigo-600 bg-indigo-50/30 dark:bg-indigo-950/20 text-indigo-600' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-800/10'}`}
-                          >
-                            <span className="text-xs font-bold">{p.label}</span>
-                            <span className="text-[10px] text-slate-400 mt-1">{p.desc}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Volume Slider */}
-                    <div>
-                      <div className="flex justify-between text-xs text-slate-500 font-bold mb-1.5">
-                        <span>{isArabic ? "مستوى صوت الرنين:" : "Notification Volume:"}</span>
-                        <span>{Math.round(soundSettings.volume * 100)}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={soundSettings.volume}
-                        onChange={(e) => handleUpdateSoundSettings({ volume: parseFloat(e.target.value) })}
-                        className="w-full accent-indigo-600 cursor-pointer"
-                      />
-                    </div>
-
-                    {/* Pitch Slider */}
-                    <div>
-                      <div className="flex justify-between text-xs text-slate-500 font-bold mb-1.5">
-                        <span>{isArabic ? "تعديل حدة الصوت (Pitch Hz/Detune):" : "Frequency Pitch Shift:"}</span>
-                        <span>{soundSettings.pitchAdjust > 0 ? `+${soundSettings.pitchAdjust}` : soundSettings.pitchAdjust} Hz</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="-200"
-                        max="200"
-                        step="10"
-                        value={soundSettings.pitchAdjust}
-                        onChange={(e) => handleUpdateSoundSettings({ pitchAdjust: parseInt(e.target.value) })}
-                        className="w-full accent-indigo-600 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Part 2: Muting individual columns & testing */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs text-slate-500 font-bold block mb-2">
-                        {isArabic ? "تمكين وتخصيص الفئات (اضغط لكتم فئة):" : "Mute/Unmute Specific Categories:"}
-                      </label>
-                      <div className="space-y-2">
-                        {[
-                          { id: 'announcement', icon: getCategoryIcon('announcement'), label: isArabic ? '📢 الإعلانات والمستجدات' : '📢 Announcements' },
-                          { id: 'message', icon: getCategoryIcon('message'), label: isArabic ? '💬 غرف المحادثة والرسائل' : '💬 User Chat Messages' },
-                          { id: 'payment', icon: getCategoryIcon('payment'), label: isArabic ? '💰 الحسابات والرسوم المالية' : '💰 Financial & Payments' },
-                          { id: 'attendance', icon: getCategoryIcon('attendance'), label: isArabic ? '📝 تقارير الحضور والغياب اليومي' : '📝 Daily Attendance' },
-                          { id: 'grade', icon: getCategoryIcon('grade'), label: isArabic ? '🎓 درجات الامتحانات والتقييمات' : '🎓 Exam & Academic results' },
-                          { id: 'system', icon: getCategoryIcon('system'), label: isArabic ? '⚙️ إشعارات وصيانة النظام' : '⚙️ Core System Admin Logs' }
-                        ].map((cat) => {
-                          const isMuted = soundSettings.mutedCategories.includes(cat.id as any);
-                          return (
-                            <div
-                              key={cat.id}
-                              onClick={() => toggleCategoryMute(cat.id as any)}
-                              className={`p-3 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${isMuted ? 'border-red-200 bg-red-50/10 text-slate-400 line-through decoration-red-400' : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 hover:bg-slate-50'}`}
-                            >
-                              <div className="flex items-center gap-2">
-                                {cat.icon}
-                                <span className="text-xs font-bold">{cat.label}</span>
-                              </div>
-                              <span className="shrink-0 text-[10px] font-bold">
-                                {isMuted ? (
-                                  <span className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-500">Muted</span>
-                                ) : (
-                                  <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/40 text-emerald-500">Active</span>
-                                )}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Live Sandbox Diagnostic Player */}
-                    <div className="p-4 bg-indigo-50/40 dark:bg-slate-800/30 rounded-2xl border border-indigo-100/30 flex items-center justify-between">
-                      <div className="flex-1 mr-4">
-                        <span className="text-xs font-bold text-slate-600 block mb-1">
-                          {isArabic ? "اختبار المؤثرات الصوتية:" : "Audio Simulation Test:"}
-                        </span>
-                        <select
-                          value={testCategory}
-                          onChange={(e) => setTestCategory(e.target.value as any)}
-                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300"
-                        >
-                          <option value="announcement">📢 Announcement</option>
-                          <option value="message">💬 Chat Message</option>
-                          <option value="payment">💰 Financial Payment</option>
-                          <option value="attendance">📝 Daily Attendance</option>
-                          <option value="grade">🎓 Academic Grades</option>
-                          <option value="system">⚙️ System Alert</option>
-                        </select>
-                      </div>
-                      <button
-                        onClick={triggerTestSound}
-                        className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer text-center whitespace-nowrap"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                        {isArabic ? "استمع الآن" : "Play Chime"}
-                      </button>
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : activeTab === 'logs' ? (
-            /* TELEMETRY ADMIN LOGS TAB */
-            <div className="p-6">
-              <div className="mb-4 p-4 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
-                <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white mb-0.5">
-                    {isArabic ? "منصة قياس التوصيل ومراقبة التنبيهات" : "Real-time Auditing & Delivery Telemetry Console"}
-                  </h4>
-                  <p className="text-slate-400">
-                    {isArabic ? "تتبع موثوقية التوصيل وموازنة تكرار المحاولات (FCM Retry & logs)" : "Audits and tracks transmission states, retries & client-side notification receipts."}
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsLoadingLogs(true);
-                    getDocs(
-                      profile.role === "superadmin"
-                        ? query(
-                            collection(db, "notifications"),
-                            where("schoolId", "==", "system"),
-                            orderBy("createdAt", "desc"),
-                          )
-                        : query(
-                            collection(db, "notifications"),
-                            where("schoolId", "==", profile.schoolId),
-                            where("userId", "==", profile.uid),
-                            orderBy("createdAt", "desc"),
-                          ),
-                    ).then((snap) => {
-                      const list = filterNotificationsForUser(
-                        snap.docs.map((doc) => ({
-                          id: doc.id,
-                          ...doc.data(),
-                          createdAt: doc.data().createdAt?.toDate
-                            ? doc.data().createdAt.toDate()
-                            : new Date(),
-                        })),
-                        viewerContext,
-                      );
-                      setDeliveryLogs(list);
-                      setIsLoadingLogs(false);
-                      toast.success(isArabic ? "تم تحديث السجلات" : "Logs synced!");
-                    });
-                  }}
-                  className="px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center gap-1.5 text-slate-600 dark:text-indigo-400 font-bold hover:bg-slate-50 transition-all cursor-pointer"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  {isArabic ? "تحديث التتبع" : "Refresh Telemetry"}
-                </button>
-              </div>
-
-              {isLoadingLogs ? (
-                <div className="h-60 flex items-center justify-center">
-                  <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-                </div>
-              ) : deliveryLogs.length === 0 ? (
-                <div className="h-60 flex flex-col items-center justify-center text-slate-400 space-y-2">
-                  <Activity className="w-12 h-12 text-slate-300 animate-pulse" />
-                  <p>{isArabic ? "لم يتم العثور على أي تنبيهات حالياً في السجل." : "No delivery logs found in database."}</p>
-                </div>
-              ) : (
-                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-950">
-                  <table className="w-full text-right text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-bold select-none text-center">
-                      <tr>
-                        <th className="p-3">{isArabic ? "العنوان والتفاصيل" : "Content & Body"}</th>
-                        <th className="p-3">{isArabic ? "الفئة" : "Type"}</th>
-                        <th className="p-3">{isArabic ? "أرسل لـ UID" : "Target User"}</th>
-                        <th className="p-3">{isArabic ? "توقيت الإرسال" : "Time Dispatch"}</th>
-                        <th className="p-3">{isArabic ? "حالة التوصيل (Logs)" : "Delivery (FCM)"}</th>
-                        <th className="p-3">{isArabic ? "تكرار المحاولة" : "Retries"}</th>
-                        <th className="p-3">{isArabic ? "إجراءات" : "Action tools"}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                      {deliveryLogs.slice(0, 10).map((log) => (
-                        <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 text-center">
-                          <td className="p-3 text-right text-[11px] max-w-xs">
-                            <div className="font-bold text-slate-800 dark:text-slate-200 truncate">{log.title}</div>
-                            <div className="text-slate-400 text-[10px] mt-0.5 truncate">{log.message}</div>
-                          </td>
-                          <td className="p-3">
-                            <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 rounded font-code text-[10px]">
-                              {log.type}
-                            </span>
-                          </td>
-                          <td className="p-3 font-mono text-[9px] text-slate-400 select-all truncate max-w-[80px]">
-                            {log.userId}
-                          </td>
-                          <td className="p-3 text-[10px] text-slate-400 select-none">
-                            {log.createdAt instanceof Date ? log.createdAt.toLocaleTimeString() : String(log.createdAt)}
-                          </td>
-                          <td className="p-3 select-none">
-                            {log.deliveryStatus === 'failed' || !log.deliveryStatus ? (
-                              <span className="px-2 py-0.5 rounded-full bg-red-105 text-red-500 font-bold text-[9px]">
-                                ✕ Fail/Muted
-                              </span>
-                            ) : log.read === true ? (
-                              <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-500 font-bold text-[9px]">
-                                ✓✓ Opened
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-500 font-bold text-[9px]">
-                                ✓ Sent
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3 font-mono text-[10px]">
-                            {log.retryCount || 0}
-                          </td>
-                          <td className="p-3">
-                            <button
-                              onClick={() => triggerSimulationPush(log)}
-                              className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 rounded font-bold transition-all text-[10px]"
-                            >
-                              {isArabic ? "أعد التوصيل" : "Resend"}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900/50 text-[10px] text-slate-400 text-center select-none border-t border-slate-200 dark:border-slate-850">
-                    {isArabic ? "يعرض السجل آخر 10 عمليات تنبيه حقيقية مسجلة بالنظام ومحاكاة المعالجة الخلفية لمضاعفة الضمان" : "Showing latest 10 transactional alerts registered in database. Retry actions trigger push simulations."}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* ALL & UNREAD NOTIFICATIONS TAB */
-            <div className="p-4 sm:p-6 space-y-4">
-              
-              {/* Filter controls */}
-              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-50/40 dark:bg-slate-900/40 p-3 sm:p-4 border border-slate-150/40 dark:border-slate-800 rounded-[1.5rem] sm:rounded-3xl">
-                
-                {/* Visual Pill selection */}
-                <div className="flex items-center gap-2 overflow-x-auto shrink-0 pb-2 md:pb-0 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
-                  {[
-                    { id: 'all', label: isArabic ? 'الكل' : 'All' },
-                    ...NOTIFICATION_CATEGORIES.map((c) => ({
-                      id: c.id,
-                      label: isArabic ? c.labelAr : c.labelEn,
-                    })),
-                  ].map((catPill) => (
                     <button
-                      key={catPill.id}
-                      onClick={() => setCategoryFilter(catPill.id)}
-                      className={`px-3.5 py-2 text-[10px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap cursor-pointer active:scale-95 ${categoryFilter === catPill.id ? 'bg-[#0B2345] text-[#D4A64A] dark:bg-[#D4A64A] dark:text-[#0B2345] shadow-sm font-black' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-750'}`}
+                      type="button"
+                      onClick={handleMarkAllRead}
+                      className="sx-notif-header__btn sx-notif-header__btn--gold"
+                      aria-label={isArabic ? 'تحديد الكل كمقروء' : 'Mark all read'}
+                      disabled={unreadCount === 0}
                     >
-                      {catPill.label}
+                      <CheckSquare className="w-4 h-4" />
                     </button>
-                  ))}
-                </div>
-
-                {/* Search field */}
-                <div className="relative flex-1 w-full md:max-w-xs" dir={isArabic ? "rtl" : "ltr"}>
-                  <Search className={`absolute top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none ${isArabic ? "right-3.5" : "left-3.5"}`} />
-                  <input
-                    type="text"
-                    placeholder={isArabic ? "ابحث بنص التنبيه..." : "Filter text keywords..."}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 ${isArabic ? "pr-10 pl-4" : "pl-10 pr-4"}`}
-                  />
-                </div>
-              </div>
-
-              {/* Grid content feed list */}
-              {filteredNotifs.length === 0 ? (
-                loadingNotifications ? (
-                  <div className="h-[45vh] flex flex-col items-center justify-center text-slate-450 space-y-4 p-10">
-                    <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
-                    <p className="font-bold text-slate-600">{isArabic ? "جاري تحميل الإشعارات..." : "Loading notifications..."}</p>
-                  </div>
-                ) : (
-                <div className="sx-notif-empty">
-                  <Bell className="w-10 h-10 text-[#D4AF37] mb-3" />
-                  <p className="font-bold text-[#0B2345] dark:text-white">
-                    {isArabic ? 'لا توجد إشعارات حالياً' : 'No notifications right now'}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {isArabic ? 'كل شيء محدث' : 'All caught up'}
-                  </p>
-                </div>
-                )
-              ) : (
-                <div className="space-y-5 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
-                  {(['today', 'yesterday', 'older'] as const).map((groupKey) =>
-                    groupedNotifs[groupKey].length > 0 ? (
-                      <div key={groupKey} className="space-y-3">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1 sticky top-0 bg-white/90 dark:bg-slate-900/90 py-1 z-10">
-                          {isArabic ? TIME_GROUP_LABELS[groupKey].ar : TIME_GROUP_LABELS[groupKey].en}
-                        </h3>
-                        {groupedNotifs[groupKey].map(renderNotificationCard)}
-                      </div>
-                    ) : null,
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Global Footer banner */}
-        {selectedNotification && (
-          <div className="sx-notif-detail-overlay">
-            <div className="sx-notif-detail">
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="min-w-0">
-                  <span className="sx-notif-card__category">{getCategoryLabel(selectedNotification)}</span>
-                  <h3 className="font-black text-lg text-[#0B2345] dark:text-white mt-2">{selectedNotification.title}</h3>
-                </div>
-                <button type="button" onClick={() => setSelectedNotification(null)} className="sx-notif-header__btn" aria-label={isArabic ? 'إغلاق' : 'Close'}>
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-4 whitespace-pre-wrap">{selectedNotification.message}</p>
-              <div className="space-y-2 text-xs text-slate-500 mb-4">
-                {(selectedNotification.senderName || selectedNotification.metadata?.senderName) && (
-                  <p>{isArabic ? 'المرسل:' : 'From:'} {selectedNotification.senderName || selectedNotification.metadata?.senderName}</p>
+                  </>
                 )}
-                {selectedNotification.metadata?.studentName && (
-                  <p>{isArabic ? 'الطالب:' : 'Student:'} {selectedNotification.metadata.studentName}</p>
-                )}
-                <p>{selectedNotification.createdAt?.toLocaleString?.() || ''}</p>
-              </div>
-              {resolveNotificationTab(selectedNotification, normalizeDashboardRole(userRole, profile?.role)) && (
                 <button
                   type="button"
-                  onClick={() => handleNotificationAction(selectedNotification)}
-                  className="sx-notif-card__action w-full justify-center py-3"
+                  onClick={onClose}
+                  className="sx-notif-header__btn"
+                  aria-label={isArabic ? 'إغلاق' : 'Close'}
                 >
-                  {isArabic ? 'عرض' : 'View'}
+                  <X className="w-5 h-5" />
                 </button>
-              )}
+              </div>
             </div>
-          </div>
-        )}
+          </header>
 
+          {/* Category tabs — list view only */}
+          {mainView === 'list' && (
+            <div className="sx-notif-tabs-wrap">
+              <div className="sx-notif-tabs" role="tablist" aria-label={isArabic ? 'فئات الإشعارات' : 'Notification categories'}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={categoryFilter === 'all'}
+                  className={`sx-notif-tab ${categoryFilter === 'all' ? 'sx-notif-tab--active' : ''}`}
+                  onClick={() => setCategoryFilter('all')}
+                >
+                  {isArabic ? 'الكل' : 'All'}
+                </button>
+                {displayCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={categoryFilter === cat.id}
+                    className={`sx-notif-tab ${categoryFilter === cat.id ? 'sx-notif-tab--active' : ''}`}
+                    onClick={() => setCategoryFilter(cat.id)}
+                  >
+                    {isArabic ? cat.labelAr : cat.labelEn}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Body */}
+          <main className="sx-notif-body">
+            {mainView === 'list' && renderListView()}
+            {mainView === 'detail' && renderDetailView()}
+            {mainView === 'settings' && renderSettingsView()}
+            {mainView === 'logs' && renderLogsView()}
+          </main>
+
+          {/* Footer — list view */}
+          {mainView === 'list' && (
+            <footer className="sx-notif-footer">
+              <button
+                type="button"
+                className="sx-notif-footer__btn sx-notif-footer__btn--secondary"
+                onClick={() => setMainView('settings')}
+              >
+                <Settings className="w-4 h-4" />
+                {isArabic ? 'إعدادات' : 'Settings'}
+              </button>
+              <button
+                type="button"
+                className="sx-notif-footer__btn sx-notif-footer__btn--primary"
+                onClick={handleMarkAllRead}
+                disabled={unreadCount === 0}
+              >
+                <Check className="w-4 h-4" />
+                {isArabic ? 'تحديد الكل كمقروء' : 'Mark all read'}
+              </button>
+            </footer>
+          )}
+        </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };

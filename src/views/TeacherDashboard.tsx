@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { db, auth } from "../lib/firebase";
+import { signOutWithCleanup } from "../lib/authLogout";
 import {
   collection,
   query,
@@ -1369,7 +1370,7 @@ export default function TeacherDashboard() {
       portalSubtitle={getTeacherSubjectDisplay(profile)}
       schoolLogoUrl={schoolData?.logoUrl}
       logoutLabel={t("logout")}
-      onLogout={() => auth.signOut()}
+      onLogout={() => signOutWithCleanup()}
       headerEyebrow={t("dashboard")}
       headerTitle={activeTabLabel}
       headerSubtitle={schoolData?.name || profile?.name}
