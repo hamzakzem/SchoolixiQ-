@@ -135,24 +135,57 @@ function resolvePushDeliveryStatus(successCount, failureCount) {
   return 'error';
 }
 
+function omitUndefinedFields(obj) {
+  const out = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+function formatFcmErrorCodes(fcmErrors) {
+  if (!Array.isArray(fcmErrors) || fcmErrors.length === 0) return null;
+  const codes = [...new Set(fcmErrors.map((e) => e.code).filter((c) => typeof c === 'string' && c.trim()))];
+  return codes.length ? codes.join(', ') : null;
+}
+
 async function writeDelivery(docRef, payload) {
+  const status = payload.status;
+  const pushDelivery = omitUndefinedFields({
+    status,
+    reason: typeof payload.reason === 'string' ? payload.reason : undefined,
+    successCount: typeof payload.successCount === 'number' ? payload.successCount : undefined,
+    failureCount: typeof payload.failureCount === 'number' ? payload.failureCount : undefined,
+  });
+  pushDelivery.at = FieldValue.serverTimestamp();
+
+  const explicitError =
+    typeof payload.errorMessage === 'string' && payload.errorMessage.trim()
+      ? payload.errorMessage.trim()
+      : null;
+
+  if (status === 'sent') {
+    pushDelivery.errorMessage = FieldValue.delete();
+  } else if (status === 'partial' || status === 'error') {
+    pushDelivery.errorMessage = explicitError || 'unknown_fcm_error';
+  } else if (explicitError) {
+    pushDelivery.errorMessage = explicitError;
+  }
+
   await docRef.set(
     {
-      pushDispatched: payload.status === 'sent' || payload.status === 'partial',
+      pushDispatched: status === 'sent' || status === 'partial',
       pushDispatchedAt: FieldValue.serverTimestamp(),
-      pushDelivery: {
-        ...payload,
-        at: FieldValue.serverTimestamp(),
-      },
+      pushDelivery,
     },
     { merge: true },
   );
   pushLog('STATUS_WRITTEN', {
     notifId: docRef.id,
-    status: payload.status,
-    reason: payload.reason,
-    successCount: payload.successCount,
-    failureCount: payload.failureCount,
+    status,
+    reason: pushDelivery.reason,
+    successCount: pushDelivery.successCount,
+    failureCount: pushDelivery.failureCount,
   });
 }
 
@@ -257,12 +290,14 @@ async function dispatchPush(notifId, notif, ctx) {
     failureCount: response.failureCount,
   });
 
-  await writeDelivery(docRef, {
+  await writeDelivery(docRef, omitUndefinedFields({
     status,
     successCount: response.successCount,
     failureCount: response.failureCount,
-    errorMessage: fcmErrors.length ? fcmErrors.map((e) => e.code).join(', ') : undefined,
-  });
+    ...(response.failureCount > 0
+      ? { errorMessage: formatFcmErrorCodes(fcmErrors) || 'unknown_fcm_error' }
+      : {}),
+  }));
 
   return {
     notifId,
