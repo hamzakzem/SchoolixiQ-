@@ -67,6 +67,7 @@ import {
 import ScanHandler from "./components/ScanHandler";
 import { AudioNotificationManager } from "./components/AudioNotificationManager";
 import { OfflineSyncIndicator } from "./components/OfflineSyncIndicator";
+import { OfflineModeBanner } from "./components/OfflineModeBanner";
 import { useLandingPageConfig } from "./lib/landingPageConfig";
 import { PageLoadingSkeleton } from "./components/ui/Skeleton";
 import { LanguageToggle } from "./components/LanguageToggle";
@@ -128,7 +129,7 @@ const DEFAULT_PACKAGES = [
 ];
 
 const AppContent = () => {
-  const { user, profile, schoolData, loading } = useAuth();
+  const { user, profile, schoolData, loading, offlineStale } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [autoLinkChecked, setAutoLinkChecked] = useState(false);
@@ -592,7 +593,7 @@ const AppContent = () => {
       UserRole.ASSISTANT
     ].includes(profile.role);
 
-    if (isSchoolRole && (!profile?.schoolId || (!schoolData && !loading))) {
+    if (isSchoolRole && (!profile?.schoolId || (!schoolData && !loading && !offlineStale))) {
       return (
         <div
           className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6"
@@ -769,6 +770,7 @@ const AppContent = () => {
 
   return (
     <>
+      <OfflineModeBanner />
       <div
         dir={isRtl ? "rtl" : "ltr"}
         className={isRtl ? "font-sans" : "font-sans"}

@@ -17,6 +17,9 @@ export function useOfflineStatus() {
     counts: snapshot.counts as OfflineQueueCounts,
     lastSyncAt: snapshot.lastSyncAt,
     lastError: snapshot.lastError,
+    offlineDataStale: snapshot.offlineDataStale,
+    lastDataCacheUpdate: snapshot.lastDataCacheUpdate,
+    lastAppShellCacheUpdate: snapshot.lastAppShellCacheUpdate,
     statusLabel: getOfflineStatusLabel(snapshot),
   };
 }

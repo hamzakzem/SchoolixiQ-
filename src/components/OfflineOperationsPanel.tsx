@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { X, RefreshCw, Trash2, Filter } from 'lucide-react';
+import { X, RefreshCw, Trash2, Filter, Database } from 'lucide-react';
 import {
   clearSyncedOfflineOperations,
   listOfflineOperations,
@@ -7,6 +7,9 @@ import {
   syncOfflineQueue,
 } from '../lib/offline/offlineSync';
 import { useOfflineStatus } from '../lib/offline/useOfflineStatus';
+import { useAuth } from '../lib/AuthContext';
+import { getDataCacheMeta } from '../lib/offline/offlineDataCache';
+import { formatCacheAge } from '../lib/offline/offlineStatus';
 import type { OfflineModule, OfflineQueuedOperation } from '../lib/offline/offlineTypes';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -47,20 +50,36 @@ type Props = {
 };
 
 export function OfflineOperationsPanel({ open, onClose }: Props) {
-  const { counts, isSyncing, isOnline } = useOfflineStatus();
+  const { user } = useAuth();
+  const {
+    counts,
+    isSyncing,
+    isOnline,
+    lastDataCacheUpdate,
+    lastAppShellCacheUpdate,
+    offlineDataStale,
+  } = useOfflineStatus();
   const [operations, setOperations] = useState<OfflineQueuedOperation[]>([]);
   const [moduleFilter, setModuleFilter] = useState<OfflineModule | 'all'>('all');
   const [loading, setLoading] = useState(false);
+  const [cacheMeta, setCacheMeta] = useState<{
+    entryCount: number;
+    collections: string[];
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const items = await listOfflineOperations(50);
       setOperations(items);
+      if (user?.uid) {
+        const meta = await getDataCacheMeta(user.uid);
+        setCacheMeta({ entryCount: meta.entryCount, collections: meta.collections });
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.uid]);
 
   useEffect(() => {
     if (open) void refresh();
@@ -88,6 +107,26 @@ export function OfflineOperationsPanel({ open, onClose }: Props) {
           </button>
         </div>
 
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+          <div className="mb-2 flex items-center gap-2 font-bold text-slate-700 dark:text-slate-200">
+            <Database size={14} />
+            حالة التخزين المحلي
+          </div>
+          <div className="grid gap-1 text-slate-600 dark:text-slate-300 sm:grid-cols-2">
+            <div>آخر تحديث للبيانات: {formatCacheAge(lastDataCacheUpdate)}</div>
+            <div>آخر تحديث للواجهة: {formatCacheAge(lastAppShellCacheUpdate)}</div>
+            <div>عدد مجموعات البيانات: {cacheMeta?.entryCount ?? 0}</div>
+            <div>
+              {offlineDataStale ? 'يعرض آخر نسخة محفوظة' : 'البيانات محدثة من الشبكة'}
+            </div>
+          </div>
+          {cacheMeta?.collections?.length ? (
+            <p className="mt-2 text-[11px] text-slate-500">
+              المخزّن: {cacheMeta.collections.join(' · ')}
+            </p>
+          ) : null}
+        </div>
+
         <div className="flex flex-wrap gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
           <button
             type="button"
@@ -96,7 +135,7 @@ export function OfflineOperationsPanel({ open, onClose }: Props) {
             className="inline-flex items-center gap-1 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
           >
             <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-            مزامنة الآن
+            إعادة محاولة المزامنة
           </button>
           <button
             type="button"

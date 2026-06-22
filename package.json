@@ -7,7 +7,7 @@
     "dev": "tsx server.ts",
     "build": "npm run build:web",
     "build:full": "npm run build:web && npm run build:server",
-    "build:web": "vite build && npm run stage:apk",
+    "build:web": "vite build && node scripts/stage-sw-shell.mjs && npm run stage:apk",
     "stage:apk": "node scripts/stage-apk.mjs",
     "stage:apk:require": "node scripts/stage-apk.mjs --require",
     "verify:web-build": "node scripts/verify-web-build.mjs",

@@ -11,6 +11,13 @@ import { handleFirestoreError, OperationType } from '../../lib/firestore-errors'
 import { uploadStudentPhoto } from '../../lib/imageUtils';
 import { StudentService } from '../../services/student.service';
 import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
+import {
+  CACHE_COLLECTION_KEYS,
+  cacheSnapshot,
+  hydrateFromCache,
+  isFirestoreOfflineError,
+} from '../../lib/offline/offlineDataCache';
+import { setOfflineDataStale } from '../../lib/offline/offlineStatus';
 
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 
@@ -83,6 +90,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       }
 
       const snap = await getDocs(studentsQ);
+      let fetchedClasses: any[] | null = null;
       
       if (!isNextPage) {
         const classesQ = query(
@@ -91,12 +99,21 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           limit(100)
         );
         const classesSnap = await getDocs(classesQ);
-        setClasses(classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        fetchedClasses = classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setClasses(fetchedClasses);
       }
 
       const newDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       setStudents(prev => isNextPage ? [...prev, ...newDocs] : newDocs);
+
+      if (profile.uid) {
+        const studentPayload = isNextPage ? [...students, ...newDocs] : newDocs;
+        void cacheSnapshot(CACHE_COLLECTION_KEYS.students, profile.uid, profile.schoolId, studentPayload);
+        if (fetchedClasses) {
+          void cacheSnapshot(CACHE_COLLECTION_KEYS.classes, profile.uid, profile.schoolId, fetchedClasses);
+        }
+      }
 
       if (snap.docs.length < PAGE_SIZE) {
         setHasMore(false);
@@ -106,6 +123,21 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       }
     } catch (error) {
       console.error("Error fetching students data:", error);
+      if (profile?.uid && profile.schoolId && (!navigator.onLine || isFirestoreOfflineError(error))) {
+        const studentsOk = await hydrateFromCache(
+          CACHE_COLLECTION_KEYS.students,
+          profile.uid,
+          profile.schoolId,
+          setStudents,
+        );
+        const classesOk = await hydrateFromCache(
+          CACHE_COLLECTION_KEYS.classes,
+          profile.uid,
+          profile.schoolId,
+          setClasses,
+        );
+        if (studentsOk || classesOk) setOfflineDataStale(true);
+      }
     } finally {
       if (isNextPage) setIsLoadingMore(false);
     }
@@ -114,6 +146,10 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   useEffect(() => {
     let isMounted = true;
     if (isMounted) fetchStudents();
+    if (!navigator.onLine && profile?.uid && profile.schoolId) {
+      void hydrateFromCache(CACHE_COLLECTION_KEYS.students, profile.uid, profile.schoolId, setStudents);
+      void hydrateFromCache(CACHE_COLLECTION_KEYS.classes, profile.uid, profile.schoolId, setClasses);
+    }
     return () => { isMounted = false; };
   }, [profile]);
 

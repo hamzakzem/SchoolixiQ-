@@ -35,19 +35,32 @@ import {
   subscribeGuardedFirestore,
 } from './logoutGuard';
 import { initOfflineSystem, pauseOfflineSync, resumeOfflineSync } from './offline/offlineSync';
+import {
+  CACHE_COLLECTION_KEYS,
+  cacheSnapshot,
+  clearUserDataCache,
+  getCachedProfileForUser,
+  getCachedSnapshot,
+  isFirestoreOfflineError,
+} from './offline/offlineDataCache';
+import { setOfflineDataStale } from './offline/offlineStatus';
 
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   schoolData: any | null;
   loading: boolean;
+  offlineStale: boolean;
+  profileFromCache: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({ 
   user: null, 
   profile: null, 
   schoolData: null, 
-  loading: true 
+  loading: true,
+  offlineStale: false,
+  profileFromCache: false,
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -55,6 +68,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [schoolData, setSchoolData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [offlineStale, setOfflineStale] = useState(false);
+  const [profileFromCache, setProfileFromCache] = useState(false);
   const lastUserIdRef = useRef<string | null>(null);
   /** Set only after SAVE_TOKEN_SUCCESS or permission denied — never on default/skip. */
   const pushRegistrationDoneRef = useRef<'success' | 'denied' | null>(null);
@@ -68,6 +83,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
   const { language, setLanguage } = useLanguage();
   const languageRef = useRef(language);
+
+  const hydrateProfileFromCache = async (uid: string): Promise<boolean> => {
+    const cached = await getCachedProfileForUser(uid);
+    if (!cached) return false;
+    const data = cached.data;
+    const nextProfile = {
+      uid,
+      ...data,
+    } as UserProfile;
+    setProfile(nextProfile);
+    setProfileFromCache(true);
+    setOfflineStale(true);
+    setOfflineDataStale(true);
+    setLoading(false);
+
+    const schoolId = data.schoolId ? String(data.schoolId) : '';
+    if (schoolId) {
+      const schoolCached = await getCachedSnapshot<Record<string, unknown>>(
+        CACHE_COLLECTION_KEYS.school,
+        uid,
+        schoolId,
+      );
+      if (schoolCached?.data) {
+        setSchoolData(schoolCached.data);
+      }
+    }
+    console.info('[OfflineCache] PROFILE_HYDRATE', { uid, updatedAt: cached.updatedAt });
+    return true;
+  };
+
+  const persistProfileCache = (uid: string, data: Record<string, unknown>) => {
+    const { _credentialValues: _creds, password: _pw, parentPassword: _ppw, ...safe } = data;
+    void cacheSnapshot(
+      CACHE_COLLECTION_KEYS.profile,
+      uid,
+      data.schoolId ? String(data.schoolId) : '_',
+      safe,
+    );
+    setProfileFromCache(false);
+    if (navigator.onLine) {
+      setOfflineStale(false);
+      setOfflineDataStale(false);
+    }
+  };
+
+  const persistSchoolCache = (uid: string, schoolId: string, schoolInfo: Record<string, unknown>) => {
+    void cacheSnapshot(CACHE_COLLECTION_KEYS.school, uid, schoolId, schoolInfo);
+  };
 
   useEffect(() => {
     const stopOffline = initOfflineSystem();
@@ -156,9 +219,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         lastUserIdRef.current = authUser.uid;
       } else {
         const logoutSnapshot = profileSnapshotRef.current;
+        const uidToClear = lastUserIdRef.current;
         profileSnapshotRef.current = null;
         loginLoggedRef.current = null;
         setLogoutLogSnapshot(null);
+
+        if (uidToClear) {
+          void clearUserDataCache(uidToClear);
+        }
+        setOfflineStale(false);
+        setProfileFromCache(false);
+        setOfflineDataStale(false);
 
         lastUserIdRef.current = null;
         pushRegistrationDoneRef.current = null;
@@ -188,6 +259,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         lastUserIdRef.current = authUser.uid;
         triggerNativePushRegistration(authUser.uid, 'auth_state_changed');
         triggerWebPushRegistration(authUser.uid, 'auth_state_changed');
+
+        if (!navigator.onLine) {
+          void hydrateProfileFromCache(authUser.uid);
+        }
 
         const docRef = doc(db, 'users', authUser.uid);
         unsubscribeProfile = subscribeGuardedFirestore(docRef, async (docSnap) => {
@@ -240,6 +315,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             } as UserProfile;
 
             setProfile(nextProfile);
+            persistProfileCache(authUser.uid, data);
 
             profileSnapshotRef.current = {
               uid: authUser.uid,
@@ -302,6 +378,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   if (s.exists()) {
                     const schoolInfo = { id: s.id, ...s.data() } as any;
                     setSchoolData(schoolInfo);
+                    persistSchoolCache(authUser.uid, data.schoolId, schoolInfo);
                     
                     // Listen to active active package for the school
                     if (schoolInfo.planId && unsubscribePackage === null) {
@@ -334,6 +411,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   }
                 }, (error) => {
                   if (shouldIgnoreFirestoreListenerError(error)) return;
+                  if (isFirestoreOfflineError(error) || !navigator.onLine) {
+                    void getCachedSnapshot(CACHE_COLLECTION_KEYS.school, authUser.uid, data.schoolId).then(
+                      (cached) => {
+                        if (cached?.data) {
+                          setSchoolData(cached.data);
+                          setOfflineStale(true);
+                          setOfflineDataStale(true);
+                        }
+                        setLoading(false);
+                      },
+                    );
+                    return;
+                  }
                   handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${data.schoolId}`);
                   setLoading(false);
                 });
@@ -448,14 +538,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setLoading(false);
             }
           }
-        }, (error) => {
+        }, async (error) => {
           if (shouldIgnoreFirestoreListenerError(error)) return;
+          if (isFirestoreOfflineError(error) || !navigator.onLine) {
+            const hydrated = await hydrateProfileFromCache(authUser.uid);
+            if (hydrated) return;
+          }
           handleFirestoreError(error, OperationType.GET, `AuthContext:users/${authUser.uid}`);
           setLoading(false);
         });
       } else {
         setProfile(null);
         setSchoolData(null);
+        setOfflineStale(false);
+        setProfileFromCache(false);
         setLoading(false);
       }
     });
@@ -468,7 +564,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, profile, schoolData, loading }}>
+    <AuthContext.Provider value={{ user, profile, schoolData, loading, offlineStale, profileFromCache }}>
       {children}
     </AuthContext.Provider>
   );

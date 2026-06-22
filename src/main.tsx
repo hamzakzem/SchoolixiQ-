@@ -147,21 +147,24 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
         // Force checking for updates immediately on load
         registration.update();
 
-        // Listen for new service worker installations and reload automatically to apply changes
         registration.addEventListener('updatefound', () => {
           const installingWorker = registration.installing;
-          if (installingWorker) {
-            installingWorker.addEventListener('statechange', () => {
-              if (installingWorker.state === 'activated') {
-                console.log('New Schoolix version activated! Reloading application to apply brand updates...');
-                window.location.reload();
-              }
-            });
-          }
+          if (!installingWorker || !navigator.serviceWorker.controller) return;
+          installingWorker.addEventListener('statechange', () => {
+            if (installingWorker.state !== 'activated') return;
+            const reloadKey = `schoolix_sw_reload_${buildVersion}`;
+            if (sessionStorage.getItem(reloadKey)) return;
+            sessionStorage.setItem(reloadKey, '1');
+            console.log('New Schoolix service worker activated — reloading once to apply shell cache.');
+            window.location.reload();
+          });
         });
       })
-      .catch((error) => {
+        .catch((error) => {
         console.error('Schoolix PWA ServiceWorker registration failed: ', error);
+        console.warn(
+          '[SW] If running in Android WebView with server.url, service worker support depends on WebView version — open online once to precache the app shell.',
+        );
       });
   });
 }

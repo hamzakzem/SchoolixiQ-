@@ -11,6 +11,13 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
+import {
+  CACHE_COLLECTION_KEYS,
+  cacheSnapshot,
+  hydrateFromCache,
+  isFirestoreOfflineError,
+} from '../../lib/offline/offlineDataCache';
+import { setOfflineDataStale } from '../../lib/offline/offlineStatus';
 import { isPackageFeatureEnabled } from '../../lib/featureRegistry';
 import { useLanguage } from '../../lib/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -229,13 +236,24 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
   const [inventory, setInventory] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!profile?.schoolId || !hasDailySummary) {
+    if (!profile?.schoolId || !hasDailySummary || !profile.uid) {
       setLoading(false);
       return;
     }
 
     const unsubs: (() => void)[] = [];
     const schoolId = profile.schoolId;
+    const userId = profile.uid;
+
+    const cacheOrHydrate = async (
+      key: (typeof CACHE_COLLECTION_KEYS)[keyof typeof CACHE_COLLECTION_KEYS],
+      error: unknown,
+      apply: (data: any[]) => void,
+    ) => {
+      if (!userId || (!isFirestoreOfflineError(error) && navigator.onLine)) return;
+      const ok = await hydrateFromCache(key, userId, schoolId, apply);
+      if (ok) setOfflineDataStale(true);
+    };
 
     unsubs.push(
       onSnapshot(
@@ -245,31 +263,57 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
           where('date', '==', todayStr),
         ),
         (snap) => {
-          setAttendanceDocs(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          setAttendanceDocs(docs);
+          if (userId) void cacheSnapshot(CACHE_COLLECTION_KEYS.attendance, userId, schoolId, docs);
           setLoading(false);
         },
-        () => setLoading(false),
+        (error) => {
+          void cacheOrHydrate(CACHE_COLLECTION_KEYS.attendance, error, setAttendanceDocs);
+          setLoading(false);
+        },
       ),
     );
 
     unsubs.push(
       onSnapshot(
         query(collection(db, 'students'), where('schoolId', '==', schoolId)),
-        (snap) => setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        (snap) => {
+          const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          setStudents(docs);
+          if (userId) void cacheSnapshot(CACHE_COLLECTION_KEYS.students, userId, schoolId, docs);
+        },
+        (error) => {
+          void cacheOrHydrate(CACHE_COLLECTION_KEYS.students, error, setStudents);
+        },
       ),
     );
 
     unsubs.push(
       onSnapshot(
         query(collection(db, 'classes'), where('schoolId', '==', schoolId)),
-        (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        (snap) => {
+          const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          setClasses(docs);
+          if (userId) void cacheSnapshot(CACHE_COLLECTION_KEYS.classes, userId, schoolId, docs);
+        },
+        (error) => {
+          void cacheOrHydrate(CACHE_COLLECTION_KEYS.classes, error, setClasses);
+        },
       ),
     );
 
     unsubs.push(
       onSnapshot(
         query(collection(db, 'installments'), where('schoolId', '==', schoolId)),
-        (snap) => setInstallments(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        (snap) => {
+          const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          setInstallments(docs);
+          if (userId) void cacheSnapshot(CACHE_COLLECTION_KEYS.installments, userId, schoolId, docs);
+        },
+        (error) => {
+          void cacheOrHydrate(CACHE_COLLECTION_KEYS.installments, error, setInstallments);
+        },
       ),
     );
 
@@ -313,7 +357,7 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
     }
 
     return () => unsubs.forEach((u) => u());
-  }, [profile?.schoolId, hasDailySummary, hasMarketplace, todayStr]);
+  }, [profile?.schoolId, profile?.uid, hasDailySummary, hasMarketplace, todayStr]);
 
   const studentsById = useMemo(() => {
     const map = new Map<string, Record<string, unknown>>();

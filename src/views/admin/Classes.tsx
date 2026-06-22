@@ -8,6 +8,13 @@ import { Search, Plus, Filter, MoreVertical, LayoutDashboard, Trash2, AlertTrian
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+import {
+  CACHE_COLLECTION_KEYS,
+  cacheSnapshot,
+  hydrateFromCache,
+  isFirestoreOfflineError,
+} from '../../lib/offline/offlineDataCache';
+import { setOfflineDataStale } from '../../lib/offline/offlineStatus';
 
 export default function Classes() {
   const { profile } = useAuth();
@@ -34,24 +41,43 @@ export default function Classes() {
 
   useEffect(() => {
     let unsubs: (() => void)[] = [];
-    if (!profile?.schoolId) return;
+    if (!profile?.schoolId || !profile?.uid) return;
+    const userId = profile.uid;
+    const schoolId = profile.schoolId;
     
     try {
-      const classesQ = query(collection(db, 'classes'), where('schoolId', '==', profile.schoolId), limit(100));
+      const classesQ = query(collection(db, 'classes'), where('schoolId', '==', schoolId), limit(100));
       unsubs.push(onSnapshot(classesQ, snap => {
-        setClasses(
-          filterActiveRecords(
-            snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; isDeleted?: boolean })),
-          ),
+        const list = filterActiveRecords(
+          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; isDeleted?: boolean })),
         );
+        setClasses(list);
+        void cacheSnapshot(CACHE_COLLECTION_KEYS.classes, userId, schoolId, list);
+      }, async (error) => {
+        if (isFirestoreOfflineError(error) || !navigator.onLine) {
+          const ok = await hydrateFromCache(CACHE_COLLECTION_KEYS.classes, userId, schoolId, setClasses);
+          if (ok) setOfflineDataStale(true);
+        }
       }));
 
-      const studentsQ = query(collection(db, 'students'), where('schoolId', '==', profile.schoolId), limit(1000));
+      const studentsQ = query(collection(db, 'students'), where('schoolId', '==', schoolId), limit(1000));
       unsubs.push(onSnapshot(studentsQ, snap => {
-        setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setStudents(list);
+        void cacheSnapshot(CACHE_COLLECTION_KEYS.students, userId, schoolId, list);
+      }, async (error) => {
+        if (isFirestoreOfflineError(error) || !navigator.onLine) {
+          const ok = await hydrateFromCache(CACHE_COLLECTION_KEYS.students, userId, schoolId, setStudents);
+          if (ok) setOfflineDataStale(true);
+        }
       }));
     } catch (error) {
       console.error("Error setting up real-time classes listeners:", error);
+    }
+
+    if (!navigator.onLine) {
+      void hydrateFromCache(CACHE_COLLECTION_KEYS.classes, userId, schoolId, setClasses);
+      void hydrateFromCache(CACHE_COLLECTION_KEYS.students, userId, schoolId, setStudents);
     }
 
     return () => unsubs.forEach(unsub => unsub());

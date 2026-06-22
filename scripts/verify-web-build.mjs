@@ -59,7 +59,7 @@ if (!entryMatch) {
   }
 }
 
-for (const required of ['.htaccess', 'sw.js', 'index.html', 'assets/.htaccess']) {
+for (const required of ['.htaccess', 'sw.js', 'index.html', 'assets/.htaccess', 'sw-precache.json']) {
   try {
     await readFile(path.join(distDir, required), 'utf8');
   } catch {
