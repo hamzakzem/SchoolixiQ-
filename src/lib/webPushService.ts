@@ -5,23 +5,23 @@ import { db, auth } from './firebase';
 import { getServiceWorkerUrl } from './serviceWorkerRegistration';
 import { notificationDiag } from './notificationDiagnostics';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { isLogoutInProgress, setLogoutInProgress } from './logoutGuard';
 
 let webMessaging: ReturnType<typeof getMessaging> | null = null;
 let currentWebToken: string | null = null;
 let messageListenerAttached = false;
 let lastRegistrationError: string | null = null;
-let isLoggingOut = false;
 
 export function setPushLogoutInProgress(value: boolean): void {
-  isLoggingOut = value;
+  setLogoutInProgress(value);
 }
 
 export function isPushLogoutInProgress(): boolean {
-  return isLoggingOut;
+  return isLogoutInProgress();
 }
 
 function canWritePushTokensForUser(userId: string): { ok: true } | { ok: false; reason: string } {
-  if (isLoggingOut) {
+  if (isLogoutInProgress()) {
     return { ok: false, reason: 'logging_out' };
   }
   const currentUid = auth.currentUser?.uid;
@@ -683,7 +683,7 @@ export function startWebPushAutoRegistration(
     return () => {};
   }
 
-  if (isLoggingOut) {
+  if (isLogoutInProgress()) {
     console.info('[FCM] AUTO_REGISTRATION_SKIPPED', { uid: userId, reason: 'logging_out' });
     options.onSettled?.(null);
     return () => {};
@@ -698,7 +698,7 @@ export function startWebPushAutoRegistration(
   let registered = false;
 
   const attempt = async (reason: string) => {
-    if (stopped || registered || !userId || isLoggingOut) return;
+    if (stopped || registered || !userId || isLogoutInProgress()) return;
 
     const currentUid = auth.currentUser?.uid;
     if (!currentUid || currentUid !== userId) {

@@ -3,7 +3,6 @@ import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { 
   doc, 
-  onSnapshot, 
   query, 
   collection, 
   where, 
@@ -26,6 +25,14 @@ import {
   setPushLogoutInProgress,
   isPushLogoutInProgress,
 } from './webPushService';
+import {
+  isLogoutInProgress,
+  setLogoutInProgress,
+  setLogoutLogSnapshot,
+  shouldIgnoreFirestoreListenerError,
+  shouldSkipFirestoreListeners,
+  subscribeGuardedFirestore,
+} from './logoutGuard';
 
 interface AuthContextType {
   user: User | null;
@@ -128,21 +135,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const logoutSnapshot = profileSnapshotRef.current;
         profileSnapshotRef.current = null;
         loginLoggedRef.current = null;
-
-        if (logoutSnapshot) {
-          import('./loginLog').then(({ writeLoginLog }) =>
-            writeLoginLog({
-              userId: logoutSnapshot.uid,
-              role: logoutSnapshot.role,
-              schoolId: logoutSnapshot.schoolId,
-              event: 'logout',
-              email: logoutSnapshot.email,
-            }),
-          ).catch(() => {});
-        }
+        setLogoutLogSnapshot(null);
 
         lastUserIdRef.current = null;
         pushRegistrationDoneRef.current = null;
+        setLogoutInProgress(true);
         setPushLogoutInProgress(true);
         stopWebPushAutoRegistration('logout');
       }
@@ -161,12 +158,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (authUser) {
+        setLogoutInProgress(false);
         setPushLogoutInProgress(false);
         lastUserIdRef.current = authUser.uid;
         triggerWebPushRegistration(authUser.uid, 'auth_state_changed');
 
         const docRef = doc(db, 'users', authUser.uid);
-        unsubscribeProfile = onSnapshot(docRef, async (docSnap) => {
+        unsubscribeProfile = subscribeGuardedFirestore(docRef, async (docSnap) => {
+          if (shouldSkipFirestoreListeners()) return;
           if (docSnap.exists()) {
             const rawProfile = docSnap.data() as Record<string, unknown>;
             const redactionCtx =
@@ -222,6 +221,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               schoolId: data.schoolId ? String(data.schoolId) : undefined,
               email: authUser.email,
             };
+            setLogoutLogSnapshot(profileSnapshotRef.current);
 
             if (loginLoggedRef.current !== authUser.uid) {
               loginLoggedRef.current = authUser.uid;
@@ -274,14 +274,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (data.schoolId) {
               if (!schoolData || schoolData.id !== data.schoolId) {
                 if (unsubscribeSchool) unsubscribeSchool();
-                unsubscribeSchool = onSnapshot(doc(db, 'schools', data.schoolId), (s) => {
+                unsubscribeSchool = subscribeGuardedFirestore(doc(db, 'schools', data.schoolId), (s) => {
+                  if (shouldSkipFirestoreListeners()) return;
                   if (s.exists()) {
                     const schoolInfo = { id: s.id, ...s.data() } as any;
                     setSchoolData(schoolInfo);
                     
                     // Listen to active active package for the school
                     if (schoolInfo.planId && unsubscribePackage === null) {
-                      unsubscribePackage = onSnapshot(doc(db, 'packages', schoolInfo.planId), (pkgSnap) => {
+                      unsubscribePackage = subscribeGuardedFirestore(doc(db, 'packages', schoolInfo.planId), (pkgSnap) => {
+                        if (shouldSkipFirestoreListeners()) return;
                         if (pkgSnap.exists()) {
                           setSchoolData((currVal: any) => ({
                             ...currVal,
@@ -292,6 +294,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         }
                         setLoading(false);
                       }, (error) => {
+                        if (shouldIgnoreFirestoreListenerError(error)) return;
                         console.error("Error fetching package for school", error);
                         setLoading(false);
                       });
@@ -307,6 +310,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     setLoading(false);
                   }
                 }, (error) => {
+                  if (shouldIgnoreFirestoreListenerError(error)) return;
                   handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${data.schoolId}`);
                   setLoading(false);
                 });
@@ -422,6 +426,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
           }
         }, (error) => {
+          if (shouldIgnoreFirestoreListenerError(error)) return;
           handleFirestoreError(error, OperationType.GET, `AuthContext:users/${authUser.uid}`);
           setLoading(false);
         });

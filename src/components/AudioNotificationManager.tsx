@@ -4,7 +4,6 @@ import {
   collection,
   query,
   where,
-  onSnapshot,
   type DocumentData,
   type QuerySnapshot,
 } from "firebase/firestore";
@@ -26,6 +25,10 @@ import {
   beginListenerSubscription,
   isListenerHydrated,
 } from "../lib/notificationSessionGuard";
+import {
+  shouldSkipFirestoreListeners,
+  subscribeGuardedFirestore,
+} from "../lib/logoutGuard";
 
 export const AudioNotificationManager: React.FC = () => {
   const { user, profile } = useAuth();
@@ -72,7 +75,7 @@ export const AudioNotificationManager: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!user?.uid || !profile) {
+    if (shouldSkipFirestoreListeners() || !user?.uid || !profile) {
       resetNotificationSession();
       return;
     }
@@ -113,9 +116,9 @@ export const AudioNotificationManager: React.FC = () => {
       onError?: (err: unknown) => void,
     ) => {
       beginListenerSubscription(listenerKey);
-      return onSnapshot(
+      return subscribeGuardedFirestore(
         firestoreQuery,
-        (snap) => processSnapshot(snap, listenerKey, onNewDoc, filterDoc),
+        (snap) => processSnapshot(snap as QuerySnapshot<DocumentData>, listenerKey, onNewDoc, filterDoc),
         onError,
       );
     };

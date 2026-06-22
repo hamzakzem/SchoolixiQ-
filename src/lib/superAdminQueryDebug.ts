@@ -1,4 +1,9 @@
-import { onSnapshot, Query } from 'firebase/firestore';
+import { Query } from 'firebase/firestore';
+import {
+  shouldIgnoreFirestoreListenerError,
+  shouldSkipFirestoreListeners,
+  subscribeGuardedFirestore,
+} from './logoutGuard';
 
 export type SuperAdminFirestoreMeta = {
   queryName: string;
@@ -21,6 +26,7 @@ export function logSuperAdminFirestoreError(
   error: unknown,
   meta?: Pick<SuperAdminFirestoreMeta, 'collection' | 'constraints'>,
 ): void {
+  if (shouldIgnoreFirestoreListenerError(error)) return;
   const err = error as { code?: string; message?: string };
   console.error('[SuperAdminFirestore] LISTENER_ERROR', {
     QUERY_NAME: queryName,
@@ -66,10 +72,15 @@ export function subscribeSuperAdminFirestore<T extends { id: string }>(
   onData: (items: T[]) => void,
   onError?: (error: unknown) => void,
 ): () => void {
+  if (shouldSkipFirestoreListeners()) {
+    return () => {};
+  }
   logSuperAdminFirestoreSetup(meta);
-  return onSnapshot(
+  return subscribeGuardedFirestore(
     q,
     (snap) => {
+      if (shouldSkipFirestoreListeners()) return;
+      if (!('docs' in snap)) return;
       logSuperAdminFirestoreSnapshot(meta.queryName, snap.size, snap.metadata.fromCache, {
         collection: meta.collection,
         constraints: meta.constraints,

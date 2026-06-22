@@ -30,6 +30,10 @@ import {
   logSuperAdminFirestoreError,
 } from "../lib/superAdminQueryDebug";
 import {
+  shouldIgnoreFirestoreListenerError,
+  shouldSkipFirestoreListeners,
+} from "../lib/logoutGuard";
+import {
   School,
   Building,
   Plus,
@@ -711,7 +715,7 @@ export default function SuperAdminDashboard() {
   };
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (shouldSkipFirestoreListeners() || !auth.currentUser) return;
 
     const needsSchools = ["schools", "accounts", "requests"].includes(activeTab);
     const needsPackages = ["schools", "packages", "requests"].includes(activeTab);
@@ -915,7 +919,7 @@ export default function SuperAdminDashboard() {
   }, [activeTab, profile?.uid]);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (shouldSkipFirestoreListeners() || !auth.currentUser) return;
     if (activeTab === "requests") {
       setPendingRequestCount(subscriptionRequests.length);
       return;
@@ -931,6 +935,7 @@ export default function SuperAdminDashboard() {
     logSuperAdminFirestoreSetup(badgeMeta);
 
     const fetchPendingCounts = async () => {
+      if (shouldSkipFirestoreListeners() || !auth.currentUser) return;
       try {
         const [regSnap, subSnap, ordSnap] = await Promise.all([
           getCountFromServer(
@@ -957,6 +962,7 @@ export default function SuperAdminDashboard() {
         logSuperAdminFirestoreFetch(badgeMeta.queryName, badgeMeta, total);
         if (!cancelled) setPendingRequestCount(total);
       } catch (error) {
+        if (shouldIgnoreFirestoreListenerError(error)) return;
         logSuperAdminFirestoreError(badgeMeta.queryName, error, badgeMeta);
       }
     };

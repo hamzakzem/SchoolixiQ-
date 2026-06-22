@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './AuthContext';
+import {
+  shouldIgnoreFirestoreListenerError,
+  shouldSkipFirestoreListeners,
+  subscribeGuardedFirestore,
+} from './logoutGuard';
 import {
   filterNotificationsForUser,
 } from './notificationVisibility';
@@ -45,6 +50,7 @@ function logNotificationBadgeError(
   error: unknown,
   meta: { uid: string; schoolId?: string; role?: string },
 ) {
+  if (shouldIgnoreFirestoreListenerError(error)) return;
   const err = error as { code?: string; message?: string };
   console.error('[NotificationBadge] LISTENER_ERROR', {
     QUERY_NAME: queryName,
@@ -62,7 +68,7 @@ export function NotificationBadgeProvider({ children }: { children: React.ReactN
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.uid) {
+    if (shouldSkipFirestoreListeners() || !user?.uid) {
       setNotifications([]);
       setLoading(false);
       return;
@@ -128,9 +134,10 @@ export function NotificationBadgeProvider({ children }: { children: React.ReactN
     };
 
     const unsubs = queries.map(({ queryName, q }) =>
-      onSnapshot(
+      subscribeGuardedFirestore(
         q,
         (snap) => {
+          if (shouldSkipFirestoreListeners() || !('docs' in snap)) return;
           snapshotByQuery.set(
             queryName,
             snap.docs.map((d) => ({

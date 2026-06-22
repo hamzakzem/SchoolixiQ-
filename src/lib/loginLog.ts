@@ -1,5 +1,6 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+import { auth, db } from './firebase';
+import { isLogoutInProgress } from './logoutGuard';
 
 function summarizeUserAgent(): string {
   if (typeof navigator === 'undefined') return 'unknown';
@@ -21,6 +22,9 @@ export async function writeLoginLog(params: {
   event: LoginLogEvent;
   email?: string | null;
 }): Promise<void> {
+  if (!auth.currentUser) {
+    return;
+  }
   try {
     await addDoc(collection(db, 'login_logs'), {
       userId: params.userId,
@@ -32,6 +36,10 @@ export async function writeLoginLog(params: {
       createdAt: serverTimestamp(),
     });
   } catch (error) {
+    const err = error as { code?: string; message?: string };
+    if (err?.code === 'permission-denied' || isLogoutInProgress()) {
+      return;
+    }
     console.warn('[loginLog] Failed to write login log:', error);
   }
 }
