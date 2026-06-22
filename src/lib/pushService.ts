@@ -1,93 +1,198 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { db, auth } from './firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
+import { isLogoutInProgress } from './logoutGuard';
 
-// Store current token in memory to remove it during logout
 let currentPushToken: string | null = null;
+let pendingToken: string | null = null;
+let activeUserId: string | null = null;
+let listenersReady = false;
+let registerPromise: Promise<void> | null = null;
 
-export const registerForPushNotifications = async (userId: string, userRole: string, schoolId: string = '') => {
-  if (!Capacitor.isNativePlatform()) {
-    console.log('Push notifications are only available on native platforms using Capacitor.');
-    return;
+function nativePlatformLabel(): 'android' | 'ios' | 'unknown' {
+  const platform = Capacitor.getPlatform();
+  if (platform === 'android') return 'android';
+  if (platform === 'ios') return 'ios';
+  return 'unknown';
+}
+
+function logPlatformDetected(): void {
+  console.info('[NativePush] PLATFORM_DETECTED', {
+    isNative: Capacitor.isNativePlatform(),
+    platform: Capacitor.getPlatform(),
+  });
+}
+
+function canSaveTokenForUser(userId: string): boolean {
+  if (isLogoutInProgress()) return false;
+  const currentUid = auth.currentUser?.uid;
+  return Boolean(currentUid && currentUid === userId);
+}
+
+async function saveNativeTokenToFirestore(userId: string, token: string): Promise<boolean> {
+  const path = `users/${userId}`;
+  if (!canSaveTokenForUser(userId)) {
+    console.info('[NativePush] TOKEN_SAVE_SKIPPED', {
+      userId,
+      path,
+      reason: 'signed_out_or_logout',
+    });
+    return false;
   }
 
   try {
-    // Request permission to use push notifications
-    let permStatus = await PushNotifications.checkPermissions();
-
-    if (permStatus.receive === 'prompt') {
-      permStatus = await PushNotifications.requestPermissions();
-    }
-
-    if (permStatus.receive !== 'granted') {
-      console.warn('User denied push notification permission');
-      return;
-    }
-
-    // Register with Apple / Google to receive push via APNS/FCM
-    await PushNotifications.register();
-
-    // Listeners for registration success/error
-    let isRegistrationListenerAdded = false;
-    
-    // Remove all previous listeners to prevent duplicates if register is called multiple times
-    await PushNotifications.removeAllListeners();
-
-    PushNotifications.addListener('registration', async (token) => {
-      console.info('[Notifications] PUSH_TOKEN_REGISTERED', {
-        platform: Capacitor.getPlatform(),
-        userId,
-        tokenPrefix: token.value.slice(0, 12),
-      });
-      currentPushToken = token.value;
-      if (userId && auth.currentUser?.uid === userId) {
-        try {
-          const userRef = doc(db, 'users', userId);
-          await updateDoc(userRef, {
-            fcmTokens: arrayUnion(token.value)
-          });
-        } catch (e) {
-          console.error('[Notifications] PUSH_TOKEN_REGISTERED save failed', e);
-        }
-      } else if (userId) {
-        console.info('[FCM] TOKEN_SAVE_SKIPPED', { userId, reason: 'signed_out' });
-      }
+    await updateDoc(doc(db, 'users', userId), {
+      fcmTokens: arrayUnion(token),
+      fcmTokenUpdatedAt: serverTimestamp(),
+      fcmDevices: arrayUnion({
+        token,
+        platform: nativePlatformLabel(),
+        updatedAt: new Date().toISOString(),
+      }),
     });
-
-    PushNotifications.addListener('registrationError', (error: any) => {
-      console.error('Error on registration: ' + JSON.stringify(error));
+    console.info('[NativePush] TOKEN_SAVE_SUCCESS', {
+      userId,
+      path,
+      tokenPrefix: token.slice(0, 12),
     });
-
-    // Listen for notification received while app is running
-    PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('Push received: ' + JSON.stringify(notification));
-      toast.success(notification.title || 'إشعار جديد', {
-        icon: '🔔',
-        style: {
-          border: '1px solid #e2e8f0',
-          padding: '16px',
-          color: '#1e293b',
-        }
-      });
-    });
-
-    // Listen for notification tapped by the user
-    PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-      const data = notification.notification?.data || {};
-      const route = data.routeTarget || data.route || data.type;
-      if (route && typeof window !== 'undefined') {
-        localStorage.setItem('schoolix_pending_tab_redirect', String(route));
-        window.dispatchEvent(new CustomEvent('schoolix_tab_redirect'));
-        window.dispatchEvent(new CustomEvent('schoolix-notification-route', { detail: { route } }));
-        console.info('[Notifications] PUSH_CLICK_ROUTE', { route, platform: Capacitor.getPlatform() });
-      }
-    });
-
+    return true;
   } catch (error) {
-    console.error('Error setting up push notifications:', error);
+    const err = error as { code?: string; message?: string };
+    console.error('[NativePush] TOKEN_SAVE_ERROR', {
+      userId,
+      path,
+      code: err?.code ?? 'unknown',
+      message: err?.message ?? String(error),
+    });
+    return false;
   }
+}
+
+async function handleTokenReceived(tokenValue: string): Promise<void> {
+  console.info('[NativePush] TOKEN_RECEIVED', {
+    tokenPrefix: tokenValue.slice(0, 12),
+    platform: Capacitor.getPlatform(),
+  });
+  currentPushToken = tokenValue;
+  pendingToken = tokenValue;
+
+  const userId = activeUserId ?? auth.currentUser?.uid ?? null;
+  if (!userId) {
+    console.info('[NativePush] TOKEN_PENDING_UID', {
+      tokenPrefix: tokenValue.slice(0, 12),
+    });
+    return;
+  }
+
+  const saved = await saveNativeTokenToFirestore(userId, tokenValue);
+  if (saved) {
+    pendingToken = null;
+  }
+}
+
+async function flushPendingToken(userId: string): Promise<void> {
+  if (!pendingToken || !canSaveTokenForUser(userId)) return;
+  const saved = await saveNativeTokenToFirestore(userId, pendingToken);
+  if (saved) {
+    pendingToken = null;
+  }
+}
+
+function ensurePushListeners(): void {
+  if (listenersReady) return;
+  listenersReady = true;
+
+  PushNotifications.addListener('registration', (token) => {
+    void handleTokenReceived(token.value);
+  });
+
+  PushNotifications.addListener('registrationError', (error: unknown) => {
+    console.error('[NativePush] REGISTRATION_ERROR', {
+      error: typeof error === 'string' ? error : JSON.stringify(error),
+    });
+  });
+
+  PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    console.log('[NativePush] NOTIFICATION_RECEIVED', JSON.stringify(notification));
+    toast.success(notification.title || 'إشعار جديد', {
+      icon: '🔔',
+      style: {
+        border: '1px solid #e2e8f0',
+        padding: '16px',
+        color: '#1e293b',
+      },
+    });
+  });
+
+  PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+    const data = notification.notification?.data || {};
+    const route = data.routeTarget || data.route || data.type;
+    if (route && typeof window !== 'undefined') {
+      localStorage.setItem('schoolix_pending_tab_redirect', String(route));
+      window.dispatchEvent(new CustomEvent('schoolix_tab_redirect'));
+      window.dispatchEvent(new CustomEvent('schoolix-notification-route', { detail: { route } }));
+      console.info('[NativePush] PUSH_CLICK_ROUTE', { route, platform: Capacitor.getPlatform() });
+    }
+  });
+}
+
+async function runNativeRegistration(userId: string): Promise<void> {
+  logPlatformDetected();
+  if (!Capacitor.isNativePlatform()) {
+    return;
+  }
+  if (!userId) {
+    console.info('[NativePush] REGISTER_SKIPPED', { reason: 'no_user_id' });
+    return;
+  }
+  if (isLogoutInProgress()) {
+    console.info('[NativePush] REGISTER_SKIPPED', { reason: 'logging_out', userId });
+    return;
+  }
+
+  activeUserId = userId;
+  ensurePushListeners();
+  await flushPendingToken(userId);
+
+  let permStatus = await PushNotifications.checkPermissions();
+  console.info('[NativePush] PERMISSION_STATUS', permStatus);
+
+  if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
+    permStatus = await PushNotifications.requestPermissions();
+    console.info('[NativePush] PERMISSION_STATUS', { ...permStatus, afterRequest: true });
+  }
+
+  if (permStatus.receive !== 'granted') {
+    console.warn('[NativePush] PERMISSION_DENIED', { receive: permStatus.receive, userId });
+    return;
+  }
+
+  console.info('[NativePush] REGISTER_CALLED', {
+    userId,
+    platform: Capacitor.getPlatform(),
+  });
+  await PushNotifications.register();
+}
+
+export const registerForPushNotifications = async (
+  userId: string,
+  _userRole: string = '',
+  _schoolId: string = '',
+): Promise<void> => {
+  if (!Capacitor.isNativePlatform()) {
+    return;
+  }
+
+  if (registerPromise) {
+    await registerPromise;
+  }
+
+  registerPromise = runNativeRegistration(userId).finally(() => {
+    registerPromise = null;
+  });
+  await registerPromise;
 };
 
 export const unregisterPushToken = async (userId: string) => {
@@ -96,19 +201,23 @@ export const unregisterPushToken = async (userId: string) => {
   }
 
   if (!auth.currentUser || auth.currentUser.uid !== userId) {
-    console.info('[FCM] TOKEN_REMOVE_SKIPPED', { userId, reason: 'signed_out' });
+    console.info('[NativePush] TOKEN_REMOVE_SKIPPED', { userId, reason: 'signed_out' });
     currentPushToken = null;
+    pendingToken = null;
+    activeUserId = null;
     return;
   }
-  
+
   try {
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, {
-      fcmTokens: arrayRemove(currentPushToken)
+      fcmTokens: arrayRemove(currentPushToken),
     });
-    console.log('Push token removed successfully on logout.');
+    console.info('[NativePush] TOKEN_REMOVE_SUCCESS', { userId });
     currentPushToken = null;
+    pendingToken = null;
+    activeUserId = null;
   } catch (error) {
-    console.error('Error removing push token:', error);
+    console.error('[NativePush] TOKEN_REMOVE_ERROR', error);
   }
 };

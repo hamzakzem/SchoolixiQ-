@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { 
@@ -71,8 +72,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     languageRef.current = language;
   }, [language]);
 
+  const triggerNativePushRegistration = (uid: string, source: string) => {
+    if (!uid || !Capacitor.isNativePlatform()) return;
+    if (isLogoutInProgress()) {
+      console.info('[NativePush] AUTH_CONTEXT_SKIP', { uid, source, reason: 'logging_out' });
+      return;
+    }
+    console.info('[NativePush] AUTH_CONTEXT_START', { uid, source, platform: Capacitor.getPlatform() });
+    void import('./pushService').then(({ registerForPushNotifications }) =>
+      registerForPushNotifications(uid),
+    );
+  };
+
   const triggerWebPushRegistration = (uid: string, source: string) => {
     if (!uid) return;
+    if (Capacitor.isNativePlatform()) {
+      console.info('[FCM] AUTH_CONTEXT_CALL_SKIP', { uid, source, reason: 'native_platform' });
+      return;
+    }
     if (isPushLogoutInProgress()) {
       console.info('[FCM] AUTH_CONTEXT_CALL_SKIP', {
         uid,
@@ -161,6 +178,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setLogoutInProgress(false);
         setPushLogoutInProgress(false);
         lastUserIdRef.current = authUser.uid;
+        triggerNativePushRegistration(authUser.uid, 'auth_state_changed');
         triggerWebPushRegistration(authUser.uid, 'auth_state_changed');
 
         const docRef = doc(db, 'users', authUser.uid);
@@ -258,13 +276,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setLoading(false);
             }
             
-            // Native Capacitor push (Android/iOS) — web FCM runs from auth_state_changed above.
-            void import('./pushService').then(({ registerForPushNotifications }) =>
-              registerForPushNotifications(
-                authUser.uid,
-                String(data.role || 'unknown'),
-                data.schoolId ? String(data.schoolId) : '',
-              ),
+            // Native Capacitor push — independent from web FCM; retries after profile load.
+            triggerNativePushRegistration(
+              authUser.uid,
+              'profile_snapshot',
             );
 
             // Retry web FCM once profile is confirmed (all roles).
