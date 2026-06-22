@@ -6,7 +6,6 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useLanguage } from '../../lib/LanguageContext';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
-import { playPremiumNotificationSound } from '../../lib/notificationSound';
 import { useSystemConfig } from '../../lib/SystemConfigContext';
 import { Phone, GraduationCap } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -181,15 +180,8 @@ export default function AdminChatTab() {
         });
       }
 
-      // Play chime if messages count increased and the last message is from others
-      if (docs.length > prevMessagesLength.current) {
-        if (!isFirstLoad.current && docs.length > 0) {
-          const latestMsg = docs[docs.length - 1];
-          if (latestMsg.senderId !== profile.uid && !latestMsg.read) {
-            playPremiumNotificationSound();
-          }
-        }
-      }
+
+      // Sound handled globally by AudioNotificationManager
       prevMessagesLength.current = docs.length;
       isFirstLoad.current = false;
 

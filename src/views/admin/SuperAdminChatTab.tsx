@@ -7,7 +7,6 @@ import { useLanguage } from '../../lib/LanguageContext';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
 import { useSystemConfig } from '../../lib/SystemConfigContext';
-import { playPremiumNotificationSound } from '../../lib/notificationSound';
 import { Search, Building2, Megaphone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { SchoolixChatShell, type ChatShellContact } from '../../components/chat/SchoolixChatShell';
@@ -145,15 +144,7 @@ export default function SuperAdminChatTab() {
       setMessages(docs);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
 
-      // Play chime if messages increased and last is from others
-      if (docs.length > prevMessagesLength.current) {
-        if (!isFirstLoad.current && docs.length > 0) {
-          const latestMsg = docs[docs.length - 1];
-          if (latestMsg.senderId !== profile.uid && !latestMsg.read) {
-            playPremiumNotificationSound();
-          }
-        }
-      }
+      // Sound handled globally by AudioNotificationManager
       prevMessagesLength.current = docs.length;
       isFirstLoad.current = false;
 

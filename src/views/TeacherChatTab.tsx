@@ -18,7 +18,6 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useLanguage } from "../lib/LanguageContext";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import { notificationService } from "../lib/notificationService";
-import { playPremiumNotificationSound } from "../lib/notificationSound";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import {
   MoreVertical,
@@ -325,15 +324,8 @@ export default function TeacherChatTab() {
           });
         }
 
-        // Sound Notification on Receipt
-        if (docs.length > prevMessagesLength.current) {
-          if (!isFirstLoad.current && docs.length > 0) {
-            const latestMsg = docs[docs.length - 1];
-            if (latestMsg.senderId !== profile.uid && !latestMsg.read) {
-              playPremiumNotificationSound();
-            }
-          }
-        }
+
+        // Sound handled globally by AudioNotificationManager
         prevMessagesLength.current = docs.length;
         isFirstLoad.current = false;
 

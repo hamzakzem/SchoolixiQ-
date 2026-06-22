@@ -18,38 +18,23 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { 
   Bell, 
-  Search, 
-  Trash2, 
-  Volume2, 
-  VolumeX, 
-  Check, 
-  CheckSquare, 
-  X, 
-  Settings, 
-  Activity, 
-  Sparkles, 
-  Wifi, 
-  Shield, 
-  Filter, 
-  Clock, 
-  Send, 
-  Smartphone, 
-  Laptop, 
-  RefreshCw, 
-  Sliders, 
-  ChevronRight,
-  ChevronLeft,
-  MoreVertical,
-  Loader2,
-  ArrowRight,
+  MessageSquare,
+  CreditCard,
+  ClipboardCheck,
   BookOpen,
-  FileText,
-  DollarSign,
-  UserCheck,
-  ShieldCheck,
+  Settings,
+  Check, 
+  Trash2,
+  RefreshCw,
+  ArrowLeft,
+  Search,
+  X,
+  Loader2,
   AlertTriangle,
-  Mail,
-  SmartphoneIcon
+  MoreVertical,
+  Volume2,
+  VolumeX,
+  type LucideIcon,
 } from "lucide-react";
 import { 
   getSoundSettings, 
@@ -118,6 +103,27 @@ const DISPLAY_CATEGORY_IDS: NotificationCategoryId[] = [
   'homework',
   'system',
 ];
+
+const CATEGORY_ICON_MAP: Partial<Record<NotificationCategoryId, LucideIcon>> = {
+  messages: MessageSquare,
+  tuition: CreditCard,
+  attendance: ClipboardCheck,
+  homework: BookOpen,
+  system: Settings,
+  announcements: MessageSquare,
+  reports: BookOpen,
+  smart_gate: ClipboardCheck,
+};
+
+function renderCategoryIcon(categoryId: NotificationCategoryId, gold = false) {
+  const Icon = CATEGORY_ICON_MAP[categoryId] ?? Bell;
+  return (
+    <Icon
+      className={`sx-notif-lucide${gold ? ' sx-notif-lucide--gold' : ''}`}
+      aria-hidden
+    />
+  );
+}
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ 
   onClose, 
@@ -628,10 +634,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
   };
 
-  const getCategoryIcon = (notification: Record<string, unknown>) => {
-    const cat = getCategoryConfig(resolveNotificationCategoryId(notification));
-    const Icon = cat.icon;
-    return <Icon className={`w-4 h-4 ${cat.color}`} />;
+  const getCategoryIcon = (notification: Record<string, unknown>, gold = false) => {
+    const catId = resolveNotificationCategoryId(notification);
+    const useGold = gold || !notification.read;
+    return renderCategoryIcon(catId, useGold);
   };
 
   const getCategoryLabel = (notification: Record<string, unknown>) => {
@@ -667,7 +673,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const renderNotificationCard = (n: any) => {
     const role = normalizeDashboardRole(userRole, profile?.role);
     const hasRoute = Boolean(resolveNotificationTab(n, role));
-    const catConfig = getCategoryConfig(resolveNotificationCategoryId(n));
 
     return (
       <div
@@ -679,70 +684,69 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             handleNotificationClick(n, !hasRoute);
           }
         }}
-        className={`sx-notif-card group ${!n.read ? 'sx-notif-card--unread' : 'sx-notif-card--read'}`}
+        className={`sx-notif-card ${!n.read ? 'sx-notif-card--unread' : 'sx-notif-card--read'}`}
         role="button"
         tabIndex={0}
         aria-label={getNotificationTitle(n)}
       >
         {!n.read && <span className="sx-notif-card__dot" aria-hidden />}
-        <div className={`sx-notif-card__icon ${catConfig.bgColor}`}>
-          {getCategoryIcon(n)}
+        <div className="sx-notif-card__icon">
+          {getCategoryIcon(n, !n.read)}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="sx-notif-card__top">
-            <span className="sx-notif-card__category">{getCategoryLabel(n)}</span>
-            <time className="sx-notif-card__time">
-              {n.createdAt?.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || ''}
-            </time>
-          </div>
-          <h4 className="sx-notif-card__title">{getNotificationTitle(n)}</h4>
-          <p className="sx-notif-card__message">{n.message}</p>
-          <div className="sx-notif-card__footer">
-            {hasRoute ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleNotificationAction(n);
-                }}
-                className="sx-notif-card__action"
-                aria-label={isArabic ? 'عرض' : 'View'}
-              >
-                {isArabic ? 'عرض' : 'View'}
-                <ArrowRight className="w-3 h-3" />
-              </button>
-            ) : (
-              <span className="text-[10px] font-bold text-slate-400">
-                {isArabic ? 'اضغط للتفاصيل' : 'Tap for details'}
-              </span>
+        <div className="sx-notif-card__top">
+          <span className="sx-notif-card__category">{getCategoryLabel(n)}</span>
+          <time className="sx-notif-card__time">
+            {n.createdAt?.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || ''}
+          </time>
+        </div>
+        <h4 className="sx-notif-card__title">{getNotificationTitle(n)}</h4>
+        <p className="sx-notif-card__message">{n.message}</p>
+        <div className="sx-notif-card__footer">
+          {hasRoute ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNotificationAction(n);
+              }}
+              className="sx-notif-card__action"
+              aria-label={isArabic ? 'عرض' : 'View'}
+            >
+              {isArabic ? 'عرض' : 'View'}
+              <ArrowLeft className="sx-notif-lucide" style={{ width: 14, height: 14 }} aria-hidden />
+            </button>
+          ) : (
+            <span className="sx-notif-card__hint">
+              {isArabic ? 'اضغط للتفاصيل' : 'Tap for details'}
+            </span>
+          )}
+          <div className="sx-notif-card__menu">
+            <button
+              type="button"
+              className="sx-notif-card__menu-btn"
+              aria-label={isArabic ? 'المزيد' : 'More actions'}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCardMenuId(cardMenuId === n.id ? null : n.id);
+              }}
+            >
+              <MoreVertical className="sx-notif-lucide sx-notif-lucide--muted" aria-hidden />
+            </button>
+            {cardMenuId === n.id && (
+              <div className="sx-notif-card-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(e) => {
+                    void handleDeleteOne(e, n.id, n);
+                    setCardMenuId(null);
+                  }}
+                >
+                  <Trash2 className="sx-notif-lucide" style={{ width: 16, height: 16 }} aria-hidden />
+                  {isArabic ? 'حذف' : 'Delete'}
+                </button>
+              </div>
             )}
-            <div className="sx-notif-card__menu relative">
-              <button
-                type="button"
-                className="sx-notif-card__menu-btn"
-                aria-label={isArabic ? 'المزيد' : 'More actions'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCardMenuId(cardMenuId === n.id ? null : n.id);
-                }}
-              >
-                <MoreVertical className="w-4 h-4" />
-              </button>
-              {cardMenuId === n.id && (
-                <div className="sx-notif-card-menu" role="menu">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={(e) => {
-                      void handleDeleteOne(e, n.id, n);
-                      setCardMenuId(null);
-                    }}
-                  >
-                    {isArabic ? 'حذف' : 'Delete'}
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -752,16 +756,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const renderListView = () => (
     <>
       <div className="sx-notif-search" dir={isArabic ? 'rtl' : 'ltr'}>
-        <div className="relative">
-          <Search
-            className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none ${isArabic ? 'right-3' : 'left-3'}`}
-          />
+        <div className="sx-notif-search__wrap">
+          <Search className="sx-notif-lucide sx-notif-lucide--muted sx-notif-search__icon" aria-hidden />
           <input
             type="search"
+            className="has-icon"
             placeholder={isArabic ? 'ابحث في الإشعارات…' : 'Search notifications…'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className={isArabic ? 'pr-9 pl-3' : 'pl-9 pr-3'}
             aria-label={isArabic ? 'بحث' : 'Search'}
           />
         </div>
@@ -769,40 +771,29 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
       {loadError ? (
         <div className="sx-notif-state">
-          <AlertTriangle className="w-10 h-10 text-amber-500 mb-3" />
-          <p className="font-bold text-[#0B2345] dark:text-white">
-            {isArabic ? 'تعذر تحميل الإشعارات' : 'Could not load notifications'}
-          </p>
-          <button
-            type="button"
-            onClick={handleRefreshList}
-            className="sx-notif-card__action mt-4"
-          >
+          <AlertTriangle className="sx-notif-lucide sx-notif-lucide--gold" aria-hidden />
+          <p>{isArabic ? 'تعذر تحميل الإشعارات' : 'Could not load notifications'}</p>
+          <button type="button" onClick={handleRefreshList} className="sx-notif-card__action" style={{ marginTop: 16 }}>
+            <RefreshCw className="sx-notif-lucide" style={{ width: 14, height: 14 }} aria-hidden />
             {isArabic ? 'إعادة المحاولة' : 'Retry'}
           </button>
         </div>
       ) : loadingNotifications ? (
         <div className="sx-notif-state">
-          <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37] mb-3" />
-          <p className="font-bold text-[#0B2345] dark:text-white">
-            {isArabic ? 'جاري تحميل الإشعارات…' : 'Loading notifications…'}
-          </p>
+          <Loader2 className="sx-notif-lucide sx-notif-lucide--gold animate-spin" aria-hidden />
+          <p>{isArabic ? 'جاري تحميل الإشعارات…' : 'Loading notifications…'}</p>
         </div>
       ) : filteredNotifs.length === 0 ? (
         <div className="sx-notif-empty">
-          <Bell className="w-10 h-10 text-[#D4AF37] mb-3" />
-          <p className="font-bold text-[#0B2345] dark:text-white">
-            {isArabic ? 'لا توجد إشعارات حالياً' : 'No notifications right now'}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            {isArabic ? 'كل شيء محدث' : 'All caught up'}
-          </p>
+          <Bell className="sx-notif-lucide sx-notif-lucide--gold" aria-hidden />
+          <p>{isArabic ? 'لا توجد إشعارات حالياً' : 'No notifications right now'}</p>
+          <p className="sx-notif-muted">{isArabic ? 'كل شيء محدث' : 'All caught up'}</p>
         </div>
       ) : (
         <div className="sx-notif-list">
           {(['today', 'yesterday', 'older'] as const).map((groupKey) =>
             groupedNotifs[groupKey].length > 0 ? (
-              <div key={groupKey} className="space-y-2">
+              <div key={groupKey} className="sx-notif-group">
                 <h3 className="sx-notif-group-label">
                   {isArabic ? TIME_GROUP_LABELS[groupKey].ar : TIME_GROUP_LABELS[groupKey].en}
                 </h3>
@@ -819,92 +810,198 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     if (!selectedNotification) return null;
     const role = normalizeDashboardRole(userRole, profile?.role);
     const hasRoute = Boolean(resolveNotificationTab(selectedNotification, role));
-    const catConfig = getCategoryConfig(resolveNotificationCategoryId(selectedNotification));
 
     return (
       <div className="sx-notif-detail-view">
-        <div className={`sx-notif-detail-view__icon ${catConfig.bgColor}`}>
-          {getCategoryIcon(selectedNotification)}
-        </div>
-        <span className="sx-notif-card__category">{getCategoryLabel(selectedNotification)}</span>
-        <h3 className="sx-notif-detail-view__title">{getNotificationTitle(selectedNotification)}</h3>
-        <p className="sx-notif-detail-view__message">{selectedNotification.message}</p>
-        <div className="sx-notif-detail-view__meta">
-          {(selectedNotification.senderName || selectedNotification.metadata?.senderName) && (
-            <p>
-              {isArabic ? 'المرسل:' : 'From:'}{' '}
-              {selectedNotification.senderName || selectedNotification.metadata?.senderName}
-            </p>
+        <div className="sx-notif-detail-card">
+          <div className="sx-notif-detail-view__icon">
+            {getCategoryIcon(selectedNotification, true)}
+          </div>
+          <span className="sx-notif-detail-view__badge">{getCategoryLabel(selectedNotification)}</span>
+          <h3 className="sx-notif-detail-view__title">{getNotificationTitle(selectedNotification)}</h3>
+          <p className="sx-notif-detail-view__message">{selectedNotification.message}</p>
+          <div className="sx-notif-detail-view__meta">
+            {(selectedNotification.senderName || selectedNotification.metadata?.senderName) && (
+              <div className="sx-notif-detail-view__meta-row">
+                <MessageSquare className="sx-notif-lucide sx-notif-lucide--muted" style={{ width: 14, height: 14 }} aria-hidden />
+                <span>
+                  {isArabic ? 'المرسل:' : 'From:'}{' '}
+                  {selectedNotification.senderName || selectedNotification.metadata?.senderName}
+                </span>
+              </div>
+            )}
+            {selectedNotification.metadata?.studentName && (
+              <div className="sx-notif-detail-view__meta-row">
+                <BookOpen className="sx-notif-lucide sx-notif-lucide--muted" style={{ width: 14, height: 14 }} aria-hidden />
+                <span>
+                  {isArabic ? 'الطالب:' : 'Student:'} {selectedNotification.metadata.studentName}
+                </span>
+              </div>
+            )}
+            <div className="sx-notif-detail-view__meta-row">
+              <Bell className="sx-notif-lucide sx-notif-lucide--muted" style={{ width: 14, height: 14 }} aria-hidden />
+              <span>{selectedNotification.createdAt?.toLocaleString?.() || ''}</span>
+            </div>
+          </div>
+          {hasRoute && (
+            <button
+              type="button"
+              onClick={() => handleNotificationAction(selectedNotification)}
+              className="sx-notif-card__action sx-notif-detail-view__action"
+            >
+              {isArabic ? 'عرض' : 'View'}
+              <ArrowLeft className="sx-notif-lucide" style={{ width: 16, height: 16 }} aria-hidden />
+            </button>
           )}
-          {selectedNotification.metadata?.studentName && (
-            <p>
-              {isArabic ? 'الطالب:' : 'Student:'} {selectedNotification.metadata.studentName}
-            </p>
-          )}
-          <p>{selectedNotification.createdAt?.toLocaleString?.() || ''}</p>
         </div>
-        {hasRoute && (
-          <button
-            type="button"
-            onClick={() => handleNotificationAction(selectedNotification)}
-            className="sx-notif-card__action w-full justify-center mt-4 py-3"
-          >
-            {isArabic ? 'عرض' : 'View'}
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        )}
       </div>
     );
   };
 
   const renderSettingsView = () => (
     <div className="sx-notif-settings">
-      <details className="sx-notif-settings__section" open>
+      <details className="sx-notif-settings__section">
         <summary>
-          {isArabic ? 'إعداد الإشعارات الفورية' : 'Push notification setup'}
-          <Smartphone className="w-4 h-4 text-[#D4AF37]" />
+          {isArabic ? 'إعدادات الصوت' : 'Sound settings'}
+          <Volume2 className="sx-notif-lucide" aria-hidden />
         </summary>
-        <div className="sx-notif-settings__body space-y-3">
-          <p>
-            {isArabic
-              ? 'فعّل استلام التنبيهات على هذا الجهاز حتى عند إغلاق التطبيق.'
-              : 'Enable push on this device even when the app is closed.'}
-          </p>
-          {webPushWarning && (
-            <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              {webPushWarning}
-            </p>
-          )}
-          {webPushStatus === 'denied' && (
-            <p className="text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-xs">
-              {getPermissionDeniedGuidance(isArabic)}
-            </p>
-          )}
-          {!Capacitor.isNativePlatform() && (
-            <button
-              type="button"
-              onClick={handleRegisterDevice}
-              disabled={registeringDevice}
-              className="sx-notif-footer__btn sx-notif-footer__btn--primary w-full disabled:opacity-50"
-            >
-              <Sparkles className="w-4 h-4" />
-              {registeringDevice
-                ? isArabic ? 'جاري التسجيل…' : 'Registering…'
-                : isArabic ? 'تسجيل هذا الجهاز' : 'Register this device'}
-            </button>
-          )}
-          {webPushStatus === 'granted' && pushDiag?.tokenSavedToFirestore && (
-            <p className="text-emerald-700 text-xs font-bold">
-              {isArabic ? '✓ مفعل ونشط' : '✓ Active'}
-            </p>
-          )}
+        <div className="sx-notif-settings__body">
+          <div className="sx-notif-settings__stack">
+            <div className="sx-notif-chip-grid">
+              {[
+                { id: 'crystal', label: isArabic ? 'كريستالي' : 'Crystal' },
+                { id: 'minimal', label: isArabic ? 'مبسّط' : 'Minimal' },
+                { id: 'relaxing', label: isArabic ? 'هادئ' : 'Relaxing' },
+                { id: 'modern', label: isArabic ? 'عصري' : 'Modern' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleUpdateSoundSettings({ profile: p.id as UserSoundSettings['profile'] })}
+                  className={`sx-notif-chip ${soundSettings.profile === p.id ? 'sx-notif-chip--active' : ''}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div>
+              <label className="sx-notif-card__category">
+                {isArabic ? 'مستوى الصوت' : 'Volume'}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={soundSettings.volume}
+                onChange={(e) => handleUpdateSoundSettings({ volume: parseFloat(e.target.value) })}
+                className="sx-notif-range"
+              />
+            </div>
+            <div className="sx-notif-settings__stack">
+              {[
+                { id: 'announcement' as NotificationCategory, label: isArabic ? 'الإعلانات' : 'Announcements' },
+                { id: 'message' as NotificationCategory, label: isArabic ? 'الرسائل' : 'Messages' },
+                { id: 'payment' as NotificationCategory, label: isArabic ? 'الأقساط' : 'Payments' },
+                { id: 'attendance' as NotificationCategory, label: isArabic ? 'الحضور' : 'Attendance' },
+                { id: 'grade' as NotificationCategory, label: isArabic ? 'الدرجات' : 'Grades' },
+                { id: 'system' as NotificationCategory, label: isArabic ? 'النظام' : 'System' },
+              ].map((cat) => {
+                const isMuted = soundSettings.mutedCategories.includes(cat.id);
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => toggleCategoryMute(cat.id)}
+                    className={`sx-notif-toggle-row ${isMuted ? 'sx-notif-chip--muted' : ''}`}
+                  >
+                    <span>{cat.label}</span>
+                    <span>{isMuted ? <VolumeX className="sx-notif-lucide sx-notif-lucide--muted" aria-hidden /> : <Volume2 className="sx-notif-lucide" aria-hidden />}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="sx-notif-select-row">
+              <select
+                value={testCategory}
+                onChange={(e) => setTestCategory(e.target.value as NotificationCategory)}
+                className="sx-notif-select"
+              >
+                <option value="announcement">{isArabic ? 'إعلان' : 'Announcement'}</option>
+                <option value="message">{isArabic ? 'رسالة' : 'Message'}</option>
+                <option value="payment">{isArabic ? 'دفع' : 'Payment'}</option>
+              </select>
+              <button type="button" onClick={triggerTestSound} className="sx-notif-card__action">
+                {isArabic ? 'استمع' : 'Play'}
+              </button>
+            </div>
+          </div>
         </div>
       </details>
 
       <details className="sx-notif-settings__section">
         <summary>
-          {isArabic ? 'تشخيص FCM (متقدم)' : 'FCM diagnostics (advanced)'}
-          <Activity className="w-4 h-4" />
+          {isArabic ? 'إعدادات الإشعارات' : 'Notification settings'}
+          <Bell className="sx-notif-lucide" aria-hidden />
+        </summary>
+        <div className="sx-notif-settings__body">
+          <div className="sx-notif-settings__stack">
+            <p>
+              {isArabic
+                ? 'فعّل استلام التنبيهات على هذا الجهاز حتى عند إغلاق التطبيق.'
+                : 'Enable push on this device even when the app is closed.'}
+            </p>
+            {webPushWarning && (
+              <p className="sx-notif-settings__alert sx-notif-settings__alert--warn">{webPushWarning}</p>
+            )}
+            {webPushStatus === 'denied' && (
+              <p className="sx-notif-settings__alert sx-notif-settings__alert--danger">
+                {getPermissionDeniedGuidance(isArabic)}
+              </p>
+            )}
+            {!Capacitor.isNativePlatform() && (
+              <button
+                type="button"
+                onClick={handleRegisterDevice}
+                disabled={registeringDevice}
+                className="sx-notif-footer__btn sx-notif-footer__btn--primary"
+                style={{ width: '100%' }}
+              >
+                <Bell className="sx-notif-lucide" aria-hidden />
+                {registeringDevice
+                  ? isArabic ? 'جاري التسجيل…' : 'Registering…'
+                  : isArabic ? 'تسجيل هذا الجهاز' : 'Register this device'}
+              </button>
+            )}
+            {webPushStatus === 'granted' && pushDiag?.tokenSavedToFirestore && (
+              <p className="sx-notif-settings__alert sx-notif-settings__alert--success">
+                {isArabic ? '✓ مفعل ونشط' : '✓ Active'}
+              </p>
+            )}
+            {(normalizeDashboardRole(userRole, profile?.role) === 'superadmin' || import.meta.env.DEV) && (
+              <button
+                type="button"
+                disabled={testPushSent || testPushPending || !profile?.schoolId}
+                onClick={triggerTestPush}
+                className="sx-notif-footer__btn sx-notif-footer__btn--ghost"
+                style={{ width: '100%' }}
+              >
+                <RefreshCw className="sx-notif-lucide" aria-hidden />
+                {testPushPending
+                  ? isArabic ? 'جاري الإرسال…' : 'Sending…'
+                  : testPushSent
+                    ? isArabic ? 'تم الإرسال' : 'Sent'
+                    : isArabic ? 'إرسال push تجريبي' : 'Send test push'}
+              </button>
+            )}
+          </div>
+        </div>
+      </details>
+
+      <details className="sx-notif-settings__section">
+        <summary>
+          {isArabic ? 'تشخيص FCM' : 'FCM diagnostics'}
+          <Settings className="sx-notif-lucide" aria-hidden />
         </summary>
         <div className="sx-notif-settings__body">
           {pushDiag ? (
@@ -914,7 +1011,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               <div>SW: {pushDiag.serviceWorkerActive ? 'active' : 'inactive'}</div>
               <div>FCM token: {pushDiag.fcmTokenGenerated ? 'yes' : 'no'}</div>
               <div>Firestore tokens: {pushDiag.firestoreTokenCount}</div>
-              {pushDiag.lastError && <div className="text-rose-600">Error: {pushDiag.lastError}</div>}
+              {pushDiag.lastError && <div className="sx-notif-diag-error">Error: {pushDiag.lastError}</div>}
             </div>
           ) : (
             <p>{isArabic ? 'افتح هذا القسم لتحميل التشخيص' : 'Open to load diagnostics'}</p>
@@ -923,8 +1020,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             type="button"
             disabled={runningTokenDiag || !user?.uid}
             onClick={handleRunTokenDiagnostics}
-            className="sx-notif-footer__btn sx-notif-footer__btn--secondary w-full mt-3 disabled:opacity-50"
+            className="sx-notif-footer__btn sx-notif-footer__btn--ghost"
+            style={{ width: '100%', marginTop: 12 }}
           >
+            <RefreshCw className="sx-notif-lucide" aria-hidden />
             {runningTokenDiag
               ? isArabic ? 'جاري الفحص…' : 'Running…'
               : isArabic ? 'فحص التوكن' : 'Run token check'}
@@ -932,129 +1031,33 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         </div>
       </details>
 
-      <details className="sx-notif-settings__section">
-        <summary>
-          {isArabic ? 'الأصوات والتنبيهات' : 'Sound settings'}
-          <Volume2 className="w-4 h-4" />
-        </summary>
-        <div className="sx-notif-settings__body space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { id: 'crystal', label: isArabic ? 'كريستالي' : 'Crystal' },
-              { id: 'minimal', label: isArabic ? 'مبسّط' : 'Minimal' },
-              { id: 'relaxing', label: isArabic ? 'هادئ' : 'Relaxing' },
-              { id: 'modern', label: isArabic ? 'عصري' : 'Modern' },
-            ].map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => handleUpdateSoundSettings({ profile: p.id as UserSoundSettings['profile'] })}
-                className={`px-3 py-2 rounded-lg border text-xs font-bold ${
-                  soundSettings.profile === p.id
-                    ? 'border-[#0B2345] bg-[#0B2345] text-[#D4AF37]'
-                    : 'border-slate-200 text-[#0B2345]'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div>
-            <label className="text-xs font-bold block mb-1">
-              {isArabic ? 'مستوى الصوت' : 'Volume'}
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={soundSettings.volume}
-              onChange={(e) => handleUpdateSoundSettings({ volume: parseFloat(e.target.value) })}
-              className="w-full accent-[#0B2345]"
-            />
-          </div>
-          <div className="space-y-2">
-            {[
-              { id: 'announcement' as NotificationCategory, label: isArabic ? 'الإعلانات' : 'Announcements' },
-              { id: 'message' as NotificationCategory, label: isArabic ? 'الرسائل' : 'Messages' },
-              { id: 'payment' as NotificationCategory, label: isArabic ? 'الأقساط' : 'Payments' },
-              { id: 'attendance' as NotificationCategory, label: isArabic ? 'الحضور' : 'Attendance' },
-              { id: 'grade' as NotificationCategory, label: isArabic ? 'الدرجات' : 'Grades' },
-              { id: 'system' as NotificationCategory, label: isArabic ? 'النظام' : 'System' },
-            ].map((cat) => {
-              const isMuted = soundSettings.mutedCategories.includes(cat.id);
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => toggleCategoryMute(cat.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold ${
-                    isMuted
-                      ? 'border-red-200 text-slate-400 line-through'
-                      : 'border-slate-200 text-[#0B2345]'
-                  }`}
-                >
-                  {cat.label}
-                  <span>{isMuted ? (isArabic ? 'مكتوم' : 'Muted') : (isArabic ? 'مفعّل' : 'On')}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-2 items-end">
-            <select
-              value={testCategory}
-              onChange={(e) => setTestCategory(e.target.value as NotificationCategory)}
-              className="flex-1 text-xs border rounded-lg px-2 py-2"
+      {isAdminUser && (
+        <details className="sx-notif-settings__section">
+          <summary>
+            {isArabic ? 'سجل الإرسال' : 'Delivery logs'}
+            <ClipboardCheck className="sx-notif-lucide" aria-hidden />
+          </summary>
+          <div className="sx-notif-settings__body">
+            <p>{isArabic ? 'عرض سجل توصيل الإشعارات للمدرسة.' : 'View notification delivery history for your school.'}</p>
+            <button
+              type="button"
+              onClick={() => setMainView('logs')}
+              className="sx-notif-footer__btn sx-notif-footer__btn--ghost"
+              style={{ width: '100%', marginTop: 12 }}
             >
-              <option value="announcement">{isArabic ? 'إعلان' : 'Announcement'}</option>
-              <option value="message">{isArabic ? 'رسالة' : 'Message'}</option>
-              <option value="payment">{isArabic ? 'دفع' : 'Payment'}</option>
-            </select>
-            <button type="button" onClick={triggerTestSound} className="sx-notif-card__action">
-              {isArabic ? 'استمع' : 'Play'}
+              {isArabic ? 'فتح السجل' : 'Open logs'}
             </button>
           </div>
-        </div>
-      </details>
-
-      {isAdminUser && (
-        <button
-          type="button"
-          onClick={() => setMainView('logs')}
-          className="sx-notif-footer__btn sx-notif-footer__btn--secondary w-full"
-        >
-          <Activity className="w-4 h-4" />
-          {isArabic ? 'سجل التوصيل' : 'Delivery logs'}
-        </button>
-      )}
-
-      {(normalizeDashboardRole(userRole, profile?.role) === 'superadmin' || import.meta.env.DEV) && (
-        <div className="sx-notif-settings__section p-4 space-y-2">
-          <p className="text-xs font-bold text-[#0B2345] dark:text-white">
-            {isArabic ? 'اختبار Push' : 'Push test'}
-          </p>
-          <button
-            type="button"
-            disabled={testPushSent || testPushPending || !profile?.schoolId}
-            onClick={triggerTestPush}
-            className="sx-notif-footer__btn sx-notif-footer__btn--primary w-full disabled:opacity-50"
-          >
-            {testPushPending
-              ? isArabic ? 'جاري الإرسال…' : 'Sending…'
-              : testPushSent
-                ? isArabic ? 'تم الإرسال' : 'Sent'
-                : isArabic ? 'إرسال push تجريبي' : 'Send test push'}
-          </button>
-        </div>
+        </details>
       )}
     </div>
   );
 
   const renderLogsView = () => (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-black text-[#0B2345] dark:text-white">
-          {isArabic ? 'سجل التوصيل' : 'Delivery logs'}
+    <div className="sx-notif-logs">
+      <div className="sx-notif-logs__header">
+        <h3 className="sx-notif-logs__title">
+          {isArabic ? 'سجل الإرسال' : 'Delivery logs'}
         </h3>
         <button
           type="button"
@@ -1087,30 +1090,31 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           className="sx-notif-header__btn"
           aria-label={isArabic ? 'تحديث' : 'Refresh'}
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className="sx-notif-lucide" aria-hidden />
         </button>
       </div>
       {isLoadingLogs ? (
         <div className="sx-notif-state">
-          <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
+          <Loader2 className="sx-notif-lucide sx-notif-lucide--gold animate-spin" aria-hidden />
         </div>
       ) : deliveryLogs.length === 0 ? (
         <div className="sx-notif-state">
-          <p className="text-sm text-slate-500">{isArabic ? 'لا توجد سجلات' : 'No logs'}</p>
+          <p className="sx-notif-muted">{isArabic ? 'لا توجد سجلات' : 'No logs'}</p>
         </div>
       ) : (
-        <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+        <div>
           {deliveryLogs.slice(0, 10).map((log) => (
-            <div key={log.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40">
-              <p className="text-xs font-bold truncate">{log.title}</p>
-              <p className="text-[10px] text-slate-500 truncate mt-0.5">{log.message}</p>
-              <div className="flex items-center justify-between mt-2 gap-2">
-                <span className="text-[10px] font-mono text-slate-400">{log.type}</span>
+            <div key={log.id} className="sx-notif-log-item">
+              <p className="sx-notif-log-item__title">{log.title}</p>
+              <p className="sx-notif-log-item__msg">{log.message}</p>
+              <div className="sx-notif-log-item__row">
+                <span className="sx-notif-log-item__type">{log.type}</span>
                 <button
                   type="button"
                   onClick={() => triggerSimulationPush(log)}
-                  className="text-[10px] font-bold text-indigo-600 px-2 py-1 rounded-lg bg-indigo-50"
+                  className="sx-notif-log-item__retry"
                 >
+                  <RefreshCw className="sx-notif-lucide" style={{ width: 12, height: 12, display: 'inline' }} aria-hidden />
                   {isArabic ? 'إعادة' : 'Retry'}
                 </button>
               </div>
@@ -1154,18 +1158,18 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     }}
                     aria-label={isArabic ? 'رجوع' : 'Back'}
                   >
-                    {isArabic ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                    <ArrowLeft className="sx-notif-lucide" aria-hidden />
                   </button>
                 )}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <h2 className="sx-notif-header__title">
                       {mainView === 'detail'
                         ? isArabic ? 'تفاصيل الإشعار' : 'Notification details'
                         : mainView === 'settings'
                           ? isArabic ? 'الإعدادات' : 'Settings'
                           : mainView === 'logs'
-                            ? isArabic ? 'سجل التوصيل' : 'Delivery logs'
+                            ? isArabic ? 'سجل الإرسال' : 'Delivery logs'
                             : isArabic ? 'الإشعارات' : 'Notifications'}
                     </h2>
                     {mainView === 'list' && unreadCount > 0 && (
@@ -1189,34 +1193,25 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               </div>
               <div className="sx-notif-header__actions">
                 {mainView === 'list' && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleRefreshList}
-                      className="sx-notif-header__btn"
-                      aria-label={isArabic ? 'تحديث' : 'Refresh'}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleMarkAllRead}
-                      className="sx-notif-header__btn sx-notif-header__btn--gold"
-                      aria-label={isArabic ? 'تحديد الكل كمقروء' : 'Mark all read'}
-                      disabled={unreadCount === 0}
-                    >
-                      <CheckSquare className="w-4 h-4" />
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    onClick={() => setMainView('settings')}
+                    className="sx-notif-header__btn"
+                    aria-label={isArabic ? 'الإعدادات' : 'Settings'}
+                  >
+                    <Settings className="sx-notif-lucide" aria-hidden />
+                  </button>
                 )}
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="sx-notif-header__btn"
-                  aria-label={isArabic ? 'إغلاق' : 'Close'}
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                {mainView !== 'list' && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="sx-notif-header__btn"
+                    aria-label={isArabic ? 'إغلاق' : 'Close'}
+                  >
+                    <X className="sx-notif-lucide" aria-hidden />
+                  </button>
+                )}
               </div>
             </div>
           </header>
@@ -1263,20 +1258,31 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             <footer className="sx-notif-footer">
               <button
                 type="button"
-                className="sx-notif-footer__btn sx-notif-footer__btn--secondary"
-                onClick={() => setMainView('settings')}
+                className="sx-notif-footer__btn sx-notif-footer__btn--ghost"
+                onClick={handleRefreshList}
+                aria-label={isArabic ? 'تحديث' : 'Refresh'}
               >
-                <Settings className="w-4 h-4" />
-                {isArabic ? 'إعدادات' : 'Settings'}
+                <RefreshCw className="sx-notif-lucide" aria-hidden />
+                {isArabic ? 'تحديث' : 'Refresh'}
               </button>
               <button
                 type="button"
                 className="sx-notif-footer__btn sx-notif-footer__btn--primary"
                 onClick={handleMarkAllRead}
                 disabled={unreadCount === 0}
+                aria-label={isArabic ? 'تحديد الكل كمقروء' : 'Mark all read'}
               >
-                <Check className="w-4 h-4" />
-                {isArabic ? 'تحديد الكل كمقروء' : 'Mark all read'}
+                <Check className="sx-notif-lucide" aria-hidden />
+                {isArabic ? 'تحديد الكل' : 'Mark all'}
+              </button>
+              <button
+                type="button"
+                className="sx-notif-footer__btn sx-notif-footer__btn--danger"
+                onClick={onClose}
+                aria-label={isArabic ? 'إغلاق' : 'Close'}
+              >
+                <X className="sx-notif-lucide" aria-hidden />
+                {isArabic ? 'إغلاق' : 'Close'}
               </button>
             </footer>
           )}

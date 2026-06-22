@@ -803,7 +803,7 @@ export default function ParentDashboard() {
 
     const schoolId = selectedStudent.schoolId;
     let unsubs: (() => void)[] = [];
-    setLoadingGrades(true);
+      setLoadingGrades(true);
 
     const gradesQueryName = "PARENT_GRADES";
     const gradesConstraints = [
@@ -821,11 +821,11 @@ export default function ParentDashboard() {
     };
     logParentFirestoreSetup(gradesMeta);
 
-    const gradesQ = query(
-      collection(db, "grades"),
+      const gradesQ = query(
+        collection(db, "grades"),
       where("schoolId", "==", schoolId),
-      where("studentId", "==", selectedStudent.id),
-      where("parentIds", "array-contains", profile.uid),
+        where("studentId", "==", selectedStudent.id),
+        where("parentIds", "array-contains", profile.uid),
       limit(50),
     );
     unsubs.push(
@@ -839,26 +839,26 @@ export default function ParentDashboard() {
           );
           const allGrades = snap.docs
             .map((doc) => {
-              const data = doc.data();
-              const score = Number(data.score ?? 0);
-              const maxScore = Number(data.maxScore || 100);
-              return {
-                id: doc.id,
-                subject: data.subject,
+          const data = doc.data();
+          const score = Number(data.score ?? 0);
+          const maxScore = Number(data.maxScore || 100);
+          return {
+            id: doc.id,
+            subject: data.subject,
                 score,
                 maxScore,
                 percentage:
                   maxScore > 0 ? Math.round((score / maxScore) * 100) : 0,
-                term: data.term || "",
-                createdAt: data.createdAt,
-              };
+            term: data.term || "",
+            createdAt: data.createdAt,
+          };
             })
             .sort(
               (a: any, b: any) =>
                 (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
             );
-          setStudentGrades(allGrades);
-          setLoadingGrades(false);
+        setStudentGrades(allGrades);
+        setLoadingGrades(false);
         },
         parentSnapshotError(gradesQueryName),
       ),
@@ -966,8 +966,8 @@ export default function ParentDashboard() {
     unsubs.push(
       onSnapshot(
         query(
-          collection(db, "payments"),
-          where("studentId", "==", selectedStudent.id),
+        collection(db, "payments"),
+        where("studentId", "==", selectedStudent.id),
         ),
         (snap) => {
           logParentFirestoreSnapshot(
@@ -990,8 +990,8 @@ export default function ParentDashboard() {
     unsubs.push(
       onSnapshot(
         query(
-          collection(db, "installments"),
-          where("studentId", "==", selectedStudent.id),
+        collection(db, "installments"),
+        where("studentId", "==", selectedStudent.id),
         ),
         (snap) => {
           logParentFirestoreSnapshot(
@@ -1070,12 +1070,12 @@ export default function ParentDashboard() {
     };
     logParentFirestoreSetup(meta);
 
-    const repQ = query(
-      collection(db, "teacher_reports"),
+      const repQ = query(
+        collection(db, "teacher_reports"),
       where("schoolId", "==", schoolId),
-      where("studentId", "==", selectedStudent.id),
-      where("target", "in", ["parents", "both"]),
-      where("parentIds", "array-contains", profile.uid),
+        where("studentId", "==", selectedStudent.id),
+        where("target", "in", ["parents", "both"]),
+        where("parentIds", "array-contains", profile.uid),
       limit(20),
     );
 
@@ -1126,11 +1126,11 @@ export default function ParentDashboard() {
     };
     logParentFirestoreSetup(meta);
 
-    const advRepQ = query(
-      collection(db, "advanced_reports"),
+      const advRepQ = query(
+        collection(db, "advanced_reports"),
       where("schoolId", "==", schoolId),
-      where("studentId", "==", selectedStudent.id),
-      where("parentIds", "array-contains", profile.uid),
+        where("studentId", "==", selectedStudent.id),
+        where("parentIds", "array-contains", profile.uid),
       limit(20),
     );
 
@@ -1180,12 +1180,12 @@ export default function ParentDashboard() {
       doc(db, "schools", schoolId, "settings", "idCardTemplate"),
     )
       .then((templateSnap) => {
-        if (templateSnap.exists()) {
+          if (templateSnap.exists()) {
           setIdCardTemplate(templateSnap.data() as IdCardTemplate);
-        } else {
-          setIdCardTemplate(null);
-        }
-      })
+          } else {
+            setIdCardTemplate(null);
+          }
+        })
       .catch((err) => console.warn("Could not fetch idCardTemplate", err));
 
     return onSnapshot(
@@ -1731,8 +1731,8 @@ export default function ParentDashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                <LanguageToggle />
-                <ThemeToggle />
+                  <LanguageToggle />
+                  <ThemeToggle />
                 <button
                   onClick={handleLogout}
                   className="parent-icon-btn text-rose-500"
@@ -1760,9 +1760,9 @@ export default function ParentDashboard() {
                     userRole="parent"
                   />
                 )}
-                </div>
               </div>
             </div>
+          </div>
           </div>
 
           <div className="flex items-center gap-2 overflow-x-auto pb-3 px-4 hide-scrollbar">
@@ -1832,7 +1832,7 @@ export default function ParentDashboard() {
                 />
               )}
 
-                            {activeTab === "behavior" && (
+              {activeTab === "behavior" && (
                 <div className="space-y-4 md:space-y-6">
                   <div className="flex flex-col gap-1 px-1 border-b border-slate-200 dark:border-slate-800 pb-3">
                     <h2 className="text-lg font-mono font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1992,7 +1992,7 @@ export default function ParentDashboard() {
                 />
               )}
 
-                            {activeTab === "schedules" && (
+              {activeTab === "schedules" && (
                 <ParentSchedules selectedStudent={selectedStudent} />
               )}
 
@@ -2356,7 +2356,7 @@ export default function ParentDashboard() {
                 />
               )}
 
-                            {activeTab === "tuition" && (
+              {activeTab === "tuition" && (
                 <ParentTuitionView
                   isRtl={isRtl}
                   t={t}
@@ -2368,13 +2368,13 @@ export default function ParentDashboard() {
                 />
               )}
 
-                            {activeTab === "chat" && <ParentChatTab />}
+              {activeTab === "chat" && <ParentChatTab />}
 
               {activeTab === "inbox" && (
                 <ParentInboxView isRtl={isRtl} t={t} announcements={announcements} />
               )}
 
-                            {activeTab === "settings" && (
+              {activeTab === "settings" && (
                 <div className="space-y-6">
                   <div className="flex flex-col gap-2 px-2">
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-display text-right">
