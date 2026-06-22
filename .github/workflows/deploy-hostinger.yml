@@ -1,7 +1,8 @@
 name: Deploy Frontend to Hostinger
 
-# Production deploy: GitHub Actions builds dist/ (with VAPID) and uploads via SFTP.
-# Disable Hostinger Git Integration so it does not rebuild without secrets.
+# Production deploy currently handled by Hostinger Deployments auto-deploy from main.
+# SFTP disabled until remote path is verified.
+# This workflow is a build/verify gate only (VAPID + dist integrity).
 on:
   push:
     branches:
@@ -13,43 +14,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build-verify:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-
-    env:
-      HOSTINGER_FTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}
-      HOSTINGER_FTP_USERNAME: ${{ secrets.HOSTINGER_FTP_USERNAME }}
-      HOSTINGER_FTP_PASSWORD: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-      HOSTINGER_FTP_REMOTE_DIR: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Require Hostinger deploy secrets
-        run: |
-          missing=""
-          for key in HOSTINGER_FTP_SERVER HOSTINGER_FTP_USERNAME HOSTINGER_FTP_PASSWORD HOSTINGER_FTP_REMOTE_DIR; do
-            if [ -z "${!key}" ]; then
-              missing="$missing $key"
-            fi
-          done
-          if [ -n "$missing" ]; then
-            echo "::error title=Missing Hostinger secrets::Add GitHub repository secrets:$missing"
-            exit 1
-          fi
-          remote="${HOSTINGER_FTP_REMOTE_DIR}"
-          remote="${remote%/}"
-          if [[ -z "$remote" ]] || [[ "$remote" == *".."* ]]; then
-            echo "::error title=Invalid HOSTINGER_FTP_REMOTE_DIR::Set a non-empty path such as domains/schoolixiq.com/public_html, /domains/schoolixiq.com/public_html, or /home/USERNAME/domains/schoolixiq.com/public_html"
-            exit 1
-          fi
-          echo "SFTP server: ${HOSTINGER_FTP_SERVER}"
-          echo "SFTP user: ${HOSTINGER_FTP_USERNAME}"
-          echo "SFTP remote (configured): ${HOSTINGER_FTP_REMOTE_DIR}"
-          echo "SFTP port: 65002"
-          echo "Remote dir may be relative to SFTP login root or a full /home/USER/... path — deploy script will try fallbacks if cd fails."
 
       - uses: actions/setup-node@v4
         with:
@@ -134,6 +105,7 @@ jobs:
             echo "::error::dist/downloads/schoolixiq.apk missing — set GitHub secret ANDROID_APK_DOWNLOAD_URL (direct HTTPS APK URL) or place public/downloads/schoolixiq.apk before build"
             exit 1
           fi
+
       - name: Package dist zip (manual fallback)
         run: |
           cd dist && zip -r ../schoolixiq-dist.zip . && cd ..
@@ -146,17 +118,15 @@ jobs:
           path: schoolixiq-dist.zip
           retention-days: 7
 
-      - name: Install lftp
-        run: sudo apt-get update && sudo apt-get install -y lftp
+      # Production deploy currently handled by Hostinger Deployments auto-deploy from main.
+      # SFTP disabled until HOSTINGER_FTP_REMOTE_DIR is verified in hPanel.
+      # - name: Install lftp
+      # - name: Test Hostinger SFTP port
+      # - name: Deploy to Hostinger (SFTP)
 
-      - name: Test Hostinger SFTP port
-        run: nc -zv "${HOSTINGER_FTP_SERVER}" 65002 || true
-
-      - name: Deploy to Hostinger (SFTP)
-        run: bash scripts/hostinger-deploy.sh dist
-
-      - name: Deployment summary
+      - name: Build summary
         run: |
-          echo "### Hostinger deploy" >> "$GITHUB_STEP_SUMMARY"
-          echo "Uploaded \`dist/\` to \`${HOSTINGER_FTP_REMOTE_DIR}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "If the site looks old: hPanel → Cache Manager → Purge, then Ctrl+Shift+R." >> "$GITHUB_STEP_SUMMARY"
+          echo "### Frontend build/verify gate" >> "$GITHUB_STEP_SUMMARY"
+          echo "Build and verification passed. Production deploy is handled by **Hostinger Deployments** (auto-deploy from \`main\`)." >> "$GITHUB_STEP_SUMMARY"
+          echo "SFTP upload is disabled until \`HOSTINGER_FTP_REMOTE_DIR\` is confirmed." >> "$GITHUB_STEP_SUMMARY"
+          echo "Artifact \`schoolixiq-dist\` retained for 7 days if manual upload is needed." >> "$GITHUB_STEP_SUMMARY"
