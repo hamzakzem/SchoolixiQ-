@@ -1,18 +1,20 @@
-import { collection, query, where, getDocs, doc, setDoc, limit } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { safeFirestoreSet } from '../lib/offline/offlineSync';
+import type { OfflineActor } from '../lib/offline/offlineTypes';
 
 export class AttendanceService {
   /**
    * Retrieves attendance records for a specific class on a specific date.
    */
   static async getClassAttendance(schoolId: string, classId: string, date: string) {
-    const classAttendanceId = `${classId}_${date}`;
+    const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
     const q = query(
       collection(db, 'attendance'),
       where('schoolId', '==', schoolId),
       where('class', '==', classId),
       where('date', '==', date),
-      limit(1)
+      limit(1),
     );
     const snap = await getDocs(q);
     if (snap.empty) return null;
@@ -21,30 +23,43 @@ export class AttendanceService {
   }
 
   /**
-   * Safely updates attendance records.
+   * Safely updates attendance records (online-first with offline queue fallback).
    */
-  static async setAttendanceRecord(classAttendanceId: string, data: any) {
+  static async setAttendanceRecord(
+    classAttendanceId: string,
+    data: Record<string, unknown>,
+    actor?: OfflineActor,
+  ) {
     const docRef = doc(db, 'attendance', classAttendanceId);
-    await setDoc(docRef, data, { merge: true });
+    if (!actor) {
+      const { setDoc } = await import('firebase/firestore');
+      await setDoc(docRef, data, { merge: true });
+      return { mode: 'online' as const, id: classAttendanceId };
+    }
+    return safeFirestoreSet(docRef, data, {
+      module: 'attendance',
+      actor,
+      deterministicDocId: classAttendanceId,
+    }, { merge: true });
   }
 
   /**
    * Aggregates student attendance for dashboards safely.
    */
   static async getStudentAttendanceSummary(schoolId: string, classId: string, studentId: string) {
-    // Only fetche up to 90 days of attendance to prevent cost explosion
+    const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
     const q = query(
       collection(db, 'attendance'),
       where('schoolId', '==', schoolId),
       where('class', '==', classId),
-      limit(90)
+      limit(90),
     );
     const snap = await getDocs(q);
-    
+
     let absent = 0;
     let late = 0;
 
-    snap.docs.forEach(docSnap => {
+    snap.docs.forEach((docSnap) => {
       const records = docSnap.data().records || {};
       if (records[studentId] === 'absent') absent++;
       if (records[studentId] === 'late') late++;

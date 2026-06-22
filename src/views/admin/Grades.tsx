@@ -9,6 +9,8 @@ import { toast } from 'react-hot-toast';
 import GradesPrint from '../../components/print/GradesPrint';
 import { motion, AnimatePresence } from 'motion/react';
 import { notificationService } from '../../lib/notificationService';
+import { safeFirestoreAdd, safeFirestoreUpdate } from '../../lib/offline/offlineSync';
+import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { useLanguage } from '../../lib/LanguageContext';
 
@@ -284,18 +286,20 @@ export default function Grades() {
 
       const existingEntry = individualGrades.find(g => g.studentId === studentId && g.subject === subject);
 
+      const actor = offlineActorFromProfile(profile);
+
       if (existingEntry?.id) {
-        await updateDoc(doc(db, 'grades', existingEntry.id), {
+        await safeFirestoreUpdate(doc(db, 'grades', existingEntry.id), {
           score: numValue,
           maxScore: editMaxScore,
           percentage,
-          parentIds, // Keep synced
-          parentEmail, // Keep synced
+          parentIds,
+          parentEmail,
           updatedAt: serverTimestamp(),
-          lastModifiedBy: profile.uid
-        });
+          lastModifiedBy: profile.uid,
+        }, { module: 'grades', actor });
       } else {
-        await addDoc(collection(db, 'grades'), {
+        await safeFirestoreAdd('grades', {
           schoolId: profile.schoolId,
           classId: selectedClassId,
           className: selectedClass.name,
@@ -306,11 +310,12 @@ export default function Grades() {
           score: numValue,
           maxScore: editMaxScore,
           percentage,
-          parentIds, // For secure parent listing
-          parentEmail, // For secure parent listing
+          parentIds,
+          parentEmail,
           recordedBy: profile.uid,
-          createdAt: serverTimestamp()
-        });
+          createdAt: serverTimestamp(),
+          updatedAt: new Date().toISOString(),
+        }, { module: 'grades', actor });
       }
 
       toast.success('تم تحديث الدرجة بنجاح');

@@ -8,6 +8,8 @@ import { Calendar, Plus, Search, User, MessageSquare, AlertTriangle, CheckCircle
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { notificationService } from '../../lib/notificationService';
+import { safeFirestoreAdd } from '../../lib/offline/offlineSync';
+import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
 
 import { useLanguage } from '../../lib/LanguageContext';
 
@@ -66,7 +68,7 @@ export default function Behavior() {
     try {
       const link = await fetchStudentLinkFields(selectedStudent.id);
       const path = 'behavior_reports';
-      const docRef = await addDoc(collection(db, path), {
+      const reportPayload = {
         schoolId: profile.schoolId,
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,
@@ -79,11 +81,17 @@ export default function Behavior() {
         notifyParent: newReport.notifyParent,
         createdAt: serverTimestamp(),
         authorId: profile.uid,
-        authorName: profile.name
+        authorName: profile.name,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const saveResult = await safeFirestoreAdd(path, reportPayload, {
+        module: 'behavior',
+        actor: offlineActorFromProfile(profile),
       });
       
       const newReportData = {
-        id: docRef.id,
+        id: saveResult.id,
         schoolId: profile.schoolId,
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,
@@ -96,13 +104,15 @@ export default function Behavior() {
 
       setReports(prev => [newReportData, ...prev]);
 
-      if (newReport.notifyParent) {
+      if (newReport.notifyParent && saveResult.mode === 'online') {
         await notificationService.notifyStudentParents(selectedStudent.id, {
           title: newReport.type === 'positive' ? 'ملاحظة سلوكية إيجابية' : 'تنبيه سلوكي',
           message: `تم تسجيل حادثة سلوكية: ${newReport.description}`,
           type: 'behavior',
           schoolId: profile.schoolId
         });
+      } else if (newReport.notifyParent && saveResult.mode === 'queued') {
+        toast('سيتم إرسال الإشعار بعد المزامنة', { icon: 'ℹ️' });
       }
 
       toast.success('تم تسجيل التقرير السلوكي بنجاح');

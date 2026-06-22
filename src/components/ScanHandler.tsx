@@ -23,6 +23,8 @@ import {
   FileText,
 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
+import { AttendanceService } from "../services/attendance.service";
+import { offlineActorFromProfile } from "../lib/offline/offlineHelpers";
 import { useLanguage } from "../lib/LanguageContext";
 import { toast } from "react-hot-toast";
 import { useSearchParams } from "react-router-dom";
@@ -102,20 +104,21 @@ export default function ScanHandler() {
     setLoading(true);
     try {
       const date = new Date().toISOString().split("T")[0];
-      const classAttendanceId = `${student.classId}_${date}`;
-      const attendanceRef = doc(db, "attendance", classAttendanceId);
+      const classAttendanceId = `${profile.schoolId}_${student.classId}_${date}`;
+      const attendanceData = {
+        schoolId: profile.schoolId,
+        classId: student.classId,
+        class: student.classId,
+        date,
+        [`records.${student.id}`]: status,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid,
+      };
 
-      await setDoc(
-        attendanceRef,
-        {
-          schoolId: profile.schoolId,
-          classId: student.classId,
-          date,
-          [`records.${student.id}`]: status,
-          updatedAt: serverTimestamp(),
-          updatedBy: user?.uid,
-        },
-        { merge: true },
+      await AttendanceService.setAttendanceRecord(
+        classAttendanceId,
+        attendanceData,
+        offlineActorFromProfile(profile),
       );
 
       toast.success(

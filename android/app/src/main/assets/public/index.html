@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <script>
       (function() {
+        try {
+          var theme = localStorage.getItem('theme');
+          var dark = theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+          document.documentElement.classList.add('theme-transition');
+        } catch (e) {}
+      })();
+    </script>
+    <script>
+      (function() {
         // Safe immediate tracking of loading/script failures before Vite loads main.tsx
         window.addEventListener('error', function(e) {
           try {
@@ -48,6 +58,39 @@
           }
         }, true); // Use useCapture=true to intercept script and css file 404s/load failures
 
+        window.addEventListener('unhandledrejection', function(e) {
+          try {
+            var reason = String((e.reason && e.reason.message) || e.reason || '');
+            if (
+              reason.indexOf('dynamically imported') !== -1 ||
+              reason.indexOf('Failed to fetch') !== -1 ||
+              reason.indexOf('ChunkLoadError') !== -1 ||
+              reason.indexOf('Loading chunk') !== -1
+            ) {
+              var lastReload = sessionStorage.getItem('schoolix_recovery_timestamp');
+              var now = Date.now();
+              if (!lastReload || (now - parseInt(lastReload, 10) > 12000)) {
+                sessionStorage.setItem('schoolix_recovery_timestamp', now.toString());
+                console.warn('SchoolixiQ: Detected dynamic import chunk failure. Clearing SW caches and reloading...');
+                if (navigator.serviceWorker) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    for (var i = 0; i < regs.length; i++) {
+                      regs[i].unregister();
+                    }
+                    purgeAndReload();
+                  }).catch(function() {
+                    purgeAndReload();
+                  });
+                } else {
+                  purgeAndReload();
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Schoolix chunk recovery error:', err);
+          }
+        });
+
         function purgeAndReload() {
           // 2. Clear application caches
           if (window.caches) {
@@ -77,17 +120,17 @@
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
     <meta name="theme-color" content="#0B2345" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="icon" type="image/png" href="/brand/schoolixiq-logo.png" />
+    <link rel="apple-touch-icon" href="/brand/schoolixiq-logo.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <script type="module" crossorigin src="/assets/index-mFPZiwdi.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-BRGoMbh-.js">
-    <link rel="modulepreload" crossorigin href="/assets/firebase-vendor-Df4rL78i.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-BkmfNkpf.css">
+    <script type="module" crossorigin src="/assets/index-BfJNYT67.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-vXdwORNY.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-vendor-6qO70uJ7.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-NkaZLUNj.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>
 

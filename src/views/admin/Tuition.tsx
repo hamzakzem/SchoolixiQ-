@@ -7,6 +7,12 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
+import {
+  createClientMutationId,
+  tryOnlinePaymentBatch,
+  queuePaymentBatchOperation,
+} from '../../lib/offline/offlineSync';
+import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
 import { resolveStudentParentIds } from '../../lib/schoolSync';
 import {
   buildTuitionReminderPayload,
@@ -131,40 +137,87 @@ export default function Tuition() {
         ? `الدفعة رقم ${installments.filter(i => i.studentId === selectedStudent.id).indexOf(installmentToPay) + 1}`
         : 'دفعة إضافية';
 
-      const batch = writeBatch(db);
-      const paymentRef = doc(collection(db, 'payments'));
-      batch.set(paymentRef, {
+      const clientMutationId = createClientMutationId();
+      const paymentId = `pay_${clientMutationId}`;
+      const actor = offlineActorFromProfile(profile);
+      const paymentPayload = {
         schoolId: profile.schoolId,
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,
         amount: amountNum,
         type: 'tuition',
         note: installmentLabel,
+        installmentId: installmentToPay?.id ?? null,
+        collectorId: profile.uid,
         createdAt: serverTimestamp(),
         authorId: profile.uid,
-      });
+        clientMutationId,
+      };
 
-      batch.update(doc(db, 'students', selectedStudent.id), {
-        tuitionBalance: increment(amountNum),
-      });
+      const batchWrites = [
+        {
+          collection: 'payments',
+          docId: paymentId,
+          operation: 'create' as const,
+          data: paymentPayload,
+        },
+        {
+          collection: 'students',
+          docId: selectedStudent.id,
+          operation: 'update' as const,
+          data: { __increment: { tuitionBalance: amountNum } },
+        },
+        ...(installmentToPay?.id
+          ? [{
+              collection: 'installments',
+              docId: installmentToPay.id,
+              operation: 'update' as const,
+              data: {
+                status: 'paid',
+                paidAt: serverTimestamp(),
+                paidAmount: amountNum,
+              },
+            }]
+          : []),
+      ];
 
-      if (installmentToPay?.id) {
-        batch.update(doc(db, 'installments', installmentToPay.id), {
-          status: 'paid',
-          paidAt: serverTimestamp(),
-          paidAmount: amountNum,
+      const syncMode = await tryOnlinePaymentBatch(
+        async () => {
+          const batch = writeBatch(db);
+          const paymentRef = doc(db, 'payments', paymentId);
+          batch.set(paymentRef, paymentPayload);
+          batch.update(doc(db, 'students', selectedStudent.id), {
+            tuitionBalance: increment(amountNum),
+          });
+          if (installmentToPay?.id) {
+            batch.update(doc(db, 'installments', installmentToPay.id), {
+              status: 'paid',
+              paidAt: serverTimestamp(),
+              paidAmount: amountNum,
+            });
+          }
+          await batch.commit();
+        },
+        async () =>
+          queuePaymentBatchOperation({
+            actor,
+            clientMutationId,
+            batchWrites,
+            paymentPayload,
+          }),
+      );
+
+      if (syncMode === 'online') {
+        await notificationService.notifyStudentParents(selectedStudent.id, {
+          title: 'تأكيد استلام دفعة',
+          message: `تم استلام مبلغ ${amountNum.toLocaleString()} د.ع (${installmentLabel}) للأقساط الدراسية.`,
+          type: 'payment',
+          schoolId: profile.schoolId,
+          metadata: { routeTarget: 'tuition' },
         });
+      } else {
+        toast('سيتم إرسال الإشعار بعد المزامنة', { icon: 'ℹ️' });
       }
-
-      await batch.commit();
-
-      await notificationService.notifyStudentParents(selectedStudent.id, {
-        title: 'تأكيد استلام دفعة',
-        message: `تم استلام مبلغ ${amountNum.toLocaleString()} د.ع (${installmentLabel}) للأقساط الدراسية.`,
-        type: 'payment',
-        schoolId: profile.schoolId,
-        metadata: { routeTarget: 'tuition' },
-      });
 
       toast.success(`تم تسجيل ${installmentLabel} بنجاح`);
       setShowPayModal(false);

@@ -6,6 +6,8 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useLanguage } from '../../lib/LanguageContext';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
+import { sendChatMessageOfflineSafe, offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
+import { getOfflineStatusSnapshot } from '../../lib/offline/offlineStatus';
 import { useSystemConfig } from '../../lib/SystemConfigContext';
 import { Phone, GraduationCap } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -231,6 +233,11 @@ export default function AdminChatTab() {
       let fileName = null;
 
       if (selectedFile) {
+        if (!getOfflineStatusSnapshot().isOnline) {
+          toast.error(isRtl ? 'إرسال الملفات يحتاج اتصالاً بالإنترنت' : 'File uploads require an internet connection');
+          setNewMessage(messageText);
+          return;
+        }
         const fileExt = selectedFile.name.split('.').pop();
         const path = `chat_files/${convId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const storageRef = ref(storage, path);
@@ -241,51 +248,43 @@ export default function AdminChatTab() {
         setSelectedFile(null);
       }
 
-      await addDoc(collection(db, 'system_messages'), {
+      const sendResult = await sendChatMessageOfflineSafe({
+        actor: offlineActorFromProfile(profile),
         conversationId: convId,
-        schoolId: profile.schoolId,
-        senderId: profile.uid,
+        schoolId: profile.schoolId!,
+        receiverId: activeContact.id,
         senderName: profile.name || 'Admin',
         senderRole: 'admin',
-        receiverId: activeContact.id,
         content: messageText || (isRtl ? 'ملف مرفق' : 'Attachment'),
         fileUrl,
         fileType,
         fileName,
-        createdAt: serverTimestamp(),
-        read: false
       });
 
-      // Update conversation document for real-time sorting
-      await setDoc(doc(db, "conversations", convId), {
-        conversationId: convId,
-        schoolId: profile.schoolId,
-        participants: ["admin", activeContact.id === 'super_admin' ? 'super_admin' : activeContact.id],
-        lastMessage: messageText || (isRtl ? 'ملف مرفق' : 'Attachment'),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      // Notify the receiver
-      if (activeContact.id === 'super_admin') {
-        console.info('[Notifications] SUPER_ADMIN_PRODUCER_FIXED', {
-          source: 'AdminChatTab',
-          conversationId: convId,
-        });
-        await notificationService.notifySuperAdmins({
-          title: 'رسالة جديدة من إدارة مدرسة',
-          message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
-          type: 'system',
-          metadata: { senderId: profile.uid, conversationId: convId, schoolId: profile.schoolId, routeTarget: 'chat' }
-        });
+      if (sendResult.mode === 'online') {
+        if (activeContact.id === 'super_admin') {
+          console.info('[Notifications] SUPER_ADMIN_PRODUCER_FIXED', {
+            source: 'AdminChatTab',
+            conversationId: convId,
+          });
+          await notificationService.notifySuperAdmins({
+            title: 'رسالة جديدة من إدارة مدرسة',
+            message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
+            type: 'system',
+            metadata: { senderId: profile.uid, conversationId: convId, schoolId: profile.schoolId, routeTarget: 'chat' }
+          });
+        } else {
+          await notificationService.send({
+            userId: activeContact.id,
+            title: 'رسالة جديدة من الإدارة',
+            message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
+            type: 'system',
+            schoolId: profile.schoolId,
+            metadata: { senderId: profile.uid, conversationId: convId, routeTarget: 'chat' }
+          });
+        }
       } else {
-        await notificationService.send({
-          userId: activeContact.id,
-          title: 'رسالة جديدة من الإدارة',
-          message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
-          type: 'system',
-          schoolId: profile.schoolId,
-          metadata: { senderId: profile.uid, conversationId: convId, routeTarget: 'chat' }
-        });
+        toast('سيتم إرسال الإشعار بعد المزامنة', { icon: 'ℹ️' });
       }
 
       setLastInteractionTimes(prev => ({ ...prev, [activeContact.id]: Date.now() }));

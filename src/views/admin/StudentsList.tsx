@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { modalPanelProps } from '../../lib/motion';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { uploadStudentPhoto } from '../../lib/imageUtils';
+import { StudentService } from '../../services/student.service';
+import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
 
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 
@@ -556,18 +558,22 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       };
 
       if (isEditing) {
-        await updateDoc(doc(db, 'students', editingStudent.id), {
-          name: newStudent.name,
-          registrationNumber: newStudent.registrationNumber,
-          classId: newStudent.classId,
-          parentPhone: newStudent.parentPhone || '',
-          driverPhone: newStudent.driverPhone || '',
-          parentEmail: newStudent.parentEmail?.toLowerCase() || '',
-          address: newStudent.address || '',
-          parentPassword: newStudent.parentPassword || '',
-          photoUrl: newStudent.photoUrl || '',
-          updatedAt: serverTimestamp(),
-        });
+        await StudentService.updateStudent(
+          editingStudent.id,
+          {
+            name: newStudent.name,
+            registrationNumber: newStudent.registrationNumber,
+            classId: newStudent.classId,
+            parentPhone: newStudent.parentPhone || '',
+            driverPhone: newStudent.driverPhone || '',
+            parentEmail: newStudent.parentEmail?.toLowerCase() || '',
+            address: newStudent.address || '',
+            parentPassword: newStudent.parentPassword || '',
+            photoUrl: newStudent.photoUrl || '',
+            updatedAt: serverTimestamp(),
+          },
+          offlineActorFromProfile(profile),
+        );
         
         setStudents((prev) =>
           prev.map((s) =>

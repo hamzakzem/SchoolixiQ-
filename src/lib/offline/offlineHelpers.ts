@@ -1,0 +1,78 @@
+import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import type { OfflineActor } from './offlineTypes';
+import {
+  createClientMutationId,
+  safeFirestoreAdd,
+  safeFirestoreSet,
+} from './offlineSync';
+
+export type SendChatMessageInput = {
+  actor: OfflineActor;
+  conversationId: string;
+  schoolId: string;
+  receiverId: string;
+  senderName: string;
+  senderRole: string;
+  content: string;
+  fileUrl?: string | null;
+  fileType?: string | null;
+  fileName?: string | null;
+};
+
+export async function sendChatMessageOfflineSafe(
+  input: SendChatMessageInput,
+): Promise<{ mode: 'online' | 'queued'; messageId: string }> {
+  const clientMutationId = createClientMutationId();
+  const messageData = {
+    conversationId: input.conversationId,
+    schoolId: input.schoolId,
+    senderId: input.actor.userId,
+    senderName: input.senderName,
+    senderRole: input.senderRole,
+    receiverId: input.receiverId,
+    content: input.content,
+    fileUrl: input.fileUrl ?? null,
+    fileType: input.fileType ?? null,
+    fileName: input.fileName ?? null,
+    createdAt: serverTimestamp(),
+    read: false,
+    clientMutationId,
+    messageStatus: 'pending_local',
+  };
+
+  const messageResult = await safeFirestoreAdd('system_messages', messageData, {
+    module: 'messages',
+    actor: input.actor,
+    clientMutationId,
+  });
+
+  const conversationRef = doc(db, 'conversations', input.conversationId);
+  await safeFirestoreSet(
+    conversationRef,
+    {
+      conversationId: input.conversationId,
+      schoolId: input.schoolId,
+      participants: ['admin', input.receiverId === 'super_admin' ? 'super_admin' : input.receiverId],
+      lastMessage: input.content,
+      updatedAt: serverTimestamp(),
+      clientMutationId,
+    },
+    { module: 'messages', actor: input.actor, clientMutationId },
+    { merge: true },
+  );
+
+  return { mode: messageResult.mode, messageId: messageResult.id };
+}
+
+export function offlineActorFromProfile(profile: {
+  uid: string;
+  role?: string;
+  schoolId?: string;
+}): OfflineActor {
+  return {
+    userId: profile.uid,
+    role: String(profile.role ?? 'unknown'),
+    schoolId: String(profile.schoolId ?? ''),
+  };
+}

@@ -34,6 +34,7 @@ import {
   shouldSkipFirestoreListeners,
   subscribeGuardedFirestore,
 } from './logoutGuard';
+import { initOfflineSystem, pauseOfflineSync, resumeOfflineSync } from './offline/offlineSync';
 
 interface AuthContextType {
   user: User | null;
@@ -67,6 +68,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
   const { language, setLanguage } = useLanguage();
   const languageRef = useRef(language);
+
+  useEffect(() => {
+    const stopOffline = initOfflineSystem();
+    return stopOffline;
+  }, []);
 
   useEffect(() => {
     languageRef.current = language;
@@ -158,6 +164,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         pushRegistrationDoneRef.current = null;
         setLogoutInProgress(true);
         setPushLogoutInProgress(true);
+        pauseOfflineSync();
         stopWebPushAutoRegistration('logout');
       }
       
@@ -177,6 +184,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (authUser) {
         setLogoutInProgress(false);
         setPushLogoutInProgress(false);
+        resumeOfflineSync();
         lastUserIdRef.current = authUser.uid;
         triggerNativePushRegistration(authUser.uid, 'auth_state_changed');
         triggerWebPushRegistration(authUser.uid, 'auth_state_changed');

@@ -7,6 +7,8 @@ import { ClipboardCheck, Users, Search, CheckCircle2, XCircle, Clock, Save, Chev
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { notificationService } from '../../lib/notificationService';
+import { AttendanceService } from '../../services/attendance.service';
+import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
 import { useLanguage } from '../../lib/LanguageContext';
 
 const AttendanceButton = ({ active, type, onClick, label }: { 
@@ -121,33 +123,41 @@ export default function Attendance() {
     setLoading(true);
     const path = 'attendance';
     try {
-      const attendanceId = `${selectedClassId}_${date}`;
-      const { setDoc, doc } = await import('firebase/firestore');
-      
-      await setDoc(doc(db, path, attendanceId), {
+      const attendanceId = `${profile.schoolId}_${selectedClassId}_${date}`;
+      const attendanceData = {
         schoolId: profile.schoolId,
         classId: selectedClassId,
+        class: selectedClassId,
         className: selectedClass?.name,
         date,
         records: attendance,
         recordedBy: profile.uid,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+        updatedAt: serverTimestamp(),
+      };
 
-      // Notify parents for absent or late students
-      const studentIds = Object.keys(attendance);
-      for (const studentId of studentIds) {
-        const status = attendance[studentId];
-        if (status === 'absent' || status === 'late') {
-          const statusText = status === 'absent' ? t('absent') : status === 'late' ? t('late') : t('leave');
-          await notificationService.notifyStudentParents(studentId, {
-            title: `${t('attendance')}: ${statusText}`,
-            message: `${isRtl ? 'تم تسجيل الطالب كـ' : 'Student recorded as'} ${statusText} ${isRtl ? 'لليوم' : 'for today'} (${date})`,
-            type: 'attendance',
-            schoolId: profile.schoolId,
-            metadata: { studentId, status },
-          });
+      const saveResult = await AttendanceService.setAttendanceRecord(
+        attendanceId,
+        attendanceData,
+        offlineActorFromProfile(profile),
+      );
+
+      if (saveResult.mode === 'online') {
+        const studentIds = Object.keys(attendance);
+        for (const studentId of studentIds) {
+          const status = attendance[studentId];
+          if (status === 'absent' || status === 'late') {
+            const statusText = status === 'absent' ? t('absent') : status === 'late' ? t('late') : t('leave');
+            await notificationService.notifyStudentParents(studentId, {
+              title: `${t('attendance')}: ${statusText}`,
+              message: `${isRtl ? 'تم تسجيل الطالب كـ' : 'Student recorded as'} ${statusText} ${isRtl ? 'لليوم' : 'for today'} (${date})`,
+              type: 'attendance',
+              schoolId: profile.schoolId,
+              metadata: { studentId, status },
+            });
+          }
         }
+      } else {
+        toast('سيتم إرسال الإشعار بعد المزامنة', { icon: 'ℹ️' });
       }
 
       toast.success(t('success'));

@@ -8,6 +8,9 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
+import { safeFirestoreAdd, safeFirestoreDelete, safeFirestoreUpdate } from '../../lib/offline/offlineSync';
+import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
+import { getOfflineStatusSnapshot } from '../../lib/offline/offlineStatus';
 import { homeworkMatchesStudent, collectParentIdsFromStudents } from '../../lib/schoolSync';
 import { getHomeworkSubjectDisplay } from '../../lib/homeworkSubjects';
 import { buildTeacherRedactionContext } from '../../lib/userProfile';
@@ -106,13 +109,17 @@ export default function Homework() {
     if (!selectedClassId || !newHomework.title.trim() || !newHomework.content.trim() || !newHomework.dueDate || !profile) return;
     setIsSaving(true);
     try {
+      const actor = offlineActorFromProfile(profile);
       if (editingHomework) {
-        await updateDoc(doc(db, 'homework', editingHomework.id), {
+        const saveResult = await safeFirestoreUpdate(doc(db, 'homework', editingHomework.id), {
           title: newHomework.title,
           content: newHomework.content,
           dueDate: newHomework.dueDate,
-          updatedAt: serverTimestamp()
-        });
+          updatedAt: serverTimestamp(),
+        }, { module: 'homework', actor });
+        if (saveResult.mode === 'queued') {
+          toast('سيتم إرسال الإشعار بعد المزامنة', { icon: 'ℹ️' });
+        }
         toast.success(isRtl ? 'تم تحديث الواجب بنجاح' : 'Homework updated successfully');
       } else {
         const className = classes.find((c) => c.id === selectedClassId)?.name || '';
@@ -121,7 +128,7 @@ export default function Homework() {
           homeworkMatchesStudent(selectedClassId, s, classes),
         );
         const parentIds = collectParentIdsFromStudents(classStudents);
-        const homeworkRef = await addDoc(collection(db, 'homework'), {
+        const saveResult = await safeFirestoreAdd('homework', {
           ...newHomework,
           classId: selectedClassId,
           className,
@@ -133,22 +140,26 @@ export default function Homework() {
           schoolId: profile.schoolId,
           parentIds,
           createdAt: serverTimestamp(),
-          hiddenFor: []
-        });
+          hiddenFor: [],
+          updatedAt: new Date().toISOString(),
+        }, { module: 'homework', actor });
         
-        // Notify parents of students in the target class only
-        for (const student of classStudents) {
-          try {
-            await notificationService.notifyStudentParents(student.id, {
-              title: `${isRtl ? 'واجب من الإدارة' : 'Homework from Admin'}: ${newHomework.title}`,
-              message: `${newHomework.content.substring(0, 50)}...`,
-              type: 'homework',
-              schoolId: profile.schoolId,
-              metadata: { sourceId: homeworkRef.id, routeTarget: 'homework' },
-            });
-          } catch (e) {
-            console.error('Failed to send notification', e);
+        if (saveResult.mode === 'online') {
+          for (const student of classStudents) {
+            try {
+              await notificationService.notifyStudentParents(student.id, {
+                title: `${isRtl ? 'واجب من الإدارة' : 'Homework from Admin'}: ${newHomework.title}`,
+                message: `${newHomework.content.substring(0, 50)}...`,
+                type: 'homework',
+                schoolId: profile.schoolId,
+                metadata: { sourceId: saveResult.id, routeTarget: 'homework' },
+              });
+            } catch (e) {
+              console.error('Failed to send notification', e);
+            }
           }
+        } else {
+          toast('سيتم إرسال الإشعار بعد المزامنة', { icon: 'ℹ️' });
         }
 
         toast.success(isRtl ? 'تم إضافة الواجب بنجاح' : 'Homework added successfully');
@@ -167,6 +178,10 @@ export default function Homework() {
   const handleDeleteHomework = async (id: string) => {
     if (confirm(isRtl ? 'هل أنت متأكد من حذف هذا الواجب؟' : 'Are you sure you want to delete this homework?')) {
       try {
+        if (!getOfflineStatusSnapshot().isOnline) {
+          await safeFirestoreDelete();
+          return;
+        }
         await deleteDoc(doc(db, 'homework', id));
         await notificationService.deleteBySourceId(id, profile.schoolId);
         toast.success(isRtl ? 'تم حذف الواجب بنجاح' : 'Homework deleted successfully');
