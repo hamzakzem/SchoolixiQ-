@@ -124,6 +124,10 @@ if (typeof window !== 'undefined') {
 
 import { SystemConfigProvider } from './lib/SystemConfigContext.tsx';
 import { getServiceWorkerUrl, SW_BUILD_VERSION } from './lib/serviceWorkerRegistration';
+import { initPwaInstallCapture, applyPwaStandaloneBodyClass } from './lib/pwaUtils';
+
+initPwaInstallCapture();
+applyPwaStandaloneBodyClass();
 
 createRoot(document.getElementById('root')!).render(
   <SystemConfigProvider>

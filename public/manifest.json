@@ -1,11 +1,14 @@
 {
-  "name": "Schoolix IQ - Educational Platform",
-  "short_name": "Schoolix",
+  "name": "SchoolixIQ",
+  "short_name": "SchoolixIQ",
   "description": "Premium School & Learning Management System",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0B2345",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0F172A",
+  "dir": "rtl",
+  "lang": "ar",
   "orientation": "any",
   "categories": ["education", "productivity"],
   "icons": [
@@ -20,13 +23,19 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/brand/schoolixiq-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "prefer_related_applications": false,
   "shortcuts": [
     {
       "name": "Schoolix Chat",
-      "url": "/?shortcut=chat",
+      "url": "/?shortcut=chat&source=pwa",
       "description": "Open direct chat communication"
     }
   ]

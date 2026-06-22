@@ -3411,3 +3411,20 @@ html.dark .sx-notif-footer__btn--ghost {
     font-size: 12px;
   }
 }
+
+/* PWA desktop standalone polish */
+body.pwa-standalone {
+  min-height: 100dvh;
+}
+
+body.pwa-standalone #root {
+  min-height: 100dvh;
+}
+
+body.pwa-standalone .sx-global-footer {
+  display: none;
+}
+
+body.pwa-standalone .pwa-hide-in-standalone {
+  display: none !important;
+}

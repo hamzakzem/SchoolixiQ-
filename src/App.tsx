@@ -71,7 +71,9 @@ import { useLandingPageConfig } from "./lib/landingPageConfig";
 import { PageLoadingSkeleton } from "./components/ui/Skeleton";
 import { LanguageToggle } from "./components/LanguageToggle";
 import InstallAppBanner from "./components/InstallAppBanner";
+import { PwaStandaloneShell } from "./components/PwaStandaloneShell";
 import SchoolPresenceTracker from "./components/SchoolPresenceTracker";
+import { isPwaLaunchQuery, isPwaStandalone } from "./lib/pwaUtils";
 import { setupGlobalNotificationClickRouting } from "./lib/notificationRouting";
 
 const DEFAULT_PACKAGES = [
@@ -1610,6 +1612,16 @@ function PublicHome() {
   if (user) {
     return <AppContent />;
   }
+  if (isPwaStandalone() || isPwaLaunchQuery()) {
+    return (
+      <>
+        <Login />
+        <div className="fixed top-4 right-4 md:top-6 md:right-6 z-[9999]">
+          <LanguageToggle />
+        </div>
+      </>
+    );
+  }
   if (landingConfig.landingEnabled) {
     return <LandingPage />;
   }
@@ -1682,6 +1694,7 @@ export default function App() {
                 }}
               />
               <InstallAppBanner />
+              <PwaStandaloneShell />
               <AudioNotificationManager />
               <OfflineSyncIndicator />
             </BrowserRouter>

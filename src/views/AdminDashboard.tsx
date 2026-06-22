@@ -32,6 +32,7 @@ import { isPendingSchoolAdmin } from "../lib/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { NotificationCenter } from "../components/NotificationCenter";
+import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 import { motion, AnimatePresence } from "motion/react";
 import { pageTransitionProps } from "../lib/motion";
 import {
@@ -1116,7 +1117,12 @@ export default function AdminDashboard() {
 
     switch (activeTab) {
       case "overview":
-        return <Overview setActiveTab={setActiveTab} />;
+        return (
+          <div className="space-y-6 md:space-y-8">
+            <PwaInstallPrompt variant="card" />
+            <Overview setActiveTab={setActiveTab} />
+          </div>
+        );
       case "chat":
         return <AdminChatTab />;
       case "classes":
@@ -1247,6 +1253,7 @@ export default function AdminDashboard() {
         onBack={handleBack}
         headerTrailing={
           <>
+            <PwaInstallPrompt variant="header" />
             <div className="hidden md:block">
               <GlobalSearch onNavigate={navigateToTab} />
             </div>

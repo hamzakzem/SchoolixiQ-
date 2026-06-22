@@ -259,7 +259,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
   if (isCompact) {
     return (
       <footer
-        className="mt-auto shrink-0 relative w-full py-4 bg-transparent print:hidden select-none"
+        className="sx-global-footer mt-auto shrink-0 relative w-full py-4 bg-transparent print:hidden select-none"
         data-footer-mode="compact"
       >
         <div className="max-w-7xl mx-auto px-6">
@@ -296,7 +296,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
 
   return (
     <footer
-      className="bg-slate-50 dark:bg-slate-950 border-t border-slate-200/40 dark:border-slate-800/40 mt-auto shrink-0 relative w-full pt-16 md:pt-24 pb-8 overflow-hidden transition-all duration-300 select-none"
+      className="sx-global-footer bg-slate-50 dark:bg-slate-950 border-t border-slate-200/40 dark:border-slate-800/40 mt-auto shrink-0 relative w-full pt-16 md:pt-24 pb-8 overflow-hidden transition-all duration-300 select-none"
       data-footer-mode="full"
     >
       <div className="max-w-7xl mx-auto px-4 md:px-8 relative">
