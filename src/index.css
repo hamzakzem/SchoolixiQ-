@@ -2511,41 +2511,6 @@ html.dark .sx-notif-header__title {
   flex-shrink: 0;
 }
 
-.sx-notif-header__btn {
-  width: var(--sx-touch-min);
-  height: var(--sx-touch-min);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--sx-radius-md);
-  background: transparent;
-  color: var(--sx-navy);
-  border: 1px solid transparent;
-  transition: background var(--sx-transition), color var(--sx-transition), transform var(--sx-transition);
-}
-
-.sx-notif-header__btn:hover:not(:disabled) {
-  background: var(--sx-hover);
-  color: var(--sx-gold);
-}
-
-.sx-notif-header__btn:active:not(:disabled) {
-  transform: scale(0.96);
-}
-
-.sx-notif-header__btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.sx-notif-header__btn:focus-visible {
-  outline: 2px solid var(--sx-gold);
-  outline-offset: 2px;
-}
-
-html.dark .sx-notif-header__btn {
-  color: #f8fafc;
-}
 
 .sx-notif-unread-badge {
   display: inline-flex;
@@ -2858,16 +2823,17 @@ html.dark .sx-notif-card__title {
 .sx-notif-card__action {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: var(--sx-action-gap);
+  min-height: var(--sx-touch-min);
   padding: 8px 14px;
   border-radius: var(--sx-radius-md);
-  font-size: 12px;
+  font-size: 0.8125rem;
   font-weight: 700;
   font-family: 'Cairo', system-ui, sans-serif;
-  color: var(--sx-navy);
-  background: var(--sx-gold-subtle);
-  border: 1px solid var(--sx-gold-border);
-  min-height: var(--sx-touch-min);
+  color: #ffffff;
+  background: var(--sx-primary);
+  border: 1px solid var(--sx-primary);
   transition:
     background var(--sx-transition),
     color var(--sx-transition),
@@ -2876,9 +2842,19 @@ html.dark .sx-notif-card__title {
 }
 
 .sx-notif-card__action:hover {
-  background: var(--sx-gold);
-  color: var(--sx-primary);
+  background: var(--sx-primary-hover);
   transform: translateY(-1px);
+}
+
+.sx-notif-card__action:active {
+  transform: scale(0.98);
+}
+
+.sx-notif-card__action .sx-action-icon,
+.sx-notif-card__action .sx-notif-lucide {
+  width: 16px;
+  height: 16px;
+  color: var(--sx-gold);
 }
 
 .sx-notif-card__menu {
@@ -2889,17 +2865,25 @@ html.dark .sx-notif-card__title {
 .sx-notif-card__menu-btn {
   width: var(--sx-touch-min);
   height: var(--sx-touch-min);
-  display: flex;
+  min-width: var(--sx-touch-min);
+  min-height: var(--sx-touch-min);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--sx-radius-md);
   color: var(--sx-muted);
-  transition: background var(--sx-transition), color var(--sx-transition);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background var(--sx-transition), color var(--sx-transition), transform var(--sx-transition);
 }
 
 .sx-notif-card__menu-btn:hover {
-  background: var(--sx-hover);
+  background: var(--sx-gold-subtle);
   color: var(--sx-gold);
+}
+
+.sx-notif-card__menu-btn:active {
+  transform: scale(0.98);
 }
 
 .sx-notif-card-menu {
@@ -3292,94 +3276,12 @@ html.dark .sx-notif-settings__section summary {
   position: sticky;
   bottom: 0;
   z-index: 10;
-  display: flex;
-  gap: 8px;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   background: var(--sx-bg);
   border-top: 1px solid var(--sx-border);
 }
 
-.sx-notif-footer__btn {
-  flex: 1;
-  min-width: 0;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: 'Cairo', system-ui, sans-serif;
-  transition: background var(--sx-transition), color var(--sx-transition), transform var(--sx-transition);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0 8px;
-}
-
-.sx-notif-footer__btn:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.sx-notif-footer__btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.sx-notif-footer__btn:focus-visible {
-  outline: 2px solid var(--sx-gold);
-  outline-offset: 2px;
-}
-
-.sx-notif-footer__btn--ghost {
-  background: transparent;
-  color: var(--sx-navy);
-  border: 1px solid var(--sx-border);
-}
-
-.sx-notif-footer__btn--ghost:hover:not(:disabled) {
-  background: var(--sx-hover);
-}
-
-.sx-notif-footer__btn--primary {
-  background: var(--sx-navy);
-  color: var(--sx-gold);
-  border: 1px solid var(--sx-navy);
-}
-
-.sx-notif-footer__btn--primary:hover:not(:disabled) {
-  background: #1e293b;
-}
-
-.sx-notif-footer__btn--danger {
-  background: transparent;
-  color: var(--sx-muted);
-  border: 1px solid var(--sx-border);
-}
-
-.sx-notif-footer__btn--danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.08);
-  color: var(--sx-danger);
-  border-color: rgba(239, 68, 68, 0.25);
-}
-
-html.dark .sx-notif-footer__btn--ghost {
-  color: #f8fafc;
-}
-
-@media (max-width: 374px) {
-  .sx-notif-footer__btn {
-    font-size: 11px;
-    gap: 4px;
-    padding: 0 4px;
-  }
-
-  .sx-notif-footer__btn .sx-notif-lucide {
-    width: 16px;
-    height: 16px;
-  }
-}
+/* Footer buttons use .sx-action-btn--footer + variants from design-system.css */
 
 @media (max-width: 319px) {
   .sx-notif-tab {

@@ -23,6 +23,9 @@
   --sx-transition: 200ms ease;
   --sx-icon-size: 18px;
   --sx-touch-min: 40px;
+  --sx-action-height: 44px;
+  --sx-header-icon-btn: 40px;
+  --sx-action-gap: 8px;
 
   /* Legacy aliases used across the app */
   --color-primary: var(--sx-primary);
@@ -43,6 +46,7 @@
 @media (min-width: 1024px) {
   :root {
     --sx-icon-size: 22px;
+    --sx-header-icon-btn: 36px;
   }
 }
 

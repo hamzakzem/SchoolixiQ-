@@ -30,11 +30,11 @@ export function OfflineSyncIndicator() {
         aria-label={statusLabel}
       >
         {isSyncing ? (
-          <RefreshCw size={18} className="sx-icon animate-spin shrink-0" />
+          <RefreshCw size={18} className="sx-action-icon animate-spin shrink-0" strokeWidth={2.25} />
         ) : isOnline ? (
-          <Cloud size={18} className="sx-icon shrink-0" />
+          <Cloud size={18} className="sx-action-icon shrink-0" strokeWidth={2.25} />
         ) : (
-          <CloudOff size={18} className="sx-icon shrink-0" />
+          <CloudOff size={18} className="sx-action-icon shrink-0" strokeWidth={2.25} />
         )}
         <span className="truncate">{statusLabel}</span>
         {hasQueue && (
@@ -42,7 +42,7 @@ export function OfflineSyncIndicator() {
             {counts.pending + counts.failed + counts.blocked}
           </span>
         )}
-        <List size={18} className="sx-icon sx-icon-muted shrink-0" />
+        <List size={18} className="sx-action-icon sx-icon-muted shrink-0" strokeWidth={2.25} />
       </button>
 
       <OfflineOperationsPanel open={panelOpen} onClose={() => setPanelOpen(false)} />

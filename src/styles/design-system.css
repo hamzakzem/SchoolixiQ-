@@ -334,7 +334,213 @@ html.dark .sx-table-shell table thead th {
   .sx-btn:hover:not(:disabled),
   .sx-btn:active:not(:disabled),
   .sx-card:hover,
-  .sx-btn-icon:active:not(:disabled) {
+  .sx-btn-icon:active:not(:disabled),
+  .sx-action-btn:hover:not(:disabled),
+  .sx-action-btn:active:not(:disabled) {
     transform: none !important;
+  }
+}
+
+/* ─── Action buttons (icon + label, notification/footer polish) ─── */
+.sx-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sx-action-gap);
+  white-space: nowrap;
+  line-height: 1;
+  font-weight: 700;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  border: 1px solid transparent;
+  border-radius: var(--sx-radius-md);
+  cursor: pointer;
+  max-width: 100%;
+  min-height: var(--sx-touch-min);
+  padding: 0 12px;
+  color: var(--sx-primary);
+  background: transparent;
+  transition:
+    background var(--sx-transition),
+    color var(--sx-transition),
+    border-color var(--sx-transition),
+    transform var(--sx-transition),
+    opacity var(--sx-transition);
+}
+
+.sx-action-btn:focus-visible {
+  outline: 2px solid var(--sx-gold);
+  outline-offset: 2px;
+}
+
+.sx-action-btn:hover:not(:disabled) {
+  background: var(--sx-gold-subtle);
+  color: var(--sx-primary);
+}
+
+.sx-action-btn:hover:not(:disabled) .sx-action-icon {
+  color: var(--sx-gold);
+}
+
+.sx-action-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.sx-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.sx-action-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: currentColor;
+  stroke-width: 2.25;
+  transition: color var(--sx-transition);
+}
+
+.sx-action-label {
+  font-weight: 700;
+  font-size: 0.8125rem;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sx-action-btn-icon {
+  width: var(--sx-header-icon-btn);
+  height: var(--sx-header-icon-btn);
+  min-width: var(--sx-header-icon-btn);
+  min-height: var(--sx-header-icon-btn);
+  padding: 0;
+  border-radius: var(--sx-radius-md);
+}
+
+.sx-action-btn-icon .sx-action-icon {
+  width: 20px;
+  height: 20px;
+}
+
+@media (min-width: 1024px) {
+  .sx-action-btn-icon .sx-action-icon {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.sx-action-btn--footer {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--sx-action-height);
+  min-height: var(--sx-action-height);
+  padding: 0 10px;
+}
+
+.sx-action-btn--block {
+  width: 100%;
+  min-height: var(--sx-action-height);
+}
+
+.sx-action-btn-primary {
+  background: var(--sx-primary);
+  color: #ffffff;
+  border-color: var(--sx-primary);
+  box-shadow: var(--sx-shadow-soft);
+}
+
+.sx-action-btn-primary:hover:not(:disabled) {
+  background: var(--sx-primary-hover);
+  color: #ffffff;
+  box-shadow: var(--sx-shadow-hover);
+}
+
+.sx-action-btn-primary:hover:not(:disabled) .sx-action-icon {
+  color: var(--sx-gold);
+}
+
+.sx-action-btn-secondary {
+  background: var(--sx-gold-subtle);
+  color: var(--sx-primary);
+  border-color: var(--sx-gold-border);
+}
+
+.sx-action-btn-secondary:hover:not(:disabled) {
+  background: var(--sx-gold);
+  color: var(--sx-primary);
+  border-color: var(--sx-gold);
+}
+
+.sx-action-btn-ghost {
+  background: transparent;
+  color: var(--sx-primary);
+  border-color: var(--sx-border);
+}
+
+.sx-action-btn-ghost:hover:not(:disabled) {
+  background: var(--sx-gold-subtle);
+  border-color: var(--sx-gold-border);
+  color: var(--sx-primary);
+}
+
+.sx-action-btn-danger {
+  background: transparent;
+  color: var(--sx-danger);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.sx-action-btn-danger:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--sx-danger-hover);
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.sx-notif-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sx-notif-footer-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+html.dark .sx-action-btn {
+  color: #f8fafc;
+}
+
+html.dark .sx-action-btn-ghost {
+  border-color: var(--sx-border);
+}
+
+@media (max-width: 374px) {
+  .sx-action-btn--footer {
+    padding: 0 6px;
+    gap: 6px;
+  }
+
+  .sx-action-btn--footer .sx-action-label {
+    font-size: 0.75rem;
+  }
+
+  .sx-action-btn--footer .sx-action-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (max-width: 320px) {
+  .sx-notif-footer-actions {
+    flex-direction: column;
+  }
+
+  .sx-action-btn--footer {
+    width: 100%;
+    flex: none;
   }
 }

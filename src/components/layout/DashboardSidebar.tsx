@@ -85,7 +85,7 @@ export function DashboardSidebar({
       )}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <item.icon size={isCollapsed ? 22 : 18} className="sx-icon shrink-0" />
+      <item.icon size={isCollapsed ? 22 : 18} className="sx-action-icon shrink-0" strokeWidth={2.25} />
       {!isCollapsed ? (
         <span className="truncate flex-1 text-left rtl:text-right">{item.label}</span>
       ) : null}

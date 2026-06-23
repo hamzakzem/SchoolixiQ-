@@ -102,8 +102,8 @@ export function OfflineOperationsPanel({ open, onClose }: Props) {
               {isOnline ? 'متصل' : 'غير متصل'} · بانتظار {counts.pending} · فشل {counts.failed} · محظور {counts.blocked}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="sx-btn-icon rounded-xl p-2">
-            <X size={18} />
+          <button type="button" onClick={onClose} className="sx-action-btn sx-action-btn-icon" aria-label="إغلاق">
+            <X size={18} className="sx-action-icon" strokeWidth={2.25} />
           </button>
         </div>
 
@@ -132,7 +132,7 @@ export function OfflineOperationsPanel({ open, onClose }: Props) {
             type="button"
             disabled={!isOnline || isSyncing}
             onClick={() => void syncOfflineQueue().then(refresh)}
-            className="sx-btn sx-btn-primary gap-1 rounded-xl px-3 py-2 text-xs disabled:opacity-50"
+            className="sx-action-btn sx-action-btn-primary sx-action-btn--footer gap-1 rounded-xl px-3 py-2 text-xs disabled:opacity-50"
           >
             <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
             إعادة محاولة المزامنة
@@ -141,7 +141,7 @@ export function OfflineOperationsPanel({ open, onClose }: Props) {
             type="button"
             disabled={counts.failed === 0}
             onClick={() => void retryFailedOfflineOperations().then(refresh)}
-            className="sx-btn sx-btn-secondary gap-1 rounded-xl px-3 py-2 text-xs disabled:opacity-50"
+            className="sx-action-btn sx-action-btn-secondary gap-1 rounded-xl px-3 py-2 text-xs disabled:opacity-50"
           >
             إعادة المحاولات الفاشلة
           </button>
@@ -149,7 +149,7 @@ export function OfflineOperationsPanel({ open, onClose }: Props) {
             type="button"
             disabled={counts.synced === 0}
             onClick={() => void clearSyncedOfflineOperations().then(refresh)}
-            className="sx-btn sx-btn-secondary gap-1 rounded-xl px-3 py-2 text-xs disabled:opacity-50"
+            className="sx-action-btn sx-action-btn-secondary gap-1 rounded-xl px-3 py-2 text-xs disabled:opacity-50"
           >
             <Trash2 size={14} />
             مسح المزامَن
