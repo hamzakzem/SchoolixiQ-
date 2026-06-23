@@ -97,7 +97,7 @@ import {
   teacherHasAssignedClass,
   TEACHER_NO_CLASS_MSG,
 } from "../lib/teacherClass";
-import { isTeacherMenuFeatureEnabled } from "../lib/featureRegistry";
+import { invokeChatBack } from "../lib/chatUiBridge";
 import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 
@@ -1374,6 +1374,11 @@ export default function TeacherDashboard() {
       headerEyebrow={t("dashboard")}
       headerTitle={activeTabLabel}
       headerSubtitle={schoolData?.name || profile?.name}
+      showBack={activeTab === "chat"}
+      onBack={() => {
+        if (invokeChatBack()) return;
+        setActiveTab("home");
+      }}
       headerTrailing={
         <>
           <div className="hidden lg:block text-right ml-4">

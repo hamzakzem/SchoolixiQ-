@@ -29,6 +29,7 @@ import {
 import { toast } from "react-hot-toast";
 import { SchoolixChatShell, type ChatShellContact } from "../components/chat/SchoolixChatShell";
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from "../components/chat/chatAvatars";
+import { useChatBack } from "../hooks/useChatBack";
 
 export default function ParentChatTab() {
   const { profile } = useAuth();
@@ -498,6 +499,13 @@ export default function ParentChatTab() {
         ? isRtl ? 'المعلم الدراسي' : 'Class Teacher'
         : undefined;
 
+  const handleChatBack = useChatBack({
+    activeContact,
+    mobileShowChat,
+    setMobileShowChat,
+    setActiveContact: () => setActiveContact(null),
+  });
+
   return (
     <SchoolixChatShell
       isRtl={isRtl}
@@ -520,7 +528,7 @@ export default function ParentChatTab() {
         setMobileShowChat(true);
       }}
       mobileShowChat={mobileShowChat}
-      onMobileBack={() => setMobileShowChat(false)}
+      onChatBack={handleChatBack}
       groupedMessages={groupedMessages}
       isOutgoingMessage={(msg) => msg.senderId === profile?.uid}
       formatMessageTime={formatMessageTime}

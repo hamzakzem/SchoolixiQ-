@@ -1430,6 +1430,9 @@ html.dark .partner-success-section > div {
 
 /* ── SchoolixIQ Telegram-like Chat ── */
 .sx-chat-shell {
+  position: relative;
+  z-index: var(--sx-z-content);
+  isolation: isolate;
   background: #f7f8fa;
   background-image:
     radial-gradient(circle at 1px 1px, rgba(11, 35, 69, 0.04) 1px, transparent 0),
@@ -1836,18 +1839,46 @@ html.dark .sx-chat-action-item {
   50% { opacity: 1; transform: scale(1); }
 }
 
-.sx-chat-attachment-preview {
-  animation: sx-chat-menu-in 0.18s ease;
+.sx-chat-header {
+  z-index: var(--sx-z-chat-chrome);
 }
 
-@media (max-width: 767px) {
+.sx-chat-composer {
+  z-index: var(--sx-z-chat-chrome);
+}
+
+.sx-shell-main--chat {
+  position: relative;
+  z-index: var(--sx-z-content);
+}
+
+@media (min-width: 1024px) {
+  .sx-chat-shell {
+    display: flex;
+    flex-direction: row;
+  }
+
+  .sx-chat-list {
+    max-width: 360px;
+  }
+
+  .sx-chat-thread {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 1023px) {
   .sx-chat-list--visible {
     animation: sx-chat-fade-in 0.2s ease;
   }
 
-  .sx-chat-thread.flex {
+  .sx-chat-thread--detail {
     animation: sx-chat-fade-in 0.22s ease;
   }
+}
+
+.sx-chat-attachment-preview {
+  animation: sx-chat-menu-in 0.18s ease;
 }
 
 @keyframes sx-chat-fade-in {

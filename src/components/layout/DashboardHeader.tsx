@@ -39,7 +39,8 @@ export function DashboardHeader({
       className={clsx(
         'min-h-14 md:min-h-[4.5rem] pt-[calc(0.65rem+env(safe-area-inset-top,0px))] pb-3',
         'bg-sx-card/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-sx-border dark:border-slate-800',
-        'flex items-center justify-between px-4 md:px-8 shrink-0 sticky top-0 z-40 print:hidden',
+        'flex items-center justify-between px-4 md:px-8 shrink-0 sticky top-0 print:hidden',
+        'z-[var(--sx-z-header)]',
         className,
       )}
     >
@@ -47,7 +48,8 @@ export function DashboardHeader({
         <button
           type="button"
           onClick={onMenuToggle}
-          className="p-2 text-slate-500 hover:text-sx-primary bg-sx-surface hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all hidden lg:flex"
+          className="p-2 text-slate-500 hover:text-sx-primary bg-sx-surface hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all hidden lg:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
+          aria-label={isRtl ? 'القائمة' : 'Menu'}
         >
           <Menu size={20} className={menuCollapsed ? 'rotate-90' : ''} />
         </button>
@@ -56,7 +58,8 @@ export function DashboardHeader({
           <button
             type="button"
             onClick={onBack}
-            className="p-2 text-slate-500 hover:text-sx-primary rounded-xl lg:hidden"
+            className="p-2 text-slate-500 hover:text-sx-primary rounded-xl lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
+            aria-label={isRtl ? 'رجوع' : 'Back'}
           >
             <ChevronRight
               size={20}

@@ -81,6 +81,7 @@ import { pageTransitionProps } from "../lib/motion";
 
 import SolarLoading from "../components/SolarLoading";
 import ParentChatTab from "./ParentChatTab";
+import { invokeChatBack } from "../lib/chatUiBridge";
 import ParentSchedules from "./parent/ParentSchedules";
 import ParentDismissalTab from "./parent/ParentDismissalTab";
 import { ParentHomeView } from "../components/parent/ParentHomeView";
@@ -181,6 +182,7 @@ export default function ParentDashboard() {
   };
 
   const handleBack = () => {
+    if (activeTab === "chat" && invokeChatBack()) return;
     if (navigationHistory.length > 0) {
       const prevTab = navigationHistory[navigationHistory.length - 1];
       setNavigationHistory((prev) => prev.slice(0, -1));
@@ -282,6 +284,23 @@ export default function ParentDashboard() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "chat" && isSidebarOpen && window.innerWidth < 1024) {
+      console.info("[Layout] MENU_CLOSED_FOR_CHAT");
+      setIsSidebarOpen(false);
+    }
+  }, [activeTab, isSidebarOpen]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (window.innerWidth >= 1024) return;
+      if (isSidebarOpen) setIsSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isSidebarOpen]);
 
   useEffect(() => {
     if (selectedStudent) {
@@ -1598,7 +1617,7 @@ export default function ParentDashboard() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden print:hidden"
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[var(--sx-z-drawer-backdrop)] lg:hidden print:hidden"
             />
           )}
         </AnimatePresence>
@@ -1610,7 +1629,7 @@ export default function ParentDashboard() {
               animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
               exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className={`parent-dashboard-menu flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-200 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)]`}
+              className={`parent-dashboard-menu flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-[var(--sx-z-drawer)] lg:relative lg:z-auto border-slate-200 transition-colors shadow-2xl lg:shadow-none overflow-visible print:hidden pt-[env(safe-area-inset-top,0px)]`}
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
                 <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
@@ -1687,7 +1706,7 @@ export default function ParentDashboard() {
         </AnimatePresence>
 
         <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className="parent-app-header sticky top-0 z-40 transition-colors print:hidden">
+        <header className="parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden">
           <div className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-3">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">

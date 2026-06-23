@@ -116,7 +116,8 @@ export function DashboardSidebar({
           exit={{ x: isRtl ? 280 : -280, opacity: 0 }}
           transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
           className={clsx(
-            'flex-col shrink-0 fixed inset-y-0 z-50 lg:relative shadow-2xl lg:shadow-none overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)] hidden lg:flex border',
+            'flex-col shrink-0 fixed inset-y-0 shadow-2xl lg:shadow-none overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)] hidden lg:flex border',
+            'z-[var(--sx-z-drawer)] lg:z-auto',
             isRtl ? 'right-0 border-l' : 'left-0 border-r',
             sidebarSurface(variant),
           )}
@@ -208,7 +209,7 @@ export function DashboardMobileSidebarOverlay({
       <button
         type="button"
         aria-label="Close menu"
-        className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden print:hidden"
+        className="fixed inset-0 lg:hidden print:hidden z-[var(--sx-z-drawer-backdrop)] bg-slate-900/40 backdrop-blur-sm"
         onClick={onClose}
       />
       <motion.aside
@@ -216,7 +217,7 @@ export function DashboardMobileSidebarOverlay({
         animate={{ x: 0 }}
         exit={{ x: isRtl ? 280 : -280 }}
         className={clsx(
-          'fixed inset-y-0 z-50 w-[min(288px,88vw)] lg:hidden print:hidden pt-[env(safe-area-inset-top,0px)]',
+          'fixed inset-y-0 w-[min(288px,88vw)] lg:hidden print:hidden pt-[env(safe-area-inset-top,0px)] z-[var(--sx-z-drawer)]',
           isRtl ? 'right-0' : 'left-0',
         )}
       >

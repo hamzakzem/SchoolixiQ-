@@ -11,6 +11,7 @@ import { Search, Building2, Megaphone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { SchoolixChatShell, type ChatShellContact } from '../../components/chat/SchoolixChatShell';
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from '../../components/chat/chatAvatars';
+import { useChatBack } from '../../hooks/useChatBack';
 
 const BROADCAST_ID = '__broadcast__';
 
@@ -366,6 +367,13 @@ export default function SuperAdminChatTab() {
         ? isRtl ? 'مدرسة' : 'School'
         : undefined;
 
+  const handleChatBack = useChatBack({
+    activeContact,
+    mobileShowChat,
+    setMobileShowChat,
+    setActiveContact: () => setActiveContact(null),
+  });
+
   const broadcastIntro = activeContact?.id === BROADCAST_ID ? (
     <div className="flex flex-col items-center justify-center py-12 text-center px-4">
       <div className="w-20 h-20 rounded-full bg-[#D4AF37]/15 flex items-center justify-center mb-4 text-[#0B2345]">
@@ -399,7 +407,7 @@ export default function SuperAdminChatTab() {
         setMobileShowChat(true);
       }}
       mobileShowChat={mobileShowChat}
-      onMobileBack={() => setMobileShowChat(false)}
+      onChatBack={handleChatBack}
       groupedMessages={activeContact?.id === BROADCAST_ID ? {} : groupedMessages}
       isOutgoingMessage={(msg) => msg.senderId === profile?.uid}
       formatMessageTime={formatMessageTime}

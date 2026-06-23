@@ -56,7 +56,9 @@ export type SchoolixChatShellProps = {
   activeContact: ChatShellContact | null;
   onSelectContact: (contact: ChatShellContact) => void;
   mobileShowChat: boolean;
-  onMobileBack: () => void;
+  /** @deprecated use onChatBack */
+  onMobileBack?: () => void;
+  onChatBack?: () => void;
   groupedMessages: Record<string, unknown[]>;
   isOutgoingMessage: (msg: Record<string, unknown>) => boolean;
   formatMessageTime: (timestamp: unknown) => string;
@@ -126,6 +128,7 @@ export function SchoolixChatShell({
   onSelectContact,
   mobileShowChat,
   onMobileBack,
+  onChatBack,
   groupedMessages,
   isOutgoingMessage,
   formatMessageTime,
@@ -327,6 +330,9 @@ export function SchoolixChatShell({
     setSelectedIds(new Set());
   }, []);
 
+  const handleChatBackClick = onChatBack ?? onMobileBack ?? (() => undefined);
+  const showThreadBack = !!activeContact && mobileShowChat;
+
   return (
     <div
       className="sx-chat-shell h-full min-h-0 w-full max-w-full overflow-hidden flex"
@@ -334,8 +340,8 @@ export function SchoolixChatShell({
     >
       {/* Conversation list */}
       <aside
-        className={`sx-chat-list w-full md:w-[340px] lg:w-[360px] shrink-0 flex flex-col min-h-0 border-e border-[#0B2345]/10 transition-transform duration-300 ${
-          mobileShowChat ? 'hidden md:flex' : 'flex sx-chat-list--visible'
+        className={`sx-chat-list w-full lg:w-[360px] shrink-0 flex flex-col min-h-0 border-e border-[#0B2345]/10 transition-transform duration-300 ${
+          mobileShowChat ? 'hidden lg:flex' : 'flex sx-chat-list--visible'
         }`}
         aria-label={isRtl ? 'قائمة المحادثات' : 'Conversation list'}
       >
@@ -441,7 +447,7 @@ export function SchoolixChatShell({
       {/* Thread panel */}
       <motion.section
         className={`sx-chat-thread flex-1 flex flex-col min-w-0 min-h-0 ${
-          mobileShowChat ? 'flex' : 'hidden md:flex'
+          mobileShowChat ? 'flex sx-chat-thread--detail' : 'hidden lg:flex'
         }`}
         aria-label={isRtl ? 'المحادثة' : 'Chat thread'}
         initial={false}
@@ -505,14 +511,20 @@ export function SchoolixChatShell({
                 >
                   <div className="flex items-center justify-between gap-3 px-3 md:px-5 py-3">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <button
-                        type="button"
-                        onClick={onMobileBack}
-                        className="md:hidden sx-chat-icon-btn shrink-0"
-                        aria-label={isRtl ? 'رجوع إلى المحادثات' : 'Back to conversations'}
-                      >
-                        {isRtl ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
-                      </button>
+                      {showThreadBack ? (
+                        <button
+                          type="button"
+                          onClick={handleChatBackClick}
+                          className="lg:hidden sx-chat-icon-btn sx-action-btn sx-action-btn-icon shrink-0"
+                          aria-label={isRtl ? 'رجوع إلى المحادثات' : 'Back to conversations'}
+                        >
+                          {isRtl ? (
+                            <ArrowRight size={20} className="sx-action-icon" strokeWidth={2.4} />
+                          ) : (
+                            <ArrowLeft size={20} className="sx-action-icon" strokeWidth={2.4} />
+                          )}
+                        </button>
+                      ) : null}
                       {renderHeaderAvatar?.()}
                       <div className="min-w-0">
                         <h2 className="font-bold text-[#0B2345] dark:text-white truncate text-sm md:text-base">

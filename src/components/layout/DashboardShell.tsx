@@ -9,6 +9,7 @@ import {
   type DashboardNavSection,
   type DashboardShellVariant,
 } from '../../lib/dashboardMenu';
+import { invokeChatBack } from '../../lib/chatUiBridge';
 
 export type DashboardShellProps = {
   variant?: DashboardShellVariant;
@@ -107,6 +108,28 @@ export function DashboardShell({
     }
   }, []);
 
+  useEffect(() => {
+    if (hideMobileDock && isSidebarOpen && typeof window !== 'undefined' && window.innerWidth < 1024) {
+      console.info('[Layout] MENU_CLOSED_FOR_CHAT');
+      setIsSidebarOpen(false);
+    }
+  }, [hideMobileDock, isSidebarOpen]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (typeof window === 'undefined' || window.innerWidth >= 1024) return;
+      if (isSidebarOpen) setIsSidebarOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSidebarOpen]);
+
+  const handleHeaderBack = useCallback(() => {
+    if (activeTab === 'chat' && invokeChatBack()) return;
+    onBack?.();
+  }, [activeTab, onBack]);
+
   return (
     <div
       className={clsx(
@@ -133,7 +156,12 @@ export function DashboardShell({
         onLogout={onLogout}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden print:overflow-visible print:h-auto">
+      <div
+        className={clsx(
+          'flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden print:overflow-visible print:h-auto',
+          fullHeightTab && 'sx-shell-main--chat',
+        )}
+      >
         <DashboardHeader
           isRtl={isRtl}
           eyebrow={headerEyebrow}
@@ -141,7 +169,7 @@ export function DashboardShell({
           subtitle={headerSubtitle}
           breadcrumbs={breadcrumbs}
           showBack={showBack}
-          onBack={onBack}
+          onBack={onBack ? handleHeaderBack : undefined}
           onMenuToggle={handleMenuToggle}
           menuCollapsed={isSidebarCollapsed}
           trailing={headerTrailing}

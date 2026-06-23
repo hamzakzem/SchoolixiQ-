@@ -89,6 +89,7 @@ import { useSystemConfig } from "../lib/SystemConfigContext";
 import SchoolixLogo from "../components/SchoolixLogo";
 import { isCustomAppLogo } from "../lib/brandAssets";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
+import { invokeChatBack } from "../lib/chatUiBridge";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
 import AuditLogsViewer from "./admin/AuditLogsViewer";
@@ -261,6 +262,23 @@ export default function SuperAdminDashboard() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    if (activeTab === "chat" && isSidebarOpen && window.innerWidth < 1024) {
+      console.info("[Layout] MENU_CLOSED_FOR_CHAT");
+      setIsSidebarOpen(false);
+    }
+  }, [activeTab, isSidebarOpen]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (window.innerWidth >= 1024) return;
+      if (isSidebarOpen) setIsSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isSidebarOpen]);
+
   const [isSendingVerification, setIsSendingVerification] = useState(false);
   const [verificationCooldown, setVerificationCooldown] = useState(0);
   const [hideVerificationBanner, setHideVerificationBanner] = useState(false);
@@ -317,6 +335,7 @@ export default function SuperAdminDashboard() {
   };
 
   const handleBack = () => {
+    if (activeTab === "chat" && invokeChatBack()) return;
     if (navigationHistory.length > 0) {
       const prevTab = navigationHistory[navigationHistory.length - 1];
       setNavigationHistory((prev) => prev.slice(0, -1));
@@ -1642,7 +1661,7 @@ export default function SuperAdminDashboard() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[var(--sx-z-drawer-backdrop)] lg:hidden"
           />
         )}
       </AnimatePresence>
@@ -1654,7 +1673,7 @@ export default function SuperAdminDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-50 lg:relative border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible pt-[env(safe-area-inset-top,0px)]`}
+            className={`bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-[var(--sx-z-drawer)] lg:relative lg:z-auto border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible pt-[env(safe-area-inset-top,0px)]`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
@@ -2099,7 +2118,7 @@ export default function SuperAdminDashboard() {
       </AnimatePresence>
 
       <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className="min-h-[5rem] h-auto pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-10 print:hidden">
+        <header className="min-h-[5rem] h-auto pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-[var(--sx-z-header)] print:hidden">
           <div className="flex items-center gap-1.5 sm:gap-4 min-w-0">
             <button
               onClick={() => {
@@ -2130,7 +2149,8 @@ export default function SuperAdminDashboard() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 onClick={handleBack}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all font-bold text-xs shadow-sm active:scale-95 group shrink-0"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all font-bold text-xs shadow-sm active:scale-95 group shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
+                aria-label={isRtl ? 'رجوع' : 'Back'}
               >
                 <ArrowRight
                   size={14}

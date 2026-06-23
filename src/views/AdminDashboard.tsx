@@ -144,6 +144,7 @@ import Schedules from "./admin/Schedules";
 import AssistantsManagement from "./admin/AssistantsManagement";
 import DismissalMonitor from "./admin/DismissalMonitor";
 import AdminChatTab from "./admin/AdminChatTab";
+import { invokeChatBack } from "../lib/chatUiBridge";
 import AuditLogsViewer from "./admin/AuditLogsViewer";
 import RecycleBin from "./admin/RecycleBin";
 import GlobalSearch from "../components/GlobalSearch";
@@ -166,6 +167,7 @@ export default function AdminDashboard() {
   };
 
   const handleBack = () => {
+    if (activeTab === "chat" && invokeChatBack()) return;
     if (navigationHistory.length > 0) {
       const prevTab = navigationHistory[navigationHistory.length - 1];
       setNavigationHistory((prev) => prev.slice(0, -1));

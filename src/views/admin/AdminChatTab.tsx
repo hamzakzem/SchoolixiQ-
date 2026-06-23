@@ -13,6 +13,7 @@ import { Phone, GraduationCap } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { SchoolixChatShell, type ChatShellContact } from '../../components/chat/SchoolixChatShell';
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from '../../components/chat/chatAvatars';
+import { useChatBack } from '../../hooks/useChatBack';
 
 console.info('[AdminChatTab] BUILD_MARKER', 'superadmin-recipient-expansion-2026-06-17');
 
@@ -383,6 +384,14 @@ export default function AdminChatTab() {
             : 'Parent'
           : undefined;
 
+  const handleChatBack = useChatBack({
+    activeContact,
+    mobileShowChat,
+    setMobileShowChat,
+    setActiveContact: () => setActiveContact(null),
+    allowClearOnDesktop: false,
+  });
+
   return (
     <SchoolixChatShell
       isRtl={isRtl}
@@ -405,7 +414,7 @@ export default function AdminChatTab() {
         setMobileShowChat(true);
       }}
       mobileShowChat={mobileShowChat}
-      onMobileBack={() => setMobileShowChat(false)}
+      onChatBack={handleChatBack}
       groupedMessages={groupedMessages}
       isOutgoingMessage={(msg) => msg.senderRole === 'admin' || msg.senderId === profile?.uid}
       formatMessageTime={formatMessageTime}

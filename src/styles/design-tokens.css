@@ -27,6 +27,15 @@
   --sx-header-icon-btn: 40px;
   --sx-action-gap: 8px;
 
+  /* Stacking order */
+  --sx-z-content: 0;
+  --sx-z-chat-chrome: 20;
+  --sx-z-header: 40;
+  --sx-z-drawer-backdrop: 45;
+  --sx-z-drawer: 50;
+  --sx-z-popover: 60;
+  --sx-z-modal: 100;
+
   /* Legacy aliases used across the app */
   --color-primary: var(--sx-primary);
   --color-accent: var(--sx-gold);

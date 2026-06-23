@@ -292,7 +292,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
       {/* Modern Slide-up Bento Hub Overlay */}
       <AnimatePresence>
         {showQuickAccess && (
-          <div className="fixed inset-0 z-50 overflow-hidden lg:hidden">
+          <div className="fixed inset-0 z-[var(--sx-z-drawer)] overflow-hidden lg:hidden">
             {/* Backdrop glass blur */}
             <motion.div
               {...modalBackdropProps()}
@@ -416,7 +416,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
       {/* Mobile full services menu (More / three-line) */}
       <AnimatePresence>
         {isSidebarOpen && (
-          <div className="fixed inset-0 z-50 overflow-hidden lg:hidden">
+          <div className="fixed inset-0 z-[var(--sx-z-drawer)] overflow-hidden lg:hidden">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
