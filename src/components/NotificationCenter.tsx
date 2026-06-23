@@ -119,7 +119,7 @@ function renderCategoryIcon(categoryId: NotificationCategoryId, gold = false) {
   const Icon = CATEGORY_ICON_MAP[categoryId] ?? Bell;
   return (
     <Icon
-      className={`sx-notif-lucide${gold ? ' sx-notif-lucide--gold' : ''}`}
+      className={`sx-icon sx-notif-lucide${gold ? ' sx-notif-lucide--gold' : ''}`}
       aria-hidden
     />
   );
@@ -1087,7 +1087,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               toast.success(isArabic ? 'تم التحديث' : 'Updated');
             });
           }}
-          className="sx-notif-header__btn"
+          className="sx-btn-icon sx-notif-header__btn"
           aria-label={isArabic ? 'تحديث' : 'Refresh'}
         >
           <RefreshCw className="sx-notif-lucide" aria-hidden />
@@ -1147,7 +1147,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 {mainView !== 'list' && (
                   <button
                     type="button"
-                    className="sx-notif-header__btn"
+                    className="sx-btn-icon sx-notif-header__btn"
                     onClick={() => {
                       if (mainView === 'detail') {
                         setSelectedNotification(null);
@@ -1196,7 +1196,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   <button
                     type="button"
                     onClick={() => setMainView('settings')}
-                    className="sx-notif-header__btn"
+                    className="sx-btn-icon sx-notif-header__btn"
                     aria-label={isArabic ? 'الإعدادات' : 'Settings'}
                   >
                     <Settings className="sx-notif-lucide" aria-hidden />
@@ -1206,7 +1206,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="sx-notif-header__btn"
+                    className="sx-btn-icon sx-notif-header__btn"
                     aria-label={isArabic ? 'إغلاق' : 'Close'}
                   >
                     <X className="sx-notif-lucide" aria-hidden />

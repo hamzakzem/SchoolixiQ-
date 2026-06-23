@@ -707,8 +707,8 @@ export default function AdminDashboard() {
                         disabled={isSubscribing}
                         className={`w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 shadow-xl ${
                           plan.isPopular
-                            ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/20"
-                            : "bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600 shadow-slate-600/10"
+                            ? "sx-btn sx-btn-primary w-full py-4 rounded-2xl text-sm shadow-xl"
+                            : "sx-btn sx-btn-secondary w-full py-4 rounded-2xl text-sm shadow-xl"
                         }`}
                       >
                         {isSubscribing
@@ -760,7 +760,7 @@ export default function AdminDashboard() {
                       toast.success("يمكنك الآن اختيار باقة جديدة");
                     }
                   }}
-                  className="px-10 py-5 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
+                  className="sx-btn sx-btn-primary px-10 py-5 rounded-2xl text-base shadow-xl"
                 >
                   إرسال طلب جديد
                 </button>
@@ -849,7 +849,7 @@ export default function AdminDashboard() {
                       }
                     }
                   }}
-                  className="px-10 py-5 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all"
+                  className="sx-btn sx-btn-primary px-10 py-5 rounded-2xl text-base shadow-xl"
                 >
                   تحديث حالة الطلب
                 </button>
@@ -1079,7 +1079,7 @@ export default function AdminDashboard() {
             </div>
             <button
               disabled={isSettingUp}
-              className="w-full py-5 bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-[1.5rem] font-bold text-lg hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="w-full py-5 sx-btn sx-btn-primary rounded-[1.5rem] text-lg shadow-xl disabled:opacity-50"
             >
               {isSettingUp ? (isRtl ? "جاري الإعداد..." : "Setting up...") : (isRtl ? "حفظ البيانات والبدء" : "Save Record & Start")}
             </button>
@@ -1558,7 +1558,7 @@ function PackageDetailsModal({
         <div className="p-8 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
           <button
             onClick={onClose}
-            className="px-10 py-4 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
+            className="sx-btn sx-btn-primary px-10 py-4 rounded-2xl text-sm shadow-xl"
           >
             إغلاق
           </button>

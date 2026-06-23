@@ -344,7 +344,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
                   window.location.href = "/login?mode=signup";
                 }
               }}
-              className="inline-flex items-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-base transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25 active:scale-95"
+              className="inline-flex items-center gap-3 px-8 py-4 sx-btn sx-btn-primary rounded-xl text-base"
             >
               احجز عرضاً تجريبياً
               <ArrowLeft size={20} className="rtl:-scale-x-100" />

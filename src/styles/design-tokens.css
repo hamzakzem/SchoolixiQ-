@@ -1,0 +1,55 @@
+/* SchoolixIQ — centralized design tokens */
+:root {
+  --sx-primary: #0f172a;
+  --sx-primary-hover: #0b1220;
+  --sx-gold: #d4af37;
+  --sx-gold-hover: #c9a227;
+  --sx-gold-subtle: rgba(212, 175, 55, 0.12);
+  --sx-gold-subtle-hover: rgba(212, 175, 55, 0.2);
+  --sx-gold-border: rgba(212, 175, 55, 0.35);
+  --sx-bg: #ffffff;
+  --sx-surface: #f8fafc;
+  --sx-border: #e5e7eb;
+  --sx-muted: #64748b;
+  --sx-danger: #dc2626;
+  --sx-danger-hover: #b91c1c;
+  --sx-success: #16a34a;
+  --sx-warning: #f59e0b;
+  --sx-info: #2563eb;
+  --sx-radius-md: 12px;
+  --sx-radius-lg: 16px;
+  --sx-shadow-soft: 0 4px 16px -4px rgba(15, 23, 42, 0.1);
+  --sx-shadow-hover: 0 8px 24px -8px rgba(15, 23, 42, 0.14);
+  --sx-transition: 200ms ease;
+  --sx-icon-size: 18px;
+  --sx-touch-min: 40px;
+
+  /* Legacy aliases used across the app */
+  --color-primary: var(--sx-primary);
+  --color-accent: var(--sx-gold);
+  --color-secondary: #d4a64a;
+  --color-surface: var(--sx-surface);
+  --color-sx-card: var(--sx-bg);
+  --color-sx-border: var(--sx-border);
+  --color-sx-text: var(--sx-primary);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --sx-icon-size: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --sx-icon-size: 22px;
+  }
+}
+
+html.dark {
+  --sx-bg: #0f172a;
+  --sx-surface: #0f172a;
+  --sx-border: #334155;
+  --sx-muted: #94a3b8;
+  --color-sx-card: #1e293b;
+}

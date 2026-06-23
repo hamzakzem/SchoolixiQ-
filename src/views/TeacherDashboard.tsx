@@ -2222,7 +2222,7 @@ export default function TeacherDashboard() {
                     </h2>
                     <button
                       onClick={() => setShowAddReport(true)}
-                      className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                      className="flex items-center gap-2 px-6 py-3 sx-btn sx-btn-primary rounded-xl shadow-lg"
                     >
                       <Plus size={20} />
                       {t("sendNewReport")}
@@ -2549,7 +2549,7 @@ export default function TeacherDashboard() {
 
                   <button
                     type="submit"
-                    className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-5 sx-btn sx-btn-primary rounded-2xl shadow-xl gap-2"
                   >
                     <Send size={18} />
                     {t("publishHomeworkNow")}
@@ -2756,7 +2756,7 @@ export default function TeacherDashboard() {
                           key={opt.id}
                           type="button"
                           onClick={() => setReportTarget(opt.id as any)}
-                          className={`py-3 rounded-xl border text-[10px] font-bold transition-all ${reportTarget === opt.id ? "bg-indigo-600 text-white border-indigo-600 shadow-md" : "bg-white text-slate-500 border-slate-200"}`}
+                          className={`py-3 rounded-xl border text-[10px] font-bold transition-all ${reportTarget === opt.id ? "sx-btn sx-btn-primary border-transparent shadow-md" : "sx-btn sx-btn-ghost border-[var(--sx-border)]"}`}
                         >
                           {opt.label}
                         </button>

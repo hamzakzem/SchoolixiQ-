@@ -1690,7 +1690,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_schools') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "schools" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "schools" ? "sx-nav-item--active" : ""}`}
                   >
                     <Building
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1715,7 +1715,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_accounts') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "accounts" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "accounts" ? "sx-nav-item--active" : ""}`}
                   >
                     <Lock
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1744,7 +1744,7 @@ export default function SuperAdminDashboard() {
                         ? t('sidebar_team')
                         : undefined
                     }
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "team" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "team" ? "sx-nav-item--active" : ""}`}
                   >
                     <ShieldCheck
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1769,7 +1769,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_packages') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "packages" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "packages" ? "sx-nav-item--active" : ""}`}
                   >
                     <Plus
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1794,7 +1794,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_requests') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "requests" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "requests" ? "sx-nav-item--active" : ""}`}
                   >
                     <Mail
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1829,7 +1829,7 @@ export default function SuperAdminDashboard() {
                       if (window.innerWidth < 1024) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_chat') : undefined}
-                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "chat" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "chat" ? "sx-nav-item--active" : ""}`}
                   >
                     <MessageSquare
                       size={isSidebarCollapsed ? 24 : 20}
@@ -1857,7 +1857,7 @@ export default function SuperAdminDashboard() {
                       title={
                         isSidebarCollapsed ? t('sidebar_users') : undefined
                       }
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "users" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "users" ? "sx-nav-item--active" : ""}`}
                     >
                       <Users
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1880,7 +1880,7 @@ export default function SuperAdminDashboard() {
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
                       title={isSidebarCollapsed ? t('sidebar_parents') : undefined}
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "parents" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "parents" ? "sx-nav-item--active" : ""}`}
                     >
                       <Users
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1907,7 +1907,7 @@ export default function SuperAdminDashboard() {
                         if (window.innerWidth < 1024) setIsSidebarOpen(false);
                       }}
                       title={isSidebarCollapsed ? t('sidebar_settings') : undefined}
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "settings" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "settings" ? "sx-nav-item--active" : ""}`}
                     >
                       <SettingsIcon
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1934,7 +1934,7 @@ export default function SuperAdminDashboard() {
                           ? "صفحة الهبوط"
                           : undefined
                       }
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "landing_page" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "landing_page" ? "sx-nav-item--active" : ""}`}
                     >
                       <LayoutDashboard
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1963,7 +1963,7 @@ export default function SuperAdminDashboard() {
                           ? t('sidebar_footer')
                           : undefined
                       }
-                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "footer" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "footer" ? "sx-nav-item--active" : ""}`}
                     >
                       <LayoutDashboard
                         size={isSidebarCollapsed ? 24 : 20}
@@ -1992,7 +1992,7 @@ export default function SuperAdminDashboard() {
                         title={
                           isSidebarCollapsed ? t("sidebar_backups") : undefined
                         }
-                        className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "backups" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                        className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "backups" ? "sx-nav-item--active" : ""}`}
                       >
                         <Save
                           size={isSidebarCollapsed ? 24 : 20}
@@ -2025,7 +2025,7 @@ export default function SuperAdminDashboard() {
                             ? t("sidebar_diagnostics")
                             : undefined
                         }
-                        className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "diagnostics" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                        className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "diagnostics" ? "sx-nav-item--active" : ""}`}
                       >
                         <Activity
                           size={isSidebarCollapsed ? 24 : 20}
@@ -2052,7 +2052,7 @@ export default function SuperAdminDashboard() {
                           if (window.innerWidth < 1024) setIsSidebarOpen(false);
                         }}
                         title={isSidebarCollapsed ? (isRtl ? "سجل التدقيق" : "Audit Logs") : undefined}
-                        className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${activeTab === "audit_logs" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-900"}`}
+                        className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "audit_logs" ? "sx-nav-item--active" : ""}`}
                       >
                         <ShieldCheck size={isSidebarCollapsed ? 24 : 20} className="shrink-0" />
                         {!isSidebarCollapsed && (
@@ -2275,7 +2275,7 @@ export default function SuperAdminDashboard() {
                         setSchoolModalTab("info");
                         setShowAddModal(true);
                       }}
-                      className="mt-2 md:mt-0 w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl hover:bg-blue-600 dark:hover:bg-blue-700 transition-all font-black shadow-2xl shadow-blue-600/20 active:scale-95 group/btn text-sm shrink-0"
+                      className="mt-2 md:mt-0 w-full md:w-auto sx-btn sx-btn-primary gap-2 px-6 py-3 rounded-2xl text-sm shrink-0"
                     >
                       <Plus
                         size={18}
@@ -3041,7 +3041,7 @@ export default function SuperAdminDashboard() {
                         setPackageModalTab("general");
                         setShowPackageModal(true);
                       }}
-                      className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-sm shrink-0"
+                      className="w-full md:w-auto sx-btn sx-btn-primary gap-2 px-8 py-3 rounded-2xl text-sm shrink-0"
                     >
                       <Plus size={18} />
                       إضافة باقة جديدة
@@ -3168,7 +3168,7 @@ export default function SuperAdminDashboard() {
                                   });
                                   setShowPackageModal(true);
                                 }}
-                                className="py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-blue-700 transition-all font-sans text-sm flex items-center justify-center gap-2"
+                                className="py-3 sx-btn sx-btn-primary rounded-2xl text-sm flex items-center justify-center gap-2"
                               >
                                 <SettingsIcon size={14} />
                                 تعديل

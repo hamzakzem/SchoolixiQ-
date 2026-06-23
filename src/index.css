@@ -1,15 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
+@import "./styles/design-tokens.css";
+@import "./styles/design-system.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --color-primary: #0B2345;
+  --color-primary: #0F172A;
   --color-secondary: #D4A64A;
   --color-accent: #D4AF37;
-  --color-surface: #F7F8FA;
+  --color-surface: #F8FAFC;
   --color-sx-card: #FFFFFF;
   --color-sx-border: #E5E7EB;
   --color-sx-text: #1E293B;
@@ -897,29 +899,7 @@ html.theme-transition *::after {
 }
 
 .sx-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  will-change: transform;
-}
-.sx-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -8px rgba(11, 35, 69, 0.12);
-}
-.dark .sx-card:hover {
-  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.45);
-}
-
-.sx-btn {
-  transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease;
-}
-.sx-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-.sx-btn:active:not(:disabled) {
-  transform: translateY(0) scale(0.98);
-}
-.sx-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+  /* base in design-system.css; motion extras below */
 }
 
 .sx-input {
@@ -1061,10 +1041,7 @@ html.theme-transition *::after {
 }
 
 .sx-table-shell table thead th {
-  background-color: var(--color-surface);
-}
-.dark .sx-table-shell table thead th {
-  background-color: rgba(30, 41, 59, 0.8);
+  /* unified in design-system.css */
 }
 
 /* ==========================================================================
@@ -2372,15 +2349,15 @@ html.dark .parent-page-title {
 
 /* ── Notification Center — SchoolixIQ (Navy + Gold) ── */
 .sx-notif-overlay {
-  --sx-navy: #0f172a;
-  --sx-gold: #d4af37;
-  --sx-bg: #ffffff;
-  --sx-border: #e5e7eb;
-  --sx-muted: #64748b;
-  --sx-hover: rgba(212, 175, 55, 0.12);
-  --sx-danger: #ef4444;
-  --sx-success: #10b981;
-  --sx-transition: 200ms ease;
+  --sx-navy: var(--sx-primary);
+  --sx-gold: var(--sx-gold);
+  --sx-bg: var(--sx-bg);
+  --sx-border: var(--sx-border);
+  --sx-muted: var(--sx-muted);
+  --sx-hover: var(--sx-gold-subtle);
+  --sx-danger: var(--sx-danger);
+  --sx-success: var(--sx-success);
+  --sx-transition: var(--sx-transition);
 
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(8px);
@@ -2535,12 +2512,12 @@ html.dark .sx-notif-header__title {
 }
 
 .sx-notif-header__btn {
-  width: 40px;
-  height: 40px;
-  display: flex;
+  width: var(--sx-touch-min);
+  height: var(--sx-touch-min);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--sx-radius-md);
   background: transparent;
   color: var(--sx-navy);
   border: 1px solid transparent;
@@ -2549,6 +2526,7 @@ html.dark .sx-notif-header__title {
 
 .sx-notif-header__btn:hover:not(:disabled) {
   background: var(--sx-hover);
+  color: var(--sx-gold);
 }
 
 .sx-notif-header__btn:active:not(:disabled) {
@@ -2556,7 +2534,7 @@ html.dark .sx-notif-header__title {
 }
 
 .sx-notif-header__btn:disabled {
-  opacity: 0.4;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -2584,18 +2562,11 @@ html.dark .sx-notif-header__btn {
 }
 
 .sx-notif-lucide {
-  width: 18px;
-  height: 18px;
+  width: var(--sx-icon-size);
+  height: var(--sx-icon-size);
   flex-shrink: 0;
   color: var(--sx-navy);
   transition: color var(--sx-transition);
-}
-
-@media (min-width: 1024px) {
-  .sx-notif-lucide {
-    width: 20px;
-    height: 20px;
-  }
 }
 
 .sx-notif-lucide--gold {
@@ -2888,21 +2859,26 @@ html.dark .sx-notif-card__title {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
-  border-radius: 10px;
+  padding: 8px 14px;
+  border-radius: var(--sx-radius-md);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: 'Cairo', system-ui, sans-serif;
   color: var(--sx-navy);
-  background: rgba(212, 175, 55, 0.2);
-  border: 1px solid rgba(212, 175, 55, 0.35);
-  min-height: 32px;
-  transition: background var(--sx-transition);
+  background: var(--sx-gold-subtle);
+  border: 1px solid var(--sx-gold-border);
+  min-height: var(--sx-touch-min);
+  transition:
+    background var(--sx-transition),
+    color var(--sx-transition),
+    transform var(--sx-transition);
   flex-shrink: 0;
 }
 
 .sx-notif-card__action:hover {
-  background: rgba(212, 175, 55, 0.32);
+  background: var(--sx-gold);
+  color: var(--sx-primary);
+  transform: translateY(-1px);
 }
 
 .sx-notif-card__menu {
@@ -2911,19 +2887,19 @@ html.dark .sx-notif-card__title {
 }
 
 .sx-notif-card__menu-btn {
-  width: 32px;
-  height: 32px;
+  width: var(--sx-touch-min);
+  height: var(--sx-touch-min);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: var(--sx-radius-md);
   color: var(--sx-muted);
   transition: background var(--sx-transition), color var(--sx-transition);
 }
 
 .sx-notif-card__menu-btn:hover {
   background: var(--sx-hover);
-  color: var(--sx-navy);
+  color: var(--sx-gold);
 }
 
 .sx-notif-card-menu {

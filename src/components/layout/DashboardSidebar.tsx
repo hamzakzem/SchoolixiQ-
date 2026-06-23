@@ -29,18 +29,13 @@ type DashboardSidebarProps = {
   sectionLabels?: Record<string, string>;
 };
 
-function activeClasses(variant: DashboardShellVariant, active: boolean) {
-  if (!active) {
-    return 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/80 dark:text-slate-400';
-  }
-  switch (variant) {
-    case 'admin-dark':
-      return 'bg-white text-slate-900 shadow-md';
-    case 'superadmin':
-      return 'bg-blue-600 text-white shadow-md';
-    default:
-      return 'bg-sx-primary text-white shadow-md dark:bg-white dark:text-sx-primary';
-  }
+function navItemClasses(variant: DashboardShellVariant, active: boolean) {
+  const isDark = variant === 'superadmin' || variant === 'admin-dark';
+  return clsx(
+    'sx-nav-item w-full',
+    isDark && 'sx-nav-item--dark',
+    active && 'sx-nav-item--active',
+  );
 }
 
 function sidebarSurface(variant: DashboardShellVariant) {
@@ -85,13 +80,12 @@ export function DashboardSidebar({
       }}
       title={isCollapsed ? item.label : undefined}
       className={clsx(
-        'w-full flex rounded-xl transition-all font-semibold text-sm active:scale-[0.98] group relative',
+        navItemClasses(variant, activeTab === item.id),
         isCollapsed ? 'justify-center px-0 py-3' : 'items-center gap-3 px-3 py-2.5',
-        activeClasses(variant, activeTab === item.id),
       )}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <item.icon size={isCollapsed ? 22 : 18} className="shrink-0 opacity-90" />
+      <item.icon size={isCollapsed ? 22 : 18} className="sx-icon shrink-0" />
       {!isCollapsed ? (
         <span className="truncate flex-1 text-left rtl:text-right">{item.label}</span>
       ) : null}
@@ -182,11 +176,11 @@ export function DashboardSidebar({
                 onClick={onLogout}
                 title={isCollapsed ? logoutLabel : undefined}
                 className={clsx(
-                  'w-full flex rounded-xl text-red-400 hover:bg-red-500/10 transition-all font-semibold text-sm',
-                  isCollapsed ? 'justify-center py-3' : 'items-center gap-3 px-3 py-2.5',
+                  'sx-btn sx-btn-ghost w-full text-[var(--sx-danger)] hover:!bg-red-500/10',
+                  isCollapsed ? 'justify-center py-3 sx-btn-icon' : 'items-center gap-3 px-3 py-2.5',
                 )}
               >
-                <LogOut size={isCollapsed ? 22 : 18} className="shrink-0" />
+                <LogOut size={isCollapsed ? 22 : 18} className="sx-icon sx-icon-danger shrink-0" />
                 {!isCollapsed ? <span>{logoutLabel}</span> : null}
               </button>
             </div>
