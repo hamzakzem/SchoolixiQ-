@@ -510,6 +510,164 @@ html.dark .sx-table-shell table thead th {
   width: 100%;
 }
 
+/* ─── Notification footer action buttons ─── */
+.sx-notif-footer-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: var(--sx-radius-md);
+  font-family: 'Cairo', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 13.5px;
+  line-height: 1;
+  letter-spacing: normal;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background var(--sx-transition),
+    color var(--sx-transition),
+    border-color var(--sx-transition),
+    transform var(--sx-transition),
+    box-shadow var(--sx-transition);
+}
+
+.sx-notif-footer-btn:focus-visible {
+  outline: 2px solid var(--sx-gold);
+  outline-offset: 2px;
+}
+
+.sx-notif-footer-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.sx-notif-footer-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.sx-notif-footer-btn .sx-action-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: currentColor;
+  stroke-width: 2.4;
+}
+
+.sx-notif-footer-btn .sx-action-label {
+  font-weight: 800;
+  font-size: inherit;
+  line-height: 1;
+  opacity: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sx-notif-footer-btn--ghost {
+  background: #ffffff;
+  color: var(--sx-primary);
+  border-color: var(--sx-border);
+}
+
+.sx-notif-footer-btn--ghost:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: var(--sx-gold-border);
+  color: var(--sx-primary);
+}
+
+.sx-notif-footer-btn--primary {
+  background: var(--sx-primary);
+  color: #ffffff;
+  border-color: var(--sx-primary);
+  box-shadow: var(--sx-shadow-soft);
+}
+
+.sx-notif-footer-btn--primary .sx-action-icon {
+  color: var(--sx-gold);
+}
+
+.sx-notif-footer-btn--primary:hover:not(:disabled) {
+  background: var(--sx-primary-hover);
+  color: #ffffff;
+  box-shadow: var(--sx-shadow-hover);
+}
+
+.sx-notif-footer-btn--secondary {
+  background: var(--sx-gold-subtle);
+  color: var(--sx-primary);
+  border-color: var(--sx-gold-border);
+}
+
+.sx-notif-footer-btn--secondary:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.28);
+  border-color: var(--sx-gold);
+  color: var(--sx-primary);
+}
+
+html.dark .sx-notif-footer-btn--ghost {
+  background: rgba(30, 41, 59, 0.85);
+  color: #f8fafc;
+  border-color: var(--sx-border);
+}
+
+html.dark .sx-notif-footer-btn--secondary {
+  color: #f8fafc;
+}
+
+@media (min-width: 768px) {
+  .sx-notif-footer-btn {
+    font-size: 14px;
+  }
+
+  .sx-notif-footer-btn .sx-action-icon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (min-width: 375px) {
+  .sx-notif-footer-actions {
+    flex-direction: row;
+  }
+}
+
+@media (max-width: 374px) {
+  .sx-notif-footer-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .sx-notif-footer-btn {
+    width: 100%;
+    flex: none;
+    min-width: 0;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
+  .sx-notif-footer-btn:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 340px) {
+  .sx-notif-footer-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .sx-notif-footer-btn:last-child {
+    grid-column: auto;
+  }
+}
+
 html.dark .sx-action-btn {
   color: #f8fafc;
 }
@@ -518,29 +676,8 @@ html.dark .sx-action-btn-ghost {
   border-color: var(--sx-border);
 }
 
-@media (max-width: 374px) {
-  .sx-action-btn--footer {
-    padding: 0 6px;
-    gap: 6px;
-  }
-
-  .sx-action-btn--footer .sx-action-label {
-    font-size: 0.75rem;
-  }
-
-  .sx-action-btn--footer .sx-action-icon {
-    width: 16px;
-    height: 16px;
-  }
-}
-
-@media (max-width: 320px) {
-  .sx-notif-footer-actions {
-    flex-direction: column;
-  }
-
-  .sx-action-btn--footer {
-    width: 100%;
-    flex: none;
+@media (prefers-reduced-motion: reduce) {
+  .sx-notif-footer-btn:active:not(:disabled) {
+    transform: none !important;
   }
 }

@@ -1251,7 +1251,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   className={`sx-notif-tab ${categoryFilter === 'all' ? 'sx-notif-tab--active' : ''}`}
                   onClick={() => setCategoryFilter('all')}
                 >
-                  {isArabic ? 'الكل' : 'All'}
+                  <span className="sx-notif-tab-label">{isArabic ? 'الكل' : 'All'}</span>
                 </button>
                 {displayCategories.map((cat) => (
                   <button
@@ -1262,7 +1262,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     className={`sx-notif-tab ${categoryFilter === cat.id ? 'sx-notif-tab--active' : ''}`}
                     onClick={() => setCategoryFilter(cat.id)}
                   >
-                    {isArabic ? cat.labelAr : cat.labelEn}
+                    <span className="sx-notif-tab-label">{isArabic ? cat.labelAr : cat.labelEn}</span>
                   </button>
                 ))}
               </div>
@@ -1283,30 +1283,30 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               <div className="sx-notif-footer-actions">
                 <button
                   type="button"
-                  className="sx-action-btn sx-action-btn--footer sx-action-btn-ghost"
+                  className="sx-notif-footer-btn sx-notif-footer-btn--ghost"
                   onClick={handleRefreshList}
                   aria-label={isArabic ? 'تحديث' : 'Refresh'}
                 >
-                  <RefreshCw className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                  <RefreshCw className="sx-action-icon" strokeWidth={2.4} aria-hidden />
                   <span className="sx-action-label">{isArabic ? 'تحديث' : 'Refresh'}</span>
                 </button>
                 <button
                   type="button"
-                  className="sx-action-btn sx-action-btn--footer sx-action-btn-primary"
+                  className="sx-notif-footer-btn sx-notif-footer-btn--primary"
                   onClick={handleMarkAllRead}
                   disabled={unreadCount === 0}
                   aria-label={isArabic ? 'تحديد الكل كمقروء' : 'Mark all read'}
                 >
-                  <Check className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                  <Check className="sx-action-icon" strokeWidth={2.4} aria-hidden />
                   <span className="sx-action-label">{isArabic ? 'تحديد الكل' : 'Mark all'}</span>
                 </button>
                 <button
                   type="button"
-                  className="sx-action-btn sx-action-btn--footer sx-action-btn-secondary"
+                  className="sx-notif-footer-btn sx-notif-footer-btn--secondary"
                   onClick={onClose}
                   aria-label={isArabic ? 'إغلاق' : 'Close'}
                 >
-                  <X className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                  <X className="sx-action-icon" strokeWidth={2.4} aria-hidden />
                   <span className="sx-action-label">{isArabic ? 'إغلاق' : 'Close'}</span>
                 </button>
               </div>
