@@ -110,7 +110,6 @@ export function DashboardShell({
 
   useEffect(() => {
     if (hideMobileDock && isSidebarOpen && typeof window !== 'undefined' && window.innerWidth < 1024) {
-      console.info('[Layout] MENU_CLOSED_FOR_CHAT');
       setIsSidebarOpen(false);
     }
   }, [hideMobileDock, isSidebarOpen]);

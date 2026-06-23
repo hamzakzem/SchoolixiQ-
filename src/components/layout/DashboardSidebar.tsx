@@ -217,7 +217,7 @@ export function DashboardMobileSidebarOverlay({
         animate={{ x: 0 }}
         exit={{ x: isRtl ? 280 : -280 }}
         className={clsx(
-          'fixed inset-y-0 w-[min(288px,88vw)] lg:hidden print:hidden pt-[env(safe-area-inset-top,0px)] z-[var(--sx-z-drawer)]',
+          'fixed inset-y-0 w-[min(88vw,360px)] max-w-[360px] lg:hidden print:hidden pt-[env(safe-area-inset-top,0px)] z-[var(--sx-z-drawer)]',
           isRtl ? 'right-0' : 'left-0',
         )}
       >

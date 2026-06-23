@@ -2380,6 +2380,7 @@ html.dark .parent-page-title {
 
 /* ── Notification Center — SchoolixIQ (Navy + Gold) ── */
 .sx-notif-overlay {
+  z-index: var(--sx-z-modal);
   --sx-navy: var(--sx-primary);
   --sx-gold: var(--sx-gold);
   --sx-bg: var(--sx-bg);

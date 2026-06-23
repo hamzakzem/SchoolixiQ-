@@ -264,7 +264,6 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     if (activeTab === "chat" && isSidebarOpen && window.innerWidth < 1024) {
-      console.info("[Layout] MENU_CLOSED_FOR_CHAT");
       setIsSidebarOpen(false);
     }
   }, [activeTab, isSidebarOpen]);
@@ -1652,20 +1651,7 @@ export default function SuperAdminDashboard() {
       className="h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
-      {/* Sidebar Mockup matching theme */}
-      {/* Sidebar Overlay for Mobile */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[var(--sx-z-drawer-backdrop)] lg:hidden"
-          />
-        )}
-      </AnimatePresence>
-
+      {/* Sidebar */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
           <motion.aside
@@ -1673,7 +1659,7 @@ export default function SuperAdminDashboard() {
             animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
             exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`bg-slate-900 dark:bg-black text-white flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l rounded-l-[2rem] lg:rounded-none" : "left-0 border-r rounded-r-[2rem] lg:rounded-none"} z-[var(--sx-z-drawer)] lg:relative lg:z-auto border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-visible pt-[env(safe-area-inset-top,0px)]`}
+            className={`bg-slate-900 dark:bg-black text-white hidden lg:flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l lg:rounded-none" : "left-0 border-r lg:rounded-none"} z-[var(--sx-z-drawer)] lg:relative lg:z-auto border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-hidden pt-[env(safe-area-inset-top,0px)]`}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { drawerPanelProps, modalBackdropProps, MOTION_SPRING, prefersReducedMotion } from "../lib/motion";
 import {
@@ -9,8 +10,6 @@ import {
   Menu,
   X,
   Search,
-  ChevronRight,
-  ChevronLeft,
   LogOut,
 } from "lucide-react";
 
@@ -120,13 +119,40 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   };
 
   const menuPanelShellClasses = isLightMenu
-    ? "parent-dashboard-menu parent-menu-panel"
-    : "bg-[#0B2345] dark:bg-slate-950 border-t border-[#D4A64A]/30 text-white";
+    ? "parent-dashboard-menu"
+    : "sx-drawer-panel--dark";
+
+  const drawerOpen = isSidebarOpen || showQuickAccess;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (drawerOpen) {
+      document.documentElement.classList.add("sx-drawer-open");
+    } else {
+      document.documentElement.classList.remove("sx-drawer-open");
+    }
+    return () => document.documentElement.classList.remove("sx-drawer-open");
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (showQuickAccess) setShowQuickAccess(false);
+      else if (isSidebarOpen) setIsSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isSidebarOpen, showQuickAccess, setIsSidebarOpen]);
+
+  const closeServicesMenu = () => setIsSidebarOpen(false);
+
+  const renderDrawerPortal = (node: React.ReactNode) =>
+    typeof document !== "undefined" ? createPortal(node, document.body) : null;
 
   return (
     <>
       {/* Mobile Bottom Dock Bar */}
-      <div className="fixed bottom-0 inset-x-0 z-[45] lg:hidden bg-gradient-to-t from-slate-950 to-slate-900/95 border-t border-slate-800/80 backdrop-blur-lg pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-3 px-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] print:hidden w-full">
+      <div className="sx-mobile-dock fixed bottom-0 inset-x-0 lg:hidden bg-gradient-to-t from-slate-950 to-slate-900/95 border-t border-slate-800/80 backdrop-blur-lg pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-3 px-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] print:hidden w-full">
         <div className="max-w-md mx-auto flex items-center justify-between gap-2">
           {/* 1. Home Button */}
           <button
@@ -289,241 +315,198 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
         </div>
       </div>
 
-      {/* Modern Slide-up Bento Hub Overlay */}
-      <AnimatePresence>
-        {showQuickAccess && (
-          <div className="fixed inset-0 z-[var(--sx-z-drawer)] overflow-hidden lg:hidden">
-            {/* Backdrop glass blur */}
-            <motion.div
-              {...modalBackdropProps()}
-              onClick={() => setShowQuickAccess(false)}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
-            />
-
-            {/* Sliding Panel */}
-            <motion.div
-              {...drawerPanelProps(true)}
-              className={`absolute bottom-0 inset-x-0 rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+20px)] ${menuPanelShellClasses}`}
-            >
-              {/* Header block with pull pill */}
-              <div className="p-6 pb-3 shrink-0 relative flex flex-col items-center">
-                <div
-                  className={`w-12 h-1.5 rounded-full mb-5 cursor-pointer ${
-                    isLightMenu
-                      ? "bg-slate-200 hover:bg-slate-300"
-                      : "bg-slate-500/30 hover:bg-slate-500/50"
-                  }`}
-                  onClick={() => setShowQuickAccess(false)}
-                />
-                <div className="w-full flex items-center justify-between" dir={isRtl ? "rtl" : "ltr"}>
-                  <div>
-                    <h3
-                      className={`parent-menu-title text-xl font-black font-display tracking-tight flex items-center gap-2 ${
-                        isLightMenu ? "" : "text-white"
-                      }`}
-                    >
-                      <Grid className="text-[#D4A64A] w-5 h-5" />
-                      <span>{isRtl ? "بوابة الصلاحيات والوصول السريع" : "Quick Access Gateway"}</span>
-                    </h3>
-                    <p className={`parent-menu-subtitle text-xs mt-0.5 ${isLightMenu ? "" : "text-slate-400"}`}>
-                      {isRtl ? "الوصول السريع والآمن لكافة أقسام المنصة" : "Secure quick-access portal to all components"}
-                    </p>
-                  </div>
-                  <button
+      {/* Quick Access hub — bottom sheet */}
+      {renderDrawerPortal(
+        <AnimatePresence>
+          {showQuickAccess && (
+            <div className="sx-drawer-root lg:hidden" role="dialog" aria-modal="true" aria-label={isRtl ? "الوصول السريع" : "Quick access"}>
+              <motion.button
+                type="button"
+                {...modalBackdropProps()}
+                onClick={() => setShowQuickAccess(false)}
+                className="sx-drawer-backdrop"
+                aria-label={isRtl ? "إغلاق" : "Close"}
+              />
+              <motion.div
+                {...drawerPanelProps(true)}
+                className={`sx-drawer-panel sx-drawer-panel--bottom ${menuPanelShellClasses}`}
+                dir={isRtl ? "rtl" : "ltr"}
+              >
+                <div className="sx-drawer-panel__header flex-col items-center">
+                  <div
+                    className={`w-12 h-1.5 rounded-full mb-3 cursor-pointer ${
+                      isLightMenu ? "bg-slate-200" : "bg-slate-500/30"
+                    }`}
                     onClick={() => setShowQuickAccess(false)}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all active:scale-95 ${
-                      isLightMenu
-                        ? "bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 border-slate-200"
-                        : "bg-slate-800/60 text-slate-300 hover:text-white border-slate-700/50 hover:bg-slate-800"
-                    }`}
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                {/* Instant Filter Search input */}
-                <div className="w-full mt-4 relative" dir={isRtl ? "rtl" : "ltr"}>
-                  <Search
-                    className={`absolute top-1/2 -translate-y-1/2 ${isLightMenu ? "text-slate-400" : "text-slate-400"} ${isRtl ? "right-4" : "left-4"}`}
-                    size={16}
+                    role="presentation"
                   />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder={isRtl ? "البحث عن صلاحية أو قسم معين..." : "Search permissions & details..."}
-                    className={`w-full h-11 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#D4A64A] border ${
-                      isLightMenu
-                        ? `parent-menu-search ${isRtl ? "pr-11 pl-4" : "pl-11 pr-4"}`
-                        : `bg-slate-900/60 text-white placeholder-slate-500 border-slate-800/80 ${isRtl ? "pr-11 pl-4" : "pl-11 pr-4"}`
-                    }`}
-                  />
-                  {searchTerm && (
+                  <div className="w-full flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className={`sx-drawer-panel__title flex items-center gap-2 ${isLightMenu ? "parent-menu-title" : ""}`}>
+                        <Grid className="text-[#D4A64A] w-5 h-5 shrink-0" />
+                        <span className="truncate">{isRtl ? "بوابة الصلاحيات والوصول السريع" : "Quick Access Gateway"}</span>
+                      </h3>
+                      <p className={`sx-drawer-panel__subtitle ${isLightMenu ? "parent-menu-subtitle" : ""}`}>
+                        {isRtl ? "الوصول السريع والآمن لكافة أقسام المنصة" : "Secure quick-access portal to all components"}
+                      </p>
+                    </div>
                     <button
-                      onClick={() => setSearchTerm("")}
-                      className={`absolute top-1/2 -translate-y-1/2 hover:text-slate-800 ${isLightMenu ? "text-slate-400" : "text-slate-400 hover:text-white"} ${isRtl ? "left-4" : "right-4"}`}
+                      type="button"
+                      onClick={() => setShowQuickAccess(false)}
+                      className="sx-action-btn sx-action-btn-icon shrink-0"
+                      aria-label={isRtl ? "إغلاق" : "Close"}
                     >
-                      <X size={14} />
+                      <X size={18} className="sx-action-icon" strokeWidth={2.4} />
                     </button>
-                  )}
+                  </div>
+                  <div className="w-full mt-3 relative">
+                    <Search
+                      className={`absolute top-1/2 -translate-y-1/2 text-slate-400 ${isRtl ? "right-3" : "left-3"}`}
+                      size={16}
+                    />
+                    <input
+                      type="search"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder={isRtl ? "البحث عن صلاحية أو قسم معين..." : "Search permissions & details..."}
+                      className={`w-full h-11 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#D4A64A] border ${
+                        isLightMenu
+                          ? `parent-menu-search bg-white ${isRtl ? "pr-10 pl-3" : "pl-10 pr-3"}`
+                          : `bg-slate-900/60 text-white placeholder-slate-500 border-slate-800/80 ${isRtl ? "pr-10 pl-3" : "pl-10 pr-3"}`
+                      }`}
+                    />
+                  </div>
                 </div>
-              </div>
-
-              {/* Bento Grid Content Container */}
-              <div className="flex-1 overflow-y-auto px-6 py-2 custom-scrollbar" dir={isRtl ? "rtl" : "ltr"}>
-                {filteredQuickAccess.length > 0 ? (
-                  <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 gap-3">
-                    {filteredQuickAccess.map((item, index) => {
-                      const Icon = item.icon;
-                      const isActive = activeTab === item.id;
-                      return (
-                        <motion.button
-                          key={item.id}
-                          initial={{ opacity: 0, y: 15 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.03 }}
-                          onClick={() => handleTabClick(item.id)}
-                          className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] select-none text-right group min-h-[4.5rem] justify-between ${menuItemClasses(isActive)}`}
-                        >
-                          <div className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
-                            <Icon className={isLightMenu ? "parent-menu-icon" : undefined} size={20} strokeWidth={isActive ? 2.5 : 1.5} />
-                          </div>
-                          
-                          <div className="w-full">
-                            <p className={`text-xs font-black tracking-tight leading-snug break-words ${menuLabelClasses(isActive)}`}>
+                <div className="sx-drawer-panel__body px-0.5">
+                  {filteredQuickAccess.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {filteredQuickAccess.map((item, index) => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === item.id;
+                        return (
+                          <motion.button
+                            key={item.id}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.03 }}
+                            onClick={() => handleTabClick(item.id)}
+                            className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] min-h-[4.5rem] justify-between ${menuItemClasses(isActive)}`}
+                          >
+                            <div className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
+                              <Icon className={isLightMenu ? "parent-menu-icon" : undefined} size={20} strokeWidth={isActive ? 2.5 : 1.5} />
+                            </div>
+                            <p className={`text-xs font-black tracking-tight leading-snug break-words w-full ${menuLabelClasses(isActive)}`}>
                               {item.label}
                             </p>
-                          </div>
-                          
-                          <div className={`absolute ${isRtl ? "left-3" : "right-3"} bottom-3 opacity-0 group-hover:opacity-100 transition-opacity ${isLightMenu ? "text-slate-400" : ""}`}>
-                            {isRtl ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
-                          </div>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                    <p className="text-sm font-semibold">{isRtl ? "لم يتم العثور على صلاحيات تطابق بحثك" : "No matching permissions found"}</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                      <p className="text-sm font-semibold">{isRtl ? "لم يتم العثور على صلاحيات تطابق بحثك" : "No matching permissions found"}</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+      )}
 
-      {/* Mobile full services menu (More / three-line) */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <div className="fixed inset-0 z-[var(--sx-z-drawer)] overflow-hidden lg:hidden">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsSidebarOpen(false)}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className={`absolute bottom-0 inset-x-0 rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+20px)] ${menuPanelShellClasses}`}
-              dir={isRtl ? "rtl" : "ltr"}
-            >
-              <div className="p-6 pb-3 shrink-0 relative flex flex-col items-center">
-                <div
-                  className={`w-12 h-1.5 rounded-full mb-5 cursor-pointer ${
-                    isLightMenu
-                      ? "bg-slate-200 hover:bg-slate-300"
-                      : "bg-slate-500/30 hover:bg-slate-500/50"
-                  }`}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <div className="w-full flex items-center justify-between">
-                  <div>
-                    <h3
-                      className={`parent-menu-title text-xl font-black font-display tracking-tight flex items-center gap-2 ${
-                        isLightMenu ? "" : "text-white"
-                      }`}
-                    >
-                      <Menu className="text-[#D4A64A] w-5 h-5" />
-                      <span>{isRtl ? "خدمات ولي الأمر" : "Parent Services"}</span>
+      {/* Three-lines services menu — side drawer */}
+      {renderDrawerPortal(
+        <AnimatePresence>
+          {isSidebarOpen && (
+            <div className="sx-drawer-root lg:hidden" role="dialog" aria-modal="true" aria-label={isRtl ? "قائمة الخدمات" : "Services menu"}>
+              <motion.button
+                type="button"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={closeServicesMenu}
+                className="sx-drawer-backdrop"
+                aria-label={isRtl ? "إغلاق القائمة" : "Close menu"}
+              />
+              <motion.aside
+                initial={{ x: isRtl ? "100%" : "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: isRtl ? "100%" : "-100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 280 }}
+                className={`sx-drawer-panel ${isRtl ? "sx-drawer-panel--rtl" : "sx-drawer-panel--ltr"} ${menuPanelShellClasses}`}
+                dir={isRtl ? "rtl" : "ltr"}
+              >
+                <div className="sx-drawer-panel__header">
+                  <div className="min-w-0">
+                    <h3 className={`sx-drawer-panel__title flex items-center gap-2 ${isLightMenu ? "parent-menu-title" : ""}`}>
+                      <Menu className="text-[#D4A64A] w-5 h-5 shrink-0" />
+                      <span className="truncate">{isRtl ? "خدمات ولي الأمر" : "Dashboard Services"}</span>
                     </h3>
-                    <p className={`text-xs mt-0.5 ${isLightMenu ? "parent-menu-subtitle" : "text-slate-400"}`}>
+                    <p className={`sx-drawer-panel__subtitle ${isLightMenu ? "parent-menu-subtitle" : ""}`}>
                       {isRtl ? "جميع أقسام لوحة التحكم" : "All dashboard sections"}
                     </p>
                   </div>
                   <button
-                    onClick={() => setIsSidebarOpen(false)}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all active:scale-95 ${
-                      isLightMenu
-                        ? "bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 border-slate-200"
-                        : "bg-slate-800/60 text-slate-300 hover:text-white border-slate-700/50 hover:bg-slate-800"
-                    }`}
+                    type="button"
+                    onClick={closeServicesMenu}
+                    className="sx-action-btn sx-action-btn-icon shrink-0"
+                    aria-label={isRtl ? "إغلاق" : "Close"}
                   >
-                    <X size={18} />
+                    <X size={18} className="sx-action-icon" strokeWidth={2.4} />
                   </button>
                 </div>
-              </div>
-              <div className="flex-1 overflow-y-auto px-6 py-2 custom-scrollbar">
-                {menuItems.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    {menuItems.map((item, index) => {
-                      const Icon = item.icon;
-                      const isActive = activeTab === item.id;
-                      return (
-                        <motion.button
-                          key={item.id}
-                          initial={{ opacity: 0, y: 15 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.03 }}
-                          onClick={() => handleTabClick(item.id)}
-                          className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] min-h-[4.5rem] justify-between ${menuItemClasses(isActive)}`}
-                        >
-                          <div className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
-                            <Icon className={isLightMenu ? "parent-menu-icon" : undefined} size={20} strokeWidth={isActive ? 2.5 : 1.5} />
-                          </div>
-                          <p className={`text-xs font-black tracking-tight leading-snug break-words w-full ${menuLabelClasses(isActive)}`}>
-                            {item.label}
-                          </p>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                    <p className="text-sm font-semibold">
-                      {isRtl ? "لا توجد خدمات متاحة" : "No services available"}
-                    </p>
+                <div className="sx-drawer-panel__body">
+                  {menuItems.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {menuItems.map((item, index) => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === item.id;
+                        return (
+                          <motion.button
+                            key={item.id}
+                            initial={{ opacity: 0, x: isRtl ? 12 : -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.02 }}
+                            onClick={() => handleTabClick(item.id)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all active:scale-[0.98] ${menuItemClasses(isActive)}`}
+                          >
+                            <div className={`p-2 rounded-lg shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
+                              <Icon className={isLightMenu ? "parent-menu-icon" : undefined} size={18} strokeWidth={isActive ? 2.5 : 1.5} />
+                            </div>
+                            <span className={`text-sm font-bold truncate flex-1 text-start ${menuLabelClasses(isActive)}`}>
+                              {item.label}
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                      <p className="text-sm font-semibold">{isRtl ? "لا توجد خدمات متاحة" : "No services available"}</p>
+                    </div>
+                  )}
+                </div>
+                {onLogout && (
+                  <div className="sx-drawer-panel__footer">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.98] ${
+                        isLightMenu
+                          ? "parent-menu-logout border"
+                          : "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400"
+                      }`}
+                    >
+                      <LogOut size={18} className="shrink-0" />
+                      <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
+                    </button>
                   </div>
                 )}
-              </div>
-              {onLogout && (
-                <div
-                  className={`shrink-0 px-6 pt-2 pb-1 border-t ${
-                    isLightMenu ? "border-slate-200 dark:border-slate-700" : "border-slate-800/80"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] ${
-                      isLightMenu
-                        ? "parent-menu-logout border"
-                        : "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300"
-                    }`}
-                  >
-                    <LogOut size={18} className="shrink-0" />
-                    <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </motion.aside>
+            </div>
+          )}
+        </AnimatePresence>,
+      )}
     </>
   );
 };

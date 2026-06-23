@@ -31,10 +31,10 @@
   --sx-z-content: 0;
   --sx-z-chat-chrome: 20;
   --sx-z-header: 40;
-  --sx-z-drawer-backdrop: 45;
-  --sx-z-drawer: 50;
-  --sx-z-popover: 60;
-  --sx-z-modal: 100;
+  --sx-z-drawer-backdrop: 80;
+  --sx-z-drawer: 90;
+  --sx-z-popover: 100;
+  --sx-z-modal: 120;
 
   /* Legacy aliases used across the app */
   --color-primary: var(--sx-primary);
