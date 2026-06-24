@@ -111,14 +111,12 @@ export function DashboardSidebar({
     <AnimatePresence mode="wait">
       {isOpen ? (
         <motion.aside
-          initial={{ x: isRtl ? 280 : -280, opacity: 0 }}
-          animate={{ x: 0, opacity: 1, width: isCollapsed ? 76 : 272 }}
-          exit={{ x: isRtl ? 280 : -280, opacity: 0 }}
+          layout
           transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
           className={clsx(
-            'flex-col shrink-0 fixed inset-y-0 shadow-2xl lg:shadow-none overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)] hidden lg:flex border',
-            'z-[var(--sx-z-drawer)] lg:z-auto',
-            isRtl ? 'right-0 border-l' : 'left-0 border-r',
+            'sx-dashboard-sidebar sx-shell-sidebar overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)] border',
+            isCollapsed && 'sx-shell-sidebar--collapsed',
+            isRtl ? 'border-l' : 'border-r',
             sidebarSurface(variant),
           )}
         >

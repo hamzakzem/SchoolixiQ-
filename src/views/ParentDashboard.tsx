@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import React from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { clsx } from "clsx";
 import { db, auth } from "../lib/firebase";
 import { signOutWithCleanup } from "../lib/authLogout";
 import {
@@ -1606,17 +1606,19 @@ export default function ParentDashboard() {
 
     return (
       <div
-        className="parent-app sx-shell-layout h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
+        className="parent-app sx-dashboard-layout sx-shell-layout h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
         dir={isRtl ? "rtl" : "ltr"}
       >
         <AnimatePresence mode="wait">
           {isSidebarOpen && (
             <motion.aside
-              initial={{ x: isRtl ? 300 : -300, opacity: 0 }}
-              animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
-              exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
+              layout
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className={`parent-dashboard-menu hidden lg:flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l lg:rounded-none" : "left-0 border-r lg:rounded-none"} z-[var(--sx-z-drawer)] lg:relative lg:z-auto border-slate-200 transition-colors shadow-2xl lg:shadow-none overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)]`}
+              className={clsx(
+                'parent-dashboard-menu sx-dashboard-sidebar sx-shell-sidebar border-slate-200 transition-colors overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)]',
+                isSidebarCollapsed && 'sx-shell-sidebar--collapsed',
+                isRtl ? 'border-l' : 'border-r',
+              )}
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
                 <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
@@ -1692,8 +1694,8 @@ export default function ParentDashboard() {
           )}
         </AnimatePresence>
 
-        <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className="parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden">
+        <div className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
+        <header className="parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
           <div className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-3">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -1801,7 +1803,7 @@ export default function ParentDashboard() {
           </div>
         </header>
 
-        <main className={`parent-app-main sx-shell-content flex-1 flex flex-col print:overflow-visible min-h-0 ${isSidebarOpen && !isSidebarCollapsed ? 'sx-shell-content--with-sidebar' : ''} ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
+        <div className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -2500,7 +2502,7 @@ export default function ParentDashboard() {
             </motion.div>
           </AnimatePresence>
           {activeTab !== "chat" && <GlobalFooter compact />}
-        </main>
+        </div>
 
         {/* Floating/Sticky Mobile Navigation Dock for Parents */}
         <MobileNavigationDock

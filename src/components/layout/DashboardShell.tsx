@@ -132,7 +132,7 @@ export function DashboardShell({
   return (
     <div
       className={clsx(
-        'sx-shell sx-shell-layout bg-sx-surface transition-colors print:overflow-visible print:h-auto print:block',
+        'sx-shell sx-dashboard-layout sx-shell-layout bg-sx-surface transition-colors print:overflow-visible print:h-auto print:block',
         className,
       )}
       dir={isRtl ? 'rtl' : 'ltr'}
@@ -157,9 +157,8 @@ export function DashboardShell({
 
       <div
         className={clsx(
-          'sx-shell-content print:overflow-visible print:h-auto',
+          'sx-dashboard-content sx-shell-content print:overflow-visible print:h-auto',
           fullHeightTab && 'sx-shell-main--chat',
-          isSidebarOpen && !isSidebarCollapsed && 'sx-shell-content--with-sidebar',
         )}
       >
         <DashboardHeader

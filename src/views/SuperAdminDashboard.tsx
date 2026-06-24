@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { clsx } from "clsx";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { signOutWithCleanup } from "../lib/authLogout";
@@ -1648,18 +1649,20 @@ export default function SuperAdminDashboard() {
 
   return (
     <div
-      className="sx-shell-layout h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
+      className="sx-dashboard-layout sx-shell-layout h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Sidebar */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
           <motion.aside
-            initial={{ x: isRtl ? 300 : -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 288 }}
-            exit={{ x: isRtl ? 300 : -300, opacity: 0 }}
+            layout
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className={`bg-slate-900 dark:bg-black text-white hidden lg:flex flex-col shrink-0 fixed inset-y-0 ${isRtl ? "right-0 border-l lg:rounded-none" : "left-0 border-r lg:rounded-none"} z-[var(--sx-z-drawer)] lg:relative lg:z-auto border-slate-800 dark:border-slate-800 transition-colors shadow-2xl lg:shadow-none overflow-hidden pt-[env(safe-area-inset-top,0px)]`}
+            className={clsx(
+              'bg-slate-900 dark:bg-black text-white sx-dashboard-sidebar sx-shell-sidebar border-slate-800 dark:border-slate-800 transition-colors overflow-hidden pt-[env(safe-area-inset-top,0px)]',
+              isSidebarCollapsed && 'sx-shell-sidebar--collapsed',
+              isRtl ? 'border-l' : 'border-r',
+            )}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
@@ -2103,7 +2106,7 @@ export default function SuperAdminDashboard() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
+      <main className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
         <header className="min-h-[5rem] h-auto pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-[var(--sx-z-header)] print:hidden">
           <div className="flex items-center gap-1.5 sm:gap-4 min-w-0">
             <button
@@ -2245,7 +2248,7 @@ export default function SuperAdminDashboard() {
         )}
 
         <div
-          className={`sx-shell-content flex-1 flex flex-col print:overflow-visible min-h-0 ${isSidebarOpen && !isSidebarCollapsed ? 'sx-shell-content--with-sidebar' : ''} ${activeTab === "chat" ? "overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat" : "overflow-y-auto custom-scrollbar pb-28 lg:pb-10"}`}
+          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat" : "overflow-y-auto custom-scrollbar pb-28 lg:pb-10"}`}
         >
           <AnimatePresence mode="wait">
             <motion.div

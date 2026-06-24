@@ -683,12 +683,20 @@ html.dark .sx-action-btn-ghost {
 }
 
 /* ─── Mobile / tablet drawer (permissions & navigation menu) ─── */
+#sx-app-drawer-portal {
+  /* Transparent mount — children use position:fixed + z-index tokens at document level */
+  pointer-events: none;
+}
+
+#sx-app-drawer-portal.sx-app-drawer-portal--active {
+  pointer-events: auto;
+}
+
 .sx-drawer-root {
   position: fixed;
   inset: 0;
-  z-index: var(--sx-z-drawer);
+  z-index: var(--sx-z-drawer-backdrop);
   pointer-events: none;
-  isolation: isolate;
 }
 
 .sx-drawer-backdrop {
@@ -718,6 +726,7 @@ html.dark .sx-action-btn-ghost {
   flex-direction: column;
   pointer-events: auto;
   background: #ffffff;
+  opacity: 1;
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.25);
   overflow-y: auto;
   overflow-x: hidden;
@@ -728,12 +737,12 @@ html.dark .sx-action-btn-ghost {
 
 .sx-drawer-panel--ltr {
   left: 0;
-  border-inline-end: 1px solid var(--sx-border);
+  border-inline-end: 1px solid rgba(212, 175, 55, 0.35);
 }
 
 .sx-drawer-panel--rtl {
   right: 0;
-  border-inline-start: 1px solid var(--sx-border);
+  border-inline-start: 1px solid rgba(212, 175, 55, 0.35);
 }
 
 .sx-drawer-panel--light {
@@ -741,10 +750,16 @@ html.dark .sx-action-btn-ghost {
   color: var(--sx-primary);
 }
 
+.sx-drawer-panel--services {
+  background: #ffffff !important;
+  color: var(--sx-primary);
+  opacity: 1;
+}
+
 .sx-drawer-panel--dark {
   background: var(--sx-primary);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(212, 175, 55, 0.35);
 }
 
 .sx-drawer-panel--bottom {
@@ -818,19 +833,60 @@ html.dark .sx-action-btn-ghost {
 }
 
 /* ─── Dashboard shell layout (sidebar + content gap) ─── */
+.sx-dashboard-layout,
 .sx-shell-layout {
   display: flex;
+  flex-direction: row;
+  align-items: stretch;
   height: 100dvh;
   width: 100%;
   overflow: hidden;
 }
 
+@media (min-width: 1024px) {
+  .sx-dashboard-layout,
+  .sx-shell-layout {
+    gap: 24px;
+  }
+}
+
+/* Desktop: in-flow navigation rail. Mobile: hidden (overlay drawer via MobileNavigationDock). */
+.sx-dashboard-sidebar,
+.sx-shell-sidebar {
+  display: none;
+  flex-shrink: 0;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  position: relative;
+}
+
+@media (min-width: 1024px) {
+  .sx-dashboard-sidebar,
+  .sx-shell-sidebar {
+    display: flex;
+    width: 340px;
+    min-width: 320px;
+    max-width: 360px;
+  }
+
+  .sx-dashboard-sidebar--collapsed,
+  .sx-shell-sidebar--collapsed {
+    width: 76px;
+    min-width: 76px;
+    max-width: 76px;
+  }
+}
+
+.sx-dashboard-content,
 .sx-shell-content {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100dvh;
+  max-height: 100dvh;
   overflow: hidden;
 }
 
@@ -844,12 +900,9 @@ html.dark .sx-action-btn-ghost {
 }
 
 @media (min-width: 1024px) {
-  .sx-shell-content--with-sidebar {
-    padding-inline-start: clamp(20px, 2vw, 24px);
-  }
-
-  [dir='rtl'] .sx-shell-content--with-sidebar {
-    padding-inline-end: clamp(20px, 2vw, 24px);
+  .sx-shell-content-inner {
+    gap: 24px;
+    padding: 24px;
   }
 }
 
@@ -863,21 +916,46 @@ html.dark .sx-action-btn-ghost {
   gap: 0;
 }
 
-html.dark .sx-drawer-panel,
-html.dark .sx-drawer-panel--light {
+html.dark .sx-drawer-panel--dark {
   background: #0f172a;
   border-color: var(--sx-border);
 }
 
+html.dark .sx-drawer-panel--services,
+html.dark .sx-drawer-panel--services.sx-drawer-panel--light {
+  background: #ffffff !important;
+  color: var(--sx-primary);
+  border-color: rgba(212, 175, 55, 0.35);
+}
+
 html.sx-drawer-open,
-html.sx-drawer-open body {
+html.sx-drawer-open body,
+body.sx-drawer-open {
   overflow: hidden;
   overflow-x: hidden;
 }
 
-html.sx-drawer-open .sx-shell-content,
-html.sx-drawer-open .parent-app-main,
-html.sx-drawer-open main.flex-1 {
+html.sx-drawer-open #root {
   pointer-events: none;
   user-select: none;
+  position: relative;
+  z-index: var(--sx-z-content);
+}
+
+html.sx-drawer-open #sx-app-drawer-portal {
+  pointer-events: auto;
+}
+
+html.sx-drawer-open .sx-shell-content,
+html.sx-drawer-open .sx-dashboard-content,
+html.sx-drawer-open .parent-app-main,
+html.sx-drawer-open main.flex-1,
+html.sx-drawer-open .sx-shell-content-inner,
+html.sx-drawer-open .sx-shell-content-inner > * {
+  pointer-events: none;
+}
+
+html.sx-drawer-open .sx-mobile-dock {
+  z-index: var(--sx-z-header);
+  pointer-events: none;
 }
