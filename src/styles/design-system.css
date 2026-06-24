@@ -896,14 +896,23 @@ html.dark .sx-action-btn-ghost {
   flex: 1;
   min-height: 0;
   gap: 20px;
-  padding-inline: clamp(16px, 2vw, 28px);
+  padding: clamp(16px, 2vw, 28px);
+  overflow-x: hidden;
 }
 
 @media (min-width: 1024px) {
   .sx-shell-content-inner {
     gap: 24px;
-    padding: 24px;
   }
+}
+
+/* Single scroll region inside dashboard content column */
+.sx-shell-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sx-shell-main--chat {
@@ -912,7 +921,7 @@ html.dark .sx-action-btn-ghost {
 }
 
 .sx-shell-main--chat .sx-shell-content-inner {
-  padding-inline: 0;
+  padding: 0;
   gap: 0;
 }
 
@@ -935,6 +944,7 @@ body.sx-drawer-open {
   overflow-x: hidden;
 }
 
+/* Interaction safety: never disable #root or dashboard wrappers — drawer only. */
 html.sx-drawer-open #sx-app-drawer-portal {
   pointer-events: auto;
 }

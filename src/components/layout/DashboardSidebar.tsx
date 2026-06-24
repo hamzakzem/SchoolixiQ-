@@ -115,7 +115,7 @@ export function DashboardSidebar({
           transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
           className={clsx(
             'sx-dashboard-sidebar sx-shell-sidebar overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)] border',
-            isCollapsed && 'sx-shell-sidebar--collapsed',
+            isCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
             isRtl ? 'border-l' : 'border-r',
             sidebarSurface(variant),
           )}

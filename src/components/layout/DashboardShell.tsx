@@ -176,20 +176,20 @@ export function DashboardShell({
 
         <div
           className={clsx(
-            'flex-1 flex flex-col min-h-0 print:overflow-visible',
+            'sx-shell-scroll custom-scrollbar print:overflow-visible',
             fullHeightTab
               ? hideMobileDock
                 ? 'overflow-hidden pb-0'
                 : 'overflow-hidden pb-[72px] lg:pb-0'
-              : 'overflow-y-auto custom-scrollbar pb-[88px] lg:pb-8',
+              : 'pb-[88px] lg:pb-8',
           )}
         >
           <div
             className={clsx(
-              'sx-shell-content-inner custom-scrollbar',
+              'sx-shell-content-inner',
               fullHeightTab
-                ? 'h-full w-full flex flex-col min-h-0 overflow-hidden flex-1'
-                : 'w-full max-w-7xl mx-auto py-5 md:py-8 sx-fade-in flex-1 overflow-y-auto',
+                ? 'h-full w-full flex flex-col min-h-0 overflow-hidden flex-1 !p-0 !gap-0'
+                : 'w-full max-w-7xl mx-auto sx-fade-in flex-1',
             )}
           >
             {children}

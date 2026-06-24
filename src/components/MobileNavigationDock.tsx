@@ -161,13 +161,13 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || !isMobileViewport) return;
       if (showQuickAccess) setShowQuickAccess(false);
       else if (isSidebarOpen) setIsSidebarOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isSidebarOpen, showQuickAccess, setIsSidebarOpen]);
+  }, [isSidebarOpen, showQuickAccess, setIsSidebarOpen, isMobileViewport]);
 
   const closeServicesMenu = () => setIsSidebarOpen(false);
 
@@ -346,8 +346,8 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
         </div>
       </div>
 
-      {/* Quick Access hub — bottom sheet */}
-      {renderDrawerPortal(
+      {/* Quick Access hub — bottom sheet (mobile/tablet only) */}
+      {isMobileViewport && renderDrawerPortal(
         <AnimatePresence>
           {showQuickAccess && (
             <div className="sx-drawer-root lg:hidden" role="dialog" aria-modal="true" aria-label={isRtl ? "الوصول السريع" : "Quick access"}>
@@ -445,8 +445,8 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
         </AnimatePresence>,
       )}
 
-      {/* Three-lines services menu — side drawer */}
-      {renderDrawerPortal(
+      {/* Three-lines services menu — side drawer (mobile/tablet only) */}
+      {isMobileViewport && renderDrawerPortal(
         <AnimatePresence>
           {isSidebarOpen && (
             <>

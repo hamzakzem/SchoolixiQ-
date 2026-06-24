@@ -1660,7 +1660,7 @@ export default function SuperAdminDashboard() {
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             className={clsx(
               'bg-slate-900 dark:bg-black text-white sx-dashboard-sidebar sx-shell-sidebar border-slate-800 dark:border-slate-800 transition-colors overflow-hidden pt-[env(safe-area-inset-top,0px)]',
-              isSidebarCollapsed && 'sx-shell-sidebar--collapsed',
+              isSidebarCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
               isRtl ? 'border-l' : 'border-r',
             )}
           >
@@ -2248,7 +2248,7 @@ export default function SuperAdminDashboard() {
         )}
 
         <div
-          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat" : "overflow-y-auto custom-scrollbar pb-28 lg:pb-10"}`}
+          className={`sx-shell-scroll flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat" : "pb-28 lg:pb-10"}`}
         >
           <AnimatePresence mode="wait">
             <motion.div
