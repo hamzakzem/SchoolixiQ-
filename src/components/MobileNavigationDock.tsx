@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
+import { getDrawerPortalNode } from "../lib/drawerPortal";
 import { drawerPanelProps, modalBackdropProps, MOTION_SPRING, prefersReducedMotion } from "../lib/motion";
 import {
   LayoutDashboard,
@@ -122,17 +123,41 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
     ? 'sx-drawer-panel--light'
     : 'sx-drawer-panel--dark';
 
-  const drawerOpen = isSidebarOpen || showQuickAccess;
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 1024,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const sync = () => setIsMobileViewport(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  /** Mobile/tablet overlay only — desktop docked sidebar must not lock the page. */
+  const mobileOverlayOpen =
+    isMobileViewport && (showQuickAccess || isSidebarOpen);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (drawerOpen) {
+    const portal = document.getElementById("sx-app-drawer-portal");
+    if (mobileOverlayOpen) {
       document.documentElement.classList.add("sx-drawer-open");
+      document.body.classList.add("sx-drawer-open");
+      portal?.classList.add("sx-app-drawer-portal--active");
     } else {
       document.documentElement.classList.remove("sx-drawer-open");
+      document.body.classList.remove("sx-drawer-open");
+      portal?.classList.remove("sx-app-drawer-portal--active");
     }
-    return () => document.documentElement.classList.remove("sx-drawer-open");
-  }, [drawerOpen]);
+    return () => {
+      document.documentElement.classList.remove("sx-drawer-open");
+      document.body.classList.remove("sx-drawer-open");
+      portal?.classList.remove("sx-app-drawer-portal--active");
+    };
+  }, [mobileOverlayOpen]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -146,8 +171,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
 
   const closeServicesMenu = () => setIsSidebarOpen(false);
 
-  const renderDrawerPortal = (node: React.ReactNode) =>
-    typeof document !== "undefined" ? createPortal(node, document.body) : null;
+  const renderDrawerPortal = (node: React.ReactNode) => {
+    if (typeof document === "undefined") return null;
+    try {
+      return createPortal(node, getDrawerPortalNode());
+    } catch {
+      return null;
+    }
+  };
 
   return (
     <>
@@ -418,14 +449,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
       {renderDrawerPortal(
         <AnimatePresence>
           {isSidebarOpen && (
-            <div className="sx-drawer-root lg:hidden" role="dialog" aria-modal="true" aria-label={isRtl ? "قائمة الخدمات" : "Services menu"}>
+            <>
               <motion.button
                 type="button"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeServicesMenu}
-                className="sx-drawer-backdrop"
+                className="sx-drawer-backdrop lg:hidden"
                 aria-label={isRtl ? "إغلاق القائمة" : "Close menu"}
               />
               <motion.aside
@@ -433,16 +464,21 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 animate={{ x: 0 }}
                 exit={{ x: isRtl ? "100%" : "-100%" }}
                 transition={{ type: "spring", damping: 28, stiffness: 280 }}
-                className={`sx-drawer-panel ${isRtl ? "sx-drawer-panel--rtl" : "sx-drawer-panel--ltr"} ${menuPanelShellClasses}`}
+                className={`sx-drawer-panel sx-drawer-panel--light sx-drawer-panel--services lg:hidden ${isRtl ? "sx-drawer-panel--rtl" : "sx-drawer-panel--ltr"}`}
                 dir={isRtl ? "rtl" : "ltr"}
+                role="dialog"
+                aria-modal="true"
+                aria-label={isRtl ? "قائمة الخدمات" : "Services menu"}
               >
                 <div className="sx-drawer-panel__header">
                   <div className="min-w-0">
-                    <h3 className={`sx-drawer-panel__title flex items-center gap-2 ${isLightMenu ? "parent-menu-title" : ""}`}>
-                      <Menu className="text-[#D4A64A] w-5 h-5 shrink-0" />
-                      <span className="truncate">{isRtl ? "خدمات ولي الأمر" : "Dashboard Services"}</span>
+                    <h3 className="sx-drawer-panel__title flex items-center gap-2">
+                      <Menu className="text-[#D4AF37] w-5 h-5 shrink-0 sx-action-icon" strokeWidth={2.4} />
+                      <span className="truncate">
+                        {isRtl ? "الصلاحيات والتنقل" : "Permissions & Navigation"}
+                      </span>
                     </h3>
-                    <p className={`sx-drawer-panel__subtitle ${isLightMenu ? "parent-menu-subtitle" : ""}`}>
+                    <p className="sx-drawer-panel__subtitle">
                       {isRtl ? "جميع أقسام لوحة التحكم" : "All dashboard sections"}
                     </p>
                   </div>
@@ -457,7 +493,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 </div>
                 <div className="sx-drawer-panel__body">
                   {menuItems.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2">
+                    <div className="flex flex-col gap-2">
                       {menuItems.map((item, index) => {
                         const Icon = item.icon;
                         const isActive = activeTab === item.id;
@@ -469,9 +505,9 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                             transition={{ delay: index * 0.02 }}
                             onClick={() => handleTabClick(item.id)}
                             className={`sx-nav-item w-full items-center gap-3 px-3 py-2.5 ${
-                              !isLightMenu ? 'sx-nav-item--dark' : ''
-                            } ${isActive ? 'sx-nav-item--active' : ''}`}
-                            dir={isRtl ? 'rtl' : 'ltr'}
+                              isActive ? "sx-nav-item--active" : ""
+                            }`}
+                            dir={isRtl ? "rtl" : "ltr"}
                           >
                             <Icon className="sx-action-icon shrink-0" size={18} strokeWidth={isActive ? 2.4 : 2} />
                             <span className="truncate flex-1 text-start font-bold text-sm">
@@ -492,19 +528,15 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                     <button
                       type="button"
                       onClick={handleLogout}
-                      className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.98] ${
-                        isLightMenu
-                          ? "parent-menu-logout border"
-                          : "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400"
-                      }`}
+                      className="sx-btn sx-btn-ghost w-full text-[var(--sx-danger)] hover:!bg-red-500/10 items-center justify-center gap-2"
                     >
-                      <LogOut size={18} className="shrink-0" />
-                      <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
+                      <LogOut size={18} className="sx-action-icon shrink-0" strokeWidth={2.4} />
+                      <span className="font-bold text-sm">{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
                     </button>
                   </div>
                 )}
               </motion.aside>
-            </div>
+            </>
           )}
         </AnimatePresence>,
       )}

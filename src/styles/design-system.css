@@ -935,27 +935,11 @@ body.sx-drawer-open {
   overflow-x: hidden;
 }
 
-html.sx-drawer-open #root {
-  pointer-events: none;
-  user-select: none;
-  position: relative;
-  z-index: var(--sx-z-content);
-}
-
 html.sx-drawer-open #sx-app-drawer-portal {
   pointer-events: auto;
 }
 
-html.sx-drawer-open .sx-shell-content,
-html.sx-drawer-open .sx-dashboard-content,
-html.sx-drawer-open .parent-app-main,
-html.sx-drawer-open main.flex-1,
-html.sx-drawer-open .sx-shell-content-inner,
-html.sx-drawer-open .sx-shell-content-inner > * {
-  pointer-events: none;
-}
-
-html.sx-drawer-open .sx-mobile-dock {
-  z-index: var(--sx-z-header);
-  pointer-events: none;
+html.sx-drawer-open .sx-drawer-backdrop,
+html.sx-drawer-open .sx-drawer-panel {
+  pointer-events: auto;
 }
