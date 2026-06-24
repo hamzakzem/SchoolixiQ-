@@ -751,8 +751,9 @@ html.dark .sx-action-btn-ghost {
 }
 
 .sx-drawer-panel--services {
-  background: #ffffff !important;
-  color: var(--sx-primary);
+  padding: 0 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  color: #0f172a;
   opacity: 1;
 }
 
@@ -846,7 +847,24 @@ html.dark .sx-action-btn-ghost {
 @media (min-width: 1024px) {
   .sx-dashboard-layout,
   .sx-shell-layout {
-    gap: 24px;
+    gap: 0;
+  }
+
+  .sx-dashboard-content,
+  .sx-shell-content {
+    border-inline-start: 1px solid var(--sx-border);
+    background: var(--sx-surface, #f8fafc);
+  }
+
+  [dir='rtl'] .sx-dashboard-content,
+  [dir='rtl'] .sx-shell-content {
+    border-inline-start: none;
+    border-inline-end: 1px solid var(--sx-border);
+  }
+
+  html.dark .sx-dashboard-content,
+  html.dark .sx-shell-content {
+    background: #0a101c;
   }
 }
 
@@ -932,8 +950,8 @@ html.dark .sx-drawer-panel--dark {
 
 html.dark .sx-drawer-panel--services,
 html.dark .sx-drawer-panel--services.sx-drawer-panel--light {
-  background: #ffffff !important;
-  color: var(--sx-primary);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  color: #0f172a;
   border-color: rgba(212, 175, 55, 0.35);
 }
 
@@ -952,4 +970,228 @@ html.sx-drawer-open #sx-app-drawer-portal {
 html.sx-drawer-open .sx-drawer-backdrop,
 html.sx-drawer-open .sx-drawer-panel {
   pointer-events: auto;
+}
+
+/* ─── Desktop header / sidebar brand alignment ─── */
+.sx-dashboard-header {
+  min-height: 72px;
+  flex-shrink: 0;
+}
+
+.sx-sidebar-brand {
+  min-height: 72px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--sx-border);
+}
+
+.sx-shell-sidebar.bg-sx-primary .sx-sidebar-brand,
+.sx-shell-sidebar.bg-slate-950 .sx-sidebar-brand,
+.sx-shell-sidebar[class*='bg-slate-9'] .sx-sidebar-brand {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.sx-drawer-services-header {
+  flex-shrink: 0;
+  padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.35);
+  color: #ffffff;
+}
+
+.sx-drawer-services-header__title {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #ffffff;
+}
+
+.sx-drawer-services-header__subtitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 4px;
+}
+
+.sx-drawer-services-header__badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sx-drawer-services-header .sx-action-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.sx-drawer-services-header .sx-action-btn:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: rgba(212, 175, 55, 0.45);
+  color: #d4af37;
+}
+
+.sx-drawer-services-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sx-drawer-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: start;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+.sx-drawer-nav-item .sx-action-icon,
+.sx-drawer-nav-item svg {
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+.sx-drawer-nav-item:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.22);
+}
+
+.sx-drawer-nav-item:hover .sx-action-icon,
+.sx-drawer-nav-item:hover svg {
+  color: #d4af37;
+}
+
+.sx-drawer-nav-item--active {
+  background: rgba(212, 175, 55, 0.14);
+  border-color: rgba(212, 175, 55, 0.35);
+  color: #0f172a;
+}
+
+.sx-drawer-nav-item--active .sx-action-icon,
+.sx-drawer-nav-item--active svg {
+  color: #d4af37;
+}
+
+.sx-drawer-services-footer {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--sx-border);
+  background: #ffffff;
+}
+
+.sx-drawer-services-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  background: rgba(220, 38, 38, 0.06);
+  color: #dc2626;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.sx-drawer-services-logout:hover {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+/* ─── Schools data table panel ─── */
+.sx-schools-table-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sx-schools-table-scroll {
+  max-height: min(62vh, 720px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sx-schools-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(248, 250, 252, 0.98);
+  backdrop-filter: blur(6px);
+}
+
+html.dark .sx-schools-table-scroll thead th {
+  background: rgba(15, 23, 42, 0.98);
+}
+
+.sx-schools-table-pagination {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--sx-border);
+  background: #f8fafc;
+}
+
+html.dark .sx-schools-table-pagination {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.sx-schools-table-pagination__btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--sx-border);
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.sx-schools-table-pagination__btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: rgba(212, 175, 55, 0.35);
+}
+
+.sx-schools-table-pagination__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ─── Hide partner footer inside authenticated dashboards ─── */
+.sx-dashboard-context .sx-global-footer {
+  display: none !important;
 }

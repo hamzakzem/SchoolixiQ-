@@ -1291,7 +1291,7 @@ export default function AdminDashboard() {
             </div>
           </>
         }
-        showFooter={activeTab !== "chat"}
+        showFooter={false}
         fullHeightTab={activeTab === "chat"}
         hideMobileDock={activeTab === "chat"}
         notificationsCount={totalUnread}

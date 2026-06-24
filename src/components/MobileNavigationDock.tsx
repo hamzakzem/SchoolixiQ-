@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { getDrawerPortalNode } from "../lib/drawerPortal";
 import { drawerPanelProps, modalBackdropProps, MOTION_SPRING, prefersReducedMotion } from "../lib/motion";
+import SchoolixLogo from './SchoolixLogo';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -470,28 +471,32 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 aria-modal="true"
                 aria-label={isRtl ? "قائمة الخدمات" : "Services menu"}
               >
-                <div className="sx-drawer-panel__header">
-                  <div className="min-w-0">
-                    <h3 className="sx-drawer-panel__title flex items-center gap-2">
-                      <Menu className="text-[#D4AF37] w-5 h-5 shrink-0 sx-action-icon" strokeWidth={2.4} />
-                      <span className="truncate">
-                        {isRtl ? "الصلاحيات والتنقل" : "Permissions & Navigation"}
-                      </span>
-                    </h3>
-                    <p className="sx-drawer-panel__subtitle">
-                      {isRtl ? "جميع أقسام لوحة التحكم" : "All dashboard sections"}
-                    </p>
+                <div className="sx-drawer-services-header">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="sx-drawer-services-header__badge">
+                        <SchoolixLogo size={24} surface="light" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="sx-drawer-services-header__title">
+                          {isRtl ? "القائمة الرئيسية" : "Main Menu"}
+                        </h3>
+                        <p className="sx-drawer-services-header__subtitle">
+                          {isRtl ? "تصفح جميع أقسام لوحة التحكم" : "Browse all dashboard sections"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeServicesMenu}
+                      className="sx-action-btn sx-action-btn-icon shrink-0"
+                      aria-label={isRtl ? "إغلاق" : "Close"}
+                    >
+                      <X size={18} className="sx-action-icon" strokeWidth={2.4} />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={closeServicesMenu}
-                    className="sx-action-btn sx-action-btn-icon shrink-0"
-                    aria-label={isRtl ? "إغلاق" : "Close"}
-                  >
-                    <X size={18} className="sx-action-icon" strokeWidth={2.4} />
-                  </button>
                 </div>
-                <div className="sx-drawer-panel__body">
+                <div className="sx-drawer-services-body">
                   {menuItems.length > 0 ? (
                     <div className="flex flex-col gap-2">
                       {menuItems.map((item, index) => {
@@ -504,34 +509,30 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.02 }}
                             onClick={() => handleTabClick(item.id)}
-                            className={`sx-nav-item w-full items-center gap-3 px-3 py-2.5 ${
-                              isActive ? "sx-nav-item--active" : ""
-                            }`}
+                            className={`sx-drawer-nav-item ${isActive ? "sx-drawer-nav-item--active" : ""}`}
                             dir={isRtl ? "rtl" : "ltr"}
                           >
-                            <Icon className="sx-action-icon shrink-0" size={18} strokeWidth={isActive ? 2.4 : 2} />
-                            <span className="truncate flex-1 text-start font-bold text-sm">
-                              {item.label}
-                            </span>
+                            <Icon className="sx-action-icon shrink-0" size={20} strokeWidth={isActive ? 2.25 : 2.25} />
+                            <span className="truncate flex-1">{item.label}</span>
                           </motion.button>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                    <div className="flex flex-col items-center justify-center py-12 text-[#64748B]">
                       <p className="text-sm font-semibold">{isRtl ? "لا توجد خدمات متاحة" : "No services available"}</p>
                     </div>
                   )}
                 </div>
                 {onLogout && (
-                  <div className="sx-drawer-panel__footer">
+                  <div className="sx-drawer-services-footer">
                     <button
                       type="button"
                       onClick={handleLogout}
-                      className="sx-btn sx-btn-ghost w-full text-[var(--sx-danger)] hover:!bg-red-500/10 items-center justify-center gap-2"
+                      className="sx-drawer-services-logout"
                     >
-                      <LogOut size={18} className="sx-action-icon shrink-0" strokeWidth={2.4} />
-                      <span className="font-bold text-sm">{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
+                      <LogOut size={20} className="shrink-0" strokeWidth={2.25} />
+                      <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
                     </button>
                   </div>
                 )}

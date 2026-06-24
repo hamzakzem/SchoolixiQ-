@@ -25,7 +25,6 @@ import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
-import { GlobalFooter } from "../components/GlobalFooter";
 import {
   logParentFirestoreSetup,
   logParentFirestoreError,
@@ -1606,7 +1605,7 @@ export default function ParentDashboard() {
 
     return (
       <div
-        className="parent-app sx-dashboard-layout sx-shell-layout h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
+        className="parent-app sx-dashboard-context sx-dashboard-layout sx-shell-layout h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
         dir={isRtl ? "rtl" : "ltr"}
       >
         <AnimatePresence mode="wait">
@@ -1621,7 +1620,7 @@ export default function ParentDashboard() {
               )}
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
-                <div className={`p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
+                <div className={`sx-sidebar-brand p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
                   {isCustomAppLogo(config.appLogo) ? (
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
                       <img
@@ -1695,7 +1694,7 @@ export default function ParentDashboard() {
         </AnimatePresence>
 
         <div className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className="parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
+        <header className="sx-dashboard-header parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
           <div className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-3">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -2501,7 +2500,6 @@ export default function ParentDashboard() {
               )}
             </motion.div>
           </AnimatePresence>
-          {activeTab !== "chat" && <GlobalFooter compact />}
         </div>
 
         {/* Floating/Sticky Mobile Navigation Dock for Parents */}

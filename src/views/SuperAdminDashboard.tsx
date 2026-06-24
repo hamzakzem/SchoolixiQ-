@@ -76,7 +76,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { pageTransitionProps } from "../lib/motion";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
-import { GlobalFooter } from "../components/GlobalFooter";
 import { useAuth } from "../lib/AuthContext";
 import {
   activateSchoolRegistration,
@@ -631,6 +630,20 @@ export default function SuperAdminDashboard() {
 
     return matchesSearch && matchesGov && matchesDir && matchesFilter && matchesPresence;
   });
+
+  const SCHOOLS_PAGE_SIZE = 12;
+  const [schoolsPage, setSchoolsPage] = useState(1);
+
+  useEffect(() => {
+    setSchoolsPage(1);
+  }, [searchTerm, schoolFilter, presenceFilter, filterGovernorate, filterDirectorate, activeTab]);
+
+  const schoolsTotalPages = Math.max(1, Math.ceil(filteredSchools.length / SCHOOLS_PAGE_SIZE));
+  const schoolsPageSafe = Math.min(schoolsPage, schoolsTotalPages);
+  const paginatedSchools = filteredSchools.slice(
+    (schoolsPageSafe - 1) * SCHOOLS_PAGE_SIZE,
+    schoolsPageSafe * SCHOOLS_PAGE_SIZE,
+  );
 
   const userSearchTerm = searchTerm.toLowerCase();
   const filteredManagementUsers = users.filter((u) => {
@@ -1649,7 +1662,7 @@ export default function SuperAdminDashboard() {
 
   return (
     <div
-      className="sx-dashboard-layout sx-shell-layout h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
+      className="sx-dashboard-context sx-dashboard-layout sx-shell-layout h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Sidebar */}
@@ -1666,7 +1679,7 @@ export default function SuperAdminDashboard() {
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
-                className={`p-6 flex ${isSidebarCollapsed ? "justify-center border-b border-transparent" : "items-center gap-4 border-b border-slate-700 dark:border-slate-800"} pb-6`}
+                className={`sx-sidebar-brand p-6 flex ${isSidebarCollapsed ? "justify-center border-b border-transparent" : "items-center gap-4 border-b border-slate-700 dark:border-slate-800"} pb-6`}
               >
                 {isCustomAppLogo(config.appLogo) ? (
                   <img
@@ -2107,7 +2120,7 @@ export default function SuperAdminDashboard() {
       </AnimatePresence>
 
       <main className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className="min-h-[5rem] h-auto pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-[var(--sx-z-header)] print:hidden">
+        <header className="sx-dashboard-header min-h-[5rem] h-auto pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-[var(--sx-z-header)] print:hidden">
           <div className="flex items-center gap-1.5 sm:gap-4 min-w-0">
             <button
               onClick={() => {
@@ -2331,7 +2344,7 @@ export default function SuperAdminDashboard() {
                     />
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none overflow-hidden transition-all">
+                  <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none overflow-hidden transition-all sx-schools-table-panel mb-8">
                     <div className="px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/20 dark:bg-slate-800/20">
                       <div className="flex items-center gap-4">
                         <div className="p-2 md:p-3 bg-blue-600 rounded-xl md:rounded-2xl text-white shadow-lg shadow-blue-600/20">
@@ -2461,7 +2474,7 @@ export default function SuperAdminDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="overflow-x-auto w-full custom-scrollbar">
+                    <div className="sx-schools-table-scroll custom-scrollbar w-full">
                       <table className="w-full text-right border-collapse min-w-[1000px]">
                       <thead>
                         <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
@@ -2483,7 +2496,7 @@ export default function SuperAdminDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                        {filteredSchools.map((school) => (
+                        {paginatedSchools.map((school) => (
                           <tr
                             key={school.id}
                             className="group hover:bg-blue-50/30 dark:hover:bg-blue-900/5 transition-all"
@@ -2735,6 +2748,36 @@ export default function SuperAdminDashboard() {
                       </tbody>
                     </table>
                     </div>
+                    {filteredSchools.length > 0 && (
+                      <div className="sx-schools-table-pagination">
+                        <p className="text-xs font-bold text-[#64748B]">
+                          عرض {(schoolsPageSafe - 1) * SCHOOLS_PAGE_SIZE + 1}–
+                          {Math.min(schoolsPageSafe * SCHOOLS_PAGE_SIZE, filteredSchools.length)} من{" "}
+                          {filteredSchools.length} مدرسة
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="sx-schools-table-pagination__btn"
+                            disabled={schoolsPageSafe <= 1}
+                            onClick={() => setSchoolsPage((p) => Math.max(1, p - 1))}
+                          >
+                            السابق
+                          </button>
+                          <span className="text-xs font-bold text-[#0F172A] dark:text-white px-2">
+                            {schoolsPageSafe} / {schoolsTotalPages}
+                          </span>
+                          <button
+                            type="button"
+                            className="sx-schools-table-pagination__btn"
+                            disabled={schoolsPageSafe >= schoolsTotalPages}
+                            onClick={() => setSchoolsPage((p) => Math.min(schoolsTotalPages, p + 1))}
+                          >
+                            التالي
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : activeTab === "accounts" ? (
@@ -5089,7 +5132,6 @@ export default function SuperAdminDashboard() {
               ) : null}
             </motion.div>
           </AnimatePresence>
-          {activeTab !== "chat" && <GlobalFooter compact />}
         </div>
       </main>
 

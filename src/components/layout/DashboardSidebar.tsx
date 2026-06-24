@@ -123,7 +123,7 @@ export function DashboardSidebar({
           <div className="h-full flex flex-col min-w-0">
             <div
               className={clsx(
-                'px-4 py-5 flex items-center gap-3 border-b',
+                'sx-sidebar-brand px-4 py-5 flex items-center gap-3 border-b',
                 variant === 'light'
                   ? 'border-sx-border dark:border-slate-800'
                   : 'border-white/10',

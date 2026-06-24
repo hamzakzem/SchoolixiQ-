@@ -65,7 +65,7 @@ export function DashboardShell({
   onBack,
   headerTrailing,
   children,
-  showFooter = true,
+  showFooter = false,
   fullHeightTab = false,
   hideMobileDock = false,
   notificationsCount = 0,
@@ -132,7 +132,7 @@ export function DashboardShell({
   return (
     <div
       className={clsx(
-        'sx-shell sx-dashboard-layout sx-shell-layout bg-sx-surface transition-colors print:overflow-visible print:h-auto print:block',
+        'sx-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout bg-sx-surface transition-colors print:overflow-visible print:h-auto print:block',
         className,
       )}
       dir={isRtl ? 'rtl' : 'ltr'}

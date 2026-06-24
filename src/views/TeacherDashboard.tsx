@@ -1426,7 +1426,7 @@ export default function TeacherDashboard() {
           ) : null}
         </>
       }
-      showFooter={activeTab !== "chat"}
+      showFooter={false}
       fullHeightTab={activeTab === "chat"}
       hideMobileDock={activeTab === "chat"}
       notificationsCount={badgeTotalUnread || notifications.filter((n) => !n.read).length}
