@@ -27,6 +27,12 @@ import {
   QUICK_EMOJIS,
   truncatePreview,
 } from './chatHelpers';
+import {
+  getChatDevice,
+  isChatTwoColumnLayout,
+  logChatBackVisible,
+  shouldShowChatBackButton,
+} from '../../lib/chatUiNavigation';
 
 export type ChatShellContact = {
   id: string;
@@ -331,7 +337,31 @@ export function SchoolixChatShell({
   }, []);
 
   const handleChatBackClick = onChatBack ?? onMobileBack ?? (() => undefined);
-  const showThreadBack = !!activeContact && mobileShowChat;
+
+  const [isNarrowLayout, setIsNarrowLayout] = useState(
+    () => typeof window !== 'undefined' && !isChatTwoColumnLayout(),
+  );
+
+  useEffect(() => {
+    const syncLayout = () => setIsNarrowLayout(!isChatTwoColumnLayout());
+    syncLayout();
+    window.addEventListener('resize', syncLayout);
+    return () => window.removeEventListener('resize', syncLayout);
+  }, []);
+
+  const showThreadBack = useMemo(
+    () => shouldShowChatBackButton(!!activeContact, mobileShowChat),
+    [activeContact, mobileShowChat],
+  );
+
+  useEffect(() => {
+    if (!showThreadBack) return;
+    const device = getChatDevice();
+    logChatBackVisible(
+      device,
+      isNarrowLayout ? 'detail-mode-single-column' : 'detail-mode',
+    );
+  }, [showThreadBack, isNarrowLayout]);
 
   return (
     <div
@@ -515,7 +545,7 @@ export function SchoolixChatShell({
                         <button
                           type="button"
                           onClick={handleChatBackClick}
-                          className="lg:hidden sx-chat-icon-btn sx-action-btn sx-action-btn-icon shrink-0"
+                          className="sx-chat-back-btn sx-chat-icon-btn sx-action-btn sx-action-btn-icon shrink-0"
                           aria-label={isRtl ? 'رجوع إلى المحادثات' : 'Back to conversations'}
                         >
                           {isRtl ? (

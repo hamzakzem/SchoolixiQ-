@@ -1648,7 +1648,7 @@ export default function SuperAdminDashboard() {
 
   return (
     <div
-      className="h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
+      className="sx-shell-layout h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Sidebar */}
@@ -2245,7 +2245,7 @@ export default function SuperAdminDashboard() {
         )}
 
         <div
-          className={`flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0 lg:pb-0" : "overflow-y-auto custom-scrollbar pb-28 lg:pb-10"}`}
+          className={`sx-shell-content flex-1 flex flex-col print:overflow-visible min-h-0 ${isSidebarOpen && !isSidebarCollapsed ? 'sx-shell-content--with-sidebar' : ''} ${activeTab === "chat" ? "overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat" : "overflow-y-auto custom-scrollbar pb-28 lg:pb-10"}`}
         >
           <AnimatePresence mode="wait">
             <motion.div
@@ -2253,7 +2253,7 @@ export default function SuperAdminDashboard() {
               className={
                 activeTab === "chat"
                   ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden"
-                  : "w-full p-4 md:p-8 flex flex-col sx-fade-in"
+                  : "w-full sx-shell-content-inner flex flex-col sx-fade-in flex-1"
               }
               {...pageTransitionProps(activeTab === "chat")}
             >

@@ -132,7 +132,7 @@ export function DashboardShell({
   return (
     <div
       className={clsx(
-        'sx-shell h-[100dvh] overflow-hidden flex bg-sx-surface transition-colors print:overflow-visible print:h-auto print:block',
+        'sx-shell sx-shell-layout bg-sx-surface transition-colors print:overflow-visible print:h-auto print:block',
         className,
       )}
       dir={isRtl ? 'rtl' : 'ltr'}
@@ -157,8 +157,9 @@ export function DashboardShell({
 
       <div
         className={clsx(
-          'flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden print:overflow-visible print:h-auto',
+          'sx-shell-content print:overflow-visible print:h-auto',
           fullHeightTab && 'sx-shell-main--chat',
+          isSidebarOpen && !isSidebarCollapsed && 'sx-shell-content--with-sidebar',
         )}
       >
         <DashboardHeader
@@ -186,9 +187,10 @@ export function DashboardShell({
         >
           <div
             className={clsx(
+              'sx-shell-content-inner custom-scrollbar',
               fullHeightTab
-                ? 'h-full w-full flex flex-col min-h-0 overflow-hidden'
-                : 'w-full max-w-7xl mx-auto px-4 md:px-8 py-5 md:py-8 sx-fade-in flex flex-col flex-1',
+                ? 'h-full w-full flex flex-col min-h-0 overflow-hidden flex-1'
+                : 'w-full max-w-7xl mx-auto py-5 md:py-8 sx-fade-in flex-1 overflow-y-auto',
             )}
           >
             {children}

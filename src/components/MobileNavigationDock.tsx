@@ -119,8 +119,8 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   };
 
   const menuPanelShellClasses = isLightMenu
-    ? "parent-dashboard-menu"
-    : "sx-drawer-panel--dark";
+    ? 'sx-drawer-panel--light'
+    : 'sx-drawer-panel--dark';
 
   const drawerOpen = isSidebarOpen || showQuickAccess;
 
@@ -468,12 +468,13 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.02 }}
                             onClick={() => handleTabClick(item.id)}
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all active:scale-[0.98] ${menuItemClasses(isActive)}`}
+                            className={`sx-nav-item w-full items-center gap-3 px-3 py-2.5 ${
+                              !isLightMenu ? 'sx-nav-item--dark' : ''
+                            } ${isActive ? 'sx-nav-item--active' : ''}`}
+                            dir={isRtl ? 'rtl' : 'ltr'}
                           >
-                            <div className={`p-2 rounded-lg shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
-                              <Icon className={isLightMenu ? "parent-menu-icon" : undefined} size={18} strokeWidth={isActive ? 2.5 : 1.5} />
-                            </div>
-                            <span className={`text-sm font-bold truncate flex-1 text-start ${menuLabelClasses(isActive)}`}>
+                            <Icon className="sx-action-icon shrink-0" size={18} strokeWidth={isActive ? 2.4 : 2} />
+                            <span className="truncate flex-1 text-start font-bold text-sm">
                               {item.label}
                             </span>
                           </motion.button>

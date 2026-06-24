@@ -1365,7 +1365,7 @@ export default function AdminDashboard() {
               key={activeTab}
               className={
                 activeTab === "chat"
-                  ? "flex-1 flex flex-col min-h-0 h-full -mx-4 md:-mx-8"
+                  ? "flex-1 flex flex-col min-h-0 h-full lg:-mx-2"
                   : activeTab === "overview"
                     ? "w-full flex flex-col sx-fade-in space-y-6 md:space-y-8 min-w-0"
                     : "w-full flex flex-col sx-fade-in min-w-0"

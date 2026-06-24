@@ -36,13 +36,28 @@ export function resolveChatBackAction(input: ChatBackInput): ChatBackAction {
     return 'leave-chat-tab';
   }
 
-  // Mobile / tablet — single-column detail mode
+  // Mobile / tablet — single-column detail mode: return to list first
   if (mobileShowChat) {
-    if (hasActiveConversation) return 'clear-and-show-list';
     return 'show-list';
   }
 
   return 'leave-chat-tab';
+}
+
+export function shouldShowChatBackButton(
+  hasActiveConversation: boolean,
+  mobileShowChat: boolean,
+): boolean {
+  if (!hasActiveConversation) return false;
+  if (isChatTwoColumnLayout()) return false;
+  return mobileShowChat;
+}
+
+export function logChatBackVisible(
+  device: ChatDevice,
+  reason: string,
+): void {
+  console.info('[ChatUI] BACK_VISIBLE', { device, reason });
 }
 
 export function logChatBackClicked(

@@ -688,6 +688,7 @@ html.dark .sx-action-btn-ghost {
   inset: 0;
   z-index: var(--sx-z-drawer);
   pointer-events: none;
+  isolation: isolate;
 }
 
 .sx-drawer-backdrop {
@@ -699,9 +700,9 @@ html.dark .sx-action-btn-ghost {
   padding: 0;
   margin: 0;
   cursor: pointer;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .sx-drawer-panel {
@@ -709,15 +710,17 @@ html.dark .sx-action-btn-ghost {
   top: 0;
   bottom: 0;
   z-index: var(--sx-z-drawer);
-  width: min(88vw, 360px);
+  width: min(86vw, 360px);
+  min-width: 292px;
   max-width: 360px;
   height: 100dvh;
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  background: var(--sx-bg);
-  box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.35);
-  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.25);
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   padding-top: calc(16px + env(safe-area-inset-top, 0px));
   padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
@@ -725,18 +728,23 @@ html.dark .sx-action-btn-ghost {
 
 .sx-drawer-panel--ltr {
   left: 0;
-  border-right: 1px solid var(--sx-border);
+  border-inline-end: 1px solid var(--sx-border);
 }
 
 .sx-drawer-panel--rtl {
   right: 0;
-  border-left: 1px solid var(--sx-border);
+  border-inline-start: 1px solid var(--sx-border);
+}
+
+.sx-drawer-panel--light {
+  background: #ffffff;
+  color: var(--sx-primary);
 }
 
 .sx-drawer-panel--dark {
   background: var(--sx-primary);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .sx-drawer-panel--bottom {
@@ -809,7 +817,54 @@ html.dark .sx-action-btn-ghost {
   z-index: var(--sx-z-header);
 }
 
-html.dark .sx-drawer-panel {
+/* ─── Dashboard shell layout (sidebar + content gap) ─── */
+.sx-shell-layout {
+  display: flex;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.sx-shell-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.sx-shell-content-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 20px;
+  padding-inline: clamp(16px, 2vw, 28px);
+}
+
+@media (min-width: 1024px) {
+  .sx-shell-content--with-sidebar {
+    padding-inline-start: clamp(20px, 2vw, 24px);
+  }
+
+  [dir='rtl'] .sx-shell-content--with-sidebar {
+    padding-inline-end: clamp(20px, 2vw, 24px);
+  }
+}
+
+.sx-shell-main--chat {
+  position: relative;
+  z-index: var(--sx-z-content);
+}
+
+.sx-shell-main--chat .sx-shell-content-inner {
+  padding-inline: 0;
+  gap: 0;
+}
+
+html.dark .sx-drawer-panel,
+html.dark .sx-drawer-panel--light {
   background: #0f172a;
   border-color: var(--sx-border);
 }
@@ -818,4 +873,11 @@ html.sx-drawer-open,
 html.sx-drawer-open body {
   overflow: hidden;
   overflow-x: hidden;
+}
+
+html.sx-drawer-open .sx-shell-content,
+html.sx-drawer-open .parent-app-main,
+html.sx-drawer-open main.flex-1 {
+  pointer-events: none;
+  user-select: none;
 }

@@ -1606,7 +1606,7 @@ export default function ParentDashboard() {
 
     return (
       <div
-        className="parent-app h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
+        className="parent-app sx-shell-layout h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
         dir={isRtl ? "rtl" : "ltr"}
       >
         <AnimatePresence mode="wait">
@@ -1801,11 +1801,11 @@ export default function ParentDashboard() {
           </div>
         </header>
 
-        <main className={`parent-app-main flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0 lg:pb-0' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
+        <main className={`parent-app-main sx-shell-content flex-1 flex flex-col print:overflow-visible min-h-0 ${isSidebarOpen && !isSidebarCollapsed ? 'sx-shell-content--with-sidebar' : ''} ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat' : 'overflow-y-auto custom-scrollbar pb-28 lg:pb-10'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full p-4 md:p-8 space-y-4 md:space-y-6 flex flex-col max-w-7xl mx-auto sx-fade-in"}
+              className={activeTab === "chat" ? "p-0 h-full w-full flex flex-col min-h-0 overflow-hidden" : "w-full sx-shell-content-inner max-w-7xl mx-auto sx-fade-in flex flex-col flex-1"}
               {...pageTransitionProps(activeTab === "chat")}
             >
               {activeTab === "home" && (

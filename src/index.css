@@ -1047,7 +1047,7 @@ html.theme-transition *::after {
 /* ==========================================================================
    Parent dashboard menu — opt out of global aside/header navy + white-text rules
    ========================================================================== */
-aside.parent-dashboard-menu {
+aside.parent-dashboard-menu:not(.sx-drawer-panel) {
   background-color: #ffffff !important;
   border-right-color: #e2e8f0 !important;
   border-left-color: #e2e8f0 !important;
@@ -1055,7 +1055,7 @@ aside.parent-dashboard-menu {
   box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08) !important;
 }
 
-html.dark aside.parent-dashboard-menu {
+html.dark aside.parent-dashboard-menu:not(.sx-drawer-panel) {
   background-color: #0f172a !important;
   border-right-color: #334155 !important;
   border-left-color: #334155 !important;
@@ -1850,6 +1850,18 @@ html.dark .sx-chat-action-item {
 .sx-shell-main--chat {
   position: relative;
   z-index: var(--sx-z-content);
+}
+
+.sx-chat-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 1024px) {
+  .sx-chat-back-btn {
+    display: none !important;
+  }
 }
 
 @media (min-width: 1024px) {
