@@ -80,11 +80,10 @@ export function SchoolLifecycleButtons({
   };
 
   const status = school.status || 'inactive';
-  const btn =
-    'px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all disabled:opacity-50';
+  const btn = 'sx-school-action-btn';
 
   return (
-    <div className={`flex flex-wrap items-center justify-center gap-1.5 ${compact ? '' : 'max-w-[420px]'}`}>
+    <div className={`sx-school-record-actions__inner flex flex-wrap items-center justify-center gap-2 ${compact ? '' : 'max-w-[420px]'}`}>
       {status === 'active' && (
         <button
           type="button"
@@ -104,7 +103,7 @@ export function SchoolLifecycleButtons({
               });
             })
           }
-          className={`${btn} bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100`}
+          className={`${btn} sx-school-action-btn--warning`}
           title={isRtl ? 'تعطيل مؤقت' : 'Suspend'}
         >
           <PauseCircle size={12} className="inline ml-1" />
@@ -131,7 +130,7 @@ export function SchoolLifecycleButtons({
               });
             })
           }
-          className={`${btn} bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100`}
+          className={`${btn} sx-school-action-btn--success`}
         >
           <PlayCircle size={12} className="inline ml-1" />
           {isRtl ? 'إعادة التفعيل' : 'Reactivate'}
@@ -156,7 +155,7 @@ export function SchoolLifecycleButtons({
               });
             })
           }
-          className={`${btn} bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100`}
+          className={`${btn} sx-school-action-btn--ghost`}
         >
           <Archive size={12} className="inline ml-1" />
           {isRtl ? 'أرشفة' : 'Archive'}
@@ -181,7 +180,7 @@ export function SchoolLifecycleButtons({
               });
             })
           }
-          className={`${btn} bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100`}
+          className={`${btn} sx-school-action-btn--info`}
         >
           <RotateCcw size={12} className="inline ml-1" />
           {isRtl ? 'استعادة' : 'Restore'}
@@ -196,7 +195,7 @@ export function SchoolLifecycleButtons({
             setConfirmName('');
             setPermanentOpen(true);
           }}
-          className={`${btn} bg-red-50 text-red-700 border-red-200 hover:bg-red-100`}
+          className={`${btn} sx-school-action-btn--danger`}
         >
           <Trash2 size={12} className="inline ml-1" />
           {isRtl ? 'حذف نهائي' : 'Delete'}
