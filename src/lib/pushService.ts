@@ -1,9 +1,15 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { db, auth } from './firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, getDocFromServer, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { isLogoutInProgress } from './logoutGuard';
+import {
+  handleResourceExhausted,
+  isQuotaWritePaused,
+  isResourceExhaustedError,
+  logWriteSkippedDuplicate,
+} from './firestoreQuota';
 
 let currentPushToken: string | null = null;
 let pendingToken: string | null = null;
@@ -31,6 +37,17 @@ function canSaveTokenForUser(userId: string): boolean {
   return Boolean(currentUid && currentUid === userId);
 }
 
+async function nativeTokenAlreadySaved(userId: string, token: string): Promise<boolean> {
+  try {
+    const snap = await getDocFromServer(doc(db, 'users', userId));
+    if (!snap.exists()) return false;
+    const tokens = snap.data()?.fcmTokens;
+    return Array.isArray(tokens) && tokens.includes(token);
+  } catch {
+    return false;
+  }
+}
+
 async function saveNativeTokenToFirestore(userId: string, token: string): Promise<boolean> {
   const path = `users/${userId}`;
   if (!canSaveTokenForUser(userId)) {
@@ -42,7 +59,27 @@ async function saveNativeTokenToFirestore(userId: string, token: string): Promis
     return false;
   }
 
+  if (isQuotaWritePaused()) {
+    console.info('[NativePush] TOKEN_SAVE_SKIPPED', { userId, path, reason: 'quota_paused' });
+    return false;
+  }
+
+  if (currentPushToken === token) {
+    const alreadySaved = await nativeTokenAlreadySaved(userId, token);
+    if (alreadySaved) {
+      logWriteSkippedDuplicate('native_fcm_token', { userId, tokenPrefix: token.slice(0, 12) });
+      return true;
+    }
+  }
+
   try {
+    const alreadySaved = await nativeTokenAlreadySaved(userId, token);
+    if (alreadySaved) {
+      logWriteSkippedDuplicate('native_fcm_token', { userId, tokenPrefix: token.slice(0, 12) });
+      currentPushToken = token;
+      return true;
+    }
+
     await updateDoc(doc(db, 'users', userId), {
       fcmTokens: arrayUnion(token),
       fcmTokenUpdatedAt: serverTimestamp(),
@@ -60,6 +97,9 @@ async function saveNativeTokenToFirestore(userId: string, token: string): Promis
     return true;
   } catch (error) {
     const err = error as { code?: string; message?: string };
+    if (isResourceExhaustedError(error)) {
+      handleResourceExhausted('native_fcm_token');
+    }
     console.error('[NativePush] TOKEN_SAVE_ERROR', {
       userId,
       path,

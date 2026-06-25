@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, addDoc, deleteDoc, doc, updateDoc, getDoc, limit, onSnapshot } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+import { isResourceExhaustedError } from '../../lib/firestoreQuota';
 import { useAuth } from '../../lib/AuthContext';
 import { Plus, ShoppingBag, Trash2, Camera, Image as ImageIcon, X, Loader2, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -189,7 +190,9 @@ export default function Marketplace() {
       setNewItem({ itemName: '', price: 0, description: '', stock: 0, imageUrl: '' });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, STORE_COLLECTION);
-      toast.error('خطأ في الإضافة');
+      if (!isResourceExhaustedError(error)) {
+        toast.error('خطأ في الإضافة');
+      }
     }
   };
 

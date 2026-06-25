@@ -51,10 +51,18 @@ import type {
   QueueOperationInput,
 } from './offlineTypes';
 import { toast } from 'react-hot-toast';
+import {
+  getQuotaResumeAtMs,
+  handleResourceExhausted,
+  isQuotaWritePaused,
+  isResourceExhaustedError,
+  notifyQuotaExhaustedIfNeeded,
+} from '../firestoreQuota';
 
 const DEVICE_ID_KEY = 'schoolixiq_offline_device_id';
 let syncInFlight = false;
 let syncPaused = false;
+let quotaResumeTimer: ReturnType<typeof setTimeout> | null = null;
 let initialized = false;
 
 function getDeviceId(): string {
@@ -139,6 +147,28 @@ export function isNetworkFirestoreError(error: unknown): boolean {
 export function isPermissionDeniedError(error: unknown): boolean {
   const err = error as { code?: string; message?: string };
   return err?.code === 'permission-denied' || /permission/i.test(String(err?.message ?? ''));
+}
+
+function scheduleQuotaSyncResume(): void {
+  if (quotaResumeTimer) {
+    clearTimeout(quotaResumeTimer);
+    quotaResumeTimer = null;
+  }
+  const resumeAt = getQuotaResumeAtMs();
+  const delay = Math.max(5_000, resumeAt - Date.now());
+  quotaResumeTimer = setTimeout(() => {
+    quotaResumeTimer = null;
+    console.info('[Quota] SYNC_RESUMED', { reason: 'quota_cooldown_elapsed' });
+    resumeOfflineSync();
+  }, delay);
+}
+
+function pauseSyncForQuota(source: string): void {
+  handleResourceExhausted(source);
+  pauseOfflineSync();
+  console.warn('[Quota] SYNC_PAUSED', { source, resumeAt: getQuotaResumeAtMs() });
+  notifyQuotaExhaustedIfNeeded();
+  scheduleQuotaSyncResume();
 }
 
 function shouldAttemptOfflineQueue(): boolean {
@@ -427,6 +457,7 @@ async function syncSingleOperation(op: OfflineQueuedOperation): Promise<void> {
 
 export async function syncOfflineQueue(): Promise<void> {
   if (syncInFlight || syncPaused) return;
+  if (isQuotaWritePaused()) return;
   if (!getOfflineStatusSnapshot().isOnline) return;
   if (!auth.currentUser || isLogoutInProgress()) return;
 
@@ -459,6 +490,15 @@ export async function syncOfflineQueue(): Promise<void> {
         console.info('[Offline] SYNC_SUCCESS', { id: item.id, module: item.module });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        if (isResourceExhaustedError(error)) {
+          await patchQueueOperation(item.id, {
+            status: 'pending',
+            errorMessage: 'resource-exhausted',
+            retryCount: item.retryCount + 1,
+          });
+          pauseSyncForQuota('offline_sync');
+          break;
+        }
         if (isPermissionDeniedError(error)) {
           await patchQueueOperation(item.id, {
             status: 'failed',
@@ -594,12 +634,20 @@ async function tryOnlineOrQueue<T>(
   onlineFn: () => Promise<T>,
   queueFn: () => Promise<T>,
 ): Promise<T> {
+  if (isQuotaWritePaused()) {
+    notifyQuotaExhaustedIfNeeded();
+    throw new Error('resource-exhausted');
+  }
   if (shouldAttemptOfflineQueue()) {
     return queueFn();
   }
   try {
     return await onlineFn();
   } catch (error) {
+    if (isResourceExhaustedError(error)) {
+      pauseSyncForQuota('safe_firestore_write');
+      throw error;
+    }
     if (isNetworkFirestoreError(error)) {
       return queueFn();
     }

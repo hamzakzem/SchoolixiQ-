@@ -3,6 +3,14 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, update
 import { resolveStudentParentIds } from './schoolSync';
 import { resolveNotificationCategoryId } from './notificationCategories';
 import { normalizeNotificationMetadata } from './notificationRouting';
+import {
+  handleResourceExhausted,
+  isQuotaWritePaused,
+  isResourceExhaustedError,
+  logWriteSkippedDuplicate,
+} from './firestoreQuota';
+
+const markedReadNotificationIds = new Set<string>();
 
 export type NotificationType = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'tuition' | 'homework' | 'report' | 'system' | 'message' | 'chat' | 'smart_gate' | 'dismissal';
 
@@ -309,12 +317,24 @@ export const notificationService = {
    * Mark a notification as read
    */
   async markAsRead(notificationId: string) {
+    if (!notificationId || markedReadNotificationIds.has(notificationId)) {
+      logWriteSkippedDuplicate('notification_mark_read', { notificationId });
+      return true;
+    }
+    if (isQuotaWritePaused()) {
+      return false;
+    }
     try {
       await updateDoc(doc(db, 'notifications', notificationId), {
         read: true
       });
+      markedReadNotificationIds.add(notificationId);
       return true;
     } catch (error) {
+      if (isResourceExhaustedError(error)) {
+        handleResourceExhausted('notification_mark_read');
+        return false;
+      }
       console.error('Error marking notification as read:', error);
       return false;
     }
@@ -324,6 +344,9 @@ export const notificationService = {
    * Mark all notifications as read for a user
    */
   async markAllAsRead(userId: string) {
+    if (isQuotaWritePaused()) {
+      return false;
+    }
     try {
       const q = query(
         collection(db, 'notifications'), 
@@ -331,13 +354,23 @@ export const notificationService = {
         where('read', '==', false)
       );
       const snap = await getDocs(q);
+      const unreadDocs = snap.docs.filter((d) => d.data()?.read !== true);
+      if (unreadDocs.length === 0) {
+        logWriteSkippedDuplicate('notification_mark_all_read', { userId });
+        return true;
+      }
       const batch = writeBatch(db);
-      snap.docs.forEach(d => {
+      unreadDocs.forEach(d => {
         batch.update(d.ref, { read: true });
+        markedReadNotificationIds.add(d.id);
       });
       await batch.commit();
       return true;
     } catch (error) {
+      if (isResourceExhaustedError(error)) {
+        handleResourceExhausted('notification_mark_all_read');
+        return false;
+      }
       console.error('Error marking all as read:', error);
       return false;
     }

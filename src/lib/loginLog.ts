@@ -1,6 +1,15 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { isLogoutInProgress } from './logoutGuard';
+import {
+  handleResourceExhausted,
+  isQuotaWritePaused,
+  isResourceExhaustedError,
+  markWriteThrottled,
+  shouldThrottleWrite,
+} from './firestoreQuota';
+
+const LOGIN_LOG_THROTTLE_MS = 6 * 60 * 60 * 1000;
 
 function summarizeUserAgent(): string {
   if (typeof navigator === 'undefined') return 'unknown';
@@ -25,6 +34,15 @@ export async function writeLoginLog(params: {
   if (!auth.currentUser) {
     return;
   }
+  if (isQuotaWritePaused()) {
+    return;
+  }
+
+  const throttleKey = `schoolix_login_log_${params.userId}_${params.event}`;
+  if (shouldThrottleWrite(throttleKey, LOGIN_LOG_THROTTLE_MS)) {
+    return;
+  }
+
   try {
     await addDoc(collection(db, 'login_logs'), {
       userId: params.userId,
@@ -35,9 +53,14 @@ export async function writeLoginLog(params: {
       userAgentSummary: summarizeUserAgent(),
       createdAt: serverTimestamp(),
     });
+    markWriteThrottled(throttleKey);
   } catch (error) {
     const err = error as { code?: string; message?: string };
     if (err?.code === 'permission-denied' || isLogoutInProgress()) {
+      return;
+    }
+    if (isResourceExhaustedError(error)) {
+      handleResourceExhausted('login_log');
       return;
     }
     console.warn('[loginLog] Failed to write login log:', error);

@@ -1,5 +1,10 @@
 import { auth } from './firebase';
 import { captureException } from './sentryWrapper';
+import {
+  handleResourceExhausted,
+  isResourceExhaustedError,
+  notifyQuotaExhaustedIfNeeded,
+} from './firestoreQuota';
 
 export enum OperationType {
   CREATE = 'create',
@@ -45,8 +50,22 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   
+  if (isResourceExhaustedError(error)) {
+    const isWrite = [
+      OperationType.CREATE,
+      OperationType.UPDATE,
+      OperationType.DELETE,
+      OperationType.WRITE,
+    ].includes(operationType);
+    handleResourceExhausted(path || operationType, isWrite);
+    if (isWrite) {
+      notifyQuotaExhaustedIfNeeded();
+    }
+    return;
+  }
+
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  
+
   captureException(error, {
     extra: {
       firestoreErrorInfo: errInfo
@@ -58,7 +77,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   });
 
   // Only throw error for state mutation/write operations to prevent read/list sockets from crashing the React rendering tree
-  if (shouldThrow && [OperationType.CREATE, OperationType.UPDATE, OperationType.DELETE, OperationType.WRITE].includes(operationType)) {
+  if (
+    shouldThrow &&
+    [OperationType.CREATE, OperationType.UPDATE, OperationType.DELETE, OperationType.WRITE].includes(
+      operationType,
+    ) &&
+    !isResourceExhaustedError(error)
+  ) {
     throw new Error(JSON.stringify(errInfo));
   }
 }

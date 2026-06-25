@@ -4,6 +4,11 @@ import { db } from './firebase';
 import { useAuth } from './AuthContext';
 import { UserRole } from '../types';
 import {
+  handleResourceExhausted,
+  isQuotaWritePaused,
+  isResourceExhaustedError,
+} from './firestoreQuota';
+import {
   PRESENCE_HEARTBEAT_MS,
   PRESENCE_TAB_LOCK_MS,
   type SchoolPresenceRecord,
@@ -70,6 +75,7 @@ async function writeSchoolHeartbeat(
   touchSeenOnly = false,
 ): Promise<void> {
   if (!canSendHeartbeat(schoolId)) return;
+  if (isQuotaWritePaused()) return;
 
   const payload: Partial<SchoolPresenceRecord> & {
     schoolId: string;
@@ -95,7 +101,14 @@ async function writeSchoolHeartbeat(
     payload.lastActiveRole = role;
   }
 
-  await setDoc(doc(db, 'school_presence', schoolId), payload, { merge: true });
+  try {
+    await setDoc(doc(db, 'school_presence', schoolId), payload, { merge: true });
+  } catch (error) {
+    if (isResourceExhaustedError(error)) {
+      handleResourceExhausted('school_presence');
+    }
+    throw error;
+  }
 }
 
 /**
@@ -129,6 +142,14 @@ export function useSchoolPresence() {
         await writeSchoolHeartbeat(schoolId, user.uid, userName, String(role), false);
         lastBeatRef.current = Date.now();
       } catch (error) {
+        if (isResourceExhaustedError(error)) {
+          handleResourceExhausted('school_presence');
+          if (intervalRef.current != null) {
+            window.clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          return;
+        }
         if (import.meta.env.DEV) {
           console.warn('[SchoolPresence] heartbeat failed:', error);
         }

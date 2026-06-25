@@ -15,6 +15,7 @@ import {
   serverTimestamp,
   writeBatch
 } from "firebase/firestore";
+import { isResourceExhaustedError } from "../lib/firestoreQuota";
 import { useAuth } from "../lib/AuthContext";
 import { 
   Bell, 
@@ -487,10 +488,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const handleMarkAllRead = async () => {
     if (!user) return;
     try {
-      await notificationService.markAllAsRead(user.uid);
-      toast.success(isArabic ? "تم تحديد الكل كمقروء" : "All marked as read");
+      const ok = await notificationService.markAllAsRead(user.uid);
+      if (ok) {
+        toast.success(isArabic ? "تم تحديد الكل كمقروء" : "All marked as read");
+      }
     } catch (e) {
-      toast.error("Error setting stats");
+      if (!isResourceExhaustedError(e)) {
+        toast.error("Error setting stats");
+      }
     }
   };
 

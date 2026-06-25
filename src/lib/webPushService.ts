@@ -6,6 +6,12 @@ import { getServiceWorkerUrl } from './serviceWorkerRegistration';
 import { notificationDiag } from './notificationDiagnostics';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { isLogoutInProgress, setLogoutInProgress } from './logoutGuard';
+import {
+  handleResourceExhausted,
+  isQuotaWritePaused,
+  isResourceExhaustedError,
+  logWriteSkippedDuplicate,
+} from './firestoreQuota';
 
 let webMessaging: ReturnType<typeof getMessaging> | null = null;
 let currentWebToken: string | null = null;
@@ -362,8 +368,28 @@ async function saveTokenToFirestore(userId: string, token: string): Promise<void
     return;
   }
 
+  if (isQuotaWritePaused()) {
+    logTokenSaveSkipped(userId, 'quota_paused');
+    return;
+  }
+
   const userRef = doc(db, 'users', userId);
   const path = `users/${userId}`;
+
+  try {
+    const existingTokens = await readUserTokensFromServer(userId);
+    if (existingTokens.includes(token)) {
+      logWriteSkippedDuplicate('web_fcm_token', { userId, tokenPrefix: token.slice(0, 12) });
+      return;
+    }
+  } catch (readErr) {
+    if (isResourceExhaustedError(readErr)) {
+      handleResourceExhausted('web_fcm_token_read');
+      return;
+    }
+    /* proceed with save attempt if read failed for other reasons */
+  }
+
   console.info('[FCM] SAVE_TOKEN_START', {
     userId,
     path,
@@ -390,6 +416,9 @@ async function saveTokenToFirestore(userId: string, token: string): Promise<void
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const code = (err as { code?: string })?.code ?? 'unknown';
+    if (isResourceExhaustedError(err)) {
+      handleResourceExhausted('web_fcm_token');
+    }
     console.error('[FCM] SAVE_TOKEN_ERROR', {
       userId,
       path,
@@ -621,6 +650,20 @@ export async function autoRegisterWebPushToken(
   if (typeof window === 'undefined' || !('Notification' in window)) return null;
   if (!userId) return null;
 
+  if (isQuotaWritePaused()) {
+    console.info('[FCM] AUTO_REGISTRATION_SKIPPED', { uid: userId, reason: 'quota_paused' });
+    return { ok: false, reason: 'save_failed', error: 'quota_paused' };
+  }
+
+  const localToken = getStoredWebPushToken();
+  if (localToken) {
+    const alreadySaved = await isTokenSavedInFirestore(userId, localToken);
+    if (alreadySaved) {
+      logWriteSkippedDuplicate('web_fcm_auto_register', { userId, tokenPrefix: localToken.slice(0, 12) });
+      return { ok: true, token: localToken, tokenPrefix: localToken.slice(0, 12) };
+    }
+  }
+
   const permission = Notification.permission;
   console.info('[FCM] PERMISSION_STATUS', { permission, userId, auto: true });
 
@@ -726,6 +769,14 @@ export function startWebPushAutoRegistration(
     } else if (result?.reason === 'permission_denied') {
       registered = true;
       options.onSettled?.(result);
+    } else if (
+      result?.error === 'quota_paused' ||
+      result?.error === 'resource-exhausted' ||
+      (result?.error && String(result.error).toLowerCase().includes('resource-exhausted'))
+    ) {
+      handleResourceExhausted('web_fcm_auto_registration');
+      registered = true;
+      options.onSettled?.(result);
     }
     // permission_default / transient errors: do not mark registered — retries continue
   };
@@ -756,10 +807,15 @@ export function startWebPushAutoRegistration(
       window.clearInterval(intervalId);
       return;
     }
+    if (isQuotaWritePaused()) {
+      registered = true;
+      window.clearInterval(intervalId);
+      return;
+    }
     if (Notification.permission === 'granted' || Notification.permission === 'default') {
       void attempt('poll');
     }
-  }, 3000);
+  }, 30_000);
 
   const stop = () => {
     stopped = true;
