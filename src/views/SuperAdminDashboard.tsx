@@ -99,6 +99,8 @@ import {
   SchoolStatusBadge,
 } from "../components/superadmin/SchoolLifecycleButtons";
 import { SchoolPresenceBadge } from "../components/superadmin/SchoolPresenceBadge";
+import { SuperAdminSchoolRecordList } from "../components/superadmin/SuperAdminSchoolRecordList";
+import { SuperAdminSchoolAccountList } from "../components/superadmin/SuperAdminSchoolAccountList";
 import { useSchoolPresenceMap } from "../lib/useSchoolPresenceMap";
 import {
   presenceFilterMatches,
@@ -739,6 +741,31 @@ export default function SuperAdminDashboard() {
       console.error("Error toggling featured status:", error);
       toast.error("فشل في تغيير حالة التميز للمدرسة");
     }
+  };
+
+  const openEditSchool = (school: (typeof schools)[0]) => {
+    setEditingSchool(school);
+    setNewSchool({
+      name: school.name,
+      address: school.address,
+      googleMapsUrl: school.googleMapsUrl || "",
+      governorate: school.governorate || "",
+      directorate: school.directorate || "",
+      stage: school.stage || "",
+      shift: school.shift || "",
+      genderType: school.genderType || "",
+      approximateStudents: school.approximateStudents || "",
+      adminName: school.adminName || "",
+      adminEmail: school.adminEmail || "",
+      adminPassword: "",
+      authUid: "",
+      adminPhone: school.adminPhone || "",
+      planId: school.planId || "",
+      durationDays: 365,
+      showSubscriptionTimer: school.showSubscriptionTimer !== false,
+    });
+    setSchoolModalTab("info");
+    setShowAddModal(true);
   };
 
   useEffect(() => {
@@ -2465,280 +2492,17 @@ export default function SuperAdminDashboard() {
                       </div>
                     </div>
                     <div className="sx-table-shell !border-0 !rounded-none">
-                    <div className="sx-table-scroll sx-schools-table-scroll custom-scrollbar w-full">
-                      <table className="sx-table sx-table--wide w-full text-right border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
-                          <th className="px-8 py-5 text-right">
-                            المدرسة والبيانات
-                          </th>
-                          <th className="px-6 py-5 text-right">المحافظة</th>
-                          <th className="px-6 py-5 text-right">المديرية</th>
-                          <th className="px-6 py-5 text-right">المرحلة الدراسية</th>
-                          <th className="px-6 py-5 text-right">المواصفات</th>
-                          <th className="px-6 py-5 text-right">
-                            فترة الاشتراك
-                          </th>
-                          <th className="px-6 py-5 text-right">النشاط المباشر</th>
-                          <th className="px-6 py-5 text-center">
-                            الحالة التشغيلية
-                          </th>
-                          <th className="px-8 py-5 text-center">التحكم</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                        {paginatedSchools.map((school) => (
-                          <tr
-                            key={school.id}
-                            className="group hover:bg-blue-50/30 dark:hover:bg-blue-900/5 transition-all"
-                          >
-                            <td className="px-8 py-6">
-                              <div className="flex items-center gap-4">
-                                {school.logoUrl ? (
-                                  <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-800 p-1 flex items-center justify-center shadow-lg shadow-blue-500/10 border border-slate-100 dark:border-slate-700 hover:scale-110 transition-transform shrink-0">
-                                    <img
-                                      src={school.logoUrl}
-                                      alt="Logo"
-                                      className="w-full h-full object-contain"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform shrink-0">
-                                    <Building size={20} />
-                                  </div>
-                                )}
-                                <div className="flex flex-col min-w-0">
-                                  <span className="font-black text-slate-900 dark:text-white tracking-tight leading-tight truncate max-w-[200px]">
-                                    {school.name}
-                                  </span>
-                                  <div className="flex flex-col gap-0.5 mt-1">
-                                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
-                                      ID: {school.id?.slice(0, 8)}
-                                    </span>
-                                    {school.governorate && (
-                                      <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-bold max-w-[180px]">
-                                        {school.governorate}{" "}
-                                        {school.directorate
-                                          ? ` - ${school.directorate}`
-                                          : ""}
-                                        {school.stage
-                                          ? ` - ${school.stage}`
-                                          : ""}
-                                        {school.shift
-                                          ? ` - ${school.shift}`
-                                          : ""}
-                                        {school.genderType
-                                          ? ` - ${school.genderType}`
-                                          : ""}
-                                        {school.approximateStudents
-                                          ? ` - ${school.approximateStudents} طالب تقريباً`
-                                          : ""}
-                                      </div>
-                                    )}
-                                    {school.address && (
-                                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[180px]">
-                                        <MapPin
-                                          size={10}
-                                          className="text-slate-300"
-                                        />
-                                        {school.address}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
-                              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                {school.governorate || "غير محدد"}
-                              </span>
-                            </td>
-                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
-                              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                {school.directorate || "غير محدد"}
-                              </span>
-                            </td>
-                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
-                              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                {school.stage || school.educationLevel || "غير محدد"}
-                              </span>
-                            </td>
-                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
-                              <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] font-black rounded-md border border-blue-100 dark:border-blue-900/40 uppercase tracking-tighter">
-                                    {packages.find(
-                                      (p) => p.id === school.planId,
-                                    )?.name || "BASIC_PLAN"}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden w-20">
-                                    <div
-                                      className="h-full bg-blue-500 transition-all"
-                                      style={{
-                                        width: `${Math.min(100, ((school.studentCount || 0) / (packages.find((p) => p.id === school.planId)?.maxStudents || 500)) * 100)}%`,
-                                      }}
-                                    ></div>
-                                  </div>
-                                  <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 font-mono shrink-0">
-                                    {school.studentCount || 0}/
-                                    {packages.find(
-                                      (p) => p.id === school.planId,
-                                    )?.maxStudents || 500}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-6">
-                              <div className="flex flex-col gap-2">
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 font-mono">
-                                    {school.createdAt
-                                      ?.toDate?.()
-                                      ?.toLocaleDateString("ar-IQ")}
-                                  </span>
-                                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">
-                                    تاريخ التسجيل
-                                  </span>
-                                </div>
-                                <div className="h-px bg-slate-100 dark:bg-slate-800 w-full"></div>
-                                {school.subscriptionExpiresAt ? (
-                                  <SubscriptionTimer
-                                    expiryDate={school.subscriptionExpiresAt}
-                                    variant="compact"
-                                  />
-                                ) : (
-                                  <span className="text-[9px] font-black text-slate-400 italic">
-                                    LIFETIME_ACCESS
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-6 border-r border-slate-100 dark:border-slate-800/50">
-                              <SchoolPresenceBadge
-                                presence={presenceMap[school.id]}
-                              />
-                            </td>
-                            <td className="px-6 py-6 text-center">
-                              <SchoolStatusBadge school={school} isRtl={isRtl} />
-                            </td>
-                            <td className="px-8 py-6">
-                              <div className="flex flex-col items-center gap-3">
-                                <div className="flex items-center justify-center gap-2">
-                                  <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/50 p-1 rounded-2xl border border-slate-100 dark:border-slate-700 group-hover:border-blue-100 dark:group-hover:border-blue-900/30 transition-all">
-                                    <button
-                                      onClick={() =>
-                                        handleToggleFeatured(
-                                          school.id,
-                                          school.featured,
-                                        )
-                                      }
-                                      title={
-                                        school.featured
-                                          ? "إزالة المدرسة من قائمة شركاء النجاح في الصفحة الرئيسية"
-                                          : "إضافة المدرسة كشريك نجاح في الصفحة الرئيسية"
-                                      }
-                                      className={`p-2.5 rounded-xl transition-all ${school.featured ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 shadow-sm border border-amber-200 dark:border-amber-800/50" : "text-slate-400 hover:text-amber-500 hover:bg-white dark:hover:bg-slate-900"}`}
-                                    >
-                                      <Star
-                                        size={16}
-                                        fill={
-                                          school.featured
-                                            ? "currentColor"
-                                            : "none"
-                                        }
-                                      />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        handleToggleTimer(
-                                          school.id,
-                                          !!school.showSubscriptionTimer,
-                                        )
-                                      }
-                                      title={
-                                        school.showSubscriptionTimer
-                                          ? "إخفاء المؤقت عن المدرسة"
-                                          : "إظهار المؤقت للمدرسة"
-                                      }
-                                      className={`p-2.5 rounded-xl transition-all ${school.showSubscriptionTimer ? "bg-white dark:bg-slate-900 text-blue-600 shadow-sm border border-slate-100 dark:border-slate-800" : "text-slate-400 hover:text-slate-600 hover:bg-white dark:hover:bg-slate-900"}`}
-                                    >
-                                      {school.showSubscriptionTimer ? (
-                                        <Eye size={16} />
-                                      ) : (
-                                        <EyeOff size={16} />
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setEditingSchool(school);
-                                        setNewSchool({
-                                          name: school.name,
-                                          address: school.address,
-                                          googleMapsUrl: school.googleMapsUrl || "",
-                                          governorate:
-                                            school.governorate || "",
-                                          directorate:
-                                            school.directorate || "",
-                                          stage: school.stage || "",
-                                          shift: school.shift || "",
-                                          genderType: school.genderType || "",
-                                          approximateStudents:
-                                            school.approximateStudents || "",
-                                          adminName: school.adminName || "",
-                                          adminEmail: school.adminEmail || "",
-                                          adminPassword: "",
-                                          authUid: "",
-                                          adminPhone: school.adminPhone || "",
-                                          planId: school.planId || "",
-                                          durationDays: 365,
-                                          showSubscriptionTimer:
-                                            school.showSubscriptionTimer !==
-                                            false,
-                                        });
-                                        setSchoolModalTab("info");
-                                        setShowAddModal(true);
-                                      }}
-                                      className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
-                                    >
-                                      <SettingsIcon size={16} />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        handleExtendSubscription(
-                                          school.id,
-                                          school.subscriptionExpiresAt,
-                                        )
-                                      }
-                                      className="p-2.5 text-blue-600 hover:bg-white dark:hover:bg-slate-900 rounded-xl transition-all"
-                                    >
-                                      <Plus size={16} />
-                                    </button>
-                                  </div>
-                                </div>
-                                <SchoolLifecycleButtons
-                                  school={school}
-                                  isRtl={isRtl}
-                                  compact
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {filteredSchools.length === 0 && (
-                          <tr>
-                            <td
-                              colSpan={8}
-                              className="px-8 py-16 text-center text-slate-400 dark:text-slate-500 font-bold"
-                            >
-                              لا توجد مدارس مطابقة للبحث أو الفلتر
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                    </div>
+                      <SuperAdminSchoolRecordList
+                        schools={paginatedSchools}
+                        packages={packages}
+                        presenceMap={presenceMap}
+                        isRtl={isRtl}
+                        emptyMessage="لا توجد مدارس مطابقة للبحث أو الفلتر"
+                        onEdit={openEditSchool}
+                        onToggleFeatured={handleToggleFeatured}
+                        onToggleTimer={handleToggleTimer}
+                        onExtendSubscription={handleExtendSubscription}
+                      />
                     {filteredSchools.length > 0 && (
                       <div className="sx-pagination-bar sx-schools-table-pagination">
                         <p className="text-xs font-bold text-[#64748B]">
@@ -2831,124 +2595,17 @@ export default function SuperAdminDashboard() {
                     </button>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none overflow-hidden transition-all">
-                    <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto">
-                      <table className="w-full text-right border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
-                            <th className="px-8 py-5">
-                              المدرسة وبيانات التواصل
-                            </th>
-                            <th className="px-6 py-5">المصادقة والأمان</th>
-                            <th className="px-6 py-5">الحالة</th>
-                            <th className="px-8 py-5 text-center">الإجراءات</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                          {filteredSchools.map((school) => (
-                            <tr
-                              key={school.id}
-                              className="group hover:bg-blue-50/30 dark:hover:bg-blue-900/5 transition-all"
-                            >
-                              <td className="px-8 py-6">
-                                <div className="flex items-center gap-4">
-                                  {school.logoUrl ? (
-                                    <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-800 p-1 flex items-center justify-center border border-slate-100 dark:border-slate-700 shadow-sm transition-transform group-hover:scale-110 shrink-0">
-                                      <img
-                                        src={school.logoUrl}
-                                        alt="Logo"
-                                        className="w-full h-full object-contain"
-                                      />
-                                    </div>
-                                  ) : (
-                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-slate-700 shadow-sm transition-transform group-hover:scale-110 shrink-0">
-                                      <Building size={20} />
-                                    </div>
-                                  )}
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-slate-900 dark:text-white font-black text-sm tracking-tight truncate max-w-[200px]">
-                                      {school.name}
-                                    </span>
-                                    <div className="flex flex-col gap-0.5 mt-1">
-                                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                                        <Mail
-                                          size={10}
-                                          className="text-slate-300"
-                                        />
-                                        <span className="truncate max-w-[150px]">
-                                          {school.adminEmail || "---"}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
-                                        <Phone
-                                          size={10}
-                                          className="text-slate-300"
-                                        />
-                                        <span>
-                                          {school.adminPhone || "---"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-6">
-                                <div className="flex flex-col gap-2">
-                                  <div className="inline-flex items-center gap-2 bg-slate-50 dark:bg-slate-950 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800 group-hover:border-blue-100 dark:group-hover:border-blue-900/30 transition-colors w-fit">
-                                    <SecureCredentialCell hasCredential={!!school.adminPassword} />
-                                  </div>
-                                  <span className="text-[10px] font-bold text-slate-400 font-mono">
-                                    ID: {school.id?.slice(0, 8)}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-6">
-                                <SchoolStatusBadge school={school} isRtl={isRtl} />
-                              </td>
-                              <td className="px-8 py-6">
-                                <div className="flex flex-col items-center gap-3">
-                                  <div className="flex justify-center gap-2">
-                                    <a
-                                      href={`mailto:${school.adminEmail}`}
-                                      className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl text-slate-400 hover:text-blue-600 transition-all border border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900/50 hover:shadow-lg hover:shadow-blue-500/5"
-                                      title="إرسال بريد"
-                                    >
-                                      <Mail size={16} />
-                                    </a>
-                                    {school.adminPhone && (
-                                      <a
-                                        href={`https://wa.me/${school.adminPhone.replace(/\s+/g, "")}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl text-slate-400 hover:text-green-600 transition-all border border-slate-200 dark:border-slate-800 hover:border-green-200 dark:hover:border-green-900/50 hover:shadow-lg hover:shadow-green-500/5"
-                                        title="واتساب"
-                                      >
-                                        <Phone size={16} />
-                                      </a>
-                                    )}
-                                  </div>
-                                  <SchoolLifecycleButtons
-                                    school={school}
-                                    isRtl={isRtl}
-                                    compact
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                          {filteredSchools.length === 0 && (
-                            <tr>
-                              <td
-                                colSpan={4}
-                                className="px-8 py-16 text-center text-slate-400 dark:text-slate-500 font-bold"
-                              >
-                                لا توجد حسابات مدارس مطابقة للبحث
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                  <div className="sx-table-shell bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none overflow-hidden transition-all !p-0">
+                    <SuperAdminSchoolAccountList
+                      schools={filteredSchools}
+                      isRtl={isRtl}
+                      emptyMessage="لا توجد حسابات مدارس مطابقة للبحث"
+                      renderCredential={(hasCredential) => (
+                        <div className="inline-flex items-center gap-2 bg-slate-50 dark:bg-slate-950 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800 w-fit">
+                          <SecureCredentialCell hasCredential={hasCredential} />
+                        </div>
+                      )}
+                    />
                   </div>
 
                   {subscriptionRequests.filter(
