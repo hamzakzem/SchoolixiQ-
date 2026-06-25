@@ -444,7 +444,7 @@ export function SuperAdminSchoolRecordList({
 
   return (
     <>
-      <div className="sx-school-record-cards lg:hidden sx-schools-table-scroll custom-scrollbar">
+      <div className="sx-school-record-cards lg:hidden sx-school-record-list-scroll custom-scrollbar">
         {schools.map((school) => (
           <SchoolRecordCard
             key={school.id}
@@ -460,7 +460,7 @@ export function SuperAdminSchoolRecordList({
         ))}
       </div>
 
-      <div className="hidden lg:block sx-table-scroll sx-schools-table-scroll custom-scrollbar w-full">
+      <div className="hidden lg:block sx-school-record-list-scroll sx-school-record-list-scroll--table custom-scrollbar w-full">
         <table className="sx-school-table sx-table sx-table--wide w-full text-right border-collapse">
           <thead>
             <tr>

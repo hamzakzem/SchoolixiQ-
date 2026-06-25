@@ -232,11 +232,10 @@ export default function SuperAdminDashboard() {
   const [presenceFilter, setPresenceFilter] = useState<
     "all" | "online" | "offline" | "recent"
   >("all");
-  const presenceMap = useSchoolPresenceMap(activeTab === "schools");
-  const [, setPresenceTick] = useState(0);
-  const [usersTab, setUsersTab] = useState<"management" | "parents">(
-    "management",
+  const presenceMap = useSchoolPresenceMap(
+    activeTab === "schools" || activeTab === "accounts",
   );
+  const [, setPresenceTick] = useState(0);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const { totalUnread } = useNotificationBadges();
@@ -1687,9 +1686,9 @@ export default function SuperAdminDashboard() {
       className="sx-dashboard-context sx-dashboard-layout sx-shell-layout h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
-      {/* Sidebar */}
+      {/* Docked sidebar retired — navigation via overlay drawer only */}
       <AnimatePresence mode="wait">
-        {isSidebarOpen && (
+        {false && isSidebarOpen && (
           <motion.aside
             layout
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
@@ -2278,7 +2277,7 @@ export default function SuperAdminDashboard() {
         )}
 
         <div
-          className={`sx-shell-scroll flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat" : "pb-28 lg:pb-10"}`}
+          className={`sx-shell-scroll flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === "chat" ? "overflow-hidden h-full pb-0 sx-shell-main--chat" : ""}`}
         >
           <AnimatePresence mode="wait">
             <motion.div
@@ -2354,14 +2353,13 @@ export default function SuperAdminDashboard() {
                       hint={t('stat_users_hint')}
                       color="text-indigo-600"
                       onClick={() => {
-                        setActiveTab("users");
-                        setUsersTab("parents");
+                        setActiveTab("parents");
                       }}
-                      isActive={activeTab === "users"}
+                      isActive={activeTab === "parents"}
                     />
                   </div>
 
-                  <div className="sx-section sx-schools-table-panel bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none !p-0 overflow-hidden">
+                  <div className="sx-section sx-schools-table-panel sx-schools-table-panel--expanded bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none !p-0 overflow-visible">
                     <div className="sx-section-header !mb-0 px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-800/20">
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="p-2 md:p-3 bg-blue-600 rounded-xl md:rounded-2xl text-white shadow-lg shadow-blue-600/20 shrink-0">
@@ -2491,7 +2489,7 @@ export default function SuperAdminDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="sx-table-shell !border-0 !rounded-none">
+                    <div className="sx-table-shell sx-school-record-list-body !border-0 !rounded-none">
                       <SuperAdminSchoolRecordList
                         schools={paginatedSchools}
                         packages={packages}
@@ -2595,9 +2593,10 @@ export default function SuperAdminDashboard() {
                     </button>
                   </div>
 
-                  <div className="sx-table-shell bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none overflow-hidden transition-all !p-0">
+                  <div className="sx-section sx-schools-table-panel sx-schools-table-panel--expanded bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none overflow-visible transition-all !p-0">
                     <SuperAdminSchoolAccountList
                       schools={filteredSchools}
+                      presenceMap={presenceMap}
                       isRtl={isRtl}
                       emptyMessage="لا توجد حسابات مدارس مطابقة للبحث"
                       renderCredential={(hasCredential) => (
@@ -3337,29 +3336,13 @@ export default function SuperAdminDashboard() {
                       </p>
                     </div>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto shrink-0">
-                      <div className="bg-slate-100 dark:bg-slate-800 p-1 flex items-center rounded-2xl w-full sm:w-auto">
-                        <button
-                          onClick={() => setUsersTab("management")}
-                          className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${usersTab === "management" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-                        >
-                          إدارة المدارس
-                        </button>
-                        <button
-                          onClick={() => setUsersTab("parents")}
-                          className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${usersTab === "parents" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-                        >
-                          الأهالي
-                        </button>
-                      </div>
-                      {usersTab === "management" && (
-                        <button
-                          onClick={() => setShowUserModal(true)}
-                          className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-sm"
-                        >
-                          <Plus size={18} />
-                          إضافة مستخدم
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setShowUserModal(true)}
+                        className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-sm"
+                      >
+                        <Plus size={18} />
+                        إضافة مستخدم
+                      </button>
                     </div>
                   </div>
 
@@ -3377,195 +3360,120 @@ export default function SuperAdminDashboard() {
                     />
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
-                    <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto w-full custom-scrollbar">
-                      <table className="w-full text-right border-collapse min-w-[800px]">
+                  <div className="sx-admin-list-shell">
+                    <div className="sx-admin-list-scroll overflow-x-auto w-full custom-scrollbar">
+                      <table className="sx-admin-list-table">
                         <thead>
-                          <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                            <th className="px-6 py-4">المستخدم</th>
-                            <th className="px-6 py-4">البريد الإلكتروني</th>
-                          {usersTab === "management" ? (
-                            <>
-                              <th className="px-6 py-4">الصلاحية</th>
-                              <th className="px-6 py-4">الإجراءات</th>
-                            </>
-                          ) : (
-                            <>
-                              <th className="px-6 py-4">المدرسة المشترك بها</th>
-                              <th className="px-6 py-4">الطلاب المرتبطين</th>
-                              <th className="px-6 py-4 text-center">الإجراءات</th>
-                            </>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {(usersTab === "management"
-                          ? filteredManagementUsers
-                          : filteredParentUsers
-                        ).map((user) => {
+                          <tr>
+                            <th>المستخدم</th>
+                            <th>البريد الإلكتروني</th>
+                            <th>الصلاحية / المدرسة</th>
+                            <th className="text-center">الإجراءات</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                        {filteredManagementUsers.map((user) => {
                             const userSchool = schools.find(
                               (s) => s.id === user.schoolId,
                             );
-                            const userStudents = students.filter(
-                              (s) =>
-                                user.studentIds?.includes(s.id) ||
-                                s.parentIds?.includes(user.id),
-                            );
+                            const roleBadgeClass =
+                              user.role === "superadmin"
+                                ? "sx-admin-role-badge--superadmin"
+                                : user.role === "admin"
+                                  ? "sx-admin-role-badge--admin"
+                                  : user.role === "teacher"
+                                    ? "sx-admin-role-badge--teacher"
+                                    : user.role === "parent"
+                                      ? "sx-admin-role-badge--parent"
+                                      : "sx-admin-role-badge--staff";
                             return (
-                              <tr
-                                key={user.id}
-                                className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 last:border-0 uppercase text-[11px] font-bold"
-                              >
-                                <td className="px-6 py-4">
+                              <tr key={user.id}>
+                                <td>
                                   <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-[10px]">
+                                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 font-black text-sm shrink-0">
                                       {user.name?.[0]}
                                     </div>
-                                    <span className="text-slate-900 dark:text-white">
+                                    <span className="font-bold text-slate-900 dark:text-white">
                                       {user.name}
                                     </span>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono tracking-tight lowercase">
+                                <td className="text-slate-600 dark:text-slate-300 font-mono lowercase">
                                   {user.email}
                                 </td>
-
-                                {usersTab === "management" ? (
-                                  <>
-                                    <td className="px-6 py-4">
-                                      <div className="space-y-1">
-                                        <span
-                                          className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${
-                                            user.role === "superadmin"
-                                              ? "bg-purple-100 text-purple-600 border border-purple-200"
-                                              : user.role === "admin"
-                                                ? "bg-blue-100 text-blue-600 border border-blue-200"
-                                                : user.role === "teacher"
-                                                  ? "bg-indigo-100 text-indigo-600 border border-indigo-200"
-                                                  : "bg-green-100 text-green-600 border border-green-200"
-                                          }`}
+                                <td>
+                                  <div className="flex flex-col gap-2 items-start">
+                                    <span className={`sx-admin-role-badge ${roleBadgeClass}`}>
+                                      {user.role === "superadmin"
+                                        ? "Super Admin"
+                                        : user.role === "admin"
+                                          ? "مدير مدرسة"
+                                          : user.role === "teacher"
+                                            ? "معلّم"
+                                            : user.role === "parent"
+                                              ? "ولي أمر"
+                                              : user.role}
+                                    </span>
+                                    {userSchool ? (
+                                      <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                                        <Building size={13} />
+                                        {userSchool.name}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="flex items-center justify-center gap-2">
+                                    {userDeleteConfirmId === user.id ? (
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => handleDeleteUser(user.id)}
+                                          className="sx-school-action-btn sx-school-action-btn--danger"
                                         >
-                                          {user.role === "superadmin"
-                                            ? "Super Admin"
-                                            : user.role === "admin"
-                                              ? "School Admin"
-                                              : user.role === "teacher"
-                                                ? "Teacher"
-                                                : user.role === "parent"
-                                                  ? "Parent"
-                                                  : user.role}
-                                        </span>
-                                        {userSchool && (
-                                          <div className="text-[9px] text-slate-400 flex items-center gap-1">
-                                            <Building size={10} />
-                                            {userSchool.name}
-                                          </div>
-                                        )}
+                                          تأكيد الحذف
+                                        </button>
+                                        <button
+                                          onClick={() => setUserDeleteConfirmId(null)}
+                                          className="sx-school-action-btn sx-school-action-btn--ghost"
+                                        >
+                                          إلغاء
+                                        </button>
                                       </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                      <div className="flex items-center justify-center gap-2">
-                                        {userDeleteConfirmId === user.id ? (
-                                          <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
-                                            <button
-                                              onClick={() =>
-                                                handleDeleteUser(user.id)
-                                              }
-                                              className="px-4 py-2 bg-red-600 text-white text-[9px] font-black rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20"
-                                            >
-                                              تأكيد الحذف
-                                            </button>
-                                            <button
-                                              onClick={() =>
-                                                setUserDeleteConfirmId(null)
-                                              }
-                                              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-                                            >
-                                              إلغاء
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          <>
-                                            <button
-                                              onClick={() => {
-                                                setEditingUser(user);
-                                                setNewUser({
-                                                  name: user.name,
-                                                  email: user.email,
-                                                  role: user.role,
-                                                  schoolId: user.schoolId || "",
-                                                });
-                                                setShowUserModal(true);
-                                              }}
-                                              className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/30"
-                                              title="تعديل المستخدم"
-                                            >
-                                              <SettingsIcon size={16} />
-                                            </button>
-                                            <button
-                                              onClick={() =>
-                                                setUserDeleteConfirmId(user.id)
-                                              }
-                                              className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 rounded-xl transition-all border border-slate-100 dark:border-slate-800 hover:border-red-100 dark:hover:border-red-900/20"
-                                              title="حذف المستخدم"
-                                            >
-                                              <Trash2 size={16} />
-                                            </button>
-                                          </>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </>
-                                ) : (
-                                  <>
-                                    <td className="px-6 py-4">
-                                      <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                        {userSchool ? (
-                                          userSchool.name
-                                        ) : (
-                                          <span className="text-slate-400 text-[10px]">
-                                            غير مرتبط
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                      <div className="space-y-1">
-                                        {userStudents.length > 0 ? (
-                                          userStudents.map((s) => (
-                                            <div
-                                              key={s.id}
-                                              className="text-[10px] bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-1 rounded-md inline-block mr-1"
-                                            >
-                                              {s.name}
-                                            </div>
-                                          ))
-                                        ) : (
-                                          <span className="text-slate-400 text-[10px]">
-                                            لا يوجد طلاب بعد
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                      <div className="flex items-center justify-center">
-                                        {renderGuardianDeleteActions(user)}
-                                      </div>
-                                    </td>
-                                  </>
-                                )}
+                                    ) : (
+                                      <>
+                                        <button
+                                          onClick={() => {
+                                            setEditingUser(user);
+                                            setNewUser({
+                                              name: user.name,
+                                              email: user.email,
+                                              role: user.role,
+                                              schoolId: user.schoolId || "",
+                                            });
+                                            setShowUserModal(true);
+                                          }}
+                                          className="sx-school-record-quick-btn"
+                                          title="تعديل المستخدم"
+                                        >
+                                          <SettingsIcon size={16} />
+                                        </button>
+                                        <button
+                                          onClick={() => setUserDeleteConfirmId(user.id)}
+                                          className="sx-school-record-quick-btn"
+                                          title="حذف المستخدم"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
                               </tr>
                             );
                           })}
-                        {(usersTab === "management"
-                          ? filteredManagementUsers
-                          : filteredParentUsers
-                        ).length === 0 && (
+                        {filteredManagementUsers.length === 0 && (
                           <tr>
-                            <td
-                              colSpan={usersTab === "management" ? 4 : 4}
-                              className="px-6 py-16 text-center text-slate-400 dark:text-slate-500 font-bold"
-                            >
+                            <td colSpan={4} className="sx-school-record-empty">
                               لا توجد نتائج مطابقة للبحث
                             </td>
                           </tr>
@@ -3602,18 +3510,18 @@ export default function SuperAdminDashboard() {
                     />
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
-                    <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto w-full custom-scrollbar">
-                      <table className="w-full text-right border-collapse min-w-[800px]">
+                  <div className="sx-admin-list-shell">
+                    <div className="sx-admin-list-scroll overflow-x-auto w-full custom-scrollbar">
+                      <table className="sx-admin-list-table">
                         <thead>
-                          <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                            <th className="px-6 py-4">ولي الأمر</th>
-                            <th className="px-6 py-4">المدرسة المشتركة</th>
-                          <th className="px-6 py-4">الطلاب المرتبطين</th>
-                          <th className="px-6 py-4 text-center">الإجراءات</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          <tr>
+                            <th>ولي الأمر</th>
+                            <th>المدرسة المشتركة</th>
+                            <th>الطلاب المرتبطين</th>
+                            <th className="text-center">الإجراءات</th>
+                          </tr>
+                        </thead>
+                        <tbody>
                         {filteredParentUsers.map((user) => {
                             const userSchool = schools.find(
                               (s) => s.id === user.schoolId,
@@ -3623,11 +3531,8 @@ export default function SuperAdminDashboard() {
                             );
 
                             return (
-                              <tr
-                                key={user.id}
-                                className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 last:border-0 text-xs"
-                              >
-                                <td className="px-6 py-4">
+                              <tr key={user.id}>
+                                <td>
                                   <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-black">
                                       {user.name?.[0]}
@@ -3642,7 +3547,7 @@ export default function SuperAdminDashboard() {
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4">
+                                <td>
                                   {userSchool ? (
                                     <div className="flex items-center gap-2">
                                       <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex justify-center items-center">
@@ -3658,7 +3563,7 @@ export default function SuperAdminDashboard() {
                                     </span>
                                   )}
                                 </td>
-                                <td className="px-6 py-4">
+                                <td>
                                   <div className="flex flex-wrap gap-2">
                                     {userStudents.length > 0 ? (
                                       userStudents.map((st) => (
@@ -3676,7 +3581,7 @@ export default function SuperAdminDashboard() {
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-6 py-4">
+                                <td>
                                   <div className="flex items-center justify-center">
                                     {renderGuardianDeleteActions(user)}
                                   </div>

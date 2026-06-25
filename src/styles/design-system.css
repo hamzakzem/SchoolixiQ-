@@ -1531,10 +1531,66 @@ html.dark .sx-pagination-bar {
   overflow: hidden;
 }
 
+.sx-schools-table-panel--expanded {
+  min-height: clamp(560px, 72vh, 920px);
+  flex: 1 1 auto;
+  overflow: visible;
+}
+
+.sx-schools-table-panel--expanded .sx-school-record-list-body,
+.sx-schools-table-panel--expanded .sx-table-shell {
+  overflow: visible;
+  min-height: clamp(420px, 58vh, 800px);
+}
+
+.sx-school-record-list-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sx-school-record-list-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile/tablet: comfortable internal scroll */
+@media (max-width: 1023px) {
+  .sx-school-record-list-scroll {
+    max-height: clamp(560px, 72vh, 920px);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .sx-school-record-list-scroll--table {
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+}
+
+/* Desktop: page scroll — no tiny nested box */
+@media (min-width: 1024px) {
+  .sx-school-record-list-scroll {
+    max-height: none;
+    overflow-y: visible;
+    overflow-x: auto;
+  }
+}
+
 .sx-schools-table-scroll {
-  max-height: min(68vh, 780px);
+  max-height: clamp(560px, 72vh, 920px);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 1024px) {
+  .sx-schools-table-panel--expanded .sx-schools-table-scroll,
+  .sx-schools-table-panel--expanded .sx-school-record-list-scroll {
+    max-height: none;
+    overflow-y: visible;
+  }
 }
 
 .sx-schools-table-scroll thead th {
@@ -1594,9 +1650,6 @@ html.dark .sx-schools-table-pagination {
   flex-direction: column;
   gap: 16px;
   padding: 16px;
-  max-height: min(68vh, 780px);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 /* ─── School lifecycle action buttons ─── */
@@ -2011,6 +2064,166 @@ html.dark .sx-school-record-meta {
   font-size: 0.9375rem;
   font-weight: 700;
   color: #64748b;
+}
+
+/* ─── Admin users / parents list shells ─── */
+.sx-admin-list-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(480px, 65vh, 860px);
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05);
+}
+
+html.dark .sx-admin-list-shell {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.sx-admin-list-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: clamp(520px, 70vh, 900px);
+}
+
+@media (min-width: 1024px) {
+  .sx-admin-list-scroll {
+    max-height: none;
+    overflow-y: visible;
+    overflow-x: auto;
+  }
+}
+
+.sx-admin-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 880px;
+  text-align: right;
+}
+
+.sx-admin-list-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 14px 16px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #64748b;
+  background: rgba(248, 250, 252, 0.98);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+html.dark .sx-admin-list-table thead th {
+  background: rgba(15, 23, 42, 0.98);
+  color: #94a3b8;
+  border-bottom-color: #334155;
+}
+
+.sx-admin-list-table tbody td {
+  padding: 16px;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+html.dark .sx-admin-list-table tbody td {
+  border-bottom-color: #1e293b;
+}
+
+.sx-admin-list-table tbody tr:hover {
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.sx-admin-role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 10px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.sx-admin-role-badge--superadmin {
+  background: rgba(147, 51, 234, 0.12);
+  color: #7e22ce;
+  border-color: rgba(147, 51, 234, 0.28);
+}
+
+.sx-admin-role-badge--admin {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+  border-color: rgba(59, 130, 246, 0.28);
+}
+
+.sx-admin-role-badge--teacher {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4338ca;
+  border-color: rgba(99, 102, 241, 0.28);
+}
+
+.sx-admin-role-badge--parent {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.28);
+}
+
+.sx-admin-role-badge--staff {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.28);
+}
+
+.sx-school-status-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sx-school-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.3;
+  border: 1px solid transparent;
+  letter-spacing: 0.01em;
+}
+
+.sx-school-status-badge--active {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.sx-school-status-badge--suspended {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.sx-school-status-badge--archived {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.35);
+}
+
+.sx-school-status-badge--inactive {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.28);
 }
 
 .sx-school-table {

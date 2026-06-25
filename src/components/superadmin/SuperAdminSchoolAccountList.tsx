@@ -5,6 +5,8 @@ import {
   SchoolLifecycleButtons,
   SchoolStatusBadge,
 } from './SchoolLifecycleButtons';
+import { SchoolPresenceBadge } from './SchoolPresenceBadge';
+import type { SchoolPresenceRecord } from '../../lib/schoolPresence';
 import type { SuperAdminSchoolRecord } from './SuperAdminSchoolRecordList';
 
 function SchoolLogo({ school }: { school: SuperAdminSchoolRecord }) {
@@ -73,14 +75,33 @@ function ContactChip({
   );
 }
 
+function AccountStatusRow({
+  school,
+  presence,
+  isRtl,
+}: {
+  school: SuperAdminSchoolRecord;
+  presence?: SchoolPresenceRecord | null;
+  isRtl: boolean;
+}) {
+  return (
+    <div className="sx-school-status-row">
+      <SchoolStatusBadge school={school} isRtl={isRtl} />
+      <SchoolPresenceBadge presence={presence} />
+    </div>
+  );
+}
+
 function AccountCard({
   school,
   isRtl,
   hasCredential,
+  presence,
 }: {
   school: SuperAdminSchoolRecord & { adminPassword?: string };
   isRtl: boolean;
   hasCredential: boolean;
+  presence?: SchoolPresenceRecord | null;
 }) {
   return (
     <article className="sx-school-record-card" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -92,8 +113,9 @@ function AccountCard({
           </h4>
           <SchoolIdCopy id={school.id} isRtl={isRtl} />
         </div>
-        <SchoolStatusBadge school={school} isRtl={isRtl} />
       </header>
+
+      <AccountStatusRow school={school} presence={presence} isRtl={isRtl} />
 
       <div className="sx-school-record-chips">
         <ContactChip
@@ -151,6 +173,7 @@ function AccountCard({
 
 type SuperAdminSchoolAccountListProps = {
   schools: (SuperAdminSchoolRecord & { adminPassword?: string })[];
+  presenceMap: Record<string, SchoolPresenceRecord | undefined>;
   isRtl: boolean;
   emptyMessage: string;
   renderCredential: (hasCredential: boolean) => React.ReactNode;
@@ -158,6 +181,7 @@ type SuperAdminSchoolAccountListProps = {
 
 export function SuperAdminSchoolAccountList({
   schools,
+  presenceMap,
   isRtl,
   emptyMessage,
   renderCredential,
@@ -168,25 +192,26 @@ export function SuperAdminSchoolAccountList({
 
   return (
     <>
-      <div className="sx-school-record-cards lg:hidden sx-schools-table-scroll custom-scrollbar">
+      <div className="sx-school-record-cards lg:hidden sx-school-record-list-scroll custom-scrollbar">
         {schools.map((school) => (
           <AccountCard
             key={school.id}
             school={school}
             isRtl={isRtl}
             hasCredential={!!school.adminPassword}
+            presence={presenceMap[school.id]}
           />
         ))}
       </div>
 
-      <div className="hidden lg:block sx-table-scroll sx-schools-table-scroll custom-scrollbar w-full">
+      <div className="hidden lg:block sx-school-record-list-scroll sx-school-record-list-scroll--table custom-scrollbar w-full">
         <table className="sx-school-table w-full text-right border-collapse" style={{ minWidth: 960 }}>
           <thead>
             <tr>
               <th>المدرسة</th>
               <th>بيانات التواصل</th>
               <th>المصادقة</th>
-              <th>الحالة</th>
+              <th>الحالة والنشاط</th>
               <th className="text-center">الإجراءات</th>
             </tr>
           </thead>
@@ -220,7 +245,11 @@ export function SuperAdminSchoolAccountList({
                   {renderCredential(!!school.adminPassword)}
                 </td>
                 <td className="sx-school-table__cell">
-                  <SchoolStatusBadge school={school} isRtl={isRtl} />
+                  <AccountStatusRow
+                    school={school}
+                    presence={presenceMap[school.id]}
+                    isRtl={isRtl}
+                  />
                 </td>
                 <td className="sx-school-table__cell sx-school-table__cell--actions">
                   <div className="flex justify-center gap-2 mb-3">

@@ -27,19 +27,17 @@ export function SchoolStatusBadge({
   isRtl: boolean;
 }) {
   const status = school.status || 'inactive';
-  const tone =
+  const toneClass =
     status === 'active'
-      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 border-emerald-100'
+      ? 'sx-school-status-badge--active'
       : status === 'suspended'
-        ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 border-amber-100'
+        ? 'sx-school-status-badge--suspended'
         : status === 'archived'
-          ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 border-slate-200'
-          : 'bg-red-50 dark:bg-red-950/30 text-red-600 border-red-100';
+          ? 'sx-school-status-badge--archived'
+          : 'sx-school-status-badge--inactive';
 
   return (
-    <span
-      className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-wide border ${tone}`}
-    >
+    <span className={`sx-school-status-badge ${toneClass}`}>
       {getSchoolStatusLabel(status, isRtl)}
     </span>
   );
