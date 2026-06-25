@@ -126,8 +126,14 @@ import { SystemConfigProvider } from './lib/SystemConfigContext.tsx';
 import { getServiceWorkerUrl, SW_BUILD_VERSION } from './lib/serviceWorkerRegistration';
 import { initPwaInstallCapture, applyPwaStandaloneBodyClass } from './lib/pwaUtils';
 
+import { getDrawerPortalNode } from './lib/drawerPortal';
+
 initPwaInstallCapture();
 applyPwaStandaloneBodyClass();
+
+if (typeof document !== 'undefined') {
+  getDrawerPortalNode();
+}
 
 createRoot(document.getElementById('root')!).render(
   <SystemConfigProvider>
