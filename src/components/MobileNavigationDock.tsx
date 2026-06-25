@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { getDrawerPortalNode } from "../lib/drawerPortal";
-import { drawerPanelProps, modalBackdropProps, MOTION_SPRING, prefersReducedMotion } from "../lib/motion";
+import { drawerPanelProps, drawerNavItemMotion, modalBackdropProps, MOTION_SPRING, prefersReducedMotion, servicesSideDrawerProps } from "../lib/motion";
 import SchoolixLogo from './SchoolixLogo';
 import {
   LayoutDashboard,
@@ -448,36 +448,34 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
 
       {/* Three-lines services menu — side drawer (mobile/tablet only) */}
       {isMobileViewport && renderDrawerPortal(
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {isSidebarOpen && (
             <>
               <motion.button
                 type="button"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                {...modalBackdropProps()}
                 onClick={closeServicesMenu}
                 className="sx-drawer-backdrop lg:hidden"
                 aria-label={isRtl ? "إغلاق القائمة" : "Close menu"}
               />
               <motion.aside
-                initial={{ x: isRtl ? "100%" : "-100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: isRtl ? "100%" : "-100%" }}
-                transition={{ type: "spring", damping: 28, stiffness: 280 }}
-                className={`sx-drawer-panel sx-drawer-panel--light sx-drawer-panel--services lg:hidden ${isRtl ? "sx-drawer-panel--rtl" : "sx-drawer-panel--ltr"}`}
+                key="services-drawer"
+                {...servicesSideDrawerProps(isRtl)}
+                className={`sx-drawer-panel sx-drawer-panel--services lg:hidden ${isRtl ? "sx-drawer-panel--rtl" : "sx-drawer-panel--ltr"}`}
                 dir={isRtl ? "rtl" : "ltr"}
                 role="dialog"
                 aria-modal="true"
                 aria-label={isRtl ? "قائمة الخدمات" : "Services menu"}
               >
                 <div className="sx-drawer-services-header">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="sx-drawer-services-header__glow" aria-hidden />
+                  <div className="flex items-start justify-between gap-3 relative z-[1]">
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="sx-drawer-services-header__badge">
-                        <SchoolixLogo size={24} surface="light" />
+                        <SchoolixLogo size={26} surface="light" />
                       </div>
                       <div className="min-w-0">
+                        <p className="sx-drawer-services-header__eyebrow">SchoolixIQ</p>
                         <h3 className="sx-drawer-services-header__title">
                           {isRtl ? "القائمة الرئيسية" : "Main Menu"}
                         </h3>
@@ -489,38 +487,55 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                     <button
                       type="button"
                       onClick={closeServicesMenu}
-                      className="sx-action-btn sx-action-btn-icon shrink-0"
+                      className="sx-drawer-services-close sx-action-btn sx-action-btn-icon shrink-0"
                       aria-label={isRtl ? "إغلاق" : "Close"}
                     >
-                      <X size={18} className="sx-action-icon" strokeWidth={2.4} />
+                      <X size={18} strokeWidth={2.4} />
                     </button>
                   </div>
                 </div>
                 <div className="sx-drawer-services-body">
                   {menuItems.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      {menuItems.map((item, index) => {
-                        const Icon = item.icon;
-                        const isActive = activeTab === item.id;
-                        return (
-                          <motion.button
-                            key={item.id}
-                            initial={{ opacity: 0, x: isRtl ? 12 : -12 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.02 }}
-                            onClick={() => handleTabClick(item.id)}
-                            className={`sx-drawer-nav-item ${isActive ? "sx-drawer-nav-item--active" : ""}`}
-                            dir={isRtl ? "rtl" : "ltr"}
-                          >
-                            <Icon className="sx-action-icon shrink-0" size={20} strokeWidth={isActive ? 2.25 : 2.25} />
-                            <span className="truncate flex-1">{item.label}</span>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
+                    <>
+                      <p className="sx-drawer-services-section-label">
+                        {isRtl ? "الأقسام والصلاحيات" : "Sections & permissions"}
+                        <span className="sx-drawer-services-section-count">{menuItems.length}</span>
+                      </p>
+                      <div className="sx-drawer-services-list">
+                        {menuItems.map((item, index) => {
+                          const Icon = item.icon;
+                          const isActive = activeTab === item.id;
+                          return (
+                            <motion.button
+                              key={item.id}
+                              type="button"
+                              {...drawerNavItemMotion(index, isRtl)}
+                              whileTap={prefersReducedMotion() ? undefined : { scale: 0.98 }}
+                              onClick={() => handleTabClick(item.id)}
+                              className={`sx-drawer-nav-item ${isActive ? "sx-drawer-nav-item--active" : ""}`}
+                              dir={isRtl ? "rtl" : "ltr"}
+                            >
+                              <span className="sx-drawer-nav-item__icon" aria-hidden>
+                                <Icon size={20} strokeWidth={isActive ? 2.35 : 2.15} />
+                              </span>
+                              <span className="sx-drawer-nav-item__label truncate">{item.label}</span>
+                              {isActive ? (
+                                <span className="sx-drawer-nav-item__active-dot" aria-hidden />
+                              ) : null}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    </>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-[#64748B]">
-                      <p className="text-sm font-semibold">{isRtl ? "لا توجد خدمات متاحة" : "No services available"}</p>
+                    <div className="sx-drawer-services-empty">
+                      <Menu size={28} className="sx-drawer-services-empty__icon" strokeWidth={1.75} />
+                      <p className="sx-drawer-services-empty__title">
+                        {isRtl ? "لا توجد خدمات متاحة" : "No services available"}
+                      </p>
+                      <p className="sx-drawer-services-empty__hint">
+                        {isRtl ? "جرّب تحديث الصفحة أو التواصل مع الإدارة" : "Try refreshing or contact your admin"}
+                      </p>
                     </div>
                   )}
                 </div>

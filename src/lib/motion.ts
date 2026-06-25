@@ -52,6 +52,38 @@ export function modalPanelProps() {
       };
 }
 
+export function servicesSideDrawerProps(isRtl: boolean) {
+  if (prefersReducedMotion()) {
+    return {
+      initial: { opacity: 0 },
+      animate: { opacity: 1 },
+      exit: { opacity: 0 },
+      transition: { duration: 0.01 },
+    };
+  }
+  return {
+    initial: { x: isRtl ? '100%' : '-100%' },
+    animate: { x: 0 },
+    exit: { x: isRtl ? '100%' : '-100%' },
+    transition: { type: 'spring' as const, stiffness: 340, damping: 34, mass: 0.82 },
+  };
+}
+
+export function drawerNavItemMotion(index: number, isRtl: boolean) {
+  if (prefersReducedMotion()) {
+    return { initial: false, animate: {}, transition: { duration: 0 } };
+  }
+  return {
+    initial: { opacity: 0, x: isRtl ? 14 : -14 },
+    animate: { opacity: 1, x: 0 },
+    transition: {
+      delay: 0.06 + index * 0.035,
+      duration: 0.32,
+      ease: MOTION_EASE,
+    },
+  };
+}
+
 export function drawerPanelProps(fromBottom = true) {
   if (prefersReducedMotion()) {
     return {
