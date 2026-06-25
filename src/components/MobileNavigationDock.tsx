@@ -137,38 +137,44 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
     return () => mq.removeEventListener('change', sync);
   }, []);
 
-  /** Mobile/tablet overlay only — desktop docked sidebar must not lock the page. */
-  const mobileOverlayOpen =
-    isMobileViewport && (showQuickAccess || isSidebarOpen);
+  /** Overlay drawer open — all viewports (services menu). Quick-access sheet is mobile only. */
+  const servicesDrawerOpen = isSidebarOpen;
+  const quickAccessOverlayOpen = isMobileViewport && showQuickAccess;
+  const portalLayerOpen = servicesDrawerOpen || quickAccessOverlayOpen;
 
   useEffect(() => {
     if (typeof document === "undefined") return;
     const portal = document.getElementById("sx-app-drawer-portal");
-    if (mobileOverlayOpen) {
+    let clearTimer: ReturnType<typeof setTimeout> | undefined;
+
+    if (portalLayerOpen) {
       document.documentElement.classList.add("sx-drawer-open");
       document.body.classList.add("sx-drawer-open");
       portal?.classList.add("sx-app-drawer-portal--active");
     } else {
       document.documentElement.classList.remove("sx-drawer-open");
       document.body.classList.remove("sx-drawer-open");
-      portal?.classList.remove("sx-app-drawer-portal--active");
+      clearTimer = window.setTimeout(() => {
+        portal?.classList.remove("sx-app-drawer-portal--active");
+      }, 320);
     }
     return () => {
+      if (clearTimer) window.clearTimeout(clearTimer);
       document.documentElement.classList.remove("sx-drawer-open");
       document.body.classList.remove("sx-drawer-open");
       portal?.classList.remove("sx-app-drawer-portal--active");
     };
-  }, [mobileOverlayOpen]);
+  }, [portalLayerOpen]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || !isMobileViewport) return;
+      if (e.key !== "Escape") return;
       if (showQuickAccess) setShowQuickAccess(false);
       else if (isSidebarOpen) setIsSidebarOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isSidebarOpen, showQuickAccess, setIsSidebarOpen, isMobileViewport]);
+  }, [isSidebarOpen, showQuickAccess, setIsSidebarOpen]);
 
   const closeServicesMenu = () => setIsSidebarOpen(false);
 
@@ -446,22 +452,28 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
         </AnimatePresence>,
       )}
 
-      {/* Three-lines services menu — side drawer (mobile/tablet only) */}
-      {isMobileViewport && renderDrawerPortal(
+      {/* Three-lines services menu — side drawer (all viewports) */}
+      {renderDrawerPortal(
         <AnimatePresence mode="wait">
           {isSidebarOpen && (
-            <>
+            <motion.div
+              key="services-drawer-stack"
+              className="sx-drawer-stack"
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 1 }}
+            >
               <motion.button
                 type="button"
                 {...modalBackdropProps()}
                 onClick={closeServicesMenu}
-                className="sx-drawer-backdrop lg:hidden"
+                className="sx-drawer-backdrop"
                 aria-label={isRtl ? "إغلاق القائمة" : "Close menu"}
               />
               <motion.aside
                 key="services-drawer"
                 {...servicesSideDrawerProps(isRtl)}
-                className={`sx-drawer-panel sx-drawer-panel--services lg:hidden ${isRtl ? "sx-drawer-panel--rtl" : "sx-drawer-panel--ltr"}`}
+                className={`sx-drawer-panel sx-drawer-panel--services ${isRtl ? "sx-drawer-panel--rtl" : "sx-drawer-panel--ltr"}`}
                 dir={isRtl ? "rtl" : "ltr"}
                 role="dialog"
                 aria-modal="true"
@@ -552,7 +564,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   </div>
                 )}
               </motion.aside>
-            </>
+            </motion.div>
           )}
         </AnimatePresence>,
       )}

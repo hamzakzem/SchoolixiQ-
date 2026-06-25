@@ -3,7 +3,6 @@ import { clsx } from 'clsx';
 import { GlobalFooter } from '../GlobalFooter';
 import { MobileNavigationDock } from '../MobileNavigationDock';
 import { DashboardHeader, type BreadcrumbItem } from './DashboardHeader';
-import { DashboardSidebar } from './DashboardSidebar';
 import {
   type DashboardMenuItem,
   type DashboardNavSection,
@@ -73,39 +72,14 @@ export function DashboardShell({
   setShowNotifications,
   className,
 }: DashboardShellProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth >= 1024,
-  );
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setIsSidebarOpen(false);
-        setIsSidebarCollapsed(false);
-      } else {
-        setIsSidebarOpen(true);
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleMenuToggle = useCallback(() => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
-      setIsSidebarCollapsed((v) => !v);
-    } else {
-      setIsSidebarOpen((v) => {
-        if (!v) setIsSidebarCollapsed(false);
-        return !v;
-      });
-    }
+    setIsSidebarOpen((v) => !v);
   }, []);
 
   const closeMobileSidebar = useCallback(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-      setIsSidebarOpen(false);
-    }
+    setIsSidebarOpen(false);
   }, []);
 
   useEffect(() => {
@@ -117,7 +91,6 @@ export function DashboardShell({
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (typeof window === 'undefined' || window.innerWidth >= 1024) return;
       if (isSidebarOpen) setIsSidebarOpen(false);
     };
     window.addEventListener('keydown', onKeyDown);
@@ -137,24 +110,6 @@ export function DashboardShell({
       )}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <DashboardSidebar
-        variant={variant}
-        menuItems={menuItems}
-        sections={sections}
-        sectionLabels={sectionLabels}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        isOpen={isSidebarOpen}
-        isCollapsed={isSidebarCollapsed}
-        isRtl={isRtl}
-        onCloseMobile={closeMobileSidebar}
-        portalTitle={portalTitle}
-        portalSubtitle={portalSubtitle}
-        schoolLogoUrl={schoolLogoUrl}
-        logoutLabel={logoutLabel}
-        onLogout={onLogout}
-      />
-
       <div
         className={clsx(
           'sx-dashboard-content sx-shell-content print:overflow-visible print:h-auto',
@@ -170,7 +125,7 @@ export function DashboardShell({
           showBack={showBack}
           onBack={onBack ? handleHeaderBack : undefined}
           onMenuToggle={handleMenuToggle}
-          menuCollapsed={isSidebarCollapsed}
+          menuCollapsed={!isSidebarOpen}
           trailing={headerTrailing}
         />
 
@@ -179,9 +134,9 @@ export function DashboardShell({
             'sx-shell-scroll custom-scrollbar print:overflow-visible',
             fullHeightTab
               ? hideMobileDock
-                ? 'overflow-hidden pb-0'
-                : 'overflow-hidden pb-[72px] lg:pb-0'
-              : 'pb-[88px] lg:pb-8',
+                ? 'overflow-hidden !pb-0'
+                : 'overflow-hidden sx-shell-main--chat'
+              : '',
           )}
         >
           <div

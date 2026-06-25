@@ -245,16 +245,12 @@ export default function SuperAdminDashboard() {
     null,
   );
   const [viewingPackage, setViewingPackage] = useState<any | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1024) {
-        setIsSidebarOpen(false);
-        setIsSidebarCollapsed(false);
-      } else {
-        setIsSidebarOpen(true);
         setIsSidebarCollapsed(false);
       }
     };
@@ -271,7 +267,6 @@ export default function SuperAdminDashboard() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (window.innerWidth >= 1024) return;
       if (isSidebarOpen) setIsSidebarOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
@@ -2124,13 +2119,9 @@ export default function SuperAdminDashboard() {
           <div className="flex items-center gap-1.5 sm:gap-4 min-w-0">
             <button
               onClick={() => {
-                if (window.innerWidth >= 1024) {
-                  setIsSidebarCollapsed(!isSidebarCollapsed);
-                } else {
-                  setIsSidebarOpen(!isSidebarOpen);
-                  if (!isSidebarOpen) {
-                    setIsSidebarCollapsed(false);
-                  }
+                setIsSidebarOpen(!isSidebarOpen);
+                if (!isSidebarOpen) {
+                  setIsSidebarCollapsed(false);
                 }
               }}
               className="w-11 h-11 hidden lg:flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
@@ -2138,8 +2129,7 @@ export default function SuperAdminDashboard() {
               <Menu
                 size={20}
                 className={
-                  (!isSidebarOpen && window.innerWidth < 1024) ||
-                  isSidebarCollapsed
+                  !isSidebarOpen
                     ? "rotate-90 transition-transform"
                     : "transition-transform"
                 }
@@ -2344,23 +2334,23 @@ export default function SuperAdminDashboard() {
                     />
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none overflow-hidden transition-all sx-schools-table-panel mb-8">
-                    <div className="px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/20 dark:bg-slate-800/20">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 md:p-3 bg-blue-600 rounded-xl md:rounded-2xl text-white shadow-lg shadow-blue-600/20">
+                  <div className="sx-section sx-schools-table-panel bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none !p-0 overflow-hidden">
+                    <div className="sx-section-header !mb-0 px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-800/20">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="p-2 md:p-3 bg-blue-600 rounded-xl md:rounded-2xl text-white shadow-lg shadow-blue-600/20 shrink-0">
                           <LayoutGrid size={24} />
                         </div>
-                        <div>
-                          <h3 className="text-xl font-black text-slate-900 dark:text-white font-display tracking-tight">
+                        <div className="min-w-0">
+                          <h3 className="sx-section-title font-display tracking-tight">
                             أحدث المدارس المشتركة
                           </h3>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-0.5">
+                          <p className="sx-section-subtitle mt-0.5">
                             Global Network Nodes & Licenses
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-end gap-2 w-full md:w-auto">
+                      <div className="sx-section-toolbar flex-col items-stretch md:items-end">
                         <div className="relative w-full md:w-96 group">
                           <Search
                             className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors"
@@ -2474,8 +2464,9 @@ export default function SuperAdminDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="sx-schools-table-scroll custom-scrollbar w-full">
-                      <table className="w-full text-right border-collapse min-w-[1000px]">
+                    <div className="sx-table-shell !border-0 !rounded-none">
+                    <div className="sx-table-scroll sx-schools-table-scroll custom-scrollbar w-full">
+                      <table className="sx-table sx-table--wide w-full text-right border-collapse">
                       <thead>
                         <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
                           <th className="px-8 py-5 text-right">
@@ -2749,7 +2740,7 @@ export default function SuperAdminDashboard() {
                     </table>
                     </div>
                     {filteredSchools.length > 0 && (
-                      <div className="sx-schools-table-pagination">
+                      <div className="sx-pagination-bar sx-schools-table-pagination">
                         <p className="text-xs font-bold text-[#64748B]">
                           عرض {(schoolsPageSafe - 1) * SCHOOLS_PAGE_SIZE + 1}–
                           {Math.min(schoolsPageSafe * SCHOOLS_PAGE_SIZE, filteredSchools.length)} من{" "}
@@ -2778,6 +2769,7 @@ export default function SuperAdminDashboard() {
                         </div>
                       </div>
                     )}
+                    </div>
                   </div>
                 </>
               ) : activeTab === "accounts" ? (
@@ -2840,7 +2832,7 @@ export default function SuperAdminDashboard() {
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none overflow-hidden transition-all">
-                    <div className="overflow-x-auto">
+                    <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto">
                       <table className="w-full text-right border-collapse">
                         <thead>
                           <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
@@ -2976,7 +2968,7 @@ export default function SuperAdminDashboard() {
                         </p>
                       </div>
                       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-orange-200/50 dark:border-orange-900/20 shadow-xl shadow-orange-500/5 overflow-hidden transition-all">
-                        <div className="overflow-x-auto w-full custom-scrollbar">
+                        <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto w-full custom-scrollbar">
                           <table className="w-full text-right border-collapse min-w-[700px]">
                           <thead>
                             <tr className="bg-orange-50/50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase tracking-widest border-b border-orange-100/50 dark:border-orange-900/20">
@@ -3526,7 +3518,7 @@ export default function SuperAdminDashboard() {
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
-                    <div className="overflow-x-auto w-full custom-scrollbar">
+                    <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto w-full custom-scrollbar">
                       <table className="w-full text-right border-collapse min-w-[800px]">
                         <thead>
                           <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
@@ -3729,7 +3721,7 @@ export default function SuperAdminDashboard() {
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
-                    <div className="overflow-x-auto w-full custom-scrollbar">
+                    <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto w-full custom-scrollbar">
                       <table className="w-full text-right border-collapse min-w-[800px]">
                         <thead>
                           <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
@@ -3954,7 +3946,7 @@ export default function SuperAdminDashboard() {
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
-                    <div className="overflow-x-auto w-full custom-scrollbar">
+                    <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto w-full custom-scrollbar">
                       <table className="w-full text-right border-collapse min-w-[800px]">
                         <thead>
                           <tr className="bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">

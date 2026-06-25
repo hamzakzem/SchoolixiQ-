@@ -270,10 +270,10 @@ export default function Attendance() {
                  {t('saveAttendance')}
                </button>
             </div>
-            <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+            <div className="sx-table-shell bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
                {/* Desktop View */}
-               <div className="hidden md:block overflow-x-auto custom-scrollbar">
-                 <table className={`w-full ${isRtl ? 'text-right' : 'text-left'}`}>
+               <div className="hidden md:block sx-table-scroll sx-table-scroll--flat overflow-x-auto custom-scrollbar">
+                 <table className={`sx-table w-full ${isRtl ? 'text-right' : 'text-left'}`}>
                     <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
                        <tr>
                           <th className="p-5">{t('student')}</th>

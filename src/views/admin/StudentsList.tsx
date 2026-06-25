@@ -796,7 +796,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         </div>
       </div>
 
-      <div className={`bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 ${viewMode === 'cards' ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <div className={`sx-table-shell bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 ${viewMode === 'cards' ? 'overflow-visible' : 'overflow-hidden'}`}>
         <div className="p-4 md:p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
           <span className="text-[10px] md:text-xs font-extrabold text-slate-400 uppercase tracking-[0.2em]">النتائج: {filteredStudents.length}</span>
           <div className="hidden md:flex bg-slate-100 p-1 rounded-xl border border-slate-200">
@@ -816,8 +816,8 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         </div>
 
         {viewMode === 'table' ? (
-          <div className="overflow-x-auto overflow-y-hidden custom-scrollbar">
-            <table className="w-full text-right border-collapse">
+          <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto overflow-y-hidden custom-scrollbar">
+            <table className="sx-table w-full text-right border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-200">
                   <th className="px-8 py-5">اسم الطالب</th>

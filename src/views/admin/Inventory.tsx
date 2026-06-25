@@ -114,10 +114,11 @@ export default function Inventory() {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm lg:col-span-2">
-           <h3 className="text-xl font-bold text-slate-800 mb-6 font-display">قائمة المواد</h3>
-           <div className="overflow-x-auto">
-              <table className="w-full text-right min-w-[500px]">
+        <div className="sx-section bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm lg:col-span-2">
+           <h3 className="sx-section-title text-xl mb-6 font-display">قائمة المواد</h3>
+           <div className="sx-table-shell border-0 shadow-none rounded-2xl overflow-hidden">
+           <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto">
+              <table className="sx-table w-full text-right min-w-[500px]">
                  <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] border-b border-slate-200">
                     <tr>
                        <th className="p-4">اسم المادة</th>
@@ -175,6 +176,7 @@ export default function Inventory() {
                     )}
                  </tbody>
               </table>
+           </div>
            </div>
         </div>
 

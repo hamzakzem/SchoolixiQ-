@@ -689,6 +689,21 @@ html.dark .sx-action-btn-ghost {
 }
 
 #sx-app-drawer-portal.sx-app-drawer-portal--active {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sx-z-drawer);
+  pointer-events: auto;
+}
+
+.sx-drawer-stack {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sx-z-drawer);
+  pointer-events: none;
+}
+
+.sx-drawer-stack > .sx-drawer-backdrop,
+.sx-drawer-stack > .sx-drawer-panel {
   pointer-events: auto;
 }
 
@@ -874,33 +889,16 @@ html.dark .sx-action-btn-ghost {
   }
 }
 
-/* Desktop: in-flow navigation rail. Mobile: hidden (overlay drawer via MobileNavigationDock). */
+/* Navigation: overlay drawer on all viewports (MobileNavigationDock). Docked rail retired. */
 .sx-dashboard-sidebar,
 .sx-shell-sidebar {
-  display: none;
+  display: none !important;
   flex-shrink: 0;
   flex-direction: column;
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
   position: relative;
-}
-
-@media (min-width: 1024px) {
-  .sx-dashboard-sidebar,
-  .sx-shell-sidebar {
-    display: flex;
-    width: 340px;
-    min-width: 320px;
-    max-width: 360px;
-  }
-
-  .sx-dashboard-sidebar--collapsed,
-  .sx-shell-sidebar--collapsed {
-    width: 76px;
-    min-width: 76px;
-    max-width: 76px;
-  }
 }
 
 .sx-dashboard-content,
@@ -912,6 +910,8 @@ html.dark .sx-action-btn-ghost {
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
+  position: relative;
+  z-index: var(--sx-z-content);
 }
 
 .sx-shell-content-inner {
@@ -921,6 +921,7 @@ html.dark .sx-action-btn-ghost {
   min-height: 0;
   gap: 20px;
   padding: clamp(16px, 2vw, 28px);
+  padding-bottom: clamp(32px, 5vh, 72px);
   overflow-x: hidden;
 }
 
@@ -937,6 +938,18 @@ html.dark .sx-action-btn-ghost {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: clamp(32px, 5vh, 72px);
+}
+
+.sx-shell-scroll.sx-shell-main--chat,
+.sx-shell-main--chat.sx-shell-scroll {
+  padding-bottom: 0;
+}
+
+@media (max-width: 1023px) {
+  .sx-dashboard-context .sx-shell-scroll:not(.sx-shell-main--chat) {
+    padding-bottom: max(5.5rem, clamp(32px, 5vh, 72px));
+  }
 }
 
 .sx-shell-main--chat {
@@ -1300,15 +1313,226 @@ html.sx-drawer-open .sx-drawer-panel {
   }
 }
 
-/* ─── Schools data table panel ─── */
+/* ─── Global dashboard sections, tables & card grids ─── */
+.sx-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 24px;
+  padding: clamp(16px, 2vw, 24px);
+  border-radius: 18px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+html.dark .sx-section {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.sx-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: clamp(14px, 2vw, 20px);
+}
+
+.sx-section-title {
+  margin: 0;
+  font-family: 'Cairo', system-ui, sans-serif;
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  font-weight: 800;
+  line-height: 1.3;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+html.dark .sx-section-title {
+  color: #f8fafc;
+}
+
+.sx-section-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #64748b;
+}
+
+html.dark .sx-section-subtitle {
+  color: #94a3b8;
+}
+
+.sx-section-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .sx-section-toolbar {
+    gap: 12px;
+    width: auto;
+    justify-content: flex-end;
+  }
+}
+
+.sx-section-toolbar > * {
+  flex-shrink: 0;
+}
+
+.sx-section-toolbar input,
+.sx-section-toolbar select,
+.sx-section-toolbar button {
+  min-height: 42px;
+}
+
+.sx-table-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+html.dark .sx-table-shell {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.sx-table-scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: min(62vh, 720px);
+}
+
+.sx-table-scroll--tall {
+  max-height: min(72vh, 840px);
+}
+
+.sx-table-scroll--flat {
+  max-height: none;
+}
+
+.sx-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+  text-align: right;
+}
+
+.sx-table--wide {
+  min-width: 1100px;
+}
+
+.sx-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(248, 250, 252, 0.98);
+  backdrop-filter: blur(6px);
+  padding: 14px 16px;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #64748b;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+html.dark .sx-table thead th {
+  background: rgba(15, 23, 42, 0.98);
+  color: #94a3b8;
+  border-bottom-color: #334155;
+}
+
+.sx-table tbody td {
+  padding: 14px 16px;
+  vertical-align: middle;
+}
+
+.sx-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+html.dark .sx-table tbody tr {
+  border-bottom-color: #1e293b;
+}
+
+.sx-pagination-bar {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px 8px;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+html.dark .sx-pagination-bar {
+  background: rgba(15, 23, 42, 0.5);
+  border-top-color: #334155;
+}
+
+.sx-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: clamp(16px, 2vw, 20px);
+}
+
+.sx-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(16px, 2vw, 24px);
+}
+
+@media (min-width: 640px) {
+  .sx-dashboard-grid--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .sx-dashboard-grid--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sx-dashboard-grid--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .sx-drawer-panel--services {
+    width: min(400px, 36vw);
+    max-width: 420px;
+  }
+}
+
+/* ─── Schools data table panel (aliases sx-section / sx-table-*) ─── */
 .sx-schools-table-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  margin-bottom: 24px;
+  padding: 0;
+  border-radius: 20px;
+  overflow: hidden;
 }
 
 .sx-schools-table-scroll {
-  max-height: min(62vh, 720px);
+  max-height: min(68vh, 780px);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -1332,7 +1556,8 @@ html.dark .sx-schools-table-scroll thead th {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 20px;
+  margin-top: 0;
+  padding: 14px 20px 8px;
   border-top: 1px solid var(--sx-border);
   background: #f8fafc;
 }

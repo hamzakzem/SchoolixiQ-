@@ -261,7 +261,7 @@ export default function ParentDashboard() {
     });
   }, [selectedStudent?.schoolId]);
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -273,10 +273,6 @@ export default function ParentDashboard() {
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1024) {
-        setIsSidebarOpen(false);
-        setIsSidebarCollapsed(false);
-      } else {
-        setIsSidebarOpen(true);
         setIsSidebarCollapsed(false);
       }
     };
@@ -293,7 +289,6 @@ export default function ParentDashboard() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (window.innerWidth >= 1024) return;
       if (isSidebarOpen) setIsSidebarOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
@@ -1700,13 +1695,9 @@ export default function ParentDashboard() {
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <button
                   onClick={() => {
-                    if (window.innerWidth >= 1024) {
-                       setIsSidebarCollapsed(!isSidebarCollapsed);
-                    } else {
-                       setIsSidebarOpen(!isSidebarOpen);
-                       if (!isSidebarOpen) {
-                         setIsSidebarCollapsed(false);
-                       }
+                    setIsSidebarOpen(!isSidebarOpen);
+                    if (!isSidebarOpen) {
+                      setIsSidebarCollapsed(false);
                     }
                   }}
                   className="parent-icon-btn hidden lg:flex shrink-0 bg-[#F7F8FA]"

@@ -309,8 +309,9 @@ export default function Marketplace() {
         <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display">أحدث الطلبات</h2>
         
         {/* Desktop View Table */}
-        <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden overflow-x-auto">
-           <table className="w-full text-right min-w-[600px]">
+        <div className="hidden md:block sx-table-shell bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+           <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto">
+           <table className="sx-table w-full text-right min-w-[600px]">
               <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] border-b border-slate-200 dark:border-slate-800">
                  <tr>
                     <th className="p-4">المنتج</th>
@@ -382,6 +383,7 @@ export default function Marketplace() {
                  )}
               </tbody>
            </table>
+           </div>
         </div>
 
         {/* Mobile View List */}

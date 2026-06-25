@@ -569,9 +569,9 @@ export default function Grades() {
                   </div>
                 </div>
               ) : viewMode === 'grid' ? (
-                <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-right border-collapse">
+                <div className="sx-table-shell bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
+                  <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto">
+                    <table className="sx-table sx-table--wide w-full text-right border-collapse">
                       <thead className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-slate-200">
                         <tr>
                           <th className="p-4 sticky right-0 bg-slate-50 z-30 border-l border-slate-200 shadow-[2px_0_10px_rgba(0,0,0,0.05)] w-48">قائمة الطلاب</th>

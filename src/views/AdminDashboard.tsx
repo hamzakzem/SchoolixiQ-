@@ -616,7 +616,7 @@ export default function AdminDashboard() {
                 لمدرستكم وإرسال طلب تفعيل.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6 text-right">
+              <div className="sx-card-grid sx-dashboard-grid--4 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6 text-right">
                 {isLoadingPackages ? (
                   <div className="col-span-full py-20 flex flex-col items-center justify-center gap-4">
                     <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>

@@ -722,13 +722,17 @@ header button:hover *, header a:hover *,
 }
 
 /* 3. Sidebar (القائمة الجانبية) styling - Uniform Navy Blue (#0B2345) with Gold (#D4A64A) accents */
-aside, [class*="aside"], [class*="Sidebar"] {
+aside:not(.sx-drawer-panel--services):not(.parent-dashboard-menu),
+[class*="aside"]:not(.sx-drawer-panel--services):not(.parent-dashboard-menu),
+[class*="Sidebar"]:not(.sx-drawer-panel--services) {
   background-color: #0B2345 !important;
   border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-aside *, [class*="aside"] *, [class*="Sidebar"] * {
+aside:not(.sx-drawer-panel--services):not(.parent-dashboard-menu) *,
+[class*="aside"]:not(.sx-drawer-panel--services):not(.parent-dashboard-menu) *,
+[class*="Sidebar"]:not(.sx-drawer-panel--services) * {
   color: rgba(255, 255, 255, 0.9) !important;
 }
 
@@ -751,12 +755,15 @@ aside [class*="bg-indigo-600"] *,
 }
 
 /* Hover effect on sidebars */
-aside a:hover, aside button:hover, .sidebar-link:hover {
+aside:not(.sx-drawer-panel--services) a:hover,
+aside:not(.sx-drawer-panel--services) button:hover,
+.sidebar-link:hover {
   background-color: rgba(212, 166, 74, 0.15) !important;
   color: #D4A64A !important;
 }
 
-aside a:hover *, aside button:hover * {
+aside:not(.sx-drawer-panel--services) a:hover *,
+aside:not(.sx-drawer-panel--services) button:hover * {
   color: #D4A64A !important;
 }
 
@@ -1178,6 +1185,109 @@ html.dark aside.parent-dashboard-menu .parent-nav-item--active .parent-nav-icon,
 html.dark aside.parent-dashboard-menu .parent-nav-item--active svg {
   color: #0b2345 !important;
   stroke: #0b2345 !important;
+}
+
+/* ==========================================================================
+   Permissions overlay drawer — opt out of global navy sidebar + white-text rules
+   ========================================================================== */
+aside.sx-drawer-panel--services {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;
+  border-color: rgba(212, 175, 55, 0.35) !important;
+  border-right-color: rgba(212, 175, 55, 0.35) !important;
+  border-left-color: rgba(212, 175, 55, 0.35) !important;
+  color: #0f172a !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-services-header,
+aside.sx-drawer-panel--services .sx-drawer-services-header * {
+  color: #ffffff !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-services-header__eyebrow {
+  color: rgba(212, 175, 55, 0.95) !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-services-header__title {
+  color: #ffffff !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-services-header__subtitle {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-services-body,
+aside.sx-drawer-panel--services .sx-drawer-services-body * {
+  color: #0f172a !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-services-section-label {
+  color: #64748b !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-nav-item,
+aside.sx-drawer-panel--services .sx-drawer-nav-item__label {
+  color: #0f172a !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-nav-item__icon,
+aside.sx-drawer-panel--services .sx-drawer-nav-item__icon svg {
+  color: #0f172a !important;
+  stroke: #0f172a !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-nav-item:hover,
+aside.sx-drawer-panel--services .sx-drawer-nav-item:hover .sx-drawer-nav-item__label {
+  color: #b8922e !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-nav-item:hover .sx-drawer-nav-item__icon,
+aside.sx-drawer-panel--services .sx-drawer-nav-item:hover .sx-drawer-nav-item__icon svg {
+  color: #b8922e !important;
+  stroke: #b8922e !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-nav-item--active,
+aside.sx-drawer-panel--services .sx-drawer-nav-item--active .sx-drawer-nav-item__label {
+  color: #0f172a !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-nav-item--active .sx-drawer-nav-item__icon,
+aside.sx-drawer-panel--services .sx-drawer-nav-item--active .sx-drawer-nav-item__icon svg {
+  color: #b8922e !important;
+  stroke: #b8922e !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-services-empty__title {
+  color: #0f172a !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-services-empty__hint {
+  color: #64748b !important;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-services-logout,
+aside.sx-drawer-panel--services .sx-drawer-services-logout svg {
+  color: #dc2626 !important;
+  stroke: #dc2626 !important;
+}
+
+aside.sx-drawer-panel--services a:hover,
+aside.sx-drawer-panel--services button:hover {
+  background-color: inherit;
+}
+
+aside.sx-drawer-panel--services .sx-drawer-nav-item:hover {
+  background: rgba(212, 175, 55, 0.08) !important;
+}
+
+html.dark aside.sx-drawer-panel--services {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;
+  color: #0f172a !important;
+}
+
+html.dark aside.sx-drawer-panel--services .sx-drawer-services-body,
+html.dark aside.sx-drawer-panel--services .sx-drawer-services-body * {
+  color: #0f172a !important;
 }
 
 /* Parent mobile slide-up panels (MobileNavigationDock light surface) */

@@ -243,8 +243,9 @@ export default function Schedules() {
           </div>
 
           {/* Desktop View Table */}
-          <div className="hidden md:block overflow-x-auto print:hidden">
-            <table className="w-full text-right border-collapse">
+          <div className="sx-table-shell hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden print:hidden">
+          <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto print:hidden">
+            <table className="sx-table w-full text-right border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/50">
                   <th className="p-5 border-b border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-black text-lg w-32 tracking-wide">اليوم</th>
@@ -319,6 +320,7 @@ export default function Schedules() {
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
 
           {/* Mobile View List */}

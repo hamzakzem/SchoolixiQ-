@@ -212,7 +212,7 @@ export default function Behavior() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm h-full">
+          <div className="sx-section bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm h-full">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 font-display">آخر الحوادث السلوكية</h3>
             <div className="space-y-4 overflow-y-auto h-[600px] pr-2 custom-scrollbar">
               {reports.map(report => (
