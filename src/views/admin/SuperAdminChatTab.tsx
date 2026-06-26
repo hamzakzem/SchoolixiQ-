@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { db, storage } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc, orderBy, setDoc } from 'firebase/firestore';
@@ -12,6 +12,15 @@ import { toast } from 'react-hot-toast';
 import { SchoolixChatShell, type ChatShellContact } from '../../components/chat/SchoolixChatShell';
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from '../../components/chat/chatAvatars';
 import { useChatBack } from '../../hooks/useChatBack';
+import { enterChatMode, leaveChatMode } from '../../lib/chatFreezeGuard';
+import { markSystemMessagesRead } from '../../lib/chatMessageReads';
+import { markChatPerf, openChatSnapshotListener, resetChatPerf } from '../../lib/chatPerf';
+import {
+  applyThreadMessagesIfChanged,
+  buildThreadMessagesQuery,
+  shouldMarkThreadUnread,
+  unreadIdsForReceiver,
+} from '../../lib/chatThreadMessages';
 
 const BROADCAST_ID = '__broadcast__';
 
@@ -44,6 +53,23 @@ export default function SuperAdminChatTab() {
 
   const prevMessagesLength = useRef<number>(0);
   const isFirstLoad = useRef<boolean>(true);
+  const didAutoSelectRef = useRef(false);
+  const messagesSigRef = useRef('');
+  const unreadKeyRef = useRef('');
+  const messagesFirstSnapshotRef = useRef(false);
+
+  useEffect(() => {
+    resetChatPerf('SuperAdminChatTab');
+    enterChatMode('SuperAdminChatTab');
+    console.info('[ChatFreeze] LISTENER_SETUP', { tab: 'SuperAdminChatTab' });
+    return () => {
+      console.info('[ChatFreeze] LISTENER_CLEANUP', { tab: 'SuperAdminChatTab' });
+      leaveChatMode('SuperAdminChatTab');
+      messagesSigRef.current = '';
+      unreadKeyRef.current = '';
+      messagesFirstSnapshotRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!canUsePlatformChat(profile)) return;
@@ -53,10 +79,13 @@ export default function SuperAdminChatTab() {
       const schs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
       setSchools(schs);
       setContactsLoaded(true);
-      if (schs.length > 0 && !activeContact) {
-          setActiveContact({ id: schs[0].id, name: schs[0].name, type: 'school', extra: schs[0] });
+      markChatPerf('contacts_loaded', 'SuperAdminChatTab', { contacts: schs.length });
+      if (schs.length > 0 && !didAutoSelectRef.current) {
+        didAutoSelectRef.current = true;
+        setActiveContact({ id: schs[0].id, name: schs[0].name, type: 'school', extra: schs[0] });
       }
     });
+    const untrackSchools = openChatSnapshotListener('SuperAdminChatTab:schools');
 
     // Fetch all unread messages meant for superadmin
     const qUnread = query(
@@ -72,6 +101,7 @@ export default function SuperAdminChatTab() {
       });
       setUnreadCounts(counts);
     });
+    const untrackUnread = openChatSnapshotListener('SuperAdminChatTab:unread');
 
     const qConversations = query(
       collection(db, "conversations"),
@@ -111,8 +141,16 @@ export default function SuperAdminChatTab() {
     }, (err) => {
       console.warn("Conversations listener error:", err);
     });
+    const untrackConversations = openChatSnapshotListener('SuperAdminChatTab:conversations');
 
-    return () => { unsubscribe(); unsubUnread(); unsubConversations(); };
+    return () => {
+      unsubscribe();
+      unsubUnread();
+      unsubConversations();
+      untrackSchools();
+      untrackUnread();
+      untrackConversations();
+    };
   }, [profile?.role, profile?.schoolId]);
 
   useEffect(() => {
@@ -121,40 +159,36 @@ export default function SuperAdminChatTab() {
       return;
     }
 
-    // conversationId is superadmin_schoolId
-    const convId = `superadmin_${activeContact.id}`;
+    messagesSigRef.current = '';
+    unreadKeyRef.current = '';
+    messagesFirstSnapshotRef.current = false;
 
-    const q = query(
-      collection(db, 'system_messages'),
-      where('schoolId', '==', activeContact.id),
-      where('conversationId', '==', convId)
-    );
+    const convId = `superadmin_${activeContact.id}`;
+    const q = buildThreadMessagesQuery(activeContact.id, convId);
+    const untrackMessages = openChatSnapshotListener('SuperAdminChatTab:messages');
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data() as any
       }));
-      // Sort in memory by createdAt
-      docs.sort((a: any, b: any) => {
-        const timeA = a.createdAt?.toMillis() || 0;
-        const timeB = b.createdAt?.toMillis() || 0;
-        return timeA - timeB;
-      });
 
-      setMessages(docs);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      const sorted = applyThreadMessagesIfChanged(docs, messagesSigRef, setMessages);
 
-      // Sound handled globally by AudioNotificationManager
-      prevMessagesLength.current = docs.length;
+      if (!messagesFirstSnapshotRef.current) {
+        messagesFirstSnapshotRef.current = true;
+        markChatPerf('messages_first_snapshot', 'SuperAdminChatTab', {
+          conversationId: convId,
+          count: sorted.length,
+        });
+      }
+
+      prevMessagesLength.current = sorted.length;
       isFirstLoad.current = false;
 
-      // Mark unread as read if it's meant for superadmin
-      const unreadMe = docs.filter(m => !m.read && m.receiverId === 'super_admin');
-      if (unreadMe.length > 0) {
-        unreadMe.forEach(m => {
-          updateDoc(doc(db, 'system_messages', m.id), { read: true }).catch(err => console.log(err));
-        });
+      const unreadIds = unreadIdsForReceiver(sorted, ['super_admin']);
+      if (shouldMarkThreadUnread(unreadIds, unreadKeyRef)) {
+        markSystemMessagesRead(unreadIds, 'SuperAdminChatTab');
       }
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'SuperAdminChatTab:system_messages');
@@ -162,8 +196,9 @@ export default function SuperAdminChatTab() {
 
     return () => {
       unsubscribe();
+      untrackMessages();
     };
-  }, [profile, activeContact]);
+  }, [profile?.uid, profile?.role, profile?.schoolId, activeContact?.id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -290,7 +325,6 @@ export default function SuperAdminChatTab() {
         );
       } else {
         await sendToSchool(activeContact, messageText, filePayload);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'system_messages');
@@ -319,7 +353,7 @@ export default function SuperAdminChatTab() {
     return (a.name || '').localeCompare(b.name || '');
   });
 
-  const groupedMessages = messages.reduce((acc, msg) => {
+  const groupedMessages = useMemo(() => messages.reduce((acc, msg) => {
     let dateStr = isRtl ? 'اليوم' : 'Today';
     if (msg.createdAt && typeof msg.createdAt.toDate === 'function') {
       const date = msg.createdAt.toDate();
@@ -332,7 +366,7 @@ export default function SuperAdminChatTab() {
     if (!acc[dateStr]) acc[dateStr] = [];
     acc[dateStr].push(msg);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, any[]>), [messages, isRtl]);
 
   const shellContacts: ChatShellContact[] = filteredSchools.map((school) => ({
     id: school.id,

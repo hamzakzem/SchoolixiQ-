@@ -4,6 +4,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  Profiler,
 } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -33,6 +34,12 @@ import {
   logChatBackVisible,
   shouldShowChatBackButton,
 } from '../../lib/chatUiNavigation';
+import { enterChatMode, leaveChatMode, logChatInteractionOk } from '../../lib/chatFreezeGuard';
+import { recordChatRender } from '../../lib/chatPerf';
+import {
+  cancelChatScroll,
+  scheduleChatScrollToBottom,
+} from '../../lib/chatScrollHelper';
 
 export type ChatShellContact = {
   id: string;
@@ -172,6 +179,8 @@ export function SchoolixChatShell({
   const prevMessageCountRef = useRef(0);
   const isNearBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRafRef = useRef<number | null>(null);
+  const lastScrolledContactRef = useRef<string | null>(null);
 
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [newBelowCount, setNewBelowCount] = useState(0);
@@ -210,6 +219,17 @@ export function SchoolixChatShell({
     (isLoadingMessages || threadLoading) && messageCount === 0 && !messagesLoadError;
 
   useEffect(() => {
+    enterChatMode('SchoolixChatShell');
+    console.info('[ChatFreeze] LISTENER_SETUP', { component: 'SchoolixChatShell' });
+    logChatInteractionOk({ surface: 'chat-shell' });
+    return () => {
+      console.info('[ChatFreeze] LISTENER_CLEANUP', { component: 'SchoolixChatShell' });
+      cancelChatScroll(scrollRafRef);
+      leaveChatMode('SchoolixChatShell');
+    };
+  }, []);
+
+  useEffect(() => {
     setThreadSearchOpen(false);
     setThreadSearchQuery('');
     setReplyPreview(null);
@@ -218,6 +238,7 @@ export function SchoolixChatShell({
     setNewBelowCount(0);
     setThreadLoading(true);
     prevMessageCountRef.current = 0;
+    lastScrolledContactRef.current = null;
   }, [activeContact?.id]);
 
   useEffect(() => {
@@ -226,19 +247,11 @@ export function SchoolixChatShell({
     }
   }, [messageCount, messagesLoadError]);
 
-  useEffect(() => {
-    const prev = prevMessageCountRef.current;
-    if (messageCount > prev && prev > 0 && !isNearBottomRef.current) {
-      setNewBelowCount((c) => c + (messageCount - prev));
-    }
-    prevMessageCountRef.current = messageCount;
-  }, [messageCount]);
-
   const scrollToBottom = useCallback(
     (smooth = true) => {
-      messagesEndRef.current?.scrollIntoView({
-        behavior: smooth ? 'smooth' : 'auto',
-        block: 'end',
+      scheduleChatScrollToBottom(messagesContainerRef, messagesEndRef, {
+        smooth,
+        rafRef: scrollRafRef,
       });
       setNewBelowCount(0);
       setShowScrollDown(false);
@@ -246,6 +259,24 @@ export function SchoolixChatShell({
     },
     [messagesEndRef],
   );
+
+  useEffect(() => {
+    if (!activeContact?.id) return;
+    if (lastScrolledContactRef.current === activeContact.id) return;
+    lastScrolledContactRef.current = activeContact.id;
+    scrollToBottom(false);
+  }, [activeContact?.id, scrollToBottom]);
+
+  useEffect(() => {
+    const prev = prevMessageCountRef.current;
+    if (messageCount > prev && (prev === 0 || isNearBottomRef.current)) {
+      scrollToBottom(prev > 0);
+    }
+    if (messageCount > prev && prev > 0 && !isNearBottomRef.current) {
+      setNewBelowCount((c) => c + (messageCount - prev));
+    }
+    prevMessageCountRef.current = messageCount;
+  }, [messageCount, scrollToBottom]);
 
   const handleMessagesScroll = useCallback(() => {
     const el = messagesContainerRef.current;
@@ -364,6 +395,10 @@ export function SchoolixChatShell({
   }, [showThreadBack, isNarrowLayout]);
 
   return (
+    <Profiler
+      id="SchoolixChatShell"
+      onRender={(id, phase, actualDuration) => recordChatRender(id, phase, actualDuration)}
+    >
     <div
       className="sx-chat-shell h-full min-h-0 w-full max-w-full overflow-hidden flex"
       dir={isRtl ? 'rtl' : 'ltr'}
@@ -427,8 +462,8 @@ export function SchoolixChatShell({
                   key={contact.id}
                   type="button"
                   onClick={() => onSelectContact(contact)}
-                  className={`sx-chat-contact w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${
-                    isSelected ? 'sx-chat-contact--active' : ''
+                  className={`sx-chat-list-item sx-chat-contact w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${
+                    isSelected ? 'sx-chat-list-item--active sx-chat-contact--active' : ''
                   }`}
                   aria-current={isSelected ? 'true' : undefined}
                   aria-label={contact.name}
@@ -899,7 +934,7 @@ export function SchoolixChatShell({
                 <button
                   type="submit"
                   disabled={isSending || (!newMessage.trim() && !selectedFile)}
-                  className="sx-chat-send shrink-0 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2"
+                  className="sx-chat-send-btn sx-chat-send shrink-0 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2"
                   aria-label={isRtl ? 'إرسال' : 'Send'}
                 >
                   {isSending ? (
@@ -919,5 +954,6 @@ export function SchoolixChatShell({
         )}
       </motion.section>
     </div>
+    </Profiler>
   );
 }

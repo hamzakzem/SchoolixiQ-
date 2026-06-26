@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { db, storage } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc, orderBy, setDoc } from 'firebase/firestore';
@@ -14,6 +14,15 @@ import { toast } from 'react-hot-toast';
 import { SchoolixChatShell, type ChatShellContact } from '../../components/chat/SchoolixChatShell';
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from '../../components/chat/chatAvatars';
 import { useChatBack } from '../../hooks/useChatBack';
+import { enterChatMode, leaveChatMode } from '../../lib/chatFreezeGuard';
+import { markSystemMessagesRead } from '../../lib/chatMessageReads';
+import { markChatPerf, openChatSnapshotListener, resetChatPerf } from '../../lib/chatPerf';
+import {
+  applyThreadMessagesIfChanged,
+  buildThreadMessagesQuery,
+  shouldMarkThreadUnread,
+  unreadIdsForReceiver,
+} from '../../lib/chatThreadMessages';
 
 console.info('[AdminChatTab] BUILD_MARKER', 'superadmin-recipient-expansion-2026-06-17');
 
@@ -41,6 +50,23 @@ export default function AdminChatTab() {
 
   const prevMessagesLength = useRef<number>(0);
   const isFirstLoad = useRef<boolean>(true);
+  const didAutoSelectRef = useRef(false);
+  const messagesSigRef = useRef('');
+  const unreadKeyRef = useRef('');
+  const messagesFirstSnapshotRef = useRef(false);
+
+  useEffect(() => {
+    resetChatPerf('AdminChatTab');
+    enterChatMode('AdminChatTab');
+    console.info('[ChatFreeze] LISTENER_SETUP', { tab: 'AdminChatTab' });
+    return () => {
+      console.info('[ChatFreeze] LISTENER_CLEANUP', { tab: 'AdminChatTab' });
+      leaveChatMode('AdminChatTab');
+      messagesSigRef.current = '';
+      unreadKeyRef.current = '';
+      messagesFirstSnapshotRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (profile?.schoolId) {
@@ -61,10 +87,13 @@ export default function AdminChatTab() {
         const allContacts = [adminContact, ...cts];
         setContacts(allContacts);
         setContactsLoaded(true);
-        if (!activeContact) {
-            setActiveContact({ id: 'super_admin', name: adminContact.name, type: 'superadmin', extra: adminContact });
+        markChatPerf('contacts_loaded', 'AdminChatTab', { contacts: allContacts.length });
+        if (!didAutoSelectRef.current) {
+          didAutoSelectRef.current = true;
+          setActiveContact({ id: 'super_admin', name: adminContact.name, type: 'superadmin', extra: adminContact });
         }
       });
+      const untrackUsers = openChatSnapshotListener('AdminChatTab:users');
 
       // Fetch students for this school
       const qStudents = query(collection(db, 'students'), where('schoolId', '==', profile.schoolId));
@@ -72,12 +101,13 @@ export default function AdminChatTab() {
         const s = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
         setStudents(s);
       });
+      const untrackStudents = openChatSnapshotListener('AdminChatTab:students');
 
-      // Fetch unread messages
       const qUnread = query(
         collection(db, 'system_messages'),
         where('schoolId', '==', profile.schoolId),
-        where('read', '==', false) // Only unread
+        where('receiverId', 'in', ['admin', profile.uid]),
+        where('read', '==', false),
       );
       const unsubUnread = onSnapshot(qUnread, (snapshot) => {
         const counts: Record<string, number> = {};
@@ -91,6 +121,7 @@ export default function AdminChatTab() {
         });
         setUnreadCounts(counts);
       });
+      const untrackUnread = openChatSnapshotListener('AdminChatTab:unread');
 
       const qConversations = query(
         collection(db, "conversations"),
@@ -139,68 +170,77 @@ export default function AdminChatTab() {
       }, (err) => {
         console.warn("Conversations listener error:", err);
       });
+      const untrackConversations = openChatSnapshotListener('AdminChatTab:conversations');
 
-      return () => { unsubscribe(); unsubStudents(); unsubUnread(); unsubConversations(); };
+      return () => {
+        unsubscribe();
+        unsubStudents();
+        unsubUnread();
+        unsubConversations();
+        untrackUsers();
+        untrackStudents();
+        untrackUnread();
+        untrackConversations();
+      };
     }
-  }, [profile?.schoolId, activeContact, isRtl]);
+  }, [profile?.schoolId, profile?.uid, isRtl]);
 
   useEffect(() => {
     if (!profile?.uid || !profile?.schoolId || !activeContact) return;
 
-    // Admin chats with someone
+    messagesSigRef.current = '';
+    unreadKeyRef.current = '';
+    messagesFirstSnapshotRef.current = false;
+
     const convId = activeContact.id === 'super_admin' ? `superadmin_${profile.schoolId}` : `${profile.schoolId}_${activeContact.id}`;
 
-    const q = query(
-      collection(db, 'system_messages'),
-      where('schoolId', '==', profile.schoolId),
-      where('conversationId', '==', convId)
-    );
+    const q = buildThreadMessagesQuery(profile.schoolId, convId);
+    const untrackMessages = openChatSnapshotListener('AdminChatTab:messages');
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data() as any
       }));
-      // Sort in memory by createdAt
-      docs.sort((a: any, b: any) => {
-        const timeA = a.createdAt?.toMillis() || 0;
-        const timeB = b.createdAt?.toMillis() || 0;
-        return timeA - timeB;
-      });
 
-      setMessages(docs);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      const sorted = applyThreadMessagesIfChanged(docs, messagesSigRef, setMessages);
 
-      // Update interactions for active chat
-      if (docs.length > 0) {
-        const lastMsg = docs[docs.length - 1];
+      if (!messagesFirstSnapshotRef.current) {
+        messagesFirstSnapshotRef.current = true;
+        markChatPerf('messages_first_snapshot', 'AdminChatTab', {
+          conversationId: convId,
+          count: sorted.length,
+        });
+      }
+
+      if (sorted.length > 0) {
+        const lastMsg = sorted[sorted.length - 1];
         const msgTime = lastMsg.createdAt?.toMillis() || Date.now();
+        const contactId = activeContact.id;
         setLastInteractionTimes(prev => {
-          if (msgTime > (prev[activeContact.id] || 0)) {
-            return { ...prev, [activeContact.id]: msgTime };
+          if (msgTime > (prev[contactId] || 0)) {
+            return { ...prev, [contactId]: msgTime };
           }
           return prev;
         });
       }
 
-
-      // Sound handled globally by AudioNotificationManager
-      prevMessagesLength.current = docs.length;
+      prevMessagesLength.current = sorted.length;
       isFirstLoad.current = false;
 
-      // Mark unread as read if it's meant for the admin
-      const unreadMe = docs.filter(m => !m.read && (m.receiverId === 'admin' || m.receiverId === profile.uid));
-      if (unreadMe.length > 0) {
-        unreadMe.forEach(m => {
-          updateDoc(doc(db, 'system_messages', m.id), { read: true }).catch(err => console.log(err));
-        });
+      const unreadIds = unreadIdsForReceiver(sorted, ['admin', profile.uid]);
+      if (shouldMarkThreadUnread(unreadIds, unreadKeyRef)) {
+        markSystemMessagesRead(unreadIds, 'AdminChatTab');
       }
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'AdminChatTab:system_messages');
     });
 
-    return () => unsubscribe();
-  }, [profile, activeContact]);
+    return () => {
+      unsubscribe();
+      untrackMessages();
+    };
+  }, [profile?.uid, profile?.schoolId, activeContact?.id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -289,7 +329,6 @@ export default function AdminChatTab() {
       }
 
       setLastInteractionTimes(prev => ({ ...prev, [activeContact.id]: Date.now() }));
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'system_messages');
       toast.error(isRtl ? 'فشل إرسال الرسالة' : 'Failed to send message');
@@ -319,7 +358,7 @@ export default function AdminChatTab() {
     return (a.name || '').localeCompare(b.name || '');
   });
 
-  const groupedMessages = messages.reduce((acc, msg) => {
+  const groupedMessages = useMemo(() => messages.reduce((acc, msg) => {
     let dateStr = isRtl ? 'اليوم' : 'Today';
     if (msg.createdAt && typeof msg.createdAt.toDate === 'function') {
       const date = msg.createdAt.toDate();
@@ -332,7 +371,7 @@ export default function AdminChatTab() {
     if (!acc[dateStr]) acc[dateStr] = [];
     acc[dateStr].push(msg);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, any[]>), [messages, isRtl]);
 
   const shellContacts: ChatShellContact[] = filteredContacts.map((c) => ({
     id: c.id,

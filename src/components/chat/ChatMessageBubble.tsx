@@ -162,8 +162,10 @@ export function ChatMessageBubble({
 
         <div className="relative flex flex-col min-w-0">
           <div
-            className={`sx-chat-bubble px-3.5 py-2.5 relative ${
-              isMe ? 'sx-chat-bubble--out' : 'sx-chat-bubble--in'
+            className={`sx-chat-bubble px-3.5 py-2.5 relative max-w-[82%] lg:max-w-[70%] ${
+              isMe
+                ? 'sx-chat-bubble--out sx-chat-bubble--outgoing'
+                : 'sx-chat-bubble--in sx-chat-bubble--incoming'
             } ${selectionMode ? 'cursor-pointer' : ''}`}
             onTouchStart={startLongPress}
             onTouchEnd={cancelLongPress}

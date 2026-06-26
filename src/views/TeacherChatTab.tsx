@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/AuthContext";
 import { db, storage } from "../lib/firebase";
 import {
@@ -36,6 +36,15 @@ import { motion, AnimatePresence } from "motion/react";
 import { toast } from "react-hot-toast";
 import { SchoolixChatShell, type ChatShellContact } from "../components/chat/SchoolixChatShell";
 import { useChatBack } from "../hooks/useChatBack";
+import { enterChatMode, leaveChatMode } from "../lib/chatFreezeGuard";
+import { markSystemMessagesRead } from "../lib/chatMessageReads";
+import { markChatPerf, openChatSnapshotListener, recordChatRender, resetChatPerf } from "../lib/chatPerf";
+import {
+  applyThreadMessagesIfChanged,
+  buildThreadMessagesQuery,
+  shouldMarkThreadUnread,
+  unreadIdsForReceiver,
+} from "../lib/chatThreadMessages";
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from "../components/chat/chatAvatars";
 
 export default function TeacherChatTab() {
@@ -84,6 +93,23 @@ export default function TeacherChatTab() {
 
   const prevMessagesLength = useRef<number>(0);
   const isFirstLoad = useRef<boolean>(true);
+  const didAutoSelectRef = useRef(false);
+  const messagesSigRef = useRef("");
+  const unreadKeyRef = useRef("");
+  const messagesFirstSnapshotRef = useRef(false);
+
+  useEffect(() => {
+    resetChatPerf("TeacherChatTab");
+    enterChatMode("TeacherChatTab");
+    console.info("[ChatFreeze] LISTENER_SETUP", { tab: "TeacherChatTab" });
+    return () => {
+      console.info("[ChatFreeze] LISTENER_CLEANUP", { tab: "TeacherChatTab" });
+      leaveChatMode("TeacherChatTab");
+      messagesSigRef.current = "";
+      unreadKeyRef.current = "";
+      messagesFirstSnapshotRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (profile?.schoolId) {
@@ -91,7 +117,8 @@ export default function TeacherChatTab() {
         if (docSnap.exists()) {
           const data = { id: docSnap.id, ...(docSnap.data() as any) };
           setSchoolInfo(data);
-          if (!activeContact) {
+          if (!didAutoSelectRef.current) {
+            didAutoSelectRef.current = true;
             setActiveContact({
               id: "admin",
               name:
@@ -115,7 +142,9 @@ export default function TeacherChatTab() {
         }));
         setParents(p);
         setContactsLoaded(true);
+        markChatPerf("contacts_loaded", "TeacherChatTab", { contacts: p.length + 1 });
       });
+      const untrackParents = openChatSnapshotListener("TeacherChatTab:parents");
       // Fetch students for this school
       const qStudents = query(
         collection(db, "students"),
@@ -128,6 +157,7 @@ export default function TeacherChatTab() {
         }));
         setStudents(s);
       });
+      const untrackStudents = openChatSnapshotListener("TeacherChatTab:students");
 
       // Fetch unread messages
       const qUnread = query(
@@ -146,6 +176,7 @@ export default function TeacherChatTab() {
         
         setUnreadCounts(counts);
       });
+      const untrackUnread = openChatSnapshotListener("TeacherChatTab:unread");
 
       const qConversations = query(
         collection(db, "conversations"),
@@ -194,27 +225,20 @@ export default function TeacherChatTab() {
       }, (err) => {
         console.warn("Conversations listener error:", err);
       });
+      const untrackConversations = openChatSnapshotListener("TeacherChatTab:conversations");
 
       return () => {
         unsubParents();
         unsubStudents();
         unsubUnread();
         unsubConversations();
+        untrackParents();
+        untrackStudents();
+        untrackUnread();
+        untrackConversations();
       };
     }
-  }, [profile?.schoolId, activeContact, profile?.uid]);
-
-  useEffect(() => {
-    if (!activeContact && schoolInfo) {
-      setActiveContact({
-        id: "admin",
-        name:
-          schoolInfo.name ||
-          (isRtl ? "إدارة المدرسة" : "School Administration"),
-        type: "admin",
-      });
-    }
-  }, [schoolInfo, activeContact]);
+  }, [profile?.schoolId, profile?.uid, isRtl]);
 
   useEffect(() => {
     if (profile) {
@@ -281,6 +305,10 @@ export default function TeacherChatTab() {
   useEffect(() => {
     if (!profile?.uid || !profile?.schoolId || !activeContact) return;
 
+    messagesSigRef.current = "";
+    unreadKeyRef.current = "";
+    messagesFirstSnapshotRef.current = false;
+
     let convId = "";
     if (activeContact.type === "admin") {
       convId = `${profile.schoolId}_${profile.uid}`;
@@ -288,11 +316,8 @@ export default function TeacherChatTab() {
       convId = [profile.uid, activeContact.id].sort().join("_");
     }
 
-    const q = query(
-      collection(db, "system_messages"),
-      where("schoolId", "==", profile.schoolId),
-      where("conversationId", "==", convId),
-    );
+    const q = buildThreadMessagesQuery(profile.schoolId, convId);
+    const untrackMessages = openChatSnapshotListener("TeacherChatTab:messages");
 
     const unsubscribe = onSnapshot(
       q,
@@ -301,20 +326,19 @@ export default function TeacherChatTab() {
           id: doc.id,
           ...(doc.data() as any),
         }));
-        docs.sort((a: any, b: any) => {
-          const timeA = a.createdAt?.toMillis() || 0;
-          const timeB = b.createdAt?.toMillis() || 0;
-          return timeA - timeB;
-        });
-        setMessages(docs);
-        setTimeout(
-          () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
-          100,
-        );
 
-        // Update interactions for active chat
-        if (docs.length > 0) {
-          const lastMsg = docs[docs.length - 1];
+        const sorted = applyThreadMessagesIfChanged(docs, messagesSigRef, setMessages);
+
+        if (!messagesFirstSnapshotRef.current) {
+          messagesFirstSnapshotRef.current = true;
+          markChatPerf("messages_first_snapshot", "TeacherChatTab", {
+            conversationId: convId,
+            count: sorted.length,
+          });
+        }
+
+        if (sorted.length > 0) {
+          const lastMsg = sorted[sorted.length - 1];
           const msgTime = lastMsg.createdAt?.toMillis() || Date.now();
           setLastInteractionTimes(prev => {
             const opponentId = activeContact.id === 'admin' ? 'admin' : activeContact.id;
@@ -325,20 +349,12 @@ export default function TeacherChatTab() {
           });
         }
 
-
-        // Sound handled globally by AudioNotificationManager
-        prevMessagesLength.current = docs.length;
+        prevMessagesLength.current = sorted.length;
         isFirstLoad.current = false;
 
-        const unreadMe = docs.filter(
-          (m) => !m.read && m.receiverId === profile.uid,
-        );
-        if (unreadMe.length > 0) {
-          unreadMe.forEach((m) => {
-            updateDoc(doc(db, "system_messages", m.id), { read: true }).catch(
-              (err) => console.log(err),
-            );
-          });
+        const unreadIds = unreadIdsForReceiver(sorted, [profile.uid]);
+        if (shouldMarkThreadUnread(unreadIds, unreadKeyRef)) {
+          markSystemMessagesRead(unreadIds, "TeacherChatTab");
         }
       },
       (error) => {
@@ -350,8 +366,11 @@ export default function TeacherChatTab() {
       },
     );
 
-    return () => unsubscribe();
-  }, [profile, activeContact]);
+    return () => {
+      unsubscribe();
+      untrackMessages();
+    };
+  }, [profile?.uid, profile?.schoolId, activeContact?.id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -463,10 +482,6 @@ export default function TeacherChatTab() {
       
       setLastInteractionTimes(prev => ({ ...prev, [receiverId]: Date.now() }));
 
-      setTimeout(
-        () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
-        100,
-      );
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "system_messages");
       toast.error(isRtl ? "فشل إرسال الرسالة" : "Failed to send message");
@@ -520,7 +535,7 @@ export default function TeacherChatTab() {
     return (a.name || "").localeCompare(b.name || "");
   });
 
-  const groupedMessages = messages.reduce(
+  const groupedMessages = useMemo(() => messages.reduce(
     (acc, msg) => {
       let dateStr = isRtl ? "اليوم" : "Today";
       if (msg.createdAt && typeof msg.createdAt.toDate === "function") {
@@ -543,7 +558,7 @@ export default function TeacherChatTab() {
       return acc;
     },
     {} as Record<string, any[]>,
-  );
+  ), [messages, isRtl]);
 
   const shellContacts: ChatShellContact[] = filteredContacts.map((c) => ({
     id: c.id,

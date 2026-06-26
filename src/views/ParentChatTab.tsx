@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/AuthContext";
 import { db, storage } from "../lib/firebase";
 import {
@@ -30,6 +30,15 @@ import { toast } from "react-hot-toast";
 import { SchoolixChatShell, type ChatShellContact } from "../components/chat/SchoolixChatShell";
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from "../components/chat/chatAvatars";
 import { useChatBack } from "../hooks/useChatBack";
+import { enterChatMode, leaveChatMode } from "../lib/chatFreezeGuard";
+import { markSystemMessagesRead } from "../lib/chatMessageReads";
+import { markChatPerf, openChatSnapshotListener, resetChatPerf } from "../lib/chatPerf";
+import {
+  applyThreadMessagesIfChanged,
+  buildThreadMessagesQuery,
+  shouldMarkThreadUnread,
+  unreadIdsForReceiver,
+} from "../lib/chatThreadMessages";
 
 export default function ParentChatTab() {
   const { profile } = useAuth();
@@ -62,6 +71,23 @@ export default function ParentChatTab() {
 
   const prevMessagesLength = useRef<number>(0);
   const isFirstLoad = useRef<boolean>(true);
+  const didAutoSelectRef = useRef(false);
+  const messagesSigRef = useRef("");
+  const unreadKeyRef = useRef("");
+  const messagesFirstSnapshotRef = useRef(false);
+
+  useEffect(() => {
+    resetChatPerf("ParentChatTab");
+    enterChatMode("ParentChatTab");
+    console.info("[ChatFreeze] LISTENER_SETUP", { tab: "ParentChatTab" });
+    return () => {
+      console.info("[ChatFreeze] LISTENER_CLEANUP", { tab: "ParentChatTab" });
+      leaveChatMode("ParentChatTab");
+      messagesSigRef.current = "";
+      unreadKeyRef.current = "";
+      messagesFirstSnapshotRef.current = false;
+    };
+  }, []);
 
   // Fetch school info for current parent
   useEffect(() => {
@@ -84,7 +110,11 @@ export default function ParentChatTab() {
       const unsub = onSnapshot(qStudents, (snap) => {
         setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() as any })));
       });
-      return () => unsub();
+      const untrackStudents = openChatSnapshotListener("ParentChatTab:students");
+      return () => {
+        unsub();
+        untrackStudents();
+      };
     }
   }, [profile?.uid]);
 
@@ -126,10 +156,13 @@ export default function ParentChatTab() {
       // Combine admin at the top, then teachers
       setSchoolContacts([adminContact, ...teachers]);
       setContactsLoaded(true);
-      if (!activeContact) {
+      markChatPerf("contacts_loaded", "ParentChatTab", { contacts: teachers.length + 1 });
+      if (!didAutoSelectRef.current) {
+        didAutoSelectRef.current = true;
         setActiveContact(adminContact);
       }
     });
+    const untrackContacts = openChatSnapshotListener("ParentChatTab:contacts");
 
     // Fetch unread messages meant for this parent
     const qUnread = query(
@@ -151,6 +184,7 @@ export default function ParentChatTab() {
       });
       setUnreadCounts(counts);
     });
+    const untrackUnread = openChatSnapshotListener("ParentChatTab:unread");
 
     const qConversations = query(
       collection(db, "conversations"),
@@ -199,30 +233,34 @@ export default function ParentChatTab() {
     }, (err) => {
       console.warn("Conversations listener error:", err);
     });
+    const untrackConversations = openChatSnapshotListener("ParentChatTab:conversations");
 
     return () => {
       unsubscribe();
       unsubUnread();
       unsubConversations();
+      untrackContacts();
+      untrackUnread();
+      untrackConversations();
     };
-  }, [profile?.schoolId, activeContact]);
+  }, [profile?.schoolId, profile?.uid, isRtl]);
 
   useEffect(() => {
     if (!profile?.uid || !profile?.schoolId || !activeContact) return;
+
+    messagesSigRef.current = "";
+    unreadKeyRef.current = "";
+    messagesFirstSnapshotRef.current = false;
 
     let convId = "";
     if (activeContact.type === "admin") {
       convId = `${profile.schoolId}_${profile.uid}`;
     } else {
-      // Chat with teacher
       convId = [profile.uid, activeContact.id].sort().join("_");
     }
 
-    const q = query(
-      collection(db, "system_messages"),
-      where("schoolId", "==", profile.schoolId),
-      where("conversationId", "==", convId),
-    );
+    const q = buildThreadMessagesQuery(profile.schoolId, convId);
+    const untrackMessages = openChatSnapshotListener("ParentChatTab:messages");
 
     const unsubscribe = onSnapshot(
       q,
@@ -231,45 +269,35 @@ export default function ParentChatTab() {
           id: doc.id,
           ...(doc.data() as any),
         }));
-        docs.sort((a: any, b: any) => {
-          const timeA = a.createdAt?.toMillis() || 0;
-          const timeB = b.createdAt?.toMillis() || 0;
-          return timeA - timeB;
-        });
 
-        setMessages(docs);
-        setTimeout(
-          () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
-          100,
-        );
+        const sorted = applyThreadMessagesIfChanged(docs, messagesSigRef, setMessages);
 
-        // Update interactions for active chat
-        if (docs.length > 0) {
-          const lastMsg = docs[docs.length - 1];
+        if (!messagesFirstSnapshotRef.current) {
+          messagesFirstSnapshotRef.current = true;
+          markChatPerf("messages_first_snapshot", "ParentChatTab", {
+            conversationId: convId,
+            count: sorted.length,
+          });
+        }
+
+        if (sorted.length > 0) {
+          const lastMsg = sorted[sorted.length - 1];
           const msgTime = lastMsg.createdAt?.toMillis() || Date.now();
+          const contactId = activeContact.id;
           setLastInteractionTimes(prev => {
-            if (msgTime > (prev[activeContact.id] || 0)) {
-              return { ...prev, [activeContact.id]: msgTime };
+            if (msgTime > (prev[contactId] || 0)) {
+              return { ...prev, [contactId]: msgTime };
             }
             return prev;
           });
         }
 
-
-        // Sound handled globally by AudioNotificationManager
-        prevMessagesLength.current = docs.length;
+        prevMessagesLength.current = sorted.length;
         isFirstLoad.current = false;
 
-        // Mark unread as read if meant for this user
-        const unreadMe = docs.filter(
-          (m) => !m.read && m.receiverId === profile.uid,
-        );
-        if (unreadMe.length > 0) {
-          unreadMe.forEach((m) => {
-            updateDoc(doc(db, "system_messages", m.id), { read: true }).catch(
-              (err) => console.log(err),
-            );
-          });
+        const unreadIds = unreadIdsForReceiver(sorted, [profile.uid]);
+        if (shouldMarkThreadUnread(unreadIds, unreadKeyRef)) {
+          markSystemMessagesRead(unreadIds, "ParentChatTab");
         }
       },
       (error) => {
@@ -281,8 +309,11 @@ export default function ParentChatTab() {
       },
     );
 
-    return () => unsubscribe();
-  }, [profile, activeContact]);
+    return () => {
+      unsubscribe();
+      untrackMessages();
+    };
+  }, [profile?.uid, profile?.schoolId, activeContact?.id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -394,11 +425,6 @@ export default function ParentChatTab() {
       }
       
       setLastInteractionTimes(prev => ({ ...prev, [receiverId]: Date.now() }));
-
-      setTimeout(
-        () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
-        100,
-      );
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "system_messages");
       toast.error(isRtl ? "فشل إرسال الرسالة" : "Failed to send message");
@@ -420,7 +446,7 @@ export default function ParentChatTab() {
     return "";
   };
 
-  const groupedMessages = messages.reduce(
+  const groupedMessages = useMemo(() => messages.reduce(
     (acc, msg) => {
       let dateStr = isRtl ? "اليوم" : "Today";
       if (msg.createdAt && typeof msg.createdAt.toDate === "function") {
@@ -443,7 +469,7 @@ export default function ParentChatTab() {
       return acc;
     },
     {} as Record<string, any[]>,
-  );
+  ), [messages, isRtl]);
 
   const sortedContacts = [...schoolContacts].sort((a, b) => {
     const timeA = lastInteractionTimes[a.id] || 0;
