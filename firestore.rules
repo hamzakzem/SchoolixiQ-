@@ -652,18 +652,122 @@ service cloud.firestore {
           || isSchoolAdminAudienceNotification();
       }
 
+      function isSchoolNotificationAuthor(schoolId) {
+        return signedIn()
+          && userSchoolId() == schoolId
+          && userRole() in ['admin', 'school_admin', 'assistant', 'teacher'];
+      }
+
+      function notificationRecipientUserId() {
+        return request.resource.data.userId;
+      }
+
+      function recipientUserData(userId) {
+        return get(/databases/$(database)/documents/users/$(userId)).data;
+      }
+
+      function recipientUserExists(userId) {
+        return exists(/databases/$(database)/documents/users/$(userId));
+      }
+
+      function isSameSchoolRecipient(userId, schoolId) {
+        return recipientUserExists(userId)
+          && recipientUserData(userId).keys().hasAll(['schoolId'])
+          && recipientUserData(userId).schoolId == schoolId;
+      }
+
+      function isSameSchoolParentRecipient(userId, schoolId) {
+        return isSameSchoolRecipient(userId, schoolId)
+          && recipientUserData(userId).keys().hasAll(['role'])
+          && recipientUserData(userId).role == 'parent';
+      }
+
+      function isSameSchoolStaffRecipient(userId, schoolId) {
+        return isSameSchoolRecipient(userId, schoolId)
+          && recipientUserData(userId).keys().hasAll(['role'])
+          && recipientUserData(userId).role in ['admin', 'school_admin', 'assistant', 'teacher', 'staff'];
+      }
+
+      function notificationStudentId() {
+        return request.resource.data.keys().hasAll(['metadata'])
+          && request.resource.data.metadata is map
+          && request.resource.data.metadata.keys().hasAll(['studentId'])
+          && request.resource.data.metadata.studentId is string
+          ? request.resource.data.metadata.studentId
+          : '';
+      }
+
+      function studentInSameSchool(studentId, schoolId) {
+        return exists(/databases/$(database)/documents/students/$(studentId))
+          && hasSchoolId(get(/databases/$(database)/documents/students/$(studentId)).data)
+          && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == schoolId;
+      }
+
+      function parentLinkedToStudent(studentId, parentUserId) {
+        let student = get(/databases/$(database)/documents/students/$(studentId)).data;
+        return student.keys().hasAll(['parentIds'])
+          && student.parentIds is list
+          && parentUserId in student.parentIds;
+      }
+
+      function canCreateParentSchoolNotification() {
+        let data = request.resource.data;
+        let recipientId = notificationRecipientUserId();
+        let studentId = notificationStudentId();
+        return hasSchoolId(data)
+          && data.keys().hasAll(['userId'])
+          && isSchoolNotificationAuthor(data.schoolId)
+          && recipientId == data.userId
+          && isSameSchoolParentRecipient(recipientId, data.schoolId)
+          && (
+            studentId.size() == 0
+            || (
+              studentInSameSchool(studentId, data.schoolId)
+              && parentLinkedToStudent(studentId, recipientId)
+            )
+          );
+      }
+
+      function canCreateStaffSchoolNotification() {
+        let data = request.resource.data;
+        let recipientId = notificationRecipientUserId();
+        return hasSchoolId(data)
+          && data.keys().hasAll(['userId'])
+          && isSchoolNotificationAuthor(data.schoolId)
+          && recipientId == data.userId
+          && isSameSchoolStaffRecipient(recipientId, data.schoolId);
+      }
+
+      function isSuperAdminRecipient(userId) {
+        return recipientUserExists(userId)
+          && recipientUserData(userId).keys().hasAll(['role'])
+          && recipientUserData(userId).role in ['superadmin', 'super_admin'];
+      }
+
+      function canCreateSuperAdminRecipientNotification() {
+        let data = request.resource.data;
+        return signedIn()
+          && data.keys().hasAll(['userId', 'schoolId'])
+          && data.schoolId == 'system'
+          && userRole() in ['admin', 'school_admin', 'assistant']
+          && isSuperAdminRecipient(notificationRecipientUserId());
+      }
+
+      function canCreateSchoolNotification() {
+        return canCreateParentSchoolNotification()
+          || canCreateStaffSchoolNotification()
+          || canCreateSuperAdminRecipientNotification();
+      }
+
       allow get: if canReadNotification();
       allow list: if canReadNotification();
       allow create: if isSuperAdmin()
         || (
-          signedIn() && (
-            (hasSchoolId(request.resource.data) && canWriteSchoolData(request.resource.data.schoolId))
-            || (
-              request.resource.data.userId == 'super_admin'
-              && request.resource.data.schoolId == 'system'
-            )
-          )
-        );
+          signedIn()
+          && request.resource.data.userId == 'super_admin'
+          && request.resource.data.schoolId == 'system'
+        )
+        || canCreateSchoolNotification();
       allow update, delete: if isSuperAdmin()
         || (isNotificationRecipient() && notificationSchoolMatchesViewer())
         || isSuperAdminInboxNotification();
