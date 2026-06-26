@@ -105,7 +105,7 @@ service cloud.firestore {
     }
 
     function isSchoolStaffRole() {
-      return userRole() in ['admin', 'assistant', 'teacher', 'staff'];
+      return userRole() in ['admin', 'school_admin', 'assistant', 'teacher', 'staff'];
     }
 
     function isSchoolManagementRole() {
@@ -231,59 +231,179 @@ service cloud.firestore {
     function canReadOwnRegistration(data) {
       return signedIn() && (
         (data.keys().hasAll(['uid']) && data.uid == request.auth.uid)
-        || (data.keys().hasAll(['email']) && data.email == userEmail())
+        || (
+          data.keys().hasAll(['email'])
+          && effectiveAuthEmail().size() > 0
+          && data.email == effectiveAuthEmail()
+        )
         || (
           data.keys().hasAll(['customerInfo'])
           && data.customerInfo.keys().hasAll(['email'])
-          && data.customerInfo.email == userEmail()
+          && effectiveAuthEmail().size() > 0
+          && data.customerInfo.email == effectiveAuthEmail()
         )
       );
     }
 
-    function canReadUserInSchool() {
-      return isOwner(userId)
-        || isSuperAdmin()
-        || (signedIn() && resource.data.keys().hasAll(['email']) && resource.data.email == userEmail())
-        || (
-          signedIn()
-          && hasSchoolId(resource.data)
-          && isSchoolMember(resource.data.schoolId)
-          && isSchoolStaffRole()
-        )
-        || (
-          signedIn()
-          && isParent()
-          && hasSchoolId(resource.data)
-          && userSchoolId() == resource.data.schoolId
-          && resource.data.role in ['admin', 'assistant', 'teacher', 'staff']
+    function authTokenEmail() {
+      return signedIn() && request.auth.token.keys().hasAll(['email'])
+        ? request.auth.token.email
+        : '';
+    }
+
+    function effectiveAuthEmail() {
+      return userExists() && userEmail().size() > 0 ? userEmail() : authTokenEmail();
+    }
+
+    function platformUninitialized() {
+      return !exists(/databases/$(database)/documents/users/metadata);
+    }
+
+    function canReadOtherUserDoc(targetUserId) {
+      return signedIn()
+        && resource != null
+        && (
+          isSuperAdmin()
+          || (
+            resource.data.keys().hasAll(['email'])
+            && effectiveAuthEmail().size() > 0
+            && resource.data.email == effectiveAuthEmail()
+          )
+          || (
+            hasSchoolId(resource.data)
+            && isSchoolMember(resource.data.schoolId)
+            && isSchoolStaffRole()
+          )
+          || (
+            isParent()
+            && hasSchoolId(resource.data)
+            && userSchoolId() == resource.data.schoolId
+            && resource.data.role in ['admin', 'assistant', 'teacher', 'staff']
+          )
         );
     }
 
-    function canWriteUserInSchool() {
+    function selfOwnedUserFields() {
+      return [
+        'fcmTokens',
+        'fcmTokenUpdatedAt',
+        'fcmDevices',
+        'webPushTokens',
+        'pushTokens',
+        'notificationPreferences',
+        'lastSeen',
+        'lastActiveAt',
+        'deviceInfo',
+        'updatedAt',
+        'emailVerified',
+        'displayName',
+        'photoURL',
+        'phoneNumber',
+        'phone',
+        'whatsapp',
+        'language',
+        'name',
+        'claimedAt',
+        'uid',
+        'autoProv',
+        'studentIds',
+      ];
+    }
+
+    function privilegedUserFieldsUnchanged() {
+      return request.resource.data.role == resource.data.role
+        && (
+          !resource.data.keys().hasAll(['schoolId'])
+          || request.resource.data.schoolId == resource.data.schoolId
+        )
+        && (
+          !resource.data.keys().hasAll(['permissions'])
+          || request.resource.data.permissions == resource.data.permissions
+        )
+        && (
+          !resource.data.keys().hasAll(['status'])
+          || request.resource.data.status == resource.data.status
+        )
+        && (
+          !resource.data.keys().hasAll(['subscriptionStatus'])
+          || request.resource.data.subscriptionStatus == resource.data.subscriptionStatus
+        )
+        && (
+          !resource.data.keys().hasAll(['plan'])
+          || request.resource.data.plan == resource.data.plan
+        )
+        && (
+          !resource.data.keys().hasAll(['package'])
+          || request.resource.data.package == resource.data.package
+        )
+        && (
+          !resource.data.keys().hasAll(['packageId'])
+          || request.resource.data.packageId == resource.data.packageId
+        )
+        && (
+          !resource.data.keys().hasAll(['isSuperAdmin'])
+          || request.resource.data.isSuperAdmin == resource.data.isSuperAdmin
+        );
+    }
+
+    function canSelfUpdateUser(targetUserId) {
+      return signedIn()
+        && request.auth.uid == targetUserId
+        && resource != null
+        && privilegedUserFieldsUnchanged()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(selfOwnedUserFields());
+    }
+
+    function canParentSelfLinkSchool(targetUserId) {
+      return signedIn()
+        && request.auth.uid == targetUserId
+        && resource != null
+        && request.resource.data.role == 'parent'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['role', 'studentIds', 'schoolId', 'updatedAt'])
+        && (
+          !resource.data.keys().hasAll(['schoolId'])
+          || resource.data.schoolId == ''
+          || request.resource.data.schoolId == resource.data.schoolId
+        );
+    }
+
+    function canAdminSelfAssignSchool(targetUserId) {
+      return signedIn()
+        && request.auth.uid == targetUserId
+        && resource != null
+        && resource.data.role in ['admin', 'school_admin']
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['schoolId', 'updatedAt']);
+    }
+
+    function canAdminUpdateUserInSchool(targetUserId) {
       return isSuperAdmin()
-        || isOwner(userId)
-        || canOwnerUpdatePushTokens()
         || (
           signedIn()
-          && isSchoolManagementRole()
+          && (isAdmin() || isAssistant())
+          && resource != null
           && hasSchoolId(resource.data)
           && sameSchool(resource)
         );
     }
 
-    // Explicit owner path for FCM device registration (push token fields only).
-    function canOwnerUpdatePushTokens() {
-      return isOwner(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'fcmTokens',
-          'fcmTokenUpdatedAt',
-          'fcmDevices',
-        ]);
+    function canSelfCreateUser(targetUserId) {
+      return signedIn()
+        && request.auth.uid == targetUserId
+        && !('isSuperAdmin' in request.resource.data)
+        && (
+          request.resource.data.role in ['parent', 'teacher', 'admin', 'school_admin', 'assistant', 'staff', 'guard']
+          || (
+            platformUninitialized()
+            && request.resource.data.role in ['superadmin', 'super_admin']
+          )
+        );
     }
 
-    function canCreateUserInSchool() {
+    function canCreateUserInSchool(targetUserId) {
       return isSuperAdmin()
-        || isOwner(userId)
+        || canSelfCreateUser(targetUserId)
         || (
           signedIn()
           && isSchoolManagementRole()
@@ -397,9 +517,14 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /users/{userId} {
-      allow read, get, list: if canReadUserInSchool();
-      allow create: if canCreateUserInSchool();
-      allow update: if canWriteUserInSchool();
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow get: if canReadOtherUserDoc(userId);
+      allow list: if canReadOtherUserDoc(userId);
+      allow create: if canCreateUserInSchool(userId);
+      allow update: if canSelfUpdateUser(userId)
+        || canParentSelfLinkSchool(userId)
+        || canAdminSelfAssignSchool(userId)
+        || canAdminUpdateUserInSchool(userId);
       allow delete: if isSuperAdmin()
         || (signedIn() && isAdmin() && hasSchoolId(resource.data) && sameSchool(resource));
     }
