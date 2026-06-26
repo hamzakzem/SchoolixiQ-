@@ -7,11 +7,11 @@ import {
   handleResourceExhausted,
   isQuotaWritePaused,
   isResourceExhaustedError,
+  logPresenceSkipped,
 } from './firestoreQuota';
 import {
-  PRESENCE_HEARTBEAT_MS,
+  PRESENCE_SLOW_HEARTBEAT_MS,
   PRESENCE_TAB_LOCK_MS,
-  type SchoolPresenceRecord,
 } from './schoolPresence';
 
 const TAB_ID =
@@ -75,18 +75,15 @@ async function writeSchoolHeartbeat(
   touchSeenOnly = false,
 ): Promise<void> {
   if (!canSendHeartbeat(schoolId)) return;
-  if (isQuotaWritePaused()) return;
+  if (isQuotaWritePaused()) {
+    logPresenceSkipped('quota_paused');
+    return;
+  }
 
-  const payload: Partial<SchoolPresenceRecord> & {
-    schoolId: string;
-    lastHeartbeatAt?: ReturnType<typeof serverTimestamp>;
-    lastSeenAt?: ReturnType<typeof serverTimestamp>;
-    updatedAt: ReturnType<typeof serverTimestamp>;
-    online?: boolean;
-  } = {
+  const payload = {
     schoolId,
     updatedAt: serverTimestamp(),
-  };
+  } as Record<string, unknown>;
 
   if (touchSeenOnly) {
     payload.lastSeenAt = serverTimestamp();
@@ -112,7 +109,8 @@ async function writeSchoolHeartbeat(
 }
 
 /**
- * Heartbeat for school-scoped users only. Super Admin and users without schoolId are excluded.
+ * Event-driven school presence: login, visibility, online/offline, slow heartbeat (12 min max).
+ * Super Admin and users without schoolId are excluded.
  */
 export function useSchoolPresence() {
   const { user, profile } = useAuth();
@@ -132,10 +130,15 @@ export function useSchoolPresence() {
 
     let cancelled = false;
 
-    const beat = async (force = false) => {
+    const beat = async (reason: string, force = false) => {
       if (cancelled || !user?.uid) return;
+      if (isQuotaWritePaused()) {
+        logPresenceSkipped('quota_paused', { reason });
+        return;
+      }
       const now = Date.now();
-      if (!force && now - lastBeatRef.current < PRESENCE_HEARTBEAT_MS - 2000) {
+      if (!force && now - lastBeatRef.current < PRESENCE_SLOW_HEARTBEAT_MS - 5000) {
+        logPresenceSkipped('throttle', { reason });
         return;
       }
       try {
@@ -156,28 +159,44 @@ export function useSchoolPresence() {
       }
     };
 
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void beat(true);
-      }
-    };
-
-    const onHidden = () => {
-      if (document.visibilityState !== 'hidden') return;
-      void writeSchoolHeartbeat(schoolId, user!.uid, userName, String(role), true).catch(
+    const markOffline = () => {
+      if (!user?.uid || cancelled) return;
+      void writeSchoolHeartbeat(schoolId, user.uid, userName, String(role), true).catch(
         () => undefined,
       );
     };
 
-    void beat(true);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void beat('visibility', true);
+      }
+    };
+
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') {
+        markOffline();
+      }
+    };
+
+    const onOnline = () => {
+      void beat('online', true);
+    };
+
+    const onOffline = () => {
+      markOffline();
+    };
+
+    void beat('login', true);
 
     intervalRef.current = window.setInterval(() => {
-      void beat(false);
-    }, PRESENCE_HEARTBEAT_MS);
+      void beat('slow_heartbeat', false);
+    }, PRESENCE_SLOW_HEARTBEAT_MS);
 
     document.addEventListener('visibilitychange', onVisible);
     document.addEventListener('visibilitychange', onHidden);
     window.addEventListener('focus', onVisible);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
 
     return () => {
       cancelled = true;
@@ -187,6 +206,9 @@ export function useSchoolPresence() {
       document.removeEventListener('visibilitychange', onVisible);
       document.removeEventListener('visibilitychange', onHidden);
       window.removeEventListener('focus', onVisible);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+      markOffline();
       releaseTabLock(schoolId);
     };
   }, [user?.uid, schoolId, role, userName]);

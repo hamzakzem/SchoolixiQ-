@@ -74,6 +74,13 @@ export function logWriteSkippedDuplicate(
   console.info('[Quota] WRITE_SKIPPED_DUPLICATE', { source, ...detail });
 }
 
+export function logPresenceSkipped(
+  reason: string,
+  detail?: Record<string, unknown>,
+): void {
+  console.info('[Quota] PRESENCE_SKIPPED', { reason, ...detail });
+}
+
 export function shouldThrottleWrite(key: string, ttlMs: number): boolean {
   if (typeof sessionStorage === 'undefined') return false;
   try {
