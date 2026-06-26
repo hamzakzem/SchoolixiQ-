@@ -109,7 +109,7 @@ service cloud.firestore {
     }
 
     function isSchoolManagementRole() {
-      return userRole() in ['admin', 'assistant'];
+      return userRole() in ['admin', 'school_admin', 'assistant'];
     }
 
     function isSchoolMember(schoolId) {
@@ -185,9 +185,9 @@ service cloud.firestore {
         || (resource.data.keys().hasAll(['studentId']) && isParentOfStudent(resource.data.studentId));
     }
 
-    function canReadClassDocument() {
+    function canReadClassDocument(targetClassId) {
       return canReadSchoolManagement()
-        || (signedIn() && isTeacher() && teacherCanAccessClass(classId))
+        || (signedIn() && isTeacher() && teacherCanAccessClass(targetClassId))
         || (signedIn() && isParent() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId);
     }
 
@@ -401,6 +401,38 @@ service cloud.firestore {
         );
     }
 
+    function canSelfUpdateAdminOnboarding(targetUserId) {
+      return signedIn()
+        && request.auth.uid == targetUserId
+        && resource != null
+        && resource.data.role in ['admin', 'school_admin']
+        && request.resource.data.role in ['admin', 'school_admin']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'uid',
+          'name',
+          'email',
+          'role',
+          'status',
+          'subscriptionStatus',
+          'schoolId',
+          'pendingRegistrationId',
+          'phone',
+          'photoURL',
+          'createdAt',
+          'updatedAt',
+          'autoProv',
+        ]);
+    }
+
+    function canClaimProvisionedUserDoc(targetUserId) {
+      return signedIn()
+        && request.auth.uid != targetUserId
+        && resource != null
+        && resource.data.keys().hasAll(['email'])
+        && effectiveAuthEmail().size() > 0
+        && resource.data.email == effectiveAuthEmail();
+    }
+
     function canCreateUserInSchool(targetUserId) {
       return isSuperAdmin()
         || canSelfCreateUser(targetUserId)
@@ -467,7 +499,7 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (signedIn() && isAdmin() && request.resource.data.ownerUid == request.auth.uid);
       allow update: if isSuperAdmin()
-        || (signedIn() && isSchoolMember(schoolId) && userRole() in ['admin', 'assistant', 'teacher']);
+        || (signedIn() && isSchoolMember(schoolId) && userRole() in ['admin', 'school_admin', 'assistant', 'teacher']);
       allow delete: if isSuperAdmin();
 
       match /settings/{settingId} {
@@ -524,9 +556,11 @@ service cloud.firestore {
       allow update: if canSelfUpdateUser(userId)
         || canParentSelfLinkSchool(userId)
         || canAdminSelfAssignSchool(userId)
+        || canSelfUpdateAdminOnboarding(userId)
         || canAdminUpdateUserInSchool(userId);
       allow delete: if isSuperAdmin()
-        || (signedIn() && isAdmin() && hasSchoolId(resource.data) && sameSchool(resource));
+        || (signedIn() && isAdmin() && hasSchoolId(resource.data) && sameSchool(resource))
+        || canClaimProvisionedUserDoc(userId);
     }
 
     match /users/metadata {
@@ -541,7 +575,7 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /classes/{classId} {
-      allow read, get, list: if canReadClassDocument();
+      allow read, get, list: if canReadClassDocument(classId);
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
       allow update, delete: if isSuperAdmin()
@@ -748,6 +782,7 @@ service cloud.firestore {
       function notificationSchoolMatchesViewer() {
         return !resource.data.keys().hasAll(['schoolId'])
           || resource.data.schoolId == 'system'
+          || userSchoolId() == resource.data.schoolId
           || (
             request.auth.token.keys().hasAll(['schoolId'])
             && request.auth.token.schoolId == resource.data.schoolId
