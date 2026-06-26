@@ -259,6 +259,11 @@ service cloud.firestore {
       return !exists(/databases/$(database)/documents/users/metadata);
     }
 
+    function canReadPlatformSuperAdminUserDoc() {
+      return resource.data.keys().hasAll(['role'])
+        && resource.data.role in ['superadmin', 'super_admin'];
+    }
+
     function canReadOtherUserDoc(targetUserId) {
       return signedIn()
         && resource != null
@@ -279,6 +284,11 @@ service cloud.firestore {
             && hasSchoolId(resource.data)
             && userSchoolId() == resource.data.schoolId
             && resource.data.role in ['admin', 'assistant', 'teacher', 'staff']
+          )
+          || (
+            userRole() in ['admin', 'school_admin', 'assistant', 'teacher']
+            && userSchoolId().size() > 0
+            && canReadPlatformSuperAdminUserDoc()
           )
         );
     }
@@ -904,13 +914,44 @@ service cloud.firestore {
           && recipientUserData(userId).role in ['superadmin', 'super_admin'];
       }
 
+      function notificationSourceSchoolId() {
+        return request.resource.data.keys().hasAll(['metadata'])
+          && request.resource.data.metadata is map
+          && (
+            (
+              request.resource.data.metadata.keys().hasAll(['sourceSchoolId'])
+              && request.resource.data.metadata.sourceSchoolId is string
+              && request.resource.data.metadata.sourceSchoolId.size() > 0
+            )
+            || (
+              request.resource.data.metadata.keys().hasAll(['schoolId'])
+              && request.resource.data.metadata.schoolId is string
+              && request.resource.data.metadata.schoolId.size() > 0
+              && request.resource.data.metadata.schoolId != 'system'
+            )
+          )
+          ? (
+            request.resource.data.metadata.keys().hasAll(['sourceSchoolId'])
+              && request.resource.data.metadata.sourceSchoolId is string
+              && request.resource.data.metadata.sourceSchoolId.size() > 0
+              ? request.resource.data.metadata.sourceSchoolId
+              : request.resource.data.metadata.schoolId
+          )
+          : '';
+      }
+
       function canCreateSuperAdminRecipientNotification() {
         let data = request.resource.data;
+        let recipientId = notificationRecipientUserId();
+        let sourceSchoolId = notificationSourceSchoolId();
         return signedIn()
           && data.keys().hasAll(['userId', 'schoolId'])
           && data.schoolId == 'system'
-          && userRole() in ['admin', 'school_admin', 'assistant']
-          && isSuperAdminRecipient(notificationRecipientUserId());
+          && sourceSchoolId.size() > 0
+          && isSchoolNotificationAuthor(sourceSchoolId)
+          && userRole() in ['admin', 'school_admin', 'assistant', 'teacher']
+          && recipientId == data.userId
+          && isSuperAdminRecipient(recipientId);
       }
 
       function canCreateSchoolNotification() {

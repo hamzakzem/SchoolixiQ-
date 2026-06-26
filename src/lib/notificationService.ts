@@ -148,15 +148,22 @@ async function resolveSuperAdminUserIds(): Promise<string[]> {
 function buildSuperAdminExpandedPayload(
   payload: Omit<NotificationPayload, 'userId' | 'schoolId'>,
 ): Omit<NotificationPayload, 'userId'> {
+  const rawMeta =
+    payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {};
+  const sourceSchoolId =
+    typeof rawMeta.sourceSchoolId === 'string' && rawMeta.sourceSchoolId
+      ? rawMeta.sourceSchoolId
+      : typeof rawMeta.schoolId === 'string' && rawMeta.schoolId && rawMeta.schoolId !== 'system'
+        ? rawMeta.schoolId
+        : undefined;
+
   const metadata = {
-    ...(payload.metadata || {}),
+    ...rawMeta,
+    ...(sourceSchoolId ? { sourceSchoolId, schoolId: sourceSchoolId } : {}),
     audience: 'super_admin',
     originalRecipient: SUPER_ADMIN_POOL_ID,
     routeTarget:
-      (payload.metadata &&
-        typeof payload.metadata.routeTarget === 'string' &&
-        payload.metadata.routeTarget) ||
-      'chat',
+      (typeof rawMeta.routeTarget === 'string' && rawMeta.routeTarget) || 'chat',
   };
   return {
     ...payload,
@@ -166,6 +173,14 @@ function buildSuperAdminExpandedPayload(
     audience: 'super_admin',
     metadata,
   };
+}
+
+function logSuperAdminDebug(
+  label: 'SUPER_ADMIN_PAYLOAD' | 'SUPER_ADMIN_RULE_INTENT',
+  detail: Record<string, unknown>,
+): void {
+  if (!import.meta.env.DEV) return;
+  console.info(`[Notifications] ${label}`, detail);
 }
 
 export const notificationService = {
@@ -489,13 +504,32 @@ export const notificationService = {
    */
   async notifySuperAdmins(payload: Omit<NotificationPayload, 'userId' | 'schoolId'>) {
     try {
+      const expanded = buildSuperAdminExpandedPayload(payload);
+      logSuperAdminDebug('SUPER_ADMIN_PAYLOAD', {
+        type: expanded.type,
+        schoolId: expanded.schoolId,
+        audience: expanded.audience,
+        metadata: expanded.metadata,
+        senderId: expanded.senderId,
+      });
+      logSuperAdminDebug('SUPER_ADMIN_RULE_INTENT', {
+        notificationSchoolId: 'system',
+        sourceSchoolId:
+          expanded.metadata &&
+          typeof expanded.metadata === 'object' &&
+          typeof (expanded.metadata as Record<string, unknown>).sourceSchoolId === 'string'
+            ? (expanded.metadata as Record<string, unknown>).sourceSchoolId
+            : undefined,
+        allowedRoles: ['admin', 'school_admin', 'assistant', 'teacher'],
+        recipientScope: 'real_superadmin_uids',
+      });
+
       const uids = await resolveSuperAdminUserIds();
       if (uids.length === 0) {
         console.warn('[Notifications] SUPER_ADMIN_RECIPIENT_EXPAND_COUNT', { count: 0, action: 'skip' });
         return false;
       }
 
-      const expanded = buildSuperAdminExpandedPayload(payload);
       const ok = await this.sendToMultiple(uids, expanded);
       if (ok) {
         uids.forEach((uid) => {

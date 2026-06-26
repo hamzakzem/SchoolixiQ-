@@ -145,24 +145,28 @@ export function ChatMessageBubble({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18 }}
-      className={`flex flex-col mb-1 group/msg relative ${
-        isMe ? 'items-end' : 'items-start'
+      className={`sx-chat-msg-row flex w-full flex-col mb-2 group/msg relative ${
+        isMe ? 'sx-chat-msg-row--out items-end' : 'sx-chat-msg-row--in items-start'
       } ${isSearchMatch && isSearchActive ? 'sx-chat-msg--search-match' : ''} ${
         isSelected ? 'sx-chat-msg--selected' : ''
       }`}
       onClick={selectionMode ? handleClick : undefined}
     >
       <div
-        className={`max-w-[88%] sm:max-w-[72%] md:max-w-[min(520px,68%)] flex gap-2 ${
+        className={`sx-chat-msg-body flex gap-2 min-w-0 max-w-[84%] md:max-w-[72%] ${
           isMe ? 'flex-row-reverse' : 'flex-row'
         }`}
       >
-        {!isMe && incomingAvatar}
-        {isMe && outgoingAvatar}
+        {!isMe && incomingAvatar ? (
+          <div className="sx-chat-msg-avatar shrink-0 self-end">{incomingAvatar}</div>
+        ) : null}
+        {isMe && outgoingAvatar ? (
+          <div className="sx-chat-msg-avatar shrink-0 self-end">{outgoingAvatar}</div>
+        ) : null}
 
-        <div className="relative flex flex-col min-w-0">
+        <div className="relative flex flex-col min-w-0 max-w-full flex-1">
           <div
-            className={`sx-chat-bubble px-3.5 py-2.5 relative max-w-[82%] lg:max-w-[70%] ${
+            className={`sx-chat-bubble w-fit max-w-full min-w-[4.5rem] px-3.5 py-2.5 relative ${
               isMe
                 ? 'sx-chat-bubble--out sx-chat-bubble--outgoing'
                 : 'sx-chat-bubble--in sx-chat-bubble--incoming'
@@ -189,7 +193,10 @@ export function ChatMessageBubble({
             )}
 
             {content ? (
-              <p className="leading-relaxed whitespace-pre-wrap text-sm font-medium">
+              <p
+                className="sx-chat-bubble-text text-sm font-medium"
+                dir="auto"
+              >
                 {isSearchActive && searchQuery.trim()
                   ? highlightText(content, searchQuery)
                   : content}
@@ -197,7 +204,7 @@ export function ChatMessageBubble({
             ) : null}
 
             {fileUrl ? (
-              <div className="mt-2 rounded-xl overflow-hidden max-w-[280px]">
+              <div className="mt-2 rounded-xl overflow-hidden max-w-full">
                 {fileType === 'image' ? (
                   <img
                     src={fileUrl}
@@ -254,26 +261,26 @@ export function ChatMessageBubble({
               </>
             )}
           </div>
-        </div>
-      </div>
 
-      <div
-        className={`flex items-center gap-1.5 mt-1 px-1 ${
-          isMe ? 'justify-end' : 'justify-start'
-        }`}
-      >
-        <span className="text-[10px] text-[#0B2345]/45 font-semibold tabular-nums">
-          {formatMessageTime(msg.createdAt)}
-        </span>
-        {isMe && msg.read !== undefined ? (
-          <span className="text-[#0B2345]/40" aria-hidden>
-            {msg.read ? (
-              <CheckCheck size={13} className="text-[#D4AF37]" />
-            ) : (
-              <Check size={13} />
-            )}
-          </span>
-        ) : null}
+          <div
+            className={`sx-chat-msg-meta flex items-center gap-1.5 mt-1 px-0.5 ${
+              isMe ? 'justify-end' : 'justify-start'
+            }`}
+          >
+            <span className="text-[10px] text-[#0B2345]/45 dark:text-slate-400 font-semibold tabular-nums leading-none">
+              {formatMessageTime(msg.createdAt)}
+            </span>
+            {isMe && msg.read !== undefined ? (
+              <span className="text-[#0B2345]/40 dark:text-slate-500" aria-hidden>
+                {msg.read ? (
+                  <CheckCheck size={13} className="text-[#D4AF37]" />
+                ) : (
+                  <Check size={13} />
+                )}
+              </span>
+            ) : null}
+          </div>
+        </div>
       </div>
     </motion.div>
   );

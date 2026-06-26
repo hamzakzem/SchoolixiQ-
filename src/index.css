@@ -1560,6 +1560,59 @@ html.dark .sx-chat-shell {
 
 .sx-chat-list {
   background: #ffffff;
+  width: 100%;
+  max-width: 360px;
+}
+
+.sx-chat-list-item {
+  background: transparent;
+}
+
+.sx-chat-list-item--active,
+.sx-chat-contact--active {
+  background: linear-gradient(90deg, rgba(11, 35, 69, 0.08) 0%, rgba(212, 175, 55, 0.12) 100%);
+  box-shadow: inset 3px 0 0 #d4af37, 0 2px 12px -4px rgba(11, 35, 69, 0.12);
+}
+
+[dir="rtl"] .sx-chat-list-item--active,
+[dir="rtl"] .sx-chat-contact--active {
+  box-shadow: inset -3px 0 0 #d4af37;
+}
+
+.sx-chat-bubble--outgoing {
+  background: #0f172a;
+  color: #ffffff;
+  border-bottom-right-radius: 0.35rem;
+}
+
+.sx-chat-bubble--incoming {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #e5e7eb;
+  border-bottom-left-radius: 0.35rem;
+}
+
+html.dark .sx-chat-bubble--incoming {
+  background: #141c2e;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+.sx-chat-send-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f172a;
+  color: #ffffff;
+  transition: background 180ms ease, transform 120ms ease;
+}
+
+.sx-chat-send-btn:not(:disabled):hover {
+  background: #1e293b;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
 }
 
 html.dark .sx-chat-list {
@@ -1602,9 +1655,42 @@ html.dark .sx-chat-list {
   scroll-behavior: smooth;
 }
 
+.sx-chat-msg-row {
+  width: 100%;
+}
+
+.sx-chat-msg-body {
+  align-items: flex-end;
+}
+
+.sx-chat-msg-avatar {
+  margin-bottom: 1.25rem;
+}
+
 .sx-chat-bubble {
   border-radius: 1.125rem;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  max-width: 100%;
+}
+
+.sx-chat-bubble-text {
+  margin: 0;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  unicode-bidi: plaintext;
+  text-align: start;
+  hyphens: auto;
+}
+
+.sx-chat-bubble--out .sx-chat-bubble-text {
+  color: inherit;
+}
+
+.sx-chat-msg-meta {
+  min-height: 0.875rem;
 }
 
 .sx-chat-bubble--out {
