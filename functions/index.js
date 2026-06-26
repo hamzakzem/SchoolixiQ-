@@ -4,9 +4,15 @@ const { initializeApp, getApps, getApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 
-/** Must match firebase-applet-config.json firestoreDatabaseId — NOT (default). */
-const DATABASE_ID =
-  process.env.FIRESTORE_DATABASE_ID || 'ai-studio-5b7cdad3-1c88-4eed-9aca-523fba814a76';
+const firebaseAppletConfig = require('./firebase-applet-config.json');
+
+/** Matches firebase-applet-config.json; omit or "(default)" uses the standard database. */
+const DATABASE_ID = (() => {
+  const id =
+    process.env.FIRESTORE_DATABASE_ID || firebaseAppletConfig.firestoreDatabaseId;
+  if (!id || id === '(default)') return '(default)';
+  return id;
+})();
 
 const PUSH_MAX_AGE_MS = 10 * 60 * 1000;
 const TERMINAL = new Set(['sent', 'partial', 'skipped', 'no_tokens', 'failed', 'error']);

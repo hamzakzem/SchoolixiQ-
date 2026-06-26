@@ -5,6 +5,7 @@ import { db, auth } from './firebase';
 import { getServiceWorkerUrl } from './serviceWorkerRegistration';
 import { notificationDiag } from './notificationDiagnostics';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { getFirestoreDatabaseId } from './apiUtils';
 import { isLogoutInProgress, setLogoutInProgress } from './logoutGuard';
 import {
   handleResourceExhausted,
@@ -255,7 +256,7 @@ async function readUserTokensFromServer(userId: string): Promise<string[]> {
     console.error('[Notifications] TOKEN_READ_ERROR', {
       userId,
       path: `users/${userId}`,
-      databaseId: firebaseConfig.firestoreDatabaseId,
+      databaseId: getFirestoreDatabaseId(),
       code: code ?? 'unknown',
       error: msg,
       likelyRulesBlock: code === 'permission-denied',
@@ -321,7 +322,7 @@ export async function getWebPushDiagnostics(userId?: string): Promise<WebPushDia
     tokenSavedToFirestore,
     firestoreUserHasTokens,
     firestoreTokenCount,
-    databaseId: firebaseConfig.firestoreDatabaseId || '(default)',
+    databaseId: getFirestoreDatabaseId(),
     tokenPrefix: localToken ? `${localToken.slice(0, 12)}…` : null,
     lastError: lastRegistrationError,
   };
@@ -393,7 +394,7 @@ async function saveTokenToFirestore(userId: string, token: string): Promise<void
   console.info('[FCM] SAVE_TOKEN_START', {
     userId,
     path,
-    databaseId: firebaseConfig.firestoreDatabaseId,
+    databaseId: getFirestoreDatabaseId(),
     tokenPrefix: token.slice(0, 12),
   });
   try {
@@ -410,7 +411,7 @@ async function saveTokenToFirestore(userId: string, token: string): Promise<void
     console.info('[FCM] SAVE_TOKEN_SUCCESS', {
       userId,
       path,
-      databaseId: firebaseConfig.firestoreDatabaseId,
+      databaseId: getFirestoreDatabaseId(),
       tokenPrefix: token.slice(0, 12),
     });
   } catch (err) {
@@ -422,14 +423,14 @@ async function saveTokenToFirestore(userId: string, token: string): Promise<void
     console.error('[FCM] SAVE_TOKEN_ERROR', {
       userId,
       path,
-      databaseId: firebaseConfig.firestoreDatabaseId,
+      databaseId: getFirestoreDatabaseId(),
       code,
       error: msg,
     });
     console.error('[Notifications] TOKEN_SAVE_ERROR', {
       userId,
       path,
-      databaseId: firebaseConfig.firestoreDatabaseId,
+      databaseId: getFirestoreDatabaseId(),
       code,
       error: msg,
       fields: ['fcmTokens', 'fcmTokenUpdatedAt', 'fcmDevices'],
@@ -583,7 +584,7 @@ export async function registerWebPushDevice(
         console.error('[Notifications] TOKEN_SAVE_ERROR', {
           userId,
           error: 'Token write could not be verified in Firestore',
-          databaseId: firebaseConfig.firestoreDatabaseId,
+          databaseId: getFirestoreDatabaseId(),
         });
         return {
           ok: false,
@@ -596,7 +597,7 @@ export async function registerWebPushDevice(
       console.info('[Notifications] TOKEN_SAVE_SUCCESS', {
         userId,
         tokenPrefix: token.slice(0, 12),
-        databaseId: firebaseConfig.firestoreDatabaseId,
+        databaseId: getFirestoreDatabaseId(),
         verified: true,
       });
     } catch (saveErr) {
@@ -608,7 +609,7 @@ export async function registerWebPushDevice(
         path: `users/${userId}`,
         error: msg,
         code,
-        databaseId: firebaseConfig.firestoreDatabaseId,
+        databaseId: getFirestoreDatabaseId(),
         likelyRulesBlock: code === 'permission-denied',
       });
       return { ok: false, reason: 'save_failed', error: msg, token, tokenPrefix: token.slice(0, 12) };
@@ -632,7 +633,7 @@ export async function registerWebPushDevice(
         path: `users/${userId}`,
         error: msg,
         code,
-        databaseId: firebaseConfig.firestoreDatabaseId,
+        databaseId: getFirestoreDatabaseId(),
         likelyRulesBlock: code === 'permission-denied',
       });
       return { ok: false, error: msg };

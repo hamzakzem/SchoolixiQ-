@@ -106,7 +106,9 @@ if (typeof window !== 'undefined') {
 }
 
 export function getFirestoreDatabaseId(): string {
-  return firebaseConfig.firestoreDatabaseId || '(default)';
+  const id = (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId;
+  if (!id || id === '(default)') return '(default)';
+  return id;
 }
 
 export function getFirebaseProjectId(): string {

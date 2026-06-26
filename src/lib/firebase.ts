@@ -73,9 +73,13 @@ const getResilientCache = () => {
   }
 };
 
-export const db = initializeFirestore(app, {
-  localCache: getResilientCache()
-}, firebaseConfig.firestoreDatabaseId);
+const firestoreDatabaseId = (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId;
+const useDefaultFirestore =
+  !firestoreDatabaseId || firestoreDatabaseId === '(default)';
+
+export const db = useDefaultFirestore
+  ? initializeFirestore(app, { localCache: getResilientCache() })
+  : initializeFirestore(app, { localCache: getResilientCache() }, firestoreDatabaseId);
 
 export const auth = getAuth(app);
 export const storage = getStorage(
