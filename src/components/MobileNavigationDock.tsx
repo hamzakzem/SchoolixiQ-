@@ -54,8 +54,6 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   menuSurface = "dark",
   hidden = false,
 }) => {
-  if (hidden) return null;
-
   const isLightMenu = menuSurface === "light";
   const [showQuickAccess, setShowQuickAccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -138,14 +136,22 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   }, []);
 
   /** Overlay drawer open — all viewports (services menu). Quick-access sheet is mobile only. */
-  const servicesDrawerOpen = isSidebarOpen;
-  const quickAccessOverlayOpen = isMobileViewport && showQuickAccess;
+  const servicesDrawerOpen = !hidden && isSidebarOpen;
+  const quickAccessOverlayOpen = !hidden && isMobileViewport && showQuickAccess;
   const portalLayerOpen = servicesDrawerOpen || quickAccessOverlayOpen;
+
+  useEffect(() => {
+    if (!hidden) return;
+    if (typeof document === "undefined") return;
+    document.documentElement.classList.remove("sx-drawer-open");
+    document.body.classList.remove("sx-drawer-open");
+    document.getElementById("sx-app-drawer-portal")?.classList.remove("sx-app-drawer-portal--active");
+  }, [hidden]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
     const portal = document.getElementById("sx-app-drawer-portal");
-    let clearTimer: ReturnType<typeof setTimeout> | undefined;
+    let clearTimer: number | undefined;
 
     if (portalLayerOpen) {
       document.documentElement.classList.add("sx-drawer-open");
@@ -175,6 +181,10 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isSidebarOpen, showQuickAccess, setIsSidebarOpen]);
+
+  if (hidden) {
+    return null;
+  }
 
   const closeServicesMenu = () => setIsSidebarOpen(false);
 
