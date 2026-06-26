@@ -186,11 +186,18 @@ export function useSchoolPresence() {
       markOffline();
     };
 
+    const onActivity = () => {
+      void beat('activity', false);
+    };
+
     void beat('login', true);
 
     intervalRef.current = window.setInterval(() => {
       void beat('slow_heartbeat', false);
     }, PRESENCE_SLOW_HEARTBEAT_MS);
+
+    window.addEventListener('pointerdown', onActivity, { passive: true });
+    window.addEventListener('keydown', onActivity);
 
     document.addEventListener('visibilitychange', onVisible);
     document.addEventListener('visibilitychange', onHidden);
@@ -208,6 +215,8 @@ export function useSchoolPresence() {
       window.removeEventListener('focus', onVisible);
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
+      window.removeEventListener('pointerdown', onActivity);
+      window.removeEventListener('keydown', onActivity);
       markOffline();
       releaseTabLock(schoolId);
     };

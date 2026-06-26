@@ -37,6 +37,7 @@ import { toast } from "react-hot-toast";
 import { SchoolixChatShell, type ChatShellContact } from "../components/chat/SchoolixChatShell";
 import { useChatBack } from "../hooks/useChatBack";
 import { enterChatMode, leaveChatMode } from "../lib/chatFreezeGuard";
+import { withMessageRetentionFields } from "../lib/dataRetention";
 import { markSystemMessagesRead } from "../lib/chatMessageReads";
 import { markChatPerf, openChatSnapshotListener, recordChatRender, resetChatPerf } from "../lib/chatPerf";
 import {
@@ -422,7 +423,7 @@ export default function TeacherChatTab() {
         setSelectedFile(null);
       }
 
-      await addDoc(collection(db, "system_messages"), {
+      await addDoc(collection(db, "system_messages"), withMessageRetentionFields({
         conversationId: convId,
         schoolId: profile.schoolId,
         senderId: profile.uid,
@@ -435,7 +436,7 @@ export default function TeacherChatTab() {
         fileName,
         createdAt: serverTimestamp(),
         read: false,
-      });
+      }));
 
       // Update conversation document for real-time sorting
       await setDoc(doc(db, "conversations", convId), {

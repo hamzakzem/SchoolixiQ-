@@ -4,6 +4,7 @@
  */
 
 import { db } from './firebase';
+import { retentionField } from './dataRetention';
 import {
   addDoc,
   collection,
@@ -259,6 +260,7 @@ export async function logReminderAudit(entry: Omit<ReminderAuditEntry, 'createdA
     ...entry,
     sentAt: entry.sentAt || serverTimestamp(),
     createdAt: serverTimestamp(),
+    ...retentionField('tuition_reminder_logs'),
   });
 }
 

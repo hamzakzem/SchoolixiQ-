@@ -13,6 +13,7 @@ import { SchoolixChatShell, type ChatShellContact } from '../../components/chat/
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from '../../components/chat/chatAvatars';
 import { useChatBack } from '../../hooks/useChatBack';
 import { enterChatMode, leaveChatMode } from '../../lib/chatFreezeGuard';
+import { withMessageRetentionFields } from '../../lib/dataRetention';
 import { markSystemMessagesRead } from '../../lib/chatMessageReads';
 import { markChatPerf, openChatSnapshotListener, resetChatPerf } from '../../lib/chatPerf';
 import {
@@ -226,7 +227,7 @@ export default function SuperAdminChatTab() {
     const convId = `superadmin_${school.id}`;
     const attachmentLabel = isRtl ? 'ملف مرفق' : 'Attachment';
 
-    await addDoc(collection(db, 'system_messages'), {
+    await addDoc(collection(db, 'system_messages'), withMessageRetentionFields({
       conversationId: convId,
       schoolId: school.id,
       senderId: profile.uid,
@@ -240,7 +241,7 @@ export default function SuperAdminChatTab() {
       fileName: file?.fileName || null,
       createdAt: serverTimestamp(),
       read: false,
-    });
+    }));
 
     await setDoc(
       doc(db, 'conversations', convId),

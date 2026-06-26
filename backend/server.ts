@@ -202,6 +202,9 @@ async function startServer() {
       const db = getDb();
       const user = req.user || {};
       const sanitizedDetails = details ? sanitizeForFirestore(details) : {};
+      const expiresAt = admin.firestore.Timestamp.fromMillis(
+        Date.now() + 90 * 24 * 60 * 60 * 1000,
+      );
       await db.collection('audit_logs').add({
         action,
         performedBy: user.email || 'system',
@@ -210,7 +213,9 @@ async function startServer() {
         ip: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
         userAgent: req.headers['user-agent'],
         details: sanitizedDetails,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt,
       });
     } catch (error) {
       console.error('Audit Log Error:', error);

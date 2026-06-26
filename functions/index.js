@@ -485,3 +485,94 @@ exports.dispatchPendingNotificationPushes = onRequest(
     }
   },
 );
+
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+
+const CLEANUP_BATCH_SIZE = 400;
+const RETENTION_MS = {
+  audit_logs: 90 * 24 * 60 * 60 * 1000,
+  login_logs: 60 * 24 * 60 * 60 * 1000,
+  print_logs: 30 * 24 * 60 * 60 * 1000,
+};
+
+function cleanupLog(event, meta = {}) {
+  console.info(`[CleanupOldFirestoreData] ${event}`, { databaseId: DATABASE_ID, ...meta });
+}
+
+async function deleteQueryBatch(db, queryRef, filterFn) {
+  const snap = await queryRef.limit(CLEANUP_BATCH_SIZE).get();
+  if (snap.empty) return 0;
+  const batch = db.batch();
+  let count = 0;
+  for (const docSnap of snap.docs) {
+    if (filterFn && !filterFn(docSnap)) continue;
+    batch.delete(docSnap.ref);
+    count += 1;
+  }
+  if (count === 0) return 0;
+  await batch.commit();
+  return count;
+}
+
+async function deleteExpiredByField(db, collectionName, fieldName) {
+  const now = Timestamp.now();
+  return deleteQueryBatch(
+    db,
+    db.collection(collectionName).where(fieldName, '<=', now),
+  );
+}
+
+async function deleteOlderThanCreatedAt(db, collectionName, maxAgeMs) {
+  const cutoff = Timestamp.fromMillis(Date.now() - maxAgeMs);
+  return deleteQueryBatch(
+    db,
+    db.collection(collectionName).where('createdAt', '<', cutoff),
+  );
+}
+
+async function runCleanupOldFirestoreData() {
+  const db = getDb();
+  const stats = {};
+
+  stats.audit_logs_expires = await deleteExpiredByField(db, 'audit_logs', 'expiresAt');
+  stats.audit_logs_created = await deleteOlderThanCreatedAt(db, 'audit_logs', RETENTION_MS.audit_logs);
+
+  stats.login_logs_expires = await deleteExpiredByField(db, 'login_logs', 'expiresAt');
+  stats.login_logs_created = await deleteOlderThanCreatedAt(db, 'login_logs', RETENTION_MS.login_logs);
+
+  stats.print_logs_expires = await deleteExpiredByField(db, 'print_logs', 'expiresAt');
+  stats.print_logs_created = await deleteOlderThanCreatedAt(db, 'print_logs', RETENTION_MS.print_logs);
+
+  stats.tuition_reminder_logs = await deleteExpiredByField(db, 'tuition_reminder_logs', 'expiresAt');
+
+  stats.notifications = await deleteExpiredByField(db, 'notifications', 'expiresAt');
+
+  stats.system_messages = await deleteQueryBatch(
+    db,
+    db.collection('system_messages').where('expiresAt', '<=', Timestamp.now()),
+    (docSnap) => {
+      const data = docSnap.data() || {};
+      return data.pinned !== true && data.archived !== true && data.legalHold !== true;
+    },
+  );
+
+  return stats;
+}
+
+exports.cleanupOldFirestoreData = onSchedule(
+  {
+    schedule: '0 3 1 * *',
+    timeZone: 'Asia/Baghdad',
+    region: 'europe-west2',
+  },
+  async () => {
+    cleanupLog('START');
+    try {
+      const stats = await runCleanupOldFirestoreData();
+      cleanupLog('DONE', { stats });
+    } catch (err) {
+      cleanupLog('ERROR', { message: String(err.message || err) });
+      throw err;
+    }
+  },
+);

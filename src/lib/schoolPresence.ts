@@ -1,9 +1,8 @@
 import type { Timestamp } from 'firebase/firestore';
 
-/** Legacy export — prefer PRESENCE_SLOW_HEARTBEAT_MS for interval writes. */
-export const PRESENCE_HEARTBEAT_MS = 60_000;
-/** Max interval between optional presence heartbeats (event-driven writes are primary). */
+/** Legacy export — aliases slow heartbeat (60s interval removed for cost control). */
 export const PRESENCE_SLOW_HEARTBEAT_MS = 12 * 60 * 1000;
+export const PRESENCE_HEARTBEAT_MS = PRESENCE_SLOW_HEARTBEAT_MS;
 export const PRESENCE_OFFLINE_MS = 2 * 60_000;
 export const PRESENCE_RECENT_MS = 15 * 60_000;
 export const PRESENCE_TAB_LOCK_MS = 55_000;

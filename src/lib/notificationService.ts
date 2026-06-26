@@ -3,6 +3,7 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, update
 import { resolveStudentParentIds } from './schoolSync';
 import { resolveNotificationCategoryId } from './notificationCategories';
 import { normalizeNotificationMetadata } from './notificationRouting';
+import { retentionField } from './dataRetention';
 import {
   handleResourceExhausted,
   isQuotaWritePaused,
@@ -114,6 +115,7 @@ function buildNotificationDoc(
     },
     pushDelivery: { status: 'pending' },
     createdAt: serverTimestamp(),
+    ...retentionField('notifications'),
   };
 
   if (senderId) doc.senderId = senderId;
@@ -402,6 +404,14 @@ export const notificationService = {
       console.error('Error deleting notification:', error);
       return false;
     }
+  },
+
+  /**
+   * Delete on user open when safe; returns false if delete failed.
+   */
+  async deleteOnOpen(notificationId: string): Promise<boolean> {
+    if (!notificationId) return false;
+    return this.delete(notificationId);
   },
 
   /**

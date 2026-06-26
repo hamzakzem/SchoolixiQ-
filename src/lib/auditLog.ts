@@ -1,5 +1,6 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { retentionField } from './dataRetention';
 
 export type AuditAction =
   | 'create'
@@ -56,6 +57,7 @@ export async function logAction(input: AuditLogInput): Promise<void> {
       beforeSummary: input.beforeSummary || '',
       afterSummary: input.afterSummary || '',
       createdAt: serverTimestamp(),
+      ...retentionField('audit_logs'),
       // Legacy fields for Super Admin viewer compatibility with server logs
       uid: input.actorId,
       performedBy: input.actorId,

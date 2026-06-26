@@ -8,6 +8,7 @@ import {
   increment,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { retentionField } from "./dataRetention";
 import { printElement } from "./printUtils";
 
 interface PrintOptions {
@@ -62,6 +63,8 @@ export const printService = {
         templateName,
         count,
         timestamp: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        ...retentionField('print_logs'),
       });
     } catch (error) {
       console.error("Failed to log print action. Continuing.", error);

@@ -135,9 +135,32 @@ service cloud.firestore {
         || (signedIn() && userSchoolId() == schoolId && isSchoolManagementRole());
     }
 
+    function isActiveSchoolDoc(school) {
+      return (
+        !school.keys().hasAll(['status'])
+        || !(school.status in ['suspended', 'archived', 'inactive', 'rejected'])
+      ) && (
+        !school.keys().hasAll(['subscriptionStatus'])
+        || !(school.subscriptionStatus in ['expired', 'cancelled', 'suspended'])
+      );
+    }
+
+    function isSchoolOperationallyActive(schoolId) {
+      return schoolId == 'system'
+        || !exists(/databases/$(database)/documents/schools/$(schoolId))
+        || isActiveSchoolDoc(
+          get(/databases/$(database)/documents/schools/$(schoolId)).data
+        );
+    }
+
     function canWriteSchoolData(schoolId) {
       return isSuperAdmin()
-        || (signedIn() && userSchoolId() == schoolId && isSchoolStaffRole());
+        || (
+          signedIn()
+          && userSchoolId() == schoolId
+          && isSchoolStaffRole()
+          && isSchoolOperationallyActive(schoolId)
+        );
     }
 
     function isParentOfStudent(studentId) {
@@ -475,7 +498,13 @@ service cloud.firestore {
     function canWriteSystemMessage() {
       return isSuperAdmin()
         || (signedIn() && hasSchoolId(request.resource.data) && canWriteSchoolData(request.resource.data.schoolId))
-        || (signedIn() && isParent() && hasSchoolId(request.resource.data) && sameSchoolRequest());
+        || (
+          signedIn()
+          && isParent()
+          && hasSchoolId(request.resource.data)
+          && sameSchoolRequest()
+          && isSchoolOperationallyActive(request.resource.data.schoolId)
+        );
     }
 
     function canParentUpdateStudent() {
@@ -887,6 +916,7 @@ service cloud.firestore {
         return hasSchoolId(data)
           && data.keys().hasAll(['userId'])
           && isSchoolNotificationAuthor(data.schoolId)
+          && isSchoolOperationallyActive(data.schoolId)
           && recipientId == data.userId
           && isSameSchoolParentRecipient(recipientId, data.schoolId)
           && (
@@ -904,6 +934,7 @@ service cloud.firestore {
         return hasSchoolId(data)
           && data.keys().hasAll(['userId'])
           && isSchoolNotificationAuthor(data.schoolId)
+          && isSchoolOperationallyActive(data.schoolId)
           && recipientId == data.userId
           && isSameSchoolStaffRecipient(recipientId, data.schoolId);
       }

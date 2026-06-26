@@ -10,10 +10,9 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    // Inline path — cross-service Firestore reads must target the app's named database
-    // (not (default)); see firebase-applet-config.json firestoreDatabaseId.
+    // Cross-service Firestore reads use the project's default database (post-migration).
     function firestoreDatabaseId() {
-      return 'ai-studio-5b7cdad3-1c88-4eed-9aca-523fba814a76';
+      return '(default)';
     }
 
     function firestoreUserPath() {

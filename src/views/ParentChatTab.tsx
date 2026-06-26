@@ -31,6 +31,7 @@ import { SchoolixChatShell, type ChatShellContact } from "../components/chat/Sch
 import { ChatAvatarFrame, DefaultContactAvatar, RoleBadge } from "../components/chat/chatAvatars";
 import { useChatBack } from "../hooks/useChatBack";
 import { enterChatMode, leaveChatMode } from "../lib/chatFreezeGuard";
+import { withMessageRetentionFields } from "../lib/dataRetention";
 import { markSystemMessagesRead } from "../lib/chatMessageReads";
 import { markChatPerf, openChatSnapshotListener, resetChatPerf } from "../lib/chatPerf";
 import {
@@ -365,7 +366,7 @@ export default function ParentChatTab() {
         setSelectedFile(null);
       }
 
-      await addDoc(collection(db, "system_messages"), {
+      await addDoc(collection(db, "system_messages"), withMessageRetentionFields({
         conversationId: convId,
         schoolId: profile.schoolId,
         senderId: profile.uid,
@@ -378,7 +379,7 @@ export default function ParentChatTab() {
         fileName,
         createdAt: serverTimestamp(),
         read: false,
-      });
+      }));
 
       // Update conversation document for real-time sorting
       await setDoc(doc(db, "conversations", convId), {

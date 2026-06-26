@@ -45,6 +45,7 @@ import {
   NotificationCategory 
 } from "../lib/notificationSound";
 import { notificationService } from "../lib/notificationService";
+import { isNotificationSafeToDeleteOnOpen } from "../lib/notificationRetention";
 import {
   filterNotificationsForUser,
   isNotificationVisibleToUser,
@@ -554,8 +555,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     playCategorizedSound(testCategory, soundSettings);
   };
 
-  const handleNotificationClick = async (n: any, openDetailsOnly = false) => {
+  const consumeNotificationOnOpen = async (n: any) => {
+    if (!n?.id) return;
+    if (!isNotificationVisibleToUser(n, viewerContext)) return;
+
+    if (isNotificationSafeToDeleteOnOpen(n)) {
+      const deleted = await notificationService.deleteOnOpen(n.id);
+      if (deleted) return;
+    }
     await handleMarkOneRead(n.id, n.read, n);
+  };
+
+  const handleNotificationClick = async (n: any, openDetailsOnly = false) => {
+    await consumeNotificationOnOpen(n);
 
     if (openDetailsOnly) {
       setSelectedNotification(n);
@@ -581,7 +593,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const handleNotificationAction = async (n: any) => {
     const role = normalizeDashboardRole(userRole, profile?.role);
     const targetTab = resolveNotificationTab(n, role);
-    await handleMarkOneRead(n.id, n.read, n);
+    await consumeNotificationOnOpen(n);
     if (targetTab && activeTabSetter) {
       notificationDiag.clickRoute({ notifId: n.id, targetTab, type: n.type });
       activeTabSetter(targetTab);

@@ -1,5 +1,6 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { retentionField } from './dataRetention';
 import { isLogoutInProgress } from './logoutGuard';
 import {
   handleResourceExhausted,
@@ -52,6 +53,7 @@ export async function writeLoginLog(params: {
       email: params.email ? String(params.email).slice(0, 120) : '',
       userAgentSummary: summarizeUserAgent(),
       createdAt: serverTimestamp(),
+      ...retentionField('login_logs'),
     });
     markWriteThrottled(throttleKey);
   } catch (error) {
