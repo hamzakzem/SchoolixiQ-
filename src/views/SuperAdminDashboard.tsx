@@ -20,6 +20,8 @@ import {
   limit,
 } from "firebase/firestore";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { PartnerLogoPreview } from "../components/admin/PartnerLogoPreview";
+import { sanitizePartnerLogoUrl } from "../lib/footerPartners";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
 import { useNotificationBadges } from "../lib/NotificationBadgeContext";
@@ -413,8 +415,20 @@ export default function SuperAdminDashboard() {
     }
     setIsSavingConfig(true);
     const path = "system/config";
+    const sanitizedConfig = {
+      ...systemConfig,
+      successPartners: (systemConfig.successPartners || []).map((p) => ({
+        ...p,
+        logoUrl: sanitizePartnerLogoUrl(p.logoUrl),
+      })),
+      ourPartners: (systemConfig.ourPartners || []).map((p) => ({
+        ...p,
+        logoUrl: sanitizePartnerLogoUrl(p.logoUrl),
+      })),
+    };
     try {
-      await setDoc(doc(db, "system", "config"), systemConfig, { merge: true });
+      await setDoc(doc(db, "system", "config"), sanitizedConfig, { merge: true });
+      setSystemConfig(sanitizedConfig);
       toast.success("تم تحديث إعدادات النظام");
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
@@ -422,6 +436,25 @@ export default function SuperAdminDashboard() {
     } finally {
       setIsSavingConfig(false);
     }
+  };
+
+  const partnerLogoUploadErrorMessage = (error: unknown): string => {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code?: string }).code)
+        : error instanceof Error
+          ? error.message
+          : "";
+    if (code === "storage/unauthorized" || code === "AUTH_REQUIRED") {
+      return "غير مصرح برفع الصورة — تأكد من تسجيل الدخول كـ Super Admin";
+    }
+    if (code === "INVALID_IMAGE_TYPE") {
+      return "الرجاء اختيار صورة صالحة";
+    }
+    if (code === "FILE_TOO_LARGE") {
+      return "حجم الصورة يجب أن لا يتجاوز 2 ميغابايت";
+    }
+    return "فشل رفع الشعار إلى التخزين. حاول مرة أخرى.";
   };
 
   const handleUploadAppLogo = async (
@@ -463,25 +496,33 @@ export default function SuperAdminDashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      toast.error("الرجاء اختيار صورة صالحة");
+      return;
+    }
+
     if (file.size > 2 * 1024 * 1024) {
       toast.error("حجم الصورة يجب أن لا يتجاوز 2 ميغابايت");
       return;
     }
 
-    const toastId = toast.loading("جاري رفع الصورة...");
+    const toastId = toast.loading("جاري رفع الشعار إلى التخزين...");
     try {
-      // Use local base64 compression instead of external storage to avoid CORS/Storage issues
-      const { compressImageToBase64 } = await import("../lib/image-utils");
-      const base64Url = await compressImageToBase64(file, 200, 200, 0.8);
+      const { uploadFooterPartnerLogo } = await import("../lib/imageUtils");
+      const downloadUrl = await uploadFooterPartnerLogo(
+        file,
+        "success-partners",
+        idx,
+      );
 
       const newPartners = [...systemConfig.successPartners];
-      newPartners[idx].logoUrl = base64Url;
+      newPartners[idx] = { ...newPartners[idx], logoUrl: downloadUrl };
       setSystemConfig({ ...systemConfig, successPartners: newPartners });
 
-      toast.success("تم رفع الصورة بنجاح", { id: toastId });
-    } catch (error: any) {
-      console.error("Error processing partner logo:", error);
-      toast.error("فشل رفع الصورة.", { id: toastId });
+      toast.success("تم رفع الشعار بنجاح", { id: toastId });
+    } catch (error: unknown) {
+      console.error("Error uploading partner logo:", error);
+      toast.error(partnerLogoUploadErrorMessage(error), { id: toastId });
     } finally {
       e.target.value = "";
     }
@@ -494,24 +535,33 @@ export default function SuperAdminDashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      toast.error("الرجاء اختيار صورة صالحة");
+      return;
+    }
+
     if (file.size > 2 * 1024 * 1024) {
       toast.error("حجم الصورة يجب أن لا يتجاوز 2 ميغابايت");
       return;
     }
 
-    const toastId = toast.loading("جاري رفع الصورة...");
+    const toastId = toast.loading("جاري رفع الشعار إلى التخزين...");
     try {
-      const { compressImageToBase64 } = await import("../lib/image-utils");
-      const base64Url = await compressImageToBase64(file, 200, 200, 0.8);
+      const { uploadFooterPartnerLogo } = await import("../lib/imageUtils");
+      const downloadUrl = await uploadFooterPartnerLogo(
+        file,
+        "our-partners",
+        idx,
+      );
 
       const newPartners = [...(systemConfig.ourPartners || [])];
-      newPartners[idx].logoUrl = base64Url;
+      newPartners[idx] = { ...newPartners[idx], logoUrl: downloadUrl };
       setSystemConfig({ ...systemConfig, ourPartners: newPartners });
 
-      toast.success("تم رفع الصورة بنجاح", { id: toastId });
-    } catch (error: any) {
-      console.error("Error processing our partner logo:", error);
-      toast.error("فشل رفع الصورة.", { id: toastId });
+      toast.success("تم رفع الشعار بنجاح", { id: toastId });
+    } catch (error: unknown) {
+      console.error("Error uploading our partner logo:", error);
+      toast.error(partnerLogoUploadErrorMessage(error), { id: toastId });
     } finally {
       e.target.value = "";
     }
@@ -3930,10 +3980,17 @@ export default function SuperAdminDashboard() {
                                     type="url"
                                     value={partner.logoUrl}
                                     onChange={(e) => {
+                                      const value = e.target.value;
+                                      if (/^data:/i.test(value.trim())) {
+                                        toast.error(
+                                          "لا يمكن حفظ صورة base64 — استخدم رفع الصورة أو رابط https",
+                                        );
+                                        return;
+                                      }
                                       const newPartners = [
                                         ...systemConfig.successPartners,
                                       ];
-                                      newPartners[idx].logoUrl = e.target.value;
+                                      newPartners[idx].logoUrl = value;
                                       setSystemConfig({
                                         ...systemConfig,
                                         successPartners: newPartners,
@@ -3957,22 +4014,10 @@ export default function SuperAdminDashboard() {
                                     </label>
                                   </div>
                                 </div>
-                                {partner.logoUrl && (
-                                  <div className="w-12 h-12 bg-white border border-slate-200 rounded-xl flex items-center justify-center shrink-0 p-1">
-                                    <img
-                                      src={partner.logoUrl || undefined}
-                                      alt="prev"
-                                      className="max-w-full max-h-full object-contain"
-                                      onError={(e) =>
-                                        (e.currentTarget.style.display = "none")
-                                      }
-                                      onLoad={(e) =>
-                                        (e.currentTarget.style.display =
-                                          "block")
-                                      }
-                                    />
-                                  </div>
-                                )}
+                                <PartnerLogoPreview
+                                  logoUrl={partner.logoUrl}
+                                  name={partner.name}
+                                />
                               </div>
                             </div>
                             <div>
@@ -4153,10 +4198,17 @@ export default function SuperAdminDashboard() {
                                     type="url"
                                     value={partner.logoUrl}
                                     onChange={(e) => {
+                                      const value = e.target.value;
+                                      if (/^data:/i.test(value.trim())) {
+                                        toast.error(
+                                          "لا يمكن حفظ صورة base64 — استخدم رفع الصورة أو رابط https",
+                                        );
+                                        return;
+                                      }
                                       const newOurPartners = [
                                         ...(systemConfig.ourPartners || []),
                                       ];
-                                      newOurPartners[idx].logoUrl = e.target.value;
+                                      newOurPartners[idx].logoUrl = value;
                                       setSystemConfig({
                                         ...systemConfig,
                                         ourPartners: newOurPartners,
@@ -4180,22 +4232,11 @@ export default function SuperAdminDashboard() {
                                     </label>
                                   </div>
                                 </div>
-                                {partner.logoUrl && (
-                                  <div className="w-12 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full overflow-hidden flex items-center justify-center shrink-0 p-1">
-                                    <img
-                                      src={partner.logoUrl || undefined}
-                                      alt="prev"
-                                      className="w-full h-full object-cover rounded-full"
-                                      onError={(e) =>
-                                        (e.currentTarget.style.display = "none")
-                                      }
-                                      onLoad={(e) =>
-                                        (e.currentTarget.style.display =
-                                          "block")
-                                      }
-                                    />
-                                  </div>
-                                )}
+                                <PartnerLogoPreview
+                                  logoUrl={partner.logoUrl}
+                                  name={partner.name}
+                                  className="w-12 h-12 rounded-full"
+                                />
                               </div>
                             </div>
                           </div>

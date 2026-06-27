@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import {
+  isHttpLogoUrl,
   PARTNER_DESCRIPTION_FALLBACK,
   type FooterPartner,
 } from '../lib/footerPartners';
@@ -21,7 +22,7 @@ function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
   const [logoFailed, setLogoFailed] = useState(false);
   const description = partner.description?.trim() || PARTNER_DESCRIPTION_FALLBACK;
   const title = partner.name || 'شريك';
-  const showLogo = Boolean(partner.logoUrl) && !logoFailed;
+  const showLogo = isHttpLogoUrl(partner.logoUrl) && !logoFailed;
   const initial = title.trim().charAt(0) || 'ش';
 
   const logoBlock = (

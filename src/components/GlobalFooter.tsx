@@ -6,6 +6,7 @@ import { useSystemConfig } from "../lib/SystemConfigContext";
 import { resolveAppLogoSrc } from "../lib/brandAssets";
 import {
   excludePartnersByLogo,
+  isHttpLogoUrl,
   normalizeFeaturedSchoolPartners,
   normalizeOurPartners,
   normalizeSuccessPartners,
@@ -84,7 +85,7 @@ function PartnerLogoCircle({
   sizeClass?: string;
 }) {
   const [logoFailed, setLogoFailed] = useState(false);
-  const showLogo = Boolean(partner.logoUrl) && !logoFailed;
+  const showLogo = isHttpLogoUrl(partner.logoUrl) && !logoFailed;
   const initial = (partner.name || "؟").trim().charAt(0) || "؟";
 
   const image = (

@@ -14,6 +14,17 @@ function safeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+/** Only Firebase Storage / external HTTPS URLs — never base64/data URIs. */
+export function isHttpLogoUrl(url: string | undefined | null): boolean {
+  const value = safeString(url);
+  if (!value || /^data:/i.test(value)) return false;
+  return /^https?:\/\//i.test(value);
+}
+
+export function sanitizePartnerLogoUrl(url: string | undefined | null): string {
+  return isHttpLogoUrl(url) ? safeString(url) : '';
+}
+
 type RawPartner = {
   name?: string;
   title?: string;
@@ -29,12 +40,12 @@ type RawPartner = {
 };
 
 function resolvePartnerLogoUrl(partner: RawPartner): string {
-  return (
+  const raw =
     safeString(partner.logoUrl) ||
     safeString(partner.logo) ||
     safeString(partner.image) ||
-    safeString(partner.imageUrl)
-  );
+    safeString(partner.imageUrl);
+  return sanitizePartnerLogoUrl(raw);
 }
 
 function resolvePartnerName(partner: RawPartner): string {
@@ -95,7 +106,11 @@ export function normalizeOurPartners(partners?: RawPartner[] | null): FooterPart
   if (!Array.isArray(partners)) return [];
   return partners
     .map((partner, idx) => mapFooterPartner(partner, idx, 'our'))
-    .filter((partner) => partner.active !== false && partner.logoUrl.length > 0);
+    .filter(
+      (partner) =>
+        partner.active !== false &&
+        (partner.logoUrl.length > 0 || partner.name.length > 0),
+    );
 }
 
 /** Legacy display path: featured active schools (Super Admin star = شركاء النجاح). */

@@ -275,6 +275,40 @@ export async function uploadStudentPhoto(
   return uploadImageViaStorageOrServer(file, path, 400, 400);
 }
 
+export type FooterPartnerLogoKind = 'success-partners' | 'our-partners';
+
+/** Public footer partner logo — readable without auth (storage.rules). */
+export function buildFooterPartnerLogoPath(
+  kind: FooterPartnerLogoKind,
+  index: number,
+  filename: string,
+  mimeType?: string,
+): string {
+  const ext = resolveImageExtension(filename, mimeType);
+  const safeIndex = Math.max(0, Number(index) || 0);
+  return `public/footer/${kind}/partner_${safeIndex}_${Date.now()}${ext}`;
+}
+
+/** Upload footer partner logo to Firebase Storage; returns HTTPS download URL only. */
+export async function uploadFooterPartnerLogo(
+  file: File,
+  kind: FooterPartnerLogoKind,
+  index: number,
+): Promise<string> {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('INVALID_IMAGE_TYPE');
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    throw new Error('FILE_TOO_LARGE');
+  }
+  const path = buildFooterPartnerLogoPath(kind, index, file.name, file.type);
+  const url = await uploadImageViaStorageOrServer(file, path, 400, 400);
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error('INVALID_DOWNLOAD_URL');
+  }
+  return url;
+}
+
 export const uploadImageToServer = async (
   file: File,
   storagePath: string,

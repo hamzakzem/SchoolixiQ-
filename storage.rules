@@ -164,6 +164,19 @@ service firebase.storage {
         && userRole() in ['admin', 'school_admin', 'assistant', 'staff', 'superadmin', 'super_admin'];
     }
 
+    // Public footer partner logos (Super Admin upload, public read)
+    match /public/footer/success-partners/{fileName} {
+      allow read: if true;
+      allow write: if isSuperAdmin()
+        && isAllowedImageUpload(fileName, 2 * 1024 * 1024);
+    }
+
+    match /public/footer/our-partners/{fileName} {
+      allow read: if true;
+      allow write: if isSuperAdmin()
+        && isAllowedImageUpload(fileName, 2 * 1024 * 1024);
+    }
+
     match /system/{allPaths=**} {
       allow read: if true;
       allow write: if isSuperAdmin();
