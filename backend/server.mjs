@@ -522,9 +522,47 @@ var getDb = () => {
   }
   return getFirestore(admin.app(), dbId || "(default)");
 };
+var MIN_CRON_SECRET_LEN = 32;
+function isProductionEnv() {
+  return process.env.NODE_ENV === "production";
+}
+function redactEmail(email) {
+  if (!email) return "[no-email]";
+  if (!isProductionEnv()) return email;
+  const at = email.indexOf("@");
+  if (at <= 0) return "[redacted]";
+  return `${email.slice(0, Math.min(2, at))}***${email.slice(at)}`;
+}
+function redactUid(uid) {
+  if (!uid) return "[no-uid]";
+  if (!isProductionEnv()) return uid;
+  if (uid.length <= 10) return "[redacted-uid]";
+  return `${uid.slice(0, 6)}\u2026${uid.slice(-4)}`;
+}
+function resolveCronSecret(...candidates) {
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim();
+    if (!trimmed) continue;
+    if (isProductionEnv() && trimmed.length < MIN_CRON_SECRET_LEN) continue;
+    return trimmed;
+  }
+  return null;
+}
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3e3;
+  if (isProductionEnv()) {
+    if (!resolveCronSecret(process.env.TUITION_CRON_SECRET, process.env.CRON_SECRET)) {
+      console.error(
+        `[SECURITY] Production requires TUITION_CRON_SECRET or CRON_SECRET (min ${MIN_CRON_SECRET_LEN} chars). Tuition cron endpoint will reject all requests.`
+      );
+    }
+    if (!resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET)) {
+      console.error(
+        `[SECURITY] Production requires NOTIFICATION_CRON_SECRET or CRON_SECRET (min ${MIN_CRON_SECRET_LEN} chars). Push dispatch cron will reject all requests.`
+      );
+    }
+  }
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     const allowedOrigins = [
@@ -617,6 +655,9 @@ async function startServer() {
       const db = getDb();
       const user = req.user || {};
       const sanitizedDetails = details ? sanitizeForFirestore(details) : {};
+      const expiresAt = admin.firestore.Timestamp.fromMillis(
+        Date.now() + 90 * 24 * 60 * 60 * 1e3
+      );
       await db.collection("audit_logs").add({
         action,
         performedBy: user.email || "system",
@@ -625,15 +666,23 @@ async function startServer() {
         ip: req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress,
         userAgent: req.headers["user-agent"],
         details: sanitizedDetails,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt
       });
     } catch (error) {
       console.error("Audit Log Error:", error);
     }
   };
   const getBootstrapAdmins = () => {
-    const admins = process.env.BOOTSTRAP_ADMIN_EMAILS || "hamzakazem1999@gmail.com";
-    return admins.toLowerCase().split(",").map((e) => e.trim());
+    const raw = process.env.BOOTSTRAP_ADMIN_EMAILS?.trim();
+    if (!raw) {
+      if (isProductionEnv()) {
+        console.warn("[SECURITY] BOOTSTRAP_ADMIN_EMAILS unset in production \u2014 bootstrap super-admin disabled.");
+      }
+      return [];
+    }
+    return raw.toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
   };
   const syncUserClaims = async (uid, role, schoolId, permissions) => {
     try {
@@ -647,13 +696,13 @@ async function startServer() {
       };
       const claimsStr = JSON.stringify(claims);
       if (Buffer.byteLength(claimsStr, "utf8") > 900) {
-        console.warn(`[SECURITY] Custom claims size (${Buffer.byteLength(claimsStr, "utf8")} bytes) exceeds limit for UID: ${uid}. Stripping nested permissions 'p' to avoid claims exception.`);
+        console.warn(`[SECURITY] Custom claims size (${Buffer.byteLength(claimsStr, "utf8")} bytes) exceeds limit for UID: ${redactUid(uid)}. Stripping nested permissions 'p' to avoid claims exception.`);
         claims.p = null;
       }
       await admin.auth().setCustomUserClaims(uid, claims);
-      console.log(`Claims synced for user ${uid}: role=${role}, sv=${securityVersion}`);
+      console.log(`Claims synced for user ${redactUid(uid)}: role=${role}, sv=${securityVersion}`);
     } catch (error) {
-      console.error(`Error setting claims for user ${uid}:`, error);
+      console.error(`Error setting claims for user ${redactUid(uid)}:`, error);
     }
   };
   const verifyAdmin = async (req, res, next) => {
@@ -1073,7 +1122,7 @@ async function startServer() {
         }
       }
       const emailLower = email.toLowerCase().trim();
-      console.log(`Creating user: ${emailLower}, role: ${role}`);
+      console.log(`Creating user: ${redactEmail(emailLower)}, role: ${role}`);
       const db = getDb();
       let uid = "";
       let isExistingUser = false;
@@ -1081,7 +1130,7 @@ async function startServer() {
       try {
         const existingUser = await admin.auth().getUserByEmail(emailLower);
         uid = existingUser.uid;
-        console.log(`User already exists in Auth: ${uid}`);
+        console.log(`User already exists in Auth: ${redactUid(uid)}`);
         const userDoc = await db.collection("users").doc(uid).get();
         if (userDoc.exists) {
           isExistingUser = true;
@@ -1112,13 +1161,13 @@ async function startServer() {
           const hasPassword = existingUser.providerData.some((p) => p.providerId === "password");
           if (!hasPassword) {
             updateParams.password = crypto.randomBytes(16).toString("hex") + "SecureP1!";
-            console.log(`Setting dynamic random password for existing Google user: ${uid}`);
+            console.log(`Setting dynamic random password for existing Google user: ${redactUid(uid)}`);
           }
         }
         if (displayName) updateParams.displayName = displayName;
         if (Object.keys(updateParams).length > 1 || updateParams.emailVerified) {
           await admin.auth().updateUser(uid, updateParams);
-          console.log(`Updated existing Auth user: ${uid}, verified: true, hasPasswordUpd: ${!!updateParams.password}`);
+          console.log(`Updated existing Auth user: ${redactUid(uid)}, verified: true, hasPasswordUpd: ${!!updateParams.password}`);
         }
       } catch (authError) {
         if (authError.code === "auth/user-not-found") {
@@ -1131,7 +1180,7 @@ async function startServer() {
             emailVerified: true
           });
           uid = userRecord.uid;
-          console.log(`Created new Auth user: ${uid}, email: ${emailLower}`);
+          console.log(`Created new Auth user: ${redactUid(uid)}, email: ${redactEmail(emailLower)}`);
         } else {
           throw authError;
         }
@@ -1323,9 +1372,9 @@ async function startServer() {
         await admin.auth().deleteUser(uid);
       } catch (authError) {
         if (authError.code === "auth/user-not-found") {
-          console.log(`User ${uid} already removed from Auth.`);
+          console.log(`User ${redactUid(uid)} already removed from Auth.`);
         } else {
-          console.warn(`Failed to delete user ${uid} from Auth:`, authError.message);
+          console.warn(`Failed to delete user ${redactUid(uid)} from Auth:`, authError.message);
         }
       }
       await db.collection("users").doc(uid).delete();
@@ -1554,7 +1603,7 @@ async function startServer() {
     }
   });
   app.post("/api/internal/tuition-reminders/run", express.json(), async (req, res) => {
-    const secret = process.env.TUITION_CRON_SECRET || process.env.CRON_SECRET;
+    const secret = resolveCronSecret(process.env.TUITION_CRON_SECRET, process.env.CRON_SECRET);
     if (!secret || req.headers["x-cron-secret"] !== secret) {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
@@ -1594,7 +1643,7 @@ async function startServer() {
     }
   });
   app.post("/api/internal/notifications/push-dispatch", express.json(), async (req, res) => {
-    const secret = process.env.NOTIFICATION_CRON_SECRET || process.env.CRON_SECRET;
+    const secret = resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET);
     if (!secret || req.headers["x-cron-secret"] !== secret) {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
@@ -1669,13 +1718,13 @@ async function startServer() {
     } catch (e) {
       console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
     }
-    const isProductionEnv = process.env.NODE_ENV === "production";
+    const isProductionEnv2 = process.env.NODE_ENV === "production";
     const isDevUrl = process.env.APP_URL && (process.env.APP_URL.includes("-dev-") || process.env.APP_URL.includes("localhost") || process.env.APP_URL.includes("127.0.0.1"));
     if (process.env.APP_URL) {
       try {
         const db = getDb();
         const appUrlClean = process.env.APP_URL.replace(/\/$/, "");
-        if (isProductionEnv && !isDevUrl) {
+        if (isProductionEnv2 && !isDevUrl) {
           await db.collection("system").doc("config").set({
             appUrl: appUrlClean,
             appUrlProd: appUrlClean
