@@ -207,14 +207,7 @@ export default function Payroll() {
   const generateMonthlyPayroll = async () => {
     if (!profile?.schoolId) return;
 
-    // Removed mandatory email verification check for preview ease
-    // Rule level security still applies
-    /*
-    if (auth.currentUser && !auth.currentUser.emailVerified && auth.currentUser.email?.toLowerCase() !== 'hamzakazem1999@gmail.com') {
-      toast.error('يجب تفعيل البريد الإلكتروني أولاً للقيام بهذه العملية الأمنية');
-      return;
-    }
-    */
+    // Rule level security still applies via Firestore rules and role checks.
 
     setLoading(true);
     try {

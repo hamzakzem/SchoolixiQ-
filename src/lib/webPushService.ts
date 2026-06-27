@@ -66,7 +66,7 @@ export type WebPushRegistrationResult = {
     | 'sw_failed';
 };
 
-export type VapidKeySource = 'env_fcm' | 'env_firebase' | 'localStorage' | 'runtime_json' | 'none';
+export type VapidKeySource = 'env_fcm' | 'env_firebase' | 'runtime_json' | 'none';
 
 export type WebPushDiagnosticState = {
   vapidConfigured: boolean;
@@ -96,12 +96,6 @@ function readSyncVapidKey(): { key?: string; source: VapidKeySource } {
   const fromFirebase = import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim();
   if (fromFirebase) {
     return { key: fromFirebase, source: 'env_firebase' };
-  }
-
-  const fromStorage =
-    typeof localStorage !== 'undefined' ? localStorage.getItem('VITE_FCM_VAPID_KEY')?.trim() : undefined;
-  if (fromStorage) {
-    return { key: fromStorage, source: 'localStorage' };
   }
 
   return { source: 'none' };

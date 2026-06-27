@@ -439,15 +439,15 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
 
   const handlePrint = () => {
     if (!printRef.current) return;
-    const content = printRef.current.innerHTML;
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`
-      <html dir="rtl"><head><title>${isRtl ? 'سجل الحضور' : 'Attendance'}</title>
-      <style>body{font-family:sans-serif;padding:24px} .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-      .card{border:1px solid #e2e8f0;padding:12px;border-radius:12px}</style></head>
-      <body>${content}</body></html>
-    `);
+    win.document.title = isRtl ? 'سجل الحضور' : 'Attendance';
+    const style = win.document.createElement('style');
+    style.textContent =
+      'body{font-family:sans-serif;padding:24px} .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px} .card{border:1px solid #e2e8f0;padding:12px;border-radius:12px}';
+    win.document.head.appendChild(style);
+    win.document.body.dir = 'rtl';
+    win.document.body.appendChild(printRef.current.cloneNode(true));
     win.document.close();
     win.print();
   };
