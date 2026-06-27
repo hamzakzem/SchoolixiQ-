@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import {
   Users,
   UserRound,
@@ -67,6 +67,38 @@ import {
   ADMIN_ITEM_SECTIONS,
   type DashboardMenuItem,
 } from "../lib/dashboardMenu";
+import GlobalSearch from "../components/GlobalSearch";
+import { TabLoadingFallback } from "../components/ui/TabLoadingFallback";
+import { invokeChatBack } from "../lib/chatUiBridge";
+import { useLanguage } from "../lib/LanguageContext";
+import { useSystemConfig } from "../lib/SystemConfigContext";
+
+const Overview = lazy(() => import("./admin/Overview"));
+const StudentsList = lazy(() => import("./admin/StudentsList"));
+const StaffList = lazy(() => import("./admin/StaffList"));
+const Attendance = lazy(() => import("./admin/Attendance"));
+const EvaluationReports = lazy(() => import("./admin/EvaluationReports"));
+const AdvancedReports = lazy(() => import("./admin/AdvancedReports"));
+const Homework = lazy(() => import("./admin/Homework"));
+const Grades = lazy(() => import("./admin/Grades"));
+const StudentArchive = lazy(() => import("./admin/StudentArchive"));
+const Marketplace = lazy(() => import("./admin/Marketplace"));
+const Payroll = lazy(() => import("./admin/Payroll"));
+const Inventory = lazy(() => import("./admin/Inventory"));
+const SettingsView = lazy(() => import("./admin/SettingsView"));
+const Announcements = lazy(() => import("./admin/Announcements"));
+const IdCards = lazy(() => import("./admin/IdCards"));
+const Tuition = lazy(() => import("./admin/Tuition"));
+const TuitionReminderDashboard = lazy(() => import("./admin/TuitionReminderDashboard"));
+const Behavior = lazy(() => import("./admin/Behavior"));
+const ParentsList = lazy(() => import("./admin/ParentsList"));
+const Classes = lazy(() => import("./admin/Classes"));
+const Schedules = lazy(() => import("./admin/Schedules"));
+const AssistantsManagement = lazy(() => import("./admin/AssistantsManagement"));
+const DismissalMonitor = lazy(() => import("./admin/DismissalMonitor"));
+const AdminChatTab = lazy(() => import("./admin/AdminChatTab"));
+const AuditLogsViewer = lazy(() => import("./admin/AuditLogsViewer"));
+const RecycleBin = lazy(() => import("./admin/RecycleBin"));
 
 const DEFAULT_PACKAGES = [
   {
@@ -118,39 +150,6 @@ const DEFAULT_PACKAGES = [
     ],
   },
 ];
-
-// Sub-views
-import Overview from "./admin/Overview";
-import StudentsList from "./admin/StudentsList";
-import StaffList from "./admin/StaffList";
-import Attendance from "./admin/Attendance";
-import EvaluationReports from "./admin/EvaluationReports";
-import AdvancedReports from "./admin/AdvancedReports";
-import Homework from "./admin/Homework";
-import Grades from "./admin/Grades";
-import StudentArchive from "./admin/StudentArchive";
-import Marketplace from "./admin/Marketplace";
-import Payroll from "./admin/Payroll";
-import Inventory from "./admin/Inventory";
-import SettingsView from "./admin/SettingsView";
-import Announcements from "./admin/Announcements";
-import IdCards from "./admin/IdCards";
-import Tuition from "./admin/Tuition";
-import TuitionReminderDashboard from "./admin/TuitionReminderDashboard";
-import Behavior from "./admin/Behavior";
-import ParentsList from "./admin/ParentsList";
-import Classes from "./admin/Classes";
-import Schedules from "./admin/Schedules";
-import AssistantsManagement from "./admin/AssistantsManagement";
-import DismissalMonitor from "./admin/DismissalMonitor";
-import AdminChatTab from "./admin/AdminChatTab";
-import { invokeChatBack } from "../lib/chatUiBridge";
-import AuditLogsViewer from "./admin/AuditLogsViewer";
-import RecycleBin from "./admin/RecycleBin";
-import GlobalSearch from "../components/GlobalSearch";
-
-import { useLanguage } from "../lib/LanguageContext";
-import { useSystemConfig } from "../lib/SystemConfigContext";
 
 export default function AdminDashboard() {
   const { t, isRtl, language, setLanguage } = useLanguage();
@@ -1372,7 +1371,9 @@ export default function AdminDashboard() {
               }
               {...pageTransitionProps(activeTab === "chat")}
             >
-              {renderContent()}
+              <Suspense fallback={<TabLoadingFallback />}>
+                {renderContent()}
+              </Suspense>
             </motion.div>
           </AnimatePresence>
 
