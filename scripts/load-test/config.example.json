@@ -1,0 +1,19 @@
+{
+  "environment": "staging",
+  "firebaseProjectId": "yala-safari-iq",
+  "firestoreDatabaseId": "(default)",
+  "apiKey": "YOUR_FIREBASE_WEB_API_KEY",
+  "baseUrl": "https://yala-safari-iq.web.app",
+  "backendUrl": "https://yala-safari-iq.web.app",
+  "testPassword": "LoadTest!SchoolixIQ2026",
+  "skipWrites": true,
+  "disableFcm": true,
+  "budgetUsd": 50,
+  "serviceAccountPath": "../path-to-service-account.json",
+  "notes": {
+    "environment": "Use staging unless you have a dedicated staging Firebase project. production requires --confirm-production on CLI.",
+    "emails": "All test users use @schoolixiq-loadtest.invalid — never real parent/teacher emails.",
+    "fcm": "disableFcm:true — notifications are created with pushDelivery.status=skipped for load tests.",
+    "configLocal": "Copy this file to config.local.json (gitignored)."
+  }
+}
