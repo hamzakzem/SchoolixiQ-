@@ -74,7 +74,13 @@ export const SystemConfigProvider = ({ children }: { children: React.ReactNode }
     try {
       const cached = localStorage.getItem('schoolixiq_system_config');
       if (cached) {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached) as Partial<SystemConfig>;
+        return {
+          ...defaultSystemConfig,
+          ...parsed,
+          successPartners: Array.isArray(parsed.successPartners) ? parsed.successPartners : [],
+          ourPartners: Array.isArray(parsed.ourPartners) ? parsed.ourPartners : [],
+        };
       }
     } catch (e) {
       console.warn("Error reading cached system config:", e);

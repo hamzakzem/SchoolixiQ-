@@ -83,15 +83,27 @@ function PartnerLogoCircle({
   partner: FooterPartner;
   sizeClass?: string;
 }) {
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showLogo = Boolean(partner.logoUrl) && !logoFailed;
+  const initial = (partner.name || "؟").trim().charAt(0) || "؟";
+
   const image = (
     <div
       className={`${sizeClass} rounded-full border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center justify-center p-1.5 overflow-hidden hover:border-blue-500/60 dark:hover:border-blue-500/60 transition-all duration-300`}
     >
-      <img
-        src={partner.logoUrl}
-        alt={partner.name || "Partner"}
-        className="w-full h-full object-cover rounded-full"
-      />
+      {showLogo ? (
+        <img
+          src={partner.logoUrl}
+          alt={partner.name || "Partner"}
+          className="w-full h-full object-cover rounded-full"
+          loading="lazy"
+          onError={() => setLogoFailed(true)}
+        />
+      ) : (
+        <span className="text-sm font-black text-sx-primary dark:text-sx-accent" aria-hidden="true">
+          {initial}
+        </span>
+      )}
     </div>
   );
 
@@ -156,7 +168,13 @@ function CompactPartnerRow({
   );
 }
 
-export function GlobalFooter({ compact = false }: { compact?: boolean }) {
+export function GlobalFooter({
+  compact = false,
+  showPartnerSections = true,
+}: {
+  compact?: boolean;
+  showPartnerSections?: boolean;
+}) {
   const isCompact = compact === true;
   const { config } = useSystemConfig();
   const [featuredSchoolPartners, setFeaturedSchoolPartners] = useState<
@@ -207,7 +225,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
   ]);
 
   useEffect(() => {
-    if (isCompact || successPartners.length > 0) {
+    if (isCompact || successPartners.length > 0 || !showPartnerSections) {
       setFeaturedSchoolPartners([]);
       return;
     }
@@ -254,7 +272,10 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isCompact, successPartners.length]);
+  }, [isCompact, successPartners.length, showPartnerSections]);
+
+  const showSuccessBlock = showPartnerSections && premiumSuccessPartners.length > 0 && premiumSource;
+  const showOurBlock = showPartnerSections && premiumOurPartners.length > 0;
 
   if (isCompact) {
     return (
@@ -265,16 +286,20 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
         <div className="max-w-7xl mx-auto px-6">
           <div className="w-full h-px bg-slate-200/20 dark:bg-slate-800/25 mb-3" />
 
-          <CompactPartnerRow
-            partners={successPartners}
-            label="شركاء النجاح"
-            reason="compact-footer-mode"
-          />
-          <CompactPartnerRow
-            partners={ourPartners}
-            label="شركاؤنا"
-            reason="compact-footer-mode"
-          />
+          {showPartnerSections && (
+            <>
+              <CompactPartnerRow
+                partners={successPartners}
+                label="شركاء النجاح"
+                reason="compact-footer-mode"
+              />
+              <CompactPartnerRow
+                partners={ourPartners}
+                label="شركاؤنا"
+                reason="compact-footer-mode"
+              />
+            </>
+          )}
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
             <span className="text-[10px] md:text-xs font-semibold text-slate-400 dark:text-slate-500 select-none">
@@ -311,7 +336,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
             </div>
           )}
 
-        {premiumSuccessPartners.length > 0 && premiumSource && (
+        {showSuccessBlock && (
           <SuccessPartnersSection
             partners={premiumSuccessPartners}
             source={premiumSource}
@@ -319,7 +344,7 @@ export function GlobalFooter({ compact = false }: { compact?: boolean }) {
           />
         )}
 
-        {premiumOurPartners.length > 0 && (
+        {showOurBlock && (
           <SuccessPartnersSection
             partners={premiumOurPartners}
             source="config"

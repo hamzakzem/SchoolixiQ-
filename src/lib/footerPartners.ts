@@ -68,7 +68,9 @@ export function normalizeSuccessPartners(partners?: RawPartner[] | null): Footer
   if (!Array.isArray(partners)) return [];
   const mapped = partners.map((partner, idx) => mapFooterPartner(partner, idx, 'success'));
   const filtered = mapped.filter(
-    (partner) => partner.active !== false && partner.logoUrl.length > 0,
+    (partner) =>
+      partner.active !== false &&
+      (partner.logoUrl.length > 0 || partner.name.length > 0),
   );
 
   if (import.meta.env.DEV && partners.length > 0) {
@@ -76,7 +78,7 @@ export function normalizeSuccessPartners(partners?: RawPartner[] | null): Footer
       rawCount: partners.length,
       normalizedCount: filtered.length,
       dropped: mapped
-        .filter((partner) => partner.active === false || partner.logoUrl.length === 0)
+        .filter((partner) => partner.active === false || (partner.logoUrl.length === 0 && partner.name.length === 0))
         .map((partner) => ({
           name: partner.name,
           hasLogo: partner.logoUrl.length > 0,

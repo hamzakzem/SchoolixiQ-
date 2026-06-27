@@ -380,7 +380,9 @@ export default function LandingPage() {
   }, [config.featureCards]);
 
   const showTestimonials = config.showTestimonials && config.testimonials.length > 0;
-  const showPartners = config.showPartners || hasConfiguredFooterPartners(systemConfig);
+  /** Super Admin footer partners always show when configured; landing toggle is an extra gate only when empty. */
+  const showPartnerSections =
+    hasConfiguredFooterPartners(systemConfig) || config.showPartners !== false;
   const popularIndex = pricingPlans.findIndex((p: any) => p.isPopular);
 
   if (loading) {
@@ -841,7 +843,7 @@ export default function LandingPage() {
             {config.footerMarketingText}
           </div>
         )}
-        {showPartners && <GlobalFooter compact={false} />}
+        <GlobalFooter compact={false} showPartnerSections={showPartnerSections} />
       </footer>
     </div>
   );

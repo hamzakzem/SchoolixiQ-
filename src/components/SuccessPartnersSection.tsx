@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import {
@@ -18,19 +18,29 @@ function gridClassForCount(count: number): string {
 }
 
 function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
+  const [logoFailed, setLogoFailed] = useState(false);
   const description = partner.description?.trim() || PARTNER_DESCRIPTION_FALLBACK;
   const title = partner.name || 'شريك';
+  const showLogo = Boolean(partner.logoUrl) && !logoFailed;
+  const initial = title.trim().charAt(0) || 'ش';
 
   const logoBlock = (
     <div className="partner-logo-wrap relative mx-auto mb-6 shrink-0">
       <div className="partner-logo-ring" aria-hidden="true" />
       <div className="partner-logo-inner">
-        <img
-          src={partner.logoUrl}
-          alt={title}
-          className="partner-logo-image"
-          loading="lazy"
-        />
+        {showLogo ? (
+          <img
+            src={partner.logoUrl}
+            alt={title}
+            className="partner-logo-image"
+            loading="lazy"
+            onError={() => setLogoFailed(true)}
+          />
+        ) : (
+          <span className="text-2xl font-black text-[#0B2345] dark:text-[#D4AF37]" aria-hidden="true">
+            {initial}
+          </span>
+        )}
       </div>
     </div>
   );
