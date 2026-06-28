@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Check, Trash2 } from 'lucide-react';
-import { isCriticalNotification } from '../lib/notificationRetention';
+import { canManuallyDeleteNotification } from '../lib/notificationRetention';
 
 const SWIPE_THRESHOLD = 72;
 const MAX_DRAG = 96;
@@ -9,6 +9,7 @@ type NotificationSwipeCardProps = {
   notification: Record<string, unknown>;
   isArabic: boolean;
   enableSwipe: boolean;
+  userRole?: string;
   onMarkRead: () => void;
   onDelete: () => void;
   onCriticalDeleteBlocked: () => void;
@@ -19,6 +20,7 @@ export const NotificationSwipeCard: React.FC<NotificationSwipeCardProps> = ({
   notification,
   isArabic,
   enableSwipe,
+  userRole,
   onMarkRead,
   onDelete,
   onCriticalDeleteBlocked,
@@ -29,7 +31,7 @@ export const NotificationSwipeCard: React.FC<NotificationSwipeCardProps> = ({
   const startXRef = useRef(0);
   const startYRef = useRef(0);
   const lockedRef = useRef<'horizontal' | 'vertical' | null>(null);
-  const isCritical = isCriticalNotification(notification);
+  const isDeletable = canManuallyDeleteNotification(notification, userRole);
 
   const reset = () => {
     setOffsetX(0);
@@ -67,10 +69,10 @@ export const NotificationSwipeCard: React.FC<NotificationSwipeCardProps> = ({
       if (offsetX >= SWIPE_THRESHOLD) {
         onMarkRead();
       } else if (offsetX <= -SWIPE_THRESHOLD) {
-        if (isCritical) {
-          onCriticalDeleteBlocked();
-        } else {
+        if (isDeletable) {
           onDelete();
+        } else {
+          onCriticalDeleteBlocked();
         }
       }
     }

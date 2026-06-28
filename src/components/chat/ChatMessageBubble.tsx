@@ -9,8 +9,13 @@ import {
   MoreHorizontal,
   Paperclip,
   Star,
+  Trash2,
 } from 'lucide-react';
 import { highlightText } from './chatHelpers';
+import {
+  DELETED_MESSAGE_LABEL_AR,
+  DELETED_MESSAGE_LABEL_EN,
+} from '../../lib/chatMessageDelete';
 
 export type ChatMessageBubbleProps = {
   msg: Record<string, unknown>;
@@ -22,6 +27,8 @@ export type ChatMessageBubbleProps = {
   selectionMode?: boolean;
   onToggleSelect?: (id: string) => void;
   onReply?: (msg: Record<string, unknown>) => void;
+  onDelete?: (msg: Record<string, unknown>) => void;
+  canDelete?: boolean;
   formatMessageTime: (ts: unknown) => string;
   incomingAvatar?: React.ReactNode;
   outgoingAvatar?: React.ReactNode;
@@ -34,12 +41,16 @@ function ActionMenu({
   onCopy,
   onReply,
   onSelect,
+  onDelete,
+  showDelete,
   onClose,
 }: {
   isRtl: boolean;
   onCopy: () => void;
   onReply: () => void;
   onSelect: () => void;
+  onDelete?: () => void;
+  showDelete?: boolean;
   onClose: () => void;
 }) {
   const soon = isRtl ? 'قريباً' : 'Coming soon';
@@ -84,6 +95,20 @@ function ActionMenu({
         <Check size={15} />
         {isRtl ? 'تحديد' : 'Select'}
       </button>
+      {showDelete && onDelete ? (
+        <button
+          type="button"
+          role="menuitem"
+          className="sx-chat-action-item sx-chat-action-item--danger"
+          onClick={() => {
+            onDelete();
+            onClose();
+          }}
+        >
+          <Trash2 size={15} />
+          {isRtl ? 'حذف' : 'Delete'}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -98,6 +123,8 @@ export function ChatMessageBubble({
   selectionMode = false,
   onToggleSelect,
   onReply,
+  onDelete,
+  canDelete = false,
   formatMessageTime,
   incomingAvatar,
   outgoingAvatar,
@@ -107,6 +134,12 @@ export function ChatMessageBubble({
   const [menuOpen, setMenuOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const content = String(msg.content ?? '');
+  const isDeleted = msg.deleted === true;
+  const displayContent = isDeleted
+    ? isRtl
+      ? DELETED_MESSAGE_LABEL_AR
+      : DELETED_MESSAGE_LABEL_EN
+    : content;
   const fileUrl = msg.fileUrl as string | undefined;
   const fileType = msg.fileType as string | undefined;
   const fileName = msg.fileName as string | undefined;
@@ -170,7 +203,7 @@ export function ChatMessageBubble({
               isMe
                 ? 'sx-chat-bubble--out sx-chat-bubble--outgoing'
                 : 'sx-chat-bubble--in sx-chat-bubble--incoming'
-            } ${selectionMode ? 'cursor-pointer' : ''}`}
+            } ${selectionMode ? 'cursor-pointer' : ''} ${isDeleted ? 'sx-chat-bubble--deleted' : ''}`}
             onTouchStart={startLongPress}
             onTouchEnd={cancelLongPress}
             onTouchMove={cancelLongPress}
@@ -192,18 +225,18 @@ export function ChatMessageBubble({
               </span>
             )}
 
-            {content ? (
+            {(displayContent || isDeleted) ? (
               <p
-                className="sx-chat-bubble-text text-sm font-medium"
+                className={`sx-chat-bubble-text text-sm font-medium${isDeleted ? ' italic opacity-75' : ''}`}
                 dir="auto"
               >
-                {isSearchActive && searchQuery.trim()
-                  ? highlightText(content, searchQuery)
-                  : content}
+                {isDeleted || !isSearchActive || !searchQuery.trim()
+                  ? displayContent
+                  : highlightText(content, searchQuery)}
               </p>
             ) : null}
 
-            {fileUrl ? (
+            {!isDeleted && fileUrl ? (
               <div className="mt-2 rounded-xl overflow-hidden max-w-full">
                 {fileType === 'image' ? (
                   <img
@@ -256,6 +289,8 @@ export function ChatMessageBubble({
                   onCopy={handleCopy}
                   onReply={() => onReply?.(msg)}
                   onSelect={() => onToggleSelect?.(msgId)}
+                  onDelete={() => onDelete?.(msg)}
+                  showDelete={canDelete && !isDeleted}
                   onClose={() => setMenuOpen(false)}
                 />
               </>

@@ -516,6 +516,11 @@ export default function SuperAdminChatTab() {
           <img src={config.appLogo} alt={config.appName || ''} className="w-10 h-10 object-contain hidden sm:block rounded-xl border border-[#0B2345]/10 p-1 bg-white" referrerPolicy="no-referrer" />
         ) : undefined
       }
+      chatActor={
+        profile
+          ? { uid: profile.uid, role: profile.role ?? 'superadmin', schoolId: profile.schoolId }
+          : null
+      }
     />
   );
 }

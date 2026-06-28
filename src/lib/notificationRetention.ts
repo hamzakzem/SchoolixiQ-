@@ -85,6 +85,23 @@ export function shouldScheduleSeenDeletion(notification: {
   return getSeenRetentionMs(notification) !== null;
 }
 
+/** Whether the current user may manually delete this notification. */
+export function canManuallyDeleteNotification(
+  notification: {
+    type?: string;
+    metadata?: Record<string, unknown>;
+    audience?: string;
+  },
+  userRole?: string,
+): boolean {
+  if (!isCriticalNotification(notification)) return true;
+  const r = (userRole ?? '').toLowerCase();
+  if (r === 'superadmin' || r === 'super_admin') return true;
+  const meta = notification.metadata;
+  if (meta?.dismissible === true || meta?.allowDelete === true) return true;
+  return false;
+}
+
 /**
  * @deprecated Use shouldScheduleSeenDeletion — immediate delete-on-open is no longer used.
  */

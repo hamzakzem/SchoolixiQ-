@@ -40,6 +40,12 @@ import {
   cancelChatScroll,
   scheduleChatScrollToBottom,
 } from '../../lib/chatScrollHelper';
+import {
+  canDeleteChatMessage,
+  softDeleteChatMessage,
+  type ChatDeleteActor,
+} from '../../lib/chatMessageDelete';
+import { toast } from 'react-hot-toast';
 
 export type ChatShellContact = {
   id: string;
@@ -103,6 +109,7 @@ export type SchoolixChatShellProps = {
   emptyThreadMessage?: string;
   showEmptyThreadIntro?: boolean;
   renderEmptyThreadIntro?: () => React.ReactNode;
+  chatActor?: ChatDeleteActor | null;
 };
 
 const SCROLL_THRESHOLD = 80;
@@ -173,8 +180,33 @@ export function SchoolixChatShell({
   emptyThreadMessage,
   showEmptyThreadIntro = true,
   renderEmptyThreadIntro,
+  chatActor,
 }: SchoolixChatShellProps) {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleDeleteMessage = useCallback(
+    async (msg: Record<string, unknown>) => {
+      if (!chatActor) return;
+      const msgId = String(msg.id ?? '');
+      if (!msgId || !canDeleteChatMessage(msg, chatActor)) {
+        toast.error(isRtl ? 'لا يمكنك حذف هذه الرسالة' : 'You cannot delete this message');
+        return;
+      }
+      if (
+        !window.confirm(isRtl ? 'حذف الرسالة؟' : 'Delete this message?')
+      ) {
+        return;
+      }
+      try {
+        await softDeleteChatMessage(msgId, chatActor);
+        toast.success(isRtl ? 'تم حذف الرسالة' : 'Message deleted');
+      } catch (err) {
+        console.error('Chat message delete failed:', err);
+        toast.error(isRtl ? 'تعذر حذف الرسالة' : 'Could not delete message');
+      }
+    },
+    [chatActor, isRtl],
+  );
   const messageElMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevMessageCountRef = useRef(0);
   const isNearBottomRef = useRef(true);
@@ -749,6 +781,8 @@ export function SchoolixChatShell({
                               toggleSelect(id);
                             }}
                             onReply={handleReply}
+                            onDelete={handleDeleteMessage}
+                            canDelete={chatActor ? canDeleteChatMessage(msg, chatActor) : false}
                             formatMessageTime={formatMessageTime}
                             incomingAvatar={!isMe ? renderIncomingMessageAvatar?.() : undefined}
                             outgoingAvatar={isMe ? renderOutgoingMessageAvatar?.() : undefined}

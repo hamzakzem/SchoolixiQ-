@@ -573,6 +573,21 @@ async function runCleanupOldFirestoreData() {
     },
   );
 
+  const softDeleteCutoffMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  stats.system_messages_soft_deleted = await deleteQueryBatch(
+    db,
+    db.collection('system_messages').where('deleted', '==', true),
+    (docSnap) => {
+      const data = docSnap.data() || {};
+      if (data.pinned === true || data.archived === true || data.legalHold === true) {
+        return false;
+      }
+      const deletedAt = data.deletedAt;
+      if (!deletedAt || typeof deletedAt.toMillis !== 'function') return false;
+      return deletedAt.toMillis() <= softDeleteCutoffMs;
+    },
+  );
+
   return stats;
 }
 

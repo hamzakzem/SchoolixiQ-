@@ -704,6 +704,11 @@ export default function TeacherChatTab() {
             </a>
           ) : undefined
         }
+        chatActor={
+          profile
+            ? { uid: profile.uid, role: profile.role ?? 'teacher', schoolId: profile.schoolId }
+            : null
+        }
       />
 
       {/* School details modal (preserved & polished) */}

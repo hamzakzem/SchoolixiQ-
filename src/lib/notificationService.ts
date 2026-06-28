@@ -16,6 +16,7 @@ import {
 import {
   isCriticalNotification,
   getSeenRetentionMs,
+  canManuallyDeleteNotification,
 } from './notificationRetention';
 import { resolveStudentParentIds } from './schoolSync';
 import { resolveNotificationCategoryId } from './notificationCategories';
@@ -449,15 +450,58 @@ export const notificationService = {
   },
 
   /**
-   * Delete a specific notification
+   * Delete a specific notification; falls back to dismiss mark if deleteDoc fails.
    */
-  async delete(notificationId: string) {
+  async delete(notificationId: string, notification?: Record<string, unknown>) {
     try {
       await deleteDoc(doc(db, 'notifications', notificationId));
+      devLog('DELETE', { notificationId });
       return true;
     } catch (error) {
-      console.error('Error deleting notification:', error);
-      return false;
+      devLog('DELETE_FALLBACK', { notificationId, error: String(error) });
+      try {
+        await updateDoc(doc(db, 'notifications', notificationId), {
+          read: true,
+          dismissedAt: serverTimestamp(),
+          ...(notification ? buildSeenUpdateFields(notification) : {}),
+        });
+        return true;
+      } catch (fallbackError) {
+        console.error('Error deleting notification:', error);
+        return false;
+      }
+    }
+  },
+
+  /**
+   * Delete up to batchLimit read, non-critical (or super-admin deletable) notifications.
+   */
+  async deleteAllReadNonCritical(
+    notifications: Array<{ id: string } & Record<string, unknown>>,
+    userRole?: string,
+    batchLimit = 50,
+  ): Promise<number> {
+    if (isQuotaWritePaused()) return 0;
+    const candidates = notifications
+      .filter((n) => n.read === true && canManuallyDeleteNotification(n, userRole))
+      .slice(0, batchLimit);
+    if (candidates.length === 0) return 0;
+
+    try {
+      const batch = writeBatch(db);
+      candidates.forEach((n) => {
+        batch.delete(doc(db, 'notifications', n.id));
+      });
+      await batch.commit();
+      devLog('DELETE_ALL_READ', { count: candidates.length });
+      return candidates.length;
+    } catch (error) {
+      if (isResourceExhaustedError(error)) {
+        handleResourceExhausted('notification_delete_all_read');
+        return 0;
+      }
+      console.error('Error deleting read notifications:', error);
+      return 0;
     }
   },
 

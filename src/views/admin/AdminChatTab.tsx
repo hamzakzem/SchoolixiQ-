@@ -520,6 +520,11 @@ export default function AdminChatTab() {
           </a>
         ) : undefined
       }
+      chatActor={
+        profile
+          ? { uid: profile.uid, role: profile.role ?? 'admin', schoolId: profile.schoolId }
+          : null
+      }
     />
   );
 }

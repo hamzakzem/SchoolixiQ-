@@ -68,7 +68,7 @@ import {
   groupSummaryLabel,
   type NotificationListItem,
 } from "../lib/notificationGrouping";
-import { isCriticalNotification } from "../lib/notificationRetention";
+import { isCriticalNotification, canManuallyDeleteNotification } from "../lib/notificationRetention";
 import { NotificationSwipeCard } from "./NotificationSwipeCard";
 import {
   filterNotificationsForUser,
@@ -661,17 +661,38 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const handleDeleteAll = async () => {
     if (!user || notifications.length === 0) return;
-    if (!window.confirm(isArabic ? "هل أنت متأكد من حذف جميع الإشعارات؟" : "Are you sure you want to delete all notifications?")) return;
+    const role = normalizeDashboardRole(userRole, profile?.role);
+    const deletable = notifications.filter(
+      (n) => n.read && canManuallyDeleteNotification(n, role),
+    );
+    if (deletable.length === 0) {
+      toast.error(
+        isArabic ? 'لا توجد إشعارات مقروءة قابلة للحذف' : 'No deletable read notifications',
+      );
+      return;
+    }
+    if (
+      !window.confirm(
+        isArabic
+          ? `حذف ${Math.min(deletable.length, 50)} إشعاراً مقروءاً؟`
+          : `Delete ${Math.min(deletable.length, 50)} read notifications?`,
+      )
+    ) {
+      return;
+    }
 
     try {
-      const batch = writeBatch(db);
-      notifications.forEach(n => {
-        batch.delete(doc(db, "notifications", n.id));
-      });
-      await batch.commit();
-      toast.success(isArabic ? "تم مسح جميع الإشعارات" : "All notifications deleted");
+      const count = await notificationService.deleteAllReadNonCritical(notifications, role, 50);
+      if (count > 0) {
+        toast.success(
+          isArabic ? `تم حذف ${count} إشعاراً مقروءاً` : `Deleted ${count} read notifications`,
+        );
+      } else {
+        toast.error(isArabic ? 'تعذر الحذف' : 'Delete failed');
+      }
     } catch (err) {
-      console.error("Delete all failed:", err);
+      console.error('Delete read failed:', err);
+      toast.error(isArabic ? 'تعذر حذف الإشعارات' : 'Could not delete notifications');
     }
   };
 
@@ -688,14 +709,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     if (notification && !isNotificationVisibleToUser(notification, viewerContext)) {
       return;
     }
-    if (notification && isCriticalNotification(notification)) {
+    const role = normalizeDashboardRole(userRole, profile?.role);
+    if (notification && !canManuallyDeleteNotification(notification, role)) {
       toast.error(
         isArabic ? 'لا يمكن حذف إشعارات النظام الحرجة' : 'Critical notifications cannot be deleted',
       );
       return;
     }
-    await notificationService.delete(id);
-    toast.success(isArabic ? "تم حذف الإشعار" : "Notification deleted");
+    const ok = await notificationService.delete(id, notification);
+    if (ok) {
+      toast.success(isArabic ? 'تم حذف الإشعار' : 'Notification deleted');
+    } else {
+      toast.error(isArabic ? 'تعذر حذف الإشعار' : 'Could not delete notification');
+    }
   };
 
   const handleSwipeMarkRead = async (n: any) => {
@@ -920,6 +946,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         </div>
         <div className="sx-notif-card__top">
           <span className="sx-notif-card__category">{getCategoryLabel(n)}</span>
+          {isCriticalNotification(n) && (
+            <span className="sx-notif-card__critical-badge">
+              {isArabic ? 'حرج' : 'Critical'}
+            </span>
+          )}
           <time
             className="sx-notif-card__time"
             dateTime={n.createdAt instanceof Date ? n.createdAt.toISOString() : undefined}
@@ -962,17 +993,23 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             </button>
             {cardMenuId === n.id && (
               <div className="sx-notif-card-menu" role="menu">
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={(e) => {
-                    void handleDeleteOne(e, n.id, n);
-                    setCardMenuId(null);
-                  }}
-                >
-                  <Trash2 className="sx-notif-lucide" style={{ width: 16, height: 16 }} aria-hidden />
-                  {isArabic ? 'حذف' : 'Delete'}
-                </button>
+                {canManuallyDeleteNotification(
+                  n,
+                  normalizeDashboardRole(userRole, profile?.role),
+                ) && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(e) => {
+                      void handleDeleteOne(e, n.id, n);
+                      setCardMenuId(null);
+                    }}
+                    aria-label={isArabic ? 'حذف الإشعار' : 'Delete notification'}
+                  >
+                    <Trash2 className="sx-notif-lucide" style={{ width: 16, height: 16 }} aria-hidden />
+                    {isArabic ? 'حذف' : 'Delete'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -987,6 +1024,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       notification={n}
       isArabic={isArabic}
       enableSwipe={touchSwipeEnabled && mainView === 'list'}
+      userRole={normalizeDashboardRole(userRole, profile?.role)}
       onMarkRead={() => void handleSwipeMarkRead(n)}
       onDelete={() => void handleSwipeDelete(n)}
       onCriticalDeleteBlocked={() =>
@@ -1532,6 +1570,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   {mainView === 'list' && (
                     <p className="sx-notif-header__sub">
                       {isArabic
+                        ? 'تابع التنبيهات والرسائل المهمة في مكان واحد'
+                        : 'Track important alerts and messages in one place'}
+                    </p>
+                  )}
+                  {mainView === 'list' && (
+                    <p className="sx-notif-header__summary">
+                      {isArabic
                         ? `غير مقروءة: ${unreadCount} · اليوم: ${todayCount}`
                         : `Unread: ${unreadCount} · Today: ${todayCount}`}
                     </p>
@@ -1647,6 +1692,26 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 >
                   <Check className="sx-action-icon" strokeWidth={2.4} aria-hidden />
                   <span className="sx-action-label">{isArabic ? 'تحديد الكل' : 'Mark all'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="sx-notif-footer-btn sx-notif-footer-btn--ghost"
+                  onClick={handleDeleteAll}
+                  disabled={
+                    notifications.filter((n) =>
+                      n.read &&
+                      canManuallyDeleteNotification(
+                        n,
+                        normalizeDashboardRole(userRole, profile?.role),
+                      ),
+                    ).length === 0
+                  }
+                  aria-label={isArabic ? 'حذف الكل المقروء' : 'Delete all read'}
+                >
+                  <Trash2 className="sx-action-icon" strokeWidth={2.4} aria-hidden />
+                  <span className="sx-action-label">
+                    {isArabic ? 'حذف المقروء' : 'Delete read'}
+                  </span>
                 </button>
                 <button
                   type="button"

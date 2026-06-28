@@ -1957,6 +1957,19 @@ html.dark .sx-chat-action-item {
   cursor: not-allowed;
 }
 
+.sx-chat-action-item--danger {
+  color: #b91c1c;
+}
+
+.sx-chat-action-item--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.sx-chat-bubble--deleted {
+  opacity: 0.88;
+  border-style: dashed;
+}
+
 .sx-chat-selection-bar {
   background: linear-gradient(90deg, #0b2345, #132d52);
   color: #fff;
@@ -2591,16 +2604,17 @@ html.dark .parent-page-title {
   z-index: var(--sx-z-modal);
   --sx-navy: var(--sx-primary);
   --sx-gold: var(--sx-gold);
-  --sx-bg: var(--sx-bg);
-  --sx-border: var(--sx-border);
-  --sx-muted: var(--sx-muted);
+  --sx-bg: #ffffff;
+  --sx-border: #e2e8f0;
+  --sx-muted: #64748b;
   --sx-hover: var(--sx-gold-subtle);
   --sx-danger: var(--sx-danger);
   --sx-success: var(--sx-success);
   --sx-transition: var(--sx-transition);
 
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -2627,14 +2641,16 @@ html.dark .parent-page-title {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-height: 92dvh;
-  background: var(--sx-bg);
-  border: 1px solid var(--sx-border);
+  max-height: min(82dvh, calc(100dvh - 1rem));
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 24px 24px 0 0;
-  box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.06);
   overflow: hidden;
   animation: sx-notif-enter 0.28s ease-out;
   position: relative;
+  opacity: 1;
+  isolation: isolate;
   transition: box-shadow var(--sx-transition);
 }
 
@@ -2656,26 +2672,27 @@ html.dark .parent-page-title {
 
 @media (min-width: 768px) {
   .sx-notif-shell {
-    max-width: min(600px, calc(100vw - 32px));
-    max-height: min(85vh, 85dvh);
+    max-width: min(640px, calc(100vw - 32px));
+    max-height: min(82dvh, calc(100dvh - 2rem));
     border-radius: 20px;
   }
 }
 
 @media (min-width: 1024px) {
   .sx-notif-shell {
-    width: 440px;
-    max-width: 440px;
-    max-height: 80vh;
+    width: 460px;
+    max-width: 460px;
+    max-height: min(82dvh, 720px);
     border-radius: 20px;
     box-shadow: 0 20px 48px rgba(15, 23, 42, 0.14), 0 4px 12px rgba(15, 23, 42, 0.08);
   }
 }
 
 html.dark .sx-notif-shell {
-  --sx-bg: #0f172a;
-  --sx-border: rgba(255, 255, 255, 0.1);
-  background: #0f172a;
+  --sx-bg: #1e293b;
+  --sx-border: rgba(255, 255, 255, 0.12);
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 @keyframes sx-notif-enter {
@@ -2721,8 +2738,13 @@ html.dark .sx-notif-shell {
   top: 0;
   z-index: 10;
   padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 12px;
-  background: var(--sx-bg);
-  border-bottom: 1px solid var(--sx-border);
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+html.dark .sx-notif-header {
+  background: #1e293b;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
 .sx-notif-header__row {
@@ -2755,9 +2777,22 @@ html.dark .sx-notif-header__title {
 
 .sx-notif-header__sub {
   font-size: 12px;
-  font-weight: 500;
-  color: var(--sx-muted);
-  margin-top: 2px;
+  font-weight: 600;
+  color: #475569;
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+.sx-notif-header__summary {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+html.dark .sx-notif-header__sub,
+html.dark .sx-notif-header__summary {
+  color: #94a3b8;
 }
 
 .sx-notif-header__actions {
@@ -2804,10 +2839,15 @@ html.dark .sx-notif-lucide {
 
 .sx-notif-tabs-wrap {
   flex-shrink: 0;
-  background: var(--sx-bg);
-  border-bottom: 1px solid var(--sx-border);
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
   padding: 10px 12px 12px;
   overflow: hidden;
+}
+
+html.dark .sx-notif-tabs-wrap {
+  background: #1e293b;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
 .sx-notif-tabs {
@@ -2817,8 +2857,8 @@ html.dark .sx-notif-lucide {
   width: 100%;
   max-width: 100%;
   padding: 4px;
-  background: var(--sx-surface);
-  border: 1px solid var(--sx-border);
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
   border-radius: 999px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -2923,8 +2963,14 @@ html.dark .sx-notif-tab--active {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  background: var(--sx-bg);
+  background: #f8fafc;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html.dark .sx-notif-body {
+  background: #1a2332;
 }
 
 .sx-notif-search {
@@ -3004,9 +3050,9 @@ html.dark .sx-notif-search input {
   column-gap: 14px;
   row-gap: 6px;
   padding: 16px;
-  background: var(--sx-bg);
+  background: #ffffff;
   border-radius: 16px;
-  border: 1px solid var(--sx-border);
+  border: 1px solid #e2e8f0;
   cursor: pointer;
   position: relative;
   transition: background var(--sx-transition), box-shadow var(--sx-transition), border-color var(--sx-transition), transform var(--sx-transition);
@@ -3016,21 +3062,36 @@ html.dark .sx-notif-search input {
 }
 
 .sx-notif-card:hover {
-  background: var(--sx-hover);
+  background: #f8fafc;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
 .sx-notif-card--unread {
-  border-color: rgba(212, 175, 55, 0.45);
-  background: linear-gradient(135deg, #ffffff 0%, rgba(212, 175, 55, 0.06) 100%);
+  border-color: rgba(212, 175, 55, 0.5);
+  background: #fffdf5;
+  box-shadow: inset 3px 0 0 var(--sx-gold);
 }
 
 html.dark .sx-notif-card {
-  background: rgba(255, 255, 255, 0.03);
+  background: #243044;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 html.dark .sx-notif-card--unread {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(212, 175, 55, 0.08) 100%);
+  background: #2a3448;
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.sx-notif-card__critical-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  font-size: 9px;
+  font-weight: 800;
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  margin-inline-start: 6px;
 }
 
 .sx-notif-card--read {
@@ -3286,6 +3347,16 @@ html.dark .sx-notif-card__title {
   text-align: center;
   padding: 48px 24px;
   min-height: 220px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  margin: 8px 0;
+}
+
+html.dark .sx-notif-empty,
+html.dark .sx-notif-state {
+  background: #243044;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .sx-notif-state--loading .sx-notif-state__ring {
@@ -3295,8 +3366,8 @@ html.dark .sx-notif-card__title {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(15, 23, 42, 0.04) 100%);
-  border: 1px solid rgba(212, 175, 55, 0.25);
+  background: rgba(212, 175, 55, 0.14);
+  border: 1px solid rgba(212, 175, 55, 0.35);
   margin-bottom: 16px;
 }
 

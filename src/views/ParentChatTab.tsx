@@ -598,6 +598,11 @@ export default function ParentChatTab() {
         if (contact.type === 'teacher') return <RoleBadge label={isRtl ? 'معلم' : 'Teacher'} />;
         return null;
       }}
+      chatActor={
+        profile
+          ? { uid: profile.uid, role: profile.role ?? 'parent', schoolId: profile.schoolId }
+          : null
+      }
       headerTrailing={
         activeContact?.type === 'admin' && (schoolInfo?.phone || schoolInfo?.whatsapp) ? (
           schoolInfo?.phone ? (

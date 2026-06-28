@@ -1445,27 +1445,68 @@ html.dark .sx-action-btn-ghost {
 }
 
 .sx-dock-qa-section {
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
 .sx-dock-qa-section__head {
   margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(11, 35, 69, 0.05);
+  border-inline-start: 3px solid var(--sx-gold);
+}
+
+.sx-dock-sheet--light .sx-dock-qa-section__head {
+  background: #f8fafc;
+  border-inline-start-color: #d4af37;
 }
 
 .sx-dock-qa-section__label {
   font-size: 0.8125rem;
   font-weight: 800;
-  color: var(--sx-primary);
+  color: #0b2345;
   margin: 0;
   font-family: 'Cairo', system-ui, sans-serif;
 }
 
 .sx-dock-qa-section__desc {
-  margin: 3px 0 0;
+  margin: 4px 0 0;
   font-size: 0.6875rem;
-  color: var(--sx-muted);
+  font-weight: 600;
+  color: #64748b;
   line-height: 1.4;
   font-family: 'Cairo', system-ui, sans-serif;
+}
+
+.sx-dock-more-section {
+  margin-bottom: 18px;
+}
+
+.sx-dock-more-section__label {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #0b2345;
+  font-family: 'Cairo', system-ui, sans-serif;
+  background: rgba(11, 35, 69, 0.05);
+  border-radius: 10px;
+  border-inline-start: 3px solid var(--sx-gold);
+}
+
+.sx-dock-sheet--light .sx-dock-more-section__label {
+  background: #f8fafc;
+  color: #0b2345;
+}
+
+html.dark .sx-dock-sheet--light .sx-dock-qa-section__head,
+html.dark .sx-dock-sheet--light .sx-dock-more-section__label {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1f5f9;
+}
+
+html.dark .sx-dock-sheet--light .sx-dock-qa-section__desc {
+  color: #94a3b8;
 }
 
 .sx-dock-qa-grid {
@@ -1656,21 +1697,6 @@ html.dark .sx-action-btn-ghost {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.sx-dock-more-section {
-  margin-bottom: 16px;
-}
-
-.sx-dock-more-section__label {
-  margin: 0 0 8px;
-  padding-inline: 4px;
-  font-size: 0.6875rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--sx-muted);
-  font-family: 'Cairo', system-ui, sans-serif;
 }
 
 .sx-dock-more-row {

@@ -6,6 +6,7 @@ import {
   safeFirestoreAdd,
   safeFirestoreSet,
 } from './offlineSync';
+import { withMessageRetentionFields } from '../dataRetention';
 
 export type SendChatMessageInput = {
   actor: OfflineActor;
@@ -24,7 +25,7 @@ export async function sendChatMessageOfflineSafe(
   input: SendChatMessageInput,
 ): Promise<{ mode: 'online' | 'queued'; messageId: string }> {
   const clientMutationId = createClientMutationId();
-  const messageData = {
+  const messageData = withMessageRetentionFields({
     conversationId: input.conversationId,
     schoolId: input.schoolId,
     senderId: input.actor.userId,
@@ -39,7 +40,7 @@ export async function sendChatMessageOfflineSafe(
     read: false,
     clientMutationId,
     messageStatus: 'pending_local',
-  };
+  });
 
   const messageResult = await safeFirestoreAdd('system_messages', messageData, {
     module: 'messages',
