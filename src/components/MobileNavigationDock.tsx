@@ -377,21 +377,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   <div className="sx-dock-sheet__sticky">
                     <header className="sx-panel-header sx-panel-header--in-sheet sx-dock-sheet__header">
                       <div className="sx-panel-header__accent" aria-hidden />
-                      <div className="sx-panel-header__main">
+                      <div className="sx-panel-header__row sx-panel-header__row--top">
                         <div className="sx-panel-header__brand">
                           <span className="sx-panel-header__icon sx-panel-header__icon--gold" aria-hidden>
                             <LayoutGrid size={24} strokeWidth={2.1} />
                           </span>
-                          <div className="sx-panel-header__copy">
-                            <h2 className="sx-panel-header__title">
-                              {isRtl ? "الوصول السريع" : "Quick access"}
-                            </h2>
-                            <p className="sx-panel-header__subtitle">
-                              {isRtl
-                                ? "انتقل بسرعة إلى جميع الأقسام المتاحة حسب صلاحياتك"
-                                : "Jump quickly to all sections available for your role"}
-                            </p>
-                          </div>
+                          <h2 className="sx-panel-header__title">
+                            {isRtl ? "الوصول السريع" : "Quick access"}
+                          </h2>
                         </div>
                         <div className="sx-panel-header__actions">
                           <button
@@ -404,8 +397,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                           </button>
                         </div>
                       </div>
+                      <div className="sx-panel-header__row sx-panel-header__row--bottom">
+                        <p className="sx-panel-header__subtitle">
+                          {isRtl
+                            ? "انتقل بسرعة إلى أقسام المنصة المتاحة حسب صلاحيتك"
+                            : "Jump quickly to platform sections available for your role"}
+                        </p>
+                      </div>
                     </header>
-                    <div className="sx-dock-sheet__search-divider" aria-hidden />
                     <div className="sx-dock-sheet__search-wrap">
                       <Search className="sx-dock-sheet__search-icon" size={16} aria-hidden />
                       <input
@@ -551,19 +550,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   <div className="sx-dock-sheet__sticky">
                     <header className="sx-panel-header sx-panel-header--in-sheet sx-dock-sheet__header">
                       <div className="sx-panel-header__accent" aria-hidden />
-                      <div className="sx-panel-header__main">
+                      <div className="sx-panel-header__row sx-panel-header__row--top">
                         <div className="sx-panel-header__brand">
                           <span className="sx-panel-header__icon sx-panel-header__icon--gold" aria-hidden>
                             <Settings size={24} strokeWidth={2.1} />
                           </span>
-                          <div className="sx-panel-header__copy">
-                            <h2 className="sx-panel-header__title">{isRtl ? "المزيد" : "More"}</h2>
-                            <p className="sx-panel-header__subtitle">
-                              {isRtl
-                                ? "إعدادات الحساب، التخصيص، وأدوات النظام"
-                                : "Account settings, personalization, and system tools"}
-                            </p>
-                          </div>
+                          <h2 className="sx-panel-header__title">
+                            {isRtl ? "المزيد من الخيارات" : "More options"}
+                          </h2>
                         </div>
                         <div className="sx-panel-header__actions">
                           <button
@@ -575,6 +569,13 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                             <X size={18} strokeWidth={2.4} aria-hidden />
                           </button>
                         </div>
+                      </div>
+                      <div className="sx-panel-header__row sx-panel-header__row--bottom">
+                        <p className="sx-panel-header__subtitle">
+                          {isRtl
+                            ? "إعدادات الحساب، التخصيص، وأدوات النظام"
+                            : "Account settings, personalization, and system tools"}
+                        </p>
                       </div>
                     </header>
                   </div>

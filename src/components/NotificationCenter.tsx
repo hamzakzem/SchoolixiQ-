@@ -1529,33 +1529,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         <div className="sx-notif-panel">
           {/* Header */}
           {mainView === 'list' ? (
-            <header className="sx-panel-header sx-panel-header--sticky">
+            <header className="sx-panel-header sx-panel-header--sticky sx-panel-header--multi-actions">
               <div className="sx-panel-header__accent" aria-hidden />
-              <div className="sx-panel-header__main">
+              <div className="sx-panel-header__row sx-panel-header__row--top">
                 <div className="sx-panel-header__brand">
                   <span className="sx-panel-header__icon" aria-hidden>
                     <Bell size={24} strokeWidth={2.1} />
                   </span>
-                  <div className="sx-panel-header__copy">
-                    <h2 className="sx-panel-header__title">
-                      {isArabic ? 'الإشعارات' : 'Notifications'}
-                    </h2>
-                    <p className="sx-panel-header__subtitle">
-                      {isArabic
-                        ? 'تابع جميع التنبيهات والرسائل المهمة في مكان واحد'
-                        : 'Track all important alerts and messages in one place'}
-                    </p>
-                    <div className="sx-panel-header__chips" role="group" aria-label={isArabic ? 'ملخص الإشعارات' : 'Notification summary'}>
-                      <span className="sx-panel-header__chip sx-panel-header__chip--accent">
-                        {isArabic ? 'غير المقروءة' : 'Unread'}{' '}
-                        <strong>{unreadCount > 99 ? '99+' : unreadCount}</strong>
-                      </span>
-                      <span className="sx-panel-header__chip">
-                        {isArabic ? 'اليوم' : 'Today'}{' '}
-                        <strong>{todayCount > 99 ? '99+' : todayCount}</strong>
-                      </span>
-                    </div>
-                  </div>
+                  <h2 className="sx-panel-header__title">
+                    {isArabic ? 'مركز الإشعارات' : 'Notification center'}
+                  </h2>
                 </div>
                 <div className="sx-panel-header__actions sx-notif-header-actions">
                   <button
@@ -1582,6 +1565,23 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   >
                     <X className="sx-action-icon" strokeWidth={2.25} aria-hidden />
                   </button>
+                </div>
+              </div>
+              <div className="sx-panel-header__row sx-panel-header__row--bottom">
+                <p className="sx-panel-header__subtitle">
+                  {isArabic
+                    ? 'تابع التنبيهات والرسائل المهمة في مكان واحد'
+                    : 'Track important alerts and messages in one place'}
+                </p>
+                <div className="sx-panel-header__chips" role="group" aria-label={isArabic ? 'ملخص الإشعارات' : 'Notification summary'}>
+                  <span className="sx-panel-header__chip sx-panel-header__chip--accent">
+                    {isArabic ? 'غير المقروءة' : 'Unread'}{' '}
+                    <strong>{unreadCount > 99 ? '99+' : unreadCount}</strong>
+                  </span>
+                  <span className="sx-panel-header__chip">
+                    {isArabic ? 'اليوم' : 'Today'}{' '}
+                    <strong>{todayCount > 99 ? '99+' : todayCount}</strong>
+                  </span>
                 </div>
               </div>
             </header>
