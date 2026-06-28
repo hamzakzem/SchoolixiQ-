@@ -1,18 +1,40 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { getDrawerPortalNode } from "../lib/drawerPortal";
-import { drawerPanelProps, drawerNavItemMotion, modalBackdropProps, MOTION_SPRING, prefersReducedMotion, servicesSideDrawerProps } from "../lib/motion";
-import { OfflineQueueTrigger } from './OfflineSyncIndicator';
+import {
+  drawerPanelProps,
+  drawerNavItemMotion,
+  modalBackdropProps,
+  prefersReducedMotion,
+  servicesSideDrawerProps,
+} from "../lib/motion";
+import { OfflineQueueTrigger, useOfflineOperationsOptional } from "./OfflineSyncIndicator";
+import { useAuth } from "../lib/AuthContext";
+import { useOfflineStatus } from "../lib/offline/useOfflineStatus";
+import { useNotificationBadges } from "../lib/NotificationBadgeContext";
+import { LanguageToggle } from "./LanguageToggle";
+import { ThemeToggle } from "./ThemeToggle";
+import SchoolixLogo from "./SchoolixLogo";
+import {
+  groupItemsForQuickAccess,
+  resolvePermissionsGatewayTab,
+  canShowPermissionsGateway,
+  type QuickAccessMenuItem,
+} from "../lib/quickAccessSections";
 import {
   LayoutDashboard,
   MessageSquare,
-  Grid,
+  Grid3X3,
   Bell,
-  Menu,
+  MoreHorizontal,
   X,
   Search,
   LogOut,
+  Shield,
+  Settings,
+  ClipboardCheck,
+  CloudUpload,
 } from "lucide-react";
 
 interface MenuItem {
@@ -30,13 +52,24 @@ interface MobileNavigationDockProps {
   showNotifications?: boolean;
   setShowNotifications?: (show: boolean) => void;
   notificationsCount?: number;
+  messagesCount?: number;
+  userRole?: string;
   isRtl?: boolean;
   onLogout?: () => void;
   logoutLabel?: string;
-  /** Light = high-contrast white menu (parent portal). Dark = navy hub (default). */
   menuSurface?: "dark" | "light";
-  /** Hide dock entirely (e.g. full-screen chat on mobile). */
   hidden?: boolean;
+}
+
+type DockSheet = "none" | "quick" | "more";
+
+function DockBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="sx-dock-v2__badge" aria-hidden>
+      {count > 99 ? "99+" : count}
+    </span>
+  );
 }
 
 export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
@@ -48,101 +81,95 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   showNotifications = false,
   setShowNotifications,
   notificationsCount = 0,
+  messagesCount: messagesCountProp,
+  userRole,
   isRtl = true,
   onLogout,
   logoutLabel,
   menuSurface = "dark",
   hidden = false,
 }) => {
-  const isLightMenu = menuSurface === "light";
-  const [showQuickAccess, setShowQuickAccess] = useState(false);
+  const { profile } = useAuth();
+  const { tabBadges, categoryUnread } = useNotificationBadges();
+  const offlineOps = useOfflineOperationsOptional();
+  const { counts: offlineCounts, isSyncing } = useOfflineStatus();
+
+  const [activeSheet, setActiveSheet] = useState<DockSheet>("none");
   const [searchTerm, setSearchTerm] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
 
-  // Get home/overview item or default
-  const overviewItem = menuItems.find((i) => i.id === "overview" || i.id === "home") || menuItems[0];
-  // Get chat item or default
-  const chatItem = menuItems.find((i) => i.id === "chat") || menuItems.find((i) => i.id === "messages");
+  const role = userRole || profile?.role;
+  const isLightMenu = menuSurface === "light";
+  const overviewItem =
+    menuItems.find((i) => i.id === "overview" || i.id === "home") || menuItems[0];
+  const chatItem =
+    menuItems.find((i) => i.id === "chat") || menuItems.find((i) => i.id === "messages");
 
-  // Secondary items for the bento grid quick access
-  const quickAccessItems = menuItems.filter(
-    (item) => item.id !== "overview" && item.id !== "home"
+  const messagesCount =
+    messagesCountProp ??
+    tabBadges.chat ??
+    tabBadges.messages ??
+    categoryUnread.messages ??
+    0;
+
+  const quickAccessItems: QuickAccessMenuItem[] = menuItems.filter(
+    (item) => item.id !== overviewItem?.id && item.id !== "home",
   );
 
-  const filteredQuickAccess = quickAccessItems.filter((item) =>
-    item.label.toLowerCase().includes(searchTerm.toLowerCase())
+  const groupedQuickAccess = groupItemsForQuickAccess(quickAccessItems, searchTerm);
+  const permissionsGatewayTab = resolvePermissionsGatewayTab(quickAccessItems, role);
+  const showPermissionsGateway = canShowPermissionsGateway(role, permissionsGatewayTab);
+
+  const hasOfflineWork =
+    offlineCounts.pending + offlineCounts.failed + offlineCounts.blocked > 0 || isSyncing;
+
+  const [isCompactViewport, setIsCompactViewport] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 1024,
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const sync = () => setIsCompactViewport(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const sheetOpen = activeSheet !== "none";
+  const servicesDrawerOpen = !hidden && !isCompactViewport && isSidebarOpen;
+  const portalLayerOpen = servicesDrawerOpen || (!hidden && isCompactViewport && sheetOpen);
+
+  const closeSheets = () => {
+    setActiveSheet("none");
+    setSearchTerm("");
+    lastTriggerRef.current?.focus();
+  };
 
   const handleTabClick = (tabId: string) => {
     setActiveTab(tabId);
-    setShowQuickAccess(false);
+    closeSheets();
     setIsSidebarOpen(false);
-    if (setShowNotifications) {
-      setShowNotifications(false);
-    }
+    setShowNotifications?.(false);
   };
 
-  const handleLogout = () => {
-    setShowQuickAccess(false);
+  const openSheet = (sheet: DockSheet, trigger?: HTMLElement | null) => {
+    if (trigger) lastTriggerRef.current = trigger;
+    setActiveSheet(sheet);
     setIsSidebarOpen(false);
-    if (setShowNotifications) {
-      setShowNotifications(false);
-    }
-    onLogout?.();
+    if (sheet !== "none") setShowNotifications?.(false);
   };
 
-  const menuItemClasses = (isActive: boolean) => {
-    if (isLightMenu) {
-      return `parent-menu-item border rounded-2xl ${isActive ? "parent-menu-item--active" : ""}`;
-    }
-    if (isActive) {
-      return "bg-[#D4A64A] text-[#0B2345] border-[#D4A64A] shadow-lg shadow-[#D4A64A]/10";
-    }
-    return "bg-slate-900/50 hover:bg-[#0B2345]/50 border-slate-800/80 hover:border-slate-700/80 text-slate-300 hover:text-white";
+  const toggleNotifications = (trigger?: HTMLElement | null) => {
+    if (trigger) lastTriggerRef.current = trigger;
+    setShowNotifications?.(!showNotifications);
+    setActiveSheet("none");
+    setIsSidebarOpen(false);
   };
-
-  const menuIconClasses = (isActive: boolean) => {
-    if (isLightMenu) {
-      return `parent-menu-icon p-2.5 rounded-xl shrink-0 flex items-center justify-center ${
-        isActive ? "bg-[#0B2345]/10" : "bg-slate-100 dark:bg-slate-700"
-      }`;
-    }
-    if (isActive) {
-      return "bg-[#0B2345] text-[#D4A64A]";
-    }
-    return "bg-[#0B2345] text-slate-400 group-hover:text-white group-hover:bg-[#D4A64A] group-hover:text-[#0B2345] transition-all";
-  };
-
-  const menuLabelClasses = (isActive: boolean) => {
-    if (isLightMenu) return "parent-menu-label";
-    if (isActive) return "text-[#0B2345]";
-    return "text-white";
-  };
-
-  const menuPanelShellClasses = isLightMenu
-    ? 'sx-drawer-panel--light'
-    : 'sx-drawer-panel--dark';
-
-  const [isMobileViewport, setIsMobileViewport] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < 1024,
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 1023px)');
-    const sync = () => setIsMobileViewport(mq.matches);
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
-  }, []);
-
-  /** Overlay drawer open — all viewports (services menu). Quick-access sheet is mobile only. */
-  const servicesDrawerOpen = !hidden && isSidebarOpen;
-  const quickAccessOverlayOpen = !hidden && isMobileViewport && showQuickAccess;
-  const portalLayerOpen = servicesDrawerOpen || quickAccessOverlayOpen;
 
   useEffect(() => {
     if (!hidden) return;
-    if (typeof document === "undefined") return;
     document.documentElement.classList.remove("sx-drawer-open");
     document.body.classList.remove("sx-drawer-open");
     document.getElementById("sx-app-drawer-portal")?.classList.remove("sx-app-drawer-portal--active");
@@ -173,18 +200,31 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   }, [portalLayerOpen]);
 
   useEffect(() => {
+    if (activeSheet === "quick") {
+      const t = window.setTimeout(() => searchRef.current?.focus(), 120);
+      return () => window.clearTimeout(t);
+    }
+    return undefined;
+  }, [activeSheet]);
+
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (showQuickAccess) setShowQuickAccess(false);
-      else if (isSidebarOpen) setIsSidebarOpen(false);
+      if (activeSheet !== "none") {
+        closeSheets();
+        return;
+      }
+      if (showNotifications) {
+        setShowNotifications?.(false);
+        return;
+      }
+      if (isSidebarOpen) setIsSidebarOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isSidebarOpen, showQuickAccess, setIsSidebarOpen]);
+  }, [activeSheet, isSidebarOpen, showNotifications, setIsSidebarOpen, setShowNotifications]);
 
-  if (hidden) {
-    return null;
-  }
+  if (hidden) return null;
 
   const closeServicesMenu = () => setIsSidebarOpen(false);
 
@@ -197,287 +237,320 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
     }
   };
 
+  const dockBtnClass = (active: boolean) =>
+    `sx-dock-v2__btn${active ? " sx-dock-v2__btn--active" : ""}`;
+
   return (
     <>
-      {/* Pending offline ops — compact pill above dock (mobile only) */}
-      <div className="sx-offline-status-host sx-offline-status-host--dock print:hidden">
+      <div className="sx-offline-status-host sx-offline-status-host--dock-v2 print:hidden">
         <OfflineQueueTrigger variant="dock-pill" />
       </div>
 
-      {/* Mobile Bottom Dock Bar */}
-      <div className="sx-mobile-dock fixed bottom-0 inset-x-0 lg:hidden bg-gradient-to-t from-slate-950 to-slate-900/95 border-t border-slate-800/80 backdrop-blur-lg pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-3 px-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] print:hidden w-full">
-        <div className="max-w-md mx-auto flex items-center justify-between gap-2">
-          {/* 1. Home Button */}
+      <nav
+        className="sx-dock-v2 lg:hidden print:hidden"
+        aria-label={isRtl ? "التنقل السفلي" : "Bottom navigation"}
+      >
+        <div className="sx-dock-v2__inner">
           <button
+            type="button"
+            className={dockBtnClass(activeTab === overviewItem?.id)}
             onClick={() => handleTabClick(overviewItem.id)}
-            className="flex flex-col items-center justify-center flex-1 py-1 px-2 relative group focus:outline-none"
+            aria-label={isRtl ? "الرئيسية" : "Home"}
+            aria-current={activeTab === overviewItem?.id ? "page" : undefined}
           >
-            <div className="relative">
-              <LayoutDashboard
-                size={22}
-                className={`transition-all duration-300 ${
-                  activeTab === overviewItem.id
-                    ? "text-[#D4A64A] scale-110 drop-shadow-[0_0_8px_rgba(212,166,74,0.5)]"
-                    : "text-slate-400 group-hover:text-slate-200"
-                }`}
-              />
-              {activeTab === overviewItem.id && (
-                <motion.div
-                  layoutId="activeIndicator"
-                  className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#D4A64A] rounded-full"
-                  transition={prefersReducedMotion() ? { duration: 0.01 } : MOTION_SPRING.indicator}
-                />
-              )}
-            </div>
-            <span
-              className={`text-[9px] font-bold mt-1 tracking-tight transition-colors duration-300 ${
-                activeTab === overviewItem.id ? "text-[#D4A64A]" : "text-slate-500 group-hover:text-slate-300"
-              }`}
-            >
-              {isRtl ? "الرئيسية" : "Home"}
-            </span>
+            <LayoutDashboard size={22} strokeWidth={2.1} aria-hidden />
+            <span>{isRtl ? "الرئيسية" : "Home"}</span>
           </button>
 
-          {/* 2. Messages/Chat Button */}
           {chatItem && (
             <button
+              type="button"
+              className={dockBtnClass(activeTab === chatItem.id)}
               onClick={() => handleTabClick(chatItem.id)}
-              className="flex flex-col items-center justify-center flex-1 py-1 px-2 relative group focus:outline-none"
+              aria-label={isRtl ? "الرسائل" : "Messages"}
             >
-              <div className="relative">
-                <MessageSquare
-                  size={22}
-                  className={`transition-all duration-300 ${
-                    activeTab === chatItem.id
-                      ? "text-[#D4A64A] scale-110 drop-shadow-[0_0_8px_rgba(212,166,74,0.5)]"
-                      : "text-slate-400 group-hover:text-slate-200"
-                  }`}
-                />
-                {activeTab === chatItem.id && (
-                  <motion.div
-                    layoutId="activeIndicator"
-                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#D4A64A] rounded-full"
-                    transition={prefersReducedMotion() ? { duration: 0.01 } : MOTION_SPRING.indicator}
-                  />
-                )}
-              </div>
-              <span
-                className={`text-[9px] font-bold mt-1 tracking-tight transition-colors duration-300 ${
-                  activeTab === chatItem.id ? "text-[#D4A64A]" : "text-slate-500 group-hover:text-slate-300"
-                }`}
-              >
-                {chatItem.label}
+              <span className="sx-dock-v2__icon-wrap">
+                <MessageSquare size={22} strokeWidth={2.1} aria-hidden />
+                <DockBadge count={messagesCount} />
               </span>
+              <span>{isRtl ? "الرسائل" : "Messages"}</span>
             </button>
           )}
 
-          {/* 3. Central Premium Quick Access Hub */}
-          <button
-            onClick={() => {
-              setShowQuickAccess(true);
-              if (setShowNotifications) setShowNotifications(false);
-              setIsSidebarOpen(false);
-            }}
-            className="flex flex-col items-center justify-center relative -mt-7 shrink-0 outline-none"
-          >
-            <div className={`w-14 h-14 bg-gradient-to-br from-[#0B2345] to-slate-900 text-[#D4A64A] hover:bg-[#D4A64A] hover:text-[#0B2345] rounded-full flex items-center justify-center shadow-xl shadow-[#D4A64A]/10 border-2 border-[#D4A64A]/60 active:scale-90 transition-all duration-300 group ${showQuickAccess ? "rotate-45" : ""}`}>
-              <Grid size={24} className="transition-transform duration-300" />
-            </div>
-            <span className="text-[9px] font-black mt-1 text-[#D4A64A] tracking-wider uppercase font-display select-none">
-              {isRtl ? "الوصول السريع" : "Quick Hub"}
-            </span>
-          </button>
-
-          {/* 4. Notifications Button */}
           {setShowNotifications && (
             <button
-              onClick={() => {
-                setShowNotifications(!showNotifications);
-                setShowQuickAccess(false);
-                setIsSidebarOpen(false);
-              }}
-              className="flex flex-col items-center justify-center flex-1 py-1 px-2 relative group focus:outline-none"
+              type="button"
+              className={dockBtnClass(showNotifications)}
+              onClick={(e) => toggleNotifications(e.currentTarget)}
+              aria-label={isRtl ? "الإشعارات" : "Notifications"}
+              aria-pressed={showNotifications}
             >
-              <div className="relative">
-                <Bell
-                  size={22}
-                  className={`transition-all duration-300 ${
-                    showNotifications
-                      ? "text-[#D4A64A] scale-110 drop-shadow-[0_0_8px_rgba(212,166,74,0.5)]"
-                      : "text-slate-400 group-hover:text-slate-200"
-                  }`}
-                />
-                {notificationsCount > 0 && (
-                  <span className="absolute -top-1 -right-1.5 w-4 h-4 bg-red-500 rounded-full text-[8px] font-black text-white flex items-center justify-center animate-pulse">
-                    {notificationsCount > 9 ? "9+" : notificationsCount}
-                  </span>
-                )}
-                {showNotifications && (
-                  <motion.div
-                    layoutId="activeIndicator"
-                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#D4A64A] rounded-full"
-                    transition={prefersReducedMotion() ? { duration: 0.01 } : MOTION_SPRING.indicator}
-                  />
-                )}
-              </div>
-              <span
-                className={`text-[9px] font-bold mt-1 tracking-tight transition-colors duration-300 ${
-                  showNotifications ? "text-[#D4A64A]" : "text-slate-500 group-hover:text-slate-300"
-                }`}
-              >
-                {isRtl ? "الإشعارات" : "Alerts"}
+              <span className="sx-dock-v2__icon-wrap">
+                <Bell size={22} strokeWidth={2.1} aria-hidden />
+                <DockBadge count={notificationsCount} />
               </span>
+              <span>{isRtl ? "الإشعارات" : "Alerts"}</span>
             </button>
           )}
 
-          {/* 5. Menu Drawer Toggle */}
           <button
-            onClick={() => {
-              const nextOpen = !isSidebarOpen;
-              setIsSidebarOpen(nextOpen);
-              setShowQuickAccess(false);
-              if (setShowNotifications) setShowNotifications(false);
-            }}
-            className="flex flex-col items-center justify-center flex-1 py-1 px-2 relative group focus:outline-none"
+            type="button"
+            className={dockBtnClass(activeSheet === "quick")}
+            onClick={(e) =>
+              openSheet(activeSheet === "quick" ? "none" : "quick", e.currentTarget)
+            }
+            aria-label={isRtl ? "الوصول السريع" : "Quick access"}
+            aria-expanded={activeSheet === "quick"}
           >
-            <div className="relative">
-              <Menu
-                size={22}
-                className={`transition-all duration-300 ${
-                  isSidebarOpen
-                    ? "text-[#D4A64A] scale-110 drop-shadow-[0_0_8px_rgba(212,166,74,0.5)]"
-                    : "text-slate-400 group-hover:text-slate-200"
-                }`}
-              />
-              {isSidebarOpen && (
-                <motion.div
-                  layoutId="activeIndicator"
-                  className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#D4A64A] rounded-full"
-                  transition={prefersReducedMotion() ? { duration: 0.01 } : MOTION_SPRING.indicator}
-                />
-              )}
-            </div>
-            <span
-              className={`text-[9px] font-bold mt-1 tracking-tight transition-colors duration-300 ${
-                isSidebarOpen ? "text-[#D4A64A]" : "text-slate-500 group-hover:text-slate-300"
-              }`}
-            >
-              {isRtl ? "المزيد" : "More"}
+            <Grid3X3 size={22} strokeWidth={2.1} aria-hidden />
+            <span>{isRtl ? "الوصول السريع" : "Quick"}</span>
+          </button>
+
+          <button
+            type="button"
+            className={dockBtnClass(activeSheet === "more")}
+            onClick={(e) =>
+              openSheet(activeSheet === "more" ? "none" : "more", e.currentTarget)
+            }
+            aria-label={isRtl ? "المزيد والإعدادات" : "More & settings"}
+            aria-expanded={activeSheet === "more"}
+          >
+            <span className="sx-dock-v2__icon-wrap">
+              <MoreHorizontal size={22} strokeWidth={2.1} aria-hidden />
+              {hasOfflineWork && <span className="sx-dock-v2__dot" aria-hidden />}
             </span>
+            <span>{isRtl ? "المزيد" : "More"}</span>
           </button>
         </div>
-      </div>
+      </nav>
 
-      {/* Quick Access hub — bottom sheet (mobile/tablet only) */}
-      {isMobileViewport && renderDrawerPortal(
-        <AnimatePresence>
-          {showQuickAccess && (
-            <div className="sx-drawer-root lg:hidden" role="dialog" aria-modal="true" aria-label={isRtl ? "الوصول السريع" : "Quick access"}>
-              <motion.button
-                type="button"
-                {...modalBackdropProps()}
-                onClick={() => setShowQuickAccess(false)}
-                className="sx-drawer-backdrop"
-                aria-label={isRtl ? "إغلاق" : "Close"}
-              />
-              <motion.div
-                {...drawerPanelProps(true)}
-                className={`sx-drawer-panel sx-drawer-panel--bottom ${menuPanelShellClasses}`}
-                dir={isRtl ? "rtl" : "ltr"}
+      {/* Quick Access 2.0 — mobile/tablet sheet */}
+      {isCompactViewport &&
+        renderDrawerPortal(
+          <AnimatePresence>
+            {activeSheet === "quick" && (
+              <div
+                className="sx-dock-sheet-root"
+                role="dialog"
+                aria-modal="true"
+                aria-label={isRtl ? "الوصول السريع" : "Quick access"}
               >
-                <div className="sx-drawer-panel__header flex-col items-center">
-                  <div
-                    className={`w-12 h-1.5 rounded-full mb-3 cursor-pointer ${
-                      isLightMenu ? "bg-slate-200" : "bg-slate-500/30"
-                    }`}
-                    onClick={() => setShowQuickAccess(false)}
-                    role="presentation"
-                  />
-                  <div className="w-full flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className={`sx-drawer-panel__title flex items-center gap-2 ${isLightMenu ? "parent-menu-title" : ""}`}>
-                        <Grid className="text-[#D4A64A] w-5 h-5 shrink-0" />
-                        <span className="truncate">{isRtl ? "بوابة الصلاحيات والوصول السريع" : "Quick Access Gateway"}</span>
-                      </h3>
-                      <p className={`sx-drawer-panel__subtitle ${isLightMenu ? "parent-menu-subtitle" : ""}`}>
-                        {isRtl ? "الوصول السريع والآمن لكافة أقسام المنصة" : "Secure quick-access portal to all components"}
+                <motion.button
+                  type="button"
+                  {...modalBackdropProps()}
+                  onClick={closeSheets}
+                  className="sx-drawer-backdrop"
+                  aria-label={isRtl ? "إغلاق" : "Close"}
+                />
+                <motion.div
+                  {...drawerPanelProps(true)}
+                  className={`sx-dock-sheet sx-dock-sheet--quick ${isLightMenu ? "sx-drawer-panel--light" : "sx-dock-sheet--dark"}`}
+                  dir={isRtl ? "rtl" : "ltr"}
+                >
+                  <div className="sx-dock-sheet__grab" aria-hidden />
+                  <header className="sx-dock-sheet__header">
+                    <div className="sx-dock-sheet__titles">
+                      <h2 className="sx-dock-sheet__title">
+                        {isRtl ? "الوصول السريع" : "Quick access"}
+                      </h2>
+                      <p className="sx-dock-sheet__subtitle">
+                        {isRtl
+                          ? "الوصول السريع والآمن لكافة أقسام المنصة"
+                          : "Secure access to all platform sections"}
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowQuickAccess(false)}
+                      onClick={closeSheets}
                       className="sx-action-btn sx-action-btn-icon shrink-0"
                       aria-label={isRtl ? "إغلاق" : "Close"}
                     >
-                      <X size={18} className="sx-action-icon" strokeWidth={2.4} />
+                      <X size={18} strokeWidth={2.4} aria-hidden />
                     </button>
-                  </div>
-                  <div className="w-full mt-3 relative">
-                    <Search
-                      className={`absolute top-1/2 -translate-y-1/2 text-slate-400 ${isRtl ? "right-3" : "left-3"}`}
-                      size={16}
-                    />
+                  </header>
+                  <div className="sx-dock-sheet__search-wrap">
+                    <Search className="sx-dock-sheet__search-icon" size={16} aria-hidden />
                     <input
+                      ref={searchRef}
                       type="search"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder={isRtl ? "البحث عن صلاحية أو قسم معين..." : "Search permissions & details..."}
-                      className={`w-full h-11 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#D4A64A] border ${
-                        isLightMenu
-                          ? `parent-menu-search bg-white ${isRtl ? "pr-10 pl-3" : "pl-10 pr-3"}`
-                          : `bg-slate-900/60 text-white placeholder-slate-500 border-slate-800/80 ${isRtl ? "pr-10 pl-3" : "pl-10 pr-3"}`
-                      }`}
+                      placeholder={isRtl ? "ابحث عن قسم أو إجراء…" : "Search sections or actions…"}
+                      className="sx-dock-sheet__search"
+                      aria-label={isRtl ? "بحث" : "Search"}
                     />
                   </div>
-                </div>
-                <div className="sx-drawer-panel__body px-0.5">
-                  {filteredQuickAccess.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      {filteredQuickAccess.map((item, index) => {
-                        const Icon = item.icon;
-                        const isActive = activeTab === item.id;
-                        return (
-                          <motion.button
-                            key={item.id}
-                            initial={{ opacity: 0, y: 12 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.03 }}
-                            onClick={() => handleTabClick(item.id)}
-                            className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden active:scale-[0.98] min-h-[4.5rem] justify-between ${menuItemClasses(isActive)}`}
-                          >
-                            <div className={`p-2.5 rounded-xl shrink-0 flex items-center justify-center ${menuIconClasses(isActive)}`}>
-                              <Icon className={isLightMenu ? "parent-menu-icon" : undefined} size={20} strokeWidth={isActive ? 2.5 : 1.5} />
-                            </div>
-                            <p className={`text-xs font-black tracking-tight leading-snug break-words w-full ${menuLabelClasses(isActive)}`}>
-                              {item.label}
-                            </p>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                      <p className="text-sm font-semibold">{isRtl ? "لم يتم العثور على صلاحيات تطابق بحثك" : "No matching permissions found"}</p>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-      )}
+                  <div className="sx-dock-sheet__body">
+                    {groupedQuickAccess.length === 0 ? (
+                      <div className="sx-dock-sheet__empty">
+                        <p>{isRtl ? "لا توجد نتائج مطابقة" : "No matching results"}</p>
+                      </div>
+                    ) : (
+                      groupedQuickAccess.map(({ section, items }) => (
+                        <section key={section.id} className="sx-dock-qa-section">
+                          <h3 className="sx-dock-qa-section__label">
+                            {isRtl ? section.labelAr : section.labelEn}
+                          </h3>
+                          {section.id === "system" && showPermissionsGateway && permissionsGatewayTab && (
+                            <button
+                              type="button"
+                              className="sx-dock-perms-card"
+                              onClick={() => handleTabClick(permissionsGatewayTab)}
+                            >
+                              <span className="sx-dock-perms-card__icon" aria-hidden>
+                                <Shield size={20} strokeWidth={2.2} />
+                              </span>
+                              <span className="sx-dock-perms-card__body">
+                                <span className="sx-dock-perms-card__title">
+                                  {isRtl ? "بوابة الصلاحيات" : "Permissions gateway"}
+                                  <span className="sx-dock-perms-card__badge">
+                                    {isRtl ? "إدارة" : "Admin"}
+                                  </span>
+                                </span>
+                                <span className="sx-dock-perms-card__desc">
+                                  {isRtl
+                                    ? "إدارة الوصول والصلاحيات حسب الدور"
+                                    : "Manage role-based access"}
+                                </span>
+                              </span>
+                            </button>
+                          )}
+                          <div className="sx-dock-qa-grid">
+                            {items.map((item) => {
+                              const Icon = item.icon;
+                              const isActive = activeTab === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => handleTabClick(item.id)}
+                                  className={`sx-dock-qa-item${isActive ? " sx-dock-qa-item--active" : ""}`}
+                                >
+                                  <span className="sx-dock-qa-item__icon" aria-hidden>
+                                    <Icon size={18} strokeWidth={isActive ? 2.4 : 2} />
+                                  </span>
+                                  <span className="sx-dock-qa-item__label">{item.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+        )}
 
-      {/* Three-lines services menu — side drawer (all viewports) */}
+      {/* More / Settings sheet — mobile/tablet */}
+      {isCompactViewport &&
+        renderDrawerPortal(
+          <AnimatePresence>
+            {activeSheet === "more" && (
+              <div
+                className="sx-dock-sheet-root"
+                role="dialog"
+                aria-modal="true"
+                aria-label={isRtl ? "المزيد" : "More"}
+              >
+                <motion.button
+                  type="button"
+                  {...modalBackdropProps()}
+                  onClick={closeSheets}
+                  className="sx-drawer-backdrop"
+                  aria-label={isRtl ? "إغلاق" : "Close"}
+                />
+                <motion.div
+                  {...drawerPanelProps(true)}
+                  className={`sx-dock-sheet sx-dock-sheet--more ${isLightMenu ? "sx-drawer-panel--light" : "sx-dock-sheet--dark"}`}
+                  dir={isRtl ? "rtl" : "ltr"}
+                >
+                  <div className="sx-dock-sheet__grab" aria-hidden />
+                  <header className="sx-dock-sheet__header">
+                    <div className="sx-dock-sheet__titles">
+                      <h2 className="sx-dock-sheet__title">{isRtl ? "المزيد" : "More"}</h2>
+                      <p className="sx-dock-sheet__subtitle">
+                        {isRtl ? "الإعدادات والاختصارات" : "Settings & shortcuts"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeSheets}
+                      className="sx-action-btn sx-action-btn-icon shrink-0"
+                      aria-label={isRtl ? "إغلاق" : "Close"}
+                    >
+                      <X size={18} strokeWidth={2.4} aria-hidden />
+                    </button>
+                  </header>
+                  <div className="sx-dock-sheet__body sx-dock-more-list">
+                    {menuItems.some((i) => i.id === "settings") && (
+                      <button
+                        type="button"
+                        className="sx-dock-more-row"
+                        onClick={() => handleTabClick("settings")}
+                      >
+                        <Settings size={18} aria-hidden />
+                        <span>{isRtl ? "الإعدادات والملف الشخصي" : "Settings & profile"}</span>
+                      </button>
+                    )}
+                    {showPermissionsGateway && permissionsGatewayTab && (
+                      <button
+                        type="button"
+                        className="sx-dock-more-row"
+                        onClick={() => handleTabClick(permissionsGatewayTab)}
+                      >
+                        <Shield size={18} aria-hidden />
+                        <span>{isRtl ? "بوابة الصلاحيات" : "Permissions gateway"}</span>
+                      </button>
+                    )}
+                    {hasOfflineWork && offlineOps && (
+                      <button
+                        type="button"
+                        className="sx-dock-more-row sx-dock-more-row--warn"
+                        onClick={() => {
+                          closeSheets();
+                          offlineOps.openPanel();
+                        }}
+                      >
+                        <CloudUpload size={18} aria-hidden />
+                        <span>{isRtl ? "عمليات بانتظار المزامنة" : "Pending sync operations"}</span>
+                      </button>
+                    )}
+                    {(role === "superadmin" || role === "super_admin") &&
+                      menuItems.some((i) => i.id === "diagnostics") && (
+                        <button
+                          type="button"
+                          className="sx-dock-more-row"
+                          onClick={() => handleTabClick("diagnostics")}
+                        >
+                          <ClipboardCheck size={18} aria-hidden />
+                          <span>{isRtl ? "الفحص والتشخيص" : "Diagnostics"}</span>
+                        </button>
+                      )}
+                    <div className="sx-dock-more-toggles">
+                      <LanguageToggle />
+                      <ThemeToggle />
+                    </div>
+                    {onLogout && (
+                      <button type="button" className="sx-dock-more-logout" onClick={handleLogout}>
+                        <LogOut size={18} aria-hidden />
+                        <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+        )}
+
+      {/* Desktop services drawer — unchanged */}
       {renderDrawerPortal(
         <AnimatePresence mode="wait">
-          {isSidebarOpen && (
-            <motion.div
-              key="services-drawer-stack"
-              className="sx-drawer-stack"
-              initial={{ opacity: 1 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 1 }}
-            >
+          {servicesDrawerOpen && (
+            <motion.div key="services-drawer-stack" className="sx-drawer-stack">
               <motion.button
                 type="button"
                 {...modalBackdropProps()}
@@ -504,11 +577,8 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                       <div className="min-w-0">
                         <p className="sx-drawer-services-header__eyebrow">SchoolixIQ</p>
                         <h3 className="sx-drawer-services-header__title">
-                          {isRtl ? "القائمة الرئيسية" : "Main Menu"}
+                          {isRtl ? "القائمة الرئيسية" : "Main menu"}
                         </h3>
-                        <p className="sx-drawer-services-header__subtitle">
-                          {isRtl ? "تصفح جميع أقسام لوحة التحكم" : "Browse all dashboard sections"}
-                        </p>
                       </div>
                     </div>
                     <button
@@ -522,58 +592,32 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   </div>
                 </div>
                 <div className="sx-drawer-services-body">
-                  {menuItems.length > 0 ? (
-                    <>
-                      <p className="sx-drawer-services-section-label">
-                        {isRtl ? "الأقسام والصلاحيات" : "Sections & permissions"}
-                        <span className="sx-drawer-services-section-count">{menuItems.length}</span>
-                      </p>
-                      <div className="sx-drawer-services-list">
-                        {menuItems.map((item, index) => {
-                          const Icon = item.icon;
-                          const isActive = activeTab === item.id;
-                          return (
-                            <motion.button
-                              key={item.id}
-                              type="button"
-                              {...drawerNavItemMotion(index, isRtl)}
-                              whileTap={prefersReducedMotion() ? undefined : { scale: 0.98 }}
-                              onClick={() => handleTabClick(item.id)}
-                              className={`sx-drawer-nav-item ${isActive ? "sx-drawer-nav-item--active" : ""}`}
-                              dir={isRtl ? "rtl" : "ltr"}
-                            >
-                              <span className="sx-drawer-nav-item__icon" aria-hidden>
-                                <Icon size={20} strokeWidth={isActive ? 2.35 : 2.15} />
-                              </span>
-                              <span className="sx-drawer-nav-item__label truncate">{item.label}</span>
-                              {isActive ? (
-                                <span className="sx-drawer-nav-item__active-dot" aria-hidden />
-                              ) : null}
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="sx-drawer-services-empty">
-                      <Menu size={28} className="sx-drawer-services-empty__icon" strokeWidth={1.75} />
-                      <p className="sx-drawer-services-empty__title">
-                        {isRtl ? "لا توجد خدمات متاحة" : "No services available"}
-                      </p>
-                      <p className="sx-drawer-services-empty__hint">
-                        {isRtl ? "جرّب تحديث الصفحة أو التواصل مع الإدارة" : "Try refreshing or contact your admin"}
-                      </p>
-                    </div>
-                  )}
+                  <div className="sx-drawer-services-list">
+                    {menuItems.map((item, index) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <motion.button
+                          key={item.id}
+                          type="button"
+                          {...drawerNavItemMotion(index, isRtl)}
+                          whileTap={prefersReducedMotion() ? undefined : { scale: 0.98 }}
+                          onClick={() => handleTabClick(item.id)}
+                          className={`sx-drawer-nav-item ${isActive ? "sx-drawer-nav-item--active" : ""}`}
+                        >
+                          <span className="sx-drawer-nav-item__icon" aria-hidden>
+                            <Icon size={20} strokeWidth={isActive ? 2.35 : 2.15} />
+                          </span>
+                          <span className="sx-drawer-nav-item__label truncate">{item.label}</span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
                 </div>
                 {onLogout && (
                   <div className="sx-drawer-services-footer">
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="sx-drawer-services-logout"
-                    >
-                      <LogOut size={20} className="shrink-0" strokeWidth={2.25} />
+                    <button type="button" onClick={handleLogout} className="sx-drawer-services-logout">
+                      <LogOut size={20} strokeWidth={2.25} aria-hidden />
                       <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
                     </button>
                   </div>
@@ -585,4 +629,11 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
       )}
     </>
   );
+
+  function handleLogout() {
+    closeSheets();
+    setIsSidebarOpen(false);
+    setShowNotifications?.(false);
+    onLogout?.();
+  }
 };

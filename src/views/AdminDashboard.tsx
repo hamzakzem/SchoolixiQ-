@@ -1258,8 +1258,10 @@ export default function AdminDashboard() {
             <div className="hidden md:block">
               <GlobalSearch onNavigate={navigateToTab} />
             </div>
+            <div className="sx-dock-duplicate-hide lg:flex items-center gap-2 md:gap-3 shrink-0">
             <LanguageToggle />
             <ThemeToggle />
+
             <button
               type="button"
               onClick={() => setShowNotifications(!showNotifications)}
@@ -1283,6 +1285,7 @@ export default function AdminDashboard() {
                 userRole={profile?.role || "admin"}
               />
             ) : null}
+            </div>
             <div className="hidden lg:flex items-center gap-2">
               <div className="w-9 h-9 bg-sx-primary rounded-xl flex items-center justify-center text-white font-bold text-sm">
                 {profile?.name?.[0]}

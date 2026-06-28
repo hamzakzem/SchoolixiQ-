@@ -12,6 +12,10 @@ type OfflineOperationsContextValue = {
 
 const OfflineOperationsContext = createContext<OfflineOperationsContextValue | null>(null);
 
+export function useOfflineOperationsOptional(): OfflineOperationsContextValue | null {
+  return useContext(OfflineOperationsContext);
+}
+
 function useOfflineOperationsContext(): OfflineOperationsContextValue {
   const ctx = useContext(OfflineOperationsContext);
   if (!ctx) {

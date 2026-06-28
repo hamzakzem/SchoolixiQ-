@@ -2235,7 +2235,7 @@ export default function SuperAdminDashboard() {
               {t('system_management')}
             </h2>
           </div>
-          <div className="flex items-center gap-4 sm:gap-4 md:gap-6 shrink-0">
+          <div className="flex items-center gap-4 sm:gap-4 md:gap-6 shrink-0 sx-dock-duplicate-hide lg:flex">
             <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
             <LanguageToggle />
             <ThemeToggle />

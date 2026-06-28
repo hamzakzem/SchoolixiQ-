@@ -1729,7 +1729,7 @@ export default function ParentDashboard() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0 sx-dock-duplicate-hide lg:flex">
                   <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
                   <LanguageToggle />
                   <ThemeToggle />

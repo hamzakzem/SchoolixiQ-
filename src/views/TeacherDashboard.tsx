@@ -1398,25 +1398,27 @@ export default function TeacherDashboard() {
             </p>
           </div>
           <div className="h-6 w-px bg-sx-border dark:bg-slate-800 mx-1 hidden lg:block" />
-          <LanguageToggle />
-          <button
-            type="button"
-            onClick={() => setShowNotifications(!showNotifications)}
-            className={`w-10 h-10 md:w-11 md:h-11 rounded-xl border transition-all duration-300 flex items-center justify-center relative group active:scale-95 shrink-0 ${
-              showNotifications
-                ? "bg-sx-accent border-sx-accent text-sx-primary shadow-lg shadow-sx-accent/25"
-                : "bg-sx-primary border-sx-accent/30 text-sx-accent hover:bg-sx-accent hover:text-sx-primary"
-            }`}
-          >
-            <Bell size={18} />
-            {notifications.filter((n) => !n.read).length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-sx-primary rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                {(badgeTotalUnread || notifications.filter((n) => !n.read).length) > 9
-                  ? "9+"
-                  : badgeTotalUnread || notifications.filter((n) => !n.read).length}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2 md:gap-3 shrink-0 sx-dock-duplicate-hide lg:flex">
+            <LanguageToggle />
+            <button
+              type="button"
+              onClick={() => setShowNotifications(!showNotifications)}
+              className={`w-10 h-10 md:w-11 md:h-11 rounded-xl border transition-all duration-300 flex items-center justify-center relative group active:scale-95 shrink-0 ${
+                showNotifications
+                  ? "bg-sx-accent border-sx-accent text-sx-primary shadow-lg shadow-sx-accent/25"
+                  : "bg-sx-primary border-sx-accent/30 text-sx-accent hover:bg-sx-accent hover:text-sx-primary"
+              }`}
+            >
+              <Bell size={18} />
+              {notifications.filter((n) => !n.read).length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-sx-primary rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                  {(badgeTotalUnread || notifications.filter((n) => !n.read).length) > 9
+                    ? "9+"
+                    : badgeTotalUnread || notifications.filter((n) => !n.read).length}
+                </span>
+              )}
+            </button>
+          </div>
           {showNotifications ? (
             <NotificationCenter
               onClose={() => setShowNotifications(false)}
