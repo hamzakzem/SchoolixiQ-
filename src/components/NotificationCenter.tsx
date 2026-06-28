@@ -35,6 +35,9 @@ import {
   MoreVertical,
   Volume2,
   VolumeX,
+  Shield,
+  Wallet,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import { 
@@ -45,7 +48,28 @@ import {
   NotificationCategory 
 } from "../lib/notificationSound";
 import { notificationService } from "../lib/notificationService";
-import { isNotificationSafeToDeleteOnOpen } from "../lib/notificationRetention";
+import {
+  NOTIF_FILTER_TABS,
+  countNotifFilter,
+  matchesNotifFilter,
+  emptyStateForFilter,
+  type NotifFilterId,
+} from "../lib/notificationFilters";
+import {
+  mergeNotificationPreferences,
+  filterNotificationsByPreferences,
+  saveNotificationPreferences,
+  PREFERENCE_TOGGLES,
+  type NotificationPreferences,
+  type NotificationPreferenceKey,
+} from "../lib/notificationPreferences";
+import {
+  buildGroupedNotificationList,
+  groupSummaryLabel,
+  type NotificationListItem,
+} from "../lib/notificationGrouping";
+import { isCriticalNotification } from "../lib/notificationRetention";
+import { NotificationSwipeCard } from "./NotificationSwipeCard";
 import {
   filterNotificationsForUser,
   isNotificationVisibleToUser,
@@ -54,12 +78,10 @@ import { getSafeHomeworkNotificationTitle } from "../lib/homeworkSubjects";
 import { buildTeacherRedactionContext } from "../lib/userProfile";
 import { toast } from "react-hot-toast";
 import {
-  NOTIFICATION_CATEGORIES,
   resolveNotificationCategoryId,
   getCategoryConfig,
   getTimeGroup,
   TIME_GROUP_LABELS,
-  type NotificationCategoryId,
 } from "../lib/notificationCategories";
 import {
   normalizeDashboardRole,
@@ -95,33 +117,112 @@ interface NotificationCenterProps {
   userRole?: string;
 }
 
-type MainView = 'list' | 'detail' | 'settings' | 'logs';
+type MainView = 'list' | 'detail' | 'settings' | 'logs' | 'preferences';
 
-/** Primary category tabs shown in Notification Center 2.0 */
-const DISPLAY_CATEGORY_IDS: NotificationCategoryId[] = [
-  'messages',
-  'tuition',
-  'attendance',
-  'homework',
-  'system',
-];
-
-const CATEGORY_ICON_MAP: Partial<Record<NotificationCategoryId, LucideIcon>> = {
+const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
   messages: MessageSquare,
-  tuition: CreditCard,
+  tuition: Wallet,
   attendance: ClipboardCheck,
   homework: BookOpen,
   system: Settings,
-  announcements: MessageSquare,
-  reports: BookOpen,
-  smart_gate: ClipboardCheck,
+  announcements: Bell,
+  reports: UserRound,
+  smart_gate: Shield,
 };
 
-function renderCategoryIcon(categoryId: NotificationCategoryId, gold = false) {
-  const Icon = CATEGORY_ICON_MAP[categoryId] ?? Bell;
+/** Icons keyed by raw notification type for premium card styling. */
+const TYPE_ICON_MAP: Record<string, LucideIcon> = {
+  tuition: Wallet,
+  payment: CreditCard,
+  homework: BookOpen,
+  behavior: UserRound,
+  attendance: ClipboardCheck,
+  chat: MessageSquare,
+  message: MessageSquare,
+  system: Settings,
+  security: Shield,
+  billing: CreditCard,
+  subscription: CreditCard,
+  system_critical: Shield,
+};
+
+const TYPE_ICON_CLASS: Record<string, string> = {
+  tuition: 'sx-notif-icon--tuition',
+  payment: 'sx-notif-icon--payment',
+  homework: 'sx-notif-icon--homework',
+  behavior: 'sx-notif-icon--behavior',
+  attendance: 'sx-notif-icon--attendance',
+  chat: 'sx-notif-icon--chat',
+  message: 'sx-notif-icon--chat',
+  system: 'sx-notif-icon--system',
+  security: 'sx-notif-icon--security',
+};
+
+function resolveTypeIcon(notification: Record<string, unknown>): LucideIcon {
+  const rawType = String(notification.type ?? '').toLowerCase();
+  if (TYPE_ICON_MAP[rawType]) return TYPE_ICON_MAP[rawType];
+  const catId = resolveNotificationCategoryId(notification);
+  return CATEGORY_ICON_MAP[catId] ?? Bell;
+}
+
+function resolveTypeIconClass(notification: Record<string, unknown>): string {
+  const rawType = String(notification.type ?? '').toLowerCase();
+  return TYPE_ICON_CLASS[rawType] ?? 'sx-notif-icon--default';
+}
+
+function formatNotificationTime(
+  value: Date | { toDate?: () => Date; seconds?: number } | undefined,
+  isArabic: boolean,
+): string {
+  if (!value) return '';
+  const date =
+    value instanceof Date
+      ? value
+      : typeof (value as { toDate?: () => Date }).toDate === 'function'
+        ? (value as { toDate: () => Date }).toDate()
+        : typeof (value as { seconds?: number }).seconds === 'number'
+          ? new Date((value as { seconds: number }).seconds * 1000)
+          : new Date();
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const isToday = date.toDateString() === now.toDateString();
+
+  if (diffMin < 1) return isArabic ? 'الآن' : 'Just now';
+  if (diffMin < 60) return isArabic ? `منذ ${diffMin} د` : `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24 && isToday) {
+    return date.toLocaleTimeString(isArabic ? 'ar-IQ' : undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    const time = date.toLocaleTimeString(isArabic ? 'ar-IQ' : undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return isArabic ? `أمس ${time}` : `Yesterday ${time}`;
+  }
+  return date.toLocaleDateString(isArabic ? 'ar-IQ' : undefined, {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function renderCategoryIcon(
+  notification: Record<string, unknown>,
+  gold = false,
+) {
+  const Icon = resolveTypeIcon(notification);
+  const typeClass = resolveTypeIconClass(notification);
   return (
     <Icon
-      className={`sx-action-icon sx-notif-lucide${gold ? ' sx-notif-lucide--gold' : ''}`}
+      className={`sx-action-icon sx-notif-lucide ${typeClass}${gold ? ' sx-notif-lucide--gold' : ''}`}
       strokeWidth={2.25}
       aria-hidden
     />
@@ -141,9 +242,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   // View states
   const [mainView, setMainView] = useState<MainView>('list');
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<NotifFilterId>('all');
   const [loadError, setLoadError] = useState(false);
   const [cardMenuId, setCardMenuId] = useState<string | null>(null);
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(new Set());
+  const [notifPreferences, setNotifPreferences] = useState<NotificationPreferences>(
+    mergeNotificationPreferences(profile?.notificationPreferences),
+  );
+  const [prefsSaving, setPrefsSaving] = useState(false);
+  const [touchSwipeEnabled, setTouchSwipeEnabled] = useState(false);
   
   // Sound Settings States
   const [soundSettings, setSoundSettings] = useState<UserSoundSettings>(getSoundSettings());
@@ -168,6 +275,38 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const webPushConfigured = isWebPushConfigured();
   const webPushWarning = getWebPushConfigWarning(isArabic);
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const todayCount = React.useMemo(() => {
+    const today = new Date().toDateString();
+    return notifications.filter((n) => {
+      const d =
+        n.createdAt instanceof Date
+          ? n.createdAt
+          : n.createdAt?.toDate?.() || new Date(n.createdAt);
+      return d.toDateString() === today;
+    }).length;
+  }, [notifications]);
+
+  const preferenceVisibleNotifs = React.useMemo(
+    () => filterNotificationsByPreferences(notifications, notifPreferences),
+    [notifications, notifPreferences],
+  );
+
+  const filterCounts = React.useMemo(() => {
+    const counts: Record<NotifFilterId, number> = {
+      all: preferenceVisibleNotifs.length,
+      unread: 0,
+      messages: 0,
+      tuition: 0,
+      homework: 0,
+      attendance: 0,
+      system: 0,
+    };
+    for (const tab of NOTIF_FILTER_TABS) {
+      if (tab.id === 'all') continue;
+      counts[tab.id] = countNotifFilter(preferenceVisibleNotifs, tab.id);
+    }
+    return counts;
+  }, [preferenceVisibleNotifs]);
   const isAdminUser =
     profile?.role === 'admin' ||
     profile?.role === 'superadmin' ||
@@ -181,7 +320,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         setSelectedNotification(null);
         return;
       }
-      if (mainView === 'settings' || mainView === 'logs') {
+      if (mainView === 'settings' || mainView === 'logs' || mainView === 'preferences') {
         setMainView('list');
         return;
       }
@@ -204,6 +343,17 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       role: userRole || profile?.role,
     });
   }, [notifications.length, userRole, profile?.role]);
+
+  useEffect(() => {
+    setNotifPreferences(mergeNotificationPreferences(profile?.notificationPreferences));
+  }, [profile?.notificationPreferences, user?.uid]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const touch = 'ontouchstart' in window;
+    setTouchSwipeEnabled(coarse || touch);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -455,26 +605,23 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       });
   }, [mainView, profile, user?.uid, userRole]);
 
-  // 3. Filter notifications
+  // 3. Filter notifications (client-side only)
   useEffect(() => {
-    let result = [...notifications];
+    let result = filterNotificationsByPreferences([...notifications], notifPreferences);
 
     if (categoryFilter !== 'all') {
-      result = result.filter(
-        (n) => resolveNotificationCategoryId(n) === categoryFilter,
-      );
+      result = result.filter((n) => matchesNotifFilter(n, categoryFilter));
     }
 
-    // Keyword Search (matching title or content message)
     if (searchTerm.trim() !== '') {
       const kw = searchTerm.toLowerCase();
-      result = result.filter(n => 
-        n.title?.toLowerCase().includes(kw) || 
-        n.message?.toLowerCase().includes(kw)
+      result = result.filter(
+        (n) =>
+          n.title?.toLowerCase().includes(kw) ||
+          n.message?.toLowerCase().includes(kw),
       );
     }
 
-    // Unread first, then newest
     result.sort((a, b) => {
       if (!!a.read !== !!b.read) return a.read ? 1 : -1;
       const ta = a.createdAt?.getTime?.() || a.createdAt?.seconds * 1000 || 0;
@@ -483,7 +630,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     });
 
     setFilteredNotifs(result);
-  }, [notifications, categoryFilter, searchTerm]);
+  }, [notifications, categoryFilter, searchTerm, notifPreferences]);
+
+  const cleanupRanRef = React.useRef(false);
+
+  useEffect(() => {
+    if (loadingNotifications) {
+      cleanupRanRef.current = false;
+      return;
+    }
+    if (notifications.length === 0 || cleanupRanRef.current) return;
+    cleanupRanRef.current = true;
+    void notificationService.cleanupExpiredSeenFromList(notifications);
+  }, [loadingNotifications, notifications]);
 
   // Bulk Actions
   const handleMarkAllRead = async () => {
@@ -517,20 +676,63 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   };
 
   const handleMarkOneRead = async (id: string, read: boolean, notification?: any) => {
-    if (read) return; // already read
+    if (read) return;
     if (notification && !isNotificationVisibleToUser(notification, viewerContext)) {
       return;
     }
-    await notificationService.markAsRead(id);
+    await notificationService.markAsRead(id, notification);
   };
 
-  const handleDeleteOne = async (e: React.MouseEvent, id: string, notification?: any) => {
-    e.stopPropagation();
+  const handleDeleteOne = async (e: React.MouseEvent | null, id: string, notification?: any) => {
+    e?.stopPropagation();
     if (notification && !isNotificationVisibleToUser(notification, viewerContext)) {
+      return;
+    }
+    if (notification && isCriticalNotification(notification)) {
+      toast.error(
+        isArabic ? 'لا يمكن حذف إشعارات النظام الحرجة' : 'Critical notifications cannot be deleted',
+      );
       return;
     }
     await notificationService.delete(id);
     toast.success(isArabic ? "تم حذف الإشعار" : "Notification deleted");
+  };
+
+  const handleSwipeMarkRead = async (n: any) => {
+    if (n.read) return;
+    await handleMarkOneRead(n.id, n.read, n);
+    toast.success(isArabic ? 'تم التحديد كمقروء' : 'Marked as read');
+  };
+
+  const handleSwipeDelete = async (n: any) => {
+    await handleDeleteOne(null, n.id, n);
+  };
+
+  const handleTogglePreference = async (key: NotificationPreferenceKey) => {
+    if (!user?.uid) return;
+    const nextValue = !mergeNotificationPreferences(notifPreferences)[key];
+    setPrefsSaving(true);
+    try {
+      const saved = await saveNotificationPreferences(user.uid, notifPreferences, {
+        [key]: nextValue,
+      });
+      setNotifPreferences(saved);
+      toast.success(isArabic ? 'تم حفظ التفضيلات' : 'Preferences saved');
+    } catch (err) {
+      console.error('Failed to save notification preferences', err);
+      toast.error(isArabic ? 'تعذر حفظ التفضيلات' : 'Could not save preferences');
+    } finally {
+      setPrefsSaving(false);
+    }
+  };
+
+  const toggleGroupExpanded = (key: string) => {
+    setExpandedGroupKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
 
   // Sound Config Sync
@@ -559,11 +761,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     if (!n?.id) return;
     if (!isNotificationVisibleToUser(n, viewerContext)) return;
 
-    if (isNotificationSafeToDeleteOnOpen(n)) {
-      const deleted = await notificationService.deleteOnOpen(n.id);
-      if (deleted) return;
+    const ok = await notificationService.markAsSeenOnOpen(n.id, n);
+    if (!ok) {
+      await handleMarkOneRead(n.id, n.read, n);
     }
-    await handleMarkOneRead(n.id, n.read, n);
   };
 
   const handleNotificationClick = async (n: any, openDetailsOnly = false) => {
@@ -653,9 +854,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   };
 
   const getCategoryIcon = (notification: Record<string, unknown>, gold = false) => {
-    const catId = resolveNotificationCategoryId(notification);
     const useGold = gold || !notification.read;
-    return renderCategoryIcon(catId, useGold);
+    return renderCategoryIcon(notification, useGold);
   };
 
   const getCategoryLabel = (notification: Record<string, unknown>) => {
@@ -663,20 +863,32 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     return isArabic ? cat.labelAr : cat.labelEn;
   };
 
-  const groupedNotifs = React.useMemo(() => {
-    const groups: Record<'today' | 'yesterday' | 'older', any[]> = {
+  const groupedListItems = React.useMemo(() => {
+    const byTime: Record<'today' | 'yesterday' | 'older', NotificationListItem[]> = {
       today: [],
       yesterday: [],
       older: [],
     };
+
+    const timeBuckets: Record<'today' | 'yesterday' | 'older', any[]> = {
+      today: [],
+      yesterday: [],
+      older: [],
+    };
+
     filteredNotifs.forEach((n) => {
       const d =
         n.createdAt instanceof Date
           ? n.createdAt
           : n.createdAt?.toDate?.() || new Date(n.createdAt);
-      groups[getTimeGroup(d)].push(n);
+      timeBuckets[getTimeGroup(d)].push(n);
     });
-    return groups;
+
+    (['today', 'yesterday', 'older'] as const).forEach((bucket) => {
+      byTime[bucket] = buildGroupedNotificationList(timeBuckets[bucket]);
+    });
+
+    return byTime;
   }, [filteredNotifs]);
 
   const handleRefreshList = () => {
@@ -684,17 +896,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     toast.success(isArabic ? 'تم تحديث الإشعارات' : 'Notifications refreshed');
   };
 
-  const displayCategories = NOTIFICATION_CATEGORIES.filter((c) =>
-    DISPLAY_CATEGORY_IDS.includes(c.id),
-  );
-
-  const renderNotificationCard = (n: any) => {
+  const renderNotificationCardInner = (n: any) => {
     const role = normalizeDashboardRole(userRole, profile?.role);
     const hasRoute = Boolean(resolveNotificationTab(n, role));
 
     return (
       <div
-        key={n.id}
         onClick={() => handleNotificationClick(n, !hasRoute)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -702,19 +909,22 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             handleNotificationClick(n, !hasRoute);
           }
         }}
-        className={`sx-notif-card ${!n.read ? 'sx-notif-card--unread' : 'sx-notif-card--read'}`}
+        className={`sx-notif-card ${!n.read ? 'sx-notif-card--unread' : 'sx-notif-card--read'} ${resolveTypeIconClass(n)}`}
         role="button"
         tabIndex={0}
         aria-label={getNotificationTitle(n)}
       >
         {!n.read && <span className="sx-notif-card__dot" aria-hidden />}
-        <div className="sx-notif-card__icon">
+        <div className={`sx-notif-card__icon ${resolveTypeIconClass(n)}`}>
           {getCategoryIcon(n, !n.read)}
         </div>
         <div className="sx-notif-card__top">
           <span className="sx-notif-card__category">{getCategoryLabel(n)}</span>
-          <time className="sx-notif-card__time">
-            {n.createdAt?.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || ''}
+          <time
+            className="sx-notif-card__time"
+            dateTime={n.createdAt instanceof Date ? n.createdAt.toISOString() : undefined}
+          >
+            {formatNotificationTime(n.createdAt, isArabic)}
           </time>
         </div>
         <h4 className="sx-notif-card__title">{getNotificationTitle(n)}</h4>
@@ -771,6 +981,66 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     );
   };
 
+  const renderNotificationCard = (n: any) => (
+    <NotificationSwipeCard
+      key={n.id}
+      notification={n}
+      isArabic={isArabic}
+      enableSwipe={touchSwipeEnabled && mainView === 'list'}
+      onMarkRead={() => void handleSwipeMarkRead(n)}
+      onDelete={() => void handleSwipeDelete(n)}
+      onCriticalDeleteBlocked={() =>
+        toast.error(
+          isArabic ? 'لا يمكن حذف إشعارات النظام الحرجة' : 'Critical notifications cannot be deleted',
+        )
+      }
+    >
+      {renderNotificationCardInner(n)}
+    </NotificationSwipeCard>
+  );
+
+  const renderGroupCard = (item: Extract<NotificationListItem, { kind: 'group' }>) => {
+    const expanded = expandedGroupKeys.has(item.key);
+    const latest = item.notifications[0];
+    const summary = groupSummaryLabel(item.type, item.notifications.length, isArabic);
+    const unreadInGroup = item.notifications.filter((n) => !n.read).length;
+
+    return (
+      <div key={item.key} className="sx-notif-group-card">
+        <button
+          type="button"
+          className={`sx-notif-group-card__header${unreadInGroup > 0 ? ' sx-notif-group-card__header--unread' : ''}`}
+          onClick={() => toggleGroupExpanded(item.key)}
+          aria-expanded={expanded}
+          aria-label={summary}
+        >
+          <div className={`sx-notif-card__icon ${resolveTypeIconClass(latest)}`}>
+            {getCategoryIcon(latest, unreadInGroup > 0)}
+          </div>
+          <div className="sx-notif-group-card__body">
+            <span className="sx-notif-group-card__count">{item.notifications.length}</span>
+            <span className="sx-notif-group-card__title">{summary}</span>
+            <span className="sx-notif-group-card__hint">
+              {expanded
+                ? isArabic ? 'اضغط للطي' : 'Tap to collapse'
+                : isArabic ? 'اضغط لعرض التفاصيل' : 'Tap to expand'}
+            </span>
+          </div>
+        </button>
+        {expanded && (
+          <div className="sx-notif-group-card__items">
+            {item.notifications.map(renderNotificationCard)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderListItem = (item: NotificationListItem) => {
+    if (item.kind === 'single') return renderNotificationCard(item.notification);
+    return renderGroupCard(item);
+  };
+
   const renderListView = () => (
     <>
       <div className="sx-notif-search" dir={isArabic ? 'rtl' : 'ltr'}>
@@ -797,25 +1067,34 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </button>
         </div>
       ) : loadingNotifications ? (
-        <div className="sx-notif-state">
-          <Loader2 className="sx-notif-lucide sx-notif-lucide--gold animate-spin" aria-hidden />
-          <p>{isArabic ? 'جاري تحميل الإشعارات…' : 'Loading notifications…'}</p>
+        <div className="sx-notif-state sx-notif-state--loading" role="status" aria-live="polite">
+          <div className="sx-notif-state__ring">
+            <Loader2 className="sx-notif-lucide sx-notif-lucide--gold animate-spin" aria-hidden />
+          </div>
+          <p className="sx-notif-state__title">{isArabic ? 'جاري تحميل الإشعارات…' : 'Loading notifications…'}</p>
+          <p className="sx-notif-muted">{isArabic ? 'يرجى الانتظار' : 'Please wait'}</p>
         </div>
       ) : filteredNotifs.length === 0 ? (
-        <div className="sx-notif-empty">
-          <Bell className="sx-notif-lucide sx-notif-lucide--gold" aria-hidden />
-          <p>{isArabic ? 'لا توجد إشعارات حالياً' : 'No notifications right now'}</p>
-          <p className="sx-notif-muted">{isArabic ? 'كل شيء محدث' : 'All caught up'}</p>
+        <div className="sx-notif-empty" role="status">
+          <div className="sx-notif-empty__icon-wrap">
+            <Bell className="sx-notif-lucide sx-notif-lucide--gold" aria-hidden />
+          </div>
+          <p className="sx-notif-empty__title">
+            {emptyStateForFilter(categoryFilter, isArabic).title}
+          </p>
+          <p className="sx-notif-muted">
+            {emptyStateForFilter(categoryFilter, isArabic).hint}
+          </p>
         </div>
       ) : (
         <div className="sx-notif-list">
           {(['today', 'yesterday', 'older'] as const).map((groupKey) =>
-            groupedNotifs[groupKey].length > 0 ? (
+            groupedListItems[groupKey].length > 0 ? (
               <div key={groupKey} className="sx-notif-group">
                 <h3 className="sx-notif-group-label">
                   {isArabic ? TIME_GROUP_LABELS[groupKey].ar : TIME_GROUP_LABELS[groupKey].en}
                 </h3>
-                {groupedNotifs[groupKey].map(renderNotificationCard)}
+                {groupedListItems[groupKey].map(renderListItem)}
               </div>
             ) : null,
           )}
@@ -832,7 +1111,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     return (
       <div className="sx-notif-detail-view">
         <div className="sx-notif-detail-card">
-          <div className="sx-notif-detail-view__icon">
+          <div className={`sx-notif-detail-view__icon ${resolveTypeIconClass(selectedNotification)}`}>
             {getCategoryIcon(selectedNotification, true)}
           </div>
           <span className="sx-notif-detail-view__badge">{getCategoryLabel(selectedNotification)}</span>
@@ -858,7 +1137,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             )}
             <div className="sx-notif-detail-view__meta-row">
               <Bell className="sx-notif-lucide sx-notif-lucide--muted" style={{ width: 14, height: 14 }} aria-hidden />
-              <span>{selectedNotification.createdAt?.toLocaleString?.() || ''}</span>
+              <span>{formatNotificationTime(selectedNotification.createdAt, isArabic)}</span>
             </div>
           </div>
           {hasRoute && (
@@ -875,6 +1154,52 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       </div>
     );
   };
+
+  const renderPreferencesView = () => (
+    <div className="sx-notif-prefs">
+      <p className="sx-notif-prefs__intro">
+        {isArabic
+          ? 'تحكم في ظهور وصوت الإشعارات. تنبيهات الأمان الحرجة تبقى ظاهرة دائماً.'
+          : 'Control which notifications appear and play sound. Critical security alerts always remain visible.'}
+      </p>
+      <div className="sx-notif-prefs__list">
+        {PREFERENCE_TOGGLES.map((toggle) => {
+          const enabled = mergeNotificationPreferences(notifPreferences)[toggle.key];
+          return (
+            <button
+              key={toggle.key}
+              type="button"
+              className={`sx-notif-prefs__row${enabled ? '' : ' sx-notif-prefs__row--off'}`}
+              onClick={() => void handleTogglePreference(toggle.key)}
+              disabled={prefsSaving}
+              aria-pressed={enabled}
+              aria-label={isArabic ? toggle.labelAr : toggle.labelEn}
+            >
+              <span className="sx-notif-prefs__label">
+                {isArabic ? toggle.labelAr : toggle.labelEn}
+                {toggle.criticalNote && (
+                  <span className="sx-notif-prefs__note">
+                    {isArabic ? ' (الحرجة تبقى)' : ' (critical kept)'}
+                  </span>
+                )}
+              </span>
+              <span className={`sx-notif-prefs__switch${enabled ? ' is-on' : ''}`} aria-hidden />
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        className="sx-action-btn sx-action-btn-secondary sx-action-btn--block sx-notif-prefs__advanced"
+        onClick={() => setMainView('settings')}
+      >
+        <Settings className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+        <span className="sx-action-label">
+          {isArabic ? 'إعدادات متقدمة (صوت ودفع)' : 'Advanced settings (sound & push)'}
+        </span>
+      </button>
+    </div>
+  );
 
   const renderSettingsView = () => (
     <div className="sx-notif-settings">
@@ -1162,6 +1487,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         dir={isArabic ? 'rtl' : 'ltr'}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="sx-notif-grab" aria-hidden />
         <div className="sx-notif-panel">
           {/* Header */}
           <header className="sx-notif-header">
@@ -1191,6 +1517,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                         ? isArabic ? 'تفاصيل الإشعار' : 'Notification details'
                         : mainView === 'settings'
                           ? isArabic ? 'الإعدادات' : 'Settings'
+                          : mainView === 'preferences'
+                            ? isArabic ? 'تفضيلات الإشعارات' : 'Notification preferences'
                           : mainView === 'logs'
                             ? isArabic ? 'سجل الإرسال' : 'Delivery logs'
                             : isArabic ? 'الإشعارات' : 'Notifications'}
@@ -1203,13 +1531,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   </div>
                   {mainView === 'list' && (
                     <p className="sx-notif-header__sub">
-                      {unreadCount > 0
-                        ? isArabic
-                          ? `${unreadCount} غير مقروء`
-                          : `${unreadCount} unread`
-                        : isArabic
-                          ? 'كل شيء محدث'
-                          : 'All caught up'}
+                      {isArabic
+                        ? `غير مقروءة: ${unreadCount} · اليوم: ${todayCount}`
+                        : `Unread: ${unreadCount} · Today: ${todayCount}`}
                     </p>
                   )}
                 </div>
@@ -1227,9 +1551,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setMainView('settings')}
+                      onClick={() => setMainView('preferences')}
                       className="sx-action-btn sx-action-btn-icon"
-                      aria-label={isArabic ? 'الإعدادات' : 'Settings'}
+                      aria-label={isArabic ? 'تفضيلات الإشعارات' : 'Notification preferences'}
                     >
                       <Settings className="sx-action-icon" strokeWidth={2.25} aria-hidden />
                     </button>
@@ -1260,28 +1584,34 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           {/* Category tabs — list view only */}
           {mainView === 'list' && (
             <div className="sx-notif-tabs-wrap">
-              <div className="sx-notif-tabs" role="tablist" aria-label={isArabic ? 'فئات الإشعارات' : 'Notification categories'}>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={categoryFilter === 'all'}
-                  className={`sx-notif-tab ${categoryFilter === 'all' ? 'sx-notif-tab--active' : ''}`}
-                  onClick={() => setCategoryFilter('all')}
-                >
-                  <span className="sx-notif-tab-label">{isArabic ? 'الكل' : 'All'}</span>
-                </button>
-                {displayCategories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={categoryFilter === cat.id}
-                    className={`sx-notif-tab ${categoryFilter === cat.id ? 'sx-notif-tab--active' : ''}`}
-                    onClick={() => setCategoryFilter(cat.id)}
-                  >
-                    <span className="sx-notif-tab-label">{isArabic ? cat.labelAr : cat.labelEn}</span>
-                  </button>
-                ))}
+              <div
+                className="sx-notif-tabs sx-notif-tabs--chips"
+                role="tablist"
+                aria-label={isArabic ? 'فلاتر الإشعارات' : 'Notification filters'}
+              >
+                {NOTIF_FILTER_TABS.map((tab) => {
+                  const count = filterCounts[tab.id];
+                  const showBadge = tab.id !== 'all' && count > 0;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={categoryFilter === tab.id}
+                      className={`sx-notif-tab sx-notif-filter-chip ${categoryFilter === tab.id ? 'sx-notif-tab--active' : ''}`}
+                      onClick={() => setCategoryFilter(tab.id)}
+                    >
+                      <span className="sx-notif-tab-label">
+                        {isArabic ? tab.labelAr : tab.labelEn}
+                      </span>
+                      {showBadge && (
+                        <span className="sx-notif-filter-chip__badge" aria-hidden>
+                          {count > 99 ? '99+' : count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1290,6 +1620,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           <main className="sx-notif-body">
             {mainView === 'list' && renderListView()}
             {mainView === 'detail' && renderDetailView()}
+            {mainView === 'preferences' && renderPreferencesView()}
             {mainView === 'settings' && renderSettingsView()}
             {mainView === 'logs' && renderLogsView()}
           </main>

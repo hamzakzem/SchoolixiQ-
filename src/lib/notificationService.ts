@@ -1,5 +1,22 @@
 import { db } from './firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, writeBatch, deleteDoc, limit } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+  writeBatch,
+  deleteDoc,
+  limit,
+  Timestamp,
+} from 'firebase/firestore';
+import {
+  isCriticalNotification,
+  getSeenRetentionMs,
+} from './notificationRetention';
 import { resolveStudentParentIds } from './schoolSync';
 import { resolveNotificationCategoryId } from './notificationCategories';
 import { normalizeNotificationMetadata } from './notificationRouting';
@@ -12,6 +29,25 @@ import {
 } from './firestoreQuota';
 
 const markedReadNotificationIds = new Set<string>();
+
+function devLog(label: string, detail?: Record<string, unknown>): void {
+  if (!import.meta.env.DEV) return;
+  console.info(`[Notifications] ${label}`, detail ?? '');
+}
+
+function buildSeenUpdateFields(notification?: Record<string, unknown>): Record<string, unknown> {
+  const updates: Record<string, unknown> = {
+    read: true,
+    seenAt: serverTimestamp(),
+  };
+  if (notification) {
+    const retentionMs = getSeenRetentionMs(notification);
+    if (retentionMs !== null) {
+      updates.deleteAfter = Timestamp.fromMillis(Date.now() + retentionMs);
+    }
+  }
+  return updates;
+}
 
 export type NotificationType = 'grade' | 'behavior' | 'attendance' | 'announcement' | 'payment' | 'tuition' | 'homework' | 'report' | 'system' | 'message' | 'chat' | 'smart_gate' | 'dismissal';
 
@@ -331,9 +367,9 @@ export const notificationService = {
   },
 
   /**
-   * Mark a notification as read
+   * Mark a notification as read; sets seenAt and deleteAfter (+24h) for non-critical types.
    */
-  async markAsRead(notificationId: string) {
+  async markAsRead(notificationId: string, notification?: Record<string, unknown>) {
     if (!notificationId || markedReadNotificationIds.has(notificationId)) {
       logWriteSkippedDuplicate('notification_mark_read', { notificationId });
       return true;
@@ -342,10 +378,14 @@ export const notificationService = {
       return false;
     }
     try {
-      await updateDoc(doc(db, 'notifications', notificationId), {
-        read: true
-      });
+      const updates = buildSeenUpdateFields(notification);
+      await updateDoc(doc(db, 'notifications', notificationId), updates);
       markedReadNotificationIds.add(notificationId);
+      devLog('MARK_READ', {
+        notificationId,
+        scheduledDelete: Boolean(updates.deleteAfter),
+        critical: notification ? isCriticalNotification(notification) : undefined,
+      });
       return true;
     } catch (error) {
       if (isResourceExhaustedError(error)) {
@@ -355,6 +395,20 @@ export const notificationService = {
       console.error('Error marking notification as read:', error);
       return false;
     }
+  },
+
+  /**
+   * Mark as seen when user opens a notification. Falls back to markAsRead on failure.
+   */
+  async markAsSeenOnOpen(
+    notificationId: string,
+    notification: Record<string, unknown>,
+  ): Promise<boolean> {
+    const ok = await this.markAsRead(notificationId, notification);
+    if (!ok) {
+      devLog('MARK_SEEN_FALLBACK', { notificationId });
+    }
+    return ok;
   },
 
   /**
@@ -377,8 +431,9 @@ export const notificationService = {
         return true;
       }
       const batch = writeBatch(db);
-      unreadDocs.forEach(d => {
-        batch.update(d.ref, { read: true });
+      unreadDocs.forEach((d) => {
+        const data = d.data() as Record<string, unknown>;
+        batch.update(d.ref, buildSeenUpdateFields(data));
         markedReadNotificationIds.add(d.id);
       });
       await batch.commit();
@@ -407,11 +462,59 @@ export const notificationService = {
   },
 
   /**
-   * Delete on user open when safe; returns false if delete failed.
+   * @deprecated Immediate delete-on-open replaced by seenAt + deleteAfter retention.
    */
   async deleteOnOpen(notificationId: string): Promise<boolean> {
     if (!notificationId) return false;
     return this.delete(notificationId);
+  },
+
+  /**
+   * Delete notifications whose deleteAfter timestamp has passed (non-critical only).
+   * Pass the user's loaded inbox to avoid an extra composite index query.
+   */
+  async cleanupExpiredSeenFromList(
+    notifications: Array<{ id: string } & Record<string, unknown>>,
+  ): Promise<number> {
+    if (isQuotaWritePaused() || notifications.length === 0) return 0;
+    const nowMs = Date.now();
+    const expired = notifications.filter((n) => {
+      if (isCriticalNotification(n)) return false;
+      const raw = n.deleteAfter as
+        | { toMillis?: () => number; seconds?: number }
+        | Date
+        | undefined;
+      if (!raw) return false;
+      const ms =
+        typeof (raw as { toMillis?: () => number }).toMillis === 'function'
+          ? (raw as { toMillis: () => number }).toMillis()
+          : raw instanceof Date
+            ? raw.getTime()
+            : typeof (raw as { seconds?: number }).seconds === 'number'
+              ? (raw as { seconds: number }).seconds * 1000
+              : 0;
+      return ms > 0 && ms <= nowMs;
+    });
+    if (expired.length === 0) return 0;
+
+    try {
+      const batch = writeBatch(db);
+      let count = 0;
+      for (const n of expired.slice(0, 50)) {
+        batch.delete(doc(db, 'notifications', n.id));
+        count += 1;
+      }
+      await batch.commit();
+      devLog('CLEANUP_EXPIRED_SEEN', { deleted: count });
+      return count;
+    } catch (error) {
+      if (isResourceExhaustedError(error)) {
+        handleResourceExhausted('notification_cleanup_seen');
+        return 0;
+      }
+      console.error('Error cleaning up expired seen notifications:', error);
+      return 0;
+    }
   },
 
   /**

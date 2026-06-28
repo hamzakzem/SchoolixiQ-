@@ -514,11 +514,12 @@ async function deleteQueryBatch(db, queryRef, filterFn) {
   return count;
 }
 
-async function deleteExpiredByField(db, collectionName, fieldName) {
+async function deleteExpiredByField(db, collectionName, fieldName, filterFn) {
   const now = Timestamp.now();
   return deleteQueryBatch(
     db,
     db.collection(collectionName).where(fieldName, '<=', now),
+    filterFn,
   );
 }
 
@@ -546,6 +547,22 @@ async function runCleanupOldFirestoreData() {
   stats.tuition_reminder_logs = await deleteExpiredByField(db, 'tuition_reminder_logs', 'expiresAt');
 
   stats.notifications = await deleteExpiredByField(db, 'notifications', 'expiresAt');
+  stats.notifications_seen = await deleteExpiredByField(
+    db,
+    'notifications',
+    'deleteAfter',
+    (docSnap) => {
+      const data = docSnap.data() || {};
+      const type = String(data.type ?? '').toLowerCase();
+      const criticalTypes = new Set(['security', 'billing', 'subscription', 'system_critical']);
+      if (criticalTypes.has(type)) return false;
+      const meta = data.metadata || {};
+      if (meta.critical === true || meta.systemCritical === true || meta.retainOnOpen === true) {
+        return false;
+      }
+      return true;
+    },
+  );
 
   stats.system_messages = await deleteQueryBatch(
     db,
