@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { clsx } from 'clsx';
-import { GlobalFooter } from '../GlobalFooter';
+import { OfflineQueueTrigger } from '../OfflineSyncIndicator';
 import { MobileNavigationDock } from '../MobileNavigationDock';
 import { DashboardHeader, type BreadcrumbItem } from './DashboardHeader';
 import {
@@ -126,7 +126,12 @@ export function DashboardShell({
           onBack={onBack ? handleHeaderBack : undefined}
           onMenuToggle={handleMenuToggle}
           menuCollapsed={!isSidebarOpen}
-          trailing={headerTrailing}
+          trailing={
+            <>
+              {headerTrailing}
+              <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
+            </>
+          }
         />
 
         <div

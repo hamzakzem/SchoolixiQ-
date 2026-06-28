@@ -25,6 +25,7 @@ import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import { OfflineQueueTrigger } from "../components/OfflineSyncIndicator";
 import {
   logParentFirestoreSetup,
   logParentFirestoreError,
@@ -1729,6 +1730,7 @@ export default function ParentDashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                  <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
                   <LanguageToggle />
                   <ThemeToggle />
                 <button

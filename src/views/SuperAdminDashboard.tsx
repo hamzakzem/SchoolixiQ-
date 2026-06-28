@@ -24,6 +24,7 @@ import { PartnerLogoPreview } from "../components/admin/PartnerLogoPreview";
 import { sanitizePartnerLogoUrl } from "../lib/footerPartners";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import { OfflineQueueTrigger } from "../components/OfflineSyncIndicator";
 import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import {
@@ -2235,6 +2236,7 @@ export default function SuperAdminDashboard() {
             </h2>
           </div>
           <div className="flex items-center gap-4 sm:gap-4 md:gap-6 shrink-0">
+            <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
             <LanguageToggle />
             <ThemeToggle />
 

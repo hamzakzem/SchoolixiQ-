@@ -66,7 +66,7 @@ import {
 } from "./lib/apiUtils";
 import ScanHandler from "./components/ScanHandler";
 import { AudioNotificationManager } from "./components/AudioNotificationManager";
-import { OfflineSyncIndicator } from "./components/OfflineSyncIndicator";
+import { OfflineOperationsProvider } from "./components/OfflineSyncIndicator";
 import { OfflineModeBanner } from "./components/OfflineModeBanner";
 import { useLandingPageConfig } from "./lib/landingPageConfig";
 import { PageLoadingSkeleton } from "./components/ui/Skeleton";
@@ -1666,6 +1666,7 @@ export default function App() {
             <NotificationBadgeProvider>
               <SchoolPresenceTracker />
             <BrowserRouter>
+              <OfflineOperationsProvider>
               <Suspense fallback={<PageLoadingSkeleton />}>
                 <Routes>
                   <Route
@@ -1698,7 +1699,7 @@ export default function App() {
               <InstallAppBanner />
               <PwaStandaloneShell />
               <AudioNotificationManager />
-              <OfflineSyncIndicator />
+              </OfflineOperationsProvider>
             </BrowserRouter>
             </NotificationBadgeProvider>
           </AuthProvider>

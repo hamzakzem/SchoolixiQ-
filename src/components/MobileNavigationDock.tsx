@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { getDrawerPortalNode } from "../lib/drawerPortal";
 import { drawerPanelProps, drawerNavItemMotion, modalBackdropProps, MOTION_SPRING, prefersReducedMotion, servicesSideDrawerProps } from "../lib/motion";
-import SchoolixLogo from './SchoolixLogo';
+import { OfflineQueueTrigger } from './OfflineSyncIndicator';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -199,6 +199,11 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
 
   return (
     <>
+      {/* Pending offline ops — compact pill above dock (mobile only) */}
+      <div className="sx-offline-status-host sx-offline-status-host--dock print:hidden">
+        <OfflineQueueTrigger variant="dock-pill" />
+      </div>
+
       {/* Mobile Bottom Dock Bar */}
       <div className="sx-mobile-dock fixed bottom-0 inset-x-0 lg:hidden bg-gradient-to-t from-slate-950 to-slate-900/95 border-t border-slate-800/80 backdrop-blur-lg pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-3 px-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] print:hidden w-full">
         <div className="max-w-md mx-auto flex items-center justify-between gap-2">
