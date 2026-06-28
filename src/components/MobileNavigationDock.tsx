@@ -20,21 +20,30 @@ import {
   groupItemsForQuickAccess,
   resolvePermissionsGatewayTab,
   canShowPermissionsGateway,
+  getQuickAccessItemDescription,
+  getQuickAccessItemBadge,
+  getPermissionsGatewayBadge,
   type QuickAccessMenuItem,
 } from "../lib/quickAccessSections";
 import {
   LayoutDashboard,
   MessageSquare,
-  Grid3X3,
+  LayoutGrid,
   Bell,
   MoreHorizontal,
   X,
   Search,
   LogOut,
-  Shield,
+  ShieldCheck,
   Settings,
   ClipboardCheck,
   CloudUpload,
+  Sparkles,
+  ChevronLeft,
+  User,
+  Globe,
+  Moon,
+  KeyRound,
 } from "lucide-react";
 
 interface MenuItem {
@@ -237,8 +246,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
     }
   };
 
-  const dockBtnClass = (active: boolean) =>
-    `sx-dock-v2__btn${active ? " sx-dock-v2__btn--active" : ""}`;
+  const dockBtnClass = (active: boolean, variant?: "quick") =>
+    `sx-dock-v2__btn${active ? (variant === "quick" ? " sx-dock-v2__btn--active-quick" : " sx-dock-v2__btn--active") : ""}`;
+
+  const permissionsBadge = getPermissionsGatewayBadge(role, isRtl);
+  const showQuickAccessHint = showPermissionsGateway;
+
+  const offlinePendingCount =
+    offlineCounts.pending + offlineCounts.failed + offlineCounts.blocked;
 
   return (
     <>
@@ -289,21 +304,26 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 <Bell size={22} strokeWidth={2.1} aria-hidden />
                 <DockBadge count={notificationsCount} />
               </span>
-              <span>{isRtl ? "الإشعارات" : "Alerts"}</span>
+              <span>{isRtl ? "الإشعارات" : "Notifications"}</span>
             </button>
           )}
 
           <button
             type="button"
-            className={dockBtnClass(activeSheet === "quick")}
+            className={dockBtnClass(activeSheet === "quick", "quick")}
             onClick={(e) =>
               openSheet(activeSheet === "quick" ? "none" : "quick", e.currentTarget)
             }
-            aria-label={isRtl ? "الوصول السريع" : "Quick access"}
+            aria-label={
+              isRtl ? "الوصول السريع إلى أقسام المنصة" : "Quick access to platform sections"
+            }
             aria-expanded={activeSheet === "quick"}
           >
-            <Grid3X3 size={22} strokeWidth={2.1} aria-hidden />
-            <span>{isRtl ? "الوصول السريع" : "Quick"}</span>
+            <span className="sx-dock-v2__icon-wrap">
+              <LayoutGrid size={22} strokeWidth={2.1} aria-hidden />
+              {showQuickAccessHint && <span className="sx-dock-v2__dot" aria-hidden />}
+            </span>
+            <span>{isRtl ? "الوصول" : "Access"}</span>
           </button>
 
           <button
@@ -348,88 +368,135 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   dir={isRtl ? "rtl" : "ltr"}
                 >
                   <div className="sx-dock-sheet__grab" aria-hidden />
-                  <header className="sx-dock-sheet__header">
-                    <div className="sx-dock-sheet__titles">
-                      <h2 className="sx-dock-sheet__title">
-                        {isRtl ? "الوصول السريع" : "Quick access"}
-                      </h2>
-                      <p className="sx-dock-sheet__subtitle">
-                        {isRtl
-                          ? "الوصول السريع والآمن لكافة أقسام المنصة"
-                          : "Secure access to all platform sections"}
-                      </p>
+                  <div className="sx-dock-sheet__sticky">
+                    <header className="sx-dock-sheet__header">
+                      <div className="sx-dock-sheet__title-row">
+                        <span className="sx-dock-sheet__title-icon" aria-hidden>
+                          <Sparkles size={18} strokeWidth={2.2} />
+                        </span>
+                        <div className="sx-dock-sheet__titles">
+                          <h2 className="sx-dock-sheet__title">
+                            {isRtl ? "الوصول السريع" : "Quick access"}
+                          </h2>
+                          <p className="sx-dock-sheet__subtitle">
+                            {isRtl
+                              ? "انتقل بسرعة إلى الأقسام المسموحة حسب صلاحيتك"
+                              : "Jump to sections allowed for your role"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={closeSheets}
+                        className="sx-dock-sheet__close"
+                        aria-label={isRtl ? "إغلاق" : "Close"}
+                      >
+                        <X size={18} strokeWidth={2.4} aria-hidden />
+                      </button>
+                    </header>
+                    <div className="sx-dock-sheet__search-wrap">
+                      <Search className="sx-dock-sheet__search-icon" size={16} aria-hidden />
+                      <input
+                        ref={searchRef}
+                        type="search"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder={isRtl ? "ابحث عن قسم…" : "Search sections…"}
+                        className="sx-dock-sheet__search"
+                        aria-label={isRtl ? "بحث" : "Search"}
+                      />
+                      {searchTerm ? (
+                        <button
+                          type="button"
+                          className="sx-dock-sheet__search-clear"
+                          onClick={() => {
+                            setSearchTerm("");
+                            searchRef.current?.focus();
+                          }}
+                          aria-label={isRtl ? "مسح البحث" : "Clear search"}
+                        >
+                          <X size={14} aria-hidden />
+                        </button>
+                      ) : null}
                     </div>
-                    <button
-                      type="button"
-                      onClick={closeSheets}
-                      className="sx-action-btn sx-action-btn-icon shrink-0"
-                      aria-label={isRtl ? "إغلاق" : "Close"}
-                    >
-                      <X size={18} strokeWidth={2.4} aria-hidden />
-                    </button>
-                  </header>
-                  <div className="sx-dock-sheet__search-wrap">
-                    <Search className="sx-dock-sheet__search-icon" size={16} aria-hidden />
-                    <input
-                      ref={searchRef}
-                      type="search"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder={isRtl ? "ابحث عن قسم أو إجراء…" : "Search sections or actions…"}
-                      className="sx-dock-sheet__search"
-                      aria-label={isRtl ? "بحث" : "Search"}
-                    />
                   </div>
                   <div className="sx-dock-sheet__body">
                     {groupedQuickAccess.length === 0 ? (
                       <div className="sx-dock-sheet__empty">
-                        <p>{isRtl ? "لا توجد نتائج مطابقة" : "No matching results"}</p>
+                        <p className="sx-dock-sheet__empty-title">
+                          {isRtl ? "لا توجد نتائج مطابقة" : "No matching results"}
+                        </p>
+                        <p className="sx-dock-sheet__empty-hint">
+                          {isRtl
+                            ? "جرّب كلمات مثل: الطلاب، الأقساط، الرسائل"
+                            : "Try: students, tuition, messages"}
+                        </p>
                       </div>
                     ) : (
                       groupedQuickAccess.map(({ section, items }) => (
                         <section key={section.id} className="sx-dock-qa-section">
-                          <h3 className="sx-dock-qa-section__label">
-                            {isRtl ? section.labelAr : section.labelEn}
-                          </h3>
-                          {section.id === "system" && showPermissionsGateway && permissionsGatewayTab && (
-                            <button
-                              type="button"
-                              className="sx-dock-perms-card"
-                              onClick={() => handleTabClick(permissionsGatewayTab)}
-                            >
-                              <span className="sx-dock-perms-card__icon" aria-hidden>
-                                <Shield size={20} strokeWidth={2.2} />
-                              </span>
-                              <span className="sx-dock-perms-card__body">
-                                <span className="sx-dock-perms-card__title">
-                                  {isRtl ? "بوابة الصلاحيات" : "Permissions gateway"}
-                                  <span className="sx-dock-perms-card__badge">
-                                    {isRtl ? "إدارة" : "Admin"}
+                          <div className="sx-dock-qa-section__head">
+                            <h3 className="sx-dock-qa-section__label">
+                              {isRtl ? section.labelAr : section.labelEn}
+                            </h3>
+                            <p className="sx-dock-qa-section__desc">
+                              {isRtl ? section.descAr : section.descEn}
+                            </p>
+                          </div>
+                          {section.id === "system" &&
+                            showPermissionsGateway &&
+                            permissionsGatewayTab && (
+                              <button
+                                type="button"
+                                className="sx-dock-perms-card"
+                                onClick={() => handleTabClick(permissionsGatewayTab)}
+                              >
+                                <span className="sx-dock-perms-card__body">
+                                  <span className="sx-dock-perms-card__title">
+                                    {isRtl ? "بوابة الصلاحيات" : "Permissions gateway"}
+                                    <span className="sx-dock-perms-card__badge">
+                                      {permissionsBadge}
+                                    </span>
+                                  </span>
+                                  <span className="sx-dock-perms-card__desc">
+                                    {isRtl
+                                      ? "إدارة الوصول والصلاحيات حسب الدور"
+                                      : "Manage role-based access"}
                                   </span>
                                 </span>
-                                <span className="sx-dock-perms-card__desc">
-                                  {isRtl
-                                    ? "إدارة الوصول والصلاحيات حسب الدور"
-                                    : "Manage role-based access"}
+                                <span className="sx-dock-perms-card__icon" aria-hidden>
+                                  <ShieldCheck size={20} strokeWidth={2.2} />
                                 </span>
-                              </span>
-                            </button>
-                          )}
+                              </button>
+                            )}
                           <div className="sx-dock-qa-grid">
                             {items.map((item) => {
                               const Icon = item.icon;
                               const isActive = activeTab === item.id;
+                              const desc = getQuickAccessItemDescription(item, isRtl);
+                              const badge = getQuickAccessItemBadge(item.id, isRtl);
+                              const longLabel = item.label.length > 14;
                               return (
                                 <button
                                   key={item.id}
                                   type="button"
                                   onClick={() => handleTabClick(item.id)}
-                                  className={`sx-dock-qa-item${isActive ? " sx-dock-qa-item--active" : ""}`}
+                                  className={`sx-dock-qa-item${isActive ? " sx-dock-qa-item--active" : ""}${longLabel ? " sx-dock-qa-item--wide" : ""}`}
                                 >
+                                  <span className="sx-dock-qa-item__content">
+                                    <span className="sx-dock-qa-item__label-row">
+                                      <span className="sx-dock-qa-item__label">{item.label}</span>
+                                      {badge === "admin" ? (
+                                        <span className="sx-dock-qa-item__chip">
+                                          {isRtl ? "إداري" : "Admin"}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                    <span className="sx-dock-qa-item__desc">{desc}</span>
+                                  </span>
                                   <span className="sx-dock-qa-item__icon" aria-hidden>
                                     <Icon size={18} strokeWidth={isActive ? 2.4 : 2} />
                                   </span>
-                                  <span className="sx-dock-qa-item__label">{item.label}</span>
                                 </button>
                               );
                             })}
@@ -468,76 +535,214 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   dir={isRtl ? "rtl" : "ltr"}
                 >
                   <div className="sx-dock-sheet__grab" aria-hidden />
-                  <header className="sx-dock-sheet__header">
-                    <div className="sx-dock-sheet__titles">
-                      <h2 className="sx-dock-sheet__title">{isRtl ? "المزيد" : "More"}</h2>
-                      <p className="sx-dock-sheet__subtitle">
-                        {isRtl ? "الإعدادات والاختصارات" : "Settings & shortcuts"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={closeSheets}
-                      className="sx-action-btn sx-action-btn-icon shrink-0"
-                      aria-label={isRtl ? "إغلاق" : "Close"}
-                    >
-                      <X size={18} strokeWidth={2.4} aria-hidden />
-                    </button>
-                  </header>
-                  <div className="sx-dock-sheet__body sx-dock-more-list">
-                    {menuItems.some((i) => i.id === "settings") && (
+                  <div className="sx-dock-sheet__sticky">
+                    <header className="sx-dock-sheet__header">
+                      <div className="sx-dock-sheet__title-row">
+                        <span className="sx-dock-sheet__title-icon sx-dock-sheet__title-icon--more" aria-hidden>
+                          <MoreHorizontal size={18} strokeWidth={2.2} />
+                        </span>
+                        <div className="sx-dock-sheet__titles">
+                          <h2 className="sx-dock-sheet__title">{isRtl ? "المزيد" : "More"}</h2>
+                          <p className="sx-dock-sheet__subtitle">
+                            {isRtl
+                              ? "إعدادات الحساب، المزامنة، وأدوات النظام"
+                              : "Account settings, sync, and system tools"}
+                          </p>
+                        </div>
+                      </div>
                       <button
                         type="button"
-                        className="sx-dock-more-row"
-                        onClick={() => handleTabClick("settings")}
+                        onClick={closeSheets}
+                        className="sx-dock-sheet__close"
+                        aria-label={isRtl ? "إغلاق" : "Close"}
                       >
-                        <Settings size={18} aria-hidden />
-                        <span>{isRtl ? "الإعدادات والملف الشخصي" : "Settings & profile"}</span>
+                        <X size={18} strokeWidth={2.4} aria-hidden />
                       </button>
-                    )}
-                    {showPermissionsGateway && permissionsGatewayTab && (
-                      <button
-                        type="button"
-                        className="sx-dock-more-row"
-                        onClick={() => handleTabClick(permissionsGatewayTab)}
-                      >
-                        <Shield size={18} aria-hidden />
-                        <span>{isRtl ? "بوابة الصلاحيات" : "Permissions gateway"}</span>
-                      </button>
-                    )}
-                    {hasOfflineWork && offlineOps && (
-                      <button
-                        type="button"
-                        className="sx-dock-more-row sx-dock-more-row--warn"
-                        onClick={() => {
-                          closeSheets();
-                          offlineOps.openPanel();
-                        }}
-                      >
-                        <CloudUpload size={18} aria-hidden />
-                        <span>{isRtl ? "عمليات بانتظار المزامنة" : "Pending sync operations"}</span>
-                      </button>
-                    )}
-                    {(role === "superadmin" || role === "super_admin") &&
-                      menuItems.some((i) => i.id === "diagnostics") && (
+                    </header>
+                  </div>
+                  <div className="sx-dock-sheet__body sx-dock-more-body">
+                    <section className="sx-dock-more-section">
+                      <h3 className="sx-dock-more-section__label">
+                        {isRtl ? "الحساب" : "Account"}
+                      </h3>
+                      {menuItems.some((i) => i.id === "settings") && (
                         <button
                           type="button"
                           className="sx-dock-more-row"
-                          onClick={() => handleTabClick("diagnostics")}
+                          onClick={() => handleTabClick("settings")}
                         >
-                          <ClipboardCheck size={18} aria-hidden />
-                          <span>{isRtl ? "الفحص والتشخيص" : "Diagnostics"}</span>
+                          <span className="sx-dock-more-row__icon" aria-hidden>
+                            <User size={18} strokeWidth={2} />
+                          </span>
+                          <span className="sx-dock-more-row__text">
+                            <span className="sx-dock-more-row__label">
+                              {isRtl ? "الملف الشخصي" : "Profile"}
+                            </span>
+                            <span className="sx-dock-more-row__hint">
+                              {isRtl ? "عرض وتعديل بياناتك" : "View and edit your details"}
+                            </span>
+                          </span>
+                          <ChevronLeft
+                            size={16}
+                            className="sx-dock-more-row__chevron"
+                            aria-hidden
+                          />
                         </button>
                       )}
-                    <div className="sx-dock-more-toggles">
-                      <LanguageToggle />
-                      <ThemeToggle />
-                    </div>
+                      {menuItems.some((i) => i.id === "settings") && (
+                        <button
+                          type="button"
+                          className="sx-dock-more-row"
+                          onClick={() => handleTabClick("settings")}
+                        >
+                          <span className="sx-dock-more-row__icon" aria-hidden>
+                            <Settings size={18} strokeWidth={2} />
+                          </span>
+                          <span className="sx-dock-more-row__text">
+                            <span className="sx-dock-more-row__label">
+                              {isRtl ? "الإعدادات" : "Settings"}
+                            </span>
+                            <span className="sx-dock-more-row__hint">
+                              {isRtl ? "تفضيلات الحساب والمدرسة" : "Account and school preferences"}
+                            </span>
+                          </span>
+                          <ChevronLeft
+                            size={16}
+                            className="sx-dock-more-row__chevron"
+                            aria-hidden
+                          />
+                        </button>
+                      )}
+                    </section>
+
+                    <section className="sx-dock-more-section">
+                      <h3 className="sx-dock-more-section__label">
+                        {isRtl ? "التخصيص" : "Personalization"}
+                      </h3>
+                      <div className="sx-dock-more-row sx-dock-more-row--static">
+                        <span className="sx-dock-more-row__icon" aria-hidden>
+                          <Globe size={18} strokeWidth={2} />
+                        </span>
+                        <span className="sx-dock-more-row__text">
+                          <span className="sx-dock-more-row__label">
+                            {isRtl ? "اللغة" : "Language"}
+                          </span>
+                          <span className="sx-dock-more-row__hint">
+                            {isRtl ? "العربية / English" : "Arabic / English"}
+                          </span>
+                        </span>
+                        <LanguageToggle />
+                      </div>
+                      <div className="sx-dock-more-row sx-dock-more-row--static">
+                        <span className="sx-dock-more-row__icon" aria-hidden>
+                          <Moon size={18} strokeWidth={2} />
+                        </span>
+                        <span className="sx-dock-more-row__text">
+                          <span className="sx-dock-more-row__label">
+                            {isRtl ? "المظهر" : "Appearance"}
+                          </span>
+                          <span className="sx-dock-more-row__hint">
+                            {isRtl ? "الوضع الفاتح أو الليلي" : "Light or dark mode"}
+                          </span>
+                        </span>
+                        <ThemeToggle />
+                      </div>
+                    </section>
+
+                    {(hasOfflineWork ||
+                      showPermissionsGateway ||
+                      ((role === "superadmin" || role === "super_admin") &&
+                        menuItems.some((i) => i.id === "diagnostics"))) && (
+                      <section className="sx-dock-more-section">
+                        <h3 className="sx-dock-more-section__label">
+                          {isRtl ? "النظام" : "System"}
+                        </h3>
+                        {hasOfflineWork && offlineOps && (
+                          <button
+                            type="button"
+                            className="sx-dock-more-row sx-dock-more-row--status"
+                            onClick={() => {
+                              closeSheets();
+                              offlineOps.openPanel();
+                            }}
+                          >
+                            <span className="sx-dock-more-row__icon sx-dock-more-row__icon--warn" aria-hidden>
+                              <CloudUpload size={18} strokeWidth={2} />
+                            </span>
+                            <span className="sx-dock-more-row__text">
+                              <span className="sx-dock-more-row__label">
+                                {isRtl ? "عمليات بانتظار المزامنة" : "Pending sync operations"}
+                              </span>
+                              <span className="sx-dock-more-row__hint">
+                                {isRtl
+                                  ? `${offlinePendingCount} عملية تحتاج مزامنة`
+                                  : `${offlinePendingCount} operations need sync`}
+                              </span>
+                            </span>
+                            <span className="sx-dock-more-row__chip sx-dock-more-row__chip--warn">
+                              {isSyncing ? (isRtl ? "جاري" : "Syncing") : offlinePendingCount}
+                            </span>
+                          </button>
+                        )}
+                        {(role === "superadmin" || role === "super_admin") &&
+                          menuItems.some((i) => i.id === "diagnostics") && (
+                            <button
+                              type="button"
+                              className="sx-dock-more-row"
+                              onClick={() => handleTabClick("diagnostics")}
+                            >
+                              <span className="sx-dock-more-row__icon" aria-hidden>
+                                <ClipboardCheck size={18} strokeWidth={2} />
+                              </span>
+                              <span className="sx-dock-more-row__text">
+                                <span className="sx-dock-more-row__label">
+                                  {isRtl ? "التشخيصات" : "Diagnostics"}
+                                </span>
+                                <span className="sx-dock-more-row__hint">
+                                  {isRtl ? "فحص النظام والأداء" : "System health checks"}
+                                </span>
+                              </span>
+                              <ChevronLeft
+                                size={16}
+                                className="sx-dock-more-row__chevron"
+                                aria-hidden
+                              />
+                            </button>
+                          )}
+                        {showPermissionsGateway && permissionsGatewayTab && (
+                          <button
+                            type="button"
+                            className="sx-dock-more-row"
+                            onClick={() => handleTabClick(permissionsGatewayTab)}
+                          >
+                            <span className="sx-dock-more-row__icon" aria-hidden>
+                              <KeyRound size={18} strokeWidth={2} />
+                            </span>
+                            <span className="sx-dock-more-row__text">
+                              <span className="sx-dock-more-row__label">
+                                {isRtl ? "بوابة الصلاحيات" : "Permissions gateway"}
+                              </span>
+                              <span className="sx-dock-more-row__hint">
+                                {isRtl ? "إدارة الوصول حسب الدور" : "Role-based access control"}
+                              </span>
+                            </span>
+                            <span className="sx-dock-more-row__chip">{permissionsBadge}</span>
+                          </button>
+                        )}
+                      </section>
+                    )}
+
                     {onLogout && (
-                      <button type="button" className="sx-dock-more-logout" onClick={handleLogout}>
-                        <LogOut size={18} aria-hidden />
-                        <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
-                      </button>
+                      <div className="sx-dock-more-footer">
+                        <button
+                          type="button"
+                          className="sx-dock-more-logout"
+                          onClick={handleLogout}
+                        >
+                          <LogOut size={18} aria-hidden />
+                          <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </motion.div>
