@@ -2737,9 +2737,9 @@ html.dark .sx-notif-shell {
   position: sticky;
   top: 0;
   z-index: 10;
-  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 12px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px 16px;
   background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e8ecf1;
 }
 
 html.dark .sx-notif-header {
@@ -2764,11 +2764,12 @@ html.dark .sx-notif-header {
 }
 
 .sx-notif-header__title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--sx-navy);
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #0b2345;
   line-height: 1.25;
   margin: 0;
+  font-family: 'Cairo', system-ui, sans-serif;
 }
 
 html.dark .sx-notif-header__title {

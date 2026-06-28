@@ -1528,6 +1528,64 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         <div className="sx-notif-grab" aria-hidden />
         <div className="sx-notif-panel">
           {/* Header */}
+          {mainView === 'list' ? (
+            <header className="sx-panel-header sx-panel-header--sticky">
+              <div className="sx-panel-header__accent" aria-hidden />
+              <div className="sx-panel-header__main">
+                <div className="sx-panel-header__brand">
+                  <span className="sx-panel-header__icon" aria-hidden>
+                    <Bell size={24} strokeWidth={2.1} />
+                  </span>
+                  <div className="sx-panel-header__copy">
+                    <h2 className="sx-panel-header__title">
+                      {isArabic ? 'الإشعارات' : 'Notifications'}
+                    </h2>
+                    <p className="sx-panel-header__subtitle">
+                      {isArabic
+                        ? 'تابع جميع التنبيهات والرسائل المهمة في مكان واحد'
+                        : 'Track all important alerts and messages in one place'}
+                    </p>
+                    <div className="sx-panel-header__chips" role="group" aria-label={isArabic ? 'ملخص الإشعارات' : 'Notification summary'}>
+                      <span className="sx-panel-header__chip sx-panel-header__chip--accent">
+                        {isArabic ? 'غير المقروءة' : 'Unread'}{' '}
+                        <strong>{unreadCount > 99 ? '99+' : unreadCount}</strong>
+                      </span>
+                      <span className="sx-panel-header__chip">
+                        {isArabic ? 'اليوم' : 'Today'}{' '}
+                        <strong>{todayCount > 99 ? '99+' : todayCount}</strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="sx-panel-header__actions sx-notif-header-actions">
+                  <button
+                    type="button"
+                    onClick={handleRefreshList}
+                    className="sx-action-btn sx-action-btn-icon"
+                    aria-label={isArabic ? 'تحديث' : 'Refresh'}
+                  >
+                    <RefreshCw className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMainView('preferences')}
+                    className="sx-action-btn sx-action-btn-icon"
+                    aria-label={isArabic ? 'تفضيلات الإشعارات' : 'Notification preferences'}
+                  >
+                    <Settings className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="sx-action-btn sx-action-btn-icon"
+                    aria-label={isArabic ? 'إغلاق' : 'Close'}
+                  >
+                    <X className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                  </button>
+                </div>
+              </div>
+            </header>
+          ) : (
           <header className="sx-notif-header">
             <div className="sx-notif-header__row">
               <div className="sx-notif-header__title-wrap">
@@ -1561,70 +1619,22 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                             ? isArabic ? 'سجل الإرسال' : 'Delivery logs'
                             : isArabic ? 'الإشعارات' : 'Notifications'}
                     </h2>
-                    {mainView === 'list' && unreadCount > 0 && (
-                      <span className="sx-notif-unread-badge" aria-label={isArabic ? 'غير مقروء' : 'Unread'}>
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                      </span>
-                    )}
                   </div>
-                  {mainView === 'list' && (
-                    <p className="sx-notif-header__sub">
-                      {isArabic
-                        ? 'تابع التنبيهات والرسائل المهمة في مكان واحد'
-                        : 'Track important alerts and messages in one place'}
-                    </p>
-                  )}
-                  {mainView === 'list' && (
-                    <p className="sx-notif-header__summary">
-                      {isArabic
-                        ? `غير مقروءة: ${unreadCount} · اليوم: ${todayCount}`
-                        : `Unread: ${unreadCount} · Today: ${todayCount}`}
-                    </p>
-                  )}
                 </div>
               </div>
               <div className="sx-notif-header__actions sx-notif-header-actions">
-                {mainView === 'list' && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleRefreshList}
-                      className="sx-action-btn sx-action-btn-icon"
-                      aria-label={isArabic ? 'تحديث' : 'Refresh'}
-                    >
-                      <RefreshCw className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMainView('preferences')}
-                      className="sx-action-btn sx-action-btn-icon"
-                      aria-label={isArabic ? 'تفضيلات الإشعارات' : 'Notification preferences'}
-                    >
-                      <Settings className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="sx-action-btn sx-action-btn-icon"
-                      aria-label={isArabic ? 'إغلاق' : 'Close'}
-                    >
-                      <X className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                    </button>
-                  </>
-                )}
-                {mainView !== 'list' && (
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="sx-action-btn sx-action-btn-icon"
-                    aria-label={isArabic ? 'إغلاق' : 'Close'}
-                  >
-                    <X className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="sx-action-btn sx-action-btn-icon"
+                  aria-label={isArabic ? 'إغلاق' : 'Close'}
+                >
+                  <X className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                </button>
               </div>
             </div>
           </header>
+          )}
 
           {/* Category tabs — list view only */}
           {mainView === 'list' && (

@@ -38,7 +38,6 @@ import {
   Settings,
   ClipboardCheck,
   CloudUpload,
-  Sparkles,
   ChevronLeft,
   User,
   Globe,
@@ -376,31 +375,37 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 >
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
-                    <header className="sx-dock-sheet__header">
-                      <div className="sx-dock-sheet__title-row">
-                        <span className="sx-dock-sheet__title-icon" aria-hidden>
-                          <Sparkles size={18} strokeWidth={2.2} />
-                        </span>
-                        <div className="sx-dock-sheet__titles">
-                          <h2 className="sx-dock-sheet__title">
-                            {isRtl ? "الوصول السريع" : "Quick access"}
-                          </h2>
-                          <p className="sx-dock-sheet__subtitle">
-                            {isRtl
-                              ? "انتقل بسرعة إلى الأقسام المسموحة حسب صلاحيتك"
-                              : "Jump to sections allowed for your role"}
-                          </p>
+                    <header className="sx-panel-header sx-panel-header--in-sheet sx-dock-sheet__header">
+                      <div className="sx-panel-header__accent" aria-hidden />
+                      <div className="sx-panel-header__main">
+                        <div className="sx-panel-header__brand">
+                          <span className="sx-panel-header__icon sx-panel-header__icon--gold" aria-hidden>
+                            <LayoutGrid size={24} strokeWidth={2.1} />
+                          </span>
+                          <div className="sx-panel-header__copy">
+                            <h2 className="sx-panel-header__title">
+                              {isRtl ? "الوصول السريع" : "Quick access"}
+                            </h2>
+                            <p className="sx-panel-header__subtitle">
+                              {isRtl
+                                ? "انتقل بسرعة إلى جميع الأقسام المتاحة حسب صلاحياتك"
+                                : "Jump quickly to all sections available for your role"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="sx-panel-header__actions">
+                          <button
+                            type="button"
+                            onClick={closeSheets}
+                            className="sx-panel-header__close"
+                            aria-label={isRtl ? "إغلاق" : "Close"}
+                          >
+                            <X size={18} strokeWidth={2.4} aria-hidden />
+                          </button>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={closeSheets}
-                        className="sx-dock-sheet__close"
-                        aria-label={isRtl ? "إغلاق" : "Close"}
-                      >
-                        <X size={18} strokeWidth={2.4} aria-hidden />
-                      </button>
                     </header>
+                    <div className="sx-dock-sheet__search-divider" aria-hidden />
                     <div className="sx-dock-sheet__search-wrap">
                       <Search className="sx-dock-sheet__search-icon" size={16} aria-hidden />
                       <input
@@ -408,7 +413,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                         type="search"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder={isRtl ? "ابحث عن قسم…" : "Search sections…"}
+                        placeholder={isRtl ? "ابحث عن قسم أو خدمة…" : "Search for a section or service…"}
                         className="sx-dock-sheet__search"
                         aria-label={isRtl ? "بحث" : "Search"}
                       />
@@ -544,28 +549,33 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 >
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
-                    <header className="sx-dock-sheet__header">
-                      <div className="sx-dock-sheet__title-row">
-                        <span className="sx-dock-sheet__title-icon sx-dock-sheet__title-icon--more" aria-hidden>
-                          <MoreHorizontal size={18} strokeWidth={2.2} />
-                        </span>
-                        <div className="sx-dock-sheet__titles">
-                          <h2 className="sx-dock-sheet__title">{isRtl ? "المزيد" : "More"}</h2>
-                          <p className="sx-dock-sheet__subtitle">
-                            {isRtl
-                              ? "إعدادات الحساب، المزامنة، وأدوات النظام"
-                              : "Account settings, sync, and system tools"}
-                          </p>
+                    <header className="sx-panel-header sx-panel-header--in-sheet sx-dock-sheet__header">
+                      <div className="sx-panel-header__accent" aria-hidden />
+                      <div className="sx-panel-header__main">
+                        <div className="sx-panel-header__brand">
+                          <span className="sx-panel-header__icon sx-panel-header__icon--gold" aria-hidden>
+                            <Settings size={24} strokeWidth={2.1} />
+                          </span>
+                          <div className="sx-panel-header__copy">
+                            <h2 className="sx-panel-header__title">{isRtl ? "المزيد" : "More"}</h2>
+                            <p className="sx-panel-header__subtitle">
+                              {isRtl
+                                ? "إعدادات الحساب، التخصيص، وأدوات النظام"
+                                : "Account settings, personalization, and system tools"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="sx-panel-header__actions">
+                          <button
+                            type="button"
+                            onClick={closeSheets}
+                            className="sx-panel-header__close"
+                            aria-label={isRtl ? "إغلاق" : "Close"}
+                          >
+                            <X size={18} strokeWidth={2.4} aria-hidden />
+                          </button>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={closeSheets}
-                        className="sx-dock-sheet__close"
-                        aria-label={isRtl ? "إغلاق" : "Close"}
-                      >
-                        <X size={18} strokeWidth={2.4} aria-hidden />
-                      </button>
                     </header>
                   </div>
                   <div className="sx-dock-sheet__body sx-dock-more-body">
