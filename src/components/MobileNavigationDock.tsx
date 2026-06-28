@@ -72,6 +72,10 @@ interface MobileNavigationDockProps {
 
 type DockSheet = "none" | "quick" | "more";
 
+const devLog = (...args: unknown[]) => {
+  if (import.meta.env.DEV) console.debug("[MobileNavigationDock]", ...args);
+};
+
 function DockBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
@@ -109,7 +113,6 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   const lastTriggerRef = useRef<HTMLElement | null>(null);
 
   const role = userRole || profile?.role;
-  const isLightMenu = menuSurface === "light";
   const overviewItem =
     menuItems.find((i) => i.id === "overview" || i.id === "home") || menuItems[0];
   const chatItem =
@@ -151,12 +154,14 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   const portalLayerOpen = servicesDrawerOpen || (!hidden && isCompactViewport && sheetOpen);
 
   const closeSheets = () => {
+    devLog("closeSheets");
     setActiveSheet("none");
     setSearchTerm("");
     lastTriggerRef.current?.focus();
   };
 
   const handleTabClick = (tabId: string) => {
+    devLog("navigate", tabId);
     setActiveTab(tabId);
     closeSheets();
     setIsSidebarOpen(false);
@@ -164,6 +169,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   };
 
   const openSheet = (sheet: DockSheet, trigger?: HTMLElement | null) => {
+    devLog("openSheet", sheet);
     if (trigger) lastTriggerRef.current = trigger;
     setActiveSheet(sheet);
     setIsSidebarOpen(false);
@@ -364,8 +370,9 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 />
                 <motion.div
                   {...drawerPanelProps(true)}
-                  className={`sx-dock-sheet sx-dock-sheet--quick ${isLightMenu ? "sx-drawer-panel--light" : "sx-dock-sheet--dark"}`}
+                  className="sx-dock-sheet sx-dock-sheet--quick sx-dock-sheet--light"
                   dir={isRtl ? "rtl" : "ltr"}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
@@ -531,8 +538,9 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 />
                 <motion.div
                   {...drawerPanelProps(true)}
-                  className={`sx-dock-sheet sx-dock-sheet--more ${isLightMenu ? "sx-drawer-panel--light" : "sx-dock-sheet--dark"}`}
+                  className="sx-dock-sheet sx-dock-sheet--more sx-dock-sheet--light"
                   dir={isRtl ? "rtl" : "ltr"}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
