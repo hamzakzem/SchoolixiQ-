@@ -1265,6 +1265,178 @@ html.dark .sx-mobile-panel-header-v3__btn .sx-action-icon {
   color: #f8fafc;
 }
 
+/* ─── App modal portal (fixed to viewport — escapes motion/transform parents) ─── */
+.sx-app-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  pointer-events: auto;
+}
+
+.sx-app-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  background: rgba(15, 23, 42, 0.38) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
+}
+
+.sx-app-modal-panel {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: min(88dvh, calc(100dvh - 12px));
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #ffffff;
+  border: none;
+  border-radius: 24px 24px 0 0;
+  box-shadow: none;
+  opacity: 1 !important;
+  isolation: isolate;
+}
+
+.sx-app-modal-panel--sm {
+  max-width: 100%;
+}
+
+.sx-app-modal-panel--md {
+  max-width: 100%;
+}
+
+.sx-app-modal-panel--lg {
+  max-width: 100%;
+}
+
+.sx-app-modal-panel__header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  background: transparent;
+  border: none;
+}
+
+.sx-app-modal-panel__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0b2345;
+  line-height: 1.25;
+  font-family: 'Cairo', system-ui, sans-serif;
+}
+
+.sx-app-modal-panel__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.sx-app-modal-panel__close {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border: none;
+  border-radius: 9px;
+  background: #f1f5f9;
+  color: #0b2345;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.sx-app-modal-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px 12px;
+  background: #ffffff;
+}
+
+.sx-app-modal-panel__footer {
+  flex-shrink: 0;
+  padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: #f8fafc;
+  border: none;
+}
+
+html.dark .sx-app-modal-panel {
+  background: #1e293b;
+}
+
+html.dark .sx-app-modal-panel__title {
+  color: #ffffff;
+}
+
+html.dark .sx-app-modal-panel__subtitle {
+  color: #cbd5e1;
+}
+
+html.dark .sx-app-modal-panel__close {
+  background: #334155;
+  color: #f8fafc;
+}
+
+html.dark .sx-app-modal-panel__body {
+  background: #1e293b;
+}
+
+html.dark .sx-app-modal-panel__footer {
+  background: #1a2332;
+}
+
+@media (min-width: 768px) {
+  .sx-app-modal-root {
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+  }
+
+  .sx-app-modal-panel {
+    border-radius: 24px;
+    max-height: min(85vh, 720px);
+  }
+
+  .sx-app-modal-panel--sm {
+    max-width: 24rem;
+  }
+
+  .sx-app-modal-panel--md {
+    max-width: 32rem;
+  }
+
+  .sx-app-modal-panel--lg {
+    max-width: 42rem;
+  }
+}
+
 /* Sheet grab — minimal, no extra top gap */
 .sx-dock-sheet__grab {
   width: 32px;

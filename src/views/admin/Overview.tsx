@@ -3,9 +3,9 @@ import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, getCountFromServer, getAggregateFromServer, sum, limit, orderBy } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { useAuth } from '../../lib/AuthContext';
-import { Users, UserRound, BookOpen, Wallet, ShoppingBag, Trash2, Settings2, MapPin, ExternalLink, Edit2, Building2, GraduationCap, Clock, Map } from 'lucide-react';
+import { Users, UserRound, BookOpen, Wallet, ShoppingBag, Trash2, Settings2, MapPin, ExternalLink, Edit2, Building2, GraduationCap, Clock, Map, X } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { motion, AnimatePresence } from 'motion/react';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import { AnimatedCounter } from '../../components/ui/AnimatedCounter';
 import { toast } from 'react-hot-toast';
 
@@ -343,36 +343,32 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
       </section>
 
       {schoolInfo && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden"
-        >
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="h-1 bg-gradient-to-l from-amber-400 via-amber-500/80 to-slate-900" />
-          <div className="p-5 md:p-7">
-            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5 pb-5 border-b border-slate-100 dark:border-slate-800/80 mb-5">
-              <div className="flex items-start gap-4 min-w-0">
-                <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-900 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-amber-400 border border-slate-800 dark:border-slate-700 shadow-sm shrink-0">
-                  <Building2 size={26} />
+          <div className="p-4 sm:p-5 md:p-7">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 mb-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-11 h-11 sm:w-12 sm:h-12 bg-slate-900 dark:bg-slate-800 rounded-xl flex items-center justify-center text-amber-400 shrink-0">
+                  <Building2 size={22} />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                     {isRtl ? 'بطاقة السجل الرسمي للمدرسة' : 'Official School Registry Card'}
                   </p>
-                  <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mt-1 font-display truncate">
+                  <h3 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 dark:text-white mt-1 font-display">
                     {schoolInfo.name}
                   </h3>
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">
                       {isRtl ? 'حساب نشط' : 'Active Account'}
                     </span>
                     {schoolInfo.governorate ? (
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                         {translateSchoolValue(schoolInfo.governorate, isRtl)}
                       </span>
                     ) : null}
                     {schoolInfo.stage ? (
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                         {translateSchoolValue(schoolInfo.stage, isRtl)}
                       </span>
                     ) : null}
@@ -380,10 +376,11 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 justify-start lg:justify-end shrink-0">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
                 <button
+                  type="button"
                   onClick={() => setShowLocationModal(true)}
-                  className="px-4 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                  className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                 >
                   <Edit2 size={14} />
                   <span>{isRtl ? 'تحديث السجل' : 'Update Profile'}</span>
@@ -393,7 +390,7 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
                     href={schoolInfo.googleMapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                    className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
                   >
                     <MapPin size={14} />
                     <span>{isRtl ? 'الموقع على الخريطة' : 'View on Map'}</span>
@@ -454,156 +451,167 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
               />
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      <AnimatePresence>
-        {showAdjustModal && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" dir="rtl">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl p-8 border border-slate-200"
-            >
-              <div className="flex items-center gap-4 mb-6 text-orange-600">
-                <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center">
-                  <ShoppingBag size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">{t('salesDisplayMethod')}</h3>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest leading-relaxed">{t('adjustmentValue')}</p>
-                </div>
-              </div>
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('adjustmentValue')} ({t('iqd')})</label>
-                  <input 
-                    type="number"
-                    value={Number.isNaN(adjustValue) ? '' : adjustValue}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setAdjustValue(val === '' ? 0 : Number(val) || 0);
-                    }}
-                    className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 focus:border-orange-500 outline-none font-black text-2xl text-orange-600 font-mono"
-                    placeholder="0"
-                  />
-                  <p className="mt-2 text-[10px] text-slate-400 font-bold leading-relaxed px-1">
-                    * {isRtl ? 'الحساب الحالي' : 'Current Calculation'}: {stats.calculatedSales.toLocaleString()} ({isRtl ? 'تلقائي' : 'Auto'}) + {adjustValue.toLocaleString()} ({isRtl ? 'تسوية' : 'Adjustment'}) = {(stats.calculatedSales + adjustValue).toLocaleString()}
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  <button 
-                    onClick={handleUpdateAdjustment}
-                    className="w-full py-4 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-900/10 active:scale-95"
-                  >
-                    {t('update')}
-                  </button>
-                  <button 
-                    onClick={handleResetSales}
-                    className="w-full py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold hover:bg-rose-100 transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <Trash2 size={18} />
-                    {t('resetSales')}
-                  </button>
-                  <button 
-                    onClick={() => setShowAdjustModal(false)}
-                    className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-                  >
-                    {t('cancel')}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={showAdjustModal}
+        onClose={() => setShowAdjustModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="sm"
+        ariaLabel={t('salesDisplayMethod')}
+      >
+        <div className="p-5 sm:p-6">
+          <div className="flex items-center gap-3 mb-5 text-orange-600">
+            <div className="w-11 h-11 bg-orange-50 dark:bg-orange-950/30 rounded-xl flex items-center justify-center shrink-0">
+              <ShoppingBag size={22} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t('salesDisplayMethod')}</h3>
+              <p className="text-xs text-slate-500 font-bold">{t('adjustmentValue')}</p>
+            </div>
           </div>
-        )}
 
-        {showTuitionModal && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" dir="rtl">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl p-8 border border-slate-200"
-            >
-              <div className="flex items-center gap-4 mb-6 text-emerald-600">
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
-                  <Wallet size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">{t('tuitionRevenue')}</h3>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest leading-relaxed">{t('adjustmentValue')}</p>
-                </div>
-              </div>
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('adjustmentValue')} ({t('iqd')})</label>
-                  <input 
-                    type="number"
-                    value={Number.isNaN(tuitionAdjustValue) ? '' : tuitionAdjustValue}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setTuitionAdjustValue(val === '' ? 0 : Number(val) || 0);
-                    }}
-                    className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 focus:border-emerald-500 outline-none font-black text-2xl text-emerald-600 font-mono"
-                    placeholder="0"
-                  />
-                  <p className="mt-2 text-[10px] text-slate-400 font-bold leading-relaxed px-1">
-                    * {isRtl ? 'الحساب الحالي' : 'Current Calculation'}: {stats.calculatedTuition.toLocaleString()} ({isRtl ? 'تلقائي' : 'Auto'}) + {tuitionAdjustValue.toLocaleString()} ({isRtl ? 'تسوية' : 'Adjustment'}) = {(stats.calculatedTuition + tuitionAdjustValue).toLocaleString()}
-                  </p>
-                </div>
+          <div className="space-y-5">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('adjustmentValue')} ({t('iqd')})</label>
+              <input
+                type="number"
+                value={Number.isNaN(adjustValue) ? '' : adjustValue}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAdjustValue(val === '' ? 0 : Number(val) || 0);
+                }}
+                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none font-black text-2xl text-orange-600 font-mono"
+                placeholder="0"
+              />
+              <p className="mt-2 text-[10px] text-slate-400 font-bold leading-relaxed">
+                * {isRtl ? 'الحساب الحالي' : 'Current Calculation'}: {stats.calculatedSales.toLocaleString()} ({isRtl ? 'تلقائي' : 'Auto'}) + {adjustValue.toLocaleString()} ({isRtl ? 'تسوية' : 'Adjustment'}) = {(stats.calculatedSales + adjustValue).toLocaleString()}
+              </p>
+            </div>
 
-                <div className="flex flex-col gap-3">
-                  <button 
-                    onClick={handleUpdateTuitionAdjustment}
-                    className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-900/10 active:scale-95"
-                  >
-                    {t('update')}
-                  </button>
-                  <button 
-                    onClick={handleResetTuition}
-                    className="w-full py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold hover:bg-rose-100 transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <Trash2 size={18} />
-                    {t('resetTuition')}
-                  </button>
-                  <button 
-                    onClick={() => setShowTuitionModal(false)}
-                    className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-                  >
-                    {t('cancel')}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={handleUpdateAdjustment}
+                className="w-full py-3.5 bg-orange-600 text-white rounded-xl font-bold"
+              >
+                {t('update')}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetSales}
+                className="w-full py-3.5 bg-rose-50 text-rose-600 rounded-xl font-bold flex items-center justify-center gap-2"
+              >
+                <Trash2 size={18} />
+                {t('resetSales')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAdjustModal(false)}
+                className="w-full py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold"
+              >
+                {t('cancel')}
+              </button>
+            </div>
           </div>
-        )}
+        </div>
+      </AppModalPortal>
 
-        {showLocationModal && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" dir="rtl">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] w-full max-w-lg shadow-2xl p-6 md:p-8 relative max-h-[90vh] flex flex-col"
-            >
-              <div className="flex items-center gap-4 mb-4 text-indigo-600 dark:text-indigo-400 shrink-0">
-                <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center border border-indigo-100 dark:border-indigo-900/30">
-                  <MapPin size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">{isRtl ? 'تحديث السجل وبيانات المدرسة' : 'Update School Registry Profile'}</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-                    {schoolInfo?.name}
-                  </p>
-                </div>
-              </div>
+      <AppModalPortal
+        open={showTuitionModal}
+        onClose={() => setShowTuitionModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="sm"
+        ariaLabel={t('tuitionRevenue')}
+      >
+        <div className="p-5 sm:p-6">
+          <div className="flex items-center gap-3 mb-5 text-emerald-600">
+            <div className="w-11 h-11 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl flex items-center justify-center shrink-0">
+              <Wallet size={22} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t('tuitionRevenue')}</h3>
+              <p className="text-xs text-slate-500 font-bold">{t('adjustmentValue')}</p>
+            </div>
+          </div>
 
-              <div className="space-y-4 overflow-y-auto pr-1 flex-1 py-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-5">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('adjustmentValue')} ({t('iqd')})</label>
+              <input
+                type="number"
+                value={Number.isNaN(tuitionAdjustValue) ? '' : tuitionAdjustValue}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTuitionAdjustValue(val === '' ? 0 : Number(val) || 0);
+                }}
+                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none font-black text-2xl text-emerald-600 font-mono"
+                placeholder="0"
+              />
+              <p className="mt-2 text-[10px] text-slate-400 font-bold leading-relaxed">
+                * {isRtl ? 'الحساب الحالي' : 'Current Calculation'}: {stats.calculatedTuition.toLocaleString()} ({isRtl ? 'تلقائي' : 'Auto'}) + {tuitionAdjustValue.toLocaleString()} ({isRtl ? 'تسوية' : 'Adjustment'}) = {(stats.calculatedTuition + tuitionAdjustValue).toLocaleString()}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={handleUpdateTuitionAdjustment}
+                className="w-full py-3.5 bg-emerald-600 text-white rounded-xl font-bold"
+              >
+                {t('update')}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetTuition}
+                className="w-full py-3.5 bg-rose-50 text-rose-600 rounded-xl font-bold flex items-center justify-center gap-2"
+              >
+                <Trash2 size={18} />
+                {t('resetTuition')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTuitionModal(false)}
+                className="w-full py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold"
+              >
+                {t('cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="md"
+        ariaLabel={isRtl ? 'تحديث السجل وبيانات المدرسة' : 'Update School Registry Profile'}
+      >
+        <div className="sx-app-modal-panel__header">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 bg-indigo-50 dark:bg-indigo-950/40 rounded-xl flex items-center justify-center shrink-0">
+              <MapPin size={20} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="sx-app-modal-panel__title">{isRtl ? 'تحديث السجل وبيانات المدرسة' : 'Update School Registry Profile'}</h3>
+              <p className="sx-app-modal-panel__subtitle truncate">{schoolInfo?.name}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowLocationModal(false)}
+            className="sx-app-modal-panel__close"
+            aria-label={isRtl ? 'إغلاق' : 'Close'}
+          >
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
+
+        <div className="sx-app-modal-panel__body">
+          <div className="space-y-4 pb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Governorate */}
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1">{isRtl ? 'المحافظة' : 'Governorate'}</label>
@@ -733,28 +741,27 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
                     * {isRtl ? 'انسخ الرابط التفصيلي من خرائط جوجل والصقه هنا لمزامنة فورية.' : 'Copy from google maps and paste here.'}
                   </p>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col gap-3 mt-4 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-850">
-                <button 
-                  onClick={handleSaveLocation}
-                  disabled={savingLocation}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/10 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {savingLocation ? (isRtl ? 'جاري الحفظ والمزامنة...' : 'Saving & Syncing...') : (isRtl ? 'حفظ التغييرات ومزامنتها' : 'Save & Sync Changes')}
-                </button>
-                <button 
-                  onClick={() => setShowLocationModal(false)}
-                  className="w-full py-3 bg-slate-100 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold transition-all active:scale-95 cursor-pointer"
-                >
-                  {isRtl ? 'إلغاء' : 'Cancel'}
-                </button>
-              </div>
-            </motion.div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+
+        <div className="sx-app-modal-panel__footer flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={handleSaveLocation}
+            disabled={savingLocation}
+            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {savingLocation ? (isRtl ? 'جاري الحفظ والمزامنة...' : 'Saving & Syncing...') : (isRtl ? 'حفظ التغييرات ومزامنتها' : 'Save & Sync Changes')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowLocationModal(false)}
+            className="w-full py-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold"
+          >
+            {isRtl ? 'إلغاء' : 'Cancel'}
+          </button>
+        </div>
+      </AppModalPortal>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <div className="bg-white dark:bg-slate-900 p-5 md:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors">

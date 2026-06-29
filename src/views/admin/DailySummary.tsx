@@ -20,7 +20,6 @@ import {
 import { setOfflineDataStale } from '../../lib/offline/offlineStatus';
 import { isPackageFeatureEnabled } from '../../lib/featureRegistry';
 import { useLanguage } from '../../lib/LanguageContext';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   UserX,
   Wallet,
@@ -45,6 +44,7 @@ import {
   type DailyStudentRecord,
 } from '../../lib/dailySummaryUtils';
 import { OverviewTuitionQuickReminder } from './OverviewTuitionQuickReminder';
+import { AppModalPortal } from '../../components/AppModalPortal';
 
 type ModalType = 'present' | 'absent' | 'market' | null;
 
@@ -127,26 +127,26 @@ function SummaryStatCard({
     <Wrapper
       type={isInteractive ? 'button' : undefined}
       onClick={onClick}
-      className={`p-4 md:p-5 rounded-2xl border shadow-sm flex flex-col text-right transition-all ${styles.card} ${className} ${
+      className={`p-3.5 sm:p-4 md:p-5 rounded-2xl border shadow-sm flex flex-col text-right transition-all ${styles.card} ${className} ${
         isInteractive
-          ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
+          ? 'cursor-pointer hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
           : ''
       }`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 leading-snug">
           {label}
         </span>
         <div
-          className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${styles.badge}`}
+          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center shrink-0 ${styles.badge}`}
         >
-          <Icon size={17} className={styles.icon} />
+          <Icon size={16} className={styles.icon} />
         </div>
       </div>
-      <div className="flex items-baseline gap-1.5 min-h-[2.25rem]">
+      <div className="flex items-baseline gap-1.5 min-h-[2rem]">
         <span
-          className={`text-2xl md:text-3xl font-black tabular-nums ${isZero ? 'text-slate-300 dark:text-slate-600' : styles.value}`}
+          className={`text-xl sm:text-2xl md:text-3xl font-black tabular-nums leading-none ${isZero ? 'text-slate-300 dark:text-slate-600' : styles.value}`}
         >
           {displayValue}
         </span>
@@ -154,7 +154,7 @@ function SummaryStatCard({
           <span className="text-[10px] font-bold text-slate-400 shrink-0">{unit}</span>
         ) : null}
       </div>
-      <p className={`text-[10px] font-bold mt-2 ${isZero ? 'text-slate-400' : 'text-slate-400/80'}`}>
+      <p className={`text-[10px] font-semibold mt-1.5 leading-snug ${isZero ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>
         {isZero ? emptyHint : isRtl ? 'محدّث اليوم' : 'Updated today'}
       </p>
     </Wrapper>
@@ -714,179 +714,170 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
         </div>
       </div>
 
-      <AnimatePresence>
-        {activeModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+      <AppModalPortal
+        open={Boolean(activeModal)}
+        onClose={closeAttendanceModal}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="lg"
+        ariaLabel={modalTitle}
+      >
+        <div className="sx-app-modal-panel__header">
+          <div className="min-w-0">
+            <h3 className="sx-app-modal-panel__title">{modalTitle}</h3>
+            <p className="sx-app-modal-panel__subtitle">{todayStr}</p>
+          </div>
+          <button
+            type="button"
             onClick={closeAttendanceModal}
+            className="sx-app-modal-panel__close"
+            aria-label={isRtl ? 'إغلاق' : 'Close'}
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[85vh] rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden"
-              dir={isRtl ? 'rtl' : 'ltr'}
-            >
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white">{modalTitle}</h3>
-                  <p className="text-xs font-bold text-slate-400 mt-1">{todayStr}</p>
-                </div>
-                <button
-                  onClick={closeAttendanceModal}
-                  className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
 
-              <div className="flex-1 overflow-y-auto p-6" ref={printRef}>
-                {activeModal === 'market' ? (
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <ShoppingBag className="text-indigo-600" size={24} />
-                        <span className="font-bold text-slate-700 dark:text-slate-300">
-                          {isRtl ? 'إجمالي المحصل' : 'Total collected'}
-                        </span>
-                      </div>
-                      <span className="text-2xl font-black text-indigo-600">
-                        {stats.collectedToday.toLocaleString()} {t('iqd')}
-                      </span>
-                    </div>
-                    {completedMarketOrders.length > 0 ? (
-                      completedMarketOrders.map((order) => (
-                        <div
-                          key={order.id}
-                          className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex justify-between items-center"
-                        >
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white">
-                              {order.parentName || order.customerName || isRtl ? 'ولي أمر' : 'Parent'}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-1">
-                              {(order.items || [])
-                                .map((i: any) => i.name || i.itemName)
-                                .join('، ') || '—'}
-                            </p>
-                          </div>
-                          <span className="font-black text-indigo-600">
-                            {Number(order.total || 0).toLocaleString()} {t('iqd')}
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-center text-slate-400 font-bold py-8">
-                        {isRtl ? 'لا توجد مبيعات مكتملة اليوم' : 'No completed sales today'}
+        <div className="sx-app-modal-panel__body" ref={printRef}>
+          {activeModal === 'market' ? (
+            <div className="space-y-3">
+              <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <ShoppingBag className="text-indigo-600 shrink-0" size={22} />
+                  <span className="font-bold text-slate-700 dark:text-slate-300 text-sm">
+                    {isRtl ? 'إجمالي المحصل' : 'Total collected'}
+                  </span>
+                </div>
+                <span className="text-lg sm:text-xl font-black text-indigo-600 tabular-nums shrink-0">
+                  {stats.collectedToday.toLocaleString()} {t('iqd')}
+                </span>
+              </div>
+              {completedMarketOrders.length > 0 ? (
+                completedMarketOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 flex justify-between items-center gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                        {order.parentName || order.customerName || (isRtl ? 'ولي أمر' : 'Parent')}
                       </p>
-                    )}
+                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                        {(order.items || [])
+                          .map((i: { name?: string; itemName?: string }) => i.name || i.itemName)
+                          .join('، ') || '—'}
+                      </p>
+                    </div>
+                    <span className="font-black text-indigo-600 text-sm tabular-nums shrink-0">
+                      {Number(order.total || 0).toLocaleString()} {t('iqd')}
+                    </span>
                   </div>
-                ) : modalStudents.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {modalStudents.map((student) => (
-                      <StudentAttendanceCard key={student.studentId} student={student} isRtl={isRtl} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-slate-400 font-bold py-12">
+                ))
+              ) : (
+                <p className="text-center text-slate-400 font-bold py-10 text-sm">
+                  {isRtl ? 'لا توجد مبيعات مكتملة اليوم' : 'No completed sales today'}
+                </p>
+              )}
+            </div>
+          ) : modalStudents.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {modalStudents.map((student) => (
+                <StudentAttendanceCard key={student.studentId} student={student} isRtl={isRtl} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-slate-400 font-bold py-10 text-sm leading-relaxed px-2">
+              {isRtl
+                ? 'لا يوجد سجل لهذا اليوم — سجّل الحضور من تبويب الحضور والغياب'
+                : 'No records today — register attendance in the Attendance tab'}
+            </p>
+          )}
+        </div>
+
+        {(activeModal === 'present' || activeModal === 'absent') && (
+          <div className="sx-app-modal-panel__footer space-y-3">
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={modalStudents.length === 0}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 font-bold text-sm text-slate-700 dark:text-slate-200 disabled:opacity-40"
+              >
+                <Printer size={16} />
+                {isRtl ? 'طباعة' : 'Print'}
+              </button>
+              <button
+                type="button"
+                onClick={handleGoToAttendanceCorrection}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm"
+              >
+                <ClipboardCheck size={16} />
+                {isRtl ? 'تصحيح السجل' : 'Correct record'}
+              </button>
+            </div>
+
+            {isSchoolAdmin && attendanceDocs.length > 0 && (
+              <div className="rounded-xl bg-rose-50/80 dark:bg-rose-950/20 p-3.5">
+                {!showDangerDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowDangerDelete(true)}
+                    className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-2"
+                  >
+                    <ShieldAlert size={14} />
                     {isRtl
-                      ? 'لا يوجد سجل لهذا اليوم — سجّل الحضور من تبويب الحضور والغياب'
-                      : 'No records today — register attendance in the Attendance tab'}
-                  </p>
+                      ? 'حذف فعلي من سجل الحضور والغياب (مدير فقط)'
+                      : 'Permanently delete from attendance records (admin only)'}
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm font-black text-rose-700 dark:text-rose-400 leading-relaxed">
+                      {isRtl
+                        ? 'تحذير: هذا الإجراء سيحذف سجل حضور وغياب اليوم بالكامل من قاعدة البيانات ولا يمكن التراجع عنه بسهولة. استخدم «تصحيح السجل» أولاً إن كان الخطأ في التسجيل فقط.'
+                        : "Warning: This permanently deletes all of today's attendance records from the database. Prefer «Correct record» for registration fixes."}
+                    </p>
+                    <p className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                      {isRtl
+                        ? `سيتم حذف ${attendanceDocs.length} سجل/سجلات لتاريخ ${todayStr}`
+                        : `${attendanceDocs.length} record(s) for ${todayStr} will be deleted`}
+                    </p>
+                    <input
+                      type="text"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder={isRtl ? 'اكتب «حذف» للتأكيد' : 'Type DELETE to confirm'}
+                      className="w-full px-4 py-2.5 rounded-xl border border-rose-200 bg-white dark:bg-slate-900 font-bold text-sm"
+                      dir={isRtl ? 'rtl' : 'ltr'}
+                    />
+                    <div className="flex flex-wrap gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDangerDelete(false);
+                          setDeleteConfirmText('');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 font-bold text-sm"
+                      >
+                        {isRtl ? 'إلغاء' : 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDangerDeleteTodayAttendance}
+                        disabled={
+                          deletingAttendance ||
+                          deleteConfirmText.trim() !== (isRtl ? 'حذف' : 'DELETE')
+                        }
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-sm disabled:opacity-40"
+                      >
+                        <Trash2 size={14} />
+                        {isRtl ? 'حذف نهائي من السجل الرسمي' : 'Permanently delete'}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              {(activeModal === 'present' || activeModal === 'absent') && (
-                <div className="p-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                  <div className="flex flex-wrap gap-3 justify-end">
-                    <button
-                      onClick={handlePrint}
-                      disabled={modalStudents.length === 0}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-sm hover:bg-slate-50 disabled:opacity-40"
-                    >
-                      <Printer size={16} />
-                      {isRtl ? 'طباعة' : 'Print'}
-                    </button>
-                    <button
-                      onClick={handleGoToAttendanceCorrection}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800"
-                    >
-                      <ClipboardCheck size={16} />
-                      {isRtl ? 'تصحيح السجل' : 'Correct record'}
-                    </button>
-                  </div>
-
-                  {isSchoolAdmin && attendanceDocs.length > 0 && (
-                    <div className="rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 p-4">
-                      {!showDangerDelete ? (
-                        <button
-                          type="button"
-                          onClick={() => setShowDangerDelete(true)}
-                          className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-2"
-                        >
-                          <ShieldAlert size={14} />
-                          {isRtl
-                            ? 'حذف فعلي من سجل الحضور والغياب (مدير فقط)'
-                            : 'Permanently delete from attendance records (admin only)'}
-                        </button>
-                      ) : (
-                        <div className="space-y-3">
-                          <p className="text-sm font-black text-rose-700 dark:text-rose-400 leading-relaxed">
-                            {isRtl
-                              ? 'تحذير: هذا الإجراء سيحذف سجل حضور وغياب اليوم بالكامل من قاعدة البيانات ولا يمكن التراجع عنه بسهولة. استخدم «تصحيح السجل» أولاً إن كان الخطأ في التسجيل فقط.'
-                              : 'Warning: This permanently deletes all of today\'s attendance records from the database. Prefer «Correct record» for registration fixes.'}
-                          </p>
-                          <p className="text-xs font-bold text-slate-600 dark:text-slate-400">
-                            {isRtl
-                              ? `سيتم حذف ${attendanceDocs.length} سجل/سجلات لتاريخ ${todayStr}`
-                              : `${attendanceDocs.length} record(s) for ${todayStr} will be deleted`}
-                          </p>
-                          <input
-                            type="text"
-                            value={deleteConfirmText}
-                            onChange={(e) => setDeleteConfirmText(e.target.value)}
-                            placeholder={isRtl ? 'اكتب «حذف» للتأكيد' : 'Type DELETE to confirm'}
-                            className="w-full px-4 py-2.5 rounded-xl border border-rose-200 bg-white dark:bg-slate-900 font-bold text-sm"
-                            dir={isRtl ? 'rtl' : 'ltr'}
-                          />
-                          <div className="flex flex-wrap gap-2 justify-end">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowDangerDelete(false);
-                                setDeleteConfirmText('');
-                              }}
-                              className="px-4 py-2 rounded-xl border border-slate-200 font-bold text-sm"
-                            >
-                              {isRtl ? 'إلغاء' : 'Cancel'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleDangerDeleteTodayAttendance}
-                              disabled={
-                                deletingAttendance ||
-                                deleteConfirmText.trim() !== (isRtl ? 'حذف' : 'DELETE')
-                              }
-                              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-sm hover:bg-rose-700 disabled:opacity-40"
-                            >
-                              <Trash2 size={14} />
-                              {isRtl ? 'حذف نهائي من السجل الرسمي' : 'Permanently delete'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
+            )}
+          </div>
         )}
-      </AnimatePresence>
+      </AppModalPortal>
 
       <OverviewTuitionQuickReminder
         open={showTuitionQuickReminder}
