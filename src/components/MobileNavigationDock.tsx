@@ -376,11 +376,10 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
                     <header className="sx-panel-header sx-panel-header--in-sheet sx-dock-sheet__header">
-                      <div className="sx-panel-header__accent" aria-hidden />
                       <div className="sx-panel-header__row sx-panel-header__row--top">
                         <div className="sx-panel-header__brand">
                           <span className="sx-panel-header__icon sx-panel-header__icon--gold" aria-hidden>
-                            <LayoutGrid size={24} strokeWidth={2.1} />
+                            <LayoutGrid size={23} strokeWidth={2} />
                           </span>
                           <h2 className="sx-panel-header__title">
                             {isRtl ? "الوصول السريع" : "Quick access"}
@@ -549,14 +548,13 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
                     <header className="sx-panel-header sx-panel-header--in-sheet sx-dock-sheet__header">
-                      <div className="sx-panel-header__accent" aria-hidden />
                       <div className="sx-panel-header__row sx-panel-header__row--top">
                         <div className="sx-panel-header__brand">
                           <span className="sx-panel-header__icon sx-panel-header__icon--gold" aria-hidden>
-                            <Settings size={24} strokeWidth={2.1} />
+                            <Settings size={23} strokeWidth={2} />
                           </span>
                           <h2 className="sx-panel-header__title">
-                            {isRtl ? "المزيد من الخيارات" : "More options"}
+                            {isRtl ? "المزيد" : "More"}
                           </h2>
                         </div>
                         <div className="sx-panel-header__actions">

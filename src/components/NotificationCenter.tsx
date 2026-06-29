@@ -1530,14 +1530,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           {/* Header */}
           {mainView === 'list' ? (
             <header className="sx-panel-header sx-panel-header--sticky sx-panel-header--multi-actions">
-              <div className="sx-panel-header__accent" aria-hidden />
               <div className="sx-panel-header__row sx-panel-header__row--top">
                 <div className="sx-panel-header__brand">
-                  <span className="sx-panel-header__icon" aria-hidden>
-                    <Bell size={24} strokeWidth={2.1} />
+                  <span className="sx-panel-header__icon sx-panel-header__icon--notify" aria-hidden>
+                    <Bell size={23} strokeWidth={2} />
                   </span>
                   <h2 className="sx-panel-header__title">
-                    {isArabic ? 'مركز الإشعارات' : 'Notification center'}
+                    {isArabic ? 'الإشعارات' : 'Notifications'}
                   </h2>
                 </div>
                 <div className="sx-panel-header__actions sx-notif-header-actions">
