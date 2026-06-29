@@ -361,6 +361,8 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
             {activeSheet === "quick" && (
               <div
                 className="sx-dock-sheet-root"
+                data-ui="mobile-panel-overlay-v3"
+                data-panel="quick-access"
                 role="dialog"
                 aria-modal="true"
                 aria-label={isRtl ? "الوصول السريع" : "Quick access"}
@@ -381,6 +383,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
                     <PremiumSectionHeader
+                      panel="quick-access"
                       icon={LayoutGrid}
                       iconTone="navy"
                       title={isRtl ? "الوصول السريع" : "Quick access"}
@@ -522,6 +525,8 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
             {activeSheet === "more" && (
               <div
                 className="sx-dock-sheet-root"
+                data-ui="mobile-panel-overlay-v3"
+                data-panel="more"
                 role="dialog"
                 aria-modal="true"
                 aria-label={isRtl ? "المزيد" : "More"}
@@ -542,6 +547,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
                     <PremiumSectionHeader
+                      panel="more"
                       icon={SlidersHorizontal}
                       iconTone="navy"
                       title={isRtl ? "المزيد من الخيارات" : "More options"}

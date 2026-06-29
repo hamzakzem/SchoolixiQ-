@@ -1515,8 +1515,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   return createPortal(
     <div
-      className="sx-notif-overlay fixed inset-0"
-      style={{ zIndex: 9999 }}
+      className="sx-notif-overlay"
+      data-ui="mobile-panel-overlay-v3"
+      data-panel="notifications"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -1533,7 +1534,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           {mainView === 'list' ? (
             <PremiumSectionHeader
               sticky
-              className="sx-section-header--multi-actions"
+              panel="notifications"
+              className="sx-mobile-panel-header-v3--multi-actions"
               icon={BellRing}
               iconTone="gold"
               title={isArabic ? 'مركز الإشعارات' : 'Notification center'}

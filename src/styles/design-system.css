@@ -1062,25 +1062,36 @@ html.dark .sx-action-btn-ghost {
   }
 }
 
-/* ─── Premium section header (Notifications, Quick Access, More) — Minimal UI ─── */
-.sx-section-header {
+/* ─── Mobile panel header v3 (Notifications, Quick Access, More) ─── */
+.sx-mobile-panel-header-v3 {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 16px 18px 12px;
+  padding: 14px 16px;
   background: #ffffff;
   border: none;
   box-shadow: none;
+  text-decoration: none;
 }
 
-.sx-section-header--sticky {
+.sx-mobile-panel-header-v3::before,
+.sx-mobile-panel-header-v3::after,
+.sx-mobile-panel-header-v3__title::before,
+.sx-mobile-panel-header-v3__title::after,
+.sx-mobile-panel-header-v3__subtitle::before,
+.sx-mobile-panel-header-v3__subtitle::after {
+  display: none !important;
+  content: none !important;
+}
+
+.sx-mobile-panel-header-v3--sticky {
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
-.sx-section-header__row {
+.sx-mobile-panel-header-v3__row {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1088,7 +1099,7 @@ html.dark .sx-action-btn-ghost {
   min-width: 0;
 }
 
-.sx-section-header__icon {
+.sx-mobile-panel-header-v3__icon {
   width: 44px;
   height: 44px;
   border-radius: 12px;
@@ -1101,21 +1112,21 @@ html.dark .sx-action-btn-ghost {
   box-shadow: none;
 }
 
-.sx-section-header__icon svg {
+.sx-mobile-panel-header-v3__icon svg {
   width: 22px;
   height: 22px;
   stroke-width: 2;
 }
 
-.sx-section-header__icon--gold svg {
+.sx-mobile-panel-header-v3__icon--gold svg {
   color: #b8941f;
 }
 
-.sx-section-header__icon--navy svg {
+.sx-mobile-panel-header-v3__icon--navy svg {
   color: #0b2345;
 }
 
-.sx-section-header__title {
+.sx-mobile-panel-header-v3__title {
   margin: 0;
   padding: 0;
   flex: 1 1 auto;
@@ -1130,13 +1141,13 @@ html.dark .sx-action-btn-ghost {
   text-overflow: clip;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  text-decoration: none;
+  text-decoration: none !important;
   border: none;
   background: none;
   -webkit-font-smoothing: antialiased;
 }
 
-.sx-section-header__subtitle {
+.sx-mobile-panel-header-v3__subtitle {
   margin: 0;
   padding: 0;
   font-size: 0.9375rem;
@@ -1149,12 +1160,12 @@ html.dark .sx-action-btn-ghost {
   text-overflow: clip;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  text-decoration: none;
+  text-decoration: none !important;
   border: none;
   background: none;
 }
 
-.sx-section-header__actions {
+.sx-mobile-panel-header-v3__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -1163,7 +1174,7 @@ html.dark .sx-action-btn-ghost {
   flex-shrink: 0;
 }
 
-.sx-section-header__btn {
+.sx-mobile-panel-header-v3__btn {
   width: 40px;
   height: 40px;
   min-width: 40px;
@@ -1183,66 +1194,66 @@ html.dark .sx-action-btn-ghost {
   text-decoration: none;
 }
 
-.sx-section-header__btn svg,
-.sx-section-header__btn .sx-action-icon {
+.sx-mobile-panel-header-v3__btn svg,
+.sx-mobile-panel-header-v3__btn .sx-action-icon {
   width: 20px;
   height: 20px;
   color: #0b2345;
   opacity: 1;
 }
 
-.sx-section-header__btn:focus-visible {
+.sx-mobile-panel-header-v3__btn:focus-visible {
   outline: 2px solid #d4af37;
   outline-offset: 2px;
 }
 
-.sx-section-header__btn:disabled {
+.sx-mobile-panel-header-v3__btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 @media (max-width: 380px) {
-  .sx-section-header--multi-actions .sx-section-header__row {
+  .sx-mobile-panel-header-v3--multi-actions .sx-mobile-panel-header-v3__row {
     flex-wrap: wrap;
   }
 
-  .sx-section-header--multi-actions .sx-section-header__actions {
+  .sx-mobile-panel-header-v3--multi-actions .sx-mobile-panel-header-v3__actions {
     width: 100%;
     justify-content: flex-end;
   }
 }
 
-html.dark .sx-section-header {
+html.dark .sx-mobile-panel-header-v3 {
   background: #1e293b;
 }
 
-html.dark .sx-section-header__title {
+html.dark .sx-mobile-panel-header-v3__title {
   color: #ffffff;
 }
 
-html.dark .sx-section-header__subtitle {
+html.dark .sx-mobile-panel-header-v3__subtitle {
   color: #cbd5e1;
 }
 
-html.dark .sx-section-header__icon {
+html.dark .sx-mobile-panel-header-v3__icon {
   background: #334155;
 }
 
-html.dark .sx-section-header__icon--gold svg {
+html.dark .sx-mobile-panel-header-v3__icon--gold svg {
   color: #d4af37;
 }
 
-html.dark .sx-section-header__icon--navy svg {
+html.dark .sx-mobile-panel-header-v3__icon--navy svg {
   color: #f8fafc;
 }
 
-html.dark .sx-section-header__btn {
+html.dark .sx-mobile-panel-header-v3__btn {
   background: #334155;
   color: #f8fafc;
 }
 
-html.dark .sx-section-header__btn svg,
-html.dark .sx-section-header__btn .sx-action-icon {
+html.dark .sx-mobile-panel-header-v3__btn svg,
+html.dark .sx-mobile-panel-header-v3__btn .sx-action-icon {
   color: #f8fafc;
 }
 
@@ -1252,13 +1263,15 @@ html.dark .sx-section-header__btn .sx-action-icon {
   inset: 0;
   z-index: var(--sx-z-drawer);
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
   padding: 0;
   margin: 0;
   overflow: hidden;
   overscroll-behavior: none;
-  pointer-events: none;
+  pointer-events: auto;
+  background: transparent;
 }
 
 .sx-dock-sheet-root > .sx-drawer-backdrop {
@@ -1269,6 +1282,7 @@ html.dark .sx-section-header__btn .sx-action-icon {
   background: rgba(15, 23, 42, 0.38) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
 }
 
 .sx-dock-sheet-root > .sx-dock-sheet {
@@ -1282,6 +1296,7 @@ html.dark .sx-section-header__btn .sx-action-icon {
   min-height: 0;
   max-height: min(82dvh, calc(100dvh - 12px));
   margin: 0;
+  opacity: 1 !important;
 }
 
 @media (min-width: 768px) {
@@ -1299,10 +1314,10 @@ html.dark .sx-section-header__btn .sx-action-icon {
   min-height: 0;
   max-height: min(82dvh, calc(100dvh - 12px));
   background: #ffffff;
-  border: 1px solid #e8ecf1;
+  border: none;
   border-radius: 24px 24px 0 0;
   overflow: hidden;
-  box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.12);
+  box-shadow: none;
   opacity: 1;
   isolation: isolate;
   touch-action: manipulation;
@@ -1608,7 +1623,7 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__body {
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   touch-action: pan-y;
   background: #ffffff;
 }

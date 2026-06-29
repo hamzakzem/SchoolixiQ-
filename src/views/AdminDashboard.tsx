@@ -1278,6 +1278,7 @@ export default function AdminDashboard() {
                 </span>
               )}
             </button>
+            </div>
             {showNotifications ? (
               <NotificationCenter
                 onClose={() => setShowNotifications(false)}
@@ -1285,7 +1286,6 @@ export default function AdminDashboard() {
                 userRole={profile?.role || "admin"}
               />
             ) : null}
-            </div>
             <div className="hidden lg:flex items-center gap-2">
               <div className="w-9 h-9 bg-sx-primary rounded-xl flex items-center justify-center text-white font-bold text-sm">
                 {profile?.name?.[0]}

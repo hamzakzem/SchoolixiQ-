@@ -2255,14 +2255,6 @@ export default function SuperAdminDashboard() {
                 </span>
               )}
             </button>
-
-            {showNotifications && (
-              <NotificationCenter
-                onClose={() => setShowNotifications(false)}
-                activeTabSetter={setActiveTab}
-                userRole="super_admin"
-              />
-            )}
             <div className="text-left md:block hidden">
               <p className="text-[10px] text-slate-400 leading-none mb-1 uppercase tracking-widest font-bold">
                 {t('system_status')}
@@ -2273,6 +2265,14 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
           </div>
+
+          {showNotifications && (
+            <NotificationCenter
+              onClose={() => setShowNotifications(false)}
+              activeTabSetter={setActiveTab}
+              userRole="super_admin"
+            />
+          )}
         </header>
 
         {!auth.currentUser?.emailVerified && !hideVerificationBanner && (

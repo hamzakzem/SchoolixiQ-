@@ -2,11 +2,13 @@ import React from "react";
 import type { LucideIcon } from "lucide-react";
 
 export type SectionHeaderIconTone = "gold" | "navy";
+export type MobilePanelId = "notifications" | "quick-access" | "more";
 
 export interface PremiumSectionHeaderProps {
   icon: LucideIcon;
   title: string;
   subtitle: string;
+  panel: MobilePanelId;
   iconTone?: SectionHeaderIconTone;
   actions?: React.ReactNode;
   sticky?: boolean;
@@ -27,7 +29,7 @@ export function SectionHeaderButton({
   return (
     <button
       type="button"
-      className="sx-section-header__btn"
+      className="sx-mobile-panel-header-v3__btn"
       onClick={onClick}
       aria-label={ariaLabel}
       disabled={disabled}
@@ -41,6 +43,7 @@ export function PremiumSectionHeader({
   icon: Icon,
   title,
   subtitle,
+  panel,
   iconTone = "navy",
   actions,
   sticky = false,
@@ -48,19 +51,21 @@ export function PremiumSectionHeader({
 }: PremiumSectionHeaderProps) {
   return (
     <header
-      className={`sx-section-header${sticky ? " sx-section-header--sticky" : ""}${className ? ` ${className}` : ""}`}
+      data-ui="mobile-panel-header-v3"
+      data-panel={panel}
+      className={`sx-mobile-panel-header-v3${sticky ? " sx-mobile-panel-header-v3--sticky" : ""}${className ? ` ${className}` : ""}`}
     >
-      <div className="sx-section-header__row">
+      <div className="sx-mobile-panel-header-v3__row">
         <span
-          className={`sx-section-header__icon sx-section-header__icon--${iconTone}`}
+          className={`sx-mobile-panel-header-v3__icon sx-mobile-panel-header-v3__icon--${iconTone}`}
           aria-hidden
         >
           <Icon size={22} strokeWidth={2} />
         </span>
-        <h2 className="sx-section-header__title">{title}</h2>
-        {actions ? <div className="sx-section-header__actions">{actions}</div> : null}
+        <h2 className="sx-mobile-panel-header-v3__title">{title}</h2>
+        {actions ? <div className="sx-mobile-panel-header-v3__actions">{actions}</div> : null}
       </div>
-      <p className="sx-section-header__subtitle">{subtitle}</p>
+      <p className="sx-mobile-panel-header-v3__subtitle">{subtitle}</p>
     </header>
   );
 }

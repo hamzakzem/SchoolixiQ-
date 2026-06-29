@@ -1753,15 +1753,15 @@ export default function ParentDashboard() {
                       </span>
                     )}
                   </button>
-                {showNotifications && (
-                  <NotificationCenter
-                    onClose={() => setShowNotifications(false)}
-                    activeTabSetter={setActiveTab}
-                    userRole="parent"
-                  />
-                )}
               </div>
             </div>
+            {showNotifications && (
+              <NotificationCenter
+                onClose={() => setShowNotifications(false)}
+                activeTabSetter={setActiveTab}
+                userRole="parent"
+              />
+            )}
           </div>
           </div>
 
