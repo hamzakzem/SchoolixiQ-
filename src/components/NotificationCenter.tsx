@@ -1529,61 +1529,61 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         <div className="sx-notif-panel">
           {/* Header */}
           {mainView === 'list' ? (
-            <header className="sx-panel-header sx-panel-header--sticky sx-panel-header--multi-actions">
-              <div className="sx-panel-header__row sx-panel-header__row--top">
-                <div className="sx-panel-header__brand">
-                  <span className="sx-panel-header__icon sx-panel-header__icon--notify" aria-hidden>
-                    <Bell size={23} strokeWidth={2} />
+            <div className="sx-premium-panel-header-wrap sx-premium-panel-header-wrap--sticky sx-premium-panel-header-wrap--notif">
+              <div className="sx-premium-panel-header sx-premium-panel-header--multi-actions">
+                <div className="sx-premium-panel-header__row sx-premium-panel-header__row--top">
+                  <span className="sx-premium-panel-header__icon sx-premium-panel-header__icon--notify" aria-hidden>
+                    <Bell size={24} strokeWidth={2} />
                   </span>
-                  <h2 className="sx-panel-header__title">
-                    {isArabic ? 'الإشعارات' : 'Notifications'}
-                  </h2>
+                  <div className="sx-premium-panel-header__content">
+                    <h2 className="sx-premium-panel-header__title">
+                      {isArabic ? 'مركز الإشعارات' : 'Notification center'}
+                    </h2>
+                  </div>
+                  <div className="sx-premium-panel-header__actions sx-notif-header-actions">
+                    <button
+                      type="button"
+                      onClick={handleRefreshList}
+                      className="sx-action-btn sx-action-btn-icon"
+                      aria-label={isArabic ? 'تحديث' : 'Refresh'}
+                    >
+                      <RefreshCw className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMainView('preferences')}
+                      className="sx-action-btn sx-action-btn-icon"
+                      aria-label={isArabic ? 'تفضيلات الإشعارات' : 'Notification preferences'}
+                    >
+                      <Settings className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="sx-action-btn sx-action-btn-icon"
+                      aria-label={isArabic ? 'إغلاق' : 'Close'}
+                    >
+                      <X className="sx-action-icon" strokeWidth={2.25} aria-hidden />
+                    </button>
+                  </div>
                 </div>
-                <div className="sx-panel-header__actions sx-notif-header-actions">
-                  <button
-                    type="button"
-                    onClick={handleRefreshList}
-                    className="sx-action-btn sx-action-btn-icon"
-                    aria-label={isArabic ? 'تحديث' : 'Refresh'}
-                  >
-                    <RefreshCw className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMainView('preferences')}
-                    className="sx-action-btn sx-action-btn-icon"
-                    aria-label={isArabic ? 'تفضيلات الإشعارات' : 'Notification preferences'}
-                  >
-                    <Settings className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="sx-action-btn sx-action-btn-icon"
-                    aria-label={isArabic ? 'إغلاق' : 'Close'}
-                  >
-                    <X className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                  </button>
-                </div>
-              </div>
-              <div className="sx-panel-header__row sx-panel-header__row--bottom">
-                <p className="sx-panel-header__subtitle">
+                <p className="sx-premium-panel-header__subtitle">
                   {isArabic
                     ? 'تابع التنبيهات والرسائل المهمة في مكان واحد'
                     : 'Track important alerts and messages in one place'}
                 </p>
-                <div className="sx-panel-header__chips" role="group" aria-label={isArabic ? 'ملخص الإشعارات' : 'Notification summary'}>
-                  <span className="sx-panel-header__chip sx-panel-header__chip--accent">
-                    {isArabic ? 'غير المقروءة' : 'Unread'}{' '}
+                <div className="sx-premium-panel-header__chips" role="group" aria-label={isArabic ? 'ملخص الإشعارات' : 'Notification summary'}>
+                  <span className="sx-premium-panel-header__chip sx-premium-panel-header__chip--gold">
+                    {isArabic ? 'غير المقروءة:' : 'Unread:'}{' '}
                     <strong>{unreadCount > 99 ? '99+' : unreadCount}</strong>
                   </span>
-                  <span className="sx-panel-header__chip">
-                    {isArabic ? 'اليوم' : 'Today'}{' '}
+                  <span className="sx-premium-panel-header__chip">
+                    {isArabic ? 'اليوم:' : 'Today:'}{' '}
                     <strong>{todayCount > 99 ? '99+' : todayCount}</strong>
                   </span>
                 </div>
               </div>
-            </header>
+            </div>
           ) : (
           <header className="sx-notif-header">
             <div className="sx-notif-header__row">
