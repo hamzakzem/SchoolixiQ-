@@ -397,7 +397,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                           onClick={closeSheets}
                           ariaLabel={isRtl ? "إغلاق" : "Close"}
                         >
-                          <X size={20} strokeWidth={2.25} aria-hidden />
+                          <X size={18} strokeWidth={2} aria-hidden />
                         </SectionHeaderButton>
                       }
                     />
@@ -561,7 +561,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                           onClick={closeSheets}
                           ariaLabel={isRtl ? "إغلاق" : "Close"}
                         >
-                          <X size={20} strokeWidth={2.25} aria-hidden />
+                          <X size={18} strokeWidth={2} aria-hidden />
                         </SectionHeaderButton>
                       }
                     />

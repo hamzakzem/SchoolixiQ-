@@ -1067,12 +1067,17 @@ html.dark .sx-action-btn-ghost {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 14px 16px;
-  background: #ffffff;
+  gap: 4px;
+  padding: 2px 16px 10px;
+  background: transparent;
   border: none;
   box-shadow: none;
   text-decoration: none;
+}
+
+.sx-notif-shell > .sx-notif-panel > .sx-mobile-panel-header-v3,
+.sx-dock-sheet .sx-mobile-panel-header-v3 {
+  background: transparent;
 }
 
 .sx-mobile-panel-header-v3::before,
@@ -1100,21 +1105,21 @@ html.dark .sx-action-btn-ghost {
 }
 
 .sx-mobile-panel-header-v3__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: #f8fafc;
+  background: #f1f5f9;
   border: none;
   box-shadow: none;
 }
 
 .sx-mobile-panel-header-v3__icon svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   stroke-width: 2;
 }
 
@@ -1135,6 +1140,7 @@ html.dark .sx-action-btn-ghost {
   font-weight: 800;
   color: #0b2345;
   line-height: 1.2;
+  letter-spacing: -0.02em;
   font-family: 'Cairo', system-ui, sans-serif;
   white-space: normal;
   overflow: visible;
@@ -1149,11 +1155,11 @@ html.dark .sx-action-btn-ghost {
 
 .sx-mobile-panel-header-v3__subtitle {
   margin: 0;
-  padding: 0;
-  font-size: 0.9375rem;
+  padding: 0 0 0 52px;
+  font-size: 0.875rem;
   font-weight: 500;
   color: #64748b;
-  line-height: 1.6;
+  line-height: 1.5;
   font-family: 'Cairo', system-ui, sans-serif;
   white-space: normal;
   overflow: visible;
@@ -1169,21 +1175,21 @@ html.dark .sx-action-btn-ghost {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .sx-mobile-panel-header-v3__btn {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   padding: 0;
-  border-radius: 10px;
+  border-radius: 9px;
   flex-shrink: 0;
   border: none;
-  background: #f8fafc;
+  background: #f1f5f9;
   color: #0b2345;
   display: inline-flex;
   align-items: center;
@@ -1196,9 +1202,10 @@ html.dark .sx-action-btn-ghost {
 
 .sx-mobile-panel-header-v3__btn svg,
 .sx-mobile-panel-header-v3__btn .sx-action-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   color: #0b2345;
+  stroke-width: 2;
   opacity: 1;
 }
 
@@ -1208,23 +1215,24 @@ html.dark .sx-action-btn-ghost {
 }
 
 .sx-mobile-panel-header-v3__btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-@media (max-width: 380px) {
+@media (max-width: 360px) {
   .sx-mobile-panel-header-v3--multi-actions .sx-mobile-panel-header-v3__row {
     flex-wrap: wrap;
+    row-gap: 8px;
   }
 
   .sx-mobile-panel-header-v3--multi-actions .sx-mobile-panel-header-v3__actions {
     width: 100%;
     justify-content: flex-end;
   }
-}
 
-html.dark .sx-mobile-panel-header-v3 {
-  background: #1e293b;
+  .sx-mobile-panel-header-v3--multi-actions .sx-mobile-panel-header-v3__subtitle {
+    padding-inline-start: 0;
+  }
 }
 
 html.dark .sx-mobile-panel-header-v3__title {
@@ -1255,6 +1263,22 @@ html.dark .sx-mobile-panel-header-v3__btn {
 html.dark .sx-mobile-panel-header-v3__btn svg,
 html.dark .sx-mobile-panel-header-v3__btn .sx-action-icon {
   color: #f8fafc;
+}
+
+/* Sheet grab — minimal, no extra top gap */
+.sx-dock-sheet__grab {
+  width: 32px;
+  height: 3px;
+  border-radius: 9999px;
+  background: rgba(100, 116, 139, 0.35);
+  margin: 6px auto 0;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .sx-dock-sheet__grab {
+    display: none;
+  }
 }
 
 /* Quick access / More sheets */
@@ -1386,8 +1410,7 @@ html.dark .sx-mobile-panel-header-v3__btn .sx-action-icon {
 }
 
 .sx-dock-sheet--light .sx-dock-sheet__sticky {
-  border-bottom-color: #e2e8f0;
-  background: #ffffff;
+  background: transparent;
 }
 
 .sx-dock-sheet--light .sx-dock-sheet__close {
@@ -1450,8 +1473,8 @@ html.dark .sx-mobile-panel-header-v3__btn .sx-action-icon {
 
 .sx-dock-sheet__sticky {
   flex-shrink: 0;
-  background: #ffffff;
-  border-bottom: none;
+  background: transparent;
+  border: none;
   z-index: 3;
   position: relative;
 }
@@ -1464,11 +1487,11 @@ html.dark .sx-mobile-panel-header-v3__btn .sx-action-icon {
 }
 
 .sx-dock-sheet__grab {
-  width: 40px;
-  height: 4px;
+  width: 32px;
+  height: 3px;
   border-radius: 9999px;
-  background: rgba(148, 163, 184, 0.45);
-  margin: 8px auto 0;
+  background: rgba(100, 116, 139, 0.35);
+  margin: 6px auto 0;
   flex-shrink: 0;
 }
 
@@ -1525,21 +1548,21 @@ html.dark .sx-mobile-panel-header-v3__btn .sx-action-icon {
 
 .sx-dock-sheet__search-wrap {
   position: relative;
-  padding: 14px 16px 12px;
+  padding: 0 16px 10px;
   flex-shrink: 0;
-  background: #ffffff;
+  background: transparent;
 }
 
 .sx-dock-sheet--light .sx-dock-sheet__search-wrap {
-  background: #ffffff;
+  background: transparent;
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-sheet__sticky {
-  background: #1e293b;
+  background: transparent;
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-sheet__search-wrap {
-  background: #1e293b;
+  background: transparent;
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-sheet__body {
@@ -1563,14 +1586,14 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__body {
 
 .sx-dock-sheet__search {
   width: 100%;
-  min-height: 44px;
+  min-height: 42px;
   padding: 0 40px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  border: none;
   font-family: 'Cairo', system-ui, sans-serif;
   font-size: 0.875rem;
   font-weight: 500;
-  background: #f8fafc;
+  background: #f1f5f9;
   color: #0b2345;
 }
 
@@ -1580,9 +1603,8 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__body {
 
 .sx-dock-sheet__search:focus {
   outline: none;
-  border-color: rgba(212, 175, 55, 0.65);
-  background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
+  background: #e8edf3;
+  box-shadow: inset 0 0 0 1.5px rgba(11, 35, 69, 0.12);
 }
 
 .sx-dock-sheet__search-clear {
@@ -1659,35 +1681,37 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__body {
 }
 
 .sx-dock-qa-section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .sx-dock-qa-section__head {
-  margin-bottom: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(11, 35, 69, 0.05);
-  border-inline-start: 3px solid var(--sx-gold);
+  margin-bottom: 8px;
+  padding: 0 2px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
 }
 
 .sx-dock-sheet--light .sx-dock-qa-section__head {
-  background: #f8fafc;
-  border-inline-start-color: #d4af37;
+  background: transparent;
+  border: none;
 }
 
 .sx-dock-qa-section__label {
-  font-size: 0.8125rem;
-  font-weight: 800;
-  color: #0b2345;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
   margin: 0;
   font-family: 'Cairo', system-ui, sans-serif;
 }
 
 .sx-dock-qa-section__desc {
-  margin: 4px 0 0;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #64748b;
+  margin: 3px 0 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
   line-height: 1.4;
   font-family: 'Cairo', system-ui, sans-serif;
 }
@@ -1698,25 +1722,27 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__body {
 
 .sx-dock-more-section__label {
   margin: 0 0 8px;
-  padding: 8px 12px;
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: #0b2345;
+  padding: 0 2px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
   font-family: 'Cairo', system-ui, sans-serif;
-  background: rgba(11, 35, 69, 0.05);
-  border-radius: 10px;
-  border-inline-start: 3px solid var(--sx-gold);
+  background: transparent;
+  border-radius: 0;
+  border: none;
 }
 
 .sx-dock-sheet--light .sx-dock-more-section__label {
-  background: #f8fafc;
-  color: #0b2345;
+  background: transparent;
+  color: #64748b;
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-qa-section__head,
 html.dark .sx-dock-sheet--light .sx-dock-more-section__label {
-  background: rgba(255, 255, 255, 0.06);
-  color: #f1f5f9;
+  background: transparent;
+  color: #94a3b8;
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-qa-section__desc {
@@ -1743,13 +1769,13 @@ html.dark .sx-dock-sheet--light .sx-dock-qa-section__desc {
   gap: 10px;
   min-height: 44px;
   padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--sx-border);
-  background: #fff;
+  border-radius: 12px;
+  border: none;
+  background: #f1f5f9;
   text-align: start;
   cursor: pointer;
   font-family: 'Cairo', system-ui, sans-serif;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+  transition: background 0.15s ease, transform 0.12s ease;
 }
 
 .sx-dock-qa-item:active {
@@ -1761,9 +1787,7 @@ html.dark .sx-dock-sheet--light .sx-dock-qa-section__desc {
 }
 
 .sx-dock-qa-item--active {
-  border-color: rgba(212, 175, 55, 0.55);
-  background: rgba(212, 175, 55, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.2);
+  background: rgba(212, 175, 55, 0.14);
 }
 
 .sx-dock-qa-item__content {
@@ -1920,18 +1944,18 @@ html.dark .sx-dock-sheet--light .sx-dock-qa-section__desc {
   min-height: 44px;
   padding: 10px 12px;
   margin-bottom: 6px;
-  border-radius: 13px;
-  border: 1px solid var(--sx-border);
-  background: #fff;
+  border-radius: 12px;
+  border: none;
+  background: #f1f5f9;
   font-family: 'Cairo', system-ui, sans-serif;
   cursor: pointer;
   text-align: start;
   width: 100%;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: background 0.15s ease;
 }
 
 .sx-dock-more-row:active:not(.sx-dock-more-row--static) {
-  background: rgba(11, 35, 69, 0.04);
+  background: #e8edf3;
 }
 
 .sx-dock-more-row--static {
@@ -1941,13 +1965,13 @@ html.dark .sx-dock-sheet--light .sx-dock-qa-section__desc {
 .sx-dock-more-row__icon {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: rgba(11, 35, 69, 0.07);
-  color: var(--sx-primary);
+  background: #ffffff;
+  color: #0b2345;
 }
 
 .sx-dock-more-row__icon--warn {
@@ -1962,18 +1986,18 @@ html.dark .sx-dock-sheet--light .sx-dock-qa-section__desc {
 
 .sx-dock-more-row__label {
   display: block;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 700;
-  color: var(--sx-primary);
+  color: #0b2345;
   line-height: 1.3;
 }
 
 .sx-dock-more-row__hint {
   display: block;
-  margin-top: 1px;
-  font-size: 0.6875rem;
+  margin-top: 2px;
+  font-size: 0.75rem;
   font-weight: 500;
-  color: var(--sx-muted);
+  color: #64748b;
   line-height: 1.35;
 }
 
@@ -2222,25 +2246,30 @@ html.dark .sx-dock-sheet--light .sx-dock-more-row__hint {
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-sheet__search {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: #334155;
+  border: none;
   color: #f1f5f9;
+}
+
+html.dark .sx-dock-sheet--light .sx-dock-sheet__search:focus {
+  background: #3d4f66;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.1);
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-qa-item,
 html.dark .sx-dock-sheet--light .sx-dock-more-row {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: #334155;
+  border: none;
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-qa-item__icon,
 html.dark .sx-dock-sheet--light .sx-dock-more-row__icon {
-  background: rgba(212, 175, 55, 0.15);
-  color: #d4af37;
+  background: #1e293b;
+  color: #f8fafc;
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-sheet__sticky {
-  background: #1e293b;
+  background: transparent;
 }
 
 /* ─── Desktop header / sidebar brand alignment ─── */

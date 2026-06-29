@@ -2672,10 +2672,10 @@ html.dark .parent-page-title {
 
 .sx-notif-grab {
   display: block;
-  width: 40px;
-  height: 4px;
+  width: 32px;
+  height: 3px;
   border-radius: 9999px;
-  background: rgba(15, 23, 42, 0.15);
+  background: rgba(100, 116, 139, 0.35);
   margin: 6px auto 0;
   flex-shrink: 0;
 }
@@ -2752,14 +2752,14 @@ html.dark .sx-notif-shell {
   position: sticky;
   top: 0;
   z-index: 10;
-  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px 16px;
+  padding: 12px 16px;
   background: #ffffff;
-  border-bottom: 1px solid #e8ecf1;
+  border: none;
 }
 
 html.dark .sx-notif-header {
   background: #1e293b;
-  border-bottom-color: rgba(255, 255, 255, 0.1);
+  border: none;
 }
 
 .sx-notif-header__row {
@@ -2859,15 +2859,15 @@ html.dark .sx-notif-lucide {
 
 .sx-notif-tabs-wrap {
   flex-shrink: 0;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 10px 12px 12px;
+  background: transparent;
+  border: none;
+  padding: 0 16px 10px;
   overflow: hidden;
 }
 
 html.dark .sx-notif-tabs-wrap {
-  background: #1e293b;
-  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border: none;
 }
 
 .sx-notif-tabs {
@@ -2876,10 +2876,10 @@ html.dark .sx-notif-tabs-wrap {
   gap: 6px;
   width: 100%;
   max-width: 100%;
-  padding: 4px;
+  padding: 3px;
   background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 999px;
+  border: none;
+  border-radius: 11px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -2943,8 +2943,8 @@ html.dark .sx-notif-tabs-wrap {
 }
 
 html.dark .sx-notif-tabs {
-  background: rgba(30, 41, 59, 0.55);
-  border-color: var(--sx-border);
+  background: #334155;
+  border: none;
 }
 
 html.dark .sx-notif-tab {
@@ -2985,12 +2985,12 @@ html.dark .sx-notif-tab--active {
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  background: #f8fafc;
+  background: #ffffff;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html.dark .sx-notif-body {
-  background: #1a2332;
+  background: #1e293b;
 }
 
 .sx-notif-search {
@@ -3764,9 +3764,14 @@ html.dark .sx-notif-settings__section summary {
   position: sticky;
   bottom: 0;
   z-index: 10;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-  background: var(--sx-bg);
-  border-top: 1px solid var(--sx-border);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: #f8fafc;
+  border: none;
+}
+
+html.dark .sx-notif-footer {
+  background: #1a2332;
+  border: none;
 }
 
 .sx-notif-log-item__retry:hover {

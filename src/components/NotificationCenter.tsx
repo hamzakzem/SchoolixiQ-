@@ -1550,16 +1550,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     onClick={handleRefreshList}
                     ariaLabel={isArabic ? 'تحديث' : 'Refresh'}
                   >
-                    <RefreshCw size={20} strokeWidth={2.25} aria-hidden />
+                    <RefreshCw size={18} strokeWidth={2} aria-hidden />
                   </SectionHeaderButton>
                   <SectionHeaderButton
                     onClick={() => setMainView('preferences')}
                     ariaLabel={isArabic ? 'تفضيلات الإشعارات' : 'Notification preferences'}
                   >
-                    <Settings size={20} strokeWidth={2.25} aria-hidden />
+                    <Settings size={18} strokeWidth={2} aria-hidden />
                   </SectionHeaderButton>
                   <SectionHeaderButton onClick={onClose} ariaLabel={isArabic ? 'إغلاق' : 'Close'}>
-                    <X size={20} strokeWidth={2.25} aria-hidden />
+                    <X size={18} strokeWidth={2} aria-hidden />
                   </SectionHeaderButton>
                 </>
               }

@@ -60,7 +60,7 @@ export function PremiumSectionHeader({
           className={`sx-mobile-panel-header-v3__icon sx-mobile-panel-header-v3__icon--${iconTone}`}
           aria-hidden
         >
-          <Icon size={22} strokeWidth={2} />
+          <Icon size={20} strokeWidth={2} />
         </span>
         <h2 className="sx-mobile-panel-header-v3__title">{title}</h2>
         {actions ? <div className="sx-mobile-panel-header-v3__actions">{actions}</div> : null}
