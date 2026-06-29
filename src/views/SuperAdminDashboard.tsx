@@ -2412,7 +2412,7 @@ export default function SuperAdminDashboard() {
                   </div>
 
                   <div className="sx-section sx-schools-table-panel sx-schools-table-panel--expanded bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none !p-0 overflow-visible">
-                    <div className="sx-section-header !mb-0 px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-800/20">
+                    <div className="sx-section-bar !mb-0 px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-800/20">
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="p-2 md:p-3 bg-blue-600 rounded-xl md:rounded-2xl text-white shadow-lg shadow-blue-600/20 shrink-0">
                           <LayoutGrid size={24} />

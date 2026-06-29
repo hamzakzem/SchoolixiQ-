@@ -26,6 +26,10 @@ import {
   type QuickAccessMenuItem,
 } from "../lib/quickAccessSections";
 import {
+  PremiumSectionHeader,
+  SectionHeaderButton,
+} from "./PremiumSectionHeader";
+import {
   LayoutDashboard,
   MessageSquare,
   LayoutGrid,
@@ -376,40 +380,24 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 >
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
-                    <div className="sx-premium-panel-header-wrap">
-                      <div className="sx-premium-panel-header">
-                        <div className="sx-premium-panel-header__row sx-premium-panel-header__row--top">
-                          <span className="sx-premium-panel-header__icon" aria-hidden>
-                            <LayoutGrid size={24} strokeWidth={2} />
-                          </span>
-                          <div className="sx-premium-panel-header__content">
-                            <h2 className="sx-premium-panel-header__title">
-                              {isRtl ? "الوصول السريع" : "Quick access"}
-                            </h2>
-                          </div>
-                          <div className="sx-premium-panel-header__actions">
-                            <button
-                              type="button"
-                              onClick={closeSheets}
-                              className="sx-premium-panel-header__close"
-                              aria-label={isRtl ? "إغلاق" : "Close"}
-                            >
-                              <X size={18} strokeWidth={2.4} aria-hidden />
-                            </button>
-                          </div>
-                        </div>
-                        <p className="sx-premium-panel-header__subtitle">
-                          {isRtl
-                            ? "انتقل بسرعة إلى أقسام المنصة المتاحة حسب صلاحيتك"
-                            : "Jump quickly to platform sections available for your role"}
-                        </p>
-                        <div className="sx-premium-panel-header__chips">
-                          <span className="sx-premium-panel-header__chip sx-premium-panel-header__chip--gold">
-                            {isRtl ? "حسب صلاحيتك" : "Role-based access"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    <PremiumSectionHeader
+                      icon={LayoutGrid}
+                      iconTone="navy"
+                      title={isRtl ? "الوصول السريع" : "Quick access"}
+                      subtitle={
+                        isRtl
+                          ? "انتقل بسرعة إلى أقسام المنصة المتاحة حسب صلاحيتك"
+                          : "Jump quickly to platform sections available for your role"
+                      }
+                      actions={
+                        <SectionHeaderButton
+                          onClick={closeSheets}
+                          ariaLabel={isRtl ? "إغلاق" : "Close"}
+                        >
+                          <X size={20} strokeWidth={2.25} aria-hidden />
+                        </SectionHeaderButton>
+                      }
+                    />
                     <div className="sx-dock-sheet__search-wrap">
                       <Search className="sx-dock-sheet__search-icon" size={16} aria-hidden />
                       <input
@@ -553,40 +541,24 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                 >
                   <div className="sx-dock-sheet__grab" aria-hidden />
                   <div className="sx-dock-sheet__sticky">
-                    <div className="sx-premium-panel-header-wrap">
-                      <div className="sx-premium-panel-header">
-                        <div className="sx-premium-panel-header__row sx-premium-panel-header__row--top">
-                          <span className="sx-premium-panel-header__icon" aria-hidden>
-                            <SlidersHorizontal size={24} strokeWidth={2} />
-                          </span>
-                          <div className="sx-premium-panel-header__content">
-                            <h2 className="sx-premium-panel-header__title">
-                              {isRtl ? "المزيد من الخيارات" : "More options"}
-                            </h2>
-                          </div>
-                          <div className="sx-premium-panel-header__actions">
-                            <button
-                              type="button"
-                              onClick={closeSheets}
-                              className="sx-premium-panel-header__close"
-                              aria-label={isRtl ? "إغلاق" : "Close"}
-                            >
-                              <X size={18} strokeWidth={2.4} aria-hidden />
-                            </button>
-                          </div>
-                        </div>
-                        <p className="sx-premium-panel-header__subtitle">
-                          {isRtl
-                            ? "إعدادات الحساب، التخصيص، وأدوات النظام"
-                            : "Account settings, personalization, and system tools"}
-                        </p>
-                        <div className="sx-premium-panel-header__chips">
-                          <span className="sx-premium-panel-header__chip sx-premium-panel-header__chip--gold">
-                            {isRtl ? "إعدادات النظام" : "System settings"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    <PremiumSectionHeader
+                      icon={SlidersHorizontal}
+                      iconTone="navy"
+                      title={isRtl ? "المزيد من الخيارات" : "More options"}
+                      subtitle={
+                        isRtl
+                          ? "إعدادات الحساب، التخصيص، وأدوات النظام"
+                          : "Account settings, personalization, and system tools"
+                      }
+                      actions={
+                        <SectionHeaderButton
+                          onClick={closeSheets}
+                          ariaLabel={isRtl ? "إغلاق" : "Close"}
+                        >
+                          <X size={20} strokeWidth={2.25} aria-hidden />
+                        </SectionHeaderButton>
+                      }
+                    />
                   </div>
                   <div className="sx-dock-sheet__body sx-dock-more-body">
                     <section className="sx-dock-more-section">

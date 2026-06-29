@@ -18,7 +18,8 @@ import {
 import { isResourceExhaustedError } from "../lib/firestoreQuota";
 import { useAuth } from "../lib/AuthContext";
 import { 
-  Bell, 
+  Bell,
+  BellRing, 
   MessageSquare,
   CreditCard,
   ClipboardCheck,
@@ -70,6 +71,7 @@ import {
 } from "../lib/notificationGrouping";
 import { isCriticalNotification, canManuallyDeleteNotification } from "../lib/notificationRetention";
 import { NotificationSwipeCard } from "./NotificationSwipeCard";
+import { PremiumSectionHeader, SectionHeaderButton } from "./PremiumSectionHeader";
 import {
   filterNotificationsForUser,
   isNotificationVisibleToUser,
@@ -1529,61 +1531,37 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         <div className="sx-notif-panel">
           {/* Header */}
           {mainView === 'list' ? (
-            <div className="sx-premium-panel-header-wrap sx-premium-panel-header-wrap--sticky sx-premium-panel-header-wrap--notif">
-              <div className="sx-premium-panel-header sx-premium-panel-header--multi-actions">
-                <div className="sx-premium-panel-header__row sx-premium-panel-header__row--top">
-                  <span className="sx-premium-panel-header__icon sx-premium-panel-header__icon--notify" aria-hidden>
-                    <Bell size={24} strokeWidth={2} />
-                  </span>
-                  <div className="sx-premium-panel-header__content">
-                    <h2 className="sx-premium-panel-header__title">
-                      {isArabic ? 'مركز الإشعارات' : 'Notification center'}
-                    </h2>
-                  </div>
-                  <div className="sx-premium-panel-header__actions sx-notif-header-actions">
-                    <button
-                      type="button"
-                      onClick={handleRefreshList}
-                      className="sx-action-btn sx-action-btn-icon"
-                      aria-label={isArabic ? 'تحديث' : 'Refresh'}
-                    >
-                      <RefreshCw className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMainView('preferences')}
-                      className="sx-action-btn sx-action-btn-icon"
-                      aria-label={isArabic ? 'تفضيلات الإشعارات' : 'Notification preferences'}
-                    >
-                      <Settings className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="sx-action-btn sx-action-btn-icon"
-                      aria-label={isArabic ? 'إغلاق' : 'Close'}
-                    >
-                      <X className="sx-action-icon" strokeWidth={2.25} aria-hidden />
-                    </button>
-                  </div>
-                </div>
-                <p className="sx-premium-panel-header__subtitle">
-                  {isArabic
-                    ? 'تابع التنبيهات والرسائل المهمة في مكان واحد'
-                    : 'Track important alerts and messages in one place'}
-                </p>
-                <div className="sx-premium-panel-header__chips" role="group" aria-label={isArabic ? 'ملخص الإشعارات' : 'Notification summary'}>
-                  <span className="sx-premium-panel-header__chip sx-premium-panel-header__chip--gold">
-                    {isArabic ? 'غير المقروءة:' : 'Unread:'}{' '}
-                    <strong>{unreadCount > 99 ? '99+' : unreadCount}</strong>
-                  </span>
-                  <span className="sx-premium-panel-header__chip">
-                    {isArabic ? 'اليوم:' : 'Today:'}{' '}
-                    <strong>{todayCount > 99 ? '99+' : todayCount}</strong>
-                  </span>
-                </div>
-              </div>
-            </div>
+            <PremiumSectionHeader
+              sticky
+              className="sx-section-header--multi-actions"
+              icon={BellRing}
+              iconTone="gold"
+              title={isArabic ? 'مركز الإشعارات' : 'Notification center'}
+              subtitle={
+                isArabic
+                  ? 'تابع التنبيهات والرسائل المهمة في مكان واحد'
+                  : 'Track important alerts and messages in one place'
+              }
+              actions={
+                <>
+                  <SectionHeaderButton
+                    onClick={handleRefreshList}
+                    ariaLabel={isArabic ? 'تحديث' : 'Refresh'}
+                  >
+                    <RefreshCw size={20} strokeWidth={2.25} aria-hidden />
+                  </SectionHeaderButton>
+                  <SectionHeaderButton
+                    onClick={() => setMainView('preferences')}
+                    ariaLabel={isArabic ? 'تفضيلات الإشعارات' : 'Notification preferences'}
+                  >
+                    <Settings size={20} strokeWidth={2.25} aria-hidden />
+                  </SectionHeaderButton>
+                  <SectionHeaderButton onClick={onClose} ariaLabel={isArabic ? 'إغلاق' : 'Close'}>
+                    <X size={20} strokeWidth={2.25} aria-hidden />
+                  </SectionHeaderButton>
+                </>
+              }
+            />
           ) : (
           <header className="sx-notif-header">
             <div className="sx-notif-header__row">
