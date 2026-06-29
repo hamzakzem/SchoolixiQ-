@@ -2652,6 +2652,7 @@ html.dark .parent-page-title {
   opacity: 1;
   isolation: isolate;
   transition: box-shadow var(--sx-transition);
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .sx-notif-grab {
