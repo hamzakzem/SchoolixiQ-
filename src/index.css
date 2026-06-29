@@ -2612,13 +2612,16 @@ html.dark .parent-page-title {
   --sx-success: var(--sx-success);
   --sx-transition: var(--sx-transition);
 
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   padding: 0;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
   font-family: 'Cairo', system-ui, sans-serif;
 }
 
@@ -2641,18 +2644,22 @@ html.dark .parent-page-title {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-height: min(82dvh, calc(100dvh - 1rem));
+  height: auto;
+  min-height: 0;
+  max-height: min(82dvh, calc(100dvh - 12px));
+  flex: 0 0 auto;
+  align-self: stretch;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 24px 24px 0 0;
-  box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.12);
   overflow: hidden;
   animation: sx-notif-enter 0.28s ease-out;
   position: relative;
   opacity: 1;
   isolation: isolate;
   transition: box-shadow var(--sx-transition);
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .sx-notif-grab {
@@ -2661,7 +2668,7 @@ html.dark .parent-page-title {
   height: 4px;
   border-radius: 9999px;
   background: rgba(15, 23, 42, 0.15);
-  margin: 10px auto 0;
+  margin: 8px auto 0;
   flex-shrink: 0;
 }
 
@@ -2674,8 +2681,8 @@ html.dark .parent-page-title {
 @media (min-width: 768px) {
   .sx-notif-shell {
     max-width: min(640px, calc(100vw - 32px));
-    max-height: min(82dvh, calc(100dvh - 2rem));
-    border-radius: 20px;
+    max-height: min(82dvh, calc(100dvh - 24px));
+    border-radius: 24px;
   }
 }
 
@@ -2727,9 +2734,8 @@ html.dark .sx-notif-shell {
 .sx-notif-panel {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
-  max-height: inherit;
   overflow: hidden;
 }
 
@@ -2965,7 +2971,7 @@ html.dark .sx-notif-tab--active {
 }
 
 .sx-notif-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -3760,8 +3766,11 @@ html.dark .sx-notif-settings__section summary {
 }
 
 /* ── Notification Center 2.0: filters, swipe, prefs, groups ── */
-.sx-notif-shell {
-  padding-bottom: env(safe-area-inset-bottom, 0);
+/* Lock page scroll while notification sheet is open (mobile bottom sheet) */
+html:has(.sx-notif-overlay),
+body:has(.sx-notif-overlay) {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .sx-notif-tabs--chips .sx-notif-filter-chip {

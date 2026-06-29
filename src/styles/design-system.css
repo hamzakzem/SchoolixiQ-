@@ -1065,7 +1065,7 @@ html.dark .sx-action-btn-ghost {
 /* ─── Premium panel header card (Notifications, Quick Access, More) ─── */
 .sx-premium-panel-header-wrap {
   flex-shrink: 0;
-  padding: 10px 16px 0;
+  padding: 8px 16px 0;
   background: #ffffff;
 }
 
@@ -1076,7 +1076,7 @@ html.dark .sx-action-btn-ghost {
 }
 
 .sx-premium-panel-header-wrap--notif {
-  padding: 8px 16px 10px;
+  padding: 8px 16px 8px;
   background: #ffffff;
 }
 
@@ -1299,11 +1299,11 @@ html.dark .sx-action-btn-ghost {
 
 @media (min-width: 768px) {
   .sx-premium-panel-header-wrap {
-    padding: 12px 18px 0;
+    padding: 8px 18px 0;
   }
 
   .sx-premium-panel-header-wrap--notif {
-    padding: 10px 18px 12px;
+    padding: 8px 18px 10px;
   }
 
   .sx-premium-panel-header {
@@ -1417,19 +1417,33 @@ html.dark .sx-premium-panel-header__close:hover {
   align-items: flex-end;
   justify-content: center;
   padding: 0;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
   pointer-events: none;
 }
 
 .sx-dock-sheet-root > .sx-drawer-backdrop {
+  position: absolute;
+  inset: 0;
   z-index: 1;
   pointer-events: auto;
+  background: rgba(15, 23, 42, 0.38) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .sx-dock-sheet-root > .sx-dock-sheet {
   position: relative;
   z-index: 2;
   pointer-events: auto;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: min(82dvh, calc(100dvh - 12px));
+  margin: 0;
 }
 
 @media (min-width: 768px) {
@@ -1443,12 +1457,14 @@ html.dark .sx-premium-panel-header__close:hover {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-height: min(82dvh, calc(100dvh - 1rem));
+  height: auto;
+  min-height: 0;
+  max-height: min(82dvh, calc(100dvh - 12px));
   background: #ffffff;
-  border: 1px solid var(--sx-border, #e2e8f0);
-  border-radius: 20px 20px 0 0;
+  border: 1px solid #e8ecf1;
+  border-radius: 24px 24px 0 0;
   overflow: hidden;
-  box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.12);
   opacity: 1;
   isolation: isolate;
   touch-action: manipulation;
@@ -1457,8 +1473,8 @@ html.dark .sx-premium-panel-header__close:hover {
 @media (min-width: 768px) {
   .sx-dock-sheet {
     max-width: 640px;
-    border-radius: 20px;
-    max-height: min(82dvh, calc(100dvh - 2rem));
+    border-radius: 24px;
+    max-height: min(82dvh, calc(100dvh - 24px));
   }
 }
 
@@ -1587,10 +1603,6 @@ html.dark .sx-premium-panel-header__close:hover {
   position: relative;
 }
 
-.sx-dock-sheet--light .sx-dock-sheet__sticky {
-  background: #ffffff;
-}
-
 .sx-dock-sheet__header {
   display: block;
   padding: 0;
@@ -1603,7 +1615,7 @@ html.dark .sx-premium-panel-header__close:hover {
   height: 4px;
   border-radius: 9999px;
   background: rgba(148, 163, 184, 0.45);
-  margin: 10px auto 0;
+  margin: 8px auto 0;
   flex-shrink: 0;
 }
 
@@ -1660,7 +1672,7 @@ html.dark .sx-premium-panel-header__close:hover {
 
 .sx-dock-sheet__search-wrap {
   position: relative;
-  padding: 14px 16px 18px;
+  padding: 14px 16px 12px;
   flex-shrink: 0;
   background: #ffffff;
 }
@@ -1674,6 +1686,10 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__sticky {
 }
 
 html.dark .sx-dock-sheet--light .sx-dock-sheet__search-wrap {
+  background: #1e293b;
+}
+
+html.dark .sx-dock-sheet--light .sx-dock-sheet__body {
   background: #1e293b;
 }
 
@@ -1754,8 +1770,9 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__search-wrap {
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   touch-action: pan-y;
+  background: #ffffff;
 }
 
 .sx-dock-qa-item,
@@ -2371,7 +2388,6 @@ html.dark .sx-dock-sheet--light .sx-dock-more-row__icon {
 
 html.dark .sx-dock-sheet--light .sx-dock-sheet__sticky {
   background: #1e293b;
-  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 /* ─── Desktop header / sidebar brand alignment ─── */
