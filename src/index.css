@@ -667,31 +667,37 @@ body {
 }
 
 /* 2. Header (الشريط العلوي) styling - Premium corporate Navy Blue with gold highlight and high-contrast white content */
-header, [class*="header"]:not(.student-card-print):not([class*="aside"]) {
+/* Exclude mobile panel sheets (notifications / quick access / more) — they use sx-mobile-panel-header-v3 */
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header),
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) {
   background-color: #0B2345 !important;
   color: #FFFFFF !important;
   border-bottom: 2px solid #D4A64A !important;
 }
 
-header *:not(input):not(select):not(textarea):not(button):not(a), 
-[class*="header"] *:not(input):not(select):not(textarea):not(button):not(a) {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) *:not(input):not(select):not(textarea):not(button):not(a),
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) *:not(input):not(select):not(textarea):not(button):not(a) {
   color: #FFFFFF !important;
 }
 
-header input, header select, 
-[class*="header"] input, [class*="header"] select {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) input,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) select,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) input,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) select {
   background-color: rgba(255, 255, 255, 0.1) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   color: #FFFFFF !important;
 }
 
-header input::placeholder, 
-[class*="header"] input::placeholder {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) input::placeholder,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) input::placeholder {
   color: rgba(255, 255, 255, 0.5) !important;
 }
 
-header button, header a, 
-[class*="header"] button, [class*="header"] a {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) button,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) button,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) a {
   background-color: #D4A64A !important;
   border: 1px solid #D4A64A !important;
   color: #0B2345 !important;
@@ -699,15 +705,19 @@ header button, header a,
   box-shadow: 0 2px 8px rgba(212, 166, 74, 0.2) !important;
 }
 
-header button *, header a *, 
-[class*="header"] button *, [class*="header"] a * {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) button *,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) button *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) a * {
   color: #0B2345 !important;
   stroke: #0B2345 !important;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-header button:hover, header a:hover, 
-[class*="header"] button:hover, [class*="header"] a:hover {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) button:hover,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a:hover,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) button:hover,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) a:hover {
   background-color: #0B2345 !important;
   color: #D4A64A !important;
   border-color: #D4A64A !important;
@@ -715,8 +725,10 @@ header button:hover, header a:hover,
   transform: translateY(-1px) !important;
 }
 
-header button:hover *, header a:hover *, 
-[class*="header"] button:hover *, [class*="header"] a:hover * {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) button:hover *,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a:hover *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) button:hover *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) a:hover * {
   color: #D4A64A !important;
   stroke: #D4A64A !important;
 }
@@ -2752,14 +2764,10 @@ html.dark .sx-notif-shell {
   position: sticky;
   top: 0;
   z-index: 10;
-  padding: 12px 16px;
-  background: #ffffff;
-  border: none;
-}
-
-html.dark .sx-notif-header {
-  background: #1e293b;
-  border: none;
+  padding: 8px 12px 6px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .sx-notif-header__row {
@@ -2779,16 +2787,17 @@ html.dark .sx-notif-header {
 }
 
 .sx-notif-header__title {
-  font-size: 1.125rem;
+  font-size: 1.0625rem;
   font-weight: 800;
   color: #0b2345;
-  line-height: 1.3;
+  line-height: 1.25;
   margin: 0;
   font-family: 'Cairo', system-ui, sans-serif;
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
-  text-decoration: none;
+  text-decoration: none !important;
+  border: none !important;
 }
 
 html.dark .sx-notif-header__title {
@@ -2861,7 +2870,7 @@ html.dark .sx-notif-lucide {
   flex-shrink: 0;
   background: transparent;
   border: none;
-  padding: 0 16px 10px;
+  padding: 0 12px 8px;
   overflow: hidden;
 }
 
@@ -3042,16 +3051,16 @@ html.dark .sx-notif-search input {
 }
 
 .sx-notif-list {
-  padding: 16px;
+  padding: 4px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .sx-notif-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .sx-notif-group-label {

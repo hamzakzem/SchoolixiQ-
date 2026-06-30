@@ -27,6 +27,7 @@ import {
 } from "../lib/quickAccessSections";
 import {
   PremiumSectionHeader,
+  PanelSectionTitle,
   SectionHeaderButton,
 } from "./PremiumSectionHeader";
 import {
@@ -48,6 +49,10 @@ import {
   Globe,
   Moon,
   KeyRound,
+  Star,
+  Building2,
+  Wallet,
+  BarChart3,
 } from "lucide-react";
 
 interface MenuItem {
@@ -78,6 +83,15 @@ type DockSheet = "none" | "quick" | "more";
 
 const devLog = (...args: unknown[]) => {
   if (import.meta.env.DEV) console.debug("[MobileNavigationDock]", ...args);
+};
+
+const QUICK_SECTION_ICONS: Record<string, React.ComponentType<{ size?: number; strokeWidth?: number }>> = {
+  frequent: Star,
+  management: Building2,
+  finance: Wallet,
+  communication: MessageSquare,
+  reports: BarChart3,
+  system: ShieldCheck,
 };
 
 function DockBadge({ count }: { count: number }) {
@@ -444,14 +458,11 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                     ) : (
                       groupedQuickAccess.map(({ section, items }) => (
                         <section key={section.id} className="sx-dock-qa-section">
-                          <div className="sx-dock-qa-section__head">
-                            <h3 className="sx-dock-qa-section__label">
-                              {isRtl ? section.labelAr : section.labelEn}
-                            </h3>
-                            <p className="sx-dock-qa-section__desc">
-                              {isRtl ? section.descAr : section.descEn}
-                            </p>
-                          </div>
+                          <PanelSectionTitle
+                            icon={QUICK_SECTION_ICONS[section.id]}
+                            title={isRtl ? section.labelAr : section.labelEn}
+                            description={isRtl ? section.descAr : section.descEn}
+                          />
                           {section.id === "system" &&
                             showPermissionsGateway &&
                             permissionsGatewayTab && (
@@ -570,9 +581,10 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                   </div>
                   <div className="sx-dock-sheet__body sx-dock-more-body">
                     <section className="sx-dock-more-section">
-                      <h3 className="sx-dock-more-section__label">
-                        {isRtl ? "الحساب" : "Account"}
-                      </h3>
+                      <PanelSectionTitle
+                        icon={User}
+                        title={isRtl ? "الحساب" : "Account"}
+                      />
                       {menuItems.some((i) => i.id === "settings") && (
                         <button
                           type="button"
@@ -624,9 +636,10 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                     </section>
 
                     <section className="sx-dock-more-section">
-                      <h3 className="sx-dock-more-section__label">
-                        {isRtl ? "التخصيص" : "Personalization"}
-                      </h3>
+                      <PanelSectionTitle
+                        icon={SlidersHorizontal}
+                        title={isRtl ? "التخصيص" : "Personalization"}
+                      />
                       <div className="sx-dock-more-row sx-dock-more-row--static">
                         <span className="sx-dock-more-row__icon" aria-hidden>
                           <Globe size={18} strokeWidth={2} />
@@ -662,9 +675,10 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                       ((role === "superadmin" || role === "super_admin") &&
                         menuItems.some((i) => i.id === "diagnostics"))) && (
                       <section className="sx-dock-more-section">
-                        <h3 className="sx-dock-more-section__label">
-                          {isRtl ? "النظام" : "System"}
-                        </h3>
+                        <PanelSectionTitle
+                          icon={ShieldCheck}
+                          title={isRtl ? "النظام" : "System"}
+                        />
                         {hasOfflineWork && offlineOps && (
                           <button
                             type="button"

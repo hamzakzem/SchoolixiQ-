@@ -39,6 +39,31 @@ export function SectionHeaderButton({
   );
 }
 
+export interface PanelSectionTitleProps {
+  title: string;
+  description?: string;
+  icon?: LucideIcon;
+}
+
+/** Compact in-panel section label (Quick Access groups, More groups, notification time groups). */
+export function PanelSectionTitle({ title, description, icon: Icon }: PanelSectionTitleProps) {
+  return (
+    <div className="sx-panel-section-title" data-ui="panel-section-title">
+      {Icon ? (
+        <span className="sx-panel-section-title__icon" aria-hidden>
+          <Icon size={14} strokeWidth={2.25} />
+        </span>
+      ) : (
+        <span className="sx-panel-section-title__mark" aria-hidden />
+      )}
+      <div className="sx-panel-section-title__copy">
+        <h3 className="sx-panel-section-title__text">{title}</h3>
+        {description ? <p className="sx-panel-section-title__desc">{description}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 export function PremiumSectionHeader({
   icon: Icon,
   title,
@@ -60,12 +85,14 @@ export function PremiumSectionHeader({
           className={`sx-mobile-panel-header-v3__icon sx-mobile-panel-header-v3__icon--${iconTone}`}
           aria-hidden
         >
-          <Icon size={20} strokeWidth={2} />
+          <Icon size={18} strokeWidth={2.15} />
         </span>
-        <h2 className="sx-mobile-panel-header-v3__title">{title}</h2>
+        <div className="sx-mobile-panel-header-v3__copy">
+          <h2 className="sx-mobile-panel-header-v3__title">{title}</h2>
+          <p className="sx-mobile-panel-header-v3__subtitle">{subtitle}</p>
+        </div>
         {actions ? <div className="sx-mobile-panel-header-v3__actions">{actions}</div> : null}
       </div>
-      <p className="sx-mobile-panel-header-v3__subtitle">{subtitle}</p>
     </header>
   );
 }

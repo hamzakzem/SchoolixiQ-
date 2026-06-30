@@ -71,7 +71,7 @@ import {
 } from "../lib/notificationGrouping";
 import { isCriticalNotification, canManuallyDeleteNotification } from "../lib/notificationRetention";
 import { NotificationSwipeCard } from "./NotificationSwipeCard";
-import { PremiumSectionHeader, SectionHeaderButton } from "./PremiumSectionHeader";
+import { PremiumSectionHeader, PanelSectionTitle, SectionHeaderButton } from "./PremiumSectionHeader";
 import {
   filterNotificationsForUser,
   isNotificationVisibleToUser,
@@ -1131,9 +1131,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           {(['today', 'yesterday', 'older'] as const).map((groupKey) =>
             groupedListItems[groupKey].length > 0 ? (
               <div key={groupKey} className="sx-notif-group">
-                <h3 className="sx-notif-group-label">
-                  {isArabic ? TIME_GROUP_LABELS[groupKey].ar : TIME_GROUP_LABELS[groupKey].en}
-                </h3>
+                <PanelSectionTitle
+                  title={isArabic ? TIME_GROUP_LABELS[groupKey].ar : TIME_GROUP_LABELS[groupKey].en}
+                />
                 {groupedListItems[groupKey].map(renderListItem)}
               </div>
             ) : null,
