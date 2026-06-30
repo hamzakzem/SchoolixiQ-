@@ -1817,9 +1817,25 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__body {
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 16px 12px;
   touch-action: pan-y;
   background: #ffffff;
+}
+
+.sx-dock-sheet__footer {
+  flex-shrink: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: #ffffff;
+  border-top: 1px solid var(--sx-border);
+}
+
+.sx-dock-sheet--light .sx-dock-sheet__footer {
+  background: #ffffff;
+}
+
+html.dark .sx-dock-sheet--light .sx-dock-sheet__footer {
+  background: #1e293b;
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
 
 .sx-dock-qa-item,
@@ -2203,9 +2219,9 @@ html.dark .sx-dock-sheet--light .sx-dock-qa-section__desc {
 }
 
 .sx-dock-more-footer {
-  margin-top: auto;
-  padding-top: 8px;
-  border-top: 1px solid var(--sx-border);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .sx-dock-sheet--dark .sx-dock-more-footer {
@@ -2215,20 +2231,52 @@ html.dark .sx-dock-sheet--light .sx-dock-qa-section__desc {
 .sx-dock-more-logout {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 12px;
   min-height: 44px;
-  padding: 11px 12px;
+  padding: 10px 12px;
   border-radius: 13px;
   border: 1px solid rgba(239, 68, 68, 0.22);
   background: transparent;
   color: #dc2626;
-  font-size: 0.8125rem;
-  font-weight: 600;
   font-family: 'Cairo', system-ui, sans-serif;
   cursor: pointer;
   width: 100%;
+  text-align: start;
   transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.sx-dock-more-logout__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+}
+
+.sx-dock-more-logout__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sx-dock-more-logout__label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #dc2626;
+  line-height: 1.25;
+}
+
+.sx-dock-more-logout__hint {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: rgba(220, 38, 38, 0.72);
+  line-height: 1.35;
 }
 
 .sx-dock-more-logout:active {

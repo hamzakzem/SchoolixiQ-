@@ -106,7 +106,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   menuSurface = "dark",
   hidden = false,
 }) => {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { tabBadges, categoryUnread } = useNotificationBadges();
   const offlineOps = useOfflineOperationsOptional();
   const { counts: offlineCounts, isSyncing } = useOfflineStatus();
@@ -117,6 +117,8 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   const lastTriggerRef = useRef<HTMLElement | null>(null);
 
   const role = userRole || profile?.role;
+  const isAuthenticated = Boolean(user || profile);
+  const showLogoutAction = isAuthenticated && Boolean(onLogout);
   const overviewItem =
     menuItems.find((i) => i.id === "overview" || i.id === "home") || menuItems[0];
   const chatItem =
@@ -737,20 +739,30 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                         )}
                       </section>
                     )}
-
-                    {onLogout && (
-                      <div className="sx-dock-more-footer">
-                        <button
-                          type="button"
-                          className="sx-dock-more-logout"
-                          onClick={handleLogout}
-                        >
-                          <LogOut size={18} aria-hidden />
-                          <span>{logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
+                  {showLogoutAction && (
+                    <div className="sx-dock-sheet__footer sx-dock-more-footer">
+                      <button
+                        type="button"
+                        className="sx-dock-more-logout"
+                        onClick={handleLogout}
+                      >
+                        <span className="sx-dock-more-logout__icon" aria-hidden>
+                          <LogOut size={18} strokeWidth={2} />
+                        </span>
+                        <span className="sx-dock-more-logout__text">
+                          <span className="sx-dock-more-logout__label">
+                            {logoutLabel || (isRtl ? "تسجيل الخروج" : "Logout")}
+                          </span>
+                          <span className="sx-dock-more-logout__hint">
+                            {isRtl
+                              ? "إنهاء الجلسة الحالية بأمان"
+                              : "End your current session safely"}
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               </div>
             )}
@@ -825,7 +837,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                     })}
                   </div>
                 </div>
-                {onLogout && (
+                {showLogoutAction && (
                   <div className="sx-drawer-services-footer">
                     <button type="button" onClick={handleLogout} className="sx-drawer-services-logout">
                       <LogOut size={20} strokeWidth={2.25} aria-hidden />

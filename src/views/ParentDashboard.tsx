@@ -2510,6 +2510,8 @@ export default function ParentDashboard() {
           isRtl={isRtl}
           menuSurface="light"
           hidden={activeTab === "chat"}
+          logoutLabel={t("logout")}
+          onLogout={handleLogout}
         />
       </div>
       </div>
