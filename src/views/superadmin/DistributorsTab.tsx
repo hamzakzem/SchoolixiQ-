@@ -13,6 +13,7 @@ import {
   Calendar,
   ChevronLeft,
   Loader2,
+  MessageSquare,
   PauseCircle,
   PlayCircle,
   Plus,
@@ -34,6 +35,11 @@ import type {
   DistributorMonthlyCommission,
   DistributorRecord,
 } from "../../types/distributor";
+import { DistributorSupportInbox } from "./DistributorSupportInbox";
+import {
+  ensureDistributorSupportConversation,
+} from "../../lib/distributorSupportChat";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
 
 type SchoolRow = {
   id: string;
@@ -297,6 +303,33 @@ export function DistributorsTab({
   const planName = (planId?: string) =>
     packages.find((p) => p.id === planId)?.name || planId || "—";
 
+  const openDistributorChat = async (distributor: DistributorRecord) => {
+    let userId = distributor.userId;
+    if (!userId) {
+      const q = query(
+        collection(db, "users"),
+        where("distributorId", "==", distributor.id),
+        limit(1),
+      );
+      const snap = await getDocs(q);
+      userId = snap.docs[0]?.id;
+    }
+    if (!userId) {
+      toast.error("لا يوجد حساب مستخدم مربوط بهذا الموزع");
+      return;
+    }
+    try {
+      await ensureDistributorSupportConversation({
+        distributorId: distributor.id,
+        distributorUserId: userId,
+        distributorName: distributor.name,
+      });
+      toast.success("تم تجهيز المحادثة — راجع قسم رسائل الموزعين");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "فشل فتح المحادثة");
+    }
+  };
+
   if (loading && distributors.length === 0) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-500">
@@ -336,6 +369,8 @@ export function DistributorsTab({
           </button>
         </div>
       </div>
+
+      <DistributorSupportInbox distributors={distributors} />
 
       {/* Generate monthly */}
       <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -480,6 +515,14 @@ export function DistributorsTab({
                 {selectedDistributor.name} — المدارس التابعة
               </h4>
             </div>
+            <button
+              type="button"
+              onClick={() => void openDistributorChat(selectedDistributor)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0B2345] text-white text-sm font-bold"
+            >
+              <MessageSquare size={16} />
+              فتح محادثة
+            </button>
             <button
               type="button"
               onClick={async () => {
