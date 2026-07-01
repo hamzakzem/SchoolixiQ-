@@ -64,8 +64,56 @@ service cloud.firestore {
       return userRole() == 'guard';
     }
 
+    function isDistributor() {
+      return userRole() == 'distributor';
+    }
+
+    function userDistributorId() {
+      return userExists()
+        && userDoc().keys().hasAll(['distributorId'])
+        && userDoc().distributorId is string
+        && userDoc().distributorId.size() > 0
+        ? userDoc().distributorId
+        : '';
+    }
+
     function isParent() {
       return userRole() == 'parent';
+    }
+
+    function preservesSchoolDistributorFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'distributorId',
+        'distributorName',
+        'distributorCouponCode',
+        'discountPercent',
+        'commissionPercent',
+        'trackingSource',
+        'distributorCommissionPercent',
+        'distributorDiscountPercent',
+        'distributorDiscountAmount',
+        'distributorCommissionType',
+        'distributorLinkedAt',
+        'distributorLinkedBy',
+        'distributorCommissionPaused',
+        'distributorCommissionPausedAt',
+        'distributorCommissionPausedBy',
+      ]);
+    }
+
+    function schoolCreateWithoutDistributorFields() {
+      return !request.resource.data.keys().hasAny([
+        'distributorId',
+        'distributorName',
+        'distributorCouponCode',
+        'discountPercent',
+        'commissionPercent',
+        'trackingSource',
+        'distributorCommissionPercent',
+        'distributorDiscountPercent',
+        'distributorDiscountAmount',
+        'distributorCommissionType',
+      ]);
     }
 
     function teacherAssignedClassId() {
@@ -528,7 +576,9 @@ service cloud.firestore {
 
     // Distributors & coupons — Super Admin only (financial commissions via backend).
     match /distributors/{distributorId} {
-      allow read, get, list: if isSuperAdmin();
+      allow read, get: if isSuperAdmin()
+        || (isDistributor() && userDistributorId() == distributorId);
+      allow list: if isSuperAdmin();
       allow create, update, delete: if isSuperAdmin();
     }
 
@@ -538,8 +588,55 @@ service cloud.firestore {
     }
 
     match /distributorMonthlyCommissions/{commissionId} {
-      allow read, get, list: if isSuperAdmin();
+      allow read, get: if isSuperAdmin()
+        || (isDistributor() && resource.data.distributorId == userDistributorId());
+      allow list: if isSuperAdmin()
+        || (isDistributor() && resource.data.distributorId == userDistributorId());
       allow create, update, delete: if false;
+    }
+
+    // Distributor ↔ platform support chat (isolated from school messaging).
+    match /distributor_support_conversations/{conversationId} {
+      allow read, get: if isSuperAdmin()
+        || (isDistributor() && resource.data.distributorId == userDistributorId());
+      allow list: if isSuperAdmin()
+        || (isDistributor() && resource.data.distributorId == userDistributorId());
+      allow create: if isSuperAdmin()
+        || (
+          isDistributor()
+          && request.resource.data.conversationType == 'distributor_support'
+          && request.resource.data.distributorId == userDistributorId()
+          && request.auth.uid in request.resource.data.participants
+        );
+      allow update: if isSuperAdmin()
+        || (
+          isDistributor()
+          && resource.data.distributorId == userDistributorId()
+          && request.resource.data.distributorId == resource.data.distributorId
+        );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /distributor_support_messages/{messageId} {
+      allow read, get: if isSuperAdmin()
+        || (isDistributor() && resource.data.distributorId == userDistributorId());
+      allow list: if isSuperAdmin()
+        || (isDistributor() && resource.data.distributorId == userDistributorId());
+      allow create: if isSuperAdmin()
+        || (
+          isDistributor()
+          && request.resource.data.conversationType == 'distributor_support'
+          && request.resource.data.distributorId == userDistributorId()
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderRole == 'distributor'
+        );
+      allow update: if isSuperAdmin()
+        || (
+          isDistributor()
+          && resource.data.distributorId == userDistributorId()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readBy'])
+        );
+      allow delete: if isSuperAdmin();
     }
 
     // Platform branding & config — public read; only Super Admin may mutate.
@@ -552,9 +649,19 @@ service cloud.firestore {
     match /schools/{schoolId} {
       allow read, get, list: if true;
       allow create: if isSuperAdmin()
-        || (signedIn() && isAdmin() && request.resource.data.ownerUid == request.auth.uid);
+        || (
+          signedIn()
+          && isAdmin()
+          && request.resource.data.ownerUid == request.auth.uid
+          && schoolCreateWithoutDistributorFields()
+        );
       allow update: if isSuperAdmin()
-        || (signedIn() && isSchoolMember(schoolId) && userRole() in ['admin', 'school_admin', 'assistant', 'teacher']);
+        || (
+          signedIn()
+          && isSchoolMember(schoolId)
+          && userRole() in ['admin', 'school_admin', 'assistant', 'teacher']
+          && preservesSchoolDistributorFields()
+        );
       allow delete: if isSuperAdmin();
 
       match /settings/{settingId} {

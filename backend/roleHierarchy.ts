@@ -13,6 +13,7 @@ export const ROLE_RANK: Record<string, number> = {
   teacher: 50,
   parent: 40,
   guard: 30,
+  distributor: 25,
   student: 20,
 };
 
@@ -27,6 +28,10 @@ export function roleRank(role: string | undefined | null): number {
 
 export function isSuperAdminRole(role: string | undefined | null): boolean {
   return normalizeRole(role) === 'superadmin';
+}
+
+export function isDistributorRole(role: string | undefined | null): boolean {
+  return normalizeRole(role) === 'distributor';
 }
 
 export function isSchoolAdminRole(role: string | undefined | null): boolean {
@@ -65,6 +70,7 @@ export function canActorCreateRole(
   if (!target) return false;
 
   if (target === 'superadmin') return actor === 'superadmin';
+  if (target === 'distributor') return actor === 'superadmin';
   if (isSystemAssistant(actor, actorSchoolId)) return false;
 
   if (['admin', 'school_admin'].includes(target)) {

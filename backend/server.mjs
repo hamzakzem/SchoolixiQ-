@@ -297,6 +297,413 @@ async function runUserPermanentDelete({
   };
 }
 
+// distributorCommissions.mjs
+var COMMISSION_COLLECTION = "distributorMonthlyCommissions";
+var COUPONS_COLLECTION = "distributorCoupons";
+var DISTRIBUTORS_COLLECTION = "distributors";
+function normalizeCouponCode(code) {
+  return String(code || "").trim().toUpperCase();
+}
+function normalizeMonthKey(monthKey) {
+  const m = String(monthKey || "").trim();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(m)) {
+    const err = new Error("INVALID_MONTH_KEY");
+    err.code = "INVALID_MONTH_KEY";
+    throw err;
+  }
+  return m;
+}
+function buildCommissionDocId(distributorId, schoolId, monthKey) {
+  return `${distributorId}_${schoolId}_${monthKey}`;
+}
+function calculateCommissionAmount(netAmount, commissionPercent) {
+  const net = Number(netAmount) || 0;
+  const pct = Number(commissionPercent) || 0;
+  return Math.round(net * pct / 100);
+}
+function resolveSchoolPaymentStatus(school) {
+  const pay = String(school.paymentStatus || "").toLowerCase();
+  if (pay) return pay;
+  if (String(school.status || "").toLowerCase() === "active") return "paid";
+  return "";
+}
+function validateCouponForRedemption(coupon, normalizedCode) {
+  if (!coupon) {
+    const err = new Error("\u0643\u0648\u0628\u0648\u0646 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+    err.code = "COUPON_NOT_FOUND";
+    throw err;
+  }
+  if (coupon.active === false) {
+    const err = new Error("\u0627\u0644\u0643\u0648\u0628\u0648\u0646 \u063A\u064A\u0631 \u0646\u0634\u0637");
+    err.code = "COUPON_INACTIVE";
+    throw err;
+  }
+  const maxUses = coupon.maxUses ?? coupon.maxRedemptions;
+  if (maxUses != null && Number(coupon.redemptionCount || 0) >= Number(maxUses)) {
+    const err = new Error("\u062A\u0645 \u0627\u0633\u062A\u0646\u0641\u0627\u062F \u0639\u062F\u062F \u0627\u0633\u062A\u062E\u062F\u0627\u0645\u0627\u062A \u0627\u0644\u0643\u0648\u0628\u0648\u0646");
+    err.code = "COUPON_EXHAUSTED";
+    throw err;
+  }
+  if (coupon.expiresAt) {
+    let expiry = coupon.expiresAt;
+    if (typeof expiry?.toDate === "function") expiry = expiry.toDate();
+    else expiry = new Date(expiry);
+    if (expiry instanceof Date && !Number.isNaN(expiry.getTime()) && expiry < /* @__PURE__ */ new Date()) {
+      const err = new Error("\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0627\u0644\u0643\u0648\u0628\u0648\u0646");
+      err.code = "COUPON_EXPIRED";
+      throw err;
+    }
+  }
+  if (!coupon.distributorId) {
+    const err = new Error("\u0627\u0644\u0643\u0648\u0628\u0648\u0646 \u063A\u064A\u0631 \u0645\u0631\u0628\u0648\u0637 \u0628\u0645\u0648\u0632\u0639");
+    err.code = "COUPON_NO_DISTRIBUTOR";
+    throw err;
+  }
+  if (normalizedCode && coupon.code && normalizeCouponCode(coupon.code) !== normalizedCode) {
+    const err = new Error("\u0643\u0648\u0628\u0648\u0646 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+    err.code = "COUPON_NOT_FOUND";
+    throw err;
+  }
+  return true;
+}
+function isDistributorTrackedSchool(school) {
+  if (!school) return false;
+  if (school.trackingSource === "direct") return false;
+  if (school.trackingSource === "distributor") return Boolean(school.distributorId);
+  return Boolean(school.distributorId);
+}
+function buildDistributorTrackingFields(coupon, distributor, couponCode) {
+  const commissionPercent = Number(
+    coupon.commissionPercent ?? distributor.commissionPercent ?? 0
+  );
+  const discountPercent = Number(coupon.discountPercent ?? 0);
+  const fixedDiscountAmount = Number(coupon.discountAmount ?? 0);
+  const normalizedCode = normalizeCouponCode(coupon.code || couponCode);
+  return {
+    distributorId: String(coupon.distributorId),
+    distributorName: String(distributor.name || coupon.distributorName || ""),
+    couponCode: normalizedCode,
+    distributorCouponCode: normalizedCode,
+    discountPercent,
+    discountAmount: fixedDiscountAmount,
+    commissionPercent,
+    trackingSource: "distributor",
+    distributorCommissionPercent: commissionPercent,
+    distributorCommissionType: "recurring_monthly",
+    distributorCommissionPaused: false,
+    ...discountPercent > 0 ? { distributorDiscountPercent: discountPercent } : {},
+    ...fixedDiscountAmount > 0 ? { distributorDiscountAmount: fixedDiscountAmount } : {}
+  };
+}
+function isSchoolCommissionEligible(school) {
+  if (!isDistributorTrackedSchool(school)) {
+    return {
+      eligible: false,
+      reason: school?.trackingSource === "direct" ? "direct_tracking" : "no_distributor"
+    };
+  }
+  if (!school?.distributorId) {
+    return { eligible: false, reason: "no_distributor" };
+  }
+  if (school.distributorCommissionPaused === true) {
+    return { eligible: false, reason: "paused" };
+  }
+  const status = String(school.status || "").toLowerCase();
+  if (["suspended", "inactive", "archived", "rejected"].includes(status)) {
+    return { eligible: false, reason: "inactive" };
+  }
+  const subStatus = String(school.subscriptionStatus || "active").toLowerCase();
+  if (subStatus !== "active") {
+    return { eligible: false, reason: "subscription_inactive" };
+  }
+  const payStatus = resolveSchoolPaymentStatus(school);
+  if (!["paid", "approved"].includes(payStatus)) {
+    return { eligible: false, reason: "unpaid" };
+  }
+  return { eligible: true, reason: null };
+}
+function resolveSubscriptionAmount(school, packageData) {
+  const pkg = packageData || {};
+  const monthly = Number(pkg.priceMonthly);
+  if (monthly > 0) return monthly;
+  const yearly = Number(pkg.price);
+  if (yearly > 0) return Math.round(yearly / 12);
+  const fromSchool = Number(school.subscriptionAmount || school.lastPaymentAmount);
+  return fromSchool > 0 ? fromSchool : 0;
+}
+function resolveDiscountAmount(school, subscriptionAmount) {
+  const pct = Number(school.discountPercent ?? school.distributorDiscountPercent);
+  if (pct > 0) return Math.round(subscriptionAmount * pct / 100);
+  const fixed = Number(school.distributorDiscountAmount);
+  if (fixed > 0) return Math.min(fixed, subscriptionAmount);
+  return Number(school.discountAmount) || 0;
+}
+async function findCouponByCode(db, code) {
+  const normalized = normalizeCouponCode(code);
+  if (!normalized) return null;
+  const snap = await db.collection(COUPONS_COLLECTION).where("code", "==", normalized).limit(1).get();
+  if (snap.empty) return null;
+  const docSnap = snap.docs[0];
+  return { id: docSnap.id, ...docSnap.data() };
+}
+async function applyDistributorCoupon({
+  db,
+  adminSdk,
+  schoolId,
+  couponCode,
+  actorUid
+}) {
+  const schoolRef = db.collection("schools").doc(schoolId);
+  const schoolSnap = await schoolRef.get();
+  if (!schoolSnap.exists) {
+    const err = new Error("SCHOOL_NOT_FOUND");
+    err.code = "SCHOOL_NOT_FOUND";
+    throw err;
+  }
+  const school = schoolSnap.data() || {};
+  if (school.distributorId) {
+    return {
+      linked: false,
+      alreadyLinked: true,
+      distributorId: school.distributorId
+    };
+  }
+  const coupon = await findCouponByCode(db, couponCode);
+  validateCouponForRedemption(coupon, normalizeCouponCode(couponCode));
+  const distributorSnap = await db.collection(DISTRIBUTORS_COLLECTION).doc(String(coupon.distributorId)).get();
+  if (!distributorSnap.exists) {
+    const err = new Error("DISTRIBUTOR_NOT_FOUND");
+    err.code = "DISTRIBUTOR_NOT_FOUND";
+    throw err;
+  }
+  const distributor = distributorSnap.data() || {};
+  if (distributor.active === false) {
+    const err = new Error("DISTRIBUTOR_INACTIVE");
+    err.code = "DISTRIBUTOR_INACTIVE";
+    throw err;
+  }
+  const trackingFields = buildDistributorTrackingFields(
+    coupon,
+    distributor,
+    couponCode
+  );
+  const commissionPercent = trackingFields.commissionPercent;
+  const planId = String(school.planId || "basic");
+  const pkgSnap = await db.collection("packages").doc(planId).get();
+  const packageData = pkgSnap.exists ? pkgSnap.data() : {};
+  const subscriptionAmount = resolveSubscriptionAmount(school, packageData);
+  const computedDiscountAmount = resolveDiscountAmount(
+    { ...school, ...trackingFields },
+    subscriptionAmount
+  );
+  if (computedDiscountAmount > 0) {
+    trackingFields.discountAmount = computedDiscountAmount;
+  }
+  const FieldValue = adminSdk.firestore.FieldValue;
+  const now = FieldValue.serverTimestamp();
+  await schoolRef.update({
+    ...trackingFields,
+    distributorLinkedAt: now,
+    updatedAt: now,
+    ...actorUid ? { distributorLinkedBy: actorUid } : {}
+  });
+  await db.collection(COUPONS_COLLECTION).doc(coupon.id).set(
+    {
+      redemptionCount: FieldValue.increment(1),
+      lastRedeemedAt: now,
+      lastRedeemedSchoolId: schoolId
+    },
+    { merge: true }
+  );
+  return {
+    linked: true,
+    alreadyLinked: false,
+    trackingSource: "distributor",
+    distributorId: String(coupon.distributorId),
+    commissionPercent,
+    discountPercent: trackingFields.discountPercent,
+    discountAmount: trackingFields.discountAmount || 0,
+    commissionAccrued: false
+  };
+}
+async function generateMonthlyCommissions({ db, adminSdk, monthKey }) {
+  const normalizedMonth = normalizeMonthKey(monthKey);
+  const FieldValue = adminSdk.firestore.FieldValue;
+  const now = FieldValue.serverTimestamp();
+  const [legacySnap, trackedSnap] = await Promise.all([
+    db.collection("schools").where("distributorCommissionType", "==", "recurring_monthly").get(),
+    db.collection("schools").where("trackingSource", "==", "distributor").get()
+  ]);
+  const schoolDocMap = /* @__PURE__ */ new Map();
+  for (const schoolDoc of [...legacySnap.docs, ...trackedSnap.docs]) {
+    schoolDocMap.set(schoolDoc.id, schoolDoc);
+  }
+  const counts = {
+    generated: 0,
+    skippedInactive: 0,
+    skippedUnpaid: 0,
+    alreadyExists: 0,
+    monthKey: normalizedMonth
+  };
+  const packageCache = /* @__PURE__ */ new Map();
+  for (const schoolDoc of schoolDocMap.values()) {
+    const school = schoolDoc.data() || {};
+    const schoolId = schoolDoc.id;
+    const distributorId = String(school.distributorId || "");
+    if (!distributorId) continue;
+    const eligibility = isSchoolCommissionEligible(school);
+    if (!eligibility.eligible) {
+      if (eligibility.reason === "unpaid" || eligibility.reason === "subscription_inactive") {
+        counts.skippedUnpaid += 1;
+      } else {
+        counts.skippedInactive += 1;
+      }
+      continue;
+    }
+    const docId = buildCommissionDocId(distributorId, schoolId, normalizedMonth);
+    const commissionRef = db.collection(COMMISSION_COLLECTION).doc(docId);
+    const existing = await commissionRef.get();
+    if (existing.exists) {
+      counts.alreadyExists += 1;
+      continue;
+    }
+    const planId = String(school.planId || "basic");
+    let packageData = packageCache.get(planId);
+    if (packageData === void 0) {
+      const pkgSnap = await db.collection("packages").doc(planId).get();
+      packageData = pkgSnap.exists ? pkgSnap.data() : {};
+      packageCache.set(planId, packageData);
+    }
+    const subscriptionAmount = resolveSubscriptionAmount(school, packageData);
+    const discountAmount = resolveDiscountAmount(school, subscriptionAmount);
+    const netAmount = Math.max(0, subscriptionAmount - discountAmount);
+    const commissionPercent = Number(
+      school.commissionPercent ?? school.distributorCommissionPercent ?? 0
+    );
+    const commissionAmount = calculateCommissionAmount(netAmount, commissionPercent);
+    await commissionRef.set({
+      id: docId,
+      distributorId,
+      distributorName: String(school.distributorName || ""),
+      schoolId,
+      schoolName: String(school.name || ""),
+      monthKey: normalizedMonth,
+      planId,
+      planName: String(packageData?.name || planId),
+      subscriptionAmount,
+      discountAmount,
+      netAmount,
+      commissionPercent,
+      commissionAmount,
+      status: "earned",
+      generatedAt: now,
+      earnedAt: now,
+      paidAt: null,
+      paidBy: null,
+      canceledAt: null,
+      notes: ""
+    });
+    counts.generated += 1;
+  }
+  return counts;
+}
+async function markCommissionPaid({
+  db,
+  adminSdk,
+  commissionId,
+  paidBy,
+  notes
+}) {
+  const ref = db.collection(COMMISSION_COLLECTION).doc(commissionId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    const err = new Error("COMMISSION_NOT_FOUND");
+    err.code = "COMMISSION_NOT_FOUND";
+    throw err;
+  }
+  const data = snap.data() || {};
+  if (data.status === "paid") {
+    return { updated: false, alreadyPaid: true, id: commissionId };
+  }
+  if (data.status === "canceled") {
+    const err = new Error("COMMISSION_CANCELED");
+    err.code = "COMMISSION_CANCELED";
+    throw err;
+  }
+  const FieldValue = adminSdk.firestore.FieldValue;
+  await ref.update({
+    status: "paid",
+    paidAt: FieldValue.serverTimestamp(),
+    paidBy,
+    ...notes ? { notes: String(notes) } : {}
+  });
+  return { updated: true, alreadyPaid: false, id: commissionId };
+}
+async function markDistributorMonthCommissionsPaid({
+  db,
+  adminSdk,
+  distributorId,
+  monthKey,
+  paidBy,
+  notes
+}) {
+  const normalizedMonth = normalizeMonthKey(monthKey);
+  const snap = await db.collection(COMMISSION_COLLECTION).where("distributorId", "==", distributorId).where("monthKey", "==", normalizedMonth).get();
+  let updated = 0;
+  let skipped = 0;
+  for (const docSnap of snap.docs) {
+    const status = docSnap.data()?.status;
+    if (status === "paid" || status === "canceled") {
+      skipped += 1;
+      continue;
+    }
+    await markCommissionPaid({
+      db,
+      adminSdk,
+      commissionId: docSnap.id,
+      paidBy,
+      notes
+    });
+    updated += 1;
+  }
+  return { updated, skipped, distributorId, monthKey: normalizedMonth };
+}
+async function setSchoolDistributorCommissionPaused({
+  db,
+  adminSdk,
+  schoolId,
+  paused,
+  pausedBy
+}) {
+  const schoolRef = db.collection("schools").doc(schoolId);
+  const schoolSnap = await schoolRef.get();
+  if (!schoolSnap.exists) {
+    const err = new Error("SCHOOL_NOT_FOUND");
+    err.code = "SCHOOL_NOT_FOUND";
+    throw err;
+  }
+  const school = schoolSnap.data() || {};
+  if (!school.distributorId) {
+    const err = new Error("SCHOOL_NOT_LINKED");
+    err.code = "SCHOOL_NOT_LINKED";
+    throw err;
+  }
+  const FieldValue = adminSdk.firestore.FieldValue;
+  const update = {
+    distributorCommissionPaused: paused === true,
+    updatedAt: FieldValue.serverTimestamp()
+  };
+  if (paused) {
+    update.distributorCommissionPausedAt = FieldValue.serverTimestamp();
+    update.distributorCommissionPausedBy = pausedBy;
+  } else {
+    update.distributorCommissionPausedAt = null;
+    update.distributorCommissionPausedBy = null;
+  }
+  await schoolRef.update(update);
+  return { schoolId, paused: paused === true };
+}
+
 // roleHierarchy.ts
 var ROLE_RANK = {
   superadmin: 100,
@@ -308,6 +715,7 @@ var ROLE_RANK = {
   teacher: 50,
   parent: 40,
   guard: 30,
+  distributor: 25,
   student: 20
 };
 function normalizeRole(role) {
@@ -341,6 +749,7 @@ function canActorCreateRole(actorRole, targetRole, actorSchoolId) {
   const target = normalizeRole(targetRole);
   if (!target) return false;
   if (target === "superadmin") return actor === "superadmin";
+  if (target === "distributor") return actor === "superadmin";
   if (isSystemAssistant(actor, actorSchoolId)) return false;
   if (["admin", "school_admin"].includes(target)) {
     return actor === "superadmin";
@@ -1686,6 +2095,165 @@ async function startServer() {
         ok: false,
         error: error.message || "Internal Server Error",
         message: error.message || "\u0641\u0634\u0644 \u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0645\u062F\u0631\u0633\u0629"
+      });
+    }
+  });
+  app.post("/api/admin/distributors/apply-coupon", verifyAdmin, async (req, res) => {
+    const body = req.body || {};
+    const schoolId = String(body.schoolId || "").trim();
+    const couponCode = String(body.couponCode || "").trim();
+    if (!schoolId || !couponCode) {
+      return res.status(400).json({
+        error: "INVALID_BODY",
+        message: "schoolId \u0648 couponCode \u0645\u0637\u0644\u0648\u0628\u0627\u0646"
+      });
+    }
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u0631\u0628\u0637 \u0643\u0648\u0628\u0648\u0646 \u0627\u0644\u0645\u0648\u0632\u0639 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
+        });
+      }
+      const result = await applyDistributorCoupon({
+        db: getDb(),
+        adminSdk: admin,
+        schoolId,
+        couponCode,
+        actorUid: req.user.uid
+      });
+      await logAudit(req, "DISTRIBUTOR_APPLY_COUPON", {
+        metadata: { schoolId, couponCode, result }
+      });
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      const code = error.code || "APPLY_COUPON_FAILED";
+      res.status(code === "SCHOOL_NOT_FOUND" || code === "COUPON_INVALID" ? 404 : 400).json({
+        error: code,
+        message: error.message || "\u0641\u0634\u0644 \u0631\u0628\u0637 \u0627\u0644\u0643\u0648\u0628\u0648\u0646"
+      });
+    }
+  });
+  app.post("/api/admin/distributors/generate-monthly-commissions", verifyAdmin, async (req, res) => {
+    const monthKey = String(req.body?.monthKey || "").trim();
+    if (!monthKey) {
+      return res.status(400).json({
+        error: "MONTH_KEY_REQUIRED",
+        message: "monthKey \u0645\u0637\u0644\u0648\u0628 (\u0645\u062B\u0627\u0644: 2026-07)"
+      });
+    }
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u062A\u0648\u0644\u064A\u062F \u0627\u0644\u0639\u0645\u0648\u0644\u0627\u062A \u0627\u0644\u0634\u0647\u0631\u064A\u0629 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
+        });
+      }
+      const counts = await generateMonthlyCommissions({
+        db: getDb(),
+        adminSdk: admin,
+        monthKey
+      });
+      await logAudit(req, "DISTRIBUTOR_GENERATE_MONTHLY", {
+        metadata: { monthKey, counts }
+      });
+      res.json({ ok: true, ...counts });
+    } catch (error) {
+      res.status(400).json({
+        error: error.code || "GENERATE_FAILED",
+        message: error.message || "\u0641\u0634\u0644 \u062A\u0648\u0644\u064A\u062F \u0627\u0644\u0639\u0645\u0648\u0644\u0627\u062A"
+      });
+    }
+  });
+  app.post("/api/admin/distributors/commissions/:commissionId/mark-paid", verifyAdmin, async (req, res) => {
+    const { commissionId } = req.params;
+    const notes = req.body?.notes;
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u062A\u0639\u0644\u064A\u0645 \u0627\u0644\u0639\u0645\u0648\u0644\u0629 \u0643\u0645\u062F\u0641\u0648\u0639\u0629 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
+        });
+      }
+      const result = await markCommissionPaid({
+        db: getDb(),
+        adminSdk: admin,
+        commissionId,
+        paidBy: req.user.uid,
+        notes
+      });
+      await logAudit(req, "DISTRIBUTOR_COMMISSION_PAID", {
+        metadata: { commissionId, result }
+      });
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      res.status(error.code === "COMMISSION_NOT_FOUND" ? 404 : 400).json({
+        error: error.code || "MARK_PAID_FAILED",
+        message: error.message || "\u0641\u0634\u0644 \u062A\u0639\u0644\u064A\u0645 \u0627\u0644\u0639\u0645\u0648\u0644\u0629 \u0643\u0645\u062F\u0641\u0648\u0639\u0629"
+      });
+    }
+  });
+  app.post("/api/admin/distributors/:distributorId/commissions/mark-paid", verifyAdmin, async (req, res) => {
+    const { distributorId } = req.params;
+    const monthKey = String(req.body?.monthKey || "").trim();
+    const notes = req.body?.notes;
+    if (!monthKey) {
+      return res.status(400).json({
+        error: "MONTH_KEY_REQUIRED",
+        message: "monthKey \u0645\u0637\u0644\u0648\u0628"
+      });
+    }
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u062A\u0639\u0644\u064A\u0645 \u0639\u0645\u0648\u0644\u0627\u062A \u0627\u0644\u0645\u0648\u0632\u0639 \u0643\u0645\u062F\u0641\u0648\u0639\u0629 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
+        });
+      }
+      const result = await markDistributorMonthCommissionsPaid({
+        db: getDb(),
+        adminSdk: admin,
+        distributorId,
+        monthKey,
+        paidBy: req.user.uid,
+        notes
+      });
+      await logAudit(req, "DISTRIBUTOR_MONTH_PAID", {
+        metadata: { distributorId, monthKey, result }
+      });
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      res.status(400).json({
+        error: error.code || "MARK_PAID_FAILED",
+        message: error.message || "\u0641\u0634\u0644 \u062A\u0639\u0644\u064A\u0645 \u0639\u0645\u0648\u0644\u0627\u062A \u0627\u0644\u0634\u0647\u0631 \u0643\u0645\u062F\u0641\u0648\u0639\u0629"
+      });
+    }
+  });
+  app.post("/api/admin/schools/:schoolId/distributor-commission-pause", verifyAdmin, async (req, res) => {
+    const { schoolId } = req.params;
+    const paused = req.body?.paused === true;
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u0625\u064A\u0642\u0627\u0641 \u0639\u0645\u0648\u0644\u0629 \u0627\u0644\u0645\u0648\u0632\u0639 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
+        });
+      }
+      const result = await setSchoolDistributorCommissionPaused({
+        db: getDb(),
+        adminSdk: admin,
+        schoolId,
+        paused,
+        pausedBy: req.user.uid
+      });
+      await logAudit(req, paused ? "DISTRIBUTOR_COMMISSION_PAUSE" : "DISTRIBUTOR_COMMISSION_RESUME", {
+        metadata: { schoolId, paused }
+      });
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      res.status(error.code === "SCHOOL_NOT_FOUND" ? 404 : 400).json({
+        error: error.code || "PAUSE_FAILED",
+        message: error.message || "\u0641\u0634\u0644 \u062A\u062D\u062F\u064A\u062B \u062D\u0627\u0644\u0629 \u0639\u0645\u0648\u0644\u0629 \u0627\u0644\u0645\u0648\u0632\u0639"
       });
     }
   });
