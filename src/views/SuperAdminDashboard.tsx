@@ -3,7 +3,7 @@ import { clsx } from "clsx";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { signOutWithCleanup } from "../lib/authLogout";
-import { adminCreateUser, adminDeleteUser } from "../lib/adminApi";
+import { adminCreateUser, adminDeleteUser, adminApplyDistributorCoupon } from "../lib/adminApi";
 import { getApiUrl } from "../lib/apiUtils";
 import {
   collection,
@@ -72,6 +72,7 @@ import {
   Star,
   CreditCard,
   Bell,
+  Tag,
 } from "lucide-react";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { toast } from "react-hot-toast";
@@ -103,6 +104,7 @@ import {
   type SchoolSortOption,
 } from "../components/superadmin/SuperAdminSchoolsFilterBar";
 import { SuperAdminSchoolAccountList } from "../components/superadmin/SuperAdminSchoolAccountList";
+import { DistributorsTab } from "./superadmin/DistributorsTab";
 import { useSchoolPresenceMap } from "../lib/useSchoolPresenceMap";
 import {
   presenceFilterMatches,
@@ -227,6 +229,7 @@ export default function SuperAdminDashboard() {
     | "diagnostics"
     | "audit_logs"
     | "landing_page"
+    | "distributors"
   >("schools");
   const [schoolFilter, setSchoolFilter] = useState<
     "all" | "active" | "suspended" | "archived" | "expiring"
@@ -1203,6 +1206,22 @@ export default function SuperAdminDashboard() {
       );
       await syncAdminClaims(result.adminUid);
       scheduleRegistrationCleanup(result.source, request.id);
+
+      const couponCode = String(
+        request.couponCode ||
+          request.distributorCouponCode ||
+          request.customerInfo?.couponCode ||
+          "",
+      ).trim();
+      if (couponCode && request.schoolId) {
+        try {
+          await adminApplyDistributorCoupon(request.schoolId, couponCode);
+        } catch (couponErr) {
+          console.warn("Distributor coupon link failed", couponErr);
+          toast.error("تم التفعيل لكن فشل ربط كوبون الموزع");
+        }
+      }
+
       toast.dismiss(loadingToast);
       toast.success("تم تفعيل حساب المدرسة بنجاح");
     } catch (error: any) {
@@ -1311,6 +1330,21 @@ export default function SuperAdminDashboard() {
 
       await syncAdminClaims(result.adminUid);
       scheduleRegistrationCleanup(result.source, request.id);
+
+      const couponCode = String(
+        typedRequest.couponCode ||
+          typedRequest.distributorCouponCode ||
+          typedRequest.customerInfo?.couponCode ||
+          "",
+      ).trim();
+      if (couponCode) {
+        try {
+          await adminApplyDistributorCoupon(result.schoolId, couponCode);
+        } catch (couponErr) {
+          console.warn("Distributor coupon link failed", couponErr);
+          toast.error("تم التفعيل لكن فشل ربط كوبون الموزع");
+        }
+      }
 
       toast.dismiss(loadingToast);
       toast.success("تم تفعيل المدرسة وربط حساب المدير بنجاح");
@@ -1972,6 +2006,31 @@ export default function SuperAdminDashboard() {
                         className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                       >
                         {t('sidebar_packages')}
+                      </div>
+                    )}
+                  </button>
+                )}
+                {profile?.role === "superadmin" && (
+                  <button
+                    onClick={() => {
+                      navigateToTab("distributors");
+                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                    }}
+                    title={isSidebarCollapsed ? "الموزعون والكوبونات" : undefined}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "distributors" ? "sx-nav-item--active" : ""}`}
+                  >
+                    <Tag
+                      size={isSidebarCollapsed ? 24 : 20}
+                      className="shrink-0"
+                    />
+                    {!isSidebarCollapsed && (
+                      <span className="truncate">الموزعون والكوبونات</span>
+                    )}
+                    {isSidebarCollapsed && (
+                      <div
+                        className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                      >
+                        الموزعون والكوبونات
                       </div>
                     )}
                   </button>
@@ -2976,6 +3035,8 @@ export default function SuperAdminDashboard() {
                     ))}
                   </div>
                 </>
+              ) : activeTab === "distributors" ? (
+                <DistributorsTab schools={schools} packages={packages} />
               ) : activeTab === "chat" ? (
                 <SuperAdminChatTab />
               ) : activeTab === "requests" ? (
@@ -5886,6 +5947,7 @@ export default function SuperAdminDashboard() {
           hasPermission("manage_schools") && { id: "accounts", label: t('sidebar_accounts'), icon: Lock },
           profile?.role === "superadmin" && { id: "team", label: t('sidebar_team'), icon: ShieldCheck },
           hasPermission("manage_packages") && { id: "packages", label: t('sidebar_packages'), icon: Plus },
+          profile?.role === "superadmin" && { id: "distributors", label: "الموزعون", icon: Tag },
           hasPermission("view_requests") && { id: "requests", label: t('sidebar_requests'), icon: Mail },
           hasPermission("manage_schools") && { id: "chat", label: t('sidebar_chat'), icon: MessageSquare },
           hasPermission("manage_users") && { id: "users", label: t('sidebar_users'), icon: Users },

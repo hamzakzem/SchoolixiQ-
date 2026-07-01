@@ -191,3 +191,56 @@ export async function adminDeleteStudent(id: string) {
     data,
   };
 }
+
+export async function adminApplyDistributorCoupon(schoolId: string, couponCode: string) {
+  const json = await adminApiPost('/api/admin/distributors/apply-coupon', {
+    schoolId,
+    couponCode,
+  });
+  return json;
+}
+
+export async function adminGenerateMonthlyCommissions(monthKey: string) {
+  const json = await adminApiPost('/api/admin/distributors/generate-monthly-commissions', {
+    monthKey,
+  });
+  return json as {
+    ok?: boolean;
+    generated: number;
+    skippedInactive: number;
+    skippedUnpaid: number;
+    alreadyExists: number;
+    monthKey: string;
+  };
+}
+
+export async function adminMarkCommissionPaid(commissionId: string, notes?: string) {
+  const json = await adminApiPost(
+    `/api/admin/distributors/commissions/${encodeURIComponent(commissionId)}/mark-paid`,
+    notes ? { notes } : {},
+  );
+  return json;
+}
+
+export async function adminMarkDistributorMonthPaid(
+  distributorId: string,
+  monthKey: string,
+  notes?: string,
+) {
+  const json = await adminApiPost(
+    `/api/admin/distributors/${encodeURIComponent(distributorId)}/commissions/mark-paid`,
+    notes ? { monthKey, notes } : { monthKey },
+  );
+  return json;
+}
+
+export async function adminSetSchoolDistributorCommissionPaused(
+  schoolId: string,
+  paused: boolean,
+) {
+  const json = await adminApiPost(
+    `/api/admin/schools/${encodeURIComponent(schoolId)}/distributor-commission-pause`,
+    { paused },
+  );
+  return json;
+}
