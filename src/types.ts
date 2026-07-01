@@ -6,6 +6,7 @@ export enum UserRole {
   PARENT = 'parent',
   STAFF = 'staff',
   GUARD = 'guard',
+  DISTRIBUTOR = 'distributor',
 }
 
 export interface UserProfile {
@@ -14,6 +15,8 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   schoolId: string;
+  /** Linked distributor record when role is distributor */
+  distributorId?: string;
   status?: 'active' | 'pending' | 'suspended';
   subscriptionStatus?: 'active' | 'pending' | 'expired';
   pendingRegistrationId?: string;

@@ -200,6 +200,51 @@ export async function adminApplyDistributorCoupon(schoolId: string, couponCode: 
   return json;
 }
 
+export async function adminValidateDistributorCoupon(couponCode: string) {
+  const json = await adminApiPost('/api/admin/distributors/validate-coupon', {
+    couponCode,
+  });
+  return json as {
+    ok: boolean;
+    code: string;
+    distributorId: string;
+    distributorName: string;
+    discountPercent: number;
+    commissionPercent: number;
+  };
+}
+
+export async function adminFinalizeSchoolTracking(
+  schoolId: string,
+  couponCode?: string | null,
+) {
+  const json = await adminApiPost(
+    `/api/admin/schools/${encodeURIComponent(schoolId)}/finalize-tracking`,
+    couponCode ? { couponCode } : {},
+  );
+  return json;
+}
+
+/** Accrue distributor commission after super-admin payment confirmation. */
+export async function adminAccrueCommissionOnPaymentConfirmed(
+  schoolId: string,
+  monthKey?: string,
+) {
+  const json = await adminApiPost(
+    `/api/admin/schools/${encodeURIComponent(schoolId)}/confirm-payment-commission`,
+    monthKey ? { monthKey } : {},
+  );
+  return json as {
+    ok?: boolean;
+    created: boolean;
+    alreadyExists?: boolean;
+    commissionId?: string;
+    monthKey?: string;
+    commissionAmount?: number;
+    reason?: string;
+  };
+}
+
 export async function adminGenerateMonthlyCommissions(monthKey: string) {
   const json = await adminApiPost('/api/admin/distributors/generate-monthly-commissions', {
     monthKey,

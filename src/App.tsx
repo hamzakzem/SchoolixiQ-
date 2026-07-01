@@ -55,6 +55,7 @@ const GuardDashboard = lazy(() => import("./views/GuardDashboard"));
 const ParentDashboard = lazy(() => import("./views/ParentDashboard"));
 const SuperAdminDashboard = lazy(() => import("./views/SuperAdminDashboard"));
 const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
+const DistributorDashboard = lazy(() => import("./views/DistributorDashboard"));
 const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
 const LandingPage = lazy(() => import("./views/LandingPage"));
 
@@ -759,6 +760,9 @@ const AppContent = () => {
       case UserRole.GUARD:
       case "guard":
         return <GuardDashboard />;
+      case UserRole.DISTRIBUTOR:
+      case "distributor":
+        return <DistributorDashboard />;
       default:
         return (
           <div className="p-10 text-center">
