@@ -15,6 +15,7 @@ var SCHOOL_SCOPED_COLLECTIONS = [
   "students",
   "classes",
   "attendance",
+  "attendance_records",
   "grades",
   "homework",
   "announcements",
@@ -50,21 +51,45 @@ var SCHOOL_SCOPED_COLLECTIONS = [
 ];
 async function deleteSchoolScopedCollection(db, collectionName, schoolId) {
   let deleted = 0;
-  try {
-    const snap = await db.collection(collectionName).where("schoolId", "==", schoolId).get();
-    if (snap.empty) return 0;
-    const docs = snap.docs;
-    const batchSize = 400;
-    for (let i = 0; i < docs.length; i += batchSize) {
-      const chunk = docs.slice(i, i + batchSize);
-      const batch = db.batch();
-      chunk.forEach((docSnap) => batch.delete(docSnap.ref));
-      await batch.commit();
-      deleted += chunk.length;
+  const snap = await db.collection(collectionName).where("schoolId", "==", schoolId).get();
+  if (snap.empty) return 0;
+  const docs = snap.docs;
+  const batchSize = 400;
+  for (let i = 0; i < docs.length; i += batchSize) {
+    const chunk = docs.slice(i, i + batchSize);
+    const batch = db.batch();
+    chunk.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+    deleted += chunk.length;
+  }
+  return deleted;
+}
+async function deleteAuthUsersInBatches(authAdmin, uids, warnings) {
+  let deleted = 0;
+  const batchSize = 1e3;
+  for (let i = 0; i < uids.length; i += batchSize) {
+    const chunk = uids.slice(i, i + batchSize);
+    try {
+      const result = await authAdmin.deleteUsers(chunk);
+      const failures = result.errors?.length || 0;
+      deleted += chunk.length - failures;
+      for (const entry of result.errors || []) {
+        const uid = chunk[entry.index];
+        warnings.push(`Auth delete failed for ${uid}: ${entry.error?.message || "unknown"}`);
+      }
+    } catch (error) {
+      warnings.push(`Auth batch delete failed: ${error?.message || error}`);
+      for (const uid of chunk) {
+        try {
+          await authAdmin.deleteUser(uid);
+          deleted += 1;
+        } catch (singleError) {
+          if (singleError?.code !== "auth/user-not-found") {
+            warnings.push(`Auth delete failed for ${uid}: ${singleError?.message || singleError}`);
+          }
+        }
+      }
     }
-  } catch (error) {
-    console.error(`[permanent-delete] ${collectionName} cleanup failed:`, error);
-    throw new Error(`Failed to cleanup ${collectionName}: ${error.message || error}`);
   }
   return deleted;
 }
@@ -72,49 +97,204 @@ async function runSchoolPermanentDelete({
   db,
   authAdmin,
   schoolId,
+  confirm,
+  schoolName,
   confirmName
 }) {
+  if (confirm !== true) {
+    const err = new Error("confirm:true is required for permanent school delete");
+    err.status = 400;
+    throw err;
+  }
   const schoolRef = db.collection("schools").doc(schoolId);
   const schoolSnap = await schoolRef.get();
   if (!schoolSnap.exists) {
-    const err = new Error("School not found");
+    const err = new Error(`School not found: ${schoolId}`);
     err.status = 404;
     throw err;
   }
   const schoolData = schoolSnap.data() || {};
-  const schoolName = String(schoolData.name || "").trim();
-  if (!confirmName || confirmName.trim() !== schoolName) {
-    const err = new Error("School name confirmation does not match");
-    err.status = 400;
-    throw err;
+  const expectedName = String(schoolData.name || "").trim();
+  const providedName = String(schoolName || confirmName || "").trim();
+  if (expectedName) {
+    if (!providedName || providedName !== expectedName) {
+      const err = new Error("School name confirmation does not match");
+      err.status = 400;
+      throw err;
+    }
   }
-  const summary = {
-    schoolId,
-    schoolName,
-    collections: {},
-    usersDeleted: 0,
-    authUsersDeleted: 0
+  const warnings = [];
+  const deletedCounts = {
+    users: 0,
+    authUsers: 0,
+    schools: 0
   };
   const usersSnap = await db.collection("users").where("schoolId", "==", schoolId).get();
-  for (const uDoc of usersSnap.docs) {
-    try {
-      await authAdmin.deleteUser(uDoc.id);
-      summary.authUsersDeleted += 1;
-    } catch {
-    }
-    await uDoc.ref.delete();
-    summary.usersDeleted += 1;
+  const userIds = usersSnap.docs.map((docSnap) => docSnap.id);
+  deletedCounts.authUsers = await deleteAuthUsersInBatches(authAdmin, userIds, warnings);
+  const userDocs = usersSnap.docs;
+  const userBatchSize = 400;
+  for (let i = 0; i < userDocs.length; i += userBatchSize) {
+    const chunk = userDocs.slice(i, i + userBatchSize);
+    const batch = db.batch();
+    chunk.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+    deletedCounts.users += chunk.length;
   }
   for (const colName of SCHOOL_SCOPED_COLLECTIONS) {
-    summary.collections[colName] = await deleteSchoolScopedCollection(
-      db,
-      colName,
-      schoolId
-    );
+    try {
+      deletedCounts[colName] = await deleteSchoolScopedCollection(db, colName, schoolId);
+    } catch (error) {
+      warnings.push(`Failed to cleanup ${colName}: ${error?.message || error}`);
+      deletedCounts[colName] = 0;
+    }
   }
   await schoolRef.delete();
-  summary.collections.schools = 1;
-  return summary;
+  deletedCounts.schools = 1;
+  return {
+    ok: true,
+    schoolId,
+    schoolName: expectedName,
+    deletedCounts,
+    warnings
+  };
+}
+
+// userPermanentDelete.mjs
+var NOTIFICATION_RECIPIENT_FIELDS = ["userId", "recipientId", "receiverId"];
+async function deleteDocsWhere(db, collectionName, field, value) {
+  let deleted = 0;
+  const snap = await db.collection(collectionName).where(field, "==", value).get();
+  if (snap.empty) return 0;
+  const docs = snap.docs;
+  const batchSize = 400;
+  for (let i = 0; i < docs.length; i += batchSize) {
+    const chunk = docs.slice(i, i + batchSize);
+    const batch = db.batch();
+    chunk.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+    deleted += chunk.length;
+  }
+  return deleted;
+}
+async function deleteUserNotifications(db, userId) {
+  let deleted = 0;
+  for (const field of NOTIFICATION_RECIPIENT_FIELDS) {
+    try {
+      deleted += await deleteDocsWhere(db, "notifications", field, userId);
+    } catch (error) {
+      console.warn(`[delete-user] notifications/${field} cleanup:`, error?.message || error);
+    }
+  }
+  return deleted;
+}
+async function deleteUserNotificationPreferences(db, userId) {
+  let deleted = 0;
+  try {
+    const directRef = db.collection("notification_preferences").doc(userId);
+    const directSnap = await directRef.get();
+    if (directSnap.exists) {
+      await directRef.delete();
+      deleted += 1;
+    }
+  } catch (error) {
+    console.warn("[delete-user] notification_preferences direct:", error?.message || error);
+  }
+  try {
+    deleted += await deleteDocsWhere(db, "notification_preferences", "userId", userId);
+  } catch (error) {
+    console.warn("[delete-user] notification_preferences query:", error?.message || error);
+  }
+  return deleted;
+}
+async function unlinkParentFromStudents(db, userId, adminSdk) {
+  const studentsSnap = await db.collection("students").where("parentIds", "array-contains", userId).get();
+  if (studentsSnap.empty) return 0;
+  const batchSize = 400;
+  let updated = 0;
+  const docs = studentsSnap.docs;
+  for (let i = 0; i < docs.length; i += batchSize) {
+    const chunk = docs.slice(i, i + batchSize);
+    const batch = db.batch();
+    chunk.forEach((docSnap) => {
+      batch.update(docSnap.ref, {
+        parentIds: adminSdk.firestore.FieldValue.arrayRemove(userId)
+      });
+    });
+    await batch.commit();
+    updated += chunk.length;
+  }
+  return updated;
+}
+async function runUserPermanentDelete({
+  db,
+  authAdmin,
+  adminSdk,
+  userId
+}) {
+  const warnings = [];
+  const related = {
+    notifications: 0,
+    notificationPreferences: 0,
+    studentsUnlinked: 0
+  };
+  let firestoreExists = false;
+  let authExists = false;
+  let beforeData = {};
+  const userRef = db.collection("users").doc(userId);
+  const userSnap = await userRef.get();
+  firestoreExists = userSnap.exists;
+  if (firestoreExists) {
+    beforeData = userSnap.data() || {};
+  }
+  try {
+    await authAdmin.getUser(userId);
+    authExists = true;
+  } catch (error) {
+    if (error?.code !== "auth/user-not-found") {
+      throw error;
+    }
+  }
+  if (!firestoreExists && !authExists) {
+    const err = new Error("User not found in Auth or Firestore");
+    err.status = 404;
+    throw err;
+  }
+  let deletedAuth = false;
+  if (authExists) {
+    try {
+      await authAdmin.deleteUser(userId);
+      deletedAuth = true;
+    } catch (error) {
+      if (error?.code === "auth/user-not-found") {
+        warnings.push("Auth user was not found during delete");
+      } else {
+        throw error;
+      }
+    }
+  } else {
+    warnings.push("Auth user not found");
+  }
+  let deletedFirestoreUser = false;
+  if (firestoreExists) {
+    related.studentsUnlinked = await unlinkParentFromStudents(db, userId, adminSdk);
+    related.notifications = await deleteUserNotifications(db, userId);
+    related.notificationPreferences = await deleteUserNotificationPreferences(db, userId);
+    await userRef.delete();
+    deletedFirestoreUser = true;
+  } else {
+    warnings.push("Firestore user document not found");
+  }
+  return {
+    ok: true,
+    userId,
+    deletedAuth,
+    deletedFirestoreUser,
+    warnings,
+    related,
+    beforeRole: beforeData.role || null,
+    beforeSchoolId: beforeData.schoolId || null
+  };
 }
 
 // roleHierarchy.ts
@@ -176,20 +356,6 @@ function canActorCreateRole(actorRole, targetRole, actorSchoolId) {
   }
   if (actor === "staff" || actor === "assistant") {
     return target === "parent";
-  }
-  return false;
-}
-function canActorDeleteUser(actorRole, targetRole, actorSchoolId) {
-  const actor = normalizeRole(actorRole);
-  const target = normalizeRole(targetRole);
-  if (!target) return false;
-  if (isSystemAssistant(actor, actorSchoolId)) return false;
-  if (isSuperAdminRole(actor)) {
-    if (isSuperAdminRole(target)) return false;
-    return true;
-  }
-  if (isSchoolAdminRole(actor)) {
-    return roleRank(target) < roleRank("admin");
   }
   return false;
 }
@@ -1337,67 +1503,75 @@ async function startServer() {
     }
   });
   app.post("/api/admin/delete-user", verifyAdmin, async (req, res) => {
-    const { uid } = req.body;
-    if (!uid) return res.status(400).json({ error: "UID required" });
+    const body = req.body || {};
+    const userId = String(body.userId || body.uid || "").trim();
+    const confirmSuperAdminDelete = body.confirmSuperAdminDelete === true;
+    const confirmSelfDelete = body.confirmSelfDelete === true;
+    if (!userId) {
+      return res.status(400).json({ error: "USER_ID_REQUIRED", message: "userId \u0645\u0637\u0644\u0648\u0628" });
+    }
     try {
-      if (!canActorUseAdminApi(req.user.role, req.user.schoolId)) {
-        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645\u064A\u0646" });
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u062D\u0630\u0641 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645\u064A\u0646 \u0645\u0646 \u0644\u0648\u062D\u0629 \u0627\u0644\u0633\u0648\u0628\u0631 \u0623\u062F\u0645\u0646 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
+        });
       }
       const db = getDb();
-      const userDoc = await db.collection("users").doc(uid).get();
-      if (!userDoc.exists) {
-        return res.status(404).json({ error: "USER_NOT_FOUND", message: "\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F" });
-      }
-      const beforeData = userDoc.data() || {};
-      const targetSchoolId = beforeData.schoolId;
+      const userDoc = await db.collection("users").doc(userId).get();
+      const beforeData = userDoc.exists ? userDoc.data() || {} : {};
       const targetRole = beforeData.role;
-      if (isSuperAdminRole3(targetRole)) {
-        return res.status(403).json({
-          error: "FORBIDDEN",
-          message: "\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 Super Admin"
-        });
-      }
-      if (!canActorDeleteUser(req.user.role, targetRole, req.user.schoolId)) {
-        return res.status(403).json({
-          error: "FORBIDDEN",
-          message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0645\u0633\u062A\u062E\u062F\u0645 \u0628\u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u062A\u0648\u0649"
-        });
-      }
-      if (!isSuperAdminRole3(req.user.role)) {
-        if (!targetSchoolId || targetSchoolId !== req.user.schoolId) {
-          return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0645\u0633\u062A\u062E\u062F\u0645\u0649 \u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0627\u0644\u0623\u062E\u0631\u0649" });
-        }
-      }
+      let authExists = false;
       try {
-        await admin.auth().deleteUser(uid);
+        await admin.auth().getUser(userId);
+        authExists = true;
       } catch (authError) {
-        if (authError.code === "auth/user-not-found") {
-          console.log(`User ${redactUid(uid)} already removed from Auth.`);
-        } else {
-          console.warn(`Failed to delete user ${redactUid(uid)} from Auth:`, authError.message);
+        if (authError.code !== "auth/user-not-found") {
+          throw authError;
         }
       }
-      await db.collection("users").doc(uid).delete();
-      const studentsSnap = await db.collection("students").where("parentIds", "array-contains", uid).get();
-      if (!studentsSnap.empty) {
-        const batch = db.batch();
-        studentsSnap.docs.forEach((doc) => {
-          batch.update(doc.ref, {
-            parentIds: admin.firestore.FieldValue.arrayRemove(uid)
-          });
+      if (!userDoc.exists && !authExists) {
+        return res.status(404).json({
+          error: "USER_NOT_FOUND",
+          message: "\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A Auth \u0623\u0648 Firestore"
         });
-        await batch.commit();
       }
-      await logAudit(req, "DELETE_USER", { before: beforeData, metadata: { targetUid: uid } });
+      if (isSuperAdminRole3(targetRole) && !confirmSuperAdminDelete) {
+        return res.status(403).json({
+          error: "CONFIRMATION_REQUIRED",
+          message: "\u062D\u0630\u0641 \u062D\u0633\u0627\u0628 Super Admin \u064A\u062A\u0637\u0644\u0628 confirmSuperAdminDelete:true"
+        });
+      }
+      if (userId === req.user.uid && !confirmSelfDelete) {
+        return res.status(403).json({
+          error: "CONFIRMATION_REQUIRED",
+          message: "\u062D\u0630\u0641 \u062D\u0633\u0627\u0628\u0643 \u0627\u0644\u062D\u0627\u0644\u064A \u064A\u062A\u0637\u0644\u0628 confirmSelfDelete:true"
+        });
+      }
+      const result = await runUserPermanentDelete({
+        db,
+        authAdmin: admin.auth(),
+        adminSdk: admin,
+        userId
+      });
+      await logAudit(req, "DELETE_USER", {
+        before: userDoc.exists ? beforeData : null,
+        metadata: { targetUid: userId, result }
+      });
       res.json({
+        ok: true,
         success: true,
-        message: "\u062A\u0645 \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628 \u0628\u0646\u062C\u0627\u062D",
-        data: { uid }
+        deletedAuth: result.deletedAuth,
+        deletedFirestoreUser: result.deletedFirestoreUser,
+        warnings: result.warnings,
+        data: result,
+        message: "\u062A\u0645 \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628 \u0628\u0646\u062C\u0627\u062D"
       });
     } catch (error) {
       console.error("Delete User Error:", error);
-      res.status(500).json({
+      res.status(error.status || 500).json({
         success: false,
+        ok: false,
         error: error.message || "Internal Server Error",
         message: error.message || "\u062D\u062F\u062B \u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628"
       });
@@ -1474,28 +1648,45 @@ async function startServer() {
   });
   app.post("/api/admin/schools/:schoolId/permanent-delete", verifyAdmin, async (req, res) => {
     const { schoolId } = req.params;
-    const { confirmName } = req.body || {};
-    if (!schoolId) return res.status(400).json({ error: "School ID required" });
+    const body = req.body || {};
+    const confirm = body.confirm === true;
+    const schoolName = body.schoolName ?? body.confirmName;
+    if (!schoolId) {
+      return res.status(400).json({ error: "SCHOOL_ID_REQUIRED", message: "School ID required" });
+    }
     try {
-      if (req.user.role !== "superadmin") {
+      if (!isSuperAdminRole3(req.user.role)) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0646\u0647\u0627\u0626\u064A\u0627\u064B. \u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0645\u062E\u0635\u0635 \u0644\u0644SuperAdmin \u0641\u0642\u0637"
         });
       }
-      const summary = await runSchoolPermanentDelete({
+      const result = await runSchoolPermanentDelete({
         db: getDb(),
         authAdmin: admin.auth(),
         schoolId,
-        confirmName: String(confirmName || "")
+        confirm,
+        schoolName: schoolName != null ? String(schoolName) : void 0,
+        confirmName: body.confirmName != null ? String(body.confirmName) : void 0
       });
       await logAudit(req, "PERMANENT_DELETE_SCHOOL", {
-        metadata: { targetSchoolId: schoolId, summary }
+        metadata: { targetSchoolId: schoolId, result }
       });
-      res.json({ success: true, summary });
+      res.json({
+        ok: true,
+        success: true,
+        schoolId: result.schoolId,
+        deletedCounts: result.deletedCounts,
+        warnings: result.warnings,
+        summary: result
+      });
     } catch (error) {
       console.error("Permanent Delete School Error:", error);
-      res.status(error.status || 500).json({ error: error.message || "Internal Server Error" });
+      res.status(error.status || 500).json({
+        ok: false,
+        error: error.message || "Internal Server Error",
+        message: error.message || "\u0641\u0634\u0644 \u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0645\u062F\u0631\u0633\u0629"
+      });
     }
   });
   app.post("/api/admin/delete-student", verifyAdmin, async (req, res) => {

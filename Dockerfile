@@ -1,13 +1,18 @@
-# Cloud Run backend-only image — no Capacitor/mobile frontend dependencies.
+# Cloud Run backend — official build path (use: gcloud run deploy --source .)
+# Requires Dockerfile at repo root; Cloud Build uses this image, not Buildpacks.
 FROM node:22-slim AS build
 
-WORKDIR /src
-COPY server.ts firebase-applet-config.json ./
-COPY backend/package.json backend/package-lock.json ./backend/
-COPY backend/schoolPermanentDelete.mjs backend/roleHierarchy.ts ./backend/
+WORKDIR /app/backend
 
-WORKDIR /src/backend
+COPY backend/package.json backend/package-lock.json ./
 RUN npm ci
+
+# Entry + shared modules (canonical sources live at repo root)
+COPY server.ts notificationPushDispatch.ts firebase-applet-config.json ./
+
+# Backend-local modules (delete helpers, role hierarchy)
+COPY backend/schoolPermanentDelete.mjs backend/userPermanentDelete.mjs backend/roleHierarchy.ts ./
+
 RUN npm run build
 
 FROM node:22-slim
@@ -19,8 +24,8 @@ ENV PORT=8080
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY --from=build /src/backend/server.mjs ./server.mjs
-COPY firebase-applet-config.json ./
+COPY --from=build /app/backend/server.mjs ./server.mjs
+COPY --from=build /app/backend/firebase-applet-config.json ./firebase-applet-config.json
 
 EXPOSE 8080
 CMD ["node", "server.mjs"]
