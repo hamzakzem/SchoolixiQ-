@@ -526,6 +526,22 @@ service cloud.firestore {
       allow create, update, delete: if isSuperAdmin();
     }
 
+    // Distributors & coupons — Super Admin only (financial commissions via backend).
+    match /distributors/{distributorId} {
+      allow read, get, list: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /distributorCoupons/{couponId} {
+      allow read, get, list: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /distributorMonthlyCommissions/{commissionId} {
+      allow read, get, list: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
     // Platform branding & config — public read; only Super Admin may mutate.
     match /system/{document=**} {
       allow read, get, list: if true;

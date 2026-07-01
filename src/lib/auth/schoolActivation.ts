@@ -43,6 +43,8 @@ export type SchoolRegistrationRequest = {
   estimatedStudents?: string | number;
   approximateStudents?: string;
   durationDays?: number;
+  couponCode?: string;
+  distributorCouponCode?: string;
   customerInfo?: {
     email?: string;
     name?: string;
@@ -60,6 +62,7 @@ export type SchoolRegistrationRequest = {
     genderType?: string;
     estimatedStudents?: string | number;
     approximateStudents?: string;
+    couponCode?: string;
   };
 };
 
@@ -191,6 +194,8 @@ function buildSchoolPayload(
         request.estimatedStudents ||
         '',
       status: 'active',
+      subscriptionStatus: 'active',
+      paymentStatus: 'paid',
       planId,
       studentCount: 0,
       subscriptionExpiresAt: expiresAt.toISOString(),
@@ -305,6 +310,8 @@ export async function activateExistingSchoolAdmin(
   const batch = writeBatch(db);
   batch.update(doc(db, 'schools', existingSchoolId), {
     status: 'active',
+    subscriptionStatus: 'active',
+    paymentStatus: 'paid',
     planId,
     subscriptionExpiresAt: expiresAt.toISOString(),
     adminEmail: email || undefined,
@@ -340,6 +347,8 @@ export async function activateSubscriptionSchool(
   const batch = writeBatch(db);
   batch.update(doc(db, 'schools', request.schoolId), {
     status: 'active',
+    subscriptionStatus: 'active',
+    paymentStatus: 'paid',
     planId: request.planId || request.packageId || 'basic',
     subscriptionExpiresAt: expiresAt.toISOString(),
     updatedAt: serverTimestamp(),

@@ -11,6 +11,13 @@ import crypto from 'crypto';
 import { runSchoolPermanentDelete } from './schoolPermanentDelete.mjs';
 import { runUserPermanentDelete } from './userPermanentDelete.mjs';
 import {
+  applyDistributorCoupon,
+  generateMonthlyCommissions,
+  markCommissionPaid,
+  markDistributorMonthCommissionsPaid,
+  setSchoolDistributorCommissionPaused,
+} from './distributorCommissions.mjs';
+import {
   canActorUseAdminApi,
   canActorCreateRole,
   canActorDeleteUser,
@@ -1287,6 +1294,193 @@ async function startServer() {
         ok: false,
         error: error.message || 'Internal Server Error',
         message: error.message || 'فشل الحذف النهائي للمدرسة',
+      });
+    }
+  });
+
+  // --- Distributor recurring monthly commissions (superadmin financial ops) ---
+  app.post('/api/admin/distributors/apply-coupon', verifyAdmin, async (req: any, res: any) => {
+    const body = req.body || {};
+    const schoolId = String(body.schoolId || '').trim();
+    const couponCode = String(body.couponCode || '').trim();
+
+    if (!schoolId || !couponCode) {
+      return res.status(400).json({
+        error: 'INVALID_BODY',
+        message: 'schoolId و couponCode مطلوبان',
+      });
+    }
+
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'ربط كوبون الموزع مخصص لمدير النظام فقط',
+        });
+      }
+
+      const result = await applyDistributorCoupon({
+        db: getDb(),
+        adminSdk: admin,
+        schoolId,
+        couponCode,
+        actorUid: req.user.uid,
+      });
+
+      await logAudit(req, 'DISTRIBUTOR_APPLY_COUPON', {
+        metadata: { schoolId, couponCode, result },
+      });
+
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      const code = error.code || 'APPLY_COUPON_FAILED';
+      res.status(code === 'SCHOOL_NOT_FOUND' || code === 'COUPON_INVALID' ? 404 : 400).json({
+        error: code,
+        message: error.message || 'فشل ربط الكوبون',
+      });
+    }
+  });
+
+  app.post('/api/admin/distributors/generate-monthly-commissions', verifyAdmin, async (req: any, res: any) => {
+    const monthKey = String(req.body?.monthKey || '').trim();
+    if (!monthKey) {
+      return res.status(400).json({
+        error: 'MONTH_KEY_REQUIRED',
+        message: 'monthKey مطلوب (مثال: 2026-07)',
+      });
+    }
+
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'توليد العمولات الشهرية مخصص لمدير النظام فقط',
+        });
+      }
+
+      const counts = await generateMonthlyCommissions({
+        db: getDb(),
+        adminSdk: admin,
+        monthKey,
+      });
+
+      await logAudit(req, 'DISTRIBUTOR_GENERATE_MONTHLY', {
+        metadata: { monthKey, counts },
+      });
+
+      res.json({ ok: true, ...counts });
+    } catch (error: any) {
+      res.status(400).json({
+        error: error.code || 'GENERATE_FAILED',
+        message: error.message || 'فشل توليد العمولات',
+      });
+    }
+  });
+
+  app.post('/api/admin/distributors/commissions/:commissionId/mark-paid', verifyAdmin, async (req: any, res: any) => {
+    const { commissionId } = req.params;
+    const notes = req.body?.notes;
+
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'تعليم العمولة كمدفوعة مخصص لمدير النظام فقط',
+        });
+      }
+
+      const result = await markCommissionPaid({
+        db: getDb(),
+        adminSdk: admin,
+        commissionId,
+        paidBy: req.user.uid,
+        notes,
+      });
+
+      await logAudit(req, 'DISTRIBUTOR_COMMISSION_PAID', {
+        metadata: { commissionId, result },
+      });
+
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      res.status(error.code === 'COMMISSION_NOT_FOUND' ? 404 : 400).json({
+        error: error.code || 'MARK_PAID_FAILED',
+        message: error.message || 'فشل تعليم العمولة كمدفوعة',
+      });
+    }
+  });
+
+  app.post('/api/admin/distributors/:distributorId/commissions/mark-paid', verifyAdmin, async (req: any, res: any) => {
+    const { distributorId } = req.params;
+    const monthKey = String(req.body?.monthKey || '').trim();
+    const notes = req.body?.notes;
+
+    if (!monthKey) {
+      return res.status(400).json({
+        error: 'MONTH_KEY_REQUIRED',
+        message: 'monthKey مطلوب',
+      });
+    }
+
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'تعليم عمولات الموزع كمدفوعة مخصص لمدير النظام فقط',
+        });
+      }
+
+      const result = await markDistributorMonthCommissionsPaid({
+        db: getDb(),
+        adminSdk: admin,
+        distributorId,
+        monthKey,
+        paidBy: req.user.uid,
+        notes,
+      });
+
+      await logAudit(req, 'DISTRIBUTOR_MONTH_PAID', {
+        metadata: { distributorId, monthKey, result },
+      });
+
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      res.status(400).json({
+        error: error.code || 'MARK_PAID_FAILED',
+        message: error.message || 'فشل تعليم عمولات الشهر كمدفوعة',
+      });
+    }
+  });
+
+  app.post('/api/admin/schools/:schoolId/distributor-commission-pause', verifyAdmin, async (req: any, res: any) => {
+    const { schoolId } = req.params;
+    const paused = req.body?.paused === true;
+
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'إيقاف عمولة الموزع مخصص لمدير النظام فقط',
+        });
+      }
+
+      const result = await setSchoolDistributorCommissionPaused({
+        db: getDb(),
+        adminSdk: admin,
+        schoolId,
+        paused,
+        pausedBy: req.user.uid,
+      });
+
+      await logAudit(req, paused ? 'DISTRIBUTOR_COMMISSION_PAUSE' : 'DISTRIBUTOR_COMMISSION_RESUME', {
+        metadata: { schoolId, paused },
+      });
+
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      res.status(error.code === 'SCHOOL_NOT_FOUND' ? 404 : 400).json({
+        error: error.code || 'PAUSE_FAILED',
+        message: error.message || 'فشل تحديث حالة عمولة الموزع',
       });
     }
   });

@@ -42,6 +42,8 @@ if (bundle.includes('capacitor-google-auth')) {
 const requiredRoutes = [
   '/api/admin/delete-user',
   '/api/admin/schools/:schoolId/permanent-delete',
+  '/api/admin/distributors/generate-monthly-commissions',
+  '/api/admin/distributors/commissions/:commissionId/mark-paid',
 ];
 for (const route of requiredRoutes) {
   if (!bundle.includes(route)) {
