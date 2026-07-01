@@ -7,6 +7,7 @@ export const SCHOOL_SCOPED_COLLECTIONS = [
   "students",
   "classes",
   "attendance",
+  "attendance_records",
   "grades",
   "homework",
   "announcements",
@@ -43,30 +44,60 @@ export const SCHOOL_SCOPED_COLLECTIONS = [
 
 /**
  * @param {import('firebase-admin').firestore.Firestore} db
- * @param {import('firebase-admin').auth.Auth} authAdmin
+ * @param {string} collectionName
  * @param {string} schoolId
  */
 export async function deleteSchoolScopedCollection(db, collectionName, schoolId) {
   let deleted = 0;
-  try {
-    const snap = await db
-      .collection(collectionName)
-      .where("schoolId", "==", schoolId)
-      .get();
-    if (snap.empty) return 0;
+  const snap = await db
+    .collection(collectionName)
+    .where("schoolId", "==", schoolId)
+    .get();
+  if (snap.empty) return 0;
 
-    const docs = snap.docs;
-    const batchSize = 400;
-    for (let i = 0; i < docs.length; i += batchSize) {
-      const chunk = docs.slice(i, i + batchSize);
-      const batch = db.batch();
-      chunk.forEach((docSnap) => batch.delete(docSnap.ref));
-      await batch.commit();
-      deleted += chunk.length;
+  const docs = snap.docs;
+  const batchSize = 400;
+  for (let i = 0; i < docs.length; i += batchSize) {
+    const chunk = docs.slice(i, i + batchSize);
+    const batch = db.batch();
+    chunk.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+    deleted += chunk.length;
+  }
+  return deleted;
+}
+
+/**
+ * @param {import('firebase-admin').auth.Auth} authAdmin
+ * @param {string[]} uids
+ * @param {string[]} warnings
+ */
+async function deleteAuthUsersInBatches(authAdmin, uids, warnings) {
+  let deleted = 0;
+  const batchSize = 1000;
+  for (let i = 0; i < uids.length; i += batchSize) {
+    const chunk = uids.slice(i, i + batchSize);
+    try {
+      const result = await authAdmin.deleteUsers(chunk);
+      const failures = result.errors?.length || 0;
+      deleted += chunk.length - failures;
+      for (const entry of result.errors || []) {
+        const uid = chunk[entry.index];
+        warnings.push(`Auth delete failed for ${uid}: ${entry.error?.message || "unknown"}`);
+      }
+    } catch (error) {
+      warnings.push(`Auth batch delete failed: ${error?.message || error}`);
+      for (const uid of chunk) {
+        try {
+          await authAdmin.deleteUser(uid);
+          deleted += 1;
+        } catch (singleError) {
+          if (singleError?.code !== "auth/user-not-found") {
+            warnings.push(`Auth delete failed for ${uid}: ${singleError?.message || singleError}`);
+          }
+        }
+      }
     }
-  } catch (error) {
-    console.error(`[permanent-delete] ${collectionName} cleanup failed:`, error);
-    throw new Error(`Failed to cleanup ${collectionName}: ${error.message || error}`);
   }
   return deleted;
 }
@@ -76,36 +107,49 @@ export async function deleteSchoolScopedCollection(db, collectionName, schoolId)
  * @param {import('firebase-admin').firestore.Firestore} params.db
  * @param {import('firebase-admin').auth.Auth} params.authAdmin
  * @param {string} params.schoolId
+ * @param {boolean} [params.confirm]
+ * @param {string} [params.schoolName]
  * @param {string} [params.confirmName]
  */
 export async function runSchoolPermanentDelete({
   db,
   authAdmin,
   schoolId,
+  confirm,
+  schoolName,
   confirmName,
 }) {
+  if (confirm !== true) {
+    const err = new Error("confirm:true is required for permanent school delete");
+    err.status = 400;
+    throw err;
+  }
+
   const schoolRef = db.collection("schools").doc(schoolId);
   const schoolSnap = await schoolRef.get();
   if (!schoolSnap.exists) {
-    const err = new Error("School not found");
+    const err = new Error(`School not found: ${schoolId}`);
     err.status = 404;
     throw err;
   }
 
   const schoolData = schoolSnap.data() || {};
-  const schoolName = String(schoolData.name || "").trim();
-  if (!confirmName || confirmName.trim() !== schoolName) {
-    const err = new Error("School name confirmation does not match");
-    err.status = 400;
-    throw err;
+  const expectedName = String(schoolData.name || "").trim();
+  const providedName = String(schoolName || confirmName || "").trim();
+
+  if (expectedName) {
+    if (!providedName || providedName !== expectedName) {
+      const err = new Error("School name confirmation does not match");
+      err.status = 400;
+      throw err;
+    }
   }
 
-  const summary = {
-    schoolId,
-    schoolName,
-    collections: {},
-    usersDeleted: 0,
-    authUsersDeleted: 0,
+  const warnings = [];
+  const deletedCounts = {
+    users: 0,
+    authUsers: 0,
+    schools: 0,
   };
 
   const usersSnap = await db
@@ -113,27 +157,36 @@ export async function runSchoolPermanentDelete({
     .where("schoolId", "==", schoolId)
     .get();
 
-  for (const uDoc of usersSnap.docs) {
-    try {
-      await authAdmin.deleteUser(uDoc.id);
-      summary.authUsersDeleted += 1;
-    } catch {
-      // Auth user may not exist (e.g. student without login)
-    }
-    await uDoc.ref.delete();
-    summary.usersDeleted += 1;
+  const userIds = usersSnap.docs.map((docSnap) => docSnap.id);
+  deletedCounts.authUsers = await deleteAuthUsersInBatches(authAdmin, userIds, warnings);
+
+  const userDocs = usersSnap.docs;
+  const userBatchSize = 400;
+  for (let i = 0; i < userDocs.length; i += userBatchSize) {
+    const chunk = userDocs.slice(i, i + userBatchSize);
+    const batch = db.batch();
+    chunk.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+    deletedCounts.users += chunk.length;
   }
 
   for (const colName of SCHOOL_SCOPED_COLLECTIONS) {
-    summary.collections[colName] = await deleteSchoolScopedCollection(
-      db,
-      colName,
-      schoolId,
-    );
+    try {
+      deletedCounts[colName] = await deleteSchoolScopedCollection(db, colName, schoolId);
+    } catch (error) {
+      warnings.push(`Failed to cleanup ${colName}: ${error?.message || error}`);
+      deletedCounts[colName] = 0;
+    }
   }
 
   await schoolRef.delete();
-  summary.collections.schools = 1;
+  deletedCounts.schools = 1;
 
-  return summary;
+  return {
+    ok: true,
+    schoolId,
+    schoolName: expectedName,
+    deletedCounts,
+    warnings,
+  };
 }

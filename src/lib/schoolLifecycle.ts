@@ -106,7 +106,11 @@ export async function permanentDeleteSchool(params: {
         Authorization: `Bearer ${token}`,
         'X-Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ confirmName: params.confirmName }),
+      body: JSON.stringify({
+        confirm: true,
+        schoolName: params.confirmName,
+        confirmName: params.confirmName,
+      }),
     },
   );
 
@@ -118,9 +122,15 @@ export async function permanentDeleteSchool(params: {
   }
 
   if (!response.ok) {
-    const msg =
-      String(payload.message || payload.error || '') ||
-      `Permanent delete failed (${response.status})`;
+    const routeMissing =
+      response.status === 404 &&
+      (!payload.error ||
+        payload.error === 'Not Found' ||
+        String(payload.message || '').toLowerCase().includes('cannot post'));
+    const msg = routeMissing
+      ? `مسار API غير متوفر على الخادم (${response.status}). يلزم نشر backend محدّث.`
+      : String(payload.message || payload.error || '') ||
+        `Permanent delete failed (${response.status})`;
     throw new Error(msg);
   }
 

@@ -47,10 +47,12 @@ export function SchoolLifecycleButtons({
   school,
   isRtl,
   compact = false,
+  onPermanentDeleted,
 }: {
   school: SchoolRow;
   isRtl: boolean;
   compact?: boolean;
+  onPermanentDeleted?: (schoolId: string) => void;
 }) {
   const { profile } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -222,6 +224,8 @@ export function SchoolLifecycleButtons({
                     confirmName: confirmName.trim(),
                   });
                   setPermanentOpen(false);
+                  setConfirmName('');
+                  onPermanentDeleted?.(school.id);
                 })
               }
               className="flex-1 py-2 bg-red-600 text-white rounded-lg text-[10px] font-black disabled:opacity-50"

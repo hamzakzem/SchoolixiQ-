@@ -58,6 +58,7 @@ type SuperAdminSchoolRecordListProps = {
   onToggleFeatured: (schoolId: string, featured?: boolean) => void;
   onToggleTimer: (schoolId: string, currentShow: boolean) => void;
   onExtendSubscription: (schoolId: string, subscriptionExpiresAt: unknown) => void;
+  onSchoolPermanentDeleted?: (schoolId: string) => void;
 };
 
 function planForSchool(school: SuperAdminSchoolRecord, packages: PackageRow[]) {
@@ -217,6 +218,7 @@ function SchoolRecordCard({
   onToggleFeatured,
   onToggleTimer,
   onExtendSubscription,
+  onSchoolPermanentDeleted,
 }: {
   school: SuperAdminSchoolRecord;
   packages: PackageRow[];
@@ -226,6 +228,7 @@ function SchoolRecordCard({
   onToggleFeatured: (schoolId: string, featured?: boolean) => void;
   onToggleTimer: (schoolId: string, currentShow: boolean) => void;
   onExtendSubscription: (schoolId: string, subscriptionExpiresAt: unknown) => void;
+  onSchoolPermanentDeleted?: (schoolId: string) => void;
 }) {
   const stage = school.stage || school.educationLevel;
 
@@ -314,7 +317,12 @@ function SchoolRecordCard({
       />
 
       <div className="sx-school-record-actions">
-        <SchoolLifecycleButtons school={school} isRtl={isRtl} compact />
+        <SchoolLifecycleButtons
+          school={school}
+          isRtl={isRtl}
+          compact
+          onPermanentDeleted={onSchoolPermanentDeleted}
+        />
       </div>
     </article>
   );
@@ -329,6 +337,7 @@ function SchoolRecordTableRow({
   onToggleFeatured,
   onToggleTimer,
   onExtendSubscription,
+  onSchoolPermanentDeleted,
 }: {
   school: SuperAdminSchoolRecord;
   packages: PackageRow[];
@@ -338,6 +347,7 @@ function SchoolRecordTableRow({
   onToggleFeatured: (schoolId: string, featured?: boolean) => void;
   onToggleTimer: (schoolId: string, currentShow: boolean) => void;
   onExtendSubscription: (schoolId: string, subscriptionExpiresAt: unknown) => void;
+  onSchoolPermanentDeleted?: (schoolId: string) => void;
 }) {
   const stage = school.stage || school.educationLevel;
 
@@ -418,7 +428,12 @@ function SchoolRecordTableRow({
           layout="inline"
         />
         <div className="sx-school-record-actions sx-school-record-actions--table">
-          <SchoolLifecycleButtons school={school} isRtl={isRtl} compact />
+          <SchoolLifecycleButtons
+          school={school}
+          isRtl={isRtl}
+          compact
+          onPermanentDeleted={onSchoolPermanentDeleted}
+        />
         </div>
       </td>
     </tr>
@@ -435,6 +450,7 @@ export function SuperAdminSchoolRecordList({
   onToggleFeatured,
   onToggleTimer,
   onExtendSubscription,
+  onSchoolPermanentDeleted,
 }: SuperAdminSchoolRecordListProps) {
   if (schools.length === 0) {
     return (
@@ -456,6 +472,7 @@ export function SuperAdminSchoolRecordList({
             onToggleFeatured={onToggleFeatured}
             onToggleTimer={onToggleTimer}
             onExtendSubscription={onExtendSubscription}
+            onSchoolPermanentDeleted={onSchoolPermanentDeleted}
           />
         ))}
       </div>
@@ -485,6 +502,7 @@ export function SuperAdminSchoolRecordList({
                 onToggleFeatured={onToggleFeatured}
                 onToggleTimer={onToggleTimer}
                 onExtendSubscription={onExtendSubscription}
+                onSchoolPermanentDeleted={onSchoolPermanentDeleted}
               />
             ))}
           </tbody>

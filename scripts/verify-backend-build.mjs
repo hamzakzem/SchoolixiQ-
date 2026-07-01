@@ -39,6 +39,17 @@ if (bundle.includes('capacitor-google-auth')) {
   failed = true;
 }
 
+const requiredRoutes = [
+  '/api/admin/delete-user',
+  '/api/admin/schools/:schoolId/permanent-delete',
+];
+for (const route of requiredRoutes) {
+  if (!bundle.includes(route)) {
+    console.error(`FAIL: server bundle missing route ${route}`);
+    failed = true;
+  }
+}
+
 if (failed) {
   process.exit(1);
 }

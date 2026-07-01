@@ -102,10 +102,16 @@ async function adminApiPost(endpoint: string, body: Record<string, unknown>) {
   }
 
   if (!response.ok) {
-    const errorMessage =
-      (json?.message as string) ||
-      (json?.error as string) ||
-      `Server Error (${response.status})`;
+    const routeMissing =
+      response.status === 404 &&
+      (!json?.error ||
+        json.error === 'Not Found' ||
+        String(json.message || '').toLowerCase().includes('cannot post'));
+    const errorMessage = routeMissing
+      ? `مسار API غير متوفر على الخادم (${response.status}). يلزم نشر backend محدّث.`
+      : (json?.message as string) ||
+        (json?.error as string) ||
+        `Server Error (${response.status})`;
     throw new Error(errorMessage);
   }
 
@@ -137,14 +143,28 @@ export async function adminCreateUser(userData: {
   };
 }
 
-export async function adminDeleteUser(uid: string) {
+export async function adminDeleteUser(
+  userId: string,
+  options?: {
+    confirmSuperAdminDelete?: boolean;
+    confirmSelfDelete?: boolean;
+  },
+) {
   const endpoint = `/api/admin/delete-user?t=${Date.now()}`;
-  const json = await adminApiPost(endpoint, { uid });
+  const json = await adminApiPost(endpoint, {
+    userId,
+    uid: userId,
+    confirmSuperAdminDelete: options?.confirmSuperAdminDelete === true,
+    confirmSelfDelete: options?.confirmSelfDelete === true,
+  });
   const data = (json.data as Record<string, unknown> | undefined) || json;
 
   return {
-    success: json.success !== false,
+    success: json.success !== false && json.ok !== false,
     message: (json.message as string) || '',
+    deletedAuth: Boolean(json.deletedAuth),
+    deletedFirestoreUser: Boolean(json.deletedFirestoreUser),
+    warnings: Array.isArray(json.warnings) ? (json.warnings as string[]) : [],
     dataType: 'user',
     data,
   };

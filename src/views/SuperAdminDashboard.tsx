@@ -1300,9 +1300,18 @@ export default function SuperAdminDashboard() {
         : "جاري حذف المستخدم وكافة بياناته...",
     );
     try {
-      await adminDeleteUser(userId);
+      const result = await adminDeleteUser(userId);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
       toast.dismiss(loadingToast);
-      console.info("[SuperAdminUsers] DELETE_PARENT_USER_SUCCESS", { userId, role });
+      console.info("[SuperAdminUsers] DELETE_PARENT_USER_SUCCESS", {
+        userId,
+        role,
+        deletedAuth: result.deletedAuth,
+        deletedFirestoreUser: result.deletedFirestoreUser,
+      });
+      if (result.warnings.length > 0) {
+        console.warn("[SuperAdminUsers] DELETE_WARNINGS", result.warnings);
+      }
       toast.success(
         isGuardianDelete
           ? "تم حذف حساب ولي الأمر بنجاح"
@@ -2552,6 +2561,9 @@ export default function SuperAdminDashboard() {
                         onToggleFeatured={handleToggleFeatured}
                         onToggleTimer={handleToggleTimer}
                         onExtendSubscription={handleExtendSubscription}
+                        onSchoolPermanentDeleted={(schoolId) => {
+                          setSchools((prev) => prev.filter((s) => s.id !== schoolId));
+                        }}
                       />
                     {filteredSchools.length > 0 && (
                       <div className="sx-pagination-bar sx-schools-table-pagination">

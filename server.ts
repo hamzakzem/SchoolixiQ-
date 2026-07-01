@@ -9,6 +9,7 @@ import dotEnv from 'dotenv';
 import fs from 'fs';
 import crypto from 'crypto';
 import { runSchoolPermanentDelete } from './schoolPermanentDelete.mjs';
+import { runUserPermanentDelete } from './userPermanentDelete.mjs';
 import {
   canActorUseAdminApi,
   canActorCreateRole,
@@ -1087,88 +1088,87 @@ async function startServer() {
   });
 
   app.post('/api/admin/delete-user', verifyAdmin, async (req: any, res: any) => {
-    const { uid } = req.body;
-    if (!uid) return res.status(400).json({ error: 'UID required' });
-    
+    const body = req.body || {};
+    const userId = String(body.userId || body.uid || '').trim();
+    const confirmSuperAdminDelete = body.confirmSuperAdminDelete === true;
+    const confirmSelfDelete = body.confirmSelfDelete === true;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'USER_ID_REQUIRED', message: 'userId مطلوب' });
+    }
+
     try {
-      if (!canActorUseAdminApi(req.user.role, req.user.schoolId)) {
-        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف حسابات المستخدمين' });
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'حذف المستخدمين من لوحة السوبر أدمن مخصص لمدير النظام فقط',
+        });
       }
 
       const db = getDb();
-      const userDoc = await db.collection('users').doc(uid).get();
-      if (!userDoc.exists) {
-        return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'المستخدم غير موجود' });
-      }
-
-      const beforeData = userDoc.data() || {};
-      const targetSchoolId = beforeData.schoolId;
+      const userDoc = await db.collection('users').doc(userId).get();
+      const beforeData = userDoc.exists ? userDoc.data() || {} : {};
       const targetRole = beforeData.role;
 
-      if (isSuperAdminRole(targetRole)) {
-        return res.status(403).json({
-          error: 'FORBIDDEN',
-          message: 'لا يمكن حذف حساب Super Admin',
-        });
-      }
-
-      if (!canActorDeleteUser(req.user.role, targetRole, req.user.schoolId)) {
-        return res.status(403).json({
-          error: 'FORBIDDEN',
-          message: 'غير مسموح لك بحذف مستخدم بهذا المستوى',
-        });
-      }
-
-      // 2. Enforce strict multi-tenancy check
-      if (!isSuperAdminRole(req.user.role)) {
-        if (!targetSchoolId || targetSchoolId !== req.user.schoolId) {
-          return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف مستخدمى المدارس الأخرى' });
-        }
-      }
-
-      // 3. Delete from Auth
+      let authExists = false;
       try {
-        await admin.auth().deleteUser(uid);
+        await admin.auth().getUser(userId);
+        authExists = true;
       } catch (authError: any) {
-        if (authError.code === 'auth/user-not-found') {
-          console.log(`User ${redactUid(uid)} already removed from Auth.`);
-        } else {
-          console.warn(`Failed to delete user ${redactUid(uid)} from Auth:`, authError.message);
+        if (authError.code !== 'auth/user-not-found') {
+          throw authError;
         }
       }
-      
-      // 2. Delete from Firestore users
-      await db.collection('users').doc(uid).delete();
 
-      // 3. Remove as parent from students if applicable
-      const studentsSnap = await db.collection('students')
-        .where('parentIds', 'array-contains', uid)
-        .get();
-      
-      if (!studentsSnap.empty) {
-        const batch = db.batch();
-        studentsSnap.docs.forEach(doc => {
-          batch.update(doc.ref, {
-            parentIds: admin.firestore.FieldValue.arrayRemove(uid)
-          });
+      if (!userDoc.exists && !authExists) {
+        return res.status(404).json({
+          error: 'USER_NOT_FOUND',
+          message: 'المستخدم غير موجود في Auth أو Firestore',
         });
-        await batch.commit();
       }
-      
-      // 4. Log the action with snapshot
-      await logAudit(req, 'DELETE_USER', { before: beforeData, metadata: { targetUid: uid } });
+
+      if (isSuperAdminRole(targetRole) && !confirmSuperAdminDelete) {
+        return res.status(403).json({
+          error: 'CONFIRMATION_REQUIRED',
+          message: 'حذف حساب Super Admin يتطلب confirmSuperAdminDelete:true',
+        });
+      }
+
+      if (userId === req.user.uid && !confirmSelfDelete) {
+        return res.status(403).json({
+          error: 'CONFIRMATION_REQUIRED',
+          message: 'حذف حسابك الحالي يتطلب confirmSelfDelete:true',
+        });
+      }
+
+      const result = await runUserPermanentDelete({
+        db,
+        authAdmin: admin.auth(),
+        adminSdk: admin,
+        userId,
+      });
+
+      await logAudit(req, 'DELETE_USER', {
+        before: userDoc.exists ? beforeData : null,
+        metadata: { targetUid: userId, result },
+      });
 
       res.json({
+        ok: true,
         success: true,
+        deletedAuth: result.deletedAuth,
+        deletedFirestoreUser: result.deletedFirestoreUser,
+        warnings: result.warnings,
+        data: result,
         message: 'تم حذف الحساب بنجاح',
-        data: { uid }
       });
     } catch (error: any) {
       console.error('Delete User Error:', error);
-      res.status(500).json({
+      res.status(error.status || 500).json({
         success: false,
+        ok: false,
         error: error.message || 'Internal Server Error',
-        message: error.message || 'حدث خطأ أثناء حذف الحساب'
+        message: error.message || 'حدث خطأ أثناء حذف الحساب',
       });
     }
   });
@@ -1244,32 +1244,50 @@ async function startServer() {
 
   app.post('/api/admin/schools/:schoolId/permanent-delete', verifyAdmin, async (req: any, res: any) => {
     const { schoolId } = req.params;
-    const { confirmName } = req.body || {};
-    if (!schoolId) return res.status(400).json({ error: 'School ID required' });
+    const body = req.body || {};
+    const confirm = body.confirm === true;
+    const schoolName = body.schoolName ?? body.confirmName;
+
+    if (!schoolId) {
+      return res.status(400).json({ error: 'SCHOOL_ID_REQUIRED', message: 'School ID required' });
+    }
 
     try {
-      if (req.user.role !== 'superadmin') {
+      if (!isSuperAdminRole(req.user.role)) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'غير مصرح لك بحذف المدرسة نهائياً. هذا الإجراء مخصص للSuperAdmin فقط',
         });
       }
 
-      const summary = await runSchoolPermanentDelete({
+      const result = await runSchoolPermanentDelete({
         db: getDb(),
         authAdmin: admin.auth(),
         schoolId,
-        confirmName: String(confirmName || ''),
+        confirm,
+        schoolName: schoolName != null ? String(schoolName) : undefined,
+        confirmName: body.confirmName != null ? String(body.confirmName) : undefined,
       });
 
       await logAudit(req, 'PERMANENT_DELETE_SCHOOL', {
-        metadata: { targetSchoolId: schoolId, summary },
+        metadata: { targetSchoolId: schoolId, result },
       });
 
-      res.json({ success: true, summary });
+      res.json({
+        ok: true,
+        success: true,
+        schoolId: result.schoolId,
+        deletedCounts: result.deletedCounts,
+        warnings: result.warnings,
+        summary: result,
+      });
     } catch (error: any) {
       console.error('Permanent Delete School Error:', error);
-      res.status(error.status || 500).json({ error: error.message || 'Internal Server Error' });
+      res.status(error.status || 500).json({
+        ok: false,
+        error: error.message || 'Internal Server Error',
+        message: error.message || 'فشل الحذف النهائي للمدرسة',
+      });
     }
   });
 
