@@ -6,10 +6,8 @@ import {
   query,
   where,
   onSnapshot,
-  setDoc,
   doc,
   deleteDoc,
-  serverTimestamp,
 } from "firebase/firestore";
 import { useAuth } from "../../lib/AuthContext";
 import { useLanguage } from "../../lib/LanguageContext";
@@ -44,6 +42,12 @@ import QRCodeSection from "../../components/admin/idcards/QRCodeSection";
 
 import IdCardSettings from "./IdCardSettings";
 import { IdCardTemplate } from "../../types/idCardTemplate";
+import {
+  loadIdCardTemplate,
+  normalizeIdCardFromSnapshot,
+  resolveSchoolId,
+  saveIdCard,
+} from "../../lib/idCardFirestore";
 
 export default function IdCards() {
   const { profile } = useAuth();
@@ -122,20 +126,13 @@ export default function IdCards() {
     }
   };
   useEffect(() => {
-    if (!profile?.schoolId) return;
+    const schoolId = resolveSchoolId(profile);
+    if (!schoolId) return;
     const fetchTemplate = async () => {
       try {
-        const { getDoc, doc } = await import("firebase/firestore");
-        const docRef = doc(
-          db,
-          "schools",
-          profile.schoolId,
-          "settings",
-          "idCardTemplate",
-        );
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setTemplate(docSnap.data() as IdCardTemplate);
+        const { data } = await loadIdCardTemplate(schoolId);
+        if (data) {
+          setTemplate(data as IdCardTemplate);
         }
       } catch (error) {
         console.error("Error fetching template", error);
@@ -212,8 +209,11 @@ export default function IdCards() {
       cardsQ,
       (snapshot) => {
         const cardsObj: Record<string, any> = {};
-        snapshot.docs.forEach((doc) => {
-          cardsObj[doc.data().studentId] = { id: doc.id, ...doc.data() };
+        snapshot.docs.forEach((snap) => {
+          const normalized = normalizeIdCardFromSnapshot(snap);
+          if (normalized) {
+            cardsObj[normalized.studentId] = normalized.data;
+          }
         });
         setIdCards(cardsObj);
         setLoading(false);
@@ -228,32 +228,46 @@ export default function IdCards() {
 
   const handleSaveCard = async () => {
     if (!selectedStudent || !profile) return;
+    const schoolId = resolveSchoolId(profile);
+    if (!schoolId) {
+      if (import.meta.env.DEV) {
+        console.debug("[IdCardFirestore] save-card:blocked", {
+          reason: "missing schoolId",
+        });
+      }
+      toast.error(
+        isRtl
+          ? "معرّف المدرسة غير متوفر — أعد تسجيل الدخول"
+          : "School ID missing — please sign in again",
+      );
+      return;
+    }
     setIsSaving(true);
     try {
-      const cardRef = doc(collection(db, "id_cards"), selectedStudent.id);
-
-      await setDoc(cardRef, {
-        studentId: selectedStudent.id,
-        studentName: selectedStudent.name,
-        classId: selectedClassId,
-        className: classes.find((c) => c.id === selectedClassId)?.name || "",
-        parentIds: selectedStudent.parentIds || [],
-        parentEmail: (selectedStudent.parentEmail || "").toLowerCase(),
-        schoolId: profile.schoolId,
-        schoolName,
-        bloodType,
-        transportInfo,
-        driverName,
-        driverPhone,
-        carNumber,
-        guardianName,
-        schoolPhone,
-        issueDate,
-        validUntil,
-        examNumber,
-        residenceAddress,
-        updatedAt: serverTimestamp(),
-      });
+      await saveIdCard(
+        schoolId,
+        selectedStudent.id,
+        {
+          studentName: selectedStudent.name,
+          classId: selectedClassId,
+          className: classes.find((c) => c.id === selectedClassId)?.name || "",
+          parentIds: selectedStudent.parentIds || [],
+          parentEmail: (selectedStudent.parentEmail || "").toLowerCase(),
+          schoolName,
+          bloodType,
+          transportInfo,
+          driverName,
+          driverPhone,
+          carNumber,
+          guardianName,
+          schoolPhone,
+          issueDate,
+          validUntil,
+          examNumber,
+          residenceAddress,
+        },
+        !currentCard,
+      );
 
       toast.success(
         isRtl ? "تم حفظ الهوية بنجاح" : "ID Card saved successfully",

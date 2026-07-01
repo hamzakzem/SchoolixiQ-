@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../lib/AuthContext";
 import { useLanguage } from "../../lib/LanguageContext";
-import { db } from "../../lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
 import {
   handleFirestoreError,
   OperationType,
 } from "../../lib/firestore-errors";
+import {
+  loadIdCardTemplate,
+  resolveSchoolId,
+  saveIdCardTemplate,
+} from "../../lib/idCardFirestore";
 import { toast } from "react-hot-toast";
 import {
   Save,
@@ -85,18 +88,15 @@ export default function IdCardSettings() {
 
   useEffect(() => {
     const fetchTemplate = async () => {
-      if (!profile?.schoolId) return;
+      const schoolId = resolveSchoolId(profile);
+      if (!schoolId) {
+        setIsLoading(false);
+        return;
+      }
       try {
-        const docRef = doc(
-          db,
-          "schools",
-          profile.schoolId,
-          "settings",
-          "idCardTemplate",
-        );
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setTemplate((prev) => ({ ...prev, ...docSnap.data() }));
+        const { data } = await loadIdCardTemplate(schoolId);
+        if (data) {
+          setTemplate((prev) => ({ ...prev, ...data }));
         }
       } catch (error) {
         handleFirestoreError(error, OperationType.GET, "settings");
@@ -108,17 +108,23 @@ export default function IdCardSettings() {
   }, [profile]);
 
   const handleSave = async () => {
-    if (!profile?.schoolId) return;
+    const schoolId = resolveSchoolId(profile);
+    if (!schoolId) {
+      if (import.meta.env.DEV) {
+        console.debug("[IdCardFirestore] save-template:blocked", {
+          reason: "missing schoolId",
+        });
+      }
+      toast.error(
+        isRtl
+          ? "معرّف المدرسة غير متوفر — أعد تسجيل الدخول"
+          : "School ID missing — please sign in again",
+      );
+      return;
+    }
     setIsSaving(true);
     try {
-      const docRef = doc(
-        db,
-        "schools",
-        profile.schoolId,
-        "settings",
-        "idCardTemplate",
-      );
-      await setDoc(docRef, template);
+      await saveIdCardTemplate(schoolId, template);
       toast.success(
         isRtl ? "تم حفظ إعدادات الهوية بنجاح" : "Settings saved successfully",
       );
