@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { clsx } from "clsx";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
@@ -97,12 +97,11 @@ import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
 import AuditLogsViewer from "./admin/AuditLogsViewer";
 import LandingPageSettings from "./superadmin/LandingPageSettings";
-import {
-  SchoolLifecycleButtons,
-  SchoolStatusBadge,
-} from "../components/superadmin/SchoolLifecycleButtons";
-import { SchoolPresenceBadge } from "../components/superadmin/SchoolPresenceBadge";
 import { SuperAdminSchoolRecordList } from "../components/superadmin/SuperAdminSchoolRecordList";
+import {
+  SuperAdminSchoolsFilterBar,
+  type SchoolSortOption,
+} from "../components/superadmin/SuperAdminSchoolsFilterBar";
 import { SuperAdminSchoolAccountList } from "../components/superadmin/SuperAdminSchoolAccountList";
 import { useSchoolPresenceMap } from "../lib/useSchoolPresenceMap";
 import {
@@ -235,6 +234,9 @@ export default function SuperAdminDashboard() {
   const [presenceFilter, setPresenceFilter] = useState<
     "all" | "online" | "offline" | "recent"
   >("all");
+  const [schoolPlanFilter, setSchoolPlanFilter] = useState("");
+  const [schoolStageFilter, setSchoolStageFilter] = useState("");
+  const [schoolSortBy, setSchoolSortBy] = useState<SchoolSortOption>("newest");
   const presenceMap = useSchoolPresenceMap(
     activeTab === "schools" || activeTab === "accounts",
   );
@@ -672,22 +674,107 @@ export default function SuperAdminDashboard() {
       matchesFilter = days > 0 && days <= 7;
     }
 
+    const matchesPlan = schoolPlanFilter
+      ? s.planId === schoolPlanFilter
+      : true;
+    const stageValue = s.stage || s.educationLevel;
+    const matchesStage = schoolStageFilter
+      ? stageValue === schoolStageFilter
+      : true;
+
     const presenceStatus = resolveSchoolPresenceStatus(presenceMap[s.id]);
     const matchesPresence = presenceFilterMatches(presenceStatus, presenceFilter);
 
-    return matchesSearch && matchesGov && matchesDir && matchesFilter && matchesPresence;
+    return matchesSearch && matchesGov && matchesDir && matchesFilter && matchesPresence && matchesPlan && matchesStage;
   });
+
+  const schoolStatsMap = useMemo(() => {
+    const staffRoles = new Set([
+      "admin",
+      "school_admin",
+      "assistant",
+      "staff",
+      "teacher",
+    ]);
+    const map: Record<string, { staffCount: number; studentCount: number }> = {};
+    for (const s of schools) {
+      map[s.id] = {
+        studentCount: s.studentCount ?? 0,
+        staffCount: users.filter(
+          (u) => u.schoolId === s.id && staffRoles.has(u.role),
+        ).length,
+      };
+    }
+    return map;
+  }, [schools, users]);
+
+  const schoolStageOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of schools) {
+      const stage = s.stage || s.educationLevel;
+      if (stage) set.add(stage);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ar"));
+  }, [schools]);
+
+  const schoolGovernorateOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of schools) {
+      if (s.governorate) set.add(s.governorate);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ar"));
+  }, [schools]);
+
+  const schoolDirectorateOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of schools) {
+      if (s.directorate) set.add(s.directorate);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ar"));
+  }, [schools]);
+
+  const sortedFilteredSchools = useMemo(() => {
+    const getCreated = (school: (typeof schools)[0]) =>
+      school.createdAt?.toDate?.()?.getTime() ?? 0;
+    const getActivity = (schoolId: string) => {
+      const p = presenceMap[schoolId];
+      const raw = p?.lastHeartbeatAt || p?.lastSeenAt;
+      if (!raw) return 0;
+      if (typeof raw === "object" && raw !== null && "toDate" in raw) {
+        const d = (raw as { toDate?: () => Date }).toDate?.();
+        return d?.getTime() ?? 0;
+      }
+      const t = new Date(raw as string | number).getTime();
+      return Number.isNaN(t) ? 0 : t;
+    };
+
+    const list = [...filteredSchools];
+    if (schoolSortBy === "oldest") {
+      list.sort((a, b) => getCreated(a) - getCreated(b));
+    } else if (schoolSortBy === "students") {
+      list.sort(
+        (a, b) =>
+          (b.studentCount ?? schoolStatsMap[b.id]?.studentCount ?? 0) -
+          (a.studentCount ?? schoolStatsMap[a.id]?.studentCount ?? 0),
+      );
+    } else if (schoolSortBy === "activity") {
+      list.sort((a, b) => getActivity(b.id) - getActivity(a.id));
+    } else {
+      list.sort((a, b) => getCreated(b) - getCreated(a));
+    }
+    return list;
+  }, [filteredSchools, schoolSortBy, presenceMap, schoolStatsMap]);
 
   const SCHOOLS_PAGE_SIZE = 12;
   const [schoolsPage, setSchoolsPage] = useState(1);
 
   useEffect(() => {
     setSchoolsPage(1);
-  }, [searchTerm, schoolFilter, presenceFilter, filterGovernorate, filterDirectorate, activeTab]);
+  }, [searchTerm, schoolFilter, presenceFilter, filterGovernorate, filterDirectorate, schoolPlanFilter, schoolStageFilter, schoolSortBy, activeTab]);
 
-  const schoolsTotalPages = Math.max(1, Math.ceil(filteredSchools.length / SCHOOLS_PAGE_SIZE));
+  const schoolsTotalPages = Math.max(1, Math.ceil(sortedFilteredSchools.length / SCHOOLS_PAGE_SIZE));
   const schoolsPageSafe = Math.min(schoolsPage, schoolsTotalPages);
-  const paginatedSchools = filteredSchools.slice(
+  const paginatedSchools = sortedFilteredSchools.slice(
     (schoolsPageSafe - 1) * SCHOOLS_PAGE_SIZE,
     schoolsPageSafe * SCHOOLS_PAGE_SIZE,
   );
@@ -2420,10 +2507,10 @@ export default function SuperAdminDashboard() {
                     />
                   </div>
 
-                  <div className="sx-section sx-schools-table-panel sx-schools-table-panel--expanded bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none !p-0 overflow-visible">
+                  <div className="sx-section sx-schools-table-panel sx-schools-table-panel--expanded sx-sa-schools-panel bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none !p-0 overflow-hidden">
                     <div className="sx-section-bar !mb-0 px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-800/20">
                       <div className="flex items-center gap-4 min-w-0">
-                        <div className="p-2 md:p-3 bg-blue-600 rounded-xl md:rounded-2xl text-white shadow-lg shadow-blue-600/20 shrink-0">
+                        <div className="p-2 md:p-3 bg-[var(--sx-navy,#0f172a)] rounded-xl md:rounded-2xl text-[var(--sx-gold,#d4a853)] shadow-sm shrink-0">
                           <LayoutGrid size={24} />
                         </div>
                         <div className="min-w-0">
@@ -2431,153 +2518,85 @@ export default function SuperAdminDashboard() {
                             أحدث المدارس المشتركة
                           </h3>
                           <p className="sx-section-subtitle mt-0.5">
-                            Global Network Nodes & Licenses
+                            إدارة شبكة المدارس — سطح المكتب والجوال
                           </p>
                         </div>
                       </div>
-
-                      <div className="sx-section-toolbar flex-col items-stretch md:items-end">
-                        <div className="relative w-full md:w-96 group">
-                          <Search
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors"
-                            size={18}
-                          />
-                          <input
-                            type="text"
-                            placeholder="بحث عن مدرسة باسمها أو العنوان..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pr-12 pl-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-600 transition-all text-sm font-bold shadow-sm"
-                          />
-                        </div>
-                        <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-                          <select
-                            value={schoolFilter}
-                            onChange={(e) =>
-                              setSchoolFilter(
-                                e.target.value as
-                                  | "all"
-                                  | "active"
-                                  | "suspended"
-                                  | "archived"
-                                  | "expiring",
-                              )
-                            }
-                            className="w-full md:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none text-xs font-bold shadow-sm min-w-[140px]"
-                          >
-                            <option value="active">نشطة فقط</option>
-                            <option value="all">كل المدارس</option>
-                            <option value="suspended">معطّلة مؤقتاً</option>
-                            <option value="archived">مؤرشفة</option>
-                            <option value="expiring">تنتهي قريباً</option>
-                          </select>
-                          <select
-                            value={presenceFilter}
-                            onChange={(e) =>
-                              setPresenceFilter(
-                                e.target.value as
-                                  | "all"
-                                  | "online"
-                                  | "offline"
-                                  | "recent",
-                              )
-                            }
-                            className="w-full md:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none text-xs font-bold shadow-sm min-w-[150px]"
-                          >
-                            <option value="all">كل النشاط</option>
-                            <option value="online">نشطة الآن</option>
-                            <option value="recent">نشطة مؤخراً</option>
-                            <option value="offline">غير نشطة</option>
-                          </select>
-                          <select
-                            value={filterGovernorate}
-                            onChange={(e) =>
-                              setFilterGovernorate(e.target.value)
-                            }
-                            className="w-full md:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-600 transition-all text-xs font-bold shadow-sm appearance-none min-w-[120px]"
-                          >
-                            <option value="">كل المحافظات</option>
-                            <option value="بغداد">بغداد</option>
-                            <option value="البصرة">البصرة</option>
-                            <option value="نينوى">نينوى</option>
-                            <option value="أربيل">أربيل</option>
-                            <option value="النجف">النجف</option>
-                            <option value="ذي قار">ذي قار</option>
-                            <option value="كركوك">كركوك</option>
-                            <option value="الأنبار">الأنبار</option>
-                            <option value="ديالى">ديالى</option>
-                            <option value="المثنى">المثنى</option>
-                            <option value="القادسية">القادسية</option>
-                            <option value="ميسان">ميسان</option>
-                            <option value="واسط">واسط</option>
-                            <option value="صلاح الدين">صلاح الدين</option>
-                            <option value="دهوك">دهوك</option>
-                            <option value="السليمانية">السليمانية</option>
-                            <option value="بابل">بابل</option>
-                            <option value="كربلاء">كربلاء</option>
-                            <option value="حلبجة">حلبجة</option>
-                          </select>
-                          <select
-                            value={filterDirectorate}
-                            onChange={(e) =>
-                              setFilterDirectorate(e.target.value)
-                            }
-                            className="w-full md:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-600 transition-all text-xs font-bold shadow-sm appearance-none min-w-[150px]"
-                          >
-                            <option value="">كل المديريات</option>
-                            <option value="مديرية الكرخ الاولى">
-                              مديرية الكرخ الاولى
-                            </option>
-                            <option value="مديرية الكرخ الثانية">
-                              مديرية الكرخ الثانية
-                            </option>
-                            <option value="مديرية الكرخ الثالثه">
-                              مديرية الكرخ الثالثه
-                            </option>
-                            <option value="مديرية الرصافة الاولى">
-                              مديرية الرصافة الاولى
-                            </option>
-                            <option value="مديرية الرصافة الثانية">
-                              مديرية الرصافة الثانية
-                            </option>
-                            <option value="مديرية الرصافة الثالثه">
-                              مديرية الرصافة الثالثه
-                            </option>
-                            <option value="أخرى / مديرية أخرى">
-                              أخرى / مديرية أخرى
-                            </option>
-                          </select>
-                        </div>
-                      </div>
                     </div>
-                    <div className="sx-table-shell sx-school-record-list-body !border-0 !rounded-none">
+
+                    <SuperAdminSchoolsFilterBar
+                      isRtl={language === "ar"}
+                      searchTerm={searchTerm}
+                      onSearchChange={setSearchTerm}
+                      schoolFilter={schoolFilter}
+                      onSchoolFilterChange={(v) =>
+                        setSchoolFilter(
+                          v as
+                            | "all"
+                            | "active"
+                            | "suspended"
+                            | "archived"
+                            | "expiring",
+                        )
+                      }
+                      presenceFilter={presenceFilter}
+                      onPresenceFilterChange={(v) =>
+                        setPresenceFilter(
+                          v as "all" | "online" | "offline" | "recent",
+                        )
+                      }
+                      planFilter={schoolPlanFilter}
+                      onPlanFilterChange={setSchoolPlanFilter}
+                      stageFilter={schoolStageFilter}
+                      onStageFilterChange={setSchoolStageFilter}
+                      governorateFilter={filterGovernorate}
+                      onGovernorateFilterChange={setFilterGovernorate}
+                      directorateFilter={filterDirectorate}
+                      onDirectorateFilterChange={setFilterDirectorate}
+                      sortBy={schoolSortBy}
+                      onSortChange={setSchoolSortBy}
+                      packages={packages}
+                      stageOptions={schoolStageOptions}
+                      governorateOptions={schoolGovernorateOptions}
+                      directorateOptions={schoolDirectorateOptions}
+                    />
+
+                    <div className="sx-school-record-list-body">
                       <SuperAdminSchoolRecordList
                         schools={paginatedSchools}
                         packages={packages}
                         presenceMap={presenceMap}
-                        isRtl={isRtl}
+                        schoolStatsMap={schoolStatsMap}
+                        isRtl={language === "ar"}
                         emptyMessage="لا توجد مدارس مطابقة للبحث أو الفلتر"
                         onEdit={openEditSchool}
                         onToggleFeatured={handleToggleFeatured}
                         onToggleTimer={handleToggleTimer}
                         onExtendSubscription={handleExtendSubscription}
                         onSchoolPermanentDeleted={(schoolId) => {
-                          setSchools((prev) => prev.filter((s) => s.id !== schoolId));
+                          setSchools((prev) =>
+                            prev.filter((s) => s.id !== schoolId),
+                          );
                         }}
                       />
-                    {filteredSchools.length > 0 && (
-                      <div className="sx-pagination-bar sx-schools-table-pagination">
+                    {sortedFilteredSchools.length > 0 && (
+                      <div className="sx-sa-schools-pagination">
                         <p className="text-xs font-bold text-[#64748B]">
                           عرض {(schoolsPageSafe - 1) * SCHOOLS_PAGE_SIZE + 1}–
-                          {Math.min(schoolsPageSafe * SCHOOLS_PAGE_SIZE, filteredSchools.length)} من{" "}
-                          {filteredSchools.length} مدرسة
+                          {Math.min(
+                            schoolsPageSafe * SCHOOLS_PAGE_SIZE,
+                            sortedFilteredSchools.length,
+                          )}{" "}
+                          من {sortedFilteredSchools.length} مدرسة
                         </p>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             className="sx-schools-table-pagination__btn"
                             disabled={schoolsPageSafe <= 1}
-                            onClick={() => setSchoolsPage((p) => Math.max(1, p - 1))}
+                            onClick={() =>
+                              setSchoolsPage((p) => Math.max(1, p - 1))
+                            }
                           >
                             السابق
                           </button>
@@ -2588,7 +2607,11 @@ export default function SuperAdminDashboard() {
                             type="button"
                             className="sx-schools-table-pagination__btn"
                             disabled={schoolsPageSafe >= schoolsTotalPages}
-                            onClick={() => setSchoolsPage((p) => Math.min(schoolsTotalPages, p + 1))}
+                            onClick={() =>
+                              setSchoolsPage((p) =>
+                                Math.min(schoolsTotalPages, p + 1),
+                              )
+                            }
                           >
                             التالي
                           </button>
