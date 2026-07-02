@@ -103,10 +103,27 @@ export function LandingPartnersSection({
   if (!displayPartners.length) {
     if (!import.meta.env.DEV) return null;
     return (
-      <section id="partners" className="landing-partners-section">
+      <section id="partners" className="landing-partners-section" aria-labelledby="landing-partners-heading">
         <div className="lp-container">
-          <div className="lp-card p-8 text-center text-[#94a3b8] text-sm">
-            لا توجد شعارات شركاء — أضفها من إعدادات السوبر أدمن
+          <motion.div
+            initial={reduced ? {} : { opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center max-w-2xl mx-auto mb-10"
+          >
+            <p className="lp-eyebrow">الشركاء</p>
+            <h2 id="landing-partners-heading" className="lp-section-title lp-title-gold">
+              {title}
+            </h2>
+            <p className="lp-section-subtitle mx-auto">{subtitle}</p>
+          </motion.div>
+          <div className="landing-partners-empty">
+            {['م', 'د', 'س'].map((letter) => (
+              <div key={letter} className="landing-partners-empty__tile">
+                <div className="landing-partners-empty__initial">{letter}</div>
+                <p className="text-xs text-[#8b9cb3]">شريك قريباً</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

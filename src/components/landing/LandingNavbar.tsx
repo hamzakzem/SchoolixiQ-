@@ -26,9 +26,9 @@ export function LandingNavbar({
   return (
     <header className="landing-navbar">
       <div className="landing-navbar__inner">
-        <Link to="/" className="flex items-center gap-2 shrink-0 min-w-0" onClick={close}>
-          <SchoolixLogo size={34} className="landing-hero__logo-float" />
-          <span className="font-black text-sm sm:text-[15px] tracking-tight truncate text-white">{appName}</span>
+        <Link to="/" className="landing-navbar__brand" onClick={close}>
+          <SchoolixLogo size={36} className="landing-hero__logo-float" />
+          <span>{appName}</span>
         </Link>
 
         <nav className="landing-navbar__links" aria-label="التنقل الرئيسي">
@@ -43,10 +43,7 @@ export function LandingNavbar({
           <a href={resolveDemoHref(links)} className="hidden md:inline-flex lp-btn-outline !py-2 !px-4 !text-[12px]">
             {demoLabel}
           </a>
-          <Link
-            to="/login"
-            className="hidden sm:inline-flex lp-btn-gold !py-2 !px-4 !text-[12px]"
-          >
+          <Link to="/login" className="hidden sm:inline-flex lp-btn-gold !py-2 !px-4 !text-[12px]">
             <LogIn size={14} />
             {loginLabel}
           </Link>
@@ -83,9 +80,9 @@ export function LandingNavbar({
               exit={reduced ? { opacity: 0 } : { x: '100%' }}
               transition={{ duration: reduced ? 0.01 : 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
-              <div className="flex items-center justify-between mb-4 pb-4 border-b border-[rgba(212,175,55,0.28)]">
+              <div className="flex items-center justify-between mb-4 pb-4 border-b border-[rgba(255,255,255,0.06)]">
                 <span className="font-black text-white">{appName}</span>
-                <button type="button" onClick={close} className="text-[#94a3b8]" aria-label="إغلاق">
+                <button type="button" onClick={close} className="text-[#8b9cb3]" aria-label="إغلاق">
                   <X size={20} />
                 </button>
               </div>
@@ -94,7 +91,7 @@ export function LandingNavbar({
                   {label}
                 </a>
               ))}
-              <div className="mt-auto pt-4 flex flex-col gap-2 border-t border-[rgba(212,175,55,0.28)]">
+              <div className="mt-auto pt-4 flex flex-col gap-2 border-t border-[rgba(255,255,255,0.06)]">
                 <a href={resolveDemoHref(links)} onClick={close} className="lp-btn-outline w-full">
                   {demoLabel}
                 </a>

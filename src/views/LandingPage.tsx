@@ -42,6 +42,8 @@ import { LandingWhatsAppFab } from '../components/landing/LandingWhatsAppFab';
 import { LandingTechSection } from '../components/landing/LandingTechSection';
 import { LandingHeroMockup } from '../components/landing/LandingHeroMockup';
 import { LandingDistributorSection } from '../components/landing/LandingDistributorSection';
+import { LandingFeaturesShowcase } from '../components/landing/LandingFeaturesShowcase';
+import { LandingFooterShell } from '../components/landing/LandingFooterShell';
 import {
   LandingPartnersSection,
   useLandingPartners,
@@ -130,21 +132,21 @@ const AUDIENCE_ROLES = [
     title: 'للمعلم',
     description: 'حضور، واجبات، درجات، وتواصل مع الإدارة وأولياء الأمور.',
     icon: GraduationCap,
-    accent: 'from-[#D4AF37] to-[#c9a030]',
+    accent: 'from-[#8a7330] to-[#c9a84c]',
   },
   {
     id: 'parent',
     title: 'لولي الأمر',
     description: 'متابعة الأبناء: حضور، أقساط، واجبات، وتبليغات في تطبيق واحد.',
     icon: Smartphone,
-    accent: 'from-emerald-600 to-emerald-500',
+    accent: 'from-[#0B2345] to-[#1a3a5c]',
   },
   {
     id: 'guard',
     title: 'للحارس / البوابة الذكية',
     description: 'تحقق التسريح، مسح الرمز، وسجل خروج آمن ومنظم.',
     icon: Shield,
-    accent: 'from-slate-700 to-slate-600',
+    accent: 'from-[#06182f] to-[#0b2345]',
   },
 ];
 
@@ -188,11 +190,7 @@ function SectionShell({
 }
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[11px] font-bold tracking-[0.2em] uppercase mb-3" style={{ color: GOLD }}>
-      {children}
-    </p>
-  );
+  return <p className="lp-eyebrow">{children}</p>;
 }
 
 function SectionHeader({
@@ -213,7 +211,9 @@ function SectionHeader({
     <div className={`mb-12 lg:mb-16 max-w-2xl ${align === 'center' ? 'mx-auto text-center' : 'text-right'}`}>
       <Eyebrow>{eyebrow}</Eyebrow>
       <h2 className={`lp-section-title ${goldTitle ? 'lp-title-gold' : ''}`}>{title}</h2>
-      {subtitle && <p className="lp-section-subtitle">{subtitle}</p>}
+      {subtitle && (
+        <p className={`lp-section-subtitle ${align === 'center' ? 'mx-auto' : ''}`}>{subtitle}</p>
+      )}
     </div>
   );
 }
@@ -368,11 +368,11 @@ export default function LandingPage() {
       <SectionShell id="hero" className="landing-hero">
         <div className="landing-hero__glow" />
         <div className="lp-container relative">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div className="max-w-xl">
+          <div className="landing-hero__grid">
+            <div>
               {config.heroBadgeText && (
                 <div className="landing-hero__badge">
-                  <Sparkles size={12} style={{ color: GOLD }} />
+                  <Sparkles size={12} className="text-[#d4af37]" />
                   {config.heroBadgeText}
                 </div>
               )}
@@ -381,24 +381,28 @@ export default function LandingPage() {
               </h1>
               <p className="landing-hero__subtitle">{config.heroSubtitle}</p>
 
-              <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-3">
-                <Link to="/login?mode=signup" className="lp-btn-gold">
+              <div className="landing-hero__cta">
+                <Link to="/login?mode=signup" className="lp-btn-gold lp-btn-gold--lg">
                   <Rocket size={16} />
                   {config.primaryCtaLabel || 'ابدأ الآن مجاناً'}
                 </Link>
-                <a href="#features" className="lp-btn-outline">
-                  <Play size={14} className="fill-current opacity-80" />
+                <a href="#features" className="lp-btn-outline lp-btn-gold--lg">
+                  <Play size={14} className="fill-current opacity-70" />
                   {config.exploreCtaLabel || 'استكشف المميزات'}
                 </a>
               </div>
+              <div className="landing-hero__note">
+                <span>بدون التزام طويل</span>
+                <span>دعم فني عربي</span>
+                <span>تجربة متجاوبة</span>
+              </div>
             </div>
-            <div className="relative pb-8 lg:pb-0">
-              <div className="landing-mockup-glow" />
+            <div className="landing-hero__visual">
               {config.heroImageUrl ? (
                 <img
                   src={config.heroImageUrl}
                   alt=""
-                  className="rounded-3xl border border-[rgba(212,175,55,0.28)] shadow-2xl w-full object-cover max-h-[440px] landing-fade-up"
+                  className="rounded-3xl border border-[rgba(255,255,255,0.08)] shadow-2xl w-full object-cover max-h-[440px] landing-fade-up"
                   loading="lazy"
                 />
               ) : (
@@ -429,7 +433,7 @@ export default function LandingPage() {
                       <Icon size={20} strokeWidth={1.5} />
                     </div>
                     <h3 className="font-black text-sm text-white mb-2">{title}</h3>
-                    <p className="text-xs leading-[1.75] text-[#94a3b8]">{description}</p>
+                    <p className="text-xs leading-[1.75] text-[#8b9cb3]">{description}</p>
                   </motion.div>
                 );
               })}
@@ -439,7 +443,7 @@ export default function LandingPage() {
       )}
 
       {config.showPricing && (
-        <SectionShell id="pricing" className={SECTION_PY}>
+        <SectionShell id="pricing" className="landing-pricing-section lp-section--alt">
           <div className="lp-container">
             <SectionHeader
               eyebrow="الأسعار"
@@ -447,7 +451,7 @@ export default function LandingPage() {
               title={config.pricingTitle || 'اختر الباقة المناسبة لمدرستك'}
               subtitle={config.pricingSubtitle || 'جميع الباقات تشمل التحديثات والدعم الفني'}
             />
-            <div className="grid md:grid-cols-3 gap-6 lg:gap-8 items-end max-w-5xl mx-auto">
+            <div className="landing-pricing-grid">
               {pricingPlans.map((pkg: any, index: number) => {
                 const popular = pkg.isPopular;
                 const topFeatures = getPackageMarketingFeatures(pkg.permissions as PackagePermissions);
@@ -463,26 +467,24 @@ export default function LandingPage() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: index * 0.08, duration: 0.4 }}
-                    className={`landing-pricing-card flex flex-col ${
-                      isCenter
-                        ? 'landing-pricing-card--featured md:-mt-4 md:scale-[1.03] z-10 text-white'
-                        : 'lp-card text-white'
+                    className={`landing-pricing-card flex flex-col text-white ${
+                      isCenter ? 'landing-pricing-card--featured z-10' : ''
                     }`}
                   >
                     {isCenter && (
                       <span className="landing-pricing-badge">
-                        <Star size={10} className="inline ml-1" />
+                        <Star size={10} />
                         {popular ? 'الأكثر اختياراً' : 'موصى به'}
                       </span>
                     )}
                     <h3 className="text-lg font-black">{pkg.name}</h3>
-                    <p className="text-sm mt-1 mb-6 text-[#94a3b8]">{maxLabel}</p>
-                    <p className="text-[2rem] font-black tabular-nums leading-none text-[#f2c866]">{formatIqdPrice(pkg.priceMonthly)}</p>
-                    <p className="text-xs font-semibold mt-2 mb-8 text-[#94a3b8]">
+                    <p className="text-sm mt-1 mb-5 text-[#8b9cb3]">{maxLabel}</p>
+                    <p className="landing-pricing-card__price">{formatIqdPrice(pkg.priceMonthly)}</p>
+                    <p className="text-xs font-semibold mt-2 mb-8 text-[#8b9cb3]">
                       شهرياً
                       {pkg.priceYearly > 0 && <span className="block mt-1">أو {formatIqdPrice(pkg.priceYearly)} / سنة</span>}
                     </p>
-                    <ul className="space-y-3 mb-10 flex-1 text-sm text-[#cbd5e1]">
+                    <ul className="space-y-3 mb-10 flex-1 text-sm text-[#b8c5d6]">
                       {displayFeatures.map((f: string) => (
                         <li key={f} className="flex items-start gap-2.5 leading-relaxed">
                           <Check size={14} className="shrink-0 mt-1 text-[#d4af37]" />
@@ -500,6 +502,9 @@ export default function LandingPage() {
                 );
               })}
             </div>
+            <p className="landing-pricing-compare">
+              جميع الباقات تشمل التحديثات، الدعم الفني، وتجربة موحّدة للإدارة والمعلمين وأولياء الأمور.
+            </p>
           </div>
         </SectionShell>
       )}
@@ -521,35 +526,16 @@ export default function LandingPage() {
         features={config.distributorFeatures}
       />
 
-      {/* Features grid */}
-      <SectionShell id="features" className={SECTION_PY}>
+      {/* Features — alternating showcase */}
+      <SectionShell id="features" className={`${SECTION_PY} lp-section--deep`}>
         <div className="lp-container">
           <SectionHeader
             eyebrow="خدماتنا"
+            goldTitle
             title="كل ما تحتاجه مدرستك في مكان واحد"
             subtitle="وحدات متكاملة للإدارة والمعلمين وأولياء الأمور — بدون أدوات متفرقة."
           />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
-            {showcaseFeatures.map((card, idx) => {
-              const Icon = FEATURE_ICONS[card.id] || Sparkles;
-              return (
-                <motion.div
-                  key={card.id}
-                  initial={reduced ? {} : { opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: idx * 0.05, duration: 0.35 }}
-                  className="lp-card p-6 lg:p-7 hover:-translate-y-1 transition-transform duration-300"
-                >
-                  <div className="landing-feature-strip__icon !mx-0 mb-4">
-                    <Icon size={20} strokeWidth={1.5} />
-                  </div>
-                  <h3 className="font-black text-[17px] text-white mb-2">{card.title}</h3>
-                  <p className="text-sm leading-[1.85] text-[#94a3b8]">{card.description}</p>
-                </motion.div>
-              );
-            })}
-          </div>
+          <LandingFeaturesShowcase features={showcaseFeatures} icons={FEATURE_ICONS} />
         </div>
       </SectionShell>
 
@@ -763,14 +749,11 @@ export default function LandingPage() {
       )}
 
       {/* Final CTA */}
-      <SectionShell className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)]`}>
+      <SectionShell className={`${SECTION_PY} border-t border-[rgba(255,255,255,0.06)]`}>
         <div className="lp-container">
-          <div className="lp-card px-8 py-14 sm:px-12 sm:py-16 lg:px-16 text-center relative overflow-hidden border-[#d4af37]/35">
-            <div
-              className="absolute inset-0 opacity-40 pointer-events-none"
-              style={{ background: `radial-gradient(circle at 80% 20%, ${GOLD}30, transparent 50%)` }}
-            />
-            <div className="relative">
+          <div className="landing-final-cta">
+            <div className="landing-final-cta__glow" />
+            <div className="relative text-center">
               <Eyebrow>ابدأ اليوم</Eyebrow>
               <h2 className="lp-section-title max-w-xl mx-auto">
                 {config.finalCtaTitle || 'جاهز لإدارة مدرستك بذكاء؟'}
@@ -809,12 +792,14 @@ export default function LandingPage() {
       <LandingWhatsAppFab whatsappNumber={config.whatsappNumber} />
 
       {/* Footer */}
-      <footer id="contact" className="landing-footer-wrap pb-8">
-        {config.footerMarketingText && (
-          <div className="lp-container py-8 text-center text-sm leading-[1.9] text-[#94a3b8]">
-            {config.footerMarketingText}
-          </div>
-        )}
+      <footer id="contact" className="landing-footer-wrap pb-6">
+        <LandingFooterShell
+          appName={systemConfig.appName}
+          description={config.footerMarketingText}
+          whatsappNumber={config.whatsappNumber}
+          email={systemConfig.supportEmails?.[0]}
+          location="العراق"
+        />
         <GlobalFooter compact={false} showPartnerSections={showFooterPartners} />
       </footer>
     </div>
