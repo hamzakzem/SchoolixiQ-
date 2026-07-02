@@ -9,6 +9,7 @@ import {
   isSchoolDraftComplete,
   draftToCustomerInfo,
   draftToSubscriptionForm,
+  resolveDistributorApprovalStatus,
   type AdminSchoolDraft,
 } from "./lib/auth";
 import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
@@ -47,6 +48,8 @@ import {
 import { useState, useEffect, lazy, Suspense, Component, ReactNode, ErrorInfo } from "react";
 import { motion } from "motion/react";
 import { captureException } from "./lib/sentryWrapper";
+import { DistributorAccessScreen } from "./components/DistributorAccessScreen";
+import type { DistributorRecord } from "./types/distributor";
 
 // Views (Lazy-Loaded for Performance Optimization)
 const Login = lazy(() => import("./views/Login"));
@@ -238,6 +241,33 @@ const AppContent = () => {
     genderType: "",
     estimatedStudents: "",
   });
+
+  const [distributorRecord, setDistributorRecord] = useState<DistributorRecord | null>(null);
+  const [distributorAccessLoading, setDistributorAccessLoading] = useState(false);
+
+  useEffect(() => {
+    const isDistributor =
+      profile?.role === UserRole.DISTRIBUTOR || profile?.role === "distributor";
+    if (!profile || !isDistributor || !profile.distributorId) {
+      setDistributorRecord(null);
+      setDistributorAccessLoading(false);
+      return;
+    }
+    setDistributorAccessLoading(true);
+    const unsub = onSnapshot(
+      doc(db, "distributors", profile.distributorId),
+      (snap) => {
+        setDistributorRecord(
+          snap.exists()
+            ? ({ id: snap.id, ...(snap.data() as Omit<DistributorRecord, "id">) } as DistributorRecord)
+            : null,
+        );
+        setDistributorAccessLoading(false);
+      },
+      () => setDistributorAccessLoading(false),
+    );
+    return () => unsub();
+  }, [profile?.role, profile?.distributorId]);
 
   // Pending admins already have a Firestore profile — skip auto-link but allow onboarding listeners
   useEffect(() => {
@@ -585,6 +615,21 @@ const AppContent = () => {
   const renderDashboard = () => {
     if (isPendingSchoolAdmin(profile)) {
       return null;
+    }
+
+    const isDistributorRole =
+      profile?.role === UserRole.DISTRIBUTOR || profile?.role === "distributor";
+    if (isDistributorRole) {
+      if (distributorAccessLoading) {
+        return <PageLoadingSkeleton />;
+      }
+      const access = resolveDistributorApprovalStatus(distributorRecord);
+      if (access === "pending") {
+        return <DistributorAccessScreen variant="pending" isRtl={isRtl} />;
+      }
+      if (access === "rejected" || access === "blocked") {
+        return <DistributorAccessScreen variant="rejected" isRtl={isRtl} />;
+      }
     }
 
     // Dedicated recovery/error screen if profile has school role but schoolId or schoolData is missing or inaccessible in Firestore

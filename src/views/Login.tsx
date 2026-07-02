@@ -71,6 +71,8 @@ import { useSystemConfig } from "../lib/SystemConfigContext";
 import { GlobalFooter } from "../components/GlobalFooter";
 import SchoolixLogo from "../components/SchoolixLogo";
 import { isCustomAppLogo } from "../lib/brandAssets";
+import { submitDistributorRegistration } from "../lib/distributorRegistration";
+import { DistributorAccessScreen } from "../components/DistributorAccessScreen";
 
 export const getLocalizedPackages = (packagesList: any[], isRtl: boolean) => {
   return packagesList.map(pkg => {
@@ -168,6 +170,16 @@ export default function Login() {
   const [mode, setMode] = useState<"login" | "signup">(
     searchParams.get("mode") === "signup" ? "signup" : "login",
   );
+  const [authPanel, setAuthPanel] = useState<"account" | "distributor" | "distributor_success">(
+    "account",
+  );
+  const [distributorForm, setDistributorForm] = useState({
+    name: "",
+    phone: "",
+    address: "",
+    governorate: "",
+    email: "",
+  });
   const [role, setRole] = useState<UserRole>(UserRole.PARENT);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -521,6 +533,30 @@ export default function Login() {
     }
   };
 
+  const handleDistributorRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!distributorForm.name.trim() || !distributorForm.phone.trim() || !distributorForm.address.trim() || !distributorForm.governorate) {
+      toast.error(isRtl ? "يرجى تعبئة جميع الحقول المطلوبة" : "Please fill all required fields");
+      return;
+    }
+    setLoading(true);
+    try {
+      await submitDistributorRegistration({
+        name: distributorForm.name.trim(),
+        phone: distributorForm.phone.trim(),
+        address: distributorForm.address.trim(),
+        governorate: distributorForm.governorate,
+        email: distributorForm.email.trim() || undefined,
+      });
+      setAuthPanel("distributor_success");
+      toast.success(isRtl ? "تم إرسال طلب الموزع بنجاح" : "Distributor application submitted");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : (isRtl ? "فشل إرسال الطلب" : "Submission failed"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleForgotPassword = async () => {
     if (!email) {
       toast.error(isRtl ? "يرجى إدخال البريد الإلكتروني أولاً" : "Enter your email first");
@@ -537,6 +573,10 @@ export default function Login() {
       toast.error(getEmailAuthErrorMessage(error, t, isRtl));
     }
   };
+
+  if (authPanel === "distributor_success") {
+    return <DistributorAccessScreen variant="submitted" isRtl={isRtl} />;
+  }
 
   return (
     <div
@@ -601,18 +641,116 @@ export default function Login() {
 
           <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
             <button
-              onClick={() => setMode("login")}
-              className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${mode === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              type="button"
+              onClick={() => {
+                setAuthPanel("account");
+                setMode("login");
+              }}
+              className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${authPanel === "account" && mode === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
               {t("login")}
             </button>
             <button
-              onClick={() => setMode("signup")}
-              className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${mode === "signup" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              type="button"
+              onClick={() => {
+                setAuthPanel("account");
+                setMode("signup");
+              }}
+              className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${authPanel === "account" && mode === "signup" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
               {t("signup")}
             </button>
+            <button
+              type="button"
+              onClick={() => setAuthPanel("distributor")}
+              className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${authPanel === "distributor" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              {isRtl ? "تسجيل موزع" : "Distributor"}
+            </button>
           </div>
+
+          {authPanel === "distributor" ? (
+            <form onSubmit={handleDistributorRegister} className="space-y-4 sm:space-y-5">
+              <p className="text-center text-sm text-slate-500 font-bold">
+                {isRtl
+                  ? "أرسل طلبك كموزع — سيتم مراجعته من الإدارة قبل تفعيل الحساب"
+                  : "Apply as a distributor — your account will be activated after admin approval"}
+              </p>
+              <input
+                required
+                type="text"
+                placeholder={isRtl ? "الاسم الكامل" : "Full name"}
+                value={distributorForm.name}
+                onChange={(e) => setDistributorForm({ ...distributorForm, name: e.target.value })}
+                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/30"
+              />
+              <input
+                required
+                type="tel"
+                placeholder={isRtl ? "رقم الهاتف" : "Phone number"}
+                value={distributorForm.phone}
+                onChange={(e) => setDistributorForm({ ...distributorForm, phone: e.target.value })}
+                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/30"
+              />
+              <input
+                required
+                type="text"
+                placeholder={isRtl ? "العنوان" : "Address"}
+                value={distributorForm.address}
+                onChange={(e) => setDistributorForm({ ...distributorForm, address: e.target.value })}
+                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/30"
+              />
+              <select
+                required
+                value={distributorForm.governorate}
+                onChange={(e) => setDistributorForm({ ...distributorForm, governorate: e.target.value })}
+                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/50"
+              >
+                <option value="">{isRtl ? "اختر المحافظة..." : "Select governorate..."}</option>
+                <option value="بغداد">بغداد</option>
+                <option value="البصرة">البصرة</option>
+                <option value="نينوى">نينوى</option>
+                <option value="أربيل">أربيل</option>
+                <option value="النجف">النجف</option>
+                <option value="ذي قار">ذي قار</option>
+                <option value="كركوك">كركوك</option>
+                <option value="الأنبار">الأنبار</option>
+                <option value="ديالى">ديالى</option>
+                <option value="المثنى">المثنى</option>
+                <option value="القادسية">القادسية</option>
+                <option value="ميسان">ميسان</option>
+                <option value="واسط">واسط</option>
+                <option value="صلاح الدين">صلاح الدين</option>
+                <option value="دهوك">دهوك</option>
+                <option value="السليمانية">السليمانية</option>
+                <option value="بابل">بابل</option>
+                <option value="كربلاء">كربلاء</option>
+                <option value="حلبجة">حلبجة</option>
+              </select>
+              <input
+                type="email"
+                placeholder={isRtl ? "البريد الإلكتروني (اختياري)" : "Email (optional)"}
+                value={distributorForm.email}
+                onChange={(e) => setDistributorForm({ ...distributorForm, email: e.target.value })}
+                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/30"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 rounded-xl bg-indigo-600 text-white font-bold disabled:opacity-50"
+              >
+                {loading ? "..." : isRtl ? "إرسال طلب الموزع" : "Submit distributor application"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthPanel("account")}
+                className="w-full py-3 text-sm font-bold text-slate-500"
+              >
+                {isRtl ? "العودة لتسجيل الدخول" : "Back to sign in"}
+              </button>
+            </form>
+          ) : (
+          <>
 
           {/* Android APK download — direct browser download */}
           <div className="mb-6 text-center">
@@ -992,6 +1130,8 @@ export default function Login() {
             </button>
 
           </form>
+          </>
+          )}
 
           <p className="mt-6 sm:mt-8 text-center text-slate-400 text-xs sm:text-sm font-medium">
             {isRtl
