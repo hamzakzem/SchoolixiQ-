@@ -225,7 +225,10 @@ export function DistributorsTab({
         phone: newDistributor.phone.trim(),
         email: newDistributor.email.trim(),
         commissionPercent: Number(newDistributor.commissionPercent) || 0,
+        status: "active",
+        canLogin: true,
         active: true,
+        source: "manual",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

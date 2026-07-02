@@ -28,6 +28,26 @@ export function currentMonthKey() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** @param {Record<string, unknown>} distributor */
+export function assertDistributorApprovedForCoupons(distributor) {
+  const status = String(distributor.status || "").toLowerCase();
+  if (status === "pending") {
+    const err = new Error("DISTRIBUTOR_PENDING");
+    err.code = "DISTRIBUTOR_PENDING";
+    throw err;
+  }
+  if (status === "rejected" || distributor.canLogin === false) {
+    const err = new Error("DISTRIBUTOR_INACTIVE");
+    err.code = "DISTRIBUTOR_INACTIVE";
+    throw err;
+  }
+  if (distributor.active === false) {
+    const err = new Error("DISTRIBUTOR_INACTIVE");
+    err.code = "DISTRIBUTOR_INACTIVE";
+    throw err;
+  }
+}
+
 /** @param {string} distributorId @param {string} schoolId @param {string} monthKey */
 export function buildCommissionDocId(distributorId, schoolId, monthKey) {
   return `${distributorId}_${schoolId}_${monthKey}`;
@@ -169,11 +189,7 @@ export async function validateDistributorCouponCode(db, code) {
     throw err;
   }
   const distributor = distributorSnap.data() || {};
-  if (distributor.active === false) {
-    const err = new Error("DISTRIBUTOR_INACTIVE");
-    err.code = "DISTRIBUTOR_INACTIVE";
-    throw err;
-  }
+  assertDistributorApprovedForCoupons(distributor);
 
   return {
     ok: true,
@@ -353,11 +369,7 @@ export async function applyDistributorCoupon({
     throw err;
   }
   const distributor = distributorSnap.data() || {};
-  if (distributor.active === false) {
-    const err = new Error("DISTRIBUTOR_INACTIVE");
-    err.code = "DISTRIBUTOR_INACTIVE";
-    throw err;
-  }
+  assertDistributorApprovedForCoupons(distributor);
 
   const trackingFields = buildDistributorTrackingFields(
     coupon,

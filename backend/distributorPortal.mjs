@@ -46,10 +46,30 @@ export async function resolveDistributorContext(db, uid) {
     err.status = 404;
     throw err;
   }
+  const distributor = distSnap.data() || {};
+  const status = String(distributor.status || '').toLowerCase();
+  if (status === 'pending') {
+    const err = new Error('حساب الموزع بانتظار الموافقة');
+    err.code = 'DISTRIBUTOR_PENDING';
+    err.status = 403;
+    throw err;
+  }
+  if (status === 'rejected' || distributor.canLogin === false) {
+    const err = new Error('حساب الموزع غير مفعّل');
+    err.code = 'DISTRIBUTOR_INACTIVE';
+    err.status = 403;
+    throw err;
+  }
+  if (status && status !== 'active' && distributor.active !== true) {
+    const err = new Error('حساب الموزع غير نشط');
+    err.code = 'DISTRIBUTOR_INACTIVE';
+    err.status = 403;
+    throw err;
+  }
   return {
     distributorId,
     userData,
-    distributor: { id: distSnap.id, ...distSnap.data() },
+    distributor: { id: distSnap.id, ...distributor },
   };
 }
 

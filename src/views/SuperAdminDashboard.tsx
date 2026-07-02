@@ -3,7 +3,7 @@ import { clsx } from "clsx";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { signOutWithCleanup } from "../lib/authLogout";
-import { adminCreateUser, adminDeleteUser, adminApplyDistributorCoupon } from "../lib/adminApi";
+import { adminCreateUser, adminDeleteUser, adminAccrueCommissionOnPaymentConfirmed, adminFinalizeSchoolTracking, adminValidateDistributorCoupon } from "../lib/adminApi";
 import { getApiUrl } from "../lib/apiUtils";
 import {
   collection,
@@ -105,6 +105,7 @@ import {
 } from "../components/superadmin/SuperAdminSchoolsFilterBar";
 import { SuperAdminSchoolAccountList } from "../components/superadmin/SuperAdminSchoolAccountList";
 import { DistributorsTab } from "./superadmin/DistributorsTab";
+import { DistributorRequestsTab } from "./superadmin/DistributorRequestsTab";
 import { useSchoolPresenceMap } from "../lib/useSchoolPresenceMap";
 import {
   presenceFilterMatches,
@@ -230,6 +231,7 @@ export default function SuperAdminDashboard() {
     | "audit_logs"
     | "landing_page"
     | "distributors"
+    | "distributor_requests"
   >("schools");
   const [schoolFilter, setSchoolFilter] = useState<
     "all" | "active" | "suspended" | "archived" | "expiring"
@@ -1186,6 +1188,24 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  const extractRequestCouponCode = (request: SchoolRegistrationRequest | Record<string, unknown>) => {
+    const r = request as SchoolRegistrationRequest;
+    return String(
+      r.couponCode ||
+        r.distributorCouponCode ||
+        r.customerInfo?.couponCode ||
+        "",
+    ).trim();
+  };
+
+  const finalizeSchoolTrackingAfterActivation = async (
+    schoolId: string,
+    couponCode: string,
+  ) => {
+    await adminFinalizeSchoolTracking(schoolId, couponCode || null);
+    await adminAccrueCommissionOnPaymentConfirmed(schoolId);
+  };
+
   const scheduleRegistrationCleanup = (source: string, requestId: string) => {
     setTimeout(async () => {
       await deleteDoc(doc(db, source, requestId)).catch((e) =>
@@ -1201,26 +1221,18 @@ export default function SuperAdminDashboard() {
     }
     const loadingToast = toast.loading("جاري تفعيل الحساب...");
     try {
+      const couponCode = extractRequestCouponCode(request);
+      if (couponCode) {
+        await adminValidateDistributorCoupon(couponCode);
+      }
+
       const result = await activateSubscriptionSchool(
         request as SchoolRegistrationRequest,
       );
       await syncAdminClaims(result.adminUid);
       scheduleRegistrationCleanup(result.source, request.id);
 
-      const couponCode = String(
-        request.couponCode ||
-          request.distributorCouponCode ||
-          request.customerInfo?.couponCode ||
-          "",
-      ).trim();
-      if (couponCode && request.schoolId) {
-        try {
-          await adminApplyDistributorCoupon(request.schoolId, couponCode);
-        } catch (couponErr) {
-          console.warn("Distributor coupon link failed", couponErr);
-          toast.error("تم التفعيل لكن فشل ربط كوبون الموزع");
-        }
-      }
+      await finalizeSchoolTrackingAfterActivation(request.schoolId, couponCode);
 
       toast.dismiss(loadingToast);
       toast.success("تم تفعيل حساب المدرسة بنجاح");
@@ -1284,6 +1296,11 @@ export default function SuperAdminDashboard() {
     );
 
     try {
+      const couponCode = extractRequestCouponCode(typedRequest);
+      if (couponCode) {
+        await adminValidateDistributorCoupon(couponCode);
+      }
+
       const existingSchool = email
         ? schools.find((s) => s.adminEmail?.toLowerCase() === email)
         : undefined;
@@ -1331,20 +1348,7 @@ export default function SuperAdminDashboard() {
       await syncAdminClaims(result.adminUid);
       scheduleRegistrationCleanup(result.source, request.id);
 
-      const couponCode = String(
-        typedRequest.couponCode ||
-          typedRequest.distributorCouponCode ||
-          typedRequest.customerInfo?.couponCode ||
-          "",
-      ).trim();
-      if (couponCode) {
-        try {
-          await adminApplyDistributorCoupon(result.schoolId, couponCode);
-        } catch (couponErr) {
-          console.warn("Distributor coupon link failed", couponErr);
-          toast.error("تم التفعيل لكن فشل ربط كوبون الموزع");
-        }
-      }
+      await finalizeSchoolTrackingAfterActivation(result.schoolId, couponCode);
 
       toast.dismiss(loadingToast);
       toast.success("تم تفعيل المدرسة وربط حساب المدير بنجاح");
@@ -2032,6 +2036,24 @@ export default function SuperAdminDashboard() {
                       >
                         الموزعون والكوبونات
                       </div>
+                    )}
+                  </button>
+                )}
+                {profile?.role === "superadmin" && (
+                  <button
+                    onClick={() => {
+                      navigateToTab("distributor_requests");
+                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                    }}
+                    title={isSidebarCollapsed ? "طلبات الموزعين" : undefined}
+                    className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "distributor_requests" ? "sx-nav-item--active" : ""}`}
+                  >
+                    <ClipboardList
+                      size={isSidebarCollapsed ? 24 : 20}
+                      className="shrink-0"
+                    />
+                    {!isSidebarCollapsed && (
+                      <span className="truncate">طلبات الموزعين</span>
                     )}
                   </button>
                 )}
@@ -3037,6 +3059,8 @@ export default function SuperAdminDashboard() {
                 </>
               ) : activeTab === "distributors" ? (
                 <DistributorsTab schools={schools} packages={packages} />
+              ) : activeTab === "distributor_requests" ? (
+                <DistributorRequestsTab />
               ) : activeTab === "chat" ? (
                 <SuperAdminChatTab />
               ) : activeTab === "requests" ? (
@@ -5948,6 +5972,7 @@ export default function SuperAdminDashboard() {
           profile?.role === "superadmin" && { id: "team", label: t('sidebar_team'), icon: ShieldCheck },
           hasPermission("manage_packages") && { id: "packages", label: t('sidebar_packages'), icon: Plus },
           profile?.role === "superadmin" && { id: "distributors", label: "الموزعون", icon: Tag },
+          profile?.role === "superadmin" && { id: "distributor_requests", label: "طلبات الموزعين", icon: ClipboardList },
           hasPermission("view_requests") && { id: "requests", label: t('sidebar_requests'), icon: Mail },
           hasPermission("manage_schools") && { id: "chat", label: t('sidebar_chat'), icon: MessageSquare },
           hasPermission("manage_users") && { id: "users", label: t('sidebar_users'), icon: Users },

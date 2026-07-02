@@ -44,6 +44,8 @@ const requiredRoutes = [
   '/api/admin/schools/:schoolId/permanent-delete',
   '/api/admin/distributors/generate-monthly-commissions',
   '/api/admin/distributors/commissions/:commissionId/mark-paid',
+  '/api/admin/distributors/approve',
+  '/api/public/distributors/register',
 ];
 for (const route of requiredRoutes) {
   if (!bundle.includes(route)) {

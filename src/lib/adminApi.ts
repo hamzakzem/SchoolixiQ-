@@ -289,3 +289,42 @@ export async function adminSetSchoolDistributorCommissionPaused(
   );
   return json;
 }
+
+export async function adminApproveDistributor(distributorId: string, password?: string) {
+  const json = await adminApiPost('/api/admin/distributors/approve', {
+    distributorId,
+    ...(password ? { password } : {}),
+  });
+  return json as {
+    ok?: boolean;
+    distributorId: string;
+    userId?: string | null;
+    userCreated?: boolean;
+    needsEmailForLogin?: boolean;
+    alreadyActive?: boolean;
+  };
+}
+
+export async function adminRejectDistributor(distributorId: string, reason?: string) {
+  const json = await adminApiPost('/api/admin/distributors/reject', {
+    distributorId,
+    ...(reason ? { reason } : {}),
+  });
+  return json;
+}
+
+export async function adminListPendingDistributors() {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('No auth token available');
+  const response = await fetch(getApiUrl('/api/admin/distributors/pending'), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'X-Authorization': `Bearer ${token}`,
+    },
+  });
+  const json = await response.json();
+  if (!response.ok) {
+    throw new Error(String(json.message || json.error || 'Failed to load pending distributors'));
+  }
+  return json as { items: Record<string, unknown>[] };
+}

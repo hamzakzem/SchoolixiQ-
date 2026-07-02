@@ -11,7 +11,7 @@ RUN npm ci
 COPY server.ts notificationPushDispatch.ts firebase-applet-config.json ./
 
 # Backend-local modules (delete helpers, role hierarchy)
-COPY backend/schoolPermanentDelete.mjs backend/userPermanentDelete.mjs backend/distributorCommissions.mjs backend/roleHierarchy.ts ./
+COPY backend/schoolPermanentDelete.mjs backend/userPermanentDelete.mjs backend/distributorCommissions.mjs backend/distributorApproval.mjs backend/roleHierarchy.ts ./
 
 RUN npm run build
 

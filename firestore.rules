@@ -424,6 +424,10 @@ service cloud.firestore {
         && (
           !resource.data.keys().hasAll(['isSuperAdmin'])
           || request.resource.data.isSuperAdmin == resource.data.isSuperAdmin
+        )
+        && (
+          !resource.data.keys().hasAll(['distributorId'])
+          || request.resource.data.distributorId == resource.data.distributorId
         );
     }
 
@@ -574,7 +578,7 @@ service cloud.firestore {
       allow create, update, delete: if isSuperAdmin();
     }
 
-    // Distributors & coupons — Super Admin only (financial commissions via backend).
+    // Distributors & coupons — Super Admin manages status/canLogin; distributors read own record only.
     match /distributors/{distributorId} {
       allow read, get: if isSuperAdmin()
         || (isDistributor() && userDistributorId() == distributorId);

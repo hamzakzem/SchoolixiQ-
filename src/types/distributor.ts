@@ -1,5 +1,8 @@
 export type DistributorCommissionStatus = 'pending' | 'earned' | 'paid' | 'canceled';
 
+export type DistributorApprovalStatus = 'pending' | 'active' | 'rejected';
+
+/** @deprecated use DistributorApprovalStatus for login gate; kept for commission lifecycle */
 export type DistributorStatus = 'active' | 'inactive' | 'suspended';
 
 export type DistributorRecord = {
@@ -7,16 +10,25 @@ export type DistributorRecord = {
   name: string;
   phone?: string;
   email?: string;
+  address?: string;
+  governorate?: string;
   commissionPercent: number;
   active?: boolean;
+  canLogin?: boolean;
   notes?: string;
-  governorate?: string;
   region?: string;
   distributorType?: string;
   parentDistributorId?: string;
   parentDistributorName?: string;
-  status?: DistributorStatus;
+  /** Login / approval gate */
+  status?: DistributorApprovalStatus | DistributorStatus;
   userId?: string;
+  source?: string;
+  approvedAt?: unknown;
+  approvedBy?: string;
+  rejectedAt?: unknown;
+  rejectedBy?: string;
+  rejectionReason?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
 };

@@ -18,6 +18,12 @@ import {
   setSchoolDistributorCommissionPaused,
 } from './distributorCommissions.mjs';
 import {
+  approveDistributor,
+  listPendingDistributors,
+  registerDistributorApplication,
+  rejectDistributor,
+} from './distributorApproval.mjs';
+import {
   canActorUseAdminApi,
   canActorCreateRole,
   canActorDeleteUser,
@@ -1294,6 +1300,102 @@ async function startServer() {
         ok: false,
         error: error.message || 'Internal Server Error',
         message: error.message || 'فشل الحذف النهائي للمدرسة',
+      });
+    }
+  });
+
+  // --- Distributor registration & approval ---
+  app.post('/api/public/distributors/register', async (req: any, res: any) => {
+    const body = req.body || {};
+    try {
+      const result = await registerDistributorApplication(getDb(), admin, {
+        name: body.name,
+        phone: body.phone,
+        address: body.address,
+        governorate: body.governorate,
+        email: body.email,
+      });
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      res.status(error.code === 'PHONE_ALREADY_REGISTERED' || error.code === 'EMAIL_ALREADY_REGISTERED' ? 409 : 400).json({
+        error: error.code || 'REGISTER_FAILED',
+        message: error.message || 'فشل تسجيل طلب الموزع',
+      });
+    }
+  });
+
+  app.get('/api/admin/distributors/pending', verifyAdmin, async (req: any, res: any) => {
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
+      }
+      const items = await listPendingDistributors(getDb());
+      res.json({ ok: true, items });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  app.post('/api/admin/distributors/approve', verifyAdmin, async (req: any, res: any) => {
+    const distributorId = String(req.body?.distributorId || '').trim();
+    const password = req.body?.password;
+
+    if (!distributorId) {
+      return res.status(400).json({ error: 'DISTRIBUTOR_ID_REQUIRED', message: 'distributorId مطلوب' });
+    }
+
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
+      }
+
+      const result = await approveDistributor({
+        db: getDb(),
+        authAdmin: admin.auth(),
+        adminSdk: admin,
+        distributorId,
+        actorUid: req.user.uid,
+        password,
+        syncClaims: syncUserClaims,
+      });
+
+      await logAudit(req, 'DISTRIBUTOR_APPROVE', { metadata: { distributorId, result } });
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      res.status(error.code === 'DISTRIBUTOR_NOT_FOUND' ? 404 : 400).json({
+        error: error.code || 'APPROVE_FAILED',
+        message: error.message || 'فشل قبول الموزع',
+      });
+    }
+  });
+
+  app.post('/api/admin/distributors/reject', verifyAdmin, async (req: any, res: any) => {
+    const distributorId = String(req.body?.distributorId || '').trim();
+    const reason = req.body?.reason;
+
+    if (!distributorId) {
+      return res.status(400).json({ error: 'DISTRIBUTOR_ID_REQUIRED', message: 'distributorId مطلوب' });
+    }
+
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
+      }
+
+      const result = await rejectDistributor({
+        db: getDb(),
+        adminSdk: admin,
+        distributorId,
+        actorUid: req.user.uid,
+        reason,
+      });
+
+      await logAudit(req, 'DISTRIBUTOR_REJECT', { metadata: { distributorId, result } });
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      res.status(error.code === 'DISTRIBUTOR_NOT_FOUND' ? 404 : 400).json({
+        error: error.code || 'REJECT_FAILED',
+        message: error.message || 'فشل رفض الموزع',
       });
     }
   });
