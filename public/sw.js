@@ -155,7 +155,7 @@ async function hashedBundleStrategy(request) {
   } catch {
     const cached = await caches.match(request);
     if (cached) return cached;
-    throw new Error('offline-missing-chunk');
+    return Response.error();
   }
 }
 
@@ -185,7 +185,10 @@ self.addEventListener('fetch', (event) => {
           await cachePut(RUNTIME_CACHE, event.request, networkResponse);
           return networkResponse;
         })
-        .catch(() => cachedResponse);
+        .catch(async () => {
+          if (cachedResponse) return cachedResponse;
+          return (await caches.match('/')) || (await caches.match('/index.html')) || Response.error();
+        });
 
       return cachedResponse || fetchPromise;
     }),

@@ -60,6 +60,7 @@ import {
   Package,
   X,
   ClipboardCheck,
+  ClipboardList,
   FileArchive,
   LayoutGrid,
   LayoutDashboard,
