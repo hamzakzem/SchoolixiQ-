@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { prefersReducedMotion } from '../../lib/motion';
+import { LandingHeroMockup } from './LandingHeroMockup';
 
 const TECH_ITEMS = [
   'إدارة الطلاب والملفات',
@@ -34,10 +35,6 @@ export function LandingTechSection() {
             [400, 80],
             [220, 200],
             [400, 320],
-            [520, 120],
-            [280, 120],
-            [280, 280],
-            [520, 280],
           ].map(([cx, cy], i) => (
             <circle key={i} cx={cx} cy={cy} r="4" fill="#d4af37" opacity="0.6">
               {!reduced && (
@@ -54,22 +51,26 @@ export function LandingTechSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-48px' }}
           transition={{ duration: 0.45 }}
-          className="grid lg:grid-cols-2 gap-12 items-center"
+          className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center"
         >
-          <div>
+          <div className="order-2 lg:order-1 relative">
+            <div className="landing-mockup-glow" />
+            <LandingHeroMockup compact />
+          </div>
+          <div className="order-1 lg:order-2">
             <p className="lp-eyebrow">التقنية</p>
-            <h2 id="landing-tech-heading" className="lp-section-title">
+            <h2 id="landing-tech-heading" className="lp-section-title lp-title-gold">
               نظام متكامل لإدارة مدرستك
             </h2>
             <p className="lp-section-subtitle">
               بنية حديثة وآمنة تربط كل أقسام المدرسة في منصة واحدة — بدون تعقيد.
             </p>
+            <ul className="landing-tech-list mt-8 grid sm:grid-cols-2 gap-x-4">
+              {TECH_ITEMS.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </div>
-          <ul className="landing-tech-list lp-card p-6 sm:p-8 grid sm:grid-cols-2 gap-x-4">
-            {TECH_ITEMS.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
         </motion.div>
       </div>
     </section>

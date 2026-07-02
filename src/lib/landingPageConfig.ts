@@ -58,6 +58,10 @@ export type LandingPageConfig = {
   featureStrip?: LandingFeatureCard[];
   showExplainerSections?: boolean;
   showTechSection?: boolean;
+  showDistributorSection?: boolean;
+  distributorTitle?: string;
+  distributorSubtitle?: string;
+  distributorFeatures?: string[];
   finalCtaTitle?: string;
   finalCtaSubtitle?: string;
   updatedAt?: unknown;
@@ -163,6 +167,16 @@ export const DEFAULT_LANDING_PAGE_CONFIG: LandingPageConfig = {
   featureStrip: DEFAULT_FEATURE_STRIP,
   showExplainerSections: true,
   showTechSection: true,
+  showDistributorSection: true,
+  distributorTitle: 'برنامج الموزعين',
+  distributorSubtitle:
+    'انضم كشريك توزيع لـ SchoolixIQ — سجّل مدارس جديدة، استخدم الكوبونات، وتابع عمولاتك الشهرية من لوحة مخصصة.',
+  distributorFeatures: [
+    'كوبونات تسويقية لربط المدارس بالمنصة',
+    'عمولات شهرية شفافة على الاشتراكات',
+    'متابعة أداء المدارس المرتبطة من لوحة الموزع',
+    'دعم مخصص وموافقة إدارية قبل تفعيل الحساب',
+  ],
   finalCtaTitle: 'جاهز لإدارة مدرستك بذكاء؟',
   finalCtaSubtitle: 'تجربة موحّدة للإدارة والمعلمين وأولياء الأمور — ابدأ اليوم.',
 };
@@ -225,6 +239,10 @@ function mergeLandingConfig(data: Record<string, unknown> | undefined): LandingP
       Array.isArray(data.featureStrip) && data.featureStrip.length
         ? (data.featureStrip as LandingFeatureCard[])
         : DEFAULT_LANDING_PAGE_CONFIG.featureStrip,
+    distributorFeatures:
+      Array.isArray(data.distributorFeatures) && data.distributorFeatures.length
+        ? (data.distributorFeatures as string[])
+        : DEFAULT_LANDING_PAGE_CONFIG.distributorFeatures,
   };
 }
 

@@ -117,6 +117,7 @@ export default function LandingPageSettings() {
               ['showPartners', 'عرض الشركاء في التذييل'],
               ['showExplainerSections', 'عرض أقسام الشرح'],
               ['showTechSection', 'عرض قسم التقنية'],
+              ['showDistributorSection', 'عرض قسم الموزعين'],
             ] as const
           ).map(([key, label]) => (
             <label key={key} className="flex items-center gap-3 cursor-pointer font-bold text-sm">
@@ -231,6 +232,66 @@ export default function LandingPageSettings() {
             </button>
           </div>
         ))}
+      </section>
+
+      <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+        <h3 className="font-black text-lg">قسم الموزعين</h3>
+        {(
+          [
+            ['distributorTitle', 'عنوان قسم الموزعين'],
+            ['distributorSubtitle', 'وصف قسم الموزعين'],
+          ] as const
+        ).map(([key, label]) => (
+          <div key={key}>
+            <label className="block text-sm font-bold mb-1">{label}</label>
+            <textarea
+              value={config[key] || ''}
+              onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
+              rows={key === 'distributorSubtitle' ? 3 : 2}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3"
+            />
+          </div>
+        ))}
+        <div className="space-y-2">
+          <label className="block text-sm font-bold">مزايا الموزعين (سطر لكل ميزة)</label>
+          {(config.distributorFeatures || []).map((item, index) => (
+            <div key={`dist-f-${index}`} className="flex gap-2">
+              <input
+                value={item}
+                onChange={(e) => {
+                  const list = [...(config.distributorFeatures || [])];
+                  list[index] = e.target.value;
+                  setConfig({ ...config, distributorFeatures: list });
+                }}
+                className="flex-1 rounded-lg border px-3 py-2"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setConfig({
+                    ...config,
+                    distributorFeatures: (config.distributorFeatures || []).filter((_, i) => i !== index),
+                  })
+                }
+                className="text-red-500 text-sm font-bold px-2"
+              >
+                حذف
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setConfig({
+                ...config,
+                distributorFeatures: [...(config.distributorFeatures || []), ''],
+              })
+            }
+            className="text-blue-600 font-bold text-sm"
+          >
+            + ميزة
+          </button>
+        </div>
       </section>
 
       {/* Problem / Solution lists */}

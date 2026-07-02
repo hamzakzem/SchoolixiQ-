@@ -171,7 +171,7 @@ export default function Login() {
     searchParams.get("mode") === "signup" ? "signup" : "login",
   );
   const [authPanel, setAuthPanel] = useState<"account" | "distributor" | "distributor_success">(
-    "account",
+    searchParams.get("panel") === "distributor" ? "distributor" : "account",
   );
   const [distributorForm, setDistributorForm] = useState({
     name: "",

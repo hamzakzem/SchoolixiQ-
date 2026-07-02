@@ -242,6 +242,17 @@
   font-weight: 900;
   line-height: 1.12;
   letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #f2c866 0%, #d4af37 45%, #f2c866 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing-page .lp-title-gold {
+  background: linear-gradient(135deg, #f2c866 0%, #d4af37 55%, #f2c866 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .landing-hero__subtitle {
@@ -420,35 +431,90 @@
   flex-shrink: 0;
 }
 
-/* Partners scroll row */
-.landing-partners-scroll {
+/* Partners carousel — single row like reference */
+.landing-partners-section {
+  padding-block: var(--lp-section-py);
+  background: var(--lp-navy-deep);
+  border-block: 1px solid var(--lp-border-gold);
+}
+
+.landing-partners-carousel-wrap {
+  overflow: hidden;
+  mask-image: linear-gradient(to left, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(to left, transparent, black 8%, black 92%, transparent);
+}
+
+.landing-partners-carousel-track {
   display: flex;
   gap: 1rem;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 0.5rem;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: var(--lp-gold) var(--lp-navy-card);
+  width: max-content;
 }
 
-.landing-partners-scroll::-webkit-scrollbar {
-  height: 4px;
+.landing-partners-carousel-track--animate {
+  animation: lp-partners-scroll 40s linear infinite;
 }
 
-.landing-partner-chip {
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-  min-width: 10rem;
-  padding: 1.25rem;
+@media (prefers-reduced-motion: reduce) {
+  .landing-partners-carousel-track--animate {
+    animation: none;
+    overflow-x: auto;
+    max-width: 100%;
+    padding-bottom: 0.5rem;
+  }
+}
+
+@keyframes lp-partners-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+[dir="rtl"] .landing-partners-carousel-track--animate {
+  animation-direction: reverse;
+}
+
+.landing-partner-carousel-card {
+  width: 11rem;
+  padding: 1.25rem 1rem;
   text-align: center;
+  background: var(--lp-navy-card);
+  border: 1px solid var(--lp-border-gold);
+  border-radius: 1rem;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.landing-partner-carousel-card:hover {
+  border-color: rgba(212, 175, 55, 0.5);
+  transform: translateY(-3px);
+}
+
+.landing-partner-carousel-card__logo {
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-inline: auto;
+  margin-bottom: 0.75rem;
+  border-radius: 50%;
+  border: 1px solid var(--lp-border-gold);
+  background: var(--lp-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.landing-partner-carousel-card__name {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--lp-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* WhatsApp FAB */
 .landing-whatsapp-fab {
   position: fixed;
   bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
-  left: max(1.25rem, env(safe-area-inset-left, 0px));
+  right: max(1.25rem, env(safe-area-inset-right, 0px));
   z-index: 45;
   width: 3.25rem;
   height: 3.25rem;
@@ -483,7 +549,7 @@
 
 .landing-whatsapp-fab__tooltip {
   position: absolute;
-  left: calc(100% + 0.75rem);
+  right: calc(100% + 0.75rem);
   top: 50%;
   transform: translateY(-50%);
   padding: 0.5rem 0.875rem;

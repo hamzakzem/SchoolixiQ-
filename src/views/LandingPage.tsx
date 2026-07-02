@@ -13,6 +13,8 @@ import {
   GraduationCap,
   LayoutDashboard,
   Lock,
+  Play,
+  Rocket,
   Shield,
   Smartphone,
   Sparkles,
@@ -38,6 +40,8 @@ import SchoolixLogo from '../components/SchoolixLogo';
 import { LandingNavbar } from '../components/landing/LandingNavbar';
 import { LandingWhatsAppFab } from '../components/landing/LandingWhatsAppFab';
 import { LandingTechSection } from '../components/landing/LandingTechSection';
+import { LandingHeroMockup } from '../components/landing/LandingHeroMockup';
+import { LandingDistributorSection } from '../components/landing/LandingDistributorSection';
 import {
   LandingPartnersSection,
   useLandingPartners,
@@ -196,143 +200,63 @@ function SectionHeader({
   title,
   subtitle,
   align = 'center',
+  goldTitle = false,
 }: {
   eyebrow: string;
   title: string;
   subtitle?: string;
   align?: 'center' | 'start';
   light?: boolean;
+  goldTitle?: boolean;
 }) {
   return (
     <div className={`mb-12 lg:mb-16 max-w-2xl ${align === 'center' ? 'mx-auto text-center' : 'text-right'}`}>
       <Eyebrow>{eyebrow}</Eyebrow>
-      <h2 className="lp-section-title">{title}</h2>
+      <h2 className={`lp-section-title ${goldTitle ? 'lp-title-gold' : ''}`}>{title}</h2>
       {subtitle && <p className="lp-section-subtitle">{subtitle}</p>}
     </div>
   );
 }
 
-function HeroVisualStack() {
-  const reduced = prefersReducedMotion();
-  return (
-    <div className="relative w-full max-w-[520px] mx-auto lg:mx-0 lg:mr-auto">
-      <div
-        className="absolute -top-8 -left-8 w-48 h-48 rounded-full opacity-40 blur-3xl pointer-events-none"
-        style={{ background: `radial-gradient(circle, ${GOLD}40, transparent)` }}
-      />
-      <div
-        className="absolute -bottom-6 -right-6 w-56 h-56 rounded-full opacity-30 blur-3xl pointer-events-none"
-        style={{ background: `radial-gradient(circle, ${NAVY}50, transparent)` }}
-      />
-
-      <motion.div
-        initial={reduced ? {} : { opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: MOTION_EASE }}
-        className="landing-mockup-laptop relative z-10 landing-fade-up"
-      >
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[rgba(212,175,55,0.2)] bg-[#081f3d]">
-          <span className="w-2 h-2 rounded-full bg-red-400/70" />
-          <span className="w-2 h-2 rounded-full bg-amber-400/70" />
-          <span className="w-2 h-2 rounded-full bg-emerald-400/70" />
-          <span className="mr-auto text-[9px] font-mono text-[#94a3b8]">admin.schoolixiq.com</span>
-        </div>
-        <div className="flex min-h-[280px] sm:min-h-[320px]">
-          <div className="w-14 shrink-0 bg-[#06182f] flex flex-col items-center py-5 gap-3 border-l border-[rgba(212,175,55,0.12)]">
-            {[LayoutDashboard, Users, Wallet, Bell, BarChart3].map((Icon, i) => (
-              <div
-                key={i}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center ${i === 0 ? 'bg-[#D4AF37]/20 text-[#D4AF37]' : 'text-white/35'}`}
-              >
-                <Icon size={16} strokeWidth={1.5} />
-              </div>
-            ))}
-          </div>
-          <div className="flex-1 p-4 sm:p-5 bg-[#0b2345]">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#94a3b8]">لوحة المدرسة</p>
-            <p className="text-lg font-black text-white mt-0.5">ملخص اليوم</p>
-            <div className="grid grid-cols-3 gap-2 mt-4 mb-4">
-              {[
-                { l: 'حضور', icon: UserCheck },
-                { l: 'أقساط', icon: Wallet },
-                { l: 'تبليغات', icon: Bell },
-              ].map(({ l, icon: Icon }) => (
-                <div
-                  key={l}
-                  className="rounded-xl border border-[rgba(212,175,55,0.2)] p-2.5 bg-[#081f3d]"
-                >
-                  <Icon size={14} className="text-[#d4af37] mb-1" />
-                  <p className="text-[9px] font-bold text-[#cbd5e1]">{l}</p>
-                </div>
-              ))}
-            </div>
-            <div className="rounded-xl border border-[rgba(212,175,55,0.2)] overflow-hidden">
-              <div className="px-3 py-2 text-[9px] font-bold text-[#94a3b8] bg-[#081f3d]">
-                آخر النشاطات
-              </div>
-              {['تسجيل حضور — الصف الخامس', 'تذكير أقساط — ولي أمر', 'طلب تسريح — البوابة'].map((row) => (
-                <div
-                  key={row}
-                  className="flex items-center gap-2 px-3 py-2.5 border-b last:border-0 border-[rgba(212,175,55,0.1)] text-[10px] font-medium text-[#cbd5e1]"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] shrink-0" />
-                  <span className="truncate">{row}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 h-12 rounded-lg border border-[rgba(212,175,55,0.15)] bg-[#081f3d] flex items-end gap-1 px-2 pb-2">
-              {[40, 65, 45, 80, 55, 70].map((h, i) => (
-                <div key={i} className="flex-1 rounded-sm bg-[#d4af37]/60" style={{ height: `${h}%` }} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={reduced ? {} : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="landing-mockup-phone"
-      >
-        <div className="rounded-[1.75rem] p-[3px] bg-[#081f3d] border border-[rgba(212,175,55,0.3)] shadow-2xl">
-          <div className="rounded-[1.6rem] overflow-hidden bg-[#06182f]">
-            <div className="h-4 flex justify-center items-end">
-              <div className="w-10 h-1 rounded-full bg-black/50" />
-            </div>
-            <div className="bg-[#0b2345] px-2.5 pb-3 pt-1 space-y-1.5">
-              <p className="text-[8px] font-black text-white px-1">ولي الأمر</p>
-              {['حضور', 'واجب', 'قسط'].map((t) => (
-                <div
-                  key={t}
-                  className="text-[8px] font-bold py-1.5 px-2 rounded-lg bg-[#081f3d] border border-[rgba(212,175,55,0.2)] text-[#cbd5e1]"
-                >
-                  {t}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
+function HeroTitle({ text }: { text: string }) {
+  if (text.includes('\n')) {
+    return (
+      <>
+        {text.split('\n').map((line, i) => (
+          <span key={i} className="block">
+            {line}
+          </span>
+        ))}
+      </>
+    );
+  }
+  const splitIdx = text.indexOf(' لمستقبل');
+  if (splitIdx > 0) {
+    return (
+      <>
+        <span className="block">{text.slice(0, splitIdx)}</span>
+        <span className="block">{text.slice(splitIdx + 1)}</span>
+      </>
+    );
+  }
+  return <>{text}</>;
 }
 
 function PhoneMockup() {
   return (
     <div className="relative mx-auto w-[260px] sm:w-[280px]">
-      <div className="absolute inset-x-6 -bottom-4 h-10 bg-[#0B2345]/10 blur-2xl rounded-full pointer-events-none" />
-      <div className="relative rounded-[2.25rem] p-[4px] bg-gradient-to-b from-slate-600 to-slate-900 shadow-xl">
-        <div className="rounded-[2rem] overflow-hidden bg-[#07172E]">
+      <div className="absolute inset-x-6 -bottom-4 h-10 bg-[#d4af37]/10 blur-2xl rounded-full pointer-events-none" />
+      <div className="relative rounded-[2.25rem] p-[4px] bg-[#081f3d] border border-[rgba(212,175,55,0.3)] shadow-xl">
+        <div className="rounded-[2rem] overflow-hidden bg-[#06182f]">
           <div className="h-7 flex items-center justify-center">
-            <div className="w-16 h-4 rounded-full bg-black/40" />
+            <div className="w-16 h-4 rounded-full bg-black/50" />
           </div>
-          <div className="bg-[#F7F8FA] dark:bg-[#0a1525] min-h-[340px] px-4 pb-6 pt-2">
+          <div className="bg-[#0b2345] min-h-[340px] px-4 pb-6 pt-2">
             <div className="flex items-center gap-2 mb-6 pt-1">
               <SchoolixLogo size={32} />
               <div>
-                <p className="text-sm font-black text-[#0B2345] dark:text-white">SchoolixIQ</p>
-                <p className="text-[10px] text-slate-500 font-semibold">بوابة ولي الأمر</p>
+                <p className="text-sm font-black text-white">SchoolixIQ</p>
+                <p className="text-[10px] text-[#94a3b8] font-semibold">بوابة ولي الأمر</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -341,8 +265,8 @@ function PhoneMockup() {
                   key={item}
                   className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-[12px] font-bold ${
                     i === 0
-                      ? 'bg-[#0B2345] text-white'
-                      : 'bg-white dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/[0.08] text-[#0B2345] dark:text-slate-200'
+                      ? 'bg-[#081f3d] border border-[rgba(212,175,55,0.35)] text-[#f2c866]'
+                      : 'bg-[#06182f] border border-[rgba(212,175,55,0.15)] text-[#cbd5e1]'
                   }`}
                 >
                   <span>{item}</span>
@@ -417,9 +341,10 @@ export default function LandingPage() {
   }, [config.featureCards]);
 
   const showTestimonials = config.showTestimonials && config.testimonials.length > 0;
-  /** Super Admin footer partners always show when configured; landing toggle is an extra gate only when empty. */
   const showPartnerSections =
     hasConfiguredFooterPartners(systemConfig) || config.showPartners !== false;
+  /** Partners render once in page section — footer partners hidden on landing */
+  const showFooterPartners = false;
   const popularIndex = pricingPlans.findIndex((p: any) => p.isPopular);
 
   if (loading) {
@@ -436,7 +361,6 @@ export default function LandingPage() {
         appName={systemConfig.appName}
         links={navLinks}
         loginLabel={config.secondaryCtaLabel || 'تسجيل الدخول'}
-        primaryLabel={config.primaryCtaLabel || 'ابدأ الآن مجاناً'}
         demoLabel={config.demoCtaLabel || 'احجز عرضاً مجانياً'}
       />
 
@@ -445,26 +369,30 @@ export default function LandingPage() {
         <div className="landing-hero__glow" />
         <div className="lp-container relative">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div className="max-w-xl order-1">
+            <div className="max-w-xl">
               {config.heroBadgeText && (
                 <div className="landing-hero__badge">
                   <Sparkles size={12} style={{ color: GOLD }} />
                   {config.heroBadgeText}
                 </div>
               )}
-              <h1 className="landing-hero__title text-white">{config.heroTitle}</h1>
+              <h1 className="landing-hero__title">
+                <HeroTitle text={config.heroTitle} />
+              </h1>
               <p className="landing-hero__subtitle">{config.heroSubtitle}</p>
 
               <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-3">
                 <Link to="/login?mode=signup" className="lp-btn-gold">
+                  <Rocket size={16} />
                   {config.primaryCtaLabel || 'ابدأ الآن مجاناً'}
                 </Link>
                 <a href="#features" className="lp-btn-outline">
+                  <Play size={14} className="fill-current opacity-80" />
                   {config.exploreCtaLabel || 'استكشف المميزات'}
                 </a>
               </div>
             </div>
-            <div className="order-2 lg:pt-2 pb-8 lg:pb-0 relative">
+            <div className="relative pb-8 lg:pb-0">
               <div className="landing-mockup-glow" />
               {config.heroImageUrl ? (
                 <img
@@ -474,7 +402,7 @@ export default function LandingPage() {
                   loading="lazy"
                 />
               ) : (
-                <HeroVisualStack />
+                <LandingHeroMockup />
               )}
             </div>
           </div>
@@ -509,6 +437,89 @@ export default function LandingPage() {
           </div>
         </SectionShell>
       )}
+
+      {config.showPricing && (
+        <SectionShell id="pricing" className={SECTION_PY}>
+          <div className="lp-container">
+            <SectionHeader
+              eyebrow="الأسعار"
+              goldTitle
+              title={config.pricingTitle || 'اختر الباقة المناسبة لمدرستك'}
+              subtitle={config.pricingSubtitle || 'جميع الباقات تشمل التحديثات والدعم الفني'}
+            />
+            <div className="grid md:grid-cols-3 gap-6 lg:gap-8 items-end max-w-5xl mx-auto">
+              {pricingPlans.map((pkg: any, index: number) => {
+                const popular = pkg.isPopular;
+                const topFeatures = getPackageMarketingFeatures(pkg.permissions as PackagePermissions);
+                const displayFeatures =
+                  topFeatures.length > 0 ? topFeatures : (Array.isArray(pkg.features) ? pkg.features : []).slice(0, 5);
+                const maxLabel = pkg.maxStudents > 0 ? `حتى ${pkg.maxStudents.toLocaleString('ar-IQ')} طالب` : 'طلاب غير محدود';
+                const isCenter = popular || (popularIndex === -1 && index === 1);
+
+                return (
+                  <motion.div
+                    key={pkg.id}
+                    initial={reduced ? {} : { opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.08, duration: 0.4 }}
+                    className={`landing-pricing-card flex flex-col ${
+                      isCenter
+                        ? 'landing-pricing-card--featured md:-mt-4 md:scale-[1.03] z-10 text-white'
+                        : 'lp-card text-white'
+                    }`}
+                  >
+                    {isCenter && (
+                      <span className="landing-pricing-badge">
+                        <Star size={10} className="inline ml-1" />
+                        {popular ? 'الأكثر اختياراً' : 'موصى به'}
+                      </span>
+                    )}
+                    <h3 className="text-lg font-black">{pkg.name}</h3>
+                    <p className="text-sm mt-1 mb-6 text-[#94a3b8]">{maxLabel}</p>
+                    <p className="text-[2rem] font-black tabular-nums leading-none text-[#f2c866]">{formatIqdPrice(pkg.priceMonthly)}</p>
+                    <p className="text-xs font-semibold mt-2 mb-8 text-[#94a3b8]">
+                      شهرياً
+                      {pkg.priceYearly > 0 && <span className="block mt-1">أو {formatIqdPrice(pkg.priceYearly)} / سنة</span>}
+                    </p>
+                    <ul className="space-y-3 mb-10 flex-1 text-sm text-[#cbd5e1]">
+                      {displayFeatures.map((f: string) => (
+                        <li key={f} className="flex items-start gap-2.5 leading-relaxed">
+                          <Check size={14} className="shrink-0 mt-1 text-[#d4af37]" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      to="/login?mode=signup"
+                      className={isCenter ? 'lp-btn-gold w-full text-center' : 'lp-btn-outline w-full text-center'}
+                    >
+                      ابدأ الآن
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </SectionShell>
+      )}
+
+      <LandingPartnersSection
+        successPartners={successPartners}
+        ourPartners={ourPartners}
+        title={config.partnersTitle || 'شركاؤنا في النجاح'}
+        subtitle={config.partnersSubtitle || 'مؤسسات ومدارس تثق بمنصة SchoolixIQ'}
+        showPartners={showPartnerSections}
+      />
+
+      {config.showTechSection !== false && <LandingTechSection />}
+
+      <LandingDistributorSection
+        show={config.showDistributorSection !== false}
+        title={config.distributorTitle}
+        subtitle={config.distributorSubtitle}
+        features={config.distributorFeatures}
+      />
 
       {/* Features grid */}
       <SectionShell id="features" className={SECTION_PY}>
@@ -692,83 +703,6 @@ export default function LandingPage() {
         </div>
       </SectionShell>
 
-      {/* Tech motion section */}
-      {config.showTechSection !== false && <LandingTechSection />}
-
-      {/* Pricing */}
-      {config.showPricing && (
-        <SectionShell id="pricing" className={SECTION_PY}>
-          <div className="lp-container">
-            <SectionHeader
-              eyebrow="الأسعار"
-              title={config.pricingTitle || 'اختر الباقة المناسبة لمدرستك'}
-              subtitle={config.pricingSubtitle || 'جميع الباقات تشمل التحديثات والدعم الفني'}
-            />
-            <div className="grid md:grid-cols-3 gap-6 lg:gap-8 items-end max-w-5xl mx-auto">
-              {pricingPlans.map((pkg: any, index: number) => {
-                const popular = pkg.isPopular;
-                const topFeatures = getPackageMarketingFeatures(pkg.permissions as PackagePermissions);
-                const displayFeatures =
-                  topFeatures.length > 0 ? topFeatures : (Array.isArray(pkg.features) ? pkg.features : []).slice(0, 5);
-                const maxLabel = pkg.maxStudents > 0 ? `حتى ${pkg.maxStudents.toLocaleString('ar-IQ')} طالب` : 'طلاب غير محدود';
-                const isCenter = popular || (popularIndex === -1 && index === 1);
-
-                return (
-                  <motion.div
-                    key={pkg.id}
-                    initial={reduced ? {} : { opacity: 0, y: 12 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.08, duration: 0.4 }}
-                    className={`landing-pricing-card flex flex-col ${
-                      isCenter
-                        ? 'landing-pricing-card--featured md:-mt-4 md:scale-[1.03] z-10 text-white'
-                        : 'lp-card text-white'
-                    }`}
-                  >
-                    {isCenter && (
-                      <span className="landing-pricing-badge">
-                        {popular ? 'الأكثر اختياراً' : 'موصى به'}
-                      </span>
-                    )}
-                    <h3 className="text-lg font-black">{pkg.name}</h3>
-                    <p className={`text-sm mt-1 mb-6 ${isCenter ? 'text-[#94a3b8]' : 'text-[#94a3b8]'}`}>{maxLabel}</p>
-                    <p className="text-[2rem] font-black tabular-nums leading-none text-[#f2c866]">{formatIqdPrice(pkg.priceMonthly)}</p>
-                    <p className="text-xs font-semibold mt-2 mb-8 text-[#94a3b8]">
-                      شهرياً
-                      {pkg.priceYearly > 0 && <span className="block mt-1">أو {formatIqdPrice(pkg.priceYearly)} / سنة</span>}
-                    </p>
-                    <ul className="space-y-3 mb-10 flex-1 text-sm text-[#cbd5e1]">
-                      {displayFeatures.map((f: string) => (
-                        <li key={f} className="flex items-start gap-2.5 leading-relaxed">
-                          <Check size={14} className="shrink-0 mt-1 text-[#d4af37]" />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                    <Link
-                      to="/login?mode=signup"
-                      className={isCenter ? 'lp-btn-gold w-full text-center' : 'lp-btn-outline w-full text-center'}
-                    >
-                      ابدأ الآن
-                    </Link>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        </SectionShell>
-      )}
-
-      {/* Partners */}
-      <LandingPartnersSection
-        successPartners={successPartners}
-        ourPartners={ourPartners}
-        title={config.partnersTitle || 'شركاؤنا في النجاح'}
-        subtitle={config.partnersSubtitle || 'مؤسسات ومدارس تثق بمنصة SchoolixIQ'}
-        showPartners={showPartnerSections}
-      />
-
       {/* Testimonials — real config only */}
       {showTestimonials && (
         <SectionShell className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)] bg-[#081f3d]`}>
@@ -881,7 +815,7 @@ export default function LandingPage() {
             {config.footerMarketingText}
           </div>
         )}
-        <GlobalFooter compact={false} showPartnerSections={showPartnerSections} />
+        <GlobalFooter compact={false} showPartnerSections={showFooterPartners} />
       </footer>
     </div>
   );

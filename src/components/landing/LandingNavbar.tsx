@@ -11,13 +11,11 @@ export function LandingNavbar({
   appName,
   links,
   loginLabel,
-  primaryLabel,
   demoLabel,
 }: {
   appName: string;
   links: NavLink[];
   loginLabel: string;
-  primaryLabel: string;
   demoLabel: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -42,18 +40,15 @@ export function LandingNavbar({
         </nav>
 
         <div className="landing-navbar__actions">
+          <a href={resolveDemoHref(links)} className="hidden md:inline-flex lp-btn-outline !py-2 !px-4 !text-[12px]">
+            {demoLabel}
+          </a>
           <Link
             to="/login"
-            className="hidden sm:inline-flex items-center gap-1 px-3 py-2 text-[12px] sm:text-[13px] font-bold text-[#cbd5e1] hover:text-[#f2c866] transition-colors"
+            className="hidden sm:inline-flex lp-btn-gold !py-2 !px-4 !text-[12px]"
           >
             <LogIn size={14} />
             {loginLabel}
-          </Link>
-          <a href={resolveDemoHref(links)} className="hidden md:inline-flex lp-btn-gold !py-2 !px-4 !text-[12px]">
-            {demoLabel}
-          </a>
-          <Link to="/login?mode=signup" className="lp-btn-gold !py-2 !px-3 sm:!px-4 !text-[12px] sm:!text-[13px]">
-            {primaryLabel}
           </Link>
           <button
             type="button"
@@ -100,14 +95,11 @@ export function LandingNavbar({
                 </a>
               ))}
               <div className="mt-auto pt-4 flex flex-col gap-2 border-t border-[rgba(212,175,55,0.28)]">
-                <Link to="/login" onClick={close} className="lp-btn-outline w-full">
-                  {loginLabel}
-                </Link>
                 <a href={resolveDemoHref(links)} onClick={close} className="lp-btn-outline w-full">
                   {demoLabel}
                 </a>
-                <Link to="/login?mode=signup" onClick={close} className="lp-btn-gold w-full">
-                  {primaryLabel}
+                <Link to="/login" onClick={close} className="lp-btn-gold w-full">
+                  {loginLabel}
                 </Link>
               </div>
             </motion.nav>
