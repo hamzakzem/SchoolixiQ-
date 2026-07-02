@@ -55,3 +55,9 @@ export {
   type SchoolRegistrationRequest,
   type ActivationResult,
 } from './schoolActivation';
+
+export {
+  resolveDistributorApprovalStatus,
+  canDistributorAccessDashboard,
+  type DistributorAccessState,
+} from './distributorAccess';
