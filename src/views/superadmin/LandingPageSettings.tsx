@@ -115,6 +115,8 @@ export default function LandingPageSettings() {
               ['showFaq', 'عرض الأسئلة الشائعة'],
               ['showAppDownload', 'عرض قسم تحميل التطبيق'],
               ['showPartners', 'عرض الشركاء في التذييل'],
+              ['showExplainerSections', 'عرض أقسام الشرح'],
+              ['showTechSection', 'عرض قسم التقنية'],
             ] as const
           ).map(([key, label]) => (
             <label key={key} className="flex items-center gap-3 cursor-pointer font-bold text-sm">
@@ -140,6 +142,15 @@ export default function LandingPageSettings() {
             ['heroBadgeText', 'نص الشارة'],
             ['primaryCtaLabel', 'زر البدء'],
             ['secondaryCtaLabel', 'زر تسجيل الدخول'],
+            ['exploreCtaLabel', 'زر استكشف المميزات'],
+            ['demoCtaLabel', 'زر احجز عرضاً مجانياً'],
+            ['whatsappNumber', 'رقم واتساب'],
+            ['pricingTitle', 'عنوان قسم الباقات'],
+            ['pricingSubtitle', 'وصف قسم الباقات'],
+            ['partnersTitle', 'عنوان قسم الشركاء'],
+            ['partnersSubtitle', 'وصف قسم الشركاء'],
+            ['finalCtaTitle', 'عنوان الدعوة النهائية'],
+            ['finalCtaSubtitle', 'وصف الدعوة النهائية'],
             ['heroImageUrl', 'رابط صورة البطل (اختياري)'],
             ['footerMarketingText', 'نص تسويقي في التذييل'],
           ] as const
@@ -160,6 +171,64 @@ export default function LandingPageSettings() {
                 className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3 font-medium"
               />
             )}
+          </div>
+        ))}
+      </section>
+
+      {/* Feature strip */}
+      <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="font-black text-lg">شريط المميزات (5 عناصر)</h3>
+          <button
+            type="button"
+            onClick={() =>
+              setConfig({
+                ...config,
+                featureStrip: [
+                  ...(config.featureStrip || []),
+                  { id: uid(), title: '', description: '' },
+                ],
+              })
+            }
+            className="text-blue-600 font-bold text-sm flex items-center gap-1"
+          >
+            <Plus size={16} /> عنصر
+          </button>
+        </div>
+        {(config.featureStrip || []).map((card, index) => (
+          <div key={card.id} className="grid sm:grid-cols-3 gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+            <input
+              placeholder="العنوان"
+              value={card.title}
+              onChange={(e) => {
+                const cards = [...(config.featureStrip || [])];
+                cards[index] = { ...card, title: e.target.value };
+                setConfig({ ...config, featureStrip: cards });
+              }}
+              className="rounded-lg border px-3 py-2"
+            />
+            <input
+              placeholder="الوصف"
+              value={card.description}
+              onChange={(e) => {
+                const cards = [...(config.featureStrip || [])];
+                cards[index] = { ...card, description: e.target.value };
+                setConfig({ ...config, featureStrip: cards });
+              }}
+              className="sm:col-span-2 rounded-lg border px-3 py-2"
+            />
+            <button
+              type="button"
+              onClick={() =>
+                setConfig({
+                  ...config,
+                  featureStrip: (config.featureStrip || []).filter((_, i) => i !== index),
+                })
+              }
+              className="text-red-500 text-sm font-bold"
+            >
+              حذف
+            </button>
           </div>
         ))}
       </section>

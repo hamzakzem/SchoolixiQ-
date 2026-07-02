@@ -3,6 +3,7 @@
 @import "./styles/design-tokens.css";
 @import "./styles/design-system.css";
 @import "./styles/superadmin-schools-grid.css";
+@import "./styles/landing-page.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 

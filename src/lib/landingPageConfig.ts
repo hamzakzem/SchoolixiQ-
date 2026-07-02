@@ -47,6 +47,19 @@ export type LandingPageConfig = {
   showAppDownload: boolean;
   showPartners: boolean;
   footerMarketingText: string;
+  /** Optional WhatsApp CTA — digits only or with country code */
+  whatsappNumber?: string;
+  exploreCtaLabel?: string;
+  demoCtaLabel?: string;
+  pricingTitle?: string;
+  pricingSubtitle?: string;
+  partnersTitle?: string;
+  partnersSubtitle?: string;
+  featureStrip?: LandingFeatureCard[];
+  showExplainerSections?: boolean;
+  showTechSection?: boolean;
+  finalCtaTitle?: string;
+  finalCtaSubtitle?: string;
   updatedAt?: unknown;
 };
 
@@ -95,15 +108,25 @@ export const DEFAULT_LANDING_FAQ: LandingFaqItem[] = [
   },
 ];
 
+export const DEFAULT_FEATURE_STRIP: LandingFeatureCard[] = [
+  { id: 'reports', title: 'تقارير ذكية', description: 'لوحات لحظية تدعم قرارات الإدارة المالية والتعليمية.' },
+  { id: 'comms', title: 'تواصل فعّال', description: 'رسائل وتنبيهات فورية بين الإدارة والمعلمين وأولياء الأمور.' },
+  { id: 'manage', title: 'إدارة شاملة', description: 'طلاب، صفوف، كادر، حضور، أقساط، وجداول من مكان واحد.' },
+  { id: 'ease', title: 'سهولة الاستخدام', description: 'واجهة عربية واضحة مصممة لسير عمل المدرسة اليومي.' },
+  { id: 'security', title: 'أمان موثوق', description: 'صلاحيات دقيقة وتشفير Firebase لحماية بيانات المدرسة.' },
+];
+
 export const DEFAULT_LANDING_PAGE_CONFIG: LandingPageConfig = {
   landingEnabled: true,
-  heroTitle: 'SchoolixIQ — نظام إدارة المدارس الذكي',
+  heroTitle: 'إدارة مدارس ذكية لمستقبل تعليمي أفضل',
   heroSubtitle:
-    'منصة عربية متكاملة تربط الإدارة والمعلمين وأولياء الأمور: حضور، أقساط، تقارير، وبوابة تسريح آمنة في تجربة واحدة.',
-  primaryCtaLabel: 'ابدأ الآن',
+    'منصة متكاملة لإدارة جميع جوانب مدرستك بسهولة وذكاء، توفر الوقت، تنظّم العمل، وتمنحك تقارير دقيقة لاتخاذ قرارات أفضل.',
+  primaryCtaLabel: 'ابدأ الآن مجاناً',
   secondaryCtaLabel: 'تسجيل الدخول',
+  exploreCtaLabel: 'استكشف المميزات',
+  demoCtaLabel: 'احجز عرضاً مجانياً',
   heroImageUrl: '',
-  heroBadgeText: 'الخيار الأول للمدارس الأهلية في العراق',
+  heroBadgeText: 'منصة SchoolixIQ الذكية',
   problemPoints: [
     'فوضى الحضور والغياب اليومي',
     'ضياع متابعة الأقساط والتحصيل',
@@ -132,6 +155,16 @@ export const DEFAULT_LANDING_PAGE_CONFIG: LandingPageConfig = {
   showPartners: true,
   footerMarketingText:
     'SchoolixIQ — شريكك الرقمي لإدارة المدرسة باحترافية. انضم إلى المدارس التي اختارت التحول الذكي.',
+  whatsappNumber: '07757905554',
+  pricingTitle: 'اختر الباقة المناسبة لمدرستك',
+  pricingSubtitle: 'جميع الباقات تشمل التحديثات والدعم الفني',
+  partnersTitle: 'شركاؤنا في النجاح',
+  partnersSubtitle: 'مؤسسات ومدارس تثق بمنصة SchoolixIQ',
+  featureStrip: DEFAULT_FEATURE_STRIP,
+  showExplainerSections: true,
+  showTechSection: true,
+  finalCtaTitle: 'جاهز لإدارة مدرستك بذكاء؟',
+  finalCtaSubtitle: 'تجربة موحّدة للإدارة والمعلمين وأولياء الأمور — ابدأ اليوم.',
 };
 
 export const FALLBACK_PRICING_PACKAGES = [
@@ -146,7 +179,7 @@ export const FALLBACK_PRICING_PACKAGES = [
   },
   {
     id: 'professional',
-    name: 'الباقة الاحترافية',
+    name: 'الباقة المتقدمة',
     priceMonthly: 300000,
     priceYearly: 3000000,
     maxStudents: 750,
@@ -155,7 +188,7 @@ export const FALLBACK_PRICING_PACKAGES = [
   },
   {
     id: 'premium',
-    name: 'الباقة الشاملة',
+    name: 'الباقة الاحترافية',
     priceMonthly: 500000,
     priceYearly: 5000000,
     maxStudents: 0,
@@ -188,6 +221,10 @@ function mergeLandingConfig(data: Record<string, unknown> | undefined): LandingP
       Array.isArray(data.faq) && data.faq.length
         ? (data.faq as LandingFaqItem[])
         : DEFAULT_LANDING_PAGE_CONFIG.faq,
+    featureStrip:
+      Array.isArray(data.featureStrip) && data.featureStrip.length
+        ? (data.featureStrip as LandingFeatureCard[])
+        : DEFAULT_LANDING_PAGE_CONFIG.featureStrip,
   };
 }
 
@@ -251,4 +288,13 @@ export function getPackageMarketingFeatures(
 export function formatIqdPrice(amount: number): string {
   if (!amount || amount <= 0) return 'حسب الطلب';
   return `${amount.toLocaleString('ar-IQ')} د.ع`;
+}
+
+/** Normalize Iraqi mobile to wa.me digits (964...). */
+export function resolveWhatsAppUrl(number?: string): string {
+  const raw = String(number || DEFAULT_LANDING_PAGE_CONFIG.whatsappNumber || '').replace(/\D/g, '');
+  if (!raw) return 'https://wa.me/9647757905554';
+  if (raw.startsWith('964')) return `https://wa.me/${raw}`;
+  if (raw.startsWith('0')) return `https://wa.me/964${raw.slice(1)}`;
+  return `https://wa.me/964${raw}`;
 }

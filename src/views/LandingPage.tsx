@@ -12,7 +12,6 @@ import {
   Download,
   GraduationCap,
   LayoutDashboard,
-  LogIn,
   Lock,
   Shield,
   Smartphone,
@@ -29,14 +28,20 @@ import {
   FALLBACK_PRICING_PACKAGES,
   formatIqdPrice,
   getPackageMarketingFeatures,
+  resolveWhatsAppUrl,
   type LandingFeatureCard,
 } from '../lib/landingPageConfig';
 import { useSystemConfig } from '../lib/SystemConfigContext';
 import { hasConfiguredFooterPartners } from '../lib/footerPartners';
 import { GlobalFooter } from '../components/GlobalFooter';
 import SchoolixLogo from '../components/SchoolixLogo';
-import { ThemeToggle } from '../components/ThemeToggle';
-import { LanguageToggle } from '../components/LanguageToggle';
+import { LandingNavbar } from '../components/landing/LandingNavbar';
+import { LandingWhatsAppFab } from '../components/landing/LandingWhatsAppFab';
+import { LandingTechSection } from '../components/landing/LandingTechSection';
+import {
+  LandingPartnersSection,
+  useLandingPartners,
+} from '../components/landing/LandingPartnersSection';
 import {
   ANDROID_APK_NOT_CONFIGURED_MSG_AR,
   resolveAndroidApkUrl,
@@ -48,27 +53,46 @@ import type { PackagePermissions } from '../lib/featureRegistry';
 
 const NAVY = '#0B2345';
 const GOLD = '#D4AF37';
-const BG = '#F7F8FA';
-const MUTED = 'text-slate-600 dark:text-slate-400';
 const SECTION_PY = 'py-20 lg:py-28';
 
-const TRUST_PILLARS = [
+const FEATURE_STRIP_ICONS: Record<string, React.ElementType> = {
+  reports: BarChart3,
+  comms: Bell,
+  manage: LayoutDashboard,
+  ease: Sparkles,
+  security: Lock,
+};
+
+const EXPLAINER_SECTIONS = [
   {
-    icon: Lock,
-    title: 'أمان وصلاحيات',
-    description: 'تشفير Firebase وصلاحيات دقيقة لكل دور في المدرسة.',
-  },
-  {
+    id: 'central',
     icon: LayoutDashboard,
-    title: 'لوحة موحّدة',
-    description: 'إدارة الطلاب والحضور والأقساط والتقارير من مكان واحد.',
+    title: 'إدارة مركزية',
+    description: 'إدارة الطلاب، الصفوف، الكادر، الحضور، الأقساط، الجداول والملفات من مكان واحد.',
+    mini: 'لوحة موحّدة للإدارة',
   },
   {
-    icon: Smartphone,
-    title: 'تجربة متجاوبة',
-    description: 'تعمل على الهاتف والتابلت والحاسوب — للإدارة ولأولياء الأمور.',
+    id: 'comms',
+    icon: Bell,
+    title: 'تواصل أسرع',
+    description: 'رسائل وتنبيهات فورية بين الإدارة والمعلمين وأولياء الأمور.',
+    mini: 'تنبيهات لحظية',
   },
-];
+  {
+    id: 'decisions',
+    icon: BarChart3,
+    title: 'قرارات أدق',
+    description: 'تقارير لحظية تساعد الإدارة على متابعة الأداء المالي والتعليمي.',
+    mini: 'تقارير وإحصائيات',
+  },
+  {
+    id: 'responsive',
+    icon: Smartphone,
+    title: 'جاهز للهاتف والكمبيوتر',
+    description: 'تجربة متجاوبة على الهاتف والتابلت والكمبيوتر.',
+    mini: 'متجاوب بالكامل',
+  },
+] as const;
 
 /** Six flagship features — synced with marketing requirements */
 const SHOWCASE_FEATURE_IDS = [
@@ -172,7 +196,6 @@ function SectionHeader({
   title,
   subtitle,
   align = 'center',
-  light = false,
 }: {
   eyebrow: string;
   title: string;
@@ -183,14 +206,8 @@ function SectionHeader({
   return (
     <div className={`mb-12 lg:mb-16 max-w-2xl ${align === 'center' ? 'mx-auto text-center' : 'text-right'}`}>
       <Eyebrow>{eyebrow}</Eyebrow>
-      <h2
-        className={`text-2xl sm:text-3xl lg:text-[2.35rem] font-black leading-[1.15] tracking-[-0.02em] ${light ? 'text-white' : 'text-[#0B2345] dark:text-white'}`}
-      >
-        {title}
-      </h2>
-      {subtitle && (
-        <p className={`mt-4 text-base sm:text-lg leading-[1.85] ${light ? 'text-slate-300' : MUTED}`}>{subtitle}</p>
-      )}
+      <h2 className="lp-section-title">{title}</h2>
+      {subtitle && <p className="lp-section-subtitle">{subtitle}</p>}
     </div>
   );
 }
@@ -212,16 +229,16 @@ function HeroVisualStack() {
         initial={reduced ? {} : { opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: MOTION_EASE }}
-        className="relative z-10 rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#081220] shadow-[0_40px_80px_-24px_rgba(11,35,69,0.25)] overflow-hidden"
+        className="landing-mockup-laptop relative z-10 landing-fade-up"
       >
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-white/[0.06] bg-[#F7F8FA] dark:bg-white/[0.02]">
-          <span className="w-2 h-2 rounded-full bg-red-300/80" />
-          <span className="w-2 h-2 rounded-full bg-amber-300/80" />
-          <span className="w-2 h-2 rounded-full bg-emerald-300/80" />
-          <span className="mr-auto text-[9px] font-mono text-slate-400">admin.schoolixiq.com</span>
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[rgba(212,175,55,0.2)] bg-[#081f3d]">
+          <span className="w-2 h-2 rounded-full bg-red-400/70" />
+          <span className="w-2 h-2 rounded-full bg-amber-400/70" />
+          <span className="w-2 h-2 rounded-full bg-emerald-400/70" />
+          <span className="mr-auto text-[9px] font-mono text-[#94a3b8]">admin.schoolixiq.com</span>
         </div>
         <div className="flex min-h-[280px] sm:min-h-[320px]">
-          <div className="w-14 shrink-0 bg-[#07172E] flex flex-col items-center py-5 gap-3 border-l border-white/[0.04]">
+          <div className="w-14 shrink-0 bg-[#06182f] flex flex-col items-center py-5 gap-3 border-l border-[rgba(212,175,55,0.12)]">
             {[LayoutDashboard, Users, Wallet, Bell, BarChart3].map((Icon, i) => (
               <div
                 key={i}
@@ -231,9 +248,9 @@ function HeroVisualStack() {
               </div>
             ))}
           </div>
-          <div className="flex-1 p-4 sm:p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">لوحة المدرسة</p>
-            <p className="text-lg font-black text-[#0B2345] dark:text-white mt-0.5">ملخص اليوم</p>
+          <div className="flex-1 p-4 sm:p-5 bg-[#0b2345]">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#94a3b8]">لوحة المدرسة</p>
+            <p className="text-lg font-black text-white mt-0.5">ملخص اليوم</p>
             <div className="grid grid-cols-3 gap-2 mt-4 mb-4">
               {[
                 { l: 'حضور', icon: UserCheck },
@@ -242,25 +259,30 @@ function HeroVisualStack() {
               ].map(({ l, icon: Icon }) => (
                 <div
                   key={l}
-                  className="rounded-xl border border-slate-100 dark:border-white/[0.06] p-2.5 bg-[#F7F8FA]/80 dark:bg-white/[0.02]"
+                  className="rounded-xl border border-[rgba(212,175,55,0.2)] p-2.5 bg-[#081f3d]"
                 >
-                  <Icon size={14} className="text-[#D4AF37] mb-1" />
-                  <p className="text-[9px] font-bold text-slate-500">{l}</p>
+                  <Icon size={14} className="text-[#d4af37] mb-1" />
+                  <p className="text-[9px] font-bold text-[#cbd5e1]">{l}</p>
                 </div>
               ))}
             </div>
-            <div className="rounded-xl border border-slate-100 dark:border-white/[0.06] overflow-hidden">
-              <div className="px-3 py-2 text-[9px] font-bold text-slate-500 bg-slate-50/80 dark:bg-white/[0.02]">
+            <div className="rounded-xl border border-[rgba(212,175,55,0.2)] overflow-hidden">
+              <div className="px-3 py-2 text-[9px] font-bold text-[#94a3b8] bg-[#081f3d]">
                 آخر النشاطات
               </div>
               {['تسجيل حضور — الصف الخامس', 'تذكير أقساط — ولي أمر', 'طلب تسريح — البوابة'].map((row) => (
                 <div
                   key={row}
-                  className="flex items-center gap-2 px-3 py-2.5 border-b last:border-0 border-slate-50 dark:border-white/[0.04] text-[10px] font-medium text-slate-600 dark:text-slate-400"
+                  className="flex items-center gap-2 px-3 py-2.5 border-b last:border-0 border-[rgba(212,175,55,0.1)] text-[10px] font-medium text-[#cbd5e1]"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] shrink-0" />
                   <span className="truncate">{row}</span>
                 </div>
+              ))}
+            </div>
+            <div className="mt-3 h-12 rounded-lg border border-[rgba(212,175,55,0.15)] bg-[#081f3d] flex items-end gap-1 px-2 pb-2">
+              {[40, 65, 45, 80, 55, 70].map((h, i) => (
+                <div key={i} className="flex-1 rounded-sm bg-[#d4af37]/60" style={{ height: `${h}%` }} />
               ))}
             </div>
           </div>
@@ -271,19 +293,19 @@ function HeroVisualStack() {
         initial={reduced ? {} : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="absolute -bottom-6 left-2 sm:left-4 z-20 w-[42%] max-w-[160px]"
+        className="landing-mockup-phone"
       >
-        <div className="rounded-[1.75rem] p-[3px] bg-slate-800 shadow-2xl">
-          <div className="rounded-[1.6rem] overflow-hidden bg-[#07172E]">
+        <div className="rounded-[1.75rem] p-[3px] bg-[#081f3d] border border-[rgba(212,175,55,0.3)] shadow-2xl">
+          <div className="rounded-[1.6rem] overflow-hidden bg-[#06182f]">
             <div className="h-4 flex justify-center items-end">
-              <div className="w-10 h-1 rounded-full bg-black/40" />
+              <div className="w-10 h-1 rounded-full bg-black/50" />
             </div>
-            <div className="bg-[#F7F8FA] dark:bg-[#0a1525] px-2.5 pb-3 pt-1 space-y-1.5">
-              <p className="text-[8px] font-black text-[#0B2345] dark:text-white px-1">ولي الأمر</p>
+            <div className="bg-[#0b2345] px-2.5 pb-3 pt-1 space-y-1.5">
+              <p className="text-[8px] font-black text-white px-1">ولي الأمر</p>
               {['حضور', 'واجب', 'قسط'].map((t) => (
                 <div
                   key={t}
-                  className="text-[8px] font-bold py-1.5 px-2 rounded-lg bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 text-slate-600"
+                  className="text-[8px] font-bold py-1.5 px-2 rounded-lg bg-[#081f3d] border border-[rgba(212,175,55,0.2)] text-[#cbd5e1]"
                 >
                   {t}
                 </div>
@@ -338,9 +360,24 @@ function PhoneMockup() {
 export default function LandingPage() {
   const { config, loading } = useLandingPageConfig();
   const { config: systemConfig } = useSystemConfig();
+  const { successPartners, ourPartners } = useLandingPartners(systemConfig);
   const [packages, setPackages] = useState<any[]>([]);
   const [openFaq, setOpenFaq] = useState<string | null>(null);
   const reduced = prefersReducedMotion();
+
+  const navLinks = useMemo(() => {
+    const links: { href: string; label: string }[] = [
+      { href: '#hero', label: 'الرئيسية' },
+      { href: '#features', label: 'المميزات' },
+    ];
+    if (config.showPricing) links.push({ href: '#pricing', label: 'الباقات' });
+    links.push({ href: '#partners', label: 'الشركاء' });
+    links.push({ href: '#about', label: 'عن المنصة' });
+    links.push({ href: '#contact', label: 'تواصل معنا' });
+    return links;
+  }, [config.showPricing]);
+
+  const featureStrip = config.featureStrip?.length ? config.featureStrip : [];
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -387,103 +424,53 @@ export default function LandingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: BG }}>
-        <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-[#D4AF37] animate-spin" />
+      <div className="landing-page min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-[#081f3d] border-t-[#d4af37] animate-spin" />
       </div>
     );
   }
 
   return (
-    <div
-      className="min-h-screen text-[#0B2345] dark:text-slate-100 antialiased selection:bg-[#D4AF37]/30 overflow-x-hidden"
-      style={{ background: BG }}
-      dir="rtl"
-    >
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-200/70 dark:border-white/[0.06] bg-[#F7F8FA]/95 dark:bg-[#050a12]/95 backdrop-blur-lg">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-[4.25rem] flex items-center justify-between gap-3">
-          <Link to="/" className="flex items-center gap-2 shrink-0 min-w-0">
-            <SchoolixLogo size={32} />
-            <span className="font-black text-sm sm:text-[15px] tracking-tight truncate">{systemConfig.appName}</span>
-          </Link>
-          <nav className="hidden lg:flex items-center gap-7 text-[13px] font-semibold text-slate-500 dark:text-slate-400">
-            {[
-              ['#features', 'المميزات'],
-              ['#audience', 'لمن؟'],
-              ['#smart-gate', 'البوابة الذكية'],
-              ...(config.showPricing ? [['#pricing', 'الباقات'] as const] : []),
-              ...(config.showFaq ? [['#faq', 'الأسئلة'] as const] : []),
-            ].map(([href, label]) => (
-              <a key={href} href={href} className="hover:text-[#0B2345] dark:hover:text-white transition-colors">
-                {label}
-              </a>
-            ))}
-          </nav>
-          <div className="flex items-center gap-1 shrink-0">
-            <LanguageToggle />
-            <ThemeToggle />
-            <Link
-              to="/login"
-              className="hidden sm:inline-flex items-center gap-1 px-3 py-2 text-[12px] sm:text-[13px] font-bold text-slate-600 dark:text-slate-400"
-            >
-              <LogIn size={14} />
-              {config.secondaryCtaLabel || 'تسجيل الدخول'}
-            </Link>
-            <Link
-              to="/login?mode=signup"
-              className="px-3 sm:px-4 py-2 rounded-xl text-[12px] sm:text-[13px] font-bold text-white"
-              style={{ background: NAVY }}
-            >
-              {config.primaryCtaLabel || 'ابدأ الآن'}
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="landing-page min-h-screen antialiased selection:bg-[#D4AF37]/30 overflow-x-hidden" dir="rtl">
+      <LandingNavbar
+        appName={systemConfig.appName}
+        links={navLinks}
+        loginLabel={config.secondaryCtaLabel || 'تسجيل الدخول'}
+        primaryLabel={config.primaryCtaLabel || 'ابدأ الآن مجاناً'}
+        demoLabel={config.demoCtaLabel || 'احجز عرضاً مجانياً'}
+      />
 
       {/* Hero */}
-      <SectionShell className={`relative ${SECTION_PY} overflow-hidden`}>
-        <div
-          className="absolute inset-0 pointer-events-none opacity-60 dark:opacity-30"
-          style={{
-            background: `radial-gradient(ellipse 80% 50% at 100% 0%, ${GOLD}18, transparent), radial-gradient(ellipse 60% 40% at 0% 100%, ${NAVY}12, transparent)`,
-          }}
-        />
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+      <SectionShell id="hero" className="landing-hero">
+        <div className="landing-hero__glow" />
+        <div className="lp-container relative">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div className="max-w-xl">
+            <div className="max-w-xl order-1">
               {config.heroBadgeText && (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#D4AF37]/30 bg-white dark:bg-white/[0.04] text-xs font-bold text-slate-600 dark:text-slate-300 mb-6">
+                <div className="landing-hero__badge">
                   <Sparkles size={12} style={{ color: GOLD }} />
                   {config.heroBadgeText}
                 </div>
               )}
-              <h1 className="text-[1.85rem] sm:text-[2.5rem] lg:text-[3rem] font-black leading-[1.12] tracking-[-0.03em] text-[#0B2345] dark:text-white">
-                {config.heroTitle}
-              </h1>
-              <p className={`mt-5 text-base sm:text-lg lg:text-xl leading-[1.85] ${MUTED}`}>{config.heroSubtitle}</p>
+              <h1 className="landing-hero__title text-white">{config.heroTitle}</h1>
+              <p className="landing-hero__subtitle">{config.heroSubtitle}</p>
 
-              <div className="mt-8 flex flex-col xs:flex-row flex-wrap gap-3">
-                <Link
-                  to="/login?mode=signup"
-                  className="inline-flex justify-center items-center px-8 py-3.5 rounded-2xl text-sm font-black text-[#0B2345] shadow-lg hover:opacity-95 transition-opacity"
-                  style={{ background: GOLD }}
-                >
-                  {config.primaryCtaLabel || 'ابدأ الآن'}
+              <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-3">
+                <Link to="/login?mode=signup" className="lp-btn-gold">
+                  {config.primaryCtaLabel || 'ابدأ الآن مجاناً'}
                 </Link>
-                <Link
-                  to="/login"
-                  className="inline-flex justify-center items-center px-8 py-3.5 rounded-2xl text-sm font-bold border-2 border-[#0B2345]/15 dark:border-white/15 bg-white dark:bg-white/[0.04] hover:border-[#D4AF37]/50 transition-colors"
-                >
-                  {config.secondaryCtaLabel || 'تسجيل الدخول'}
-                </Link>
+                <a href="#features" className="lp-btn-outline">
+                  {config.exploreCtaLabel || 'استكشف المميزات'}
+                </a>
               </div>
             </div>
-            <div className="lg:pt-2 pb-8 lg:pb-0">
+            <div className="order-2 lg:pt-2 pb-8 lg:pb-0 relative">
+              <div className="landing-mockup-glow" />
               {config.heroImageUrl ? (
                 <img
                   src={config.heroImageUrl}
                   alt=""
-                  className="rounded-3xl border border-slate-200/80 shadow-2xl w-full object-cover max-h-[440px]"
+                  className="rounded-3xl border border-[rgba(212,175,55,0.28)] shadow-2xl w-full object-cover max-h-[440px] landing-fade-up"
                   loading="lazy"
                 />
               ) : (
@@ -494,32 +481,38 @@ export default function LandingPage() {
         </div>
       </SectionShell>
 
-      {/* Trust pillars — no fake numbers */}
-      <SectionShell className="py-14 lg:py-16 bg-white dark:bg-[#070f1a] border-y border-slate-200/60 dark:border-white/[0.05]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid sm:grid-cols-3 gap-6 lg:gap-8">
-            {TRUST_PILLARS.map(({ icon: Icon, title, description }) => (
-              <div
-                key={title}
-                className="rounded-2xl border border-slate-200/80 dark:border-white/[0.08] bg-[#F7F8FA] dark:bg-white/[0.02] p-6 lg:p-7 text-center sm:text-right hover:shadow-md transition-shadow"
-              >
-                <div
-                  className="w-12 h-12 mx-auto sm:mx-0 rounded-2xl flex items-center justify-center mb-4"
-                  style={{ background: `${GOLD}22`, color: NAVY }}
-                >
-                  <Icon size={22} strokeWidth={1.5} />
-                </div>
-                <h3 className="font-black text-base text-[#0B2345] dark:text-white mb-2">{title}</h3>
-                <p className={`text-sm leading-[1.8] ${MUTED}`}>{description}</p>
-              </div>
-            ))}
+      {/* Feature highlight strip */}
+      {featureStrip.length > 0 && (
+        <SectionShell className="landing-feature-strip">
+          <div className="lp-container">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {featureStrip.map(({ id, title, description }, idx) => {
+                const Icon = FEATURE_STRIP_ICONS[id] || Sparkles;
+                return (
+                  <motion.div
+                    key={id}
+                    initial={reduced ? {} : { opacity: 0, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.06, duration: 0.35 }}
+                    className="landing-feature-strip__card lp-card"
+                  >
+                    <div className="landing-feature-strip__icon">
+                      <Icon size={20} strokeWidth={1.5} />
+                    </div>
+                    <h3 className="font-black text-sm text-white mb-2">{title}</h3>
+                    <p className="text-xs leading-[1.75] text-[#94a3b8]">{description}</p>
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </SectionShell>
+        </SectionShell>
+      )}
 
-      {/* Features — StepUp-style grid */}
+      {/* Features grid */}
       <SectionShell id="features" className={SECTION_PY}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="lp-container">
           <SectionHeader
             eyebrow="خدماتنا"
             title="كل ما تحتاجه مدرستك في مكان واحد"
@@ -535,16 +528,13 @@ export default function LandingPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: idx * 0.05, duration: 0.35 }}
-                  className="group rounded-2xl lg:rounded-3xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#0a1525] p-6 lg:p-7 shadow-sm hover:shadow-[0_20px_40px_-16px_rgba(11,35,69,0.15)] hover:border-[#D4AF37]/30 transition-all duration-300"
+                  className="lp-card p-6 lg:p-7 hover:-translate-y-1 transition-transform duration-300"
                 >
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform"
-                    style={{ background: `${GOLD}18`, color: NAVY }}
-                  >
+                  <div className="landing-feature-strip__icon !mx-0 mb-4">
                     <Icon size={20} strokeWidth={1.5} />
                   </div>
-                  <h3 className="font-black text-[17px] text-[#0B2345] dark:text-white mb-2">{card.title}</h3>
-                  <p className={`text-sm leading-[1.85] ${MUTED}`}>{card.description}</p>
+                  <h3 className="font-black text-[17px] text-white mb-2">{card.title}</h3>
+                  <p className="text-sm leading-[1.85] text-[#94a3b8]">{card.description}</p>
                 </motion.div>
               );
             })}
@@ -552,9 +542,44 @@ export default function LandingPage() {
         </div>
       </SectionShell>
 
+      {/* Explainer sections */}
+      {config.showExplainerSections !== false && (
+        <SectionShell className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)] bg-[#081f3d]`}>
+          <div className="lp-container">
+            <SectionHeader
+              eyebrow="لماذا SchoolixIQ"
+              title="حلول عملية لإدارة يومية أسهل"
+              subtitle="أربعة محاور تغطي احتياجات المدرسة الحديثة."
+            />
+            <div className="grid sm:grid-cols-2 gap-5 lg:gap-6">
+              {EXPLAINER_SECTIONS.map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <motion.div
+                    key={item.id}
+                    initial={reduced ? {} : { opacity: 0, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.07, duration: 0.35 }}
+                    className="landing-explainer-card lp-card"
+                  >
+                    <div className="landing-feature-strip__icon !mx-0 mb-4">
+                      <Icon size={20} strokeWidth={1.5} />
+                    </div>
+                    <h3 className="font-black text-lg text-white mb-2">{item.title}</h3>
+                    <p className="text-sm leading-[1.85] text-[#cbd5e1]">{item.description}</p>
+                    <div className="landing-explainer-mini">{item.mini}</div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </SectionShell>
+      )}
+
       {/* Audience */}
-      <SectionShell id="audience" className={`${SECTION_PY} bg-white dark:bg-[#070f1a] border-y border-slate-200/60 dark:border-white/[0.05]`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <SectionShell id="audience" className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)]`}>
+        <div className="lp-container">
           <SectionHeader
             eyebrow="لمن؟"
             title="منصة واحدة لكل أدوار المدرسة"
@@ -566,15 +591,15 @@ export default function LandingPage() {
               return (
                 <div
                   key={role.id}
-                  className="rounded-2xl lg:rounded-3xl overflow-hidden border border-slate-200/80 dark:border-white/[0.08] bg-[#F7F8FA] dark:bg-[#0a1525] shadow-sm hover:shadow-lg transition-shadow"
+                  className="lp-card overflow-hidden hover:-translate-y-1 transition-transform"
                 >
                   <div className={`h-2 bg-gradient-to-l ${role.accent}`} />
                   <div className="p-6">
-                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/[0.06] border border-slate-100 dark:border-white/10 flex items-center justify-center mb-4">
-                      <Icon size={18} className="text-[#0B2345] dark:text-[#D4AF37]" />
+                    <div className="w-10 h-10 rounded-xl bg-[#081f3d] border border-[rgba(212,175,55,0.2)] flex items-center justify-center mb-4">
+                      <Icon size={18} className="text-[#d4af37]" />
                     </div>
-                    <h3 className="font-black text-base mb-2">{role.title}</h3>
-                    <p className={`text-sm leading-[1.8] ${MUTED}`}>{role.description}</p>
+                    <h3 className="font-black text-base mb-2 text-white">{role.title}</h3>
+                    <p className="text-sm leading-[1.8] text-[#94a3b8]">{role.description}</p>
                   </div>
                 </div>
               );
@@ -585,27 +610,25 @@ export default function LandingPage() {
 
       {/* Problem / Solution */}
       <SectionShell className={SECTION_PY}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="lp-container">
           <SectionHeader eyebrow="التحول" title="من الفوضى إلى نظام واحد موثوق" />
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-16">
-            <div className="rounded-3xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#0a1525] p-8 lg:p-10">
-              <p className="text-sm font-bold text-slate-500 mb-5">قبل SchoolixIQ</p>
+            <div className="lp-card p-8 lg:p-10">
+              <p className="text-sm font-bold text-[#94a3b8] mb-5">قبل SchoolixIQ</p>
               <ul className="space-y-4">
                 {config.problemPoints.map((point) => (
-                  <li key={point} className={`text-[15px] leading-[1.85] pr-4 border-r-2 border-slate-200 dark:border-white/10 ${MUTED}`}>
+                  <li key={point} className="text-[15px] leading-[1.85] pr-4 border-r-2 border-[rgba(212,175,55,0.2)] text-[#cbd5e1]">
                     {point}
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="rounded-3xl border-2 p-8 lg:p-10 bg-[#0B2345] text-white" style={{ borderColor: `${GOLD}44` }}>
-              <p className="text-sm font-bold mb-5" style={{ color: GOLD }}>
-                بعد SchoolixIQ
-              </p>
+            <div className="lp-card p-8 lg:p-10 border-[#d4af37]/40">
+              <p className="text-sm font-bold mb-5 text-[#f2c866]">بعد SchoolixIQ</p>
               <ul className="space-y-4">
                 {config.solutionPoints.map((point) => (
-                  <li key={point} className="text-[15px] leading-[1.85] font-medium pr-4 border-r-2 border-[#D4AF37]/50 flex items-start gap-2">
-                    <Check size={16} className="shrink-0 mt-1" style={{ color: GOLD }} />
+                  <li key={point} className="text-[15px] leading-[1.85] font-medium pr-4 border-r-2 border-[#D4AF37]/50 flex items-start gap-2 text-white">
+                    <Check size={16} className="shrink-0 mt-1 text-[#d4af37]" />
                     <span>{point}</span>
                   </li>
                 ))}
@@ -616,9 +639,9 @@ export default function LandingPage() {
       </SectionShell>
 
       {/* Smart Gate */}
-      <SectionShell id="smart-gate" className={`${SECTION_PY} bg-[#0B2345] text-white`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionHeader eyebrow="البوابة الذكية" title={config.smartGateTitle} subtitle={config.smartGateDescription} light />
+      <SectionShell id="smart-gate" className={`${SECTION_PY} bg-[#081f3d] border-y border-[rgba(212,175,55,0.2)]`}>
+        <div className="lp-container">
+          <SectionHeader eyebrow="البوابة الذكية" title={config.smartGateTitle} subtitle={config.smartGateDescription} />
           <div className="grid lg:grid-cols-12 gap-10 items-start">
             <div className="lg:col-span-7 space-y-0">
               {[
@@ -636,16 +659,16 @@ export default function LandingPage() {
                     {idx + 1}
                   </div>
                   <div>
-                    <p className="font-bold text-[15px]">{item.step}</p>
-                    <p className="text-sm text-slate-400 mt-1">{item.detail}</p>
+                    <p className="font-bold text-[15px] text-white">{item.step}</p>
+                    <p className="text-sm text-[#94a3b8] mt-1">{item.detail}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="lg:col-span-5 rounded-2xl border border-white/10 bg-white/[0.04] p-6 lg:p-8">
-              <Shield size={32} className="mb-4" style={{ color: GOLD }} />
-              <p className="font-black text-lg mb-2">تسريح آمن ومنظم</p>
-              <p className="text-sm text-slate-400 leading-[1.85]">
+            <div className="lg:col-span-5 lp-card p-6 lg:p-8">
+              <Shield size={32} className="mb-4 text-[#d4af37]" />
+              <p className="font-black text-lg mb-2 text-white">تسريح آمن ومنظم</p>
+              <p className="text-sm text-[#94a3b8] leading-[1.85]">
                 تقليل الازدحام عند البوابة، حماية الطلاب، وشفافية كاملة للإدارة وأولياء الأمور.
               </p>
             </div>
@@ -654,18 +677,14 @@ export default function LandingPage() {
       </SectionShell>
 
       {/* Parent App */}
-      <SectionShell className={`${SECTION_PY} bg-white dark:bg-[#070f1a] border-t border-slate-200/60 dark:border-white/[0.05]`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+      <SectionShell className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)]`}>
+        <div className="lp-container grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div className="order-2 lg:order-1 flex justify-center">
             <PhoneMockup />
           </div>
           <div className="order-1 lg:order-2">
             <SectionHeader eyebrow="تطبيق ولي الأمر" title={config.parentAppTitle} subtitle={config.parentAppDescription} align="start" />
-            <Link
-              to="/login?mode=signup"
-              className="inline-flex items-center gap-2 mt-2 px-6 py-3 rounded-xl text-sm font-bold text-white"
-              style={{ background: NAVY }}
-            >
+            <Link to="/login?mode=signup" className="lp-btn-gold mt-2">
               ابدأ الآن
               <ArrowLeft size={16} className="rotate-180" />
             </Link>
@@ -673,11 +692,18 @@ export default function LandingPage() {
         </div>
       </SectionShell>
 
-      {/* Pricing — unchanged logic */}
+      {/* Tech motion section */}
+      {config.showTechSection !== false && <LandingTechSection />}
+
+      {/* Pricing */}
       {config.showPricing && (
         <SectionShell id="pricing" className={SECTION_PY}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <SectionHeader eyebrow="الأسعار" title="اختر الباقة المناسبة" subtitle="شفافية كاملة — بدون رسوم مخفية." />
+          <div className="lp-container">
+            <SectionHeader
+              eyebrow="الأسعار"
+              title={config.pricingTitle || 'اختر الباقة المناسبة لمدرستك'}
+              subtitle={config.pricingSubtitle || 'جميع الباقات تشمل التحديثات والدعم الفني'}
+            />
             <div className="grid md:grid-cols-3 gap-6 lg:gap-8 items-end max-w-5xl mx-auto">
               {pricingPlans.map((pkg: any, index: number) => {
                 const popular = pkg.isPopular;
@@ -688,48 +714,45 @@ export default function LandingPage() {
                 const isCenter = popular || (popularIndex === -1 && index === 1);
 
                 return (
-                  <div
+                  <motion.div
                     key={pkg.id}
-                    className={`relative flex flex-col rounded-3xl transition-transform duration-200 ${
+                    initial={reduced ? {} : { opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.08, duration: 0.4 }}
+                    className={`landing-pricing-card flex flex-col ${
                       isCenter
-                        ? 'md:-mt-4 p-9 border-2 bg-[#0B2345] text-white shadow-xl md:scale-[1.03] z-10'
-                        : 'p-8 border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#0a1525]'
+                        ? 'landing-pricing-card--featured md:-mt-4 md:scale-[1.03] z-10 text-white'
+                        : 'lp-card text-white'
                     }`}
-                    style={isCenter ? { borderColor: GOLD } : undefined}
                   >
                     {isCenter && (
-                      <span
-                        className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-[10px] font-black text-[#0B2345] whitespace-nowrap"
-                        style={{ background: GOLD }}
-                      >
-                        {popular ? 'الأكثر طلباً' : 'موصى به'}
+                      <span className="landing-pricing-badge">
+                        {popular ? 'الأكثر اختياراً' : 'موصى به'}
                       </span>
                     )}
                     <h3 className="text-lg font-black">{pkg.name}</h3>
-                    <p className={`text-sm mt-1 mb-6 ${isCenter ? 'text-slate-400' : MUTED}`}>{maxLabel}</p>
-                    <p className="text-[2rem] font-black tabular-nums leading-none">{formatIqdPrice(pkg.priceMonthly)}</p>
-                    <p className={`text-xs font-semibold mt-2 mb-8 ${isCenter ? 'text-slate-500' : 'text-slate-500'}`}>
+                    <p className={`text-sm mt-1 mb-6 ${isCenter ? 'text-[#94a3b8]' : 'text-[#94a3b8]'}`}>{maxLabel}</p>
+                    <p className="text-[2rem] font-black tabular-nums leading-none text-[#f2c866]">{formatIqdPrice(pkg.priceMonthly)}</p>
+                    <p className="text-xs font-semibold mt-2 mb-8 text-[#94a3b8]">
                       شهرياً
                       {pkg.priceYearly > 0 && <span className="block mt-1">أو {formatIqdPrice(pkg.priceYearly)} / سنة</span>}
                     </p>
-                    <ul className={`space-y-3 mb-10 flex-1 text-sm ${isCenter ? 'text-slate-300' : ''}`}>
+                    <ul className="space-y-3 mb-10 flex-1 text-sm text-[#cbd5e1]">
                       {displayFeatures.map((f: string) => (
                         <li key={f} className="flex items-start gap-2.5 leading-relaxed">
-                          <Check size={14} className={`shrink-0 mt-1 ${isCenter ? '' : 'text-[#0B2345] dark:text-[#D4AF37]'}`} style={isCenter ? { color: GOLD } : undefined} />
+                          <Check size={14} className="shrink-0 mt-1 text-[#d4af37]" />
                           {f}
                         </li>
                       ))}
                     </ul>
                     <Link
                       to="/login?mode=signup"
-                      className={`block text-center py-3.5 rounded-xl text-sm font-black transition-opacity hover:opacity-90 ${
-                        isCenter ? 'text-[#0B2345]' : 'bg-[#0B2345] text-white dark:bg-white/10'
-                      }`}
-                      style={isCenter ? { background: GOLD } : undefined}
+                      className={isCenter ? 'lp-btn-gold w-full text-center' : 'lp-btn-outline w-full text-center'}
                     >
-                      {isCenter ? 'ابدأ الآن' : 'اختر هذه الباقة'}
+                      ابدأ الآن
                     </Link>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
@@ -737,18 +760,27 @@ export default function LandingPage() {
         </SectionShell>
       )}
 
+      {/* Partners */}
+      <LandingPartnersSection
+        successPartners={successPartners}
+        ourPartners={ourPartners}
+        title={config.partnersTitle || 'شركاؤنا في النجاح'}
+        subtitle={config.partnersSubtitle || 'مؤسسات ومدارس تثق بمنصة SchoolixIQ'}
+        showPartners={showPartnerSections}
+      />
+
       {/* Testimonials — real config only */}
       {showTestimonials && (
-        <SectionShell className={`${SECTION_PY} bg-white dark:bg-[#070f1a] border-t border-slate-200/60 dark:border-white/[0.05]`}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionShell className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)] bg-[#081f3d]`}>
+          <div className="lp-container">
             <SectionHeader eyebrow="آراء العملاء" title="تجارب من الميدان" />
             <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
               {config.testimonials.map((t) => (
-                <figure key={t.id} className="rounded-2xl border border-slate-200/80 dark:border-white/[0.08] bg-[#F7F8FA] dark:bg-[#0a1525] p-6 lg:p-8">
-                  <blockquote className={`text-[15px] leading-[1.9] ${MUTED}`}>&ldquo;{t.quote}&rdquo;</blockquote>
-                  <figcaption className="mt-6 pt-5 border-t border-slate-200/80 dark:border-white/10">
-                    <p className="font-black">{t.name}</p>
-                    <p className="text-xs font-semibold text-slate-500 mt-1">{t.role}</p>
+                <figure key={t.id} className="lp-card p-6 lg:p-8">
+                  <blockquote className="text-[15px] leading-[1.9] text-[#cbd5e1]">&ldquo;{t.quote}&rdquo;</blockquote>
+                  <figcaption className="mt-6 pt-5 border-t border-[rgba(212,175,55,0.2)]">
+                    <p className="font-black text-white">{t.name}</p>
+                    <p className="text-xs font-semibold text-[#94a3b8] mt-1">{t.role}</p>
                   </figcaption>
                 </figure>
               ))}
@@ -760,9 +792,9 @@ export default function LandingPage() {
       {/* FAQ */}
       {config.showFaq && config.faq.length > 0 && (
         <SectionShell id="faq" className={SECTION_PY}>
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="lp-container max-w-2xl">
             <SectionHeader eyebrow="الدعم" title="أسئلة شائعة" />
-            <div className="divide-y divide-slate-200/80 dark:divide-white/10 border border-slate-200/80 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-[#0a1525]">
+            <div className="divide-y divide-[rgba(212,175,55,0.15)] border border-[rgba(212,175,55,0.28)] rounded-2xl overflow-hidden lp-card">
               {config.faq.map((item) => {
                 const open = openFaq === item.id;
                 return (
@@ -770,10 +802,10 @@ export default function LandingPage() {
                     <button
                       type="button"
                       onClick={() => setOpenFaq(open ? null : item.id)}
-                      className="w-full flex items-center justify-between gap-4 px-6 py-5 text-right text-[15px] font-bold hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors"
+                      className="w-full flex items-center justify-between gap-4 px-6 py-5 text-right text-[15px] font-bold text-white hover:bg-[#081f3d] transition-colors"
                     >
                       {item.question}
-                      <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+                      <ChevronDown size={18} className={`shrink-0 text-[#94a3b8] transition-transform ${open ? 'rotate-180' : ''}`} />
                     </button>
                     <AnimatePresence initial={false}>
                       {open && (
@@ -784,7 +816,7 @@ export default function LandingPage() {
                           transition={{ duration: MOTION_DURATION.base, ease: MOTION_EASE }}
                           className="overflow-hidden"
                         >
-                          <div className={`px-6 pb-5 text-[15px] leading-[1.9] ${MUTED}`}>{item.answer}</div>
+                          <div className="px-6 pb-5 text-[15px] leading-[1.9] text-[#cbd5e1]">{item.answer}</div>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -797,49 +829,55 @@ export default function LandingPage() {
       )}
 
       {/* Final CTA */}
-      <SectionShell className={`${SECTION_PY} border-t border-slate-200/60 dark:border-white/[0.05]`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="rounded-3xl px-8 py-14 sm:px-12 sm:py-18 lg:px-16 text-center relative overflow-hidden" style={{ background: NAVY }}>
+      <SectionShell className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)]`}>
+        <div className="lp-container">
+          <div className="lp-card px-8 py-14 sm:px-12 sm:py-16 lg:px-16 text-center relative overflow-hidden border-[#d4af37]/35">
             <div
-              className="absolute inset-0 opacity-30 pointer-events-none"
-              style={{ background: `radial-gradient(circle at 80% 20%, ${GOLD}40, transparent 50%)` }}
+              className="absolute inset-0 opacity-40 pointer-events-none"
+              style={{ background: `radial-gradient(circle at 80% 20%, ${GOLD}30, transparent 50%)` }}
             />
             <div className="relative">
               <Eyebrow>ابدأ اليوم</Eyebrow>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white leading-tight max-w-xl mx-auto">
-                جاهز لإدارة مدرستك بذكاء؟
+              <h2 className="lp-section-title max-w-xl mx-auto">
+                {config.finalCtaTitle || 'جاهز لإدارة مدرستك بذكاء؟'}
               </h2>
-              <p className="mt-4 text-slate-300 text-base leading-[1.85] max-w-md mx-auto">
-                تجربة موحّدة للإدارة والمعلمين وأولياء الأمور.
+              <p className="lp-section-subtitle max-w-md mx-auto">
+                {config.finalCtaSubtitle || 'تجربة موحّدة للإدارة والمعلمين وأولياء الأمور.'}
               </p>
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link
-                  to="/login?mode=signup"
-                  className="w-full sm:w-auto inline-flex justify-center px-8 py-4 rounded-2xl text-sm font-black text-[#0B2345] min-w-[200px]"
-                  style={{ background: GOLD }}
-                >
-                  {config.primaryCtaLabel || 'ابدأ الآن'}
+                <Link to="/login?mode=signup" className="lp-btn-gold w-full sm:w-auto min-w-[200px]">
+                  {config.primaryCtaLabel || 'ابدأ الآن مجاناً'}
                 </Link>
                 {config.showAppDownload && (
                   <button
                     type="button"
                     onClick={handleApkDownload}
-                    className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-8 py-4 rounded-2xl text-sm font-bold border border-white/25 text-white hover:bg-white/5 min-w-[200px]"
+                    className="lp-btn-outline w-full sm:w-auto min-w-[200px]"
                   >
                     <Download size={18} />
                     تحميل Android
                   </button>
                 )}
+                <a
+                  href={resolveWhatsAppUrl(config.whatsappNumber)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="lp-btn-outline w-full sm:w-auto min-w-[200px]"
+                >
+                  تواصل عبر واتساب
+                </a>
               </div>
             </div>
           </div>
         </div>
       </SectionShell>
 
-      {/* Partners footer */}
-      <footer className="border-t border-slate-200/60 dark:border-white/[0.05] bg-white dark:bg-[#070f1a] pb-8">
+      <LandingWhatsAppFab whatsappNumber={config.whatsappNumber} />
+
+      {/* Footer */}
+      <footer id="contact" className="landing-footer-wrap pb-8">
         {config.footerMarketingText && (
-          <div className={`max-w-6xl mx-auto px-4 py-8 text-center text-sm leading-[1.9] ${MUTED}`}>
+          <div className="lp-container py-8 text-center text-sm leading-[1.9] text-[#94a3b8]">
             {config.footerMarketingText}
           </div>
         )}

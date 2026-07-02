@@ -18,7 +18,7 @@ function gridClassForCount(count: number): string {
   return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 max-w-6xl mx-auto';
 }
 
-function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
+function PartnerPremiumCard({ partner, isDark = false }: { partner: FooterPartner; isDark?: boolean }) {
   const [logoFailed, setLogoFailed] = useState(false);
   const description = partner.description?.trim() || PARTNER_DESCRIPTION_FALLBACK;
   const title = partner.name || 'شريك';
@@ -50,14 +50,14 @@ function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
     <>
       {logoBlock}
 
-      <h4 className="text-base font-semibold text-[#0B2345] dark:text-slate-100 mb-2 px-2">
+      <h4 className={`text-base font-semibold mb-2 px-2 ${isDark ? 'text-white' : 'text-[#0B2345] dark:text-slate-100'}`}>
         {title}
       </h4>
       <div
         className="w-8 h-px rounded-full mx-auto mb-4 bg-gradient-to-r from-[#D4AF37]/70 to-[#0B2345]/30"
         aria-hidden="true"
       />
-      <p className="text-sm leading-[1.85] text-slate-600 dark:text-slate-400 mb-5 px-2 flex-1">
+      <p className={`text-sm leading-[1.85] mb-5 px-2 flex-1 ${isDark ? 'text-[#cbd5e1]' : 'text-slate-600 dark:text-slate-400'}`}>
         {description}
       </p>
 
@@ -73,7 +73,11 @@ function PartnerPremiumCard({ partner }: { partner: FooterPartner }) {
   );
 
   const cardClass =
-    'partner-premium-card group relative flex flex-col items-center text-center p-8 md:p-9 rounded-3xl bg-white dark:bg-slate-900/95 border border-slate-100 dark:border-slate-800 shadow-sm min-h-[260px] transition-all duration-300 ease-out hover:shadow-lg hover:-translate-y-1 hover:border-slate-200 focus-within:ring-2 focus-within:ring-[#D4AF37]/25 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-950';
+    `partner-premium-card group relative flex flex-col items-center text-center p-8 md:p-9 rounded-3xl min-h-[260px] transition-all duration-300 ease-out hover:shadow-lg hover:-translate-y-1 focus-within:ring-2 focus-within:ring-[#D4AF37]/25 focus-within:ring-offset-2 ${
+      isDark
+        ? 'bg-[#081f3d] border border-[rgba(212,175,55,0.28)] shadow-none hover:border-[rgba(212,175,55,0.45)] focus-within:ring-offset-[#06182f]'
+        : 'bg-white dark:bg-slate-900/95 border border-slate-100 dark:border-slate-800 shadow-sm hover:border-slate-200 dark:focus-within:ring-offset-slate-950'
+    }`;
 
   if (partner.link) {
     return (
@@ -96,10 +100,18 @@ export function SuccessPartnersSection({
   partners,
   source = 'config',
   variant = 'success',
+  theme = 'light',
+  title,
+  subtitle,
+  hideHeader = false,
 }: {
   partners: FooterPartner[];
   source?: 'config' | 'featured-schools';
   variant?: 'success' | 'our';
+  theme?: 'light' | 'dark';
+  title?: string;
+  subtitle?: string;
+  hideHeader?: boolean;
 }) {
   const reduced = prefersReducedMotion();
 
@@ -114,6 +126,9 @@ export function SuccessPartnersSection({
   if (!partners.length) return null;
 
   const isOurVariant = variant === 'our';
+  const isDark = theme === 'dark';
+  const displayTitle = title || (isOurVariant ? 'شركاؤنا' : 'شركاء النجاح');
+  const displaySubtitle = subtitle || SUBTITLE;
 
   return (
     <section
@@ -122,16 +137,25 @@ export function SuccessPartnersSection({
       data-partners-section="premium"
       data-partners-source={source}
       data-partners-variant={variant}
+      data-partners-theme={theme}
     >
       <motion.div
         initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduced ? 0.01 : 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="rounded-3xl md:rounded-[2rem] px-6 py-12 md:px-10 md:py-16 shadow-[0_20px_48px_-28px_rgba(11,35,69,0.14)] border border-slate-200/60 dark:border-slate-800/60 overflow-hidden"
-        style={{
-          background:
-            'linear-gradient(165deg, #F7F8FA 0%, #ffffff 45%, rgba(212,175,55,0.08) 100%)',
-        }}
+        className={`rounded-3xl md:rounded-[2rem] px-6 py-12 md:px-10 md:py-16 overflow-hidden ${
+          isDark
+            ? 'border border-[rgba(212,175,55,0.28)] bg-[#0b2345] shadow-none'
+            : 'shadow-[0_20px_48px_-28px_rgba(11,35,69,0.14)] border border-slate-200/60 dark:border-slate-800/60'
+        }`}
+        style={
+          isDark
+            ? undefined
+            : {
+                background:
+                  'linear-gradient(165deg, #F7F8FA 0%, #ffffff 45%, rgba(212,175,55,0.08) 100%)',
+              }
+        }
       >
         {import.meta.env.DEV && (
           <p className="text-center text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-6">
@@ -139,34 +163,52 @@ export function SuccessPartnersSection({
           </p>
         )}
 
+        {!hideHeader && (
         <div className="text-center max-w-2xl mx-auto mb-10 md:mb-14">
           {!isOurVariant && (
-            <span className="inline-block px-4 py-1.5 rounded-full text-[11px] font-bold tracking-wide text-[#0B2345] dark:text-[#D4AF37] bg-white/80 dark:bg-slate-900/80 border border-[#D4AF37]/25 mb-4">
+            <span
+              className={`inline-block px-4 py-1.5 rounded-full text-[11px] font-bold tracking-wide mb-4 ${
+                isDark
+                  ? 'text-[#f2c866] bg-[#081f3d] border border-[rgba(212,175,55,0.28)]'
+                  : 'text-[#0B2345] dark:text-[#D4AF37] bg-white/80 dark:bg-slate-900/80 border border-[#D4AF37]/25'
+              }`}
+            >
               شركاؤنا
             </span>
           )}
           <h2
             id={isOurVariant ? 'our-partners-heading' : 'success-partners-heading'}
-            className="text-2xl md:text-4xl font-black text-[#0B2345] dark:text-white leading-tight mb-4"
+            className={`text-2xl md:text-4xl font-black leading-tight mb-4 ${isDark ? 'text-white' : 'text-[#0B2345] dark:text-white'}`}
           >
             {isOurVariant ? (
-              'شركاؤنا'
+              displayTitle
             ) : (
               <>
-                شركاء <span className="text-[#D4AF37]">النجاح</span>
+                {displayTitle.includes('النجاح') ? (
+                  <>
+                    شركاء <span className="text-[#D4AF37]">النجاح</span>
+                  </>
+                ) : (
+                  displayTitle
+                )}
               </>
             )}
           </h2>
           {!isOurVariant && (
-            <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 leading-[1.85] font-medium">
-              {SUBTITLE}
+            <p
+              className={`text-sm md:text-base leading-[1.85] font-medium ${
+                isDark ? 'text-[#cbd5e1]' : 'text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              {displaySubtitle}
             </p>
           )}
         </div>
+        )}
 
         <div className={`grid gap-6 md:gap-8 ${gridClassForCount(partners.length)}`}>
           {partners.map((partner) => (
-            <PartnerPremiumCard key={partner.id} partner={partner} />
+            <PartnerPremiumCard key={partner.id} partner={partner} isDark={isDark} />
           ))}
         </div>
       </motion.div>
