@@ -2,8 +2,6 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import {
   Building,
-  ChevronDown,
-  ChevronUp,
   Copy,
   Eye,
   EyeOff,
@@ -96,7 +94,7 @@ function SchoolIdCopy({ id, isRtl }: { id: string; isRtl: boolean }) {
       className="sx-sa-info-cell__value flex items-center gap-1 font-mono text-xs"
       aria-label={isRtl ? 'نسخ معرّف المدرسة' : 'Copy school ID'}
     >
-      <span className="truncate">{id.slice(0, 10)}…</span>
+      <span className="break-all">{id.slice(0, 10)}…</span>
       <Copy size={12} aria-hidden />
     </button>
   );
@@ -139,7 +137,6 @@ export function SuperAdminSchoolCard({
   onExtendSubscription,
   onSchoolPermanentDeleted,
 }: SuperAdminSchoolCardProps) {
-  const [expanded, setExpanded] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [visible, setVisible] = useState(!lazy);
   const rootRef = useRef<HTMLElement | null>(null);
@@ -170,8 +167,6 @@ export function SuperAdminSchoolCard({
     return () => observer.disconnect();
   }, [lazy, visible]);
 
-  const toggleExpand = () => setExpanded((v) => !v);
-
   if (!visible) {
     return (
       <div
@@ -187,7 +182,7 @@ export function SuperAdminSchoolCard({
   return (
     <article
       ref={rootRef}
-      className={`sx-sa-school-card ${expanded ? 'sx-sa-school-card--expanded' : ''}`}
+      className="sx-school-card sx-sa-school-card"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <header className="sx-sa-school-card__head">
@@ -236,25 +231,6 @@ export function SuperAdminSchoolCard({
         </span>
       </div>
 
-      <button
-        type="button"
-        className="sx-sa-school-card__expand"
-        onClick={toggleExpand}
-        aria-expanded={expanded}
-      >
-        {expanded ? (
-          <>
-            <ChevronUp size={16} aria-hidden />
-            {isRtl ? 'إخفاء التفاصيل' : 'Hide details'}
-          </>
-        ) : (
-          <>
-            <ChevronDown size={16} aria-hidden />
-            {isRtl ? 'عرض التفاصيل' : 'Show details'}
-          </>
-        )}
-      </button>
-
       <div className="sx-sa-school-card__info-grid sx-sa-school-card__info-grid--details">
         <div className="sx-sa-info-cell">
           <p className="sx-sa-info-cell__label">{isRtl ? 'المحافظة' : 'Governorate'}</p>
@@ -291,7 +267,7 @@ export function SuperAdminSchoolCard({
             <p className="sx-sa-info-cell__label">{isRtl ? 'مدير المدرسة' : 'Admin'}</p>
             <p className="sx-sa-info-cell__value flex items-center gap-1.5 min-w-0">
               <User size={14} className="shrink-0" aria-hidden />
-              <span className="truncate">{school.adminName}</span>
+              <span className="break-words">{school.adminName}</span>
             </p>
           </div>
         ) : null}

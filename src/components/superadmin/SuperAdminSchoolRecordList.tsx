@@ -71,10 +71,10 @@ export function SuperAdminSchoolRecordList({
   const useLazy = schools.length > LAZY_THRESHOLD;
 
   return (
-    <div className="sx-sa-schools-grid-wrap">
-      <div className="sx-sa-schools-grid" role="list">
+    <div className="sx-schools-grid-root sx-sa-schools-grid-wrap">
+      <div className="sx-schools-grid sx-sa-schools-grid" role="list">
         {schools.map((school) => (
-          <div key={school.id} role="listitem">
+          <div key={school.id} role="listitem" className="sx-schools-grid__item">
             <SuperAdminSchoolCard
               school={school}
               packages={packages}

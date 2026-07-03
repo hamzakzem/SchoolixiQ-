@@ -2589,7 +2589,7 @@ export default function SuperAdminDashboard() {
                     />
                   </div>
 
-                  <div className="sx-section sx-schools-table-panel sx-schools-table-panel--expanded sx-sa-schools-panel bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none !p-0 overflow-hidden">
+                  <div className="sx-section sx-sa-schools-panel bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none !p-0 overflow-visible">
                     <div className="sx-section-bar !mb-0 px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-800/20">
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="p-2 md:p-3 bg-[var(--sx-navy,#0f172a)] rounded-xl md:rounded-2xl text-[var(--sx-gold,#d4a853)] shadow-sm shrink-0">
@@ -2643,7 +2643,7 @@ export default function SuperAdminDashboard() {
                       directorateOptions={schoolDirectorateOptions}
                     />
 
-                    <div className="sx-school-record-list-body">
+                    <div className="sx-school-record-list-body sx-sa-schools-list-flow">
                       <SuperAdminSchoolRecordList
                         schools={paginatedSchools}
                         packages={packages}

@@ -1,8 +1,153 @@
-/* Super Admin — Schools network grid (v2) */
+/* ═══════════════════════════════════════════════════════════════
+   Decoupled Grid System — Super Admin schools network
+   Panel → flow only | List → no flex lock | Grid → independent | Card → autonomous
+   ═══════════════════════════════════════════════════════════════ */
 
+/* Level 1 — Panel: flow container only (never controls child height) */
 .sx-sa-schools-panel {
-  overflow: hidden;
-  max-width: 100%;
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  flex: none !important;
+  overflow: visible !important;
+  width: 100%;
+  max-width: none;
+  margin-bottom: 24px;
+  border-radius: 20px;
+}
+
+.sx-sa-schools-panel.sx-schools-table-panel,
+.sx-sa-schools-panel.sx-schools-table-panel--expanded {
+  display: block !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  flex: none !important;
+  overflow: visible !important;
+}
+
+/* Level 2 — List wrapper: break flex hierarchy from design-system */
+.sx-sa-schools-panel .sx-school-record-list-body,
+.sx-sa-schools-list-flow {
+  display: block !important;
+  flex: unset !important;
+  flex-grow: unset !important;
+  flex-shrink: unset !important;
+  min-height: auto !important;
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  width: 100% !important;
+}
+
+/* Level 3 — Grid root: decoupled from panel flex */
+.sx-schools-grid-root,
+.sx-sa-schools-grid-wrap {
+  padding: 16px;
+  overflow: visible;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  box-sizing: border-box;
+  display: block;
+}
+
+/* Level 3 — Grid: independent SaaS layout */
+.sx-schools-grid,
+.sx-sa-schools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  overflow: visible;
+  align-items: start;
+}
+
+.sx-schools-grid__item,
+.sx-schools-grid > [role='listitem'],
+.sx-sa-schools-grid > [role='listitem'] {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+@media (max-width: 768px) {
+  .sx-schools-grid-root,
+  .sx-sa-schools-grid-wrap {
+    padding: 14px 16px 20px;
+  }
+
+  .sx-schools-grid,
+  .sx-sa-schools-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .sx-school-card,
+  .sx-sa-school-card {
+    width: 100%;
+  }
+}
+
+/* Level 4 — Card: fully independent unit */
+.sx-school-card,
+.sx-sa-school-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: auto;
+  min-height: 240px;
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+  font-family: Cairo, sans-serif;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.sx-school-card:hover,
+.sx-sa-school-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
+  border-color: rgba(212, 175, 55, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sx-school-card,
+  .sx-sa-school-card {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .sx-school-card:hover,
+  .sx-sa-school-card:hover {
+    transform: none;
+  }
+}
+
+html.dark .sx-school-card,
+html.dark .sx-sa-school-card {
+  background: #0f172a;
+  border-color: rgba(212, 175, 55, 0.22);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+html.dark .sx-school-card:hover,
+html.dark .sx-sa-school-card:hover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  border-color: rgba(212, 175, 55, 0.4);
 }
 
 .sx-sa-schools-filters {
@@ -81,53 +226,6 @@ html.dark .sx-sa-schools-filters__select {
   background: #0f172a;
   border-color: #334155;
   color: #f8fafc;
-}
-
-.sx-sa-schools-grid-wrap {
-  padding: 16px 20px 24px;
-  overflow-x: hidden;
-  max-width: 100%;
-}
-
-.sx-sa-schools-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  width: 100%;
-  max-width: 100%;
-}
-
-@media (min-width: 640px) {
-  .sx-sa-schools-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 20px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .sx-sa-schools-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-.sx-sa-school-card {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  border-radius: 20px;
-  border: 1px solid var(--sx-border, #e2e8f0);
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-  min-width: 0;
-  max-width: 100%;
-  font-family: Cairo, sans-serif;
-}
-
-html.dark .sx-sa-school-card {
-  background: #0f172a;
-  border-color: #334155;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 .sx-sa-school-card__head {
@@ -333,17 +431,12 @@ html.dark .sx-sa-stat-chip--plan {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
+  width: 100%;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 480px) {
   .sx-sa-school-card__info-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1200px) {
-  .sx-sa-school-card__info-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -374,59 +467,31 @@ html.dark .sx-sa-info-cell__value {
 }
 
 .sx-sa-school-card__expand {
-  display: none;
+  display: none !important;
 }
 
-@media (max-width: 639px) {
-  .sx-sa-school-card__expand {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    min-height: 44px;
-    border-radius: 14px;
-    border: 1px dashed var(--sx-border, #cbd5e1);
-    background: transparent;
-    font-family: Cairo, sans-serif;
-    font-weight: 600;
-    font-size: 0.8125rem;
-    color: var(--sx-navy, #0f172a);
-    cursor: pointer;
-  }
-
-  html.dark .sx-sa-school-card__expand {
-    color: #e2e8f0;
-    border-color: #475569;
-  }
-
-  .sx-sa-school-card__info-grid--details {
-    display: none;
-  }
-
-  .sx-sa-school-card--expanded .sx-sa-school-card__info-grid--details {
-    display: grid;
-  }
-}
-
-@media (min-width: 640px) {
-  .sx-sa-school-card__info-grid--details {
-    display: grid;
-  }
+.sx-sa-school-card__info-grid--details {
+  display: grid !important;
 }
 
 .sx-sa-school-card__toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--sx-border, #e2e8f0);
+  width: 100%;
 }
 
 html.dark .sx-sa-school-card__toolbar {
   border-color: #334155;
+}
+
+.sx-sa-school-card__lifecycle {
+  margin-top: 8px;
+  width: 100%;
 }
 
 .sx-sa-icon-btn {
@@ -479,14 +544,15 @@ html.dark .sx-sa-icon-btn {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 0;
-  right: 0;
-  z-index: 30;
+  right: auto;
+  z-index: 40;
   padding: 12px;
   border-radius: 16px;
   border: 1px solid var(--sx-border, #e2e8f0);
   background: #fff;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
-  max-width: 100%;
+  min-width: min(100%, 280px);
+  max-width: min(100vw - 32px, 320px);
 }
 
 html.dark .sx-sa-more-menu__panel {
@@ -502,15 +568,14 @@ html.dark .sx-sa-more-menu__panel {
   }
 }
 
-.sx-sa-school-card__lifecycle {
-  margin-top: 8px;
-}
-
 .sx-sa-school-card-placeholder {
-  min-height: 200px;
+  min-height: 240px;
+  height: auto;
+  width: 100%;
   border-radius: 20px;
   border: 1px dashed var(--sx-border, #e2e8f0);
   background: var(--sx-surface-muted, #f8fafc);
+  overflow: visible;
 }
 
 .sx-sa-schools-empty {
