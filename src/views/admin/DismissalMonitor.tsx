@@ -2,7 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { subscribeSchoolDismissals, groupDismissalsByClass, filterVerifiedForManager, managerApproveDismissal, managerRejectDismissal } from '../../lib/dismissalService';
+import {
+  subscribeSchoolDismissals,
+  filterVerifiedForManager,
+  managerApproveDismissal,
+  managerRejectDismissal,
+} from '../../lib/dismissalService';
 import {
   ACTIVE_DISMISSAL_STATUSES,
   DISMISSAL_STATUS_LABELS,
@@ -11,13 +16,14 @@ import {
   type DismissalRequest,
   type DismissalStatus,
 } from '../../lib/dismissalTypes';
-import { ShieldCheck, Filter, CheckCircle, XCircle } from 'lucide-react';
+import { Filter, CheckCircle, XCircle, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import DismissalStudentCard from '../../components/dismissal/DismissalStudentCard';
-import { DismissalWorkflowGraph } from '../../components/dismissal/DismissalWorkflowGraph';
-import { DismissalWorkflowDebug } from '../../components/dismissal/DismissalWorkflowDebug';
+import { DismissalWorkflowListShell, DismissalListRow } from '../../components/dismissal/DismissalWorkflow';
+import { DismissalActionHighlight } from '../../components/dismissal/DismissalActionHighlight';
+import { DismissalStepper } from '../../components/dismissal/DismissalStepper';
 import { DismissalTimeline } from '../../components/dismissal/DismissalTimeline';
-import { DismissalStatusBadge } from '../../components/ui/DismissalStatusBadge';
+import { DismissalWorkflowDebug } from '../../components/dismissal/DismissalWorkflowDebug';
+import '../../styles/dismissal-workflow.css';
 
 type SchoolClass = { id: string; name: string };
 
@@ -29,6 +35,7 @@ export default function DismissalMonitor() {
   const [classFilter, setClassFilter] = useState('all');
   const [rejectReason, setRejectReason] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile?.schoolId) return;
@@ -58,35 +65,36 @@ export default function DismissalMonitor() {
     return d.getTime() / 1000;
   }, []);
 
-  const stats = useMemo(() => ({
-    active: requests.filter((r) => ACTIVE_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r))).length,
-    completedToday: requests.filter(
-      (r) => resolveDismissalStatus(r) === 'DISMISSED' && (r.dismissedAt?.seconds || r.managerVerifiedAt?.seconds || 0) >= todayStart,
-    ).length,
-    rejected: requests.filter((r) =>
-      TERMINAL_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)) && resolveDismissalStatus(r) !== 'DISMISSED',
-    ).length,
-  }), [requests, todayStart]);
+  const stats = useMemo(
+    () => ({
+      active: requests.filter((r) =>
+        ACTIVE_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)),
+      ).length,
+      completedToday: requests.filter(
+        (r) =>
+          resolveDismissalStatus(r) === 'DISMISSED' &&
+          (r.dismissedAt?.seconds || r.managerVerifiedAt?.seconds || 0) >= todayStart,
+      ).length,
+      rejected: requests.filter(
+        (r) =>
+          TERMINAL_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)) &&
+          resolveDismissalStatus(r) !== 'DISMISSED',
+      ).length,
+    }),
+    [requests, todayStart],
+  );
 
   const managerQueue = useMemo(() => filterVerifiedForManager(requests), [requests]);
 
-  const filtered = useMemo(() => {
-    return requests.filter((r) => {
-      if (statusFilter !== 'all' && resolveDismissalStatus(r) !== statusFilter) return false;
-      if (classFilter !== 'all' && r.classId !== classFilter) return false;
-      return true;
-    });
-  }, [requests, statusFilter, classFilter]);
-
-  const activeByClass = useMemo(() => {
-    const active = filtered.filter((r) => ACTIVE_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)));
-    return groupDismissalsByClass(active);
-  }, [filtered]);
-
-  const completedByClass = useMemo(() => {
-    const done = filtered.filter((r) => resolveDismissalStatus(r) === 'DISMISSED');
-    return groupDismissalsByClass(done);
-  }, [filtered]);
+  const filtered = useMemo(
+    () =>
+      requests.filter((r) => {
+        if (statusFilter !== 'all' && resolveDismissalStatus(r) !== statusFilter) return false;
+        if (classFilter !== 'all' && r.classId !== classFilter) return false;
+        return true;
+      }),
+    [requests, statusFilter, classFilter],
+  );
 
   const handleApprove = async (requestId: string) => {
     if (!profile) return;
@@ -96,7 +104,8 @@ export default function DismissalMonitor() {
         uid: profile.uid,
         name: profile.name || 'مدير',
       });
-      toast.success('تم اعتماد التسريح');
+      toast.success('تم اعتماد التسريح النهائي');
+      setConfirmId(null);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'فشل الاعتماد');
     } finally {
@@ -124,155 +133,150 @@ export default function DismissalMonitor() {
     }
   };
 
-  const classNameById = useMemo(() => {
-    const map: Record<string, string> = {};
-    schoolClasses.forEach((c) => { map[c.id] = c.name; });
-    requests.forEach((r) => {
-      if (r.classId) map[r.classId] = r.className || map[r.classId];
-    });
-    return map;
-  }, [schoolClasses, requests]);
-
   return (
-    <div className="space-y-8 animate-in fade-in duration-500" dir="rtl">
-      <div>
-        <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-          <ShieldCheck size={28} />
-          البوابة الذكية / التسريح الآمن — مراقبة التسريح
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 font-bold mt-1">
-          متابعة طلبات التسريح الآمن حسب الصفوف المسجلة في المدرسة
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: 'نشطة الآن', value: stats.active, tone: 'text-amber-600 bg-amber-50' },
-          { label: 'مكتملة اليوم', value: stats.completedToday, tone: 'text-emerald-600 bg-emerald-50' },
-          { label: 'مرفوضة / منتهية', value: stats.rejected, tone: 'text-slate-600 bg-slate-100' },
-        ].map((s) => (
-          <div key={s.label} className={`rounded-2xl p-5 border ${s.tone}`}>
-            <p className="text-xs font-bold uppercase">{s.label}</p>
-            <p className="text-3xl font-black mt-1">{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-3 items-center">
-        <Filter size={16} className="text-slate-400" />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="px-4 py-2 rounded-xl border font-bold text-sm bg-white"
-        >
-          <option value="all">كل الحالات</option>
-          {Object.entries(DISMISSAL_STATUS_LABELS).map(([id, l]) => (
-            <option key={id} value={id}>{l.ar}</option>
-          ))}
-        </select>
-        <select
-          value={classFilter}
-          onChange={(e) => setClassFilter(e.target.value)}
-          className="px-4 py-2 rounded-xl border font-bold text-sm bg-white"
-        >
-          <option value="all">كل الصفوف</option>
-          {schoolClasses.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {managerQueue.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-950/20 rounded-3xl border border-amber-200 dark:border-amber-900/40 p-5 space-y-4">
-          <h3 className="font-black text-amber-900 dark:text-amber-200">
-            بانتظار اعتماد الإدارة ({managerQueue.length})
-          </h3>
-          {managerQueue.map((r) => (
-            <div key={r.id} className="bg-white dark:bg-slate-900 rounded-2xl border p-4 space-y-3">
-              <DismissalStudentCard request={r} />
-              <DismissalWorkflowGraph request={r} locale="ar" />
-              <p className="text-xs text-slate-500">
-                تحقق الحارس: <strong>{r.guardVerifiedByName || '—'}</strong>
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={busyId === r.id}
-                  onClick={() => handleApprove(r.id)}
-                  className="flex items-center gap-1 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-50"
-                >
-                  <CheckCircle size={16} />
-                  اعتماد التسريح
-                </button>
-                <button
-                  type="button"
-                  disabled={busyId === r.id}
-                  onClick={() => handleReject(r.id)}
-                  className="flex items-center gap-1 px-4 py-2 bg-rose-100 text-rose-700 rounded-xl font-bold text-sm"
-                >
-                  <XCircle size={16} />
-                  رفض
-                </button>
-              </div>
-              <input
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="سبب الرفض (عند الحاجة)"
-                className="w-full px-3 py-2 rounded-lg border text-sm"
-              />
-            </div>
-          ))}
+    <div dir="rtl">
+      <DismissalWorkflowListShell
+        locale="ar"
+        title="مراقبة التسريح الآمن"
+        subtitle="اعتماد نهائي للطلبات التي تحققها الحارس (GUARD_VERIFIED)"
+        stats={[
+          { label: 'نشطة', value: stats.active },
+          { label: 'مكتملة اليوم', value: stats.completedToday },
+          { label: 'مرفوضة', value: stats.rejected },
+        ]}
+      >
+        <div className="col-span-full flex flex-wrap gap-3 items-center mb-2">
+          <Filter size={16} className="text-[var(--dw-gold-400)]" aria-hidden />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            className="dw-input w-auto min-w-[140px]"
+            aria-label="تصفية الحالة"
+          >
+            <option value="all">كل الحالات</option>
+            {Object.entries(DISMISSAL_STATUS_LABELS).map(([id, l]) => (
+              <option key={id} value={id}>
+                {l.ar}
+              </option>
+            ))}
+          </select>
+          <select
+            value={classFilter}
+            onChange={(e) => setClassFilter(e.target.value)}
+            className="dw-input w-auto min-w-[140px]"
+            aria-label="تصفية الصف"
+          >
+            <option value="all">كل الصفوف</option>
+            {schoolClasses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border p-5">
-          <h3 className="font-bold text-slate-800 mb-3">نشطة حسب الصف</h3>
-          {Object.keys(activeByClass).length === 0 ? (
-            <p className="text-sm text-slate-400 font-bold">لا توجد طلبات نشطة</p>
-          ) : (
-            Object.entries(activeByClass).map(([classId, items]) => (
-              <p key={classId} className="text-sm font-bold text-slate-600 py-1">
-                {classNameById[classId] || classId}: {items.length}
-              </p>
-            ))
-          )}
-        </div>
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border p-5">
-          <h3 className="font-bold text-slate-800 mb-3">مكتملة حسب الصف</h3>
-          {Object.keys(completedByClass).length === 0 ? (
-            <p className="text-sm text-slate-400 font-bold">لا توجد طلبات مكتملة</p>
-          ) : (
-            Object.entries(completedByClass).map(([classId, items]) => (
-              <p key={classId} className="text-sm font-bold text-slate-600 py-1">
-                {classNameById[classId] || classId}: {items.length}
-              </p>
-            ))
-          )}
-        </div>
-      </div>
+        {managerQueue.length > 0 && (
+          <section className="col-span-full space-y-4" aria-label="طلبات بانتظار الاعتماد">
+            <p className="dw-zone-label">
+              بانتظار اعتمادك ({managerQueue.length})
+            </p>
+            {managerQueue.map((r) => (
+              <article key={r.id} className="dw-glass-card dw-glass-card--no-lift border-2 border-[rgba(201,162,39,0.45)]">
+                <DismissalActionHighlight request={r} locale="ar" viewerRole="manager" />
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border overflow-hidden">
-        <div className="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
-          {filtered.map((r) => (
-            <div key={r.id} className="p-5 hover:bg-slate-50/50">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <DismissalStudentCard request={r} />
-                  <p className="text-[10px] font-mono text-indigo-600 mt-2">{r.token}</p>
+                <div className="flex flex-wrap justify-between gap-3 mb-4 mt-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-black/30 border border-[var(--dw-glass-border)] flex items-center justify-center overflow-hidden">
+                      {r.photoUrl ? (
+                        <img src={r.photoUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <User size={20} className="text-[var(--dw-gold-400)]" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-lg">{r.studentName}</h3>
+                      <p className="text-xs text-[var(--dw-slate-muted)]">{r.className}</p>
+                    </div>
+                  </div>
+                  <span className="dw-badge dw-badge--pending">GUARD_VERIFIED</span>
                 </div>
-                <DismissalStatusBadge status={resolveDismissalStatus(r)} />
-              </div>
-              <DismissalWorkflowGraph request={r} locale="ar" showLegend={false} />
-              <DismissalTimeline request={r} compact />
-              <DismissalWorkflowDebug request={r} locale="ar" />
-            </div>
-          ))}
-          {filtered.length === 0 && (
-            <p className="text-center py-16 text-slate-400 font-bold">لا توجد طلبات</p>
-          )}
-        </div>
-      </div>
+
+                <DismissalStepper request={r} locale="ar" mode="full" />
+
+                <p className="text-sm text-[var(--dw-slate-muted)] mt-4">
+                  تحقق الحارس:{' '}
+                  <strong className="text-white">{r.guardVerifiedByName || '—'}</strong>
+                </p>
+
+                <div className="mt-4 p-3 rounded-xl bg-black/20 border border-white/10">
+                  <DismissalTimeline request={r} locale="ar" variant="enterprise" />
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {confirmId === r.id ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busyId === r.id}
+                        onClick={() => handleApprove(r.id)}
+                        className="dw-btn dw-btn--gold flex-1 min-w-[160px]"
+                        aria-label="تأكيد التسريح النهائي"
+                      >
+                        <CheckCircle size={16} />
+                        تأكيد التسريح النهائي
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmId(null)}
+                        className="dw-btn dw-btn--ghost"
+                      >
+                        إلغاء
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => setConfirmId(r.id)}
+                      className="dw-btn dw-btn--success"
+                    >
+                      <CheckCircle size={16} />
+                      اعتماد التسريح
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={busyId === r.id}
+                    onClick={() => handleReject(r.id)}
+                    className="dw-btn dw-btn--danger"
+                  >
+                    <XCircle size={16} />
+                    رفض
+                  </button>
+                </div>
+                <input
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="سبب الرفض (عند الحاجة)"
+                  className="dw-input mt-3"
+                  aria-label="سبب الرفض"
+                />
+                <DismissalWorkflowDebug request={r} locale="ar" />
+              </article>
+            ))}
+          </section>
+        )}
+
+        <section className="col-span-full mt-6" aria-label="كل الطلبات">
+          <p className="dw-zone-label">سجل الطلبات</p>
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+            {filtered.map((r) => (
+              <DismissalListRow key={r.id} request={r} locale="ar" />
+            ))}
+            {filtered.length === 0 && <p className="dw-empty">لا توجد طلبات</p>}
+          </div>
+        </section>
+      </DismissalWorkflowListShell>
     </div>
   );
 }

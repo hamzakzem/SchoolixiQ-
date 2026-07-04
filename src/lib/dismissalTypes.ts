@@ -327,3 +327,106 @@ export function getDismissalEvents(request: DismissalRequest): DismissalEvent[] 
     metadata: h.note ? { note: h.note } : undefined,
   }));
 }
+
+/** Who is responsible for the next action — for UX clarity */
+export function getDismissalResponsibleParty(
+  request: DismissalRequest,
+  locale: 'ar' | 'en' = 'ar',
+): { role: string; label: string } | null {
+  const status = resolveDismissalStatus(request);
+  const map: Record<string, { ar: string; en: string; role: string }> = {
+    REQUESTED: { ar: 'الحارس', en: 'Guard', role: 'guard' },
+    GUARD_REVIEWING: { ar: 'الحارس', en: 'Guard', role: 'guard' },
+    GUARD_VERIFIED: { ar: 'الإدارة', en: 'Manager', role: 'manager' },
+    MANAGER_REVIEWING: { ar: 'الإدارة', en: 'Manager', role: 'manager' },
+    APPROVED: { ar: 'الإدارة', en: 'Manager', role: 'manager' },
+  };
+  const entry = map[status];
+  if (!entry) return null;
+  return { role: entry.role, label: locale === 'ar' ? entry.ar : entry.en };
+}
+
+export function eventTypeToRoleLabel(type: string, locale: 'ar' | 'en' = 'ar'): string {
+  const roles: Record<string, { ar: string; en: string }> = {
+    REQUEST_CREATED: { ar: 'ولي الأمر', en: 'Parent' },
+    GUARD_VERIFIED: { ar: 'الحارس', en: 'Guard' },
+    GUARD_REJECTED: { ar: 'الحارس', en: 'Guard' },
+    MANAGER_APPROVED: { ar: 'الإدارة', en: 'Manager' },
+    MANAGER_REJECTED: { ar: 'الإدارة', en: 'Manager' },
+    DISMISSED: { ar: 'النظام', en: 'System' },
+    SYSTEM_RECONCILE: { ar: 'النظام', en: 'System' },
+  };
+  return roles[type]?.[locale] || type;
+}
+
+export type DismissalViewerRole = 'parent' | 'guard' | 'manager' | 'admin';
+
+/** Action Highlight — what must happen next (decision layer, not history) */
+export function getDismissalActionRequired(
+  request: DismissalRequest,
+  locale: 'ar' | 'en' = 'ar',
+  viewerRole?: DismissalViewerRole,
+): {
+  actionLabel: string;
+  responsibleLabel: string;
+  responsibleRole: string;
+  tone: 'active' | 'done' | 'rejected';
+} | null {
+  const status = resolveDismissalStatus(request);
+  const responsible = getDismissalResponsibleParty(request, locale);
+  const isAr = locale === 'ar';
+
+  if (status === 'DISMISSED') {
+    return {
+      actionLabel: isAr ? 'تم التسريح — يمكن استلام الطالب' : 'Dismissed — pickup allowed',
+      responsibleLabel: isAr ? 'مكتمل' : 'Complete',
+      responsibleRole: 'system',
+      tone: 'done',
+    };
+  }
+  if (status === 'REJECTED' || status === 'EXPIRED') {
+    return {
+      actionLabel: isAr ? 'الطلب مغلق' : 'Request closed',
+      responsibleLabel: request.rejectReason || (isAr ? 'مرفوض' : 'Rejected'),
+      responsibleRole: 'system',
+      tone: 'rejected',
+    };
+  }
+
+  const byRole: Record<string, { ar: string; en: string }> = {
+    parent_REQUESTED: { ar: 'بانتظار تحقق الحارس عند البوابة', en: 'Waiting for guard verification' },
+    parent_GUARD_VERIFIED: { ar: 'بانتظار اعتماد الإدارة', en: 'Waiting for manager approval' },
+    guard_REQUESTED: { ar: 'مطابقة بيانات ولي الأمر والطالب', en: 'Verify parent & student data' },
+    manager_GUARD_VERIFIED: { ar: 'اعتماد التسريح النهائي', en: 'Final dismissal approval' },
+    _REQUESTED: { ar: 'بانتظار تحقق الحارس', en: 'Waiting for guard' },
+    _GUARD_VERIFIED: { ar: 'بانتظار اعتماد الإدارة', en: 'Waiting for manager' },
+  };
+
+  const key = viewerRole ? `${viewerRole}_${status}` : `_${status}`;
+  const action = byRole[key] || byRole[`_${status}`];
+  const actionLabel = action
+    ? isAr ? action.ar : action.en
+    : isAr
+      ? 'متابعة الطلب'
+      : 'Continue request';
+
+  if (!responsible) return null;
+
+  return {
+    actionLabel,
+    responsibleLabel: responsible.label,
+    responsibleRole: responsible.role,
+    tone: 'active',
+  };
+}
+
+/** Current step index for compact stepper (state only, no event names) */
+export function getDismissalCurrentStepIndex(request: DismissalRequest): number {
+  const states = getWorkflowNodeStates(request);
+  const current = states.indexOf('current');
+  if (current >= 0) return current;
+  const rejected = states.indexOf('rejected');
+  if (rejected >= 0) return rejected;
+  if (states.every((s) => s === 'completed')) return states.length - 1;
+  return 0;
+}

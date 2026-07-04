@@ -1,20 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { toast } from 'react-hot-toast';
-import { DoorOpen, QrCode, Clock, CheckCircle } from 'lucide-react';
-import {
-  createDismissalRequest,
-  subscribeParentDismissals,
-} from '../../lib/dismissalService';
+import { QrCode, User } from 'lucide-react';
+import { createDismissalRequest, subscribeParentDismissals } from '../../lib/dismissalService';
 import {
   ACTIVE_DISMISSAL_STATUSES,
   resolveDismissalStatus,
+  DISMISSAL_STATUS_LABELS,
   type DismissalRequest,
 } from '../../lib/dismissalTypes';
-import DismissalStudentCard from '../../components/dismissal/DismissalStudentCard';
-import { DismissalTimeline } from '../../components/dismissal/DismissalTimeline';
-import { DismissalWorkflowGraph } from '../../components/dismissal/DismissalWorkflowGraph';
-import { DismissalStatusBadge } from '../../components/ui/DismissalStatusBadge';
+import { DismissalWorkflow } from '../../components/dismissal/DismissalWorkflow';
+import '../../styles/dismissal-workflow.css';
 
 type StudentOption = {
   id: string;
@@ -37,13 +33,13 @@ export default function ParentDismissalTab({
   selectedStudent,
   isRtl = true,
 }: Props) {
+  const locale = isRtl ? 'ar' : 'en';
   const { profile } = useAuth();
   const [requests, setRequests] = useState<DismissalRequest[]>([]);
   const [pickupName, setPickupName] = useState('');
   const [pickupRelation, setPickupRelation] = useState('');
   const [pickupNote, setPickupNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [lastToken, setLastToken] = useState('');
   const [pickedStudentId, setPickedStudentId] = useState('');
 
   useEffect(() => {
@@ -52,15 +48,15 @@ export default function ParentDismissalTab({
   }, [profile?.uid, profile?.schoolId]);
 
   useEffect(() => {
-    const initial = selectedStudent?.id || students[0]?.id || '';
-    setPickedStudentId(initial);
+    setPickedStudentId(selectedStudent?.id || students[0]?.id || '');
   }, [selectedStudent?.id, students]);
 
   const student = students.find((s) => s.id === pickedStudentId) || null;
-
   const activeForStudent = student
     ? requests.find(
-        (r) => r.studentId === student.id && ACTIVE_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)),
+        (r) =>
+          r.studentId === student.id &&
+          ACTIVE_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)),
       )
     : null;
 
@@ -69,14 +65,9 @@ export default function ParentDismissalTab({
       toast.error('اختر طالباً مرتبطاً بحسابك');
       return;
     }
-    if (!students.some((s) => s.id === student.id)) {
-      toast.error('هذا الطالب غير مرتبط بحسابك');
-      return;
-    }
-
     setSubmitting(true);
     try {
-      const result = await createDismissalRequest({
+      await createDismissalRequest({
         schoolId: profile.schoolId,
         studentId: student.id,
         parentId: profile.uid,
@@ -86,10 +77,9 @@ export default function ParentDismissalTab({
         pickupPersonRelation: pickupRelation.trim() || 'ولي أمر',
         pickupNote: pickupNote.trim(),
       });
-      setLastToken(result.token);
       toast.success('تم إرسال طلب التسريح');
-    } catch (e: any) {
-      toast.error(e.message || 'فشل إرسال الطلب');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'فشل إرسال الطلب');
     } finally {
       setSubmitting(false);
     }
@@ -97,142 +87,143 @@ export default function ParentDismissalTab({
 
   if (students.length === 0) {
     return (
-      <div className="py-16 text-center text-slate-400 font-bold" dir="rtl">
-        لا يوجد أبناء مرتبطون بحسابك
+      <div className="dw-root dw-root--embedded" dir="rtl">
+        <p className="dw-empty">لا يوجد أبناء مرتبطون بحسابك</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6" dir={isRtl ? 'rtl' : 'ltr'}>
-      <div>
-        <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-          <DoorOpen size={24} />
-          {isRtl ? 'طلب تسريح الطالب' : 'Student dismissal request'}
-        </h2>
-        <p className="text-sm text-slate-500 mt-1 font-bold">
-          {isRtl
-            ? 'اختر أحد أبنائك المسجلين — يتم التحقق من الصف من سجل المدرسة'
-            : 'Pick a linked child — class is verified from school records'}
-        </p>
-      </div>
+    <div className="space-y-6">
+      <DismissalWorkflow
+        request={activeForStudent}
+        locale={locale}
+        viewerRole="parent"
+        embedded
+        title={isRtl ? 'التسريح الآمن' : 'Safe dismissal'}
+        subtitle={
+          isRtl
+            ? 'عملية محكومة — أين نحن الآن + ماذا حدث'
+            : 'Controlled process — state + history'
+        }
+      >
+        <div className="space-y-4">
+          {students.length > 1 && (
+            <div className="dw-glass-card dw-glass-card--flat">
+              <label className="dw-zone-label" htmlFor="dw-student-pick">
+                {isRtl ? 'اختر الطالب' : 'Select student'}
+              </label>
+              <select
+                id="dw-student-pick"
+                value={pickedStudentId}
+                onChange={(e) => setPickedStudentId(e.target.value)}
+                className="dw-input"
+                aria-label={isRtl ? 'اختيار الطالب' : 'Student selection'}
+              >
+                {students.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                    {s.className || s.class ? ` — ${s.className || s.class}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-        {students.length > 1 && (
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-2">اختر الطالب</label>
-            <select
-              value={pickedStudentId}
-              onChange={(e) => setPickedStudentId(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border font-bold bg-white"
-            >
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                  {s.className || s.class ? ` — ${s.className || s.class}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {student && (
-          <>
-            <DismissalStudentCard
-              request={{
-                studentName: student.name,
-                className: student.className || student.class || '—',
-                registrationNumber: student.registrationNumber,
-                photoUrl: student.photoUrl,
-                parentName: profile?.name || '',
-                requestedByName: profile?.name || '',
-              }}
-            />
-
-            {!activeForStudent ? (
-              <>
-                <input
-                  value={pickupName}
-                  onChange={(e) => setPickupName(e.target.value)}
-                  placeholder={isRtl ? 'اسم المستلم (اختياري)' : 'Pickup person name'}
-                  className="w-full px-4 py-3 rounded-xl border font-bold"
-                />
-                <input
-                  value={pickupRelation}
-                  onChange={(e) => setPickupRelation(e.target.value)}
-                  placeholder={isRtl ? 'صلة القرابة' : 'Relation'}
-                  className="w-full px-4 py-3 rounded-xl border font-bold"
-                />
-                <textarea
-                  value={pickupNote}
-                  onChange={(e) => setPickupNote(e.target.value)}
-                  placeholder={isRtl ? 'ملاحظة للبوابة (اختياري)' : 'Note for guard'}
-                  className="w-full px-4 py-3 rounded-xl border font-bold min-h-[80px]"
-                />
-                <button
-                  onClick={handleRequest}
-                  disabled={submitting}
-                  className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black disabled:opacity-50"
-                >
-                  {isRtl ? 'أنا عند البوابة — إرسال الطلب' : 'I am at the gate — Send request'}
-                </button>
-              </>
-            ) : (
-              <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-100 space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-bold text-emerald-800 flex items-center gap-2">
-                    <Clock size={16} />
-                    {isRtl ? 'متابعة الطلب' : 'Request progress'}
-                  </p>
-                  <DismissalStatusBadge status={resolveDismissalStatus(activeForStudent)} locale={isRtl ? 'ar' : 'en'} />
+          {student && (
+            <div className="dw-glass-card">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="w-14 h-14 rounded-xl bg-black/30 border border-[var(--dw-glass-border)] flex items-center justify-center overflow-hidden shrink-0">
+                  {student.photoUrl ? (
+                    <img src={student.photoUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <User size={24} className="text-[var(--dw-gold-400)]" aria-hidden />
+                  )}
                 </div>
-                <DismissalWorkflowGraph request={activeForStudent} locale={isRtl ? 'ar' : 'en'} />
-                <DismissalTimeline request={activeForStudent} locale={isRtl ? 'ar' : 'en'} compact />
-                <DismissalStudentCard request={activeForStudent} />
-                <div className="flex items-center gap-3 p-4 bg-white rounded-xl border">
-                  <QrCode size={32} className="text-slate-700" />
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">رمز التسليم</p>
-                    <p className="text-2xl font-black font-mono tracking-widest text-slate-900">
-                      {activeForStudent.token}
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      {activeForStudent.className} — صالح لمدة 10 دقائق
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {lastToken && !activeForStudent && (
-              <p className="text-xs font-mono text-center text-slate-500">آخر رمز: {lastToken}</p>
-            )}
-          </>
-        )}
-      </div>
-
-      {requests.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border p-6 space-y-3">
-          <h3 className="font-bold text-slate-800">{isRtl ? 'سجل الطلبات' : 'Request history'}</h3>
-          {requests.slice(0, 10).map((r) => (
-            <div key={r.id} className="p-4 rounded-xl bg-slate-50 space-y-3">
-              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <span className="font-bold block text-sm">{r.studentName}</span>
-                  <span className="text-[10px] text-slate-400">{r.className}</span>
+                  <p className="font-bold text-lg text-white">{student.name}</p>
+                  <p className="text-sm text-[var(--dw-slate-muted)]">{student.className || student.class}</p>
+                  {student.registrationNumber && (
+                    <p className="text-xs font-mono text-[var(--dw-gold-400)] mt-1">
+                      #{student.registrationNumber}
+                    </p>
+                  )}
                 </div>
-                <DismissalStatusBadge status={resolveDismissalStatus(r)} locale={isRtl ? 'ar' : 'en'} />
               </div>
-              <DismissalWorkflowGraph request={r} locale={isRtl ? 'ar' : 'en'} showLegend={false} />
-              <DismissalTimeline request={r} locale={isRtl ? 'ar' : 'en'} compact />
-              {resolveDismissalStatus(r) === 'DISMISSED' && (
-                <p className="text-[10px] text-emerald-600 flex items-center gap-1">
-                  <CheckCircle size={12} />
-                  {isRtl ? 'تم التسريح بنجاح' : 'Dismissed successfully'}
-                </p>
+
+              {!activeForStudent ? (
+                <div className="space-y-3">
+                  <input
+                    value={pickupName}
+                    onChange={(e) => setPickupName(e.target.value)}
+                    placeholder={isRtl ? 'اسم المستلم (اختياري)' : 'Pickup person'}
+                    className="dw-input"
+                    aria-label={isRtl ? 'اسم المستلم' : 'Pickup name'}
+                  />
+                  <input
+                    value={pickupRelation}
+                    onChange={(e) => setPickupRelation(e.target.value)}
+                    placeholder={isRtl ? 'صلة القرابة' : 'Relation'}
+                    className="dw-input"
+                  />
+                  <textarea
+                    value={pickupNote}
+                    onChange={(e) => setPickupNote(e.target.value)}
+                    placeholder={isRtl ? 'ملاحظة للبوابة' : 'Note for guard'}
+                    className="dw-input min-h-[72px] resize-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRequest}
+                    disabled={submitting}
+                    className="dw-btn dw-btn--gold w-full"
+                    aria-busy={submitting}
+                  >
+                    {isRtl ? 'أنا عند البوابة — طلب تسريح' : 'Request dismissal at gate'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="dw-token-box" role="group" aria-label={isRtl ? 'رمز التسليم' : 'Pickup token'}>
+                    <QrCode size={36} className="text-[var(--dw-gold-400)] shrink-0" aria-hidden />
+                    <div>
+                      <p className="text-[10px] font-semibold text-[var(--dw-slate-muted)] uppercase">
+                        {isRtl ? 'رمز التسليم' : 'Pickup code'}
+                      </p>
+                      <p className="dw-token-box__code">{activeForStudent.token}</p>
+                      <p className="text-[10px] text-[var(--dw-slate-muted)] mt-1">
+                        {isRtl ? 'صالح 10 دقائق' : 'Valid 10 min'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[var(--dw-slate-muted)]" aria-live="polite">
+                    {DISMISSAL_STATUS_LABELS[resolveDismissalStatus(activeForStudent)]?.[locale]}
+                  </p>
+                </div>
               )}
             </div>
-          ))}
+          )}
+        </div>
+      </DismissalWorkflow>
+
+      {requests.length > 0 && (
+        <div className="dw-root dw-root--embedded" dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className="dw-shell">
+            <p className="dw-zone-label">{isRtl ? 'سجل الطلبات' : 'History'}</p>
+            <div className="dw-panel-grid space-y-3">
+              {requests.slice(0, 8).map((r) => (
+                <div key={r.id} className="dw-glass-card dw-glass-card--flat">
+                  <div className="flex justify-between items-center gap-2 mb-2">
+                    <span className="font-semibold text-sm">{r.studentName}</span>
+                    <span className="dw-badge dw-badge--pending">
+                      {DISMISSAL_STATUS_LABELS[resolveDismissalStatus(r)]?.[locale]}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-[var(--dw-slate-muted)]">{r.className}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
