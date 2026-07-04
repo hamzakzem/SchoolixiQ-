@@ -86,8 +86,6 @@ import {
   TEACHER_NAV_SECTIONS,
   type DashboardMenuItem,
 } from "../lib/dashboardMenu";
-import TeacherDismissalTab from "./teacher/TeacherDismissalTab";
-import { DoorOpen } from "lucide-react";
 import {
   chunkArray,
   filterClassesForTeacher,
@@ -112,7 +110,6 @@ type Tab =
   | "settings"
   | "chat"
   | "schedules"
-  | "dismissal"
   | "market";
 
 import SolarLoading from "../components/SolarLoading";
@@ -1275,11 +1272,6 @@ export default function TeacherDashboard() {
       permission: "behavior_management",
     },
     {
-      id: "dismissal",
-      label: isRtl ? "التسريح الآمن" : "Safe dismissal",
-      icon: DoorOpen,
-    },
-    {
       id: "reports",
       label: isRtl ? "تقارير التقييم" : "Evaluation Reports",
       icon: FileText,
@@ -1308,7 +1300,7 @@ export default function TeacherDashboard() {
     if (perms && typeof perms === "object" && !Array.isArray(perms)) {
       return isTeacherMenuFeatureEnabled(item.id, perms);
     }
-    return item.id === "home" || item.id === "chat" || item.id === "dismissal";
+    return item.id === "home" || item.id === "chat";
   });
 
   const shellMenuItems = useMemo((): DashboardMenuItem[] => {
@@ -2181,15 +2173,6 @@ export default function TeacherDashboard() {
                 </div>
               )}
 
-              {activeTab === "dismissal" && (
-                <div className="animate-in fade-in duration-500">
-                  <TeacherDismissalTab
-                    assignedClassIds={assignedClassIds}
-                    assignedClassName={assignedClassName}
-                    isRtl={isRtl}
-                  />
-                </div>
-              )}
 
               {activeTab === "advanced_reports" && (
                 <div className="animate-in fade-in duration-500">

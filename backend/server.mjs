@@ -9,6 +9,9 @@ import { getStorage } from "firebase-admin/storage";
 import dotEnv from "dotenv";
 import fs from "fs";
 import crypto from "crypto";
+import { registerDismissalRoutes } from "./dismissalApi.mjs";
+import { registerDismissalRecoveryRoute } from "./dismissalRecoveryWorker.mjs";
+import { registerDismissalCompactionRoute } from "./dismissalCompactionWorker.mjs";
 
 // schoolPermanentDelete.mjs
 var SCHOOL_SCOPED_COLLECTIONS = [
@@ -2421,6 +2424,13 @@ async function startServer() {
       res.status(500).json({ success: false, error: error.message || "Push poll failed" });
     }
   });
+  registerDismissalRoutes(app, {
+    getDb,
+    verifyToken,
+    jsonParser: express.json(),
+  });
+  registerDismissalRecoveryRoute(app, { getDb, resolveCronSecret });
+  registerDismissalCompactionRoute(app, { getDb, resolveCronSecret });
   app.all("/api/*", (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.status(404).json({

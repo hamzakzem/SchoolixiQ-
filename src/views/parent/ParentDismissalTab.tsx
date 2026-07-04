@@ -7,10 +7,14 @@ import {
   subscribeParentDismissals,
 } from '../../lib/dismissalService';
 import {
-  DISMISSAL_STATUS_LABELS,
+  ACTIVE_DISMISSAL_STATUSES,
+  resolveDismissalStatus,
   type DismissalRequest,
 } from '../../lib/dismissalTypes';
 import DismissalStudentCard from '../../components/dismissal/DismissalStudentCard';
+import { DismissalTimeline } from '../../components/dismissal/DismissalTimeline';
+import { DismissalWorkflowGraph } from '../../components/dismissal/DismissalWorkflowGraph';
+import { DismissalStatusBadge } from '../../components/ui/DismissalStatusBadge';
 
 type StudentOption = {
   id: string;
@@ -56,9 +60,7 @@ export default function ParentDismissalTab({
 
   const activeForStudent = student
     ? requests.find(
-        (r) =>
-          r.studentId === student.id &&
-          ['waiting', 'called', 'ready'].includes(r.status),
+        (r) => r.studentId === student.id && ACTIVE_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)),
       )
     : null;
 
@@ -176,11 +178,16 @@ export default function ParentDismissalTab({
                 </button>
               </>
             ) : (
-              <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-100 space-y-3">
-                <p className="font-bold text-emerald-800 flex items-center gap-2">
-                  <Clock size={16} />
-                  {DISMISSAL_STATUS_LABELS[activeForStudent.status].ar}
-                </p>
+              <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-100 space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-bold text-emerald-800 flex items-center gap-2">
+                    <Clock size={16} />
+                    {isRtl ? 'متابعة الطلب' : 'Request progress'}
+                  </p>
+                  <DismissalStatusBadge status={resolveDismissalStatus(activeForStudent)} locale={isRtl ? 'ar' : 'en'} />
+                </div>
+                <DismissalWorkflowGraph request={activeForStudent} locale={isRtl ? 'ar' : 'en'} />
+                <DismissalTimeline request={activeForStudent} locale={isRtl ? 'ar' : 'en'} compact />
                 <DismissalStudentCard request={activeForStudent} />
                 <div className="flex items-center gap-3 p-4 bg-white rounded-xl border">
                   <QrCode size={32} className="text-slate-700" />
@@ -208,19 +215,21 @@ export default function ParentDismissalTab({
         <div className="bg-white dark:bg-slate-900 rounded-3xl border p-6 space-y-3">
           <h3 className="font-bold text-slate-800">{isRtl ? 'سجل الطلبات' : 'Request history'}</h3>
           {requests.slice(0, 10).map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center justify-between p-3 rounded-xl bg-slate-50 text-sm gap-3"
-            >
-              <div>
-                <span className="font-bold block">{r.studentName}</span>
-                <span className="text-[10px] text-slate-400">{r.className}</span>
+            <div key={r.id} className="p-4 rounded-xl bg-slate-50 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <span className="font-bold block text-sm">{r.studentName}</span>
+                  <span className="text-[10px] text-slate-400">{r.className}</span>
+                </div>
+                <DismissalStatusBadge status={resolveDismissalStatus(r)} locale={isRtl ? 'ar' : 'en'} />
               </div>
-              <span className="text-xs font-bold text-slate-500">
-                {DISMISSAL_STATUS_LABELS[r.status].ar}
-              </span>
-              {r.status === 'completed' && (
-                <CheckCircle size={14} className="text-emerald-500" />
+              <DismissalWorkflowGraph request={r} locale={isRtl ? 'ar' : 'en'} showLegend={false} />
+              <DismissalTimeline request={r} locale={isRtl ? 'ar' : 'en'} compact />
+              {resolveDismissalStatus(r) === 'DISMISSED' && (
+                <p className="text-[10px] text-emerald-600 flex items-center gap-1">
+                  <CheckCircle size={12} />
+                  {isRtl ? 'تم التسريح بنجاح' : 'Dismissed successfully'}
+                </p>
               )}
             </div>
           ))}

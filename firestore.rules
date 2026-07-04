@@ -1329,65 +1329,44 @@ service cloud.firestore {
           && dismissalData().parentId == request.auth.uid;
       }
 
-      function isDismissalParentCreate() {
-        return signedIn()
-          && isParent()
-          && dismissalRequestData().keys().hasAll(['parentId', 'studentId', 'schoolId', 'status', 'token'])
-          && dismissalRequestData().parentId == request.auth.uid
-          && dismissalRequestData().status == 'waiting'
-          && isParentOfStudent(dismissalRequestData().studentId)
-          && sameDismissalSchoolOnCreate();
-      }
-
-      function teacherCanReadDismissal() {
-        return isTeacher()
-          && sameDismissalSchool()
-          && dismissalData().keys().hasAll(['classId'])
-          && teacherCanAccessClass(dismissalData().classId);
-      }
-
-      function teacherCanUpdateDismissal() {
-        return teacherCanReadDismissal()
-          && request.resource.data.schoolId == dismissalData().schoolId
-          && request.resource.data.studentId == dismissalData().studentId
-          && request.resource.data.classId == dismissalData().classId
-          && request.resource.data.parentId == dismissalData().parentId
-          && request.resource.data.token == dismissalData().token
-          && request.resource.data.status in ['called', 'ready'];
-      }
-
-      function guardCanUpdateDismissal() {
-        return isGuard()
-          && sameDismissalSchool()
-          && request.resource.data.schoolId == dismissalData().schoolId
-          && request.resource.data.studentId == dismissalData().studentId
-          && request.resource.data.token == dismissalData().token
-          && request.resource.data.status in ['completed', 'cancelled'];
-      }
+      // Transitions are enforced server-side only (Admin SDK via /api/dismissal/*).
+      // Clients may read; direct writes are blocked except Super Admin maintenance.
 
       allow get: if isSuperAdmin()
         || (isDismissalSchoolStaff() && sameDismissalSchool())
         || (isGuard() && sameDismissalSchool())
-        || teacherCanReadDismissal()
         || isDismissalParentOwner();
 
       allow list: if isSuperAdmin()
         || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && (
           isDismissalSchoolStaff()
           || isGuard()
-          || teacherCanReadDismissal()
           || (isParent() && resource.data.keys().hasAll(['parentId']) && resource.data.parentId == request.auth.uid)
         ));
 
-      allow create: if isSuperAdmin() || isDismissalParentCreate();
+      allow create: if isSuperAdmin();
 
-      allow update: if isSuperAdmin()
-        || (isDismissalSchoolStaff() && sameDismissalSchool())
-        || (teacherCanUpdateDismissal())
-        || (guardCanUpdateDismissal());
+      allow update: if isSuperAdmin();
 
       allow delete: if isSuperAdmin()
         || (isDismissalSchoolStaff() && sameDismissalSchool());
+    }
+
+    match /dismissal_logs/{logId} {
+      allow read: if isSuperAdmin()
+        || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && isDismissalSchoolStaff());
+      allow write: if false;
+    }
+
+    match /dismissal_snapshots/{requestId} {
+      allow read: if isSuperAdmin()
+        || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && (
+          isDismissalSchoolStaff()
+          || isGuard()
+          || (isParent() && exists(/databases/$(database)/documents/dismissal_requests/$(requestId))
+            && get(/databases/$(database)/documents/dismissal_requests/$(requestId)).data.parentId == request.auth.uid)
+        ));
+      allow write: if false;
     }
 
     // -------------------------------------------------------------------------

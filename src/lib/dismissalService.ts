@@ -1,15 +1,11 @@
 import { db } from './firebase';
 import {
   collection,
-  addDoc,
-  updateDoc,
-  doc,
   query,
   where,
   getDocs,
   getDoc,
-  serverTimestamp,
-  Timestamp,
+  doc,
   onSnapshot,
   limit,
   type Unsubscribe,
@@ -17,11 +13,21 @@ import {
 import { notificationService } from './notificationService';
 import {
   ACTIVE_DISMISSAL_STATUSES,
+  GUARD_PENDING_STATUSES,
+  MANAGER_QUEUE_STATUSES,
   DISMISSAL_NO_VALID_CLASS_MSG,
+  coerceDismissalStatus,
+  reconcileDismissalRequest,
+  resolveDismissalStatus,
   type DismissalRequest,
-  type DismissalStatus,
-  type DismissalStatusEvent,
 } from './dismissalTypes';
+import {
+  apiCreateDismissalRequest,
+  apiGuardVerifyDismissal,
+  apiGuardRejectDismissal,
+  apiManagerApproveDismissal,
+  apiManagerRejectDismissal,
+} from './dismissalApiClient';
 
 export type VerifiedDismissalStudent = {
   studentId: string;
@@ -34,19 +40,18 @@ export type VerifiedDismissalStudent = {
   parentIds: string[];
 };
 
+export { DISMISSAL_NO_VALID_CLASS_MSG };
+
 export async function resolveVerifiedStudentForDismissal(
   studentId: string,
   parentId: string,
   schoolId: string,
 ): Promise<VerifiedDismissalStudent> {
   const studentSnap = await getDoc(doc(db, 'students', studentId));
-  if (!studentSnap.exists()) {
-    throw new Error('الطالب غير موجود');
-  }
+  if (!studentSnap.exists()) throw new Error('الطالب غير موجود');
 
   const data = studentSnap.data() as Record<string, unknown>;
-  const studentSchoolId = String(data.schoolId || '');
-  if (!studentSchoolId || studentSchoolId !== schoolId) {
+  if (String(data.schoolId || '') !== schoolId) {
     throw new Error('الطالب لا ينتمي لهذه المدرسة');
   }
 
@@ -58,36 +63,25 @@ export async function resolveVerifiedStudentForDismissal(
   }
 
   const classId = String(data.classId || '').trim();
-  if (!classId) {
-    throw new Error(DISMISSAL_NO_VALID_CLASS_MSG);
-  }
+  if (!classId) throw new Error(DISMISSAL_NO_VALID_CLASS_MSG);
 
   const classSnap = await getDoc(doc(db, 'classes', classId));
-  if (!classSnap.exists()) {
+  if (!classSnap.exists() || String(classSnap.data()?.schoolId || '') !== schoolId) {
     throw new Error(DISMISSAL_NO_VALID_CLASS_MSG);
   }
 
-  const classData = classSnap.data() as Record<string, unknown>;
-  if (String(classData.schoolId || '') !== schoolId) {
-    throw new Error(DISMISSAL_NO_VALID_CLASS_MSG);
-  }
-
-  const className = String(classData.name || '').trim();
-  if (!className) {
-    throw new Error(DISMISSAL_NO_VALID_CLASS_MSG);
-  }
+  const className = String(classSnap.data()?.name || '').trim();
+  if (!className) throw new Error(DISMISSAL_NO_VALID_CLASS_MSG);
 
   const studentName = String(data.name || '').trim();
-  if (!studentName) {
-    throw new Error('بيانات الطالب غير مكتملة');
-  }
+  if (!studentName) throw new Error('بيانات الطالب غير مكتملة');
 
   return {
     studentId,
     studentName,
     classId,
     className,
-    schoolId: studentSchoolId,
+    schoolId,
     registrationNumber: String(data.registrationNumber || ''),
     photoUrl: String(data.photoUrl || data.photo || ''),
     parentIds,
@@ -95,12 +89,6 @@ export async function resolveVerifiedStudentForDismissal(
 }
 
 export const DISMISSAL_COLLECTION = 'dismissal_requests';
-const TOKEN_TTL_MS = 10 * 60 * 1000;
-
-function generateToken(): string {
-  const part = () => Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `${part()}-${part()}`;
-}
 
 function toMillis(ts?: { seconds: number; nanoseconds?: number } | null): number {
   if (!ts?.seconds) return 0;
@@ -110,7 +98,7 @@ function toMillis(ts?: { seconds: number; nanoseconds?: number } | null): number
 export function isDismissalTokenExpired(
   request: Pick<DismissalRequest, 'tokenExpiresAt' | 'status'>,
 ): boolean {
-  if (request.status === 'expired') return true;
+  if (request.status === 'EXPIRED') return true;
   const expiresAt = toMillis(request.tokenExpiresAt);
   return expiresAt > 0 && Date.now() > expiresAt;
 }
@@ -119,34 +107,14 @@ export function normalizeDismissalDoc(
   id: string,
   data: Record<string, unknown>,
 ): DismissalRequest {
-  const req = { id, ...data } as DismissalRequest;
-  if (isDismissalTokenExpired(req) && ACTIVE_DISMISSAL_STATUSES.includes(req.status)) {
-    return { ...req, status: 'expired' };
+  const raw = { id, ...data } as DismissalRequest;
+  let req = reconcileDismissalRequest(raw);
+  const resolved = resolveDismissalStatus(req);
+  req = { ...req, status: resolved, derivedStatus: resolved };
+  if (isDismissalTokenExpired(req) && ACTIVE_DISMISSAL_STATUSES.includes(resolved)) {
+    req = { ...req, status: 'EXPIRED', derivedStatus: 'EXPIRED' };
   }
   return req;
-}
-
-async function appendStatusHistory(
-  requestId: string,
-  entry: Omit<DismissalStatusEvent, 'at'>,
-  context?: { studentId?: string; classId?: string },
-) {
-  const ref = doc(db, DISMISSAL_COLLECTION, requestId);
-  const snap = await getDoc(ref);
-  const existing = snap.data()?.statusHistory as DismissalStatusEvent[] | undefined;
-  const history = [
-    ...(existing || []),
-    {
-      ...entry,
-      studentId: entry.studentId || context?.studentId,
-      classId: entry.classId || context?.classId,
-      at: null,
-    },
-  ];
-  await updateDoc(ref, {
-    statusHistory: history,
-    updatedAt: serverTimestamp(),
-  });
 }
 
 async function notifySchoolGuards(
@@ -161,55 +129,16 @@ async function notifySchoolGuards(
   );
   const snap = await getDocs(q);
   const ids = snap.docs.map((d) => d.id);
-  if (ids.length === 0) return;
+  if (!ids.length) return;
   await notificationService.sendToMultiple(ids, {
     ...payload,
     schoolId,
     type: 'smart_gate',
-    metadata: {
-      ...(payload.metadata || {}),
-      routeTarget: 'smart_gate',
-    },
+    metadata: { ...(payload.metadata || {}), routeTarget: 'smart_gate' },
   });
 }
 
-async function notifyClassTeachers(
-  schoolId: string,
-  classId: string,
-  payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId' | 'type'>,
-) {
-  const q = query(
-    collection(db, 'users'),
-    where('schoolId', '==', schoolId),
-    where('role', '==', 'teacher'),
-    limit(100,
-    ),
-  );
-  const snap = await getDocs(q);
-  const ids = snap.docs
-    .filter((d) => {
-      const data = d.data();
-      const assignedIds = Array.isArray(data.assignedClassIds) ? data.assignedClassIds : [];
-      if (assignedIds.includes(classId)) return true;
-      const assigned =
-        data.assignedClassId || data.primaryClassId || data.classId || data.preferredClassId;
-      return assigned === classId;
-    })
-    .map((d) => d.id);
-  if (ids.length === 0) return;
-  await notificationService.sendToMultiple(ids, {
-    ...payload,
-    schoolId,
-    type: 'smart_gate',
-    metadata: {
-      ...(payload.metadata || {}),
-      routeTarget: 'dismissal',
-      classId,
-    },
-  });
-}
-
-async function notifySchoolAdmins(
+async function notifySchoolManagers(
   schoolId: string,
   payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId' | 'type'>,
 ) {
@@ -217,20 +146,16 @@ async function notifySchoolAdmins(
     collection(db, 'users'),
     where('schoolId', '==', schoolId),
     where('role', 'in', ['admin', 'school_admin', 'assistant']),
-    limit(50,
-    ),
+    limit(50),
   );
   const snap = await getDocs(q);
   const ids = snap.docs.map((d) => d.id);
-  if (ids.length === 0) return;
+  if (!ids.length) return;
   await notificationService.sendToMultiple(ids, {
     ...payload,
     schoolId,
     type: 'smart_gate',
-    metadata: {
-      ...(payload.metadata || {}),
-      routeTarget: 'dismissal_gate',
-    },
+    metadata: { ...(payload.metadata || {}), routeTarget: 'dismissal_gate' },
   });
 }
 
@@ -247,7 +172,7 @@ export async function findActiveDismissalForStudent(
   const snap = await getDocs(q);
   const active = snap.docs
     .map((d) => normalizeDismissalDoc(d.id, d.data() as Record<string, unknown>))
-    .find((r) => ACTIVE_DISMISSAL_STATUSES.includes(r.status));
+    .find((r) => ACTIVE_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)));
   return active || null;
 }
 
@@ -261,269 +186,137 @@ export async function createDismissalRequest(input: {
   pickupPersonRelation?: string;
   pickupNote?: string;
 }): Promise<{ id: string; token: string }> {
+  await resolveVerifiedStudentForDismissal(input.studentId, input.parentId, input.schoolId);
+  const existing = await findActiveDismissalForStudent(input.studentId, input.schoolId);
+  if (existing) throw new Error('يوجد طلب تسريح نشط لهذا الطالب بالفعل');
+
+  const result = await apiCreateDismissalRequest({
+    schoolId: input.schoolId,
+    studentId: input.studentId,
+    parentName: input.parentName,
+    requestedByName: input.requestedByName,
+    pickupPersonName: input.pickupPersonName,
+    pickupPersonRelation: input.pickupPersonRelation,
+    pickupNote: input.pickupNote,
+  });
+
   const verified = await resolveVerifiedStudentForDismissal(
     input.studentId,
     input.parentId,
     input.schoolId,
   );
-
-  const existing = await findActiveDismissalForStudent(verified.studentId, verified.schoolId);
-  if (existing) {
-    throw new Error('يوجد طلب تسريح نشط لهذا الطالب بالفعل');
-  }
-
-  const token = generateToken().toUpperCase();
-  const expiresAt = Timestamp.fromMillis(Date.now() + TOKEN_TTL_MS);
-  const docRef = await addDoc(collection(db, DISMISSAL_COLLECTION), {
-    schoolId: verified.schoolId,
-    studentId: verified.studentId,
-    studentName: verified.studentName,
-    classId: verified.classId,
-    className: verified.className,
-    registrationNumber: verified.registrationNumber,
-    photoUrl: verified.photoUrl,
-    parentIds: verified.parentIds,
-    parentId: input.parentId,
-    parentName: input.parentName,
-    requestedByName: input.requestedByName,
-    pickupPersonName: input.pickupPersonName?.trim() || input.parentName,
-    pickupPersonRelation: input.pickupPersonRelation?.trim() || 'ولي أمر',
-    pickupNote: input.pickupNote?.trim() || '',
-    status: 'waiting' as DismissalStatus,
-    token,
-    tokenExpiresAt: expiresAt,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    statusHistory: [
-      {
-        status: 'waiting',
-        at: null,
-        by: input.parentId,
-        byName: input.requestedByName,
-        studentId: verified.studentId,
-        classId: verified.classId,
-      },
-    ],
-  });
-
-  const title = 'طلب تسريح من البوابة';
-  const message = `${verified.studentName} — ${verified.className} — ولي الأمر عند البوابة`;
+  const title = 'طلب تسريح جديد';
+  const message = `${verified.studentName} — بانتظار مراجعة الحارس`;
   const meta = {
-    sourceId: docRef.id,
-    dismissalId: docRef.id,
+    sourceId: result.id,
+    dismissalId: result.id,
     studentId: verified.studentId,
     classId: verified.classId,
   };
 
   await Promise.all([
-    notifyClassTeachers(verified.schoolId, verified.classId, {
-      title,
-      message,
-      metadata: meta,
-    }),
-    notifySchoolGuards(verified.schoolId, {
-      title,
-      message,
-      metadata: meta,
-    }),
-    notifySchoolAdmins(verified.schoolId, {
-      title,
-      message,
-      metadata: meta,
+    notifySchoolGuards(input.schoolId, { title, message, metadata: meta }),
+    notificationService.notifyStudentParents(verified.studentId, {
+      title: 'تم استلام طلب التسريح',
+      message: 'طلبك قيد مراجعة الحارس',
+      schoolId: input.schoolId,
+      type: 'smart_gate',
+      metadata: { ...meta, routeTarget: 'dismissal' },
     }),
   ]);
 
-  return { id: docRef.id, token };
+  return { id: result.id, token: result.token };
 }
 
-export async function teacherUpdateDismissalStatus(
+export async function guardVerifyDismissal(
   requestId: string,
-  status: 'called' | 'ready',
-  teacher: { uid: string; name: string },
-  assignedClassId: string,
+  guard: { uid: string; name: string },
+  note?: string,
 ) {
-  if (!assignedClassId) {
-    throw new Error('لم يتم تعيين صف لهذا المعلم بعد');
-  }
+  await apiGuardVerifyDismissal(requestId, note);
 
-  const existingSnap = await getDoc(doc(db, DISMISSAL_COLLECTION, requestId));
-  const existing = existingSnap.data();
-  if (!existing) {
-    throw new Error('الطلب غير موجود');
-  }
-  if (String(existing.classId || '') !== assignedClassId) {
-    throw new Error('لا يمكنك تحديث طلب لصف آخر');
-  }
-  if (!ACTIVE_DISMISSAL_STATUSES.includes(existing.status as DismissalStatus)) {
-    throw new Error('الطلب غير نشط');
-  }
+  const snap = await getDoc(doc(db, DISMISSAL_COLLECTION, requestId));
+  const data = snap.data() as Record<string, unknown> | undefined;
+  if (!data) return;
 
-  const fields: Record<string, unknown> = {
-    status,
-    updatedAt: serverTimestamp(),
-  };
-  if (status === 'called') {
-    fields.calledAt = serverTimestamp();
-    fields.calledByTeacherId = teacher.uid;
-    fields.calledByTeacherName = teacher.name;
-  } else {
-    fields.readyAt = serverTimestamp();
-    fields.readyByTeacherId = teacher.uid;
-    fields.readyByTeacherName = teacher.name;
-  }
-
-  await updateDoc(doc(db, DISMISSAL_COLLECTION, requestId), fields);
-  await appendStatusHistory(
-    requestId,
-    {
-      status,
-      by: teacher.uid,
-      byName: teacher.name,
-    },
-    {
-      studentId: String(existing.studentId || ''),
-      classId: String(existing.classId || ''),
-    },
-  );
-
-  const data = existing;
   const schoolId = String(data.schoolId || '');
-  const studentId = String(data.studentId || '');
   const studentName = String(data.studentName || '');
-  const title =
-    status === 'called' ? 'تم نداء الطالب' : 'الطالب جاهز للتسليم';
-  const message =
-    status === 'called'
-      ? `${studentName} — تم النداء من الصف`
-      : `${studentName} — جاهز عند البوابة`;
+  const title = 'طلب جاهز لاعتماد الإدارة';
+  const message = `${studentName} — تحقق الحارس (${guard.name})`;
 
   await Promise.all([
-    notifySchoolGuards(schoolId, {
+    notifySchoolManagers(schoolId, {
       title,
       message,
       metadata: { sourceId: requestId, dismissalId: requestId },
     }),
-    notificationService.notifyStudentParents(studentId, {
-      title,
-      message,
+    notificationService.notifyStudentParents(String(data.studentId || ''), {
+      title: 'تحقق الحارس',
+      message: 'طلب التسريح بانتظار اعتماد الإدارة',
       schoolId,
       type: 'smart_gate',
-      metadata: {
-        sourceId: requestId,
-        dismissalId: requestId,
-        routeTarget: 'dismissal',
-      },
+      metadata: { sourceId: requestId, dismissalId: requestId, routeTarget: 'dismissal' },
     }),
   ]);
 }
 
-export async function verifyDismissalHandover(
-  request: DismissalRequest,
-  guardSchoolId: string,
-  tokenInput: string,
-): Promise<DismissalRequest> {
-  const normalizedToken = tokenInput.trim().toUpperCase();
-  if (request.schoolId !== guardSchoolId) {
-    throw new Error('رمز لا يخص هذه المدرسة');
-  }
-  if (request.token.toUpperCase() !== normalizedToken) {
-    throw new Error('رمز التحقق غير متطابق');
-  }
-  if (isDismissalTokenExpired(request)) {
-    throw new Error('انتهت صلاحية الرمز');
-  }
-  if (!['called', 'ready'].includes(request.status)) {
-    throw new Error('الطلب غير جاهز للتسليم');
-  }
-
-  const studentSnap = await getDoc(doc(db, 'students', request.studentId));
-  if (!studentSnap.exists()) {
-    throw new Error('تعذر التحقق من بيانات الطالب');
-  }
-  const studentData = studentSnap.data() as Record<string, unknown>;
-  if (String(studentData.schoolId || '') !== guardSchoolId) {
-    throw new Error('الطالب لا ينتمي لهذه المدرسة');
-  }
-  if (String(studentData.classId || '') !== request.classId) {
-    throw new Error('بيانات الصف لا تطابق سجل الطالب');
-  }
-
-  const classSnap = await getDoc(doc(db, 'classes', request.classId));
-  if (!classSnap.exists() || String(classSnap.data()?.schoolId || '') !== guardSchoolId) {
-    throw new Error('الصف غير صالح في هذه المدرسة');
-  }
-
-  return request;
-}
-
-export async function guardCompleteDismissal(
-  request: DismissalRequest,
-  guard: { uid: string; name: string },
-  tokenInput: string,
-) {
-  await verifyDismissalHandover(request, request.schoolId, tokenInput);
-
-  await updateDoc(doc(db, DISMISSAL_COLLECTION, request.id), {
-    status: 'completed',
-    completedAt: serverTimestamp(),
-    completedByGuardId: guard.uid,
-    completedByGuardName: guard.name,
-    updatedAt: serverTimestamp(),
-  });
-  await appendStatusHistory(
-    request.id,
-    {
-      status: 'completed',
-      by: guard.uid,
-      byName: guard.name,
-    },
-    { studentId: request.studentId, classId: request.classId },
-  );
-
-  await Promise.all([
-    notificationService.notifyStudentParents(request.studentId, {
-      title: 'تم تسليم الطالب',
-      message: `تم تسليم ${request.studentName} بنجاح من البوابة`,
-      schoolId: request.schoolId,
-      type: 'system',
-      metadata: { sourceId: request.id, dismissalId: request.id, routeTarget: 'dismissal' },
-    }),
-    notifySchoolAdmins(request.schoolId, {
-      title: 'تسليم مكتمل',
-      message: `${request.studentName} — ${guard.name}`,
-      metadata: { sourceId: request.id, dismissalId: request.id },
-    }),
-  ]);
-}
-
-export async function guardCancelDismissal(
+export async function guardRejectDismissal(
   requestId: string,
   reason: string,
   guard: { uid: string; name: string },
 ) {
-  await updateDoc(doc(db, DISMISSAL_COLLECTION, requestId), {
-    status: 'cancelled',
-    cancelReason: reason,
-    cancelledAt: serverTimestamp(),
-    cancelledByGuardId: guard.uid,
-    cancelledByGuardName: guard.name,
-    updatedAt: serverTimestamp(),
-  });
+  await apiGuardRejectDismissal(requestId, reason);
+
   const snap = await getDoc(doc(db, DISMISSAL_COLLECTION, requestId));
   const data = snap.data();
-  await appendStatusHistory(
-    requestId,
-    {
-      status: 'cancelled',
-      by: guard.uid,
-      byName: guard.name,
-      note: reason,
-    },
-    {
-      studentId: String(data?.studentId || ''),
-      classId: String(data?.classId || ''),
-    },
-  );
+  if (!data) return;
+
+  await notificationService.notifyStudentParents(String(data.studentId || ''), {
+    title: 'رفض طلب التسريح',
+    message: reason || 'تم رفض الطلب من الحارس',
+    schoolId: String(data.schoolId || ''),
+    type: 'smart_gate',
+    metadata: { sourceId: requestId, dismissalId: requestId, routeTarget: 'dismissal' },
+  });
+}
+
+export async function managerApproveDismissal(
+  requestId: string,
+  manager: { uid: string; name: string },
+) {
+  await apiManagerApproveDismissal(requestId);
+
+  const snap = await getDoc(doc(db, DISMISSAL_COLLECTION, requestId));
+  const data = snap.data();
+  if (!data) return;
+
+  await notificationService.notifyStudentParents(String(data.studentId || ''), {
+    title: 'تم التسريح',
+    message: `تم اعتماد تسريح ${data.studentName} — يمكنك استلام الطالب`,
+    schoolId: String(data.schoolId || ''),
+    type: 'system',
+    metadata: { sourceId: requestId, dismissalId: requestId, routeTarget: 'dismissal' },
+  });
+}
+
+export async function managerRejectDismissal(
+  requestId: string,
+  reason: string,
+  manager: { uid: string; name: string },
+) {
+  await apiManagerRejectDismissal(requestId, reason);
+
+  const snap = await getDoc(doc(db, DISMISSAL_COLLECTION, requestId));
+  const data = snap.data();
+  if (!data) return;
+
+  await notificationService.notifyStudentParents(String(data.studentId || ''), {
+    title: 'رفض التسريح من الإدارة',
+    message: reason || 'تم رفض الطلب من الإدارة',
+    schoolId: String(data.schoolId || ''),
+    type: 'smart_gate',
+    metadata: { sourceId: requestId, dismissalId: requestId, routeTarget: 'dismissal' },
+  });
 }
 
 export function groupDismissalsByClass(
@@ -535,46 +328,6 @@ export function groupDismissalsByClass(
     acc[key].push(request);
     return acc;
   }, {});
-}
-
-export async function verifyDismissalToken(
-  token: string,
-  guardSchoolId: string,
-): Promise<DismissalRequest> {
-  const normalized = token.trim().toUpperCase();
-  const q = query(
-    collection(db, DISMISSAL_COLLECTION),
-    where('schoolId', '==', guardSchoolId),
-    limit(100),
-  );
-  const snap = await getDocs(q);
-  const docSnap = snap.docs.find(
-    (d) => String(d.data().token || '').toUpperCase() === normalized,
-  );
-  if (!docSnap) {
-    throw new Error('رمز غير صالح');
-  }
-  const request = normalizeDismissalDoc(docSnap.id, docSnap.data() as Record<string, unknown>);
-  if (request.schoolId !== guardSchoolId) {
-    throw new Error('رمز لا يخص هذه المدرسة');
-  }
-  if (isDismissalTokenExpired(request)) {
-    throw new Error('انتهت صلاحية الرمز');
-  }
-  if (!ACTIVE_DISMISSAL_STATUSES.includes(request.status)) {
-    throw new Error('الطلب غير نشط');
-  }
-
-  const studentSnap = await getDoc(doc(db, 'students', request.studentId));
-  if (!studentSnap.exists()) {
-    throw new Error('تعذر التحقق من بيانات الطالب');
-  }
-  const studentData = studentSnap.data() as Record<string, unknown>;
-  if (String(studentData.classId || '') !== request.classId) {
-    throw new Error('بيانات الصف لا تطابق سجل الطالب');
-  }
-
-  return request;
 }
 
 export function subscribeSchoolDismissals(
@@ -616,4 +369,16 @@ export function subscribeParentDismissals(
       .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
     onData(rows);
   });
+}
+
+export function filterPendingForGuard(requests: DismissalRequest[]) {
+  return requests.filter(
+    (r) => GUARD_PENDING_STATUSES.includes(resolveDismissalStatus(r)) && !r.isProcessing,
+  );
+}
+
+export function filterVerifiedForManager(requests: DismissalRequest[]) {
+  return requests.filter(
+    (r) => MANAGER_QUEUE_STATUSES.includes(resolveDismissalStatus(r)) && !r.isProcessing,
+  );
 }

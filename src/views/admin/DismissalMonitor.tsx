@@ -2,14 +2,22 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { subscribeSchoolDismissals, groupDismissalsByClass } from '../../lib/dismissalService';
+import { subscribeSchoolDismissals, groupDismissalsByClass, filterVerifiedForManager, managerApproveDismissal, managerRejectDismissal } from '../../lib/dismissalService';
 import {
+  ACTIVE_DISMISSAL_STATUSES,
   DISMISSAL_STATUS_LABELS,
+  TERMINAL_DISMISSAL_STATUSES,
+  resolveDismissalStatus,
   type DismissalRequest,
   type DismissalStatus,
 } from '../../lib/dismissalTypes';
-import { ShieldCheck, Filter, Clock } from 'lucide-react';
+import { ShieldCheck, Filter, CheckCircle, XCircle } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import DismissalStudentCard from '../../components/dismissal/DismissalStudentCard';
+import { DismissalWorkflowGraph } from '../../components/dismissal/DismissalWorkflowGraph';
+import { DismissalWorkflowDebug } from '../../components/dismissal/DismissalWorkflowDebug';
+import { DismissalTimeline } from '../../components/dismissal/DismissalTimeline';
+import { DismissalStatusBadge } from '../../components/ui/DismissalStatusBadge';
 
 type SchoolClass = { id: string; name: string };
 
@@ -19,6 +27,8 @@ export default function DismissalMonitor() {
   const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | DismissalStatus>('all');
   const [classFilter, setClassFilter] = useState('all');
+  const [rejectReason, setRejectReason] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile?.schoolId) return;
@@ -49,32 +59,70 @@ export default function DismissalMonitor() {
   }, []);
 
   const stats = useMemo(() => ({
-    active: requests.filter((r) => ['waiting', 'called', 'ready'].includes(r.status)).length,
+    active: requests.filter((r) => ACTIVE_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r))).length,
     completedToday: requests.filter(
-      (r) => r.status === 'completed' && (r.completedAt?.seconds || 0) >= todayStart,
+      (r) => resolveDismissalStatus(r) === 'DISMISSED' && (r.dismissedAt?.seconds || r.managerVerifiedAt?.seconds || 0) >= todayStart,
     ).length,
-    cancelledExpired: requests.filter((r) =>
-      ['cancelled', 'expired'].includes(r.status),
+    rejected: requests.filter((r) =>
+      TERMINAL_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)) && resolveDismissalStatus(r) !== 'DISMISSED',
     ).length,
   }), [requests, todayStart]);
 
+  const managerQueue = useMemo(() => filterVerifiedForManager(requests), [requests]);
+
   const filtered = useMemo(() => {
     return requests.filter((r) => {
-      if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+      if (statusFilter !== 'all' && resolveDismissalStatus(r) !== statusFilter) return false;
       if (classFilter !== 'all' && r.classId !== classFilter) return false;
       return true;
     });
   }, [requests, statusFilter, classFilter]);
 
   const activeByClass = useMemo(() => {
-    const active = filtered.filter((r) => ['waiting', 'called', 'ready'].includes(r.status));
+    const active = filtered.filter((r) => ACTIVE_DISMISSAL_STATUSES.includes(resolveDismissalStatus(r)));
     return groupDismissalsByClass(active);
   }, [filtered]);
 
   const completedByClass = useMemo(() => {
-    const done = filtered.filter((r) => r.status === 'completed');
+    const done = filtered.filter((r) => resolveDismissalStatus(r) === 'DISMISSED');
     return groupDismissalsByClass(done);
   }, [filtered]);
+
+  const handleApprove = async (requestId: string) => {
+    if (!profile) return;
+    setBusyId(requestId);
+    try {
+      await managerApproveDismissal(requestId, {
+        uid: profile.uid,
+        name: profile.name || 'مدير',
+      });
+      toast.success('تم اعتماد التسريح');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'فشل الاعتماد');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReject = async (requestId: string) => {
+    if (!profile || !rejectReason.trim()) {
+      toast.error('أدخل سبب الرفض');
+      return;
+    }
+    setBusyId(requestId);
+    try {
+      await managerRejectDismissal(requestId, rejectReason.trim(), {
+        uid: profile.uid,
+        name: profile.name || 'مدير',
+      });
+      toast.success('تم رفض الطلب');
+      setRejectReason('');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'فشل الرفض');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const classNameById = useMemo(() => {
     const map: Record<string, string> = {};
@@ -101,7 +149,7 @@ export default function DismissalMonitor() {
         {[
           { label: 'نشطة الآن', value: stats.active, tone: 'text-amber-600 bg-amber-50' },
           { label: 'مكتملة اليوم', value: stats.completedToday, tone: 'text-emerald-600 bg-emerald-50' },
-          { label: 'ملغية / منتهية', value: stats.cancelledExpired, tone: 'text-slate-600 bg-slate-100' },
+          { label: 'مرفوضة / منتهية', value: stats.rejected, tone: 'text-slate-600 bg-slate-100' },
         ].map((s) => (
           <div key={s.label} className={`rounded-2xl p-5 border ${s.tone}`}>
             <p className="text-xs font-bold uppercase">{s.label}</p>
@@ -133,6 +181,49 @@ export default function DismissalMonitor() {
           ))}
         </select>
       </div>
+
+      {managerQueue.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 rounded-3xl border border-amber-200 dark:border-amber-900/40 p-5 space-y-4">
+          <h3 className="font-black text-amber-900 dark:text-amber-200">
+            بانتظار اعتماد الإدارة ({managerQueue.length})
+          </h3>
+          {managerQueue.map((r) => (
+            <div key={r.id} className="bg-white dark:bg-slate-900 rounded-2xl border p-4 space-y-3">
+              <DismissalStudentCard request={r} />
+              <DismissalWorkflowGraph request={r} locale="ar" />
+              <p className="text-xs text-slate-500">
+                تحقق الحارس: <strong>{r.guardVerifiedByName || '—'}</strong>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={busyId === r.id}
+                  onClick={() => handleApprove(r.id)}
+                  className="flex items-center gap-1 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-50"
+                >
+                  <CheckCircle size={16} />
+                  اعتماد التسريح
+                </button>
+                <button
+                  type="button"
+                  disabled={busyId === r.id}
+                  onClick={() => handleReject(r.id)}
+                  className="flex items-center gap-1 px-4 py-2 bg-rose-100 text-rose-700 rounded-xl font-bold text-sm"
+                >
+                  <XCircle size={16} />
+                  رفض
+                </button>
+              </div>
+              <input
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="سبب الرفض (عند الحاجة)"
+                className="w-full px-3 py-2 rounded-lg border text-sm"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-slate-900 rounded-3xl border p-5">
@@ -170,22 +261,11 @@ export default function DismissalMonitor() {
                   <DismissalStudentCard request={r} />
                   <p className="text-[10px] font-mono text-indigo-600 mt-2">{r.token}</p>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600 shrink-0">
-                  {DISMISSAL_STATUS_LABELS[r.status].ar}
-                </span>
+                <DismissalStatusBadge status={resolveDismissalStatus(r)} />
               </div>
-              {r.statusHistory && r.statusHistory.length > 0 && (
-                <div className="mt-3 pl-3 border-r-2 border-slate-200 space-y-1">
-                  {r.statusHistory.map((h, i) => (
-                    <p key={i} className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Clock size={10} />
-                      {DISMISSAL_STATUS_LABELS[h.status]?.ar || h.status}
-                      {h.byName ? ` — ${h.byName}` : ''}
-                      {h.classId ? ` [${classNameById[h.classId] || h.classId}]` : ''}
-                    </p>
-                  ))}
-                </div>
-              )}
+              <DismissalWorkflowGraph request={r} locale="ar" showLegend={false} />
+              <DismissalTimeline request={r} compact />
+              <DismissalWorkflowDebug request={r} locale="ar" />
             </div>
           ))}
           {filtered.length === 0 && (

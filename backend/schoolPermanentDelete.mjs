@@ -20,6 +20,8 @@ export const SCHOOL_SCOPED_COLLECTIONS = [
   "inventory",
   "notifications",
   "dismissal_requests",
+  "dismissal_logs",
+  "dismissal_snapshots",
   "id_cards",
   "student_archives",
   "staff",
