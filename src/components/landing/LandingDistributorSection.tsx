@@ -1,9 +1,9 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowLeft, BadgePercent, Handshake, LineChart, Ticket, Users } from 'lucide-react';
 import { prefersReducedMotion } from '../../lib/motion';
 import { LandingCircularLogo } from './LandingCircularLogo';
+import { LandingButton } from '../ui/LandingButton';
 
 const DEFAULT_FEATURES = [
   { icon: Ticket, text: 'كوبونات تسويقية لربط المدارس بالمنصة' },
@@ -70,14 +70,18 @@ export function LandingDistributorSection({
                   شبكة موزعين معتمدين في العراق — توسّع معنا
                 </div>
               </div>
-              <div className="flex flex-col gap-3 lg:min-w-[240px]">
-                <Link to="/login?panel=distributor" className="lp-btn-gold w-full text-center">
+              <div className="flex flex-col gap-3 lg:min-w-[240px] landing-distributor__actions">
+                <LandingButton
+                  to="/login?panel=distributor"
+                  variant="primary"
+                  fullWidth
+                  icon={<ArrowLeft size={16} className="rotate-180" />}
+                >
                   سجّل كموزع معتمد
-                  <ArrowLeft size={16} className="rotate-180" />
-                </Link>
-                <Link to="/login" className="lp-btn-outline w-full text-center text-sm">
+                </LandingButton>
+                <LandingButton to="/login" variant="secondary" fullWidth className="!text-sm">
                   لديك حساب؟ تسجيل الدخول
-                </Link>
+                </LandingButton>
               </div>
             </div>
           </div>

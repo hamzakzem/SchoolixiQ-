@@ -1,7 +1,6 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { prefersReducedMotion } from '../../lib/motion';
 import type { LandingFeatureCard } from '../../lib/landingPageConfig';
+import { LandingFeatureSlider } from './LandingFeatureSlider';
 
 function FeatureMiniMock({ featureId }: { featureId: string }) {
   const rows: Record<string, { label: string; value: string }[]> = {
@@ -69,36 +68,33 @@ export function LandingFeaturesShowcase({
   features: LandingFeatureCard[];
   icons: Record<string, React.ElementType>;
 }) {
-  const reduced = prefersReducedMotion();
+  const slides = features.map((card) => {
+    const Icon = icons[card.id] || icons.reports;
+    return {
+      id: card.id,
+      label: card.title,
+      content: (
+        <article className="landing-feature-row landing-feature-row--slider">
+          <div className="landing-feature-row__content">
+            <div className="lp-icon-box">
+              <Icon size={22} strokeWidth={1.5} />
+            </div>
+            <h3 className="landing-feature-row__title">{card.title}</h3>
+            <p className="landing-feature-row__desc">{card.description}</p>
+          </div>
+          <div className="landing-feature-row__visual">
+            <FeatureMiniMock featureId={card.id} />
+          </div>
+        </article>
+      ),
+    };
+  });
 
   return (
-    <div className="landing-features-showcase space-y-6 lg:space-y-10">
-      {features.map((card, idx) => {
-        const Icon = icons[card.id] || icons.reports;
-        const reversed = idx % 2 === 1;
-
-        return (
-          <motion.article
-            key={card.id}
-            initial={reduced ? {} : { opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{ duration: 0.5, delay: reduced ? 0 : 0.06 }}
-            className={`landing-feature-row ${reversed ? 'landing-feature-row--reverse' : ''}`}
-          >
-            <div className="landing-feature-row__content">
-              <div className="lp-icon-box">
-                <Icon size={22} strokeWidth={1.5} />
-              </div>
-              <h3 className="landing-feature-row__title">{card.title}</h3>
-              <p className="landing-feature-row__desc">{card.description}</p>
-            </div>
-            <div className="landing-feature-row__visual">
-              <FeatureMiniMock featureId={card.id} />
-            </div>
-          </motion.article>
-        );
-      })}
-    </div>
+    <LandingFeatureSlider
+      slides={slides}
+      ariaLabel="عرض مميزات المنصة"
+      className="landing-features-slider"
+    />
   );
 }

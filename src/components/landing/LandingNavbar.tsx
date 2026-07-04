@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { LogIn, Menu, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { LandingCircularLogoWithLabel } from './LandingCircularLogo';
+import { LandingButton } from '../ui/LandingButton';
 import { prefersReducedMotion } from '../../lib/motion';
 
 type NavLink = { href: string; label: string };
@@ -39,13 +40,21 @@ export function LandingNavbar({
         </nav>
 
         <div className="landing-navbar__actions">
-          <a href={resolveDemoHref(links)} className="hidden md:inline-flex lp-btn-outline !py-2 !px-4 !text-[12px]">
+          <LandingButton
+            href={resolveDemoHref(links)}
+            variant="secondary"
+            className="hidden md:inline-flex !min-h-[40px] !py-2 !px-4 !text-[12px]"
+          >
             {demoLabel}
-          </a>
-          <Link to="/login" className="hidden sm:inline-flex lp-btn-gold !py-2 !px-4 !text-[12px]">
-            <LogIn size={14} />
+          </LandingButton>
+          <LandingButton
+            to="/login"
+            variant="primary"
+            icon={<LogIn size={14} />}
+            className="hidden sm:inline-flex !min-h-[40px] !py-2 !px-4 !text-[12px]"
+          >
             {loginLabel}
-          </Link>
+          </LandingButton>
           <button
             type="button"
             className="landing-navbar__menu-btn"
@@ -90,13 +99,13 @@ export function LandingNavbar({
                   {label}
                 </a>
               ))}
-              <div className="mt-auto pt-4 flex flex-col gap-2 border-t border-[rgba(255,255,255,0.06)]">
-                <a href={resolveDemoHref(links)} onClick={close} className="lp-btn-outline w-full">
+              <div className="mt-auto pt-4 flex flex-col gap-2 border-t border-[rgba(255,255,255,0.06)] landing-drawer__actions">
+                <LandingButton href={resolveDemoHref(links)} variant="secondary" fullWidth onClick={close}>
                   {demoLabel}
-                </a>
-                <Link to="/login" onClick={close} className="lp-btn-gold w-full">
+                </LandingButton>
+                <LandingButton to="/login" variant="primary" fullWidth onClick={close}>
                   {loginLabel}
-                </Link>
+                </LandingButton>
               </div>
             </motion.nav>
           </>

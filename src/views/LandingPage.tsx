@@ -46,6 +46,8 @@ import { LandingFeaturesShowcase } from '../components/landing/LandingFeaturesSh
 import { LandingRoleInterfaces } from '../components/landing/LandingRoleInterfaces';
 import { LandingSafeDismissalShowcase } from '../components/landing/LandingSafeDismissalShowcase';
 import { LandingFooterShell } from '../components/landing/LandingFooterShell';
+import { LandingButton } from '../components/ui/LandingButton';
+import { LandingFeatureSlider } from '../components/landing/LandingFeatureSlider';
 import {
   LandingPartnersSection,
   useLandingPartners,
@@ -346,15 +348,23 @@ export default function LandingPage() {
               </h1>
               <p className="landing-hero__subtitle">{config.heroSubtitle}</p>
 
-              <div className="landing-hero__cta">
-                <Link to="/login?mode=signup" className="lp-btn-gold lp-btn-gold--lg">
-                  <Rocket size={16} />
+              <div className="landing-hero__cta landing-hero__cta--stack">
+                <LandingButton
+                  to="/login?mode=signup"
+                  variant="primary"
+                  size="lg"
+                  icon={<Rocket size={16} />}
+                >
                   {config.primaryCtaLabel || 'ابدأ الآن مجاناً'}
-                </Link>
-                <a href="#features" className="lp-btn-outline lp-btn-gold--lg">
-                  <Play size={14} className="fill-current opacity-70" />
+                </LandingButton>
+                <LandingButton
+                  href="#features"
+                  variant="secondary"
+                  size="lg"
+                  icon={<Play size={14} className="fill-current opacity-70" />}
+                >
                   {config.exploreCtaLabel || 'استكشف المميزات'}
-                </a>
+                </LandingButton>
               </div>
               <div className="landing-hero__note">
                 <span>بدون التزام طويل</span>
@@ -392,27 +402,25 @@ export default function LandingPage() {
       {featureStrip.length > 0 && (
         <SectionShell className="landing-feature-strip">
           <div className="lp-container">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {featureStrip.map(({ id, title, description }, idx) => {
+            <LandingFeatureSlider
+              ariaLabel="أبرز مميزات المنصة"
+              slides={featureStrip.map(({ id, title, description }) => {
                 const Icon = FEATURE_STRIP_ICONS[id] || Sparkles;
-                return (
-                  <motion.div
-                    key={id}
-                    initial={reduced ? {} : { opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: idx * 0.06, duration: 0.35 }}
-                    className="landing-feature-strip__card lp-card"
-                  >
-                    <div className="landing-feature-strip__icon">
-                      <Icon size={20} strokeWidth={1.5} />
+                return {
+                  id,
+                  label: title,
+                  content: (
+                    <div className="landing-feature-strip__card lp-card landing-feature-strip__card--slider">
+                      <div className="landing-feature-strip__icon">
+                        <Icon size={20} strokeWidth={1.5} />
+                      </div>
+                      <h3 className="font-black text-sm text-white mb-2">{title}</h3>
+                      <p className="text-xs leading-[1.75] text-[#8b9cb3]">{description}</p>
                     </div>
-                    <h3 className="font-black text-sm text-white mb-2">{title}</h3>
-                    <p className="text-xs leading-[1.75] text-[#8b9cb3]">{description}</p>
-                  </motion.div>
-                );
+                  ),
+                };
               })}
-            </div>
+            />
           </div>
         </SectionShell>
       )}
@@ -487,12 +495,13 @@ export default function LandingPage() {
                         </li>
                       ))}
                     </ul>
-                    <Link
+                    <LandingButton
                       to="/login?mode=signup"
-                      className={isCenter ? 'lp-btn-gold w-full text-center' : 'lp-btn-outline w-full text-center'}
+                      variant={isCenter ? 'primary' : 'secondary'}
+                      fullWidth
                     >
                       ابدأ الآن
-                    </Link>
+                    </LandingButton>
                   </motion.div>
                 );
               })}
@@ -689,28 +698,37 @@ export default function LandingPage() {
               <p className="lp-section-subtitle max-w-md mx-auto">
                 {config.finalCtaSubtitle || 'تجربة موحّدة للإدارة والمعلمين وأولياء الأمور.'}
               </p>
-              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link to="/login?mode=signup" className="lp-btn-gold w-full sm:w-auto min-w-[200px]">
+              <div className="mt-8 landing-final-cta__actions">
+                <LandingButton
+                  to="/login?mode=signup"
+                  variant="primary"
+                  size="lg"
+                  className="w-full sm:w-auto sm:min-w-[200px]"
+                >
                   {config.primaryCtaLabel || 'ابدأ الآن مجاناً'}
-                </Link>
+                </LandingButton>
                 {config.showAppDownload && (
-                  <button
+                  <LandingButton
                     type="button"
+                    variant="secondary"
+                    size="lg"
+                    icon={<Download size={18} />}
                     onClick={handleApkDownload}
-                    className="lp-btn-outline w-full sm:w-auto min-w-[200px]"
+                    className="w-full sm:w-auto sm:min-w-[200px]"
                   >
-                    <Download size={18} />
                     تحميل Android
-                  </button>
+                  </LandingButton>
                 )}
-                <a
+                <LandingButton
                   href={resolveWhatsAppUrl(config.whatsappNumber)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="lp-btn-outline w-full sm:w-auto min-w-[200px]"
+                  variant="secondary"
+                  size="lg"
+                  className="w-full sm:w-auto sm:min-w-[200px]"
                 >
                   تواصل عبر واتساب
-                </a>
+                </LandingButton>
               </div>
             </div>
           </div>

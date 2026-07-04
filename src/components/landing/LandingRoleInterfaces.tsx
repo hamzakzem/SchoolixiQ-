@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { prefersReducedMotion } from '../../lib/motion';
 import { LandingCircularLogo } from './LandingCircularLogo';
+import { LandingFeatureSlider } from './LandingFeatureSlider';
 
 function AdminDashboardMock() {
   return (
@@ -124,8 +125,65 @@ const PARENT_FEATURES = [
   'طلب التسريح الآمن من البوابة',
 ];
 
+function RoleSlideCard({
+  label,
+  icon: Icon,
+  mock,
+  features,
+}: {
+  label: string;
+  icon: React.ElementType;
+  mock: React.ReactNode;
+  features: string[];
+}) {
+  return (
+    <article className="lp-role-card lp-role-card--slider">
+      <div className="lp-role-card__frame" aria-hidden="true" />
+      <div className="lp-role-card__body">
+        <div className="lp-role-card__label">
+          <Icon size={16} />
+          {label}
+        </div>
+        {mock}
+        <ul className="lp-role-card__list">
+          {features.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+      </div>
+    </article>
+  );
+}
+
 export function LandingRoleInterfaces() {
   const reduced = prefersReducedMotion();
+
+  const slides = [
+    {
+      id: 'admin',
+      label: 'واجهة إدارة المدرسة',
+      content: (
+        <RoleSlideCard
+          label="واجهة إدارة المدرسة"
+          icon={LayoutDashboard}
+          mock={<AdminDashboardMock />}
+          features={ADMIN_FEATURES}
+        />
+      ),
+    },
+    {
+      id: 'parent',
+      label: 'واجهة ولي الأمر',
+      content: (
+        <RoleSlideCard
+          label="واجهة ولي الأمر"
+          icon={Smartphone}
+          mock={<ParentAppMock />}
+          features={PARENT_FEATURES}
+        />
+      ),
+    },
+  ];
 
   return (
     <section id="interfaces" className="lp-role-section" aria-labelledby="lp-role-heading">
@@ -135,7 +193,7 @@ export function LandingRoleInterfaces() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-48px' }}
           transition={{ duration: 0.45 }}
-          className="text-center max-w-2xl mx-auto mb-12 lg:mb-16"
+          className="text-center max-w-2xl mx-auto mb-8 lg:mb-12"
         >
           <p className="lp-eyebrow">واجهات احترافية</p>
           <h2 id="lp-role-heading" className="lp-section-title lp-title-gold">
@@ -146,51 +204,7 @@ export function LandingRoleInterfaces() {
           </p>
         </motion.div>
 
-        <div className="lp-role-grid">
-          <motion.article
-            initial={reduced ? {} : { opacity: 0, x: 16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="lp-role-card"
-          >
-            <div className="lp-role-card__frame" aria-hidden="true" />
-            <div className="lp-role-card__body">
-              <div className="lp-role-card__label">
-                <LayoutDashboard size={16} />
-                واجهة إدارة المدرسة
-              </div>
-              <AdminDashboardMock />
-              <ul className="lp-role-card__list">
-                {ADMIN_FEATURES.map((f) => (
-                  <li key={f}>{f}</li>
-                ))}
-              </ul>
-            </div>
-          </motion.article>
-
-          <motion.article
-            initial={reduced ? {} : { opacity: 0, x: -16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.08 }}
-            className="lp-role-card"
-          >
-            <div className="lp-role-card__frame" aria-hidden="true" />
-            <div className="lp-role-card__body">
-              <div className="lp-role-card__label">
-                <Smartphone size={16} />
-                واجهة ولي الأمر
-              </div>
-              <ParentAppMock />
-              <ul className="lp-role-card__list">
-                {PARENT_FEATURES.map((f) => (
-                  <li key={f}>{f}</li>
-                ))}
-              </ul>
-            </div>
-          </motion.article>
-        </div>
+        <LandingFeatureSlider slides={slides} ariaLabel="عرض واجهات المدرسة وولي الأمر" />
       </div>
     </section>
   );
