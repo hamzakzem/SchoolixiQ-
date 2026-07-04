@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LogIn, Menu, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import SchoolixLogo from '../SchoolixLogo';
+import { LandingCircularLogoWithLabel } from './LandingCircularLogo';
 import { prefersReducedMotion } from '../../lib/motion';
 
 type NavLink = { href: string; label: string };
@@ -27,8 +27,7 @@ export function LandingNavbar({
     <header className="landing-navbar">
       <div className="landing-navbar__inner">
         <Link to="/" className="landing-navbar__brand" onClick={close}>
-          <SchoolixLogo size={36} className="landing-hero__logo-float" />
-          <span>{appName}</span>
+          <LandingCircularLogoWithLabel size={40} appName={appName} />
         </Link>
 
         <nav className="landing-navbar__links" aria-label="التنقل الرئيسي">

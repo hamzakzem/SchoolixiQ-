@@ -122,9 +122,9 @@ export const DEFAULT_FEATURE_STRIP: LandingFeatureCard[] = [
 
 export const DEFAULT_LANDING_PAGE_CONFIG: LandingPageConfig = {
   landingEnabled: true,
-  heroTitle: 'إدارة مدارس ذكية لمستقبل تعليمي أفضل',
+  heroTitle: 'إدارة مدارسكم بذكاء واحترافية',
   heroSubtitle:
-    'منصة متكاملة لإدارة جميع جوانب مدرستك بسهولة وذكاء، توفر الوقت، تنظّم العمل، وتمنحك تقارير دقيقة لاتخاذ قرارات أفضل.',
+    'منصة متكاملة لإدارة جميع جوانب مدرستك بسهولة وذكاء — حضور، أقساط، تقارير، تواصل، وتسريح آمن في تجربة واحدة.',
   primaryCtaLabel: 'ابدأ الآن مجاناً',
   secondaryCtaLabel: 'تسجيل الدخول',
   exploreCtaLabel: 'استكشف المميزات',

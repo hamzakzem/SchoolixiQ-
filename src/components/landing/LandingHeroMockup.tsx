@@ -9,12 +9,14 @@ import {
   Wallet,
 } from 'lucide-react';
 import { MOTION_EASE, prefersReducedMotion } from '../../lib/motion';
+import { LandingCircularLogo } from './LandingCircularLogo';
 
 export function LandingHeroMockup({ compact = false }: { compact?: boolean }) {
   const reduced = prefersReducedMotion();
 
   return (
     <div className={`landing-mockup-stage ${compact ? 'landing-mockup-stage--compact' : ''}`}>
+      <div className="landing-mockup-stage__swirl" aria-hidden="true" />
       <div className="landing-mockup-stage__glow" aria-hidden="true" />
       <div className="landing-mockup-stage__grid" aria-hidden="true" />
 
@@ -41,8 +43,13 @@ export function LandingHeroMockup({ compact = false }: { compact?: boolean }) {
               ))}
             </aside>
             <div className="landing-mockup-dashboard">
-              <p className="landing-mockup-dashboard__eyebrow">لوحة المدرسة</p>
-              <p className="landing-mockup-dashboard__title">ملخص اليوم</p>
+              <div className="landing-mockup-dashboard__brand">
+                <LandingCircularLogo size={30} />
+                <div>
+                  <p className="landing-mockup-dashboard__eyebrow">لوحة المدرسة</p>
+                  <p className="landing-mockup-dashboard__title">ملخص اليوم</p>
+                </div>
+              </div>
               <div className="landing-mockup-stats">
                 {[
                   { l: 'حضور', icon: UserCheck, v: '94%' },
@@ -89,7 +96,10 @@ export function LandingHeroMockup({ compact = false }: { compact?: boolean }) {
           <div className="landing-mockup-phone__frame">
             <div className="landing-mockup-phone__notch" />
             <div className="landing-mockup-phone__screen">
-              <p className="landing-mockup-phone__title">ولي الأمر</p>
+              <div className="landing-mockup-phone__head">
+                <LandingCircularLogo size={24} />
+                <p className="landing-mockup-phone__title">ولي الأمر</p>
+              </div>
               {['الحضور', 'واجب جديد', 'قسط'].map((t, i) => (
                 <div key={t} className={`landing-mockup-phone__item ${i === 0 ? 'is-active' : ''}`}>
                   {t}

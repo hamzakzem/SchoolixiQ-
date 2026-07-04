@@ -1,14 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, MapPin, Phone } from 'lucide-react';
-import SchoolixLogo from '../SchoolixLogo';
+import { LandingCircularLogoWithLabel } from './LandingCircularLogo';
 import { resolveWhatsAppUrl } from '../../lib/landingPageConfig';
 
 const PLATFORM_LINKS = [
   { href: '#hero', label: 'الرئيسية' },
   { href: '#features', label: 'المميزات' },
+  { href: '#interfaces', label: 'الواجهات' },
+  { href: '#smart-gate', label: 'التسريح الآمن' },
   { href: '#pricing', label: 'الباقات' },
   { href: '#partners', label: 'الشركاء' },
+  { href: '#distributors', label: 'الموزعين' },
   { href: '#about', label: 'عن المنصة' },
 ];
 
@@ -41,9 +44,8 @@ export function LandingFooterShell({
       <div className="lp-container">
         <div className="landing-footer-shell__grid">
           <div className="landing-footer-shell__brand">
-            <div className="flex items-center gap-2 mb-4">
-              <SchoolixLogo size={36} />
-              <span className="font-black text-lg text-white">{appName}</span>
+            <div className="mb-4">
+              <LandingCircularLogoWithLabel size={42} appName={appName} />
             </div>
             <p className="text-sm leading-[1.85] text-[#94a3b8] max-w-xs">
               {description || 'منصة عربية متكاملة لإدارة المدارس — حضور، أقساط، تقارير، وتواصل في تجربة واحدة.'}
@@ -82,7 +84,7 @@ export function LandingFooterShell({
               <li>
                 <a href={waUrl} target="_blank" rel="noopener noreferrer">
                   <Phone size={15} />
-                  واتساب
+                  واتساب {phone || '07757905554'}
                 </a>
               </li>
               {email && (

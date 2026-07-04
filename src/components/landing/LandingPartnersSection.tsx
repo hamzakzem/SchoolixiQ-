@@ -12,33 +12,40 @@ import {
 } from '../../lib/footerPartners';
 import { prefersReducedMotion } from '../../lib/motion';
 
-function PartnerCarouselCard({ partner }: { partner: FooterPartner }) {
+/** Logo static — inner + outer rings animate only */
+function PartnerFrameCard({ partner }: { partner: FooterPartner }) {
   const [logoFailed, setLogoFailed] = useState(false);
   const showLogo = isHttpLogoUrl(partner.logoUrl) && !logoFailed;
   const initial = (partner.name || 'ش').trim().charAt(0);
 
   const card = (
-    <div className="landing-partner-carousel-card">
-      <div className="landing-partner-carousel-card__logo">
-        {showLogo ? (
-          <img
-            src={partner.logoUrl}
-            alt={partner.name}
-            className="w-full h-full object-contain p-1"
-            loading="lazy"
-            onError={() => setLogoFailed(true)}
-          />
-        ) : (
-          <span className="text-2xl font-black text-[#d4af37]">{initial}</span>
-        )}
+    <div className="lp-partner-card">
+      <span className="lp-partner-card__outer-ring" aria-hidden="true" />
+      <div className="lp-partner-card__inner">
+        <div className="lp-partner-card__logo-wrap">
+          <span className="lp-partner-card__logo-ring" aria-hidden="true" />
+          <div className="lp-partner-card__logo">
+            {showLogo ? (
+              <img
+                src={partner.logoUrl}
+                alt={partner.name}
+                className="w-full h-full object-contain p-2"
+                loading="lazy"
+                onError={() => setLogoFailed(true)}
+              />
+            ) : (
+              <span className="text-xl font-black text-[#d4af37]">{initial}</span>
+            )}
+          </div>
+        </div>
+        <p className="lp-partner-card__name">{partner.name}</p>
       </div>
-      <p className="landing-partner-carousel-card__name">{partner.name}</p>
     </div>
   );
 
   if (partner.link) {
     return (
-      <a href={partner.link} target="_blank" rel="noopener noreferrer" className="no-underline shrink-0">
+      <a href={partner.link} target="_blank" rel="noopener noreferrer" className="lp-partner-card-link shrink-0">
         {card}
       </a>
     );
@@ -100,28 +107,42 @@ export function LandingPartnersSection({
   }, [successPartners.length, showPartners]);
 
   if (!showPartners) return null;
+
+  const sectionHeader = (
+    <motion.div
+      initial={reduced ? {} : { opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.45 }}
+      className="text-center max-w-2xl mx-auto mb-10"
+    >
+      <p className="lp-eyebrow">الشركاء</p>
+      <h2 id="landing-partners-heading" className="lp-section-title lp-title-gold">
+        {title}
+      </h2>
+      <p className="lp-section-subtitle mx-auto">{subtitle}</p>
+    </motion.div>
+  );
+
   if (!displayPartners.length) {
     if (!import.meta.env.DEV) return null;
     return (
       <section id="partners" className="landing-partners-section" aria-labelledby="landing-partners-heading">
         <div className="lp-container">
-          <motion.div
-            initial={reduced ? {} : { opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center max-w-2xl mx-auto mb-10"
-          >
-            <p className="lp-eyebrow">الشركاء</p>
-            <h2 id="landing-partners-heading" className="lp-section-title lp-title-gold">
-              {title}
-            </h2>
-            <p className="lp-section-subtitle mx-auto">{subtitle}</p>
-          </motion.div>
-          <div className="landing-partners-empty">
-            {['م', 'د', 'س'].map((letter) => (
-              <div key={letter} className="landing-partners-empty__tile">
-                <div className="landing-partners-empty__initial">{letter}</div>
-                <p className="text-xs text-[#8b9cb3]">شريك قريباً</p>
+          {sectionHeader}
+          <div className="lp-partners-grid lp-partners-grid--placeholder">
+            {['م', 'د', 'س', 'ش'].map((letter) => (
+              <div key={letter} className="lp-partner-card">
+                <span className="lp-partner-card__outer-ring" aria-hidden="true" />
+                <div className="lp-partner-card__inner">
+                  <div className="lp-partner-card__logo-wrap">
+                    <span className="lp-partner-card__logo-ring" aria-hidden="true" />
+                    <div className="lp-partner-card__logo">
+                      <span className="text-xl font-black text-[#d4af37]">{letter}</span>
+                    </div>
+                  </div>
+                  <p className="lp-partner-card__name">شريك قريباً</p>
+                </div>
               </div>
             ))}
           </div>
@@ -130,31 +151,15 @@ export function LandingPartnersSection({
     );
   }
 
-  const doubled = [...displayPartners, ...displayPartners];
-
   return (
     <section id="partners" className="landing-partners-section" aria-labelledby="landing-partners-heading">
       <div className="lp-container">
-        <motion.div
-          initial={reduced ? {} : { opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.45 }}
-          className="text-center max-w-2xl mx-auto mb-10"
-        >
-          <p className="lp-eyebrow">الشركاء</p>
-          <h2 id="landing-partners-heading" className="lp-section-title lp-title-gold">
-            {title}
-          </h2>
-          <p className="lp-section-subtitle">{subtitle}</p>
-        </motion.div>
+        {sectionHeader}
 
-        <div className="landing-partners-carousel-wrap" aria-label="شركاء النجاح">
-          <div className={`landing-partners-carousel-track ${reduced ? '' : 'landing-partners-carousel-track--animate'}`}>
-            {doubled.map((partner, idx) => (
-              <PartnerCarouselCard key={`${partner.id}-${idx}`} partner={partner} />
-            ))}
-          </div>
+        <div className="lp-partners-grid" aria-label="شركاؤنا في النجاح">
+          {displayPartners.map((partner) => (
+            <PartnerFrameCard key={partner.id} partner={partner} />
+          ))}
         </div>
       </div>
     </section>

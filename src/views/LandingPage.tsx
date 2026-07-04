@@ -36,13 +36,15 @@ import {
 import { useSystemConfig } from '../lib/SystemConfigContext';
 import { hasConfiguredFooterPartners } from '../lib/footerPartners';
 import { GlobalFooter } from '../components/GlobalFooter';
-import SchoolixLogo from '../components/SchoolixLogo';
+import { MOTION_DURATION, MOTION_EASE, prefersReducedMotion } from '../lib/motion';
 import { LandingNavbar } from '../components/landing/LandingNavbar';
 import { LandingWhatsAppFab } from '../components/landing/LandingWhatsAppFab';
 import { LandingTechSection } from '../components/landing/LandingTechSection';
 import { LandingHeroMockup } from '../components/landing/LandingHeroMockup';
 import { LandingDistributorSection } from '../components/landing/LandingDistributorSection';
 import { LandingFeaturesShowcase } from '../components/landing/LandingFeaturesShowcase';
+import { LandingRoleInterfaces } from '../components/landing/LandingRoleInterfaces';
+import { LandingSafeDismissalShowcase } from '../components/landing/LandingSafeDismissalShowcase';
 import { LandingFooterShell } from '../components/landing/LandingFooterShell';
 import {
   LandingPartnersSection,
@@ -53,12 +55,9 @@ import {
   resolveAndroidApkUrl,
   triggerAndroidApkDownload,
 } from '../lib/androidApk';
-import { MOTION_DURATION, MOTION_EASE, prefersReducedMotion } from '../lib/motion';
 import { toast } from 'react-hot-toast';
 import type { PackagePermissions } from '../lib/featureRegistry';
 
-const NAVY = '#0B2345';
-const GOLD = '#D4AF37';
 const SECTION_PY = 'py-20 lg:py-28';
 
 const FEATURE_STRIP_ICONS: Record<string, React.ElementType> = {
@@ -242,45 +241,6 @@ function HeroTitle({ text }: { text: string }) {
   return <>{text}</>;
 }
 
-function PhoneMockup() {
-  return (
-    <div className="relative mx-auto w-[260px] sm:w-[280px]">
-      <div className="absolute inset-x-6 -bottom-4 h-10 bg-[#d4af37]/10 blur-2xl rounded-full pointer-events-none" />
-      <div className="relative rounded-[2.25rem] p-[4px] bg-[#081f3d] border border-[rgba(212,175,55,0.3)] shadow-xl">
-        <div className="rounded-[2rem] overflow-hidden bg-[#06182f]">
-          <div className="h-7 flex items-center justify-center">
-            <div className="w-16 h-4 rounded-full bg-black/50" />
-          </div>
-          <div className="bg-[#0b2345] min-h-[340px] px-4 pb-6 pt-2">
-            <div className="flex items-center gap-2 mb-6 pt-1">
-              <SchoolixLogo size={32} />
-              <div>
-                <p className="text-sm font-black text-white">SchoolixIQ</p>
-                <p className="text-[10px] text-[#94a3b8] font-semibold">بوابة ولي الأمر</p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {['الحضور والغياب', 'الواجبات', 'الأقساط', 'التبليغات', 'التسريح الآمن'].map((item, i) => (
-                <div
-                  key={item}
-                  className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-[12px] font-bold ${
-                    i === 0
-                      ? 'bg-[#081f3d] border border-[rgba(212,175,55,0.35)] text-[#f2c866]'
-                      : 'bg-[#06182f] border border-[rgba(212,175,55,0.15)] text-[#cbd5e1]'
-                  }`}
-                >
-                  <span>{item}</span>
-                  <ArrowLeft size={12} className="opacity-40 rotate-180" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function LandingPage() {
   const { config, loading } = useLandingPageConfig();
   const { config: systemConfig } = useSystemConfig();
@@ -293,13 +253,18 @@ export default function LandingPage() {
     const links: { href: string; label: string }[] = [
       { href: '#hero', label: 'الرئيسية' },
       { href: '#features', label: 'المميزات' },
+      { href: '#interfaces', label: 'الواجهات' },
+      { href: '#smart-gate', label: 'التسريح الآمن' },
     ];
     if (config.showPricing) links.push({ href: '#pricing', label: 'الباقات' });
     links.push({ href: '#partners', label: 'الشركاء' });
+    if (config.showDistributorSection !== false) {
+      links.push({ href: '#distributors', label: 'الموزعين' });
+    }
     links.push({ href: '#about', label: 'عن المنصة' });
     links.push({ href: '#contact', label: 'تواصل معنا' });
     return links;
-  }, [config.showPricing]);
+  }, [config.showPricing, config.showDistributorSection]);
 
   const featureStrip = config.featureStrip?.length ? config.featureStrip : [];
 
@@ -396,6 +361,16 @@ export default function LandingPage() {
                 <span>دعم فني عربي</span>
                 <span>تجربة متجاوبة</span>
               </div>
+              <div className="landing-hero__social" aria-label="مدارس تستخدم المنصة">
+                <div className="landing-hero__avatars" aria-hidden="true">
+                  {['م', 'د', 'ر'].map((l, i) => (
+                    <span key={l} style={{ zIndex: 3 - i }}>{l}</span>
+                  ))}
+                </div>
+                <p>
+                  <strong>+100</strong> مدرسة تثق بمنصتنا
+                </p>
+              </div>
             </div>
             <div className="landing-hero__visual">
               {config.heroImageUrl ? (
@@ -441,6 +416,26 @@ export default function LandingPage() {
           </div>
         </SectionShell>
       )}
+
+      <LandingRoleInterfaces />
+
+      <LandingSafeDismissalShowcase
+        title={config.smartGateTitle}
+        subtitle={config.smartGateDescription}
+      />
+
+      {/* Features — alternating showcase */}
+      <SectionShell id="features" className={`${SECTION_PY} lp-section--deep`}>
+        <div className="lp-container">
+          <SectionHeader
+            eyebrow="خدماتنا"
+            goldTitle
+            title="كل ما تحتاجه مدرستك في مكان واحد"
+            subtitle="وحدات متكاملة للإدارة والمعلمين وأولياء الأمور — بدون أدوات متفرقة."
+          />
+          <LandingFeaturesShowcase features={showcaseFeatures} icons={FEATURE_ICONS} />
+        </div>
+      </SectionShell>
 
       {config.showPricing && (
         <SectionShell id="pricing" className="landing-pricing-section lp-section--alt">
@@ -517,8 +512,6 @@ export default function LandingPage() {
         showPartners={showPartnerSections}
       />
 
-      {config.showTechSection !== false && <LandingTechSection />}
-
       <LandingDistributorSection
         show={config.showDistributorSection !== false}
         title={config.distributorTitle}
@@ -526,18 +519,7 @@ export default function LandingPage() {
         features={config.distributorFeatures}
       />
 
-      {/* Features — alternating showcase */}
-      <SectionShell id="features" className={`${SECTION_PY} lp-section--deep`}>
-        <div className="lp-container">
-          <SectionHeader
-            eyebrow="خدماتنا"
-            goldTitle
-            title="كل ما تحتاجه مدرستك في مكان واحد"
-            subtitle="وحدات متكاملة للإدارة والمعلمين وأولياء الأمور — بدون أدوات متفرقة."
-          />
-          <LandingFeaturesShowcase features={showcaseFeatures} icons={FEATURE_ICONS} />
-        </div>
-      </SectionShell>
+      {config.showTechSection !== false && <LandingTechSection />}
 
       {/* Explainer sections */}
       {config.showExplainerSections !== false && (
@@ -631,60 +613,6 @@ export default function LandingPage() {
                 ))}
               </ul>
             </div>
-          </div>
-        </div>
-      </SectionShell>
-
-      {/* Smart Gate */}
-      <SectionShell id="smart-gate" className={`${SECTION_PY} bg-[#081f3d] border-y border-[rgba(212,175,55,0.2)]`}>
-        <div className="lp-container">
-          <SectionHeader eyebrow="البوابة الذكية" title={config.smartGateTitle} subtitle={config.smartGateDescription} />
-          <div className="grid lg:grid-cols-12 gap-10 items-start">
-            <div className="lg:col-span-7 space-y-0">
-              {[
-                { step: 'ولي الأمر يطلب التسريح', detail: 'طلب رقمي موثّق من التطبيق' },
-                { step: 'المعلم ينادي الطالب', detail: 'تنبيه فوري للصف والحارس' },
-                { step: 'الحارس يتحقق من الرمز', detail: 'مسح QR — لا تسريح بدون تحقق' },
-                { step: 'الإدارة تتابع السجل', detail: 'سجل كامل لحظي للإدارة' },
-              ].map((item, idx) => (
-                <div key={item.step} className="flex gap-5 pb-8 last:pb-0 relative">
-                  {idx < 3 && <div className="absolute top-10 bottom-0 right-[15px] w-px bg-white/10" />}
-                  <div
-                    className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-black shrink-0 z-10"
-                    style={{ borderColor: GOLD, color: GOLD, background: NAVY }}
-                  >
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <p className="font-bold text-[15px] text-white">{item.step}</p>
-                    <p className="text-sm text-[#94a3b8] mt-1">{item.detail}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="lg:col-span-5 lp-card p-6 lg:p-8">
-              <Shield size={32} className="mb-4 text-[#d4af37]" />
-              <p className="font-black text-lg mb-2 text-white">تسريح آمن ومنظم</p>
-              <p className="text-sm text-[#94a3b8] leading-[1.85]">
-                تقليل الازدحام عند البوابة، حماية الطلاب، وشفافية كاملة للإدارة وأولياء الأمور.
-              </p>
-            </div>
-          </div>
-        </div>
-      </SectionShell>
-
-      {/* Parent App */}
-      <SectionShell className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)]`}>
-        <div className="lp-container grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <div className="order-2 lg:order-1 flex justify-center">
-            <PhoneMockup />
-          </div>
-          <div className="order-1 lg:order-2">
-            <SectionHeader eyebrow="تطبيق ولي الأمر" title={config.parentAppTitle} subtitle={config.parentAppDescription} align="start" />
-            <Link to="/login?mode=signup" className="lp-btn-gold mt-2">
-              ابدأ الآن
-              <ArrowLeft size={16} className="rotate-180" />
-            </Link>
           </div>
         </div>
       </SectionShell>
@@ -797,6 +725,7 @@ export default function LandingPage() {
           appName={systemConfig.appName}
           description={config.footerMarketingText}
           whatsappNumber={config.whatsappNumber}
+          phone="07757905554"
           email={systemConfig.supportEmails?.[0]}
           location="العراق"
         />
