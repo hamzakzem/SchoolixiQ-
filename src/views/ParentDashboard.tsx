@@ -25,6 +25,7 @@ import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import { useIsLgUp } from "../lib/useDashboardViewport";
 import { OfflineQueueTrigger } from "../components/OfflineSyncIndicator";
 import {
   logParentFirestoreSetup,
@@ -263,6 +264,7 @@ export default function ParentDashboard() {
   }, [selectedStudent?.schoolId]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const isLgUp = useIsLgUp();
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -1601,16 +1603,27 @@ export default function ParentDashboard() {
 
     return (
       <div
-        className="parent-app sx-dashboard-context sx-dashboard-layout sx-shell-layout h-[100dvh] overflow-hidden flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
+        className="parent-app sx-dashboard-context sx-dashboard-layout sx-shell-layout min-h-[100dvh] flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
         dir={isRtl ? "rtl" : "ltr"}
       >
+        {!isLgUp && isSidebarOpen ? (
+          <button
+            type="button"
+            aria-label={isRtl ? "إغلاق القائمة" : "Close menu"}
+            className="fixed inset-0 z-[var(--sx-z-drawer-backdrop)] bg-slate-900/40 backdrop-blur-sm lg:hidden print:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        ) : null}
+
         <AnimatePresence mode="wait">
-          {isSidebarOpen && (
+          {(isLgUp || isSidebarOpen) && (
             <motion.aside
               layout
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               className={clsx(
                 'parent-dashboard-menu sx-dashboard-sidebar sx-shell-sidebar border-slate-200 transition-colors overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)]',
+                isLgUp && 'sx-shell-sidebar--docked',
+                !isLgUp && isSidebarOpen && 'sx-shell-sidebar--drawer',
                 isSidebarCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
                 isRtl ? 'border-l' : 'border-r',
               )}
@@ -1689,19 +1702,23 @@ export default function ParentDashboard() {
           )}
         </AnimatePresence>
 
-        <div className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent print:overflow-visible print:h-auto print:block">
+        <div className="sx-dashboard-content sx-shell-content flex-1 flex flex-col min-h-[100dvh] bg-transparent print:overflow-visible print:h-auto print:block">
         <header className="sx-dashboard-header parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
-          <div className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-3">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="px-4 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <button
                   onClick={() => {
+                    if (isLgUp) {
+                      setIsSidebarCollapsed(!isSidebarCollapsed);
+                      return;
+                    }
                     setIsSidebarOpen(!isSidebarOpen);
                     if (!isSidebarOpen) {
                       setIsSidebarCollapsed(false);
                     }
                   }}
-                  className="parent-icon-btn hidden lg:flex shrink-0 bg-[#F7F8FA]"
+                  className="parent-icon-btn hidden lg:inline-flex shrink-0 bg-[#F7F8FA]"
                   aria-label={isRtl ? "القائمة" : "Menu"}
                 >
                   <Menu size={20} />
@@ -1724,12 +1741,12 @@ export default function ParentDashboard() {
                   <p className="text-[10px] font-bold text-[#0B2345]/50 uppercase tracking-wide">
                     {t("parentWelcome")}
                   </p>
-                  <p className="text-sm font-black text-[#0B2345] dark:text-white truncate max-w-[140px] sm:max-w-xs">
+                  <p className="text-sm font-semibold text-[#0B2345] dark:text-white truncate max-w-[140px] sm:max-w-xs">
                     {profile?.name}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1 sm:gap-2 shrink-0 sx-dock-duplicate-hide lg:flex">
+              <div className="sx-header-actions sx-dock-duplicate-hide lg:flex">
                   <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
                   <LanguageToggle />
                   <ThemeToggle />
@@ -2512,6 +2529,7 @@ export default function ParentDashboard() {
           hidden={activeTab === "chat"}
           logoutLabel={t("logout")}
           onLogout={handleLogout}
+          desktopDrawerEnabled={!isLgUp}
         />
       </div>
       </div>

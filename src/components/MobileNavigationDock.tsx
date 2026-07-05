@@ -77,6 +77,7 @@ interface MobileNavigationDockProps {
   logoutLabel?: string;
   menuSurface?: "dark" | "light";
   hidden?: boolean;
+  desktopDrawerEnabled?: boolean;
 }
 
 type DockSheet = "none" | "quick" | "more";
@@ -119,6 +120,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   logoutLabel,
   menuSurface = "dark",
   hidden = false,
+  desktopDrawerEnabled = true,
 }) => {
   const { user, profile } = useAuth();
   const { tabBadges, categoryUnread } = useNotificationBadges();
@@ -170,7 +172,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   }, []);
 
   const sheetOpen = activeSheet !== "none";
-  const servicesDrawerOpen = !hidden && !isCompactViewport && isSidebarOpen;
+  const servicesDrawerOpen = !hidden && desktopDrawerEnabled && !isCompactViewport && isSidebarOpen;
   const portalLayerOpen = servicesDrawerOpen || (!hidden && isCompactViewport && sheetOpen);
 
   const closeSheets = () => {
@@ -299,7 +301,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
             aria-label={isRtl ? "الرئيسية" : "Home"}
             aria-current={activeTab === overviewItem?.id ? "page" : undefined}
           >
-            <LayoutDashboard size={22} strokeWidth={2.1} aria-hidden />
+            <LayoutDashboard size={24} strokeWidth={2.1} aria-hidden />
             <span>{isRtl ? "الرئيسية" : "Home"}</span>
           </button>
 
@@ -311,7 +313,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
               aria-label={isRtl ? "الرسائل" : "Messages"}
             >
               <span className="sx-dock-v2__icon-wrap">
-                <MessageSquare size={22} strokeWidth={2.1} aria-hidden />
+                <MessageSquare size={24} strokeWidth={2.1} aria-hidden />
                 <DockBadge count={messagesCount} />
               </span>
               <span>{isRtl ? "الرسائل" : "Messages"}</span>
@@ -327,7 +329,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
               aria-pressed={showNotifications}
             >
               <span className="sx-dock-v2__icon-wrap">
-                <Bell size={22} strokeWidth={2.1} aria-hidden />
+                <Bell size={24} strokeWidth={2.1} aria-hidden />
                 <DockBadge count={notificationsCount} />
               </span>
               <span>{isRtl ? "الإشعارات" : "Notifications"}</span>
@@ -346,7 +348,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
             aria-expanded={activeSheet === "quick"}
           >
             <span className="sx-dock-v2__icon-wrap">
-              <LayoutGrid size={22} strokeWidth={2.1} aria-hidden />
+              <LayoutGrid size={24} strokeWidth={2.1} aria-hidden />
               {showQuickAccessHint && <span className="sx-dock-v2__dot" aria-hidden />}
             </span>
             <span>{isRtl ? "الوصول" : "Access"}</span>
@@ -362,7 +364,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
             aria-expanded={activeSheet === "more"}
           >
             <span className="sx-dock-v2__icon-wrap">
-              <MoreHorizontal size={22} strokeWidth={2.1} aria-hidden />
+              <MoreHorizontal size={24} strokeWidth={2.1} aria-hidden />
               {hasOfflineWork && <span className="sx-dock-v2__dot" aria-hidden />}
             </span>
             <span>{isRtl ? "المزيد" : "More"}</span>

@@ -37,18 +37,18 @@ export function DashboardHeader({
   return (
     <header
       className={clsx(
-        'sx-dashboard-header min-h-14 md:min-h-[4.5rem] pt-[calc(0.65rem+env(safe-area-inset-top,0px))] pb-3',
+        'sx-dashboard-header min-h-14 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2',
         'bg-sx-card/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-sx-border dark:border-slate-800',
-        'flex items-center justify-between px-4 md:px-8 shrink-0 sticky top-0 print:hidden',
+        'flex items-center justify-between px-4 md:px-6 shrink-0 sticky top-0 print:hidden',
         'z-[var(--sx-z-header)]',
         className,
       )}
     >
-      <div className="flex items-center gap-2 md:gap-4 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         <button
           type="button"
           onClick={onMenuToggle}
-          className="p-2 text-slate-500 hover:text-sx-primary bg-sx-surface hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all hidden lg:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
+          className="sx-header-action-btn text-slate-500 hover:text-sx-primary bg-sx-surface hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 hidden lg:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
           aria-label={isRtl ? 'القائمة' : 'Menu'}
         >
           <Menu size={20} className={menuCollapsed ? 'rotate-90' : ''} />
@@ -58,7 +58,7 @@ export function DashboardHeader({
           <button
             type="button"
             onClick={onBack}
-            className="p-2 text-slate-500 hover:text-sx-primary rounded-xl lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
+            className="sx-header-action-btn text-slate-500 hover:text-sx-primary lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
             aria-label={isRtl ? 'رجوع' : 'Back'}
           >
             <ChevronRight
@@ -98,7 +98,7 @@ export function DashboardHeader({
               {eyebrow}
             </p>
           ) : null}
-          <h1 className="text-sm md:text-lg font-bold text-sx-text dark:text-white truncate leading-tight">
+          <h1 className="text-sm md:text-base font-semibold text-sx-text dark:text-white truncate leading-tight">
             {title}
           </h1>
           {subtitle ? (
@@ -110,7 +110,7 @@ export function DashboardHeader({
       </div>
 
       {trailing ? (
-        <div className="flex items-center gap-2 md:gap-3 shrink-0">{trailing}</div>
+        <div className="sx-header-actions">{trailing}</div>
       ) : null}
     </header>
   );

@@ -27,6 +27,7 @@ type DashboardSidebarProps = {
   logoutLabel: string;
   onLogout: () => void;
   sectionLabels?: Record<string, string>;
+  docked?: boolean;
 };
 
 function navItemClasses(variant: DashboardShellVariant, active: boolean) {
@@ -65,6 +66,7 @@ export function DashboardSidebar({
   logoutLabel,
   onLogout,
   sectionLabels,
+  docked = false,
 }: DashboardSidebarProps) {
   const groups = sections?.length
     ? groupMenuBySection(menuItems, sections)
@@ -85,7 +87,7 @@ export function DashboardSidebar({
       )}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <item.icon size={isCollapsed ? 22 : 18} className="sx-action-icon shrink-0" strokeWidth={2.25} />
+      <item.icon size={isCollapsed ? 20 : 18} className="sx-action-icon shrink-0" strokeWidth={2.25} />
       {!isCollapsed ? (
         <span className="truncate flex-1 text-left rtl:text-right">{item.label}</span>
       ) : null}
@@ -109,12 +111,14 @@ export function DashboardSidebar({
 
   return (
     <AnimatePresence mode="wait">
-      {isOpen ? (
+      {(docked || isOpen) ? (
         <motion.aside
           layout
           transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
           className={clsx(
             'sx-dashboard-sidebar sx-shell-sidebar overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)] border',
+            docked && 'sx-shell-sidebar--docked',
+            !docked && isOpen && 'sx-shell-sidebar--drawer',
             isCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
             isRtl ? 'border-l' : 'border-r',
             sidebarSurface(variant),
@@ -123,25 +127,25 @@ export function DashboardSidebar({
           <div className="h-full flex flex-col min-w-0">
             <div
               className={clsx(
-                'sx-sidebar-brand px-4 py-5 flex items-center gap-3 border-b',
+                'sx-sidebar-brand',
                 variant === 'light'
                   ? 'border-sx-border dark:border-slate-800'
                   : 'border-white/10',
-                isCollapsed && 'justify-center px-2',
+                isCollapsed && 'justify-center',
               )}
             >
-              {isCustomSchoolLogo(schoolLogoUrl) ? (
-                <div className="w-10 h-10 rounded-xl bg-white/10 p-1 border border-white/10 flex items-center justify-center shrink-0">
-                  <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain" />
-                </div>
-              ) : (
-                <SchoolixLogo size={isCollapsed ? 36 : 40} surface={variant === 'light' ? 'dark' : 'light'} />
-              )}
+              <div className="sx-sidebar-brand__logo">
+                {isCustomSchoolLogo(schoolLogoUrl) ? (
+                  <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
+                ) : (
+                  <SchoolixLogo size={isCollapsed ? 32 : 36} surface={variant === 'light' ? 'dark' : 'light'} />
+                )}
+              </div>
               {!isCollapsed ? (
                 <div className="min-w-0" dir={isRtl ? 'rtl' : 'ltr'}>
-                  <h2 className="font-bold leading-tight truncate text-sm">{portalTitle}</h2>
+                  <h2 className="font-semibold leading-tight truncate text-sm">{portalTitle}</h2>
                   {portalSubtitle ? (
-                    <p className="text-[10px] uppercase tracking-wider text-sx-accent font-bold truncate mt-0.5">
+                    <p className="text-[10px] uppercase tracking-wider text-sx-accent font-semibold truncate mt-0.5">
                       {portalSubtitle}
                     </p>
                   ) : null}
@@ -149,7 +153,7 @@ export function DashboardSidebar({
               ) : null}
             </div>
 
-            <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4 custom-scrollbar">
+            <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-3 custom-scrollbar">
               {groups.map(({ section, items }) => (
                 <div key={section.id}>
                   {!isCollapsed && section.label ? (

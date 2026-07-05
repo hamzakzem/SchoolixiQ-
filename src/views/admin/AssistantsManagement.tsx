@@ -18,6 +18,7 @@ export default function AssistantsManagement() {
     [schoolData?.packagePermissions],
   );
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [assistants, setAssistants] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -30,6 +31,7 @@ export default function AssistantsManagement() {
     name: '',
     email: '',
     password: '',
+    confirmPassword: '',
     permissions: [] as string[],
     salary: '' as string | number
   });
@@ -80,6 +82,10 @@ export default function AssistantsManagement() {
 
     if (!editingAssistant && (!formData.password || formData.password.length < 6)) {
       toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      return;
+    }
+    if (!editingAssistant && formData.confirmPassword && formData.password !== formData.confirmPassword) {
+      toast.error('كلمتا المرور غير متطابقتين');
       return;
     }
 
@@ -142,9 +148,12 @@ export default function AssistantsManagement() {
       name: '',
       email: '',
       password: '',
+      confirmPassword: '',
       permissions: [],
       salary: ''
     });
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   };
 
   const filteredAssistants = assistants.filter(a => 
@@ -318,6 +327,28 @@ export default function AssistantsManagement() {
                               className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1"
                             >
                               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {!editingAssistant && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">تأكيد كلمة المرور (اختياري)</label>
+                          <div className="relative">
+                            <Lock size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type={showConfirmPassword ? "text" : "password"}
+                              value={formData.confirmPassword}
+                              onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                              className="w-full pr-12 pl-12 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold"
+                              placeholder="••••••••"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1"
+                            >
+                              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                           </div>
                         </div>

@@ -2,7 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { clsx } from 'clsx';
 import { OfflineQueueTrigger } from '../OfflineSyncIndicator';
 import { MobileNavigationDock } from '../MobileNavigationDock';
+import { GlobalFooter } from '../GlobalFooter';
 import { DashboardHeader, type BreadcrumbItem } from './DashboardHeader';
+import { DashboardSidebar } from './DashboardSidebar';
+import { useIsLgUp } from '../../lib/useDashboardViewport';
 import {
   type DashboardMenuItem,
   type DashboardNavSection,
@@ -72,11 +75,17 @@ export function DashboardShell({
   setShowNotifications,
   className,
 }: DashboardShellProps) {
+  const isLgUp = useIsLgUp();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleMenuToggle = useCallback(() => {
+    if (isLgUp) {
+      setIsSidebarCollapsed((v) => !v);
+      return;
+    }
     setIsSidebarOpen((v) => !v);
-  }, []);
+  }, [isLgUp]);
 
   const closeMobileSidebar = useCallback(() => {
     setIsSidebarOpen(false);
@@ -110,6 +119,27 @@ export function DashboardShell({
       )}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
+      {isLgUp ? (
+        <DashboardSidebar
+          variant={variant}
+          menuItems={menuItems}
+          sections={sections}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+          isOpen
+          docked
+          isCollapsed={isSidebarCollapsed}
+          isRtl={isRtl}
+          onCloseMobile={closeMobileSidebar}
+          portalTitle={portalTitle}
+          portalSubtitle={portalSubtitle}
+          schoolLogoUrl={schoolLogoUrl}
+          logoutLabel={logoutLabel}
+          onLogout={onLogout}
+          sectionLabels={sectionLabels}
+        />
+      ) : null}
+
       <div
         className={clsx(
           'sx-dashboard-content sx-shell-content print:overflow-visible print:h-auto',
@@ -125,7 +155,7 @@ export function DashboardShell({
           showBack={showBack}
           onBack={onBack ? handleHeaderBack : undefined}
           onMenuToggle={handleMenuToggle}
-          menuCollapsed={!isSidebarOpen}
+          menuCollapsed={isSidebarCollapsed}
           trailing={
             <>
               {headerTrailing}
@@ -173,6 +203,7 @@ export function DashboardShell({
           logoutLabel={logoutLabel}
           onLogout={onLogout}
           hidden={hideMobileDock}
+          desktopDrawerEnabled={!isLgUp}
         />
       </div>
     </div>

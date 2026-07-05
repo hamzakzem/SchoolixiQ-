@@ -1258,14 +1258,14 @@ export default function AdminDashboard() {
             <div className="hidden md:block">
               <GlobalSearch onNavigate={navigateToTab} />
             </div>
-            <div className="sx-dock-duplicate-hide lg:flex items-center gap-2 md:gap-3 shrink-0">
+            <div className="sx-dock-duplicate-hide lg:flex items-center sx-header-actions">
             <LanguageToggle />
             <ThemeToggle />
 
             <button
               type="button"
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`w-10 h-10 md:w-11 md:h-11 rounded-xl border transition-all duration-300 flex items-center justify-center relative active:scale-95 shrink-0 ${
+              className={`sx-header-action-btn border transition-all duration-300 relative active:scale-95 shrink-0 ${
                 showNotifications
                   ? "bg-sx-accent border-sx-accent text-sx-primary shadow-lg shadow-sx-accent/25"
                   : "bg-sx-primary border-sx-accent/30 text-sx-accent hover:bg-sx-accent hover:text-sx-primary"

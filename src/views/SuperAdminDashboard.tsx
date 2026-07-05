@@ -24,6 +24,7 @@ import { PartnerLogoPreview } from "../components/admin/PartnerLogoPreview";
 import { sanitizePartnerLogoUrl } from "../lib/footerPartners";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
+import { useIsLgUp } from "../lib/useDashboardViewport";
 import { OfflineQueueTrigger } from "../components/OfflineSyncIndicator";
 import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
@@ -259,6 +260,9 @@ export default function SuperAdminDashboard() {
   const [viewingPackage, setViewingPackage] = useState<any | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const isLgUp = useIsLgUp();
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
+  const [showNewUserPasswordConfirm, setShowNewUserPasswordConfirm] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -632,6 +636,8 @@ export default function SuperAdminDashboard() {
     role: "parent",
     schoolId: "",
     permissions: [] as string[],
+    password: "",
+    confirmPassword: "",
   });
 
   const SYSTEM_PERMISSIONS: Record<string, string> = {
@@ -1362,21 +1368,31 @@ export default function SuperAdminDashboard() {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const path = "users";
     try {
       if (editingUser) {
+        const { password: _password, confirmPassword: _confirmPassword, ...userPatch } =
+          newUser;
         await setDoc(
           doc(db, "users", editingUser.id),
           {
-            ...newUser,
+            ...userPatch,
             updatedAt: serverTimestamp(),
           },
           { merge: true },
         );
         toast.success("تم تحديث بيانات المستخدم");
       } else {
+        if (!newUser.password || newUser.password.length < 6) {
+          toast.error("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+          return;
+        }
+        if (newUser.password !== newUser.confirmPassword) {
+          toast.error("كلمتا المرور غير متطابقتين");
+          return;
+        }
         await adminCreateUser({
           email: newUser.email.toLowerCase(),
+          password: newUser.password,
           displayName: newUser.name,
           role: newUser.role,
           schoolId: newUser.schoolId || "",
@@ -1388,7 +1404,17 @@ export default function SuperAdminDashboard() {
       }
       setShowUserModal(false);
       setEditingUser(null);
-      setNewUser({ name: "", email: "", role: "parent", schoolId: "" });
+      setShowNewUserPassword(false);
+      setShowNewUserPasswordConfirm(false);
+      setNewUser({
+        name: "",
+        email: "",
+        role: "parent",
+        schoolId: "",
+        permissions: [],
+        password: "",
+        confirmPassword: "",
+      });
     } catch (error: any) {
       console.error("Add user error:", error);
       toast.error(error.message || "حدث خطأ أثناء المعالجة");
@@ -1869,17 +1895,28 @@ export default function SuperAdminDashboard() {
 
   return (
     <div
-      className="sx-dashboard-context sx-dashboard-layout sx-shell-layout h-[100dvh] overflow-hidden bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
+      className="sx-dashboard-context sx-dashboard-layout sx-shell-layout min-h-[100dvh] bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
-      {/* Docked sidebar retired — navigation via overlay drawer only */}
+      {!isLgUp && isSidebarOpen ? (
+        <button
+          type="button"
+          aria-label={isRtl ? "إغلاق القائمة" : "Close menu"}
+          className="fixed inset-0 z-[var(--sx-z-drawer-backdrop)] bg-slate-900/40 backdrop-blur-sm lg:hidden print:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      ) : null}
+
+      {/* Docked sidebar on desktop; drawer on mobile */}
       <AnimatePresence mode="wait">
-        {false && isSidebarOpen && (
+        {(isLgUp || isSidebarOpen) && (
           <motion.aside
             layout
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             className={clsx(
               'bg-slate-900 dark:bg-black text-white sx-dashboard-sidebar sx-shell-sidebar border-slate-800 dark:border-slate-800 transition-colors overflow-hidden pt-[env(safe-area-inset-top,0px)]',
+              isLgUp && 'sx-shell-sidebar--docked',
+              !isLgUp && isSidebarOpen && 'sx-shell-sidebar--drawer',
               isSidebarCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
               isRtl ? 'border-l' : 'border-r',
             )}
@@ -2370,21 +2407,25 @@ export default function SuperAdminDashboard() {
       </AnimatePresence>
 
       <main className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className="sx-dashboard-header min-h-[5rem] h-auto pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 transition-colors shadow-sm relative z-[var(--sx-z-header)] print:hidden">
-          <div className="flex items-center gap-1.5 sm:gap-4 min-w-0">
+        <header className="sx-dashboard-header pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors shadow-sm relative z-[var(--sx-z-header)] print:hidden">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => {
+                if (isLgUp) {
+                  setIsSidebarCollapsed(!isSidebarCollapsed);
+                  return;
+                }
                 setIsSidebarOpen(!isSidebarOpen);
                 if (!isSidebarOpen) {
                   setIsSidebarCollapsed(false);
                 }
               }}
-              className="w-11 h-11 hidden lg:flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 rounded-xl transition-all shadow-sm shrink-0"
+              className="sx-header-action-btn hidden lg:inline-flex text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 shrink-0"
             >
               <Menu
                 size={20}
                 className={
-                  !isSidebarOpen
+                  isSidebarCollapsed
                     ? "rotate-90 transition-transform"
                     : "transition-transform"
                 }
@@ -2408,19 +2449,19 @@ export default function SuperAdminDashboard() {
             )}
             <h2
               id="super-admin-header"
-              className="text-sm sm:text-base md:text-xl font-black text-slate-900 dark:text-white font-display tracking-tight hover:text-blue-600 transition-colors cursor-default truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none"
+              className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white font-display tracking-tight truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none"
             >
               {t('system_management')}
             </h2>
           </div>
-          <div className="flex items-center gap-4 sm:gap-4 md:gap-6 shrink-0 sx-dock-duplicate-hide lg:flex">
+          <div className="sx-header-actions sx-dock-duplicate-hide lg:flex">
             <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
             <LanguageToggle />
             <ThemeToggle />
 
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`w-11 h-11 rounded-xl md:rounded-2xl border transition-all duration-300 flex items-center justify-center relative group active:scale-95 shrink-0 ${
+              className={`sx-header-action-btn border transition-all duration-300 relative active:scale-95 ${
                 showNotifications
                   ? "bg-[#D4A64A] border-[#D4A64A] text-[#0B2345] shadow-lg shadow-[#D4A64A]/20"
                   : "bg-[#0B2345] border-[#D4A64A]/30 text-[#D4A64A] hover:bg-[#D4A64A] hover:text-[#0B2345] hover:border-[#D4A64A]"
@@ -3314,6 +3355,9 @@ export default function SuperAdminDashboard() {
                             email: "",
                             role: "assistant",
                             schoolId: "",
+                            permissions: [],
+                            password: "",
+                            confirmPassword: "",
                           });
                           setShowUserModal(true);
                         }}
@@ -3471,7 +3515,9 @@ export default function SuperAdminDashboard() {
                                             role: user.role,
                                             schoolId: user.schoolId || "",
                                             permissions: user.permissions || [],
-                                          } as any);
+                                            password: "",
+                                            confirmPassword: "",
+                                          });
                                           setShowUserModal(true);
                                         }}
                                         className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-slate-400 hover:text-blue-600 rounded-xl transition-all"
@@ -3622,6 +3668,9 @@ export default function SuperAdminDashboard() {
                                               email: user.email,
                                               role: user.role,
                                               schoolId: user.schoolId || "",
+                                              permissions: user.permissions || [],
+                                              password: "",
+                                              confirmPassword: "",
                                             });
                                             setShowUserModal(true);
                                           }}
@@ -5897,6 +5946,87 @@ export default function SuperAdminDashboard() {
                 </div>
               </div>
 
+              {!editingUser && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">
+                      كلمة المرور
+                    </label>
+                    <div className="relative">
+                      <Lock
+                        size={16}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+                      <input
+                        required
+                        type={showNewUserPassword ? "text" : "password"}
+                        minLength={6}
+                        value={newUser.password}
+                        onChange={(e) =>
+                          setNewUser({ ...newUser, password: e.target.value })
+                        }
+                        className="w-full pr-12 pl-12 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowNewUserPassword(!showNewUserPassword)
+                        }
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {showNewUserPassword ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 font-semibold">
+                      6 أحرف على الأقل
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">
+                      تأكيد كلمة المرور (اختياري)
+                    </label>
+                    <div className="relative">
+                      <Lock
+                        size={16}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+                      <input
+                        type={showNewUserPasswordConfirm ? "text" : "password"}
+                        value={newUser.confirmPassword}
+                        onChange={(e) =>
+                          setNewUser({
+                            ...newUser,
+                            confirmPassword: e.target.value,
+                          })
+                        }
+                        className="w-full pr-12 pl-12 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-all font-bold"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowNewUserPasswordConfirm(
+                            !showNewUserPasswordConfirm,
+                          )
+                        }
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {showNewUserPasswordConfirm ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {newUser.role === "assistant" && !newUser.schoolId && (
                 <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30">
                   <h4 className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3">
@@ -5940,11 +6070,16 @@ export default function SuperAdminDashboard() {
                   onClick={() => {
                     setShowUserModal(false);
                     setEditingUser(null);
+                    setShowNewUserPassword(false);
+                    setShowNewUserPasswordConfirm(false);
                     setNewUser({
                       name: "",
                       email: "",
                       role: "parent",
                       schoolId: "",
+                      permissions: [],
+                      password: "",
+                      confirmPassword: "",
                     });
                   }}
                   className="flex-1 px-6 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all"
@@ -5996,6 +6131,7 @@ export default function SuperAdminDashboard() {
         logoutLabel={t("sidebar_logout")}
         onLogout={() => signOutWithCleanup()}
         hidden={activeTab === "chat"}
+        desktopDrawerEnabled={!isLgUp}
       />
     </div>
   );

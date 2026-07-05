@@ -1,3 +1,6 @@
 export { DashboardShell, type DashboardShellProps } from './DashboardShell';
 export { DashboardHeader, type BreadcrumbItem } from './DashboardHeader';
-export { DashboardSidebar } from './DashboardSidebar';
+export { DashboardSidebar, DashboardMobileSidebarOverlay } from './DashboardSidebar';
+export { DashboardHeader as Navbar } from './DashboardHeader';
+export { DashboardSidebar as Sidebar } from './DashboardSidebar';
+export { MobileNavigationDock as BottomNav } from '../MobileNavigationDock';
