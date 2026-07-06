@@ -15,6 +15,8 @@ import {
 import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
 import { Toaster, toast } from "react-hot-toast";
 import { UserRole } from "./types";
+import { normalizeSchoolId } from "./lib/schoolId";
+import { AssistantSchoolGate } from "./components/AssistantSchoolGate";
 import {
   ShieldCheck,
   LogOut,
@@ -133,7 +135,15 @@ const DEFAULT_PACKAGES = [
 ];
 
 const AppContent = () => {
-  const { user, profile, schoolData, loading, offlineStale } = useAuth();
+  const {
+    user,
+    profile,
+    schoolData,
+    loading,
+    authReady,
+    schoolContextLoading,
+    offlineStale,
+  } = useAuth();
   const { t, isRtl, language, setLanguage } = useLanguage();
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [autoLinkChecked, setAutoLinkChecked] = useState(false);
@@ -594,6 +604,7 @@ const AppContent = () => {
 
   if (
     loading ||
+    !authReady ||
     (user && !profile && !autoLinkChecked) ||
     isCreatingProfile ||
     (user && (!profile || isPendingSchoolAdmin(profile)) && onboardingState === "loading")
@@ -632,14 +643,19 @@ const AppContent = () => {
       }
     }
 
+    const profileSchoolId = normalizeSchoolId(profile?.schoolId);
+
     // Dedicated recovery/error screen if profile has school role but schoolId or schoolData is missing or inaccessible in Firestore
     const isSchoolRole = profile?.role && [
       UserRole.ADMIN,
       UserRole.STAFF,
-      UserRole.ASSISTANT
     ].includes(profile.role);
 
-    if (isSchoolRole && (!profile?.schoolId || (!schoolData && !loading && !offlineStale))) {
+    if (isSchoolRole && schoolContextLoading) {
+      return <PageLoadingSkeleton />;
+    }
+
+    if (isSchoolRole && (!profileSchoolId || (!schoolData && !offlineStale))) {
       return (
         <div
           className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6"
@@ -665,7 +681,7 @@ const AppContent = () => {
               </div>
               <div className="flex justify-between items-center text-right text-[11px]" dir={isRtl ? "rtl" : "ltr"}>
                 <span className="text-slate-400">{isRtl ? "معرف المدرسة:" : "School ID:"}</span>
-                <span className="text-slate-700 dark:text-slate-300 font-bold font-mono">{profile.schoolId || 'N/A'}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-bold font-mono">{profileSchoolId || (isRtl ? 'غير مرتبط' : 'Unlinked')}</span>
               </div>
               <div className="flex justify-between items-center text-right text-[11px]" dir={isRtl ? "rtl" : "ltr"}>
                 <span className="text-slate-400">{isRtl ? "دور الحساب:" : "Role:"}</span>
@@ -791,9 +807,11 @@ const AppContent = () => {
       case UserRole.SUPERADMIN:
         return <SuperAdminDashboard />;
       case UserRole.ASSISTANT:
-        // If assistant has no schoolId, they are a system assistant
-        if (!profile.schoolId) return <SuperAdminDashboard />;
-        return <AdminDashboard />;
+        return (
+          <AssistantSchoolGate>
+            <AdminDashboard />
+          </AssistantSchoolGate>
+        );
       case UserRole.ADMIN:
       case UserRole.STAFF:
       case "school_admin":

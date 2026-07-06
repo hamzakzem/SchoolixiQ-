@@ -17,6 +17,7 @@ type DashboardHeaderProps = {
   onBack?: () => void;
   onMenuToggle: () => void;
   menuCollapsed?: boolean;
+  showMenuToggle?: boolean;
   trailing?: React.ReactNode;
   className?: string;
 };
@@ -31,6 +32,7 @@ export function DashboardHeader({
   onBack,
   onMenuToggle,
   menuCollapsed,
+  showMenuToggle = true,
   trailing,
   className,
 }: DashboardHeaderProps) {
@@ -45,14 +47,16 @@ export function DashboardHeader({
       )}
     >
       <div className="flex items-center gap-2 min-w-0">
-        <button
-          type="button"
-          onClick={onMenuToggle}
-          className="sx-header-action-btn text-slate-500 hover:text-sx-primary bg-sx-surface hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 hidden lg:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
-          aria-label={isRtl ? 'القائمة' : 'Menu'}
-        >
-          <Menu size={20} className={menuCollapsed ? 'rotate-90' : ''} />
-        </button>
+        {showMenuToggle ? (
+          <button
+            type="button"
+            onClick={onMenuToggle}
+            className="sx-header-action-btn text-slate-500 hover:text-sx-primary bg-sx-surface hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 hidden lg:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
+            aria-label={isRtl ? 'القائمة' : 'Menu'}
+          >
+            <Menu size={20} className={menuCollapsed ? 'rotate-90' : ''} />
+          </button>
+        ) : null}
 
         {showBack && onBack ? (
           <button

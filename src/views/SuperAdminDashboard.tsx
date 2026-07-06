@@ -24,7 +24,7 @@ import { PartnerLogoPreview } from "../components/admin/PartnerLogoPreview";
 import { sanitizePartnerLogoUrl } from "../lib/footerPartners";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
-import { useIsLgUp } from "../lib/useDashboardViewport";
+import { useDevice } from "../lib/useDevice";
 import { OfflineQueueTrigger } from "../components/OfflineSyncIndicator";
 import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
@@ -260,25 +260,19 @@ export default function SuperAdminDashboard() {
   const [viewingPackage, setViewingPackage] = useState<any | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const isLgUp = useIsLgUp();
+  const { isMobile, isTablet, isDesktop } = useDevice();
   const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [showNewUserPasswordConfirm, setShowNewUserPasswordConfirm] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setIsSidebarCollapsed(false);
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    if (isTablet) setIsSidebarCollapsed(true);
+  }, [isTablet]);
 
   useEffect(() => {
-    if (activeTab === "chat" && isSidebarOpen && window.innerWidth < 1024) {
+    if (activeTab === "chat" && isSidebarOpen && isMobile) {
       setIsSidebarOpen(false);
     }
-  }, [activeTab, isSidebarOpen]);
+  }, [activeTab, isSidebarOpen, isMobile]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1898,26 +1892,15 @@ export default function SuperAdminDashboard() {
       className="sx-dashboard-context sx-dashboard-layout sx-shell-layout min-h-[100dvh] bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
       dir={isRtl ? "rtl" : "ltr"}
     >
-      {!isLgUp && isSidebarOpen ? (
-        <button
-          type="button"
-          aria-label={isRtl ? "إغلاق القائمة" : "Close menu"}
-          className="fixed inset-0 z-[var(--sx-z-drawer-backdrop)] bg-slate-900/40 backdrop-blur-sm lg:hidden print:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      ) : null}
-
-      {/* Docked sidebar on desktop; drawer on mobile */}
+      {!isMobile ? (
       <AnimatePresence mode="wait">
-        {(isLgUp || isSidebarOpen) && (
-          <motion.aside
+        <motion.aside
             layout
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             className={clsx(
               'bg-slate-900 dark:bg-black text-white sx-dashboard-sidebar sx-shell-sidebar border-slate-800 dark:border-slate-800 transition-colors overflow-hidden pt-[env(safe-area-inset-top,0px)]',
-              isLgUp && 'sx-shell-sidebar--docked',
-              !isLgUp && isSidebarOpen && 'sx-shell-sidebar--drawer',
-              isSidebarCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
+              'sx-shell-sidebar--docked',
+              (isTablet || isSidebarCollapsed) && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
               isRtl ? 'border-l' : 'border-r',
             )}
           >
@@ -1952,7 +1935,7 @@ export default function SuperAdminDashboard() {
                   <button
                     onClick={() => {
                       navigateToTab("schools");
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      if (isMobile) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_schools') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "schools" ? "sx-nav-item--active" : ""}`}
@@ -1977,7 +1960,7 @@ export default function SuperAdminDashboard() {
                   <button
                     onClick={() => {
                       navigateToTab("accounts");
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      if (isMobile) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_accounts') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "accounts" ? "sx-nav-item--active" : ""}`}
@@ -2002,7 +1985,7 @@ export default function SuperAdminDashboard() {
                   <button
                     onClick={() => {
                       navigateToTab("team");
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      if (isMobile) setIsSidebarOpen(false);
                     }}
                     title={
                       isSidebarCollapsed
@@ -2031,7 +2014,7 @@ export default function SuperAdminDashboard() {
                   <button
                     onClick={() => {
                       navigateToTab("packages");
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      if (isMobile) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_packages') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "packages" ? "sx-nav-item--active" : ""}`}
@@ -2056,7 +2039,7 @@ export default function SuperAdminDashboard() {
                   <button
                     onClick={() => {
                       navigateToTab("distributors");
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      if (isMobile) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? "الموزعون والكوبونات" : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "distributors" ? "sx-nav-item--active" : ""}`}
@@ -2081,7 +2064,7 @@ export default function SuperAdminDashboard() {
                   <button
                     onClick={() => {
                       navigateToTab("distributor_requests");
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      if (isMobile) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? "طلبات الموزعين" : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "distributor_requests" ? "sx-nav-item--active" : ""}`}
@@ -2099,7 +2082,7 @@ export default function SuperAdminDashboard() {
                   <button
                     onClick={() => {
                       navigateToTab("requests");
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      if (isMobile) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_requests') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "requests" ? "sx-nav-item--active" : ""}`}
@@ -2134,7 +2117,7 @@ export default function SuperAdminDashboard() {
                   <button
                     onClick={() => {
                       navigateToTab("chat");
-                      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                      if (isMobile) setIsSidebarOpen(false);
                     }}
                     title={isSidebarCollapsed ? t('sidebar_chat') : undefined}
                     className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "chat" ? "sx-nav-item--active" : ""}`}
@@ -2160,7 +2143,7 @@ export default function SuperAdminDashboard() {
                     <button
                       onClick={() => {
                         navigateToTab("users");
-                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                        if (isMobile) setIsSidebarOpen(false);
                       }}
                       title={
                         isSidebarCollapsed ? t('sidebar_users') : undefined
@@ -2185,7 +2168,7 @@ export default function SuperAdminDashboard() {
                     <button
                       onClick={() => {
                         navigateToTab("parents");
-                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                        if (isMobile) setIsSidebarOpen(false);
                       }}
                       title={isSidebarCollapsed ? t('sidebar_parents') : undefined}
                       className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "parents" ? "sx-nav-item--active" : ""}`}
@@ -2212,7 +2195,7 @@ export default function SuperAdminDashboard() {
                     <button
                       onClick={() => {
                         navigateToTab("settings");
-                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                        if (isMobile) setIsSidebarOpen(false);
                       }}
                       title={isSidebarCollapsed ? t('sidebar_settings') : undefined}
                       className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "settings" ? "sx-nav-item--active" : ""}`}
@@ -2235,7 +2218,7 @@ export default function SuperAdminDashboard() {
                     <button
                       onClick={() => {
                         navigateToTab("landing_page");
-                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                        if (isMobile) setIsSidebarOpen(false);
                       }}
                       title={
                         isSidebarCollapsed
@@ -2264,7 +2247,7 @@ export default function SuperAdminDashboard() {
                     <button
                       onClick={() => {
                         navigateToTab("footer");
-                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                        if (isMobile) setIsSidebarOpen(false);
                       }}
                       title={
                         isSidebarCollapsed
@@ -2295,7 +2278,7 @@ export default function SuperAdminDashboard() {
                       <button
                         onClick={() => {
                           navigateToTab("backups");
-                          if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                          if (isMobile) setIsSidebarOpen(false);
                         }}
                         title={
                           isSidebarCollapsed ? t("sidebar_backups") : undefined
@@ -2325,8 +2308,7 @@ export default function SuperAdminDashboard() {
                       <button
                         onClick={() => {
                           navigateToTab("diagnostics");
-                          if (window.innerWidth < 1024)
-                            setIsSidebarOpen(false);
+                          if (isMobile) setIsSidebarOpen(false);
                         }}
                         title={
                           isSidebarCollapsed
@@ -2357,7 +2339,7 @@ export default function SuperAdminDashboard() {
                       <button
                         onClick={() => {
                           navigateToTab("audit_logs");
-                          if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                          if (isMobile) setIsSidebarOpen(false);
                         }}
                         title={isSidebarCollapsed ? (isRtl ? "سجل التدقيق" : "Audit Logs") : undefined}
                         className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "audit_logs" ? "sx-nav-item--active" : ""}`}
@@ -2403,23 +2385,15 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
           </motion.aside>
-        )}
       </AnimatePresence>
+      ) : null}
 
       <main className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
         <header className="sx-dashboard-header pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors shadow-sm relative z-[var(--sx-z-header)] print:hidden">
           <div className="flex items-center gap-2 min-w-0">
+            {isDesktop ? (
             <button
-              onClick={() => {
-                if (isLgUp) {
-                  setIsSidebarCollapsed(!isSidebarCollapsed);
-                  return;
-                }
-                setIsSidebarOpen(!isSidebarOpen);
-                if (!isSidebarOpen) {
-                  setIsSidebarCollapsed(false);
-                }
-              }}
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className="sx-header-action-btn hidden lg:inline-flex text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 shrink-0"
             >
               <Menu
@@ -2431,6 +2405,7 @@ export default function SuperAdminDashboard() {
                 }
               />
             </button>
+            ) : null}
             <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-1 shrink-0 hidden sm:block"></div>
             {activeTab !== "schools" && (
               <motion.button
@@ -6101,6 +6076,7 @@ export default function SuperAdminDashboard() {
       </AnimatePresence>
 
       {/* Floating/Sticky Mobile Navigation Dock for Super Admin */}
+      {isMobile ? (
       <MobileNavigationDock
         menuItems={[
           hasPermission("manage_schools") && { id: "schools", label: t('sidebar_schools'), icon: Building },
@@ -6122,8 +6098,8 @@ export default function SuperAdminDashboard() {
         setActiveTab={(tabId) => {
           navigateToTab(tabId);
         }}
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
+        isSidebarOpen={false}
+        setIsSidebarOpen={() => undefined}
         showNotifications={showNotifications}
         setShowNotifications={setShowNotifications}
         notificationsCount={totalUnread}
@@ -6131,8 +6107,9 @@ export default function SuperAdminDashboard() {
         logoutLabel={t("sidebar_logout")}
         onLogout={() => signOutWithCleanup()}
         hidden={activeTab === "chat"}
-        desktopDrawerEnabled={!isLgUp}
+        desktopDrawerEnabled={false}
       />
+      ) : null}
     </div>
   );
 }

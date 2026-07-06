@@ -159,12 +159,12 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
     offlineCounts.pending + offlineCounts.failed + offlineCounts.blocked > 0 || isSyncing;
 
   const [isCompactViewport, setIsCompactViewport] = useState(
-    () => typeof window !== "undefined" && window.innerWidth < 1024,
+    () => typeof window !== "undefined" && window.innerWidth < 768,
   );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 1023px)");
+    const mq = window.matchMedia("(max-width: 767px)");
     const sync = () => setIsCompactViewport(mq.matches);
     sync();
     mq.addEventListener("change", sync);
@@ -262,6 +262,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   }, [activeSheet, isSidebarOpen, showNotifications, setIsSidebarOpen, setShowNotifications]);
 
   if (hidden) return null;
+  if (!isCompactViewport) return null;
 
   const closeServicesMenu = () => setIsSidebarOpen(false);
 
@@ -290,7 +291,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
       </div>
 
       <nav
-        className="sx-dock-v2 lg:hidden print:hidden"
+        className="sx-dock-v2 print:hidden"
         aria-label={isRtl ? "التنقل السفلي" : "Bottom navigation"}
       >
         <div className="sx-dock-v2__inner">

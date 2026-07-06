@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 
+export { useDevice, MOBILE_MAX_PX, TABLET_MIN_PX, DESKTOP_MIN_PX } from './useDevice';
+
+/** @deprecated Prefer useDevice().isDesktop — kept for legacy call sites */
 export function useIsLgUp() {
   const [isLgUp, setIsLgUp] = useState(
     () =>

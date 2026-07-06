@@ -15,6 +15,7 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 import { UserProfile } from '../types';
+import { normalizeSchoolId, roleRequiresSchoolBootstrap, type SchoolContextStatus, isFirestorePermissionDenied } from './schoolId';
 import { handleFirestoreError, OperationType } from './firestore-errors';
 import { buildTeacherRedactionContext } from './userProfile';
 import { resolveProfilePermissions } from './staffPermissions';
@@ -50,6 +51,11 @@ interface AuthContextType {
   profile: UserProfile | null;
   schoolData: any | null;
   loading: boolean;
+  profileLoaded: boolean;
+  schoolContextLoading: boolean;
+  schoolContextLoaded: boolean;
+  schoolContextStatus: SchoolContextStatus;
+  authReady: boolean;
   offlineStale: boolean;
   profileFromCache: boolean;
 }
@@ -59,6 +65,11 @@ const AuthContext = createContext<AuthContextType>({
   profile: null, 
   schoolData: null, 
   loading: true,
+  profileLoaded: false,
+  schoolContextLoading: false,
+  schoolContextLoaded: false,
+  schoolContextStatus: 'idle',
+  authReady: false,
   offlineStale: false,
   profileFromCache: false,
 });
@@ -68,6 +79,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [schoolData, setSchoolData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [schoolContextLoading, setSchoolContextLoading] = useState(false);
+  const [schoolContextLoaded, setSchoolContextLoaded] = useState(false);
+  const [schoolContextStatus, setSchoolContextStatus] = useState<SchoolContextStatus>('idle');
   const [offlineStale, setOfflineStale] = useState(false);
   const [profileFromCache, setProfileFromCache] = useState(false);
   const lastUserIdRef = useRef<string | null>(null);
@@ -84,6 +99,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { language, setLanguage } = useLanguage();
   const languageRef = useRef(language);
 
+  const applySchoolContext = (status: SchoolContextStatus) => {
+    setSchoolContextStatus(status);
+    setSchoolContextLoading(status === 'loading');
+    setSchoolContextLoaded(
+      status === 'ready' ||
+        status === 'unlinked' ||
+        status === 'not_found' ||
+        status === 'permission_denied',
+    );
+  };
+
+  const resetSchoolContext = () => {
+    applySchoolContext('idle');
+    setSchoolContextLoaded(false);
+  };
+
   const hydrateProfileFromCache = async (uid: string): Promise<boolean> => {
     const cached = await getCachedProfileForUser(uid);
     if (!cached) return false;
@@ -94,20 +125,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } as UserProfile;
     setProfile(nextProfile);
     setProfileFromCache(true);
+    setProfileLoaded(true);
     setOfflineStale(true);
     setOfflineDataStale(true);
     setLoading(false);
 
-    const schoolId = data.schoolId ? String(data.schoolId) : '';
-    if (schoolId) {
-      const schoolCached = await getCachedSnapshot<Record<string, unknown>>(
-        CACHE_COLLECTION_KEYS.school,
-        uid,
-        schoolId,
-      );
-      if (schoolCached?.data) {
-        setSchoolData(schoolCached.data);
-      }
+    const schoolId = normalizeSchoolId(data.schoolId);
+    const needsSchool = roleRequiresSchoolBootstrap(data.role);
+
+    if (!needsSchool) {
+      applySchoolContext('ready');
+      return true;
+    }
+
+    if (!schoolId) {
+      applySchoolContext('unlinked');
+      return true;
+    }
+
+    const schoolCached = await getCachedSnapshot<Record<string, unknown>>(
+      CACHE_COLLECTION_KEYS.school,
+      uid,
+      schoolId,
+    );
+    if (schoolCached?.data) {
+      setSchoolData(schoolCached.data);
+      applySchoolContext('ready');
+    } else {
+      applySchoolContext('loading');
     }
     console.info('[OfflineCache] PROFILE_HYDRATE', { uid, updatedAt: cached.updatedAt });
     return true;
@@ -253,6 +298,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (authUser) {
+        setLoading(true);
+        setProfileLoaded(false);
+        resetSchoolContext();
         setLogoutInProgress(false);
         setPushLogoutInProgress(false);
         resumeOfflineSync();
@@ -308,19 +356,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               claims.p,
             );
 
+            const normalizedSchoolId = normalizeSchoolId(data.schoolId) || '';
             const nextProfile = {
               uid: authUser.uid,
               ...data,
+              schoolId: normalizedSchoolId,
               permissions: resolvedPermissions as UserProfile['permissions'],
             } as UserProfile;
 
             setProfile(nextProfile);
+            setProfileLoaded(true);
             persistProfileCache(authUser.uid, data);
 
             profileSnapshotRef.current = {
               uid: authUser.uid,
               role: String(data.role || 'unknown'),
-              schoolId: data.schoolId ? String(data.schoolId) : undefined,
+              schoolId: normalizedSchoolId || undefined,
               email: authUser.email,
             };
             setLogoutLogSnapshot(profileSnapshotRef.current);
@@ -331,7 +382,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 writeLoginLog({
                   userId: authUser.uid,
                   role: String(data.role || 'unknown'),
-                  schoolId: data.schoolId ? String(data.schoolId) : undefined,
+                  schoolId: normalizedSchoolId || undefined,
                   event: 'login',
                   email: authUser.email,
                 }),
@@ -349,17 +400,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               }
             }
 
-            // Active school admins can render while school/package data streams in
-            if (
-              data.role === 'admin' &&
-              data.schoolId &&
-              (data.status === 'active' ||
-                data.subscriptionStatus === 'active' ||
-                (!data.pendingRegistrationId && data.schoolId))
-            ) {
-              setLoading(false);
+            if (normalizedSchoolId && roleRequiresSchoolBootstrap(data.role)) {
+              applySchoolContext('loading');
+            } else if (roleRequiresSchoolBootstrap(data.role)) {
+              applySchoolContext('unlinked');
+            } else {
+              applySchoolContext('ready');
             }
-            
+
             // Native Capacitor push — independent from web FCM; retries after profile load.
             triggerNativePushRegistration(
               authUser.uid,
@@ -369,16 +417,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             // Retry web FCM once profile is confirmed (all roles).
             triggerWebPushRegistration(authUser.uid, 'profile_snapshot');
 
-            // Listen to school data if schoolId exists
-            if (data.schoolId) {
-              if (!schoolData || schoolData.id !== data.schoolId) {
+            if (normalizedSchoolId) {
+              if (!schoolData || schoolData.id !== normalizedSchoolId) {
                 if (unsubscribeSchool) unsubscribeSchool();
-                unsubscribeSchool = subscribeGuardedFirestore(doc(db, 'schools', data.schoolId), (s) => {
+                unsubscribeSchool = subscribeGuardedFirestore(doc(db, 'schools', normalizedSchoolId), (s) => {
                   if (shouldSkipFirestoreListeners()) return;
                   if (s.exists()) {
                     const schoolInfo = { id: s.id, ...s.data() } as any;
                     setSchoolData(schoolInfo);
-                    persistSchoolCache(authUser.uid, data.schoolId, schoolInfo);
+                    persistSchoolCache(authUser.uid, normalizedSchoolId, schoolInfo);
                     
                     // Listen to active active package for the school
                     if (schoolInfo.planId && unsubscribePackage === null) {
@@ -393,10 +440,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                           }));
                         }
                         setLoading(false);
+                        applySchoolContext('ready');
                       }, (error) => {
                         if (shouldIgnoreFirestoreListenerError(error)) return;
                         console.error("Error fetching package for school", error);
                         setLoading(false);
+                        applySchoolContext('ready');
                       });
                     } else {
                       if (!schoolInfo.planId && unsubscribePackage) {
@@ -404,33 +453,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         unsubscribePackage = null;
                       }
                       setLoading(false);
+                      applySchoolContext('ready');
                     }
                   } else {
                     setSchoolData(null);
                     setLoading(false);
+                    applySchoolContext('not_found');
                   }
                 }, (error) => {
                   if (shouldIgnoreFirestoreListenerError(error)) return;
                   if (isFirestoreOfflineError(error) || !navigator.onLine) {
-                    void getCachedSnapshot(CACHE_COLLECTION_KEYS.school, authUser.uid, data.schoolId).then(
+                    void getCachedSnapshot(CACHE_COLLECTION_KEYS.school, authUser.uid, normalizedSchoolId).then(
                       (cached) => {
                         if (cached?.data) {
                           setSchoolData(cached.data);
                           setOfflineStale(true);
                           setOfflineDataStale(true);
+                          applySchoolContext('ready');
+                        } else {
+                          applySchoolContext('loading');
                         }
                         setLoading(false);
                       },
                     );
                     return;
                   }
-                  handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${data.schoolId}`);
+                  if (isFirestorePermissionDenied(error)) {
+                    setSchoolData(null);
+                    setLoading(false);
+                    applySchoolContext('permission_denied');
+                    return;
+                  }
+                  handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${normalizedSchoolId}`);
                   setLoading(false);
+                  applySchoolContext('not_found');
                 });
               } else {
                 setLoading(false);
+                applySchoolContext('ready');
               }
             } else {
+              if (roleRequiresSchoolBootstrap(data.role)) {
+                applySchoolContext('unlinked');
+              } else {
+                applySchoolContext('ready');
+              }
               setLoading(false);
             }
           } else {
@@ -447,28 +514,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             
             if (claims && claims.role) {
               const fallbackRole = claims.role;
-              const fallbackSchoolId = claims.schoolId || '';
               const fallbackName = authUser.displayName || claims.name || (authUser.email ? authUser.email.split('@')[0] : 'مستخدم');
               const fallbackEmail = authUser.email ? authUser.email.toLowerCase() : '';
 
-              console.log(`[AUTH PROFILE FALLBACK] Creating missing Firestore profile for UID ${authUser.uid} from Firebase claims/auth:`, {
+              console.log(`[AUTH PROFILE FALLBACK] Creating missing Firestore profile for UID ${authUser.uid}:`, {
                 email: fallbackEmail,
                 role: fallbackRole,
-                schoolId: fallbackSchoolId,
-                name: fallbackName
+                name: fallbackName,
               });
 
               try {
-                // Ensure profile document is created
                 await setDoc(doc(db, 'users', authUser.uid), {
                   uid: authUser.uid,
                   email: fallbackEmail,
                   name: fallbackName,
                   role: fallbackRole,
-                  schoolId: fallbackSchoolId,
+                  schoolId: '',
                   createdAt: serverTimestamp(),
                   updatedAt: serverTimestamp(),
-                  autoProv: true // indicator for logging
+                  autoProv: true,
                 }, { merge: true });
                 
                 // Return immediately, the onSnapshot listener will be reactively updated and correctly fetch it in the next cycle
@@ -550,6 +614,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         setProfile(null);
         setSchoolData(null);
+        setProfileLoaded(false);
+        resetSchoolContext();
         setOfflineStale(false);
         setProfileFromCache(false);
         setLoading(false);
@@ -563,8 +629,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
+  const authReady = !user || (profileLoaded && schoolContextLoaded);
+
   return (
-    <AuthContext.Provider value={{ user, profile, schoolData, loading, offlineStale, profileFromCache }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        schoolData,
+        loading,
+        profileLoaded,
+        schoolContextLoading,
+        schoolContextLoaded,
+        schoolContextStatus,
+        authReady,
+        offlineStale,
+        profileFromCache,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -25,7 +25,7 @@ import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { MobileNavigationDock } from "../components/MobileNavigationDock";
-import { useIsLgUp } from "../lib/useDashboardViewport";
+import { useDevice } from "../lib/useDevice";
 import { OfflineQueueTrigger } from "../components/OfflineSyncIndicator";
 import {
   logParentFirestoreSetup,
@@ -264,7 +264,7 @@ export default function ParentDashboard() {
   }, [selectedStudent?.schoolId]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const isLgUp = useIsLgUp();
+  const { isMobile, isTablet, isDesktop } = useDevice();
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -274,20 +274,14 @@ export default function ParentDashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setIsSidebarCollapsed(false);
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    if (isTablet) setIsSidebarCollapsed(true);
+  }, [isTablet]);
 
   useEffect(() => {
-    if (activeTab === "chat" && isSidebarOpen && window.innerWidth < 1024) {
+    if (activeTab === "chat" && isSidebarOpen && isMobile) {
       setIsSidebarOpen(false);
     }
-  }, [activeTab, isSidebarOpen]);
+  }, [activeTab, isSidebarOpen, isMobile]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1601,35 +1595,27 @@ export default function ParentDashboard() {
       );
     }
 
+    const effectiveCollapsed = isTablet || isSidebarCollapsed;
+
     return (
       <div
         className="parent-app sx-dashboard-context sx-dashboard-layout sx-shell-layout min-h-[100dvh] flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
         dir={isRtl ? "rtl" : "ltr"}
       >
-        {!isLgUp && isSidebarOpen ? (
-          <button
-            type="button"
-            aria-label={isRtl ? "إغلاق القائمة" : "Close menu"}
-            className="fixed inset-0 z-[var(--sx-z-drawer-backdrop)] bg-slate-900/40 backdrop-blur-sm lg:hidden print:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        ) : null}
-
-        <AnimatePresence mode="wait">
-          {(isLgUp || isSidebarOpen) && (
+        {!isMobile ? (
+          <AnimatePresence mode="wait">
             <motion.aside
               layout
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               className={clsx(
                 'parent-dashboard-menu sx-dashboard-sidebar sx-shell-sidebar border-slate-200 transition-colors overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)]',
-                isLgUp && 'sx-shell-sidebar--docked',
-                !isLgUp && isSidebarOpen && 'sx-shell-sidebar--drawer',
-                isSidebarCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
+                'sx-shell-sidebar--docked',
+                (isTablet || isSidebarCollapsed) && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
                 isRtl ? 'border-l' : 'border-r',
               )}
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
-                <div className={`sx-sidebar-brand p-6 flex ${isSidebarCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
+                <div className={`sx-sidebar-brand p-6 flex ${effectiveCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
                   {isCustomAppLogo(config.appLogo) ? (
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
                       <img
@@ -1639,9 +1625,9 @@ export default function ParentDashboard() {
                       />
                     </div>
                   ) : (
-                    <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} surface="dark" />
+                    <SchoolixLogo size={effectiveCollapsed ? 38 : 44} surface="dark" />
                   )}
-                  {!isSidebarCollapsed && (
+                  {!effectiveCollapsed && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-w-0" dir={isRtl ? "rtl" : "ltr"}>
                       <h2 className="parent-sidebar-heading font-bold leading-tight truncate">
                          {t("parentWelcome")}
@@ -1661,24 +1647,24 @@ export default function ParentDashboard() {
                       key={item.id}
                       onClick={() => {
                         navigateToTab(item.id);
-                        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                          if (isMobile) setIsSidebarOpen(false);
                       }}
-                      title={isSidebarCollapsed ? item.label : undefined}
-                      className={`parent-nav-item w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${
+                      title={effectiveCollapsed ? item.label : undefined}
+                      className={`parent-nav-item w-full flex ${effectiveCollapsed ? 'justify-center px-0' : 'items-center gap-3.5 px-4 md:px-5'} py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm active:scale-95 group relative ${
                         activeTab === item.id ? "parent-nav-item--active" : ""
                       }`}
                       dir={isRtl ? "rtl" : "ltr"}
                     >
                       <div className="relative shrink-0">
-                        <item.icon className="parent-nav-icon" size={isSidebarCollapsed ? 24 : 20} />
+                        <item.icon className="parent-nav-icon" size={effectiveCollapsed ? 24 : 20} />
                         {item.badge > 0 && (
                            <span className="absolute -top-1 -right-0.5 w-4 h-4 bg-red-500 text-white text-[8px] font-mono font-black rounded flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
                              {item.badge}
                            </span>
                         )}
                       </div>
-                      {!isSidebarCollapsed && <span className="parent-nav-label truncate">{item.label}</span>}
-                      {isSidebarCollapsed && (
+                      {!effectiveCollapsed && <span className="parent-nav-label truncate">{item.label}</span>}
+                      {effectiveCollapsed && (
                         <div className={`absolute ${isRtl ? 'right-[calc(100%+10px)]' : 'left-[calc(100%+10px)]'} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}>
                           {item.label}
                         </div>
@@ -1690,39 +1676,32 @@ export default function ParentDashboard() {
                 <div className="p-4 md:p-6 mt-auto">
                   <button
                     onClick={() => signOutWithCleanup()}
-                    title={isSidebarCollapsed ? t("logout") : undefined}
-                    className={`parent-nav-logout w-full flex ${isSidebarCollapsed ? 'justify-center px-0' : 'items-center gap-3 px-4 md:px-5'} py-3 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm`}
+                    title={effectiveCollapsed ? t("logout") : undefined}
+                    className={`parent-nav-logout w-full flex ${effectiveCollapsed ? 'justify-center px-0' : 'items-center gap-3 px-4 md:px-5'} py-3 md:py-4 rounded-xl md:rounded-2xl transition-all font-bold text-sm`}
                   >
-                    <LogOut size={isSidebarCollapsed ? 24 : 20} className="shrink-0 parent-nav-icon" />
-                    {!isSidebarCollapsed && <span>{t("logout")}</span>}
+                    <LogOut size={effectiveCollapsed ? 24 : 20} className="shrink-0 parent-nav-icon" />
+                    {!effectiveCollapsed && <span>{t("logout")}</span>}
                   </button>
                 </div>
               </div>
             </motion.aside>
-          )}
-        </AnimatePresence>
+          </AnimatePresence>
+        ) : null}
 
         <div className="sx-dashboard-content sx-shell-content flex-1 flex flex-col min-h-[100dvh] bg-transparent print:overflow-visible print:h-auto print:block">
         <header className="sx-dashboard-header parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
           <div className="px-4 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 min-w-0">
+                {isDesktop ? (
                 <button
-                  onClick={() => {
-                    if (isLgUp) {
-                      setIsSidebarCollapsed(!isSidebarCollapsed);
-                      return;
-                    }
-                    setIsSidebarOpen(!isSidebarOpen);
-                    if (!isSidebarOpen) {
-                      setIsSidebarCollapsed(false);
-                    }
-                  }}
+                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                   className="parent-icon-btn hidden lg:inline-flex shrink-0 bg-[#F7F8FA]"
                   aria-label={isRtl ? "القائمة" : "Menu"}
                 >
                   <Menu size={20} />
                 </button>
+                ) : null}
                 {activeTab !== "home" && (
                   <motion.button
                     initial={{ opacity: 0, scale: 0.9 }}
@@ -2513,14 +2492,15 @@ export default function ParentDashboard() {
         </div>
 
         {/* Floating/Sticky Mobile Navigation Dock for Parents */}
+        {isMobile ? (
         <MobileNavigationDock
           menuItems={allItems}
           activeTab={activeTab}
           setActiveTab={(tabId) => {
             setActiveTab(tabId);
           }}
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
+          isSidebarOpen={false}
+          setIsSidebarOpen={() => undefined}
           showNotifications={showNotifications}
           setShowNotifications={setShowNotifications}
           notificationsCount={badgeTotalUnread}
@@ -2529,8 +2509,9 @@ export default function ParentDashboard() {
           hidden={activeTab === "chat"}
           logoutLabel={t("logout")}
           onLogout={handleLogout}
-          desktopDrawerEnabled={!isLgUp}
+          desktopDrawerEnabled={false}
         />
+        ) : null}
       </div>
       </div>
     );

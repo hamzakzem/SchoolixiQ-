@@ -5,7 +5,7 @@ import { MobileNavigationDock } from '../MobileNavigationDock';
 import { GlobalFooter } from '../GlobalFooter';
 import { DashboardHeader, type BreadcrumbItem } from './DashboardHeader';
 import { DashboardSidebar } from './DashboardSidebar';
-import { useIsLgUp } from '../../lib/useDashboardViewport';
+import { useDevice } from '../../lib/useDevice';
 import {
   type DashboardMenuItem,
   type DashboardNavSection,
@@ -26,7 +26,6 @@ export type DashboardShellProps = {
   schoolLogoUrl?: string;
   logoutLabel: string;
   onLogout: () => void;
-  /** Header */
   headerEyebrow?: string;
   headerTitle: string;
   headerSubtitle?: string;
@@ -34,12 +33,10 @@ export type DashboardShellProps = {
   showBack?: boolean;
   onBack?: () => void;
   headerTrailing?: React.ReactNode;
-  /** Layout */
   children: React.ReactNode;
   showFooter?: boolean;
   fullHeightTab?: boolean;
   hideMobileDock?: boolean;
-  /** Mobile dock */
   notificationsCount?: number;
   showNotifications?: boolean;
   setShowNotifications?: (show: boolean) => void;
@@ -75,41 +72,25 @@ export function DashboardShell({
   setShowNotifications,
   className,
 }: DashboardShellProps) {
-  const isLgUp = useIsLgUp();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { isMobile, isTablet, isDesktop } = useDevice();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  useEffect(() => {
+    if (isTablet) setIsSidebarCollapsed(true);
+  }, [isTablet]);
+
   const handleMenuToggle = useCallback(() => {
-    if (isLgUp) {
+    if (isDesktop) {
       setIsSidebarCollapsed((v) => !v);
-      return;
     }
-    setIsSidebarOpen((v) => !v);
-  }, [isLgUp]);
-
-  const closeMobileSidebar = useCallback(() => {
-    setIsSidebarOpen(false);
-  }, []);
-
-  useEffect(() => {
-    if (hideMobileDock && isSidebarOpen && typeof window !== 'undefined' && window.innerWidth < 1024) {
-      setIsSidebarOpen(false);
-    }
-  }, [hideMobileDock, isSidebarOpen]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (isSidebarOpen) setIsSidebarOpen(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isSidebarOpen]);
+  }, [isDesktop]);
 
   const handleHeaderBack = useCallback(() => {
     if (activeTab === 'chat' && invokeChatBack()) return;
     onBack?.();
   }, [activeTab, onBack]);
+
+  const sidebarCollapsed = isTablet || isSidebarCollapsed;
 
   return (
     <div
@@ -119,7 +100,7 @@ export function DashboardShell({
       )}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      {isLgUp ? (
+      {!isMobile ? (
         <DashboardSidebar
           variant={variant}
           menuItems={menuItems}
@@ -128,9 +109,9 @@ export function DashboardShell({
           onTabChange={onTabChange}
           isOpen
           docked
-          isCollapsed={isSidebarCollapsed}
+          isCollapsed={sidebarCollapsed}
           isRtl={isRtl}
-          onCloseMobile={closeMobileSidebar}
+          onCloseMobile={() => undefined}
           portalTitle={portalTitle}
           portalSubtitle={portalSubtitle}
           schoolLogoUrl={schoolLogoUrl}
@@ -155,11 +136,14 @@ export function DashboardShell({
           showBack={showBack}
           onBack={onBack ? handleHeaderBack : undefined}
           onMenuToggle={handleMenuToggle}
-          menuCollapsed={isSidebarCollapsed}
+          menuCollapsed={sidebarCollapsed}
+          showMenuToggle={isDesktop}
           trailing={
             <>
               {headerTrailing}
-              <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
+              {!isMobile ? (
+                <OfflineQueueTrigger variant="header" className="inline-flex" />
+              ) : null}
             </>
           }
         />
@@ -171,7 +155,9 @@ export function DashboardShell({
               ? hideMobileDock
                 ? 'overflow-hidden !pb-0'
                 : 'overflow-hidden sx-shell-main--chat'
-              : '',
+              : isMobile
+                ? 'sx-shell-scroll--with-dock'
+                : '',
           )}
         >
           <div
@@ -180,6 +166,7 @@ export function DashboardShell({
               fullHeightTab
                 ? 'h-full w-full flex flex-col min-h-0 overflow-hidden flex-1 !p-0 !gap-0'
                 : 'w-full max-w-7xl mx-auto sx-fade-in flex-1',
+              !isMobile && 'max-w-none',
             )}
           >
             {children}
@@ -187,24 +174,23 @@ export function DashboardShell({
           {showFooter && !fullHeightTab ? <GlobalFooter compact /> : null}
         </div>
 
-        <MobileNavigationDock
-          menuItems={menuItems}
-          activeTab={activeTab}
-          setActiveTab={(tabId) => {
-            onTabChange(tabId);
-            closeMobileSidebar();
-          }}
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
-          showNotifications={showNotifications}
-          setShowNotifications={setShowNotifications}
-          notificationsCount={notificationsCount}
-          isRtl={isRtl}
-          logoutLabel={logoutLabel}
-          onLogout={onLogout}
-          hidden={hideMobileDock}
-          desktopDrawerEnabled={!isLgUp}
-        />
+        {isMobile ? (
+          <MobileNavigationDock
+            menuItems={menuItems}
+            activeTab={activeTab}
+            setActiveTab={onTabChange}
+            isSidebarOpen={false}
+            setIsSidebarOpen={() => undefined}
+            showNotifications={showNotifications}
+            setShowNotifications={setShowNotifications}
+            notificationsCount={notificationsCount}
+            isRtl={isRtl}
+            logoutLabel={logoutLabel}
+            onLogout={onLogout}
+            hidden={hideMobileDock}
+            desktopDrawerEnabled={false}
+          />
+        ) : null}
       </div>
     </div>
   );
