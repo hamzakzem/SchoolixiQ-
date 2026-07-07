@@ -8,7 +8,7 @@ import {
   ASSISTANT_SCHOOL_LINK_ERROR_AR,
   ASSISTANT_SCHOOL_NOT_FOUND_AR,
   ASSISTANT_SCHOOL_PERMISSION_AR,
-  ASSISTANT_SCHOOL_TIMEOUT_AR,
+  ASSISTANT_SCHOOL_NETWORK_ERROR_AR,
   isAssistantRole,
   resolveProfileSchoolId,
 } from '../lib/schoolId';
@@ -183,12 +183,12 @@ export function AssistantSchoolGate({ children }: AssistantSchoolGateProps) {
     );
   }
 
-  if (schoolContextStatus === 'timeout') {
+  if (schoolContextStatus === 'network_error') {
     return (
       <GateShell
         isRtl={isRtl}
-        title={isRtl ? 'انتهت مهلة التحميل' : 'Loading Timed Out'}
-        message={ASSISTANT_SCHOOL_TIMEOUT_AR}
+        title={isRtl ? 'خطأ في الاتصال' : 'Connection Error'}
+        message={ASSISTANT_SCHOOL_NETWORK_ERROR_AR}
         tone="warning"
       />
     );

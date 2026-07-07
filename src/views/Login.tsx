@@ -1011,6 +1011,7 @@ export default function Login() {
               <input
                 required
                 type="email"
+                autoComplete="username"
                 placeholder={t("email")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -1033,6 +1034,7 @@ export default function Login() {
               <input
                 required
                 type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
                 placeholder={t("password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

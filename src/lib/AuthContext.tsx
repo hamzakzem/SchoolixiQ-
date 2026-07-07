@@ -8,14 +8,23 @@ import {
   collection, 
   where, 
   getDocs, 
+  getDoc,
   setDoc, 
   deleteDoc, 
   serverTimestamp, 
   updateDoc,
-  getDocFromServer
+  getDocFromServer,
+  type DocumentSnapshot,
 } from 'firebase/firestore';
 import { UserProfile } from '../types';
-import { resolveProfileSchoolId, roleRequiresSchoolBootstrap, type SchoolContextStatus, isFirestorePermissionDenied, SCHOOL_CONTEXT_TIMEOUT_MS } from './schoolId';
+import {
+  resolveProfileSchoolId,
+  roleRequiresSchoolBootstrap,
+  type SchoolContextStatus,
+  isFirestorePermissionDenied,
+  isFirestoreNetworkError,
+  SCHOOL_CONTEXT_TIMEOUT_MS,
+} from './schoolId';
 import { handleFirestoreError, OperationType } from './firestore-errors';
 import { buildTeacherRedactionContext } from './userProfile';
 import { resolveProfilePermissions } from './staffPermissions';
@@ -97,6 +106,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   } | null>(null);
   const boundSchoolIdRef = useRef<string | null>(null);
   const schoolReadyRef = useRef(false);
+  const profileLoadedRef = useRef(false);
+  const schoolFetchGenRef = useRef(0);
   const schoolContextTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const { language, setLanguage } = useLanguage();
@@ -110,7 +121,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         status === 'unlinked' ||
         status === 'not_found' ||
         status === 'permission_denied' ||
-        status === 'timeout',
+        status === 'network_error',
     );
     if (status !== 'loading') {
       if (schoolContextTimeoutRef.current) {
@@ -120,10 +131,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const logSchoolBootstrap = (event: string, payload: Record<string, unknown>) => {
-    if (import.meta.env.DEV) {
-      console.info(`[SchoolBootstrap] ${event}`, payload);
-    }
+  const logSchoolBootstrap = (payload: {
+    uid?: string;
+    role?: string;
+    schoolId?: string | null;
+    userLoaded?: boolean;
+    schoolLoaded?: boolean;
+    error?: unknown;
+    event?: string;
+  }) => {
+    if (!import.meta.env.DEV) return;
+    console.info('[SchoolBootstrap]', {
+      uid: payload.uid,
+      role: payload.role,
+      schoolId: payload.schoolId ?? null,
+      userLoaded: payload.userLoaded,
+      schoolLoaded: payload.schoolLoaded,
+      error: payload.error != null ? String((payload.error as Error)?.message || payload.error) : undefined,
+      event: payload.event,
+    });
   };
 
   const startSchoolContextTimeout = (uid: string, schoolId: string, role: string) => {
@@ -131,16 +157,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       clearTimeout(schoolContextTimeoutRef.current);
     }
     schoolContextTimeoutRef.current = setTimeout(() => {
-      logSchoolBootstrap('TIMEOUT', {
+      if (schoolReadyRef.current) return;
+      logSchoolBootstrap({
         uid,
-        email: profileSnapshotRef.current?.email ?? null,
         role,
         schoolId,
-        schoolContextLoading: true,
-        reason: 'school_context_exceeded_10s',
+        userLoaded: profileLoadedRef.current,
+        schoolLoaded: false,
+        error: 'school_context_exceeded_10s',
+        event: 'TIMEOUT',
       });
       schoolReadyRef.current = false;
-      applySchoolContext('timeout');
+      applySchoolContext('network_error');
       setLoading(false);
     }, SCHOOL_CONTEXT_TIMEOUT_MS);
   };
@@ -152,6 +180,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     boundSchoolIdRef.current = null;
     schoolReadyRef.current = false;
+    profileLoadedRef.current = false;
+    schoolFetchGenRef.current += 1;
     applySchoolContext('idle');
     setSchoolContextLoaded(false);
   };
@@ -167,6 +197,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setProfile(nextProfile);
     setProfileFromCache(true);
     setProfileLoaded(true);
+    profileLoadedRef.current = true;
     setOfflineStale(true);
     setOfflineDataStale(true);
     setLoading(false);
@@ -191,9 +222,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
     if (schoolCached?.data) {
       setSchoolData(schoolCached.data);
+      schoolReadyRef.current = true;
       applySchoolContext('ready');
     } else {
-      applySchoolContext('loading');
+      applySchoolContext('network_error');
     }
     console.info('[OfflineCache] PROFILE_HYDRATE', { uid, updatedAt: cached.updatedAt });
     return true;
@@ -354,278 +386,382 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         const docRef = doc(db, 'users', authUser.uid);
-        unsubscribeProfile = subscribeGuardedFirestore(docRef, async (docSnap) => {
-          if (shouldSkipFirestoreListeners()) return;
-          if (docSnap.exists()) {
-            const rawProfile = docSnap.data() as Record<string, unknown>;
-            const redactionCtx =
-              buildTeacherRedactionContext(rawProfile) || rawProfile;
-            const { _credentialValues: _profileCreds, ...data } =
-              redactionCtx as Record<string, unknown>;
-            
-            // Sync user language from firestore database, or save local default
-            if (data.language && data.language !== languageRef.current) {
-              setLanguage(data.language);
-            } else if (!data.language && languageRef.current) {
-              try {
-                await updateDoc(docRef, { language: languageRef.current });
-              } catch (e) {
-                console.warn('Failed to save default user language to database:', e);
-              }
-            }
 
-            let claims: any = {};
-            try {
-              let tokenResult = await authUser.getIdTokenResult();
-              claims = tokenResult.claims || {};
-              
-              if (data.role && (claims.role !== data.role || claims.schoolId !== data.schoolId)) {
-                console.log("Stale or mismatched claims detected on snapshot. Forcing ID token refresh...");
-                try {
-                  tokenResult = await authUser.getIdTokenResult(true);
-                  claims = tokenResult.claims || {};
-                } catch (refreshErr) {
-                  console.warn("Failed to force refresh token:", refreshErr);
-                }
-              }
-            } catch (tokenError) {
-              console.warn("Failed to get ID token result or session revoked, using firestore backup:", tokenError);
-            }
-            
-            const resolvedPermissions = resolveProfilePermissions(
-              data.permissions,
-              claims.p,
-            );
-
-            const resolvedSchoolId = resolveProfileSchoolId(data);
-            const normalizedSchoolId = resolvedSchoolId || '';
-            const roleLabel = String(data.role || 'unknown');
-
-            logSchoolBootstrap('PROFILE_SNAPSHOT', {
+        const fetchDocWithRetry = async (
+          label: string,
+          fetcher: () => Promise<DocumentSnapshot>,
+        ): Promise<{ snap: DocumentSnapshot | null; error: unknown | null }> => {
+          try {
+            return { snap: await fetcher(), error: null };
+          } catch (firstError) {
+            logSchoolBootstrap({
               uid: authUser.uid,
-              email: authUser.email,
-              role: roleLabel,
-              rawSchoolId: data.schoolId ?? null,
-              legacySchool: data.school ?? null,
-              legacySchoolRef: data.schoolRef ?? null,
-              legacySchoolId: data.school_id ?? data.schoolID ?? null,
-              resolvedSchoolId: normalizedSchoolId || null,
-              profileLoaded: true,
+              event: `${label}_retry`,
+              error: firstError,
             });
+            try {
+              await new Promise((resolve) => setTimeout(resolve, 600));
+              return { snap: await fetcher(), error: null };
+            } catch (secondError) {
+              return { snap: null, error: secondError };
+            }
+          }
+        };
 
-            const nextProfile = {
+        const loadPackagePermissionsLazy = (planId: string, schoolInfo: Record<string, unknown>) => {
+          if (!planId || unsubscribePackage) return;
+          unsubscribePackage = subscribeGuardedFirestore(doc(db, 'packages', planId), (pkgSnap) => {
+            if (shouldSkipFirestoreListeners()) return;
+            if (!pkgSnap.exists()) return;
+            setSchoolData((currVal: Record<string, unknown> | null) => ({
+              ...(currVal || schoolInfo),
+              packagePermissions: normalizePackagePermissions(pkgSnap.data().permissions || {}),
+            }));
+          }, (pkgError) => {
+            if (shouldIgnoreFirestoreListenerError(pkgError)) return;
+            logSchoolBootstrap({
               uid: authUser.uid,
-              ...data,
-              schoolId: normalizedSchoolId,
-              permissions: resolvedPermissions as UserProfile['permissions'],
-            } as UserProfile;
+              event: 'package_listener_non_blocking',
+              error: pkgError,
+            });
+          });
+        };
 
-            setProfile(nextProfile);
-            setProfileLoaded(true);
-            persistProfileCache(authUser.uid, { ...data, schoolId: normalizedSchoolId });
-
-            profileSnapshotRef.current = {
+        const resolveSchoolFetchFailure = async (
+          schoolId: string,
+          roleLabel: string,
+          error: unknown,
+        ) => {
+          if (isFirestorePermissionDenied(error)) {
+            setSchoolData(null);
+            schoolReadyRef.current = false;
+            applySchoolContext('permission_denied');
+            logSchoolBootstrap({
               uid: authUser.uid,
               role: roleLabel,
-              schoolId: normalizedSchoolId || undefined,
-              email: authUser.email,
-            };
-            setLogoutLogSnapshot(profileSnapshotRef.current);
+              schoolId,
+              userLoaded: profileLoadedRef.current,
+              schoolLoaded: false,
+              error,
+              event: 'school_permission_denied',
+            });
+            return;
+          }
 
-            if (loginLoggedRef.current !== authUser.uid) {
-              loginLoggedRef.current = authUser.uid;
-              import('./loginLog').then(({ writeLoginLog }) =>
-                writeLoginLog({
-                  userId: authUser.uid,
-                  role: roleLabel,
-                  schoolId: normalizedSchoolId || undefined,
-                  event: 'login',
-                  email: authUser.email,
-                }),
-              );
-            }
+          const cached = await getCachedSnapshot<Record<string, unknown>>(
+            CACHE_COLLECTION_KEYS.school,
+            authUser.uid,
+            schoolId,
+          );
+          if (cached?.data) {
+            setSchoolData(cached.data);
+            setOfflineStale(true);
+            setOfflineDataStale(true);
+            schoolReadyRef.current = true;
+            applySchoolContext('ready');
+            logSchoolBootstrap({
+              uid: authUser.uid,
+              role: roleLabel,
+              schoolId,
+              userLoaded: profileLoadedRef.current,
+              schoolLoaded: true,
+              event: 'school_offline_cache',
+            });
+            return;
+          }
 
-            if (
-              Array.isArray(resolvedPermissions) &&
-              JSON.stringify(resolvedPermissions) !== JSON.stringify(claims.p)
-            ) {
-              try {
-                await authUser.getIdToken(true);
-              } catch (refreshErr) {
-                console.warn('Failed to refresh token after permissions update:', refreshErr);
-              }
-            }
+          schoolReadyRef.current = false;
+          applySchoolContext(
+            isFirestoreNetworkError(error) || isFirestoreOfflineError(error)
+              ? 'network_error'
+              : 'not_found',
+          );
+          logSchoolBootstrap({
+            uid: authUser.uid,
+            role: roleLabel,
+            schoolId,
+            userLoaded: profileLoadedRef.current,
+            schoolLoaded: false,
+            error,
+            event: 'school_fetch_failed',
+          });
+        };
 
-            const bindSchoolDocument = (schoolId: string) => {
-              logSchoolBootstrap('SUBSCRIBE_SCHOOL', {
-                uid: authUser.uid,
-                email: authUser.email,
-                role: roleLabel,
-                schoolId,
-              });
+        const applySchoolSnapshot = (
+          schoolId: string,
+          roleLabel: string,
+          snap: DocumentSnapshot,
+          source: 'getDoc' | 'snapshot',
+        ) => {
+          if (!snap.exists()) {
+            setSchoolData(null);
+            schoolReadyRef.current = false;
+            applySchoolContext('not_found');
+            logSchoolBootstrap({
+              uid: authUser.uid,
+              role: roleLabel,
+              schoolId,
+              userLoaded: profileLoadedRef.current,
+              schoolLoaded: false,
+              event: `school_${source}_not_found`,
+            });
+            return;
+          }
 
-              if (unsubscribeSchool) {
-                unsubscribeSchool();
-                unsubscribeSchool = null;
-              }
-              if (unsubscribePackage) {
-                unsubscribePackage();
-                unsubscribePackage = null;
-              }
+          const schoolInfo = { id: snap.id, ...snap.data() } as Record<string, unknown>;
+          setSchoolData(schoolInfo);
+          persistSchoolCache(authUser.uid, schoolId, schoolInfo);
+          schoolReadyRef.current = true;
+          applySchoolContext('ready');
+          setLoading(false);
+          logSchoolBootstrap({
+            uid: authUser.uid,
+            role: roleLabel,
+            schoolId,
+            userLoaded: profileLoadedRef.current,
+            schoolLoaded: true,
+            event: `school_${source}_ready`,
+          });
 
-              boundSchoolIdRef.current = schoolId;
-              schoolReadyRef.current = false;
-              applySchoolContext('loading');
-              startSchoolContextTimeout(authUser.uid, schoolId, roleLabel);
+          const planId = schoolInfo.planId ? String(schoolInfo.planId) : '';
+          if (planId) loadPackagePermissionsLazy(planId, schoolInfo);
+        };
 
-              unsubscribeSchool = subscribeGuardedFirestore(doc(db, 'schools', schoolId), (s) => {
-                if (shouldSkipFirestoreListeners()) return;
+        const bindSchoolDocument = async (schoolId: string, roleLabel: string) => {
+          if (boundSchoolIdRef.current === schoolId && schoolReadyRef.current) {
+            applySchoolContext('ready');
+            setLoading(false);
+            return;
+          }
+          if (boundSchoolIdRef.current === schoolId && unsubscribeSchool && !schoolReadyRef.current) {
+            return;
+          }
 
-                if (!s.exists()) {
-                  logSchoolBootstrap('SCHOOL_SNAPSHOT', {
-                    uid: authUser.uid,
-                    schoolId,
-                    exists: false,
-                    result: 'not_found',
-                  });
-                  setSchoolData(null);
-                  schoolReadyRef.current = false;
-                  setLoading(false);
-                  applySchoolContext('not_found');
-                  return;
-                }
+          const fetchGen = ++schoolFetchGenRef.current;
+          boundSchoolIdRef.current = schoolId;
+          schoolReadyRef.current = false;
+          applySchoolContext('loading');
+          startSchoolContextTimeout(authUser.uid, schoolId, roleLabel);
 
-                const schoolInfo = { id: s.id, ...s.data() } as Record<string, unknown>;
-                setSchoolData(schoolInfo);
-                persistSchoolCache(authUser.uid, schoolId, schoolInfo);
-                schoolReadyRef.current = true;
-                setLoading(false);
-                applySchoolContext('ready');
+          const schoolRef = doc(db, 'schools', schoolId);
+          const { snap, error } = await fetchDocWithRetry('school_getDoc', () => getDoc(schoolRef));
 
-                logSchoolBootstrap('SCHOOL_SNAPSHOT', {
-                  uid: authUser.uid,
-                  schoolId,
-                  exists: true,
-                  planId: schoolInfo.planId ?? null,
-                  result: 'ready',
-                });
+          if (fetchGen !== schoolFetchGenRef.current) return;
 
-                const planId = schoolInfo.planId ? String(schoolInfo.planId) : '';
-                if (planId) {
-                  unsubscribePackage = subscribeGuardedFirestore(doc(db, 'packages', planId), (pkgSnap) => {
-                    if (shouldSkipFirestoreListeners()) return;
-                    if (pkgSnap.exists()) {
-                      setSchoolData((currVal: Record<string, unknown> | null) => ({
-                        ...(currVal || schoolInfo),
-                        packagePermissions: normalizePackagePermissions(
-                          pkgSnap.data().permissions || {},
-                        ),
-                      }));
-                    }
-                  }, (pkgError) => {
-                    if (shouldIgnoreFirestoreListenerError(pkgError)) return;
-                    console.warn('[SchoolBootstrap] package listener error (non-blocking)', pkgError);
-                  });
-                }
-              }, (error) => {
-                if (shouldIgnoreFirestoreListenerError(error)) return;
-                if (isFirestoreOfflineError(error) || !navigator.onLine) {
-                  void getCachedSnapshot(CACHE_COLLECTION_KEYS.school, authUser.uid, schoolId).then(
-                    (cached) => {
-                      if (cached?.data) {
-                        setSchoolData(cached.data);
-                        setOfflineStale(true);
-                        setOfflineDataStale(true);
-                        schoolReadyRef.current = true;
-                        applySchoolContext('ready');
-                        logSchoolBootstrap('SCHOOL_OFFLINE_CACHE', {
-                          uid: authUser.uid,
-                          schoolId,
-                          result: 'ready',
-                        });
-                      } else {
-                        logSchoolBootstrap('SCHOOL_OFFLINE_CACHE', {
-                          uid: authUser.uid,
-                          schoolId,
-                          result: 'no_cache_still_loading',
-                        });
-                      }
-                      setLoading(false);
-                    },
-                  );
-                  return;
-                }
-                if (isFirestorePermissionDenied(error)) {
-                  logSchoolBootstrap('SCHOOL_SNAPSHOT', {
-                    uid: authUser.uid,
-                    schoolId,
-                    exists: false,
-                    result: 'permission_denied',
-                  });
-                  setSchoolData(null);
-                  schoolReadyRef.current = false;
-                  setLoading(false);
-                  applySchoolContext('permission_denied');
-                  return;
-                }
-                logSchoolBootstrap('SCHOOL_SNAPSHOT', {
-                  uid: authUser.uid,
-                  schoolId,
-                  result: 'error',
-                  error: String((error as Error)?.message || error),
-                });
-                handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${schoolId}`);
+          if (snap) {
+            applySchoolSnapshot(schoolId, roleLabel, snap, 'getDoc');
+          } else if (error) {
+            await resolveSchoolFetchFailure(schoolId, roleLabel, error);
+            setLoading(false);
+          }
+
+          if (unsubscribeSchool) {
+            unsubscribeSchool();
+            unsubscribeSchool = null;
+          }
+
+          unsubscribeSchool = subscribeGuardedFirestore(schoolRef, (liveSnap) => {
+            if (shouldSkipFirestoreListeners()) return;
+            if (!liveSnap.exists()) {
+              if (schoolReadyRef.current) {
                 schoolReadyRef.current = false;
-                setLoading(false);
+                setSchoolData(null);
                 applySchoolContext('not_found');
-              });
-            };
-
-            // Native Capacitor push — independent from web FCM; retries after profile load.
-            triggerNativePushRegistration(
-              authUser.uid,
-              'profile_snapshot',
-            );
-
-            // Retry web FCM once profile is confirmed (all roles).
-            triggerWebPushRegistration(authUser.uid, 'profile_snapshot');
-
-            if (normalizedSchoolId && roleRequiresSchoolBootstrap(data.role)) {
-              if (boundSchoolIdRef.current === normalizedSchoolId && schoolReadyRef.current) {
-                applySchoolContext('ready');
-                setLoading(false);
-                logSchoolBootstrap('SCHOOL_ALREADY_BOUND', {
-                  uid: authUser.uid,
-                  schoolId: normalizedSchoolId,
-                  reason: 'skip_resubscribe',
-                });
-              } else {
-                bindSchoolDocument(normalizedSchoolId);
               }
-            } else if (roleRequiresSchoolBootstrap(data.role)) {
-              if (unsubscribeSchool) {
-                unsubscribeSchool();
-                unsubscribeSchool = null;
-              }
-              if (unsubscribePackage) {
-                unsubscribePackage();
-                unsubscribePackage = null;
-              }
-              boundSchoolIdRef.current = null;
-              schoolReadyRef.current = false;
-              setSchoolData(null);
-              applySchoolContext('unlinked');
-              setLoading(false);
-              logSchoolBootstrap('UNLINKED', {
-                uid: authUser.uid,
-                email: authUser.email,
-                role: roleLabel,
-                reason: 'no_schoolId_on_users_doc',
-              });
-            } else {
+              return;
+            }
+            const schoolInfo = { id: liveSnap.id, ...liveSnap.data() } as Record<string, unknown>;
+            setSchoolData(schoolInfo);
+            persistSchoolCache(authUser.uid, schoolId, schoolInfo);
+            if (!schoolReadyRef.current) {
+              schoolReadyRef.current = true;
               applySchoolContext('ready');
               setLoading(false);
             }
+            const planId = schoolInfo.planId ? String(schoolInfo.planId) : '';
+            if (planId) loadPackagePermissionsLazy(planId, schoolInfo);
+          }, (listenerError) => {
+            if (shouldIgnoreFirestoreListenerError(listenerError)) return;
+            if (schoolReadyRef.current) {
+              logSchoolBootstrap({
+                uid: authUser.uid,
+                role: roleLabel,
+                schoolId,
+                userLoaded: profileLoadedRef.current,
+                schoolLoaded: true,
+                error: listenerError,
+                event: 'school_listener_non_blocking',
+              });
+              return;
+            }
+            void resolveSchoolFetchFailure(schoolId, roleLabel, listenerError).then(() => {
+              setLoading(false);
+            });
+          });
+        };
+
+        const processExistingUserProfile = async (
+          docSnap: DocumentSnapshot,
+          source: 'getDoc' | 'snapshot',
+        ) => {
+          if (shouldSkipFirestoreListeners()) return;
+          if (!docSnap.exists()) return;
+
+          const rawProfile = docSnap.data() as Record<string, unknown>;
+          const redactionCtx = buildTeacherRedactionContext(rawProfile) || rawProfile;
+          const { _credentialValues: _profileCreds, ...data } = redactionCtx as Record<string, unknown>;
+
+          if (data.language && data.language !== languageRef.current) {
+            setLanguage(data.language as string);
+          } else if (!data.language && languageRef.current && source === 'snapshot') {
+            try {
+              await updateDoc(docRef, { language: languageRef.current });
+            } catch (e) {
+              console.warn('Failed to save default user language to database:', e);
+            }
+          }
+
+          let claims: Record<string, unknown> = {};
+          try {
+            let tokenResult = await authUser.getIdTokenResult();
+            claims = tokenResult.claims || {};
+            if (data.role && (claims.role !== data.role || claims.schoolId !== data.schoolId)) {
+              try {
+                tokenResult = await authUser.getIdTokenResult(true);
+                claims = tokenResult.claims || {};
+              } catch (refreshErr) {
+                console.warn('Failed to force refresh token:', refreshErr);
+              }
+            }
+          } catch (tokenError) {
+            console.warn('Failed to get ID token result, using Firestore profile:', tokenError);
+          }
+
+          const resolvedPermissions = resolveProfilePermissions(
+            data.permissions,
+            claims.p as string[] | undefined,
+          );
+
+          const resolvedSchoolId = resolveProfileSchoolId(data);
+          const normalizedSchoolId = resolvedSchoolId || '';
+          const roleLabel = String(data.role || 'unknown');
+
+          logSchoolBootstrap({
+            uid: authUser.uid,
+            role: roleLabel,
+            schoolId: normalizedSchoolId || null,
+            userLoaded: true,
+            schoolLoaded: schoolReadyRef.current,
+            event: `profile_${source}`,
+          });
+
+          const nextProfile = {
+            uid: authUser.uid,
+            ...data,
+            schoolId: normalizedSchoolId,
+            permissions: resolvedPermissions as UserProfile['permissions'],
+          } as UserProfile;
+
+          setProfile(nextProfile);
+          setProfileLoaded(true);
+          profileLoadedRef.current = true;
+          persistProfileCache(authUser.uid, { ...data, schoolId: normalizedSchoolId });
+
+          profileSnapshotRef.current = {
+            uid: authUser.uid,
+            role: roleLabel,
+            schoolId: normalizedSchoolId || undefined,
+            email: authUser.email,
+          };
+          setLogoutLogSnapshot(profileSnapshotRef.current);
+
+          if (loginLoggedRef.current !== authUser.uid) {
+            loginLoggedRef.current = authUser.uid;
+            import('./loginLog').then(({ writeLoginLog }) =>
+              writeLoginLog({
+                userId: authUser.uid,
+                role: roleLabel,
+                schoolId: normalizedSchoolId || undefined,
+                event: 'login',
+                email: authUser.email,
+              }),
+            );
+          }
+
+          if (
+            Array.isArray(resolvedPermissions) &&
+            JSON.stringify(resolvedPermissions) !== JSON.stringify(claims.p)
+          ) {
+            try {
+              await authUser.getIdToken(true);
+            } catch (refreshErr) {
+              console.warn('Failed to refresh token after permissions update:', refreshErr);
+            }
+          }
+
+          triggerNativePushRegistration(authUser.uid, 'profile_snapshot');
+          triggerWebPushRegistration(authUser.uid, 'profile_snapshot');
+
+          if (normalizedSchoolId && roleRequiresSchoolBootstrap(data.role)) {
+            await bindSchoolDocument(normalizedSchoolId, roleLabel);
+          } else if (roleRequiresSchoolBootstrap(data.role)) {
+            if (unsubscribeSchool) {
+              unsubscribeSchool();
+              unsubscribeSchool = null;
+            }
+            if (unsubscribePackage) {
+              unsubscribePackage();
+              unsubscribePackage = null;
+            }
+            boundSchoolIdRef.current = null;
+            schoolReadyRef.current = false;
+            setSchoolData(null);
+            applySchoolContext('unlinked');
+            setLoading(false);
+            logSchoolBootstrap({
+              uid: authUser.uid,
+              role: roleLabel,
+              schoolId: null,
+              userLoaded: true,
+              schoolLoaded: false,
+              event: 'profile_unlinked',
+            });
+          } else {
+            applySchoolContext('ready');
+            setLoading(false);
+          }
+        };
+
+        void (async () => {
+          const { snap: initialUserSnap, error: initialUserError } = await fetchDocWithRetry(
+            'user_getDoc',
+            () => getDoc(docRef),
+          );
+
+          if (initialUserSnap?.exists()) {
+            await processExistingUserProfile(initialUserSnap, 'getDoc');
+          } else if (initialUserError) {
+            const hydrated = await hydrateProfileFromCache(authUser.uid);
+            if (!hydrated) {
+              logSchoolBootstrap({
+                uid: authUser.uid,
+                userLoaded: false,
+                schoolLoaded: false,
+                error: initialUserError,
+                event: 'user_getDoc_failed',
+              });
+              if (isFirestoreNetworkError(initialUserError) || isFirestoreOfflineError(initialUserError)) {
+                applySchoolContext('network_error');
+              }
+              setLoading(false);
+            }
+          }
+        })();
+
+        unsubscribeProfile = subscribeGuardedFirestore(docRef, async (docSnap) => {
+          if (shouldSkipFirestoreListeners()) return;
+          if (docSnap.exists()) {
+            await processExistingUserProfile(docSnap, 'snapshot');
           } else {
             // Check claims first - if server already set them, we can trust them
             let claims: any = {};
@@ -730,9 +866,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         }, async (error) => {
           if (shouldIgnoreFirestoreListenerError(error)) return;
-          if (isFirestoreOfflineError(error) || !navigator.onLine) {
+          if (profileLoadedRef.current) {
+            logSchoolBootstrap({
+              uid: authUser.uid,
+              userLoaded: true,
+              schoolLoaded: schoolReadyRef.current,
+              error,
+              event: 'profile_listener_non_blocking',
+            });
+            return;
+          }
+          if (isFirestoreOfflineError(error) || isFirestoreNetworkError(error) || !navigator.onLine) {
             const hydrated = await hydrateProfileFromCache(authUser.uid);
             if (hydrated) return;
+            applySchoolContext('network_error');
           }
           handleFirestoreError(error, OperationType.GET, `AuthContext:users/${authUser.uid}`);
           setLoading(false);

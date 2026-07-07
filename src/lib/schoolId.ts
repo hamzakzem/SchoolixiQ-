@@ -86,7 +86,27 @@ export type SchoolContextStatus =
   | 'unlinked'
   | 'not_found'
   | 'permission_denied'
-  | 'timeout';
+  | 'network_error';
+
+export function isFirestoreNetworkError(error: unknown): boolean {
+  if (error == null) return false;
+  const code = (error as { code?: string }).code ?? '';
+  const message = String((error as { message?: string }).message ?? error);
+  return (
+    code === 'unavailable' ||
+    code === 'deadline-exceeded' ||
+    code === 'resource-exhausted' ||
+    code === 'internal' ||
+    /ERR_QUIC_PROTOCOL_ERROR/i.test(message) ||
+    /WebChannel/i.test(message) ||
+    /transport error/i.test(message) ||
+    /status\s*400/i.test(message) ||
+    /\b400\b/.test(message) ||
+    /Failed to fetch/i.test(message) ||
+    /network error/i.test(message) ||
+    /client is offline/i.test(message)
+  );
+}
 
 export function isAssistantRole(role: unknown): boolean {
   return String(role ?? '').toLowerCase().trim() === 'assistant';
@@ -106,7 +126,7 @@ export const ASSISTANT_SCHOOL_PERMISSION_AR =
 
 export const ASSISTANT_SCHOOL_LINKING_AR = 'جاري ربط الحساب بالمدرسة...';
 
-export const ASSISTANT_SCHOOL_TIMEOUT_AR =
-  'انتهت مهلة تحميل بيانات المدرسة. يرجى إعادة تسجيل الدخول أو مراجعة إدارة المدرسة.';
+export const ASSISTANT_SCHOOL_NETWORK_ERROR_AR =
+  'تعذّر الاتصال بخادم البيانات. تحقق من الشبكة ثم أعد تسجيل الدخول.';
 
 export const SCHOOL_CONTEXT_TIMEOUT_MS = 10_000;

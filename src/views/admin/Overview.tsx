@@ -766,8 +766,8 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <div className="bg-white dark:bg-slate-900 p-5 md:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors">
           <h3 className="text-lg font-black text-slate-800 dark:text-white mb-6 font-display">{t('attendanceStats')}</h3>
-          <div className="h-[300px] w-full" style={{ minWidth: 0 }}>
-            <ResponsiveContainer width="99%" height="100%">
+          <div className="h-[300px] w-full min-h-[250px]" style={{ minWidth: 0 }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={250}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
                 <XAxis 
