@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { LogOut, RefreshCw } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useLanguage } from '../lib/LanguageContext';
@@ -8,8 +8,9 @@ import {
   ASSISTANT_SCHOOL_LINK_ERROR_AR,
   ASSISTANT_SCHOOL_NOT_FOUND_AR,
   ASSISTANT_SCHOOL_PERMISSION_AR,
+  ASSISTANT_SCHOOL_TIMEOUT_AR,
   isAssistantRole,
-  normalizeSchoolId,
+  resolveProfileSchoolId,
 } from '../lib/schoolId';
 import { PageLoadingSkeleton } from './ui/Skeleton';
 import { UserRole } from '../types';
@@ -87,7 +88,48 @@ export function AssistantSchoolGate({ children }: AssistantSchoolGateProps) {
     return <>{children}</>;
   }
 
-  const profileSchoolId = normalizeSchoolId(profile?.schoolId);
+  const profileSchoolId = resolveProfileSchoolId(profile as Record<string, unknown> | null | undefined)
+    ?? (profile?.schoolId ? String(profile.schoolId).trim() : null);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || !isAssistant) return;
+    let stuckReason = 'none';
+    if (!profileLoaded) stuckReason = 'profile_not_loaded';
+    else if (!schoolContextLoaded) stuckReason = 'school_context_not_loaded';
+    else if (schoolContextLoading || schoolContextStatus === 'loading') {
+      stuckReason = 'school_context_loading';
+    } else if (!profileSchoolId || schoolContextStatus === 'unlinked') {
+      stuckReason = 'missing_schoolId_on_users_doc';
+    } else if (schoolContextStatus === 'ready' && !schoolData && !offlineStale) {
+      stuckReason = 'ready_but_no_schoolData';
+    }
+    console.info('[AssistantSchoolGate] state', {
+      uid: profile?.uid,
+      email: profile?.email,
+      role: profile?.role,
+      schoolId: profileSchoolId,
+      profileLoaded,
+      schoolContextLoaded,
+      schoolContextLoading,
+      schoolContextStatus,
+      hasSchoolData: Boolean(schoolData),
+      offlineStale,
+      stuckReason,
+    });
+  }, [
+    isAssistant,
+    profile?.uid,
+    profile?.email,
+    profile?.role,
+    profileSchoolId,
+    profileLoaded,
+    schoolContextLoaded,
+    schoolContextLoading,
+    schoolContextStatus,
+    schoolData,
+    offlineStale,
+  ]);
+
   const isLoading =
     !profileLoaded ||
     !schoolContextLoaded ||
@@ -138,6 +180,17 @@ export function AssistantSchoolGate({ children }: AssistantSchoolGateProps) {
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (schoolContextStatus === 'timeout') {
+    return (
+      <GateShell
+        isRtl={isRtl}
+        title={isRtl ? 'انتهت مهلة التحميل' : 'Loading Timed Out'}
+        message={ASSISTANT_SCHOOL_TIMEOUT_AR}
+        tone="warning"
+      />
     );
   }
 

@@ -21,6 +21,46 @@ export function normalizeSchoolId(value: unknown): string | null {
   return String(value).trim();
 }
 
+/**
+ * SSOT: users/{uid}.schoolId — with read-only legacy field fallbacks (no Firestore writes).
+ * Ignores Firebase Auth custom claims.
+ */
+export function resolveProfileSchoolId(data: Record<string, unknown> | null | undefined): string | null {
+  if (!data) return null;
+
+  const tryNormalize = (value: unknown): string | null => {
+    if (value == null) return null;
+    if (typeof value === 'object') {
+      const refLike = value as { id?: unknown; path?: unknown };
+      if (typeof refLike.id === 'string') {
+        const fromId = normalizeSchoolId(refLike.id);
+        if (fromId) return fromId;
+      }
+      if (typeof refLike.path === 'string') {
+        const segment = refLike.path.split('/').filter(Boolean).pop();
+        const fromPath = normalizeSchoolId(segment);
+        if (fromPath) return fromPath;
+      }
+    }
+    return normalizeSchoolId(value);
+  };
+
+  const candidates: unknown[] = [
+    data.schoolId,
+    data.school_id,
+    data.schoolID,
+    data.school,
+    data.schoolRef,
+  ];
+
+  for (const raw of candidates) {
+    const resolved = tryNormalize(raw);
+    if (resolved) return resolved;
+  }
+
+  return null;
+}
+
 export const ASSISTANT_SCHOOL_LINK_ERROR_AR =
   'حساب المساعد غير مربوط بمدرسة. يرجى مراجعة الإدارة.';
 
@@ -45,7 +85,8 @@ export type SchoolContextStatus =
   | 'ready'
   | 'unlinked'
   | 'not_found'
-  | 'permission_denied';
+  | 'permission_denied'
+  | 'timeout';
 
 export function isAssistantRole(role: unknown): boolean {
   return String(role ?? '').toLowerCase().trim() === 'assistant';
@@ -64,3 +105,8 @@ export const ASSISTANT_SCHOOL_PERMISSION_AR =
   'لا توجد صلاحية للوصول إلى هذه المدرسة';
 
 export const ASSISTANT_SCHOOL_LINKING_AR = 'جاري ربط الحساب بالمدرسة...';
+
+export const ASSISTANT_SCHOOL_TIMEOUT_AR =
+  'انتهت مهلة تحميل بيانات المدرسة. يرجى إعادة تسجيل الدخول أو مراجعة إدارة المدرسة.';
+
+export const SCHOOL_CONTEXT_TIMEOUT_MS = 10_000;

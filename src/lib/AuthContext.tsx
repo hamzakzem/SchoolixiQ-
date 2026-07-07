@@ -15,7 +15,7 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 import { UserProfile } from '../types';
-import { normalizeSchoolId, roleRequiresSchoolBootstrap, type SchoolContextStatus, isFirestorePermissionDenied } from './schoolId';
+import { resolveProfileSchoolId, roleRequiresSchoolBootstrap, type SchoolContextStatus, isFirestorePermissionDenied, SCHOOL_CONTEXT_TIMEOUT_MS } from './schoolId';
 import { handleFirestoreError, OperationType } from './firestore-errors';
 import { buildTeacherRedactionContext } from './userProfile';
 import { resolveProfilePermissions } from './staffPermissions';
@@ -95,6 +95,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     schoolId?: string;
     email?: string | null;
   } | null>(null);
+  const boundSchoolIdRef = useRef<string | null>(null);
+  const schoolReadyRef = useRef(false);
+  const schoolContextTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const { language, setLanguage } = useLanguage();
   const languageRef = useRef(language);
@@ -106,11 +109,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       status === 'ready' ||
         status === 'unlinked' ||
         status === 'not_found' ||
-        status === 'permission_denied',
+        status === 'permission_denied' ||
+        status === 'timeout',
     );
+    if (status !== 'loading') {
+      if (schoolContextTimeoutRef.current) {
+        clearTimeout(schoolContextTimeoutRef.current);
+        schoolContextTimeoutRef.current = null;
+      }
+    }
+  };
+
+  const logSchoolBootstrap = (event: string, payload: Record<string, unknown>) => {
+    if (import.meta.env.DEV) {
+      console.info(`[SchoolBootstrap] ${event}`, payload);
+    }
+  };
+
+  const startSchoolContextTimeout = (uid: string, schoolId: string, role: string) => {
+    if (schoolContextTimeoutRef.current) {
+      clearTimeout(schoolContextTimeoutRef.current);
+    }
+    schoolContextTimeoutRef.current = setTimeout(() => {
+      logSchoolBootstrap('TIMEOUT', {
+        uid,
+        email: profileSnapshotRef.current?.email ?? null,
+        role,
+        schoolId,
+        schoolContextLoading: true,
+        reason: 'school_context_exceeded_10s',
+      });
+      schoolReadyRef.current = false;
+      applySchoolContext('timeout');
+      setLoading(false);
+    }, SCHOOL_CONTEXT_TIMEOUT_MS);
   };
 
   const resetSchoolContext = () => {
+    if (schoolContextTimeoutRef.current) {
+      clearTimeout(schoolContextTimeoutRef.current);
+      schoolContextTimeoutRef.current = null;
+    }
+    boundSchoolIdRef.current = null;
+    schoolReadyRef.current = false;
     applySchoolContext('idle');
     setSchoolContextLoaded(false);
   };
@@ -130,7 +171,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setOfflineDataStale(true);
     setLoading(false);
 
-    const schoolId = normalizeSchoolId(data.schoolId);
+    const schoolId = resolveProfileSchoolId(data);
     const needsSchool = roleRequiresSchoolBootstrap(data.role);
 
     if (!needsSchool) {
@@ -356,7 +397,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               claims.p,
             );
 
-            const normalizedSchoolId = normalizeSchoolId(data.schoolId) || '';
+            const resolvedSchoolId = resolveProfileSchoolId(data);
+            const normalizedSchoolId = resolvedSchoolId || '';
+            const roleLabel = String(data.role || 'unknown');
+
+            logSchoolBootstrap('PROFILE_SNAPSHOT', {
+              uid: authUser.uid,
+              email: authUser.email,
+              role: roleLabel,
+              rawSchoolId: data.schoolId ?? null,
+              legacySchool: data.school ?? null,
+              legacySchoolRef: data.schoolRef ?? null,
+              legacySchoolId: data.school_id ?? data.schoolID ?? null,
+              resolvedSchoolId: normalizedSchoolId || null,
+              profileLoaded: true,
+            });
+
             const nextProfile = {
               uid: authUser.uid,
               ...data,
@@ -366,11 +422,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
             setProfile(nextProfile);
             setProfileLoaded(true);
-            persistProfileCache(authUser.uid, data);
+            persistProfileCache(authUser.uid, { ...data, schoolId: normalizedSchoolId });
 
             profileSnapshotRef.current = {
               uid: authUser.uid,
-              role: String(data.role || 'unknown'),
+              role: roleLabel,
               schoolId: normalizedSchoolId || undefined,
               email: authUser.email,
             };
@@ -381,7 +437,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               import('./loginLog').then(({ writeLoginLog }) =>
                 writeLoginLog({
                   userId: authUser.uid,
-                  role: String(data.role || 'unknown'),
+                  role: roleLabel,
                   schoolId: normalizedSchoolId || undefined,
                   event: 'login',
                   email: authUser.email,
@@ -400,13 +456,130 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               }
             }
 
-            if (normalizedSchoolId && roleRequiresSchoolBootstrap(data.role)) {
+            const bindSchoolDocument = (schoolId: string) => {
+              logSchoolBootstrap('SUBSCRIBE_SCHOOL', {
+                uid: authUser.uid,
+                email: authUser.email,
+                role: roleLabel,
+                schoolId,
+              });
+
+              if (unsubscribeSchool) {
+                unsubscribeSchool();
+                unsubscribeSchool = null;
+              }
+              if (unsubscribePackage) {
+                unsubscribePackage();
+                unsubscribePackage = null;
+              }
+
+              boundSchoolIdRef.current = schoolId;
+              schoolReadyRef.current = false;
               applySchoolContext('loading');
-            } else if (roleRequiresSchoolBootstrap(data.role)) {
-              applySchoolContext('unlinked');
-            } else {
-              applySchoolContext('ready');
-            }
+              startSchoolContextTimeout(authUser.uid, schoolId, roleLabel);
+
+              unsubscribeSchool = subscribeGuardedFirestore(doc(db, 'schools', schoolId), (s) => {
+                if (shouldSkipFirestoreListeners()) return;
+
+                if (!s.exists()) {
+                  logSchoolBootstrap('SCHOOL_SNAPSHOT', {
+                    uid: authUser.uid,
+                    schoolId,
+                    exists: false,
+                    result: 'not_found',
+                  });
+                  setSchoolData(null);
+                  schoolReadyRef.current = false;
+                  setLoading(false);
+                  applySchoolContext('not_found');
+                  return;
+                }
+
+                const schoolInfo = { id: s.id, ...s.data() } as Record<string, unknown>;
+                setSchoolData(schoolInfo);
+                persistSchoolCache(authUser.uid, schoolId, schoolInfo);
+                schoolReadyRef.current = true;
+                setLoading(false);
+                applySchoolContext('ready');
+
+                logSchoolBootstrap('SCHOOL_SNAPSHOT', {
+                  uid: authUser.uid,
+                  schoolId,
+                  exists: true,
+                  planId: schoolInfo.planId ?? null,
+                  result: 'ready',
+                });
+
+                const planId = schoolInfo.planId ? String(schoolInfo.planId) : '';
+                if (planId) {
+                  unsubscribePackage = subscribeGuardedFirestore(doc(db, 'packages', planId), (pkgSnap) => {
+                    if (shouldSkipFirestoreListeners()) return;
+                    if (pkgSnap.exists()) {
+                      setSchoolData((currVal: Record<string, unknown> | null) => ({
+                        ...(currVal || schoolInfo),
+                        packagePermissions: normalizePackagePermissions(
+                          pkgSnap.data().permissions || {},
+                        ),
+                      }));
+                    }
+                  }, (pkgError) => {
+                    if (shouldIgnoreFirestoreListenerError(pkgError)) return;
+                    console.warn('[SchoolBootstrap] package listener error (non-blocking)', pkgError);
+                  });
+                }
+              }, (error) => {
+                if (shouldIgnoreFirestoreListenerError(error)) return;
+                if (isFirestoreOfflineError(error) || !navigator.onLine) {
+                  void getCachedSnapshot(CACHE_COLLECTION_KEYS.school, authUser.uid, schoolId).then(
+                    (cached) => {
+                      if (cached?.data) {
+                        setSchoolData(cached.data);
+                        setOfflineStale(true);
+                        setOfflineDataStale(true);
+                        schoolReadyRef.current = true;
+                        applySchoolContext('ready');
+                        logSchoolBootstrap('SCHOOL_OFFLINE_CACHE', {
+                          uid: authUser.uid,
+                          schoolId,
+                          result: 'ready',
+                        });
+                      } else {
+                        logSchoolBootstrap('SCHOOL_OFFLINE_CACHE', {
+                          uid: authUser.uid,
+                          schoolId,
+                          result: 'no_cache_still_loading',
+                        });
+                      }
+                      setLoading(false);
+                    },
+                  );
+                  return;
+                }
+                if (isFirestorePermissionDenied(error)) {
+                  logSchoolBootstrap('SCHOOL_SNAPSHOT', {
+                    uid: authUser.uid,
+                    schoolId,
+                    exists: false,
+                    result: 'permission_denied',
+                  });
+                  setSchoolData(null);
+                  schoolReadyRef.current = false;
+                  setLoading(false);
+                  applySchoolContext('permission_denied');
+                  return;
+                }
+                logSchoolBootstrap('SCHOOL_SNAPSHOT', {
+                  uid: authUser.uid,
+                  schoolId,
+                  result: 'error',
+                  error: String((error as Error)?.message || error),
+                });
+                handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${schoolId}`);
+                schoolReadyRef.current = false;
+                setLoading(false);
+                applySchoolContext('not_found');
+              });
+            };
 
             // Native Capacitor push — independent from web FCM; retries after profile load.
             triggerNativePushRegistration(
@@ -417,87 +590,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             // Retry web FCM once profile is confirmed (all roles).
             triggerWebPushRegistration(authUser.uid, 'profile_snapshot');
 
-            if (normalizedSchoolId) {
-              if (!schoolData || schoolData.id !== normalizedSchoolId) {
-                if (unsubscribeSchool) unsubscribeSchool();
-                unsubscribeSchool = subscribeGuardedFirestore(doc(db, 'schools', normalizedSchoolId), (s) => {
-                  if (shouldSkipFirestoreListeners()) return;
-                  if (s.exists()) {
-                    const schoolInfo = { id: s.id, ...s.data() } as any;
-                    setSchoolData(schoolInfo);
-                    persistSchoolCache(authUser.uid, normalizedSchoolId, schoolInfo);
-                    
-                    // Listen to active active package for the school
-                    if (schoolInfo.planId && unsubscribePackage === null) {
-                      unsubscribePackage = subscribeGuardedFirestore(doc(db, 'packages', schoolInfo.planId), (pkgSnap) => {
-                        if (shouldSkipFirestoreListeners()) return;
-                        if (pkgSnap.exists()) {
-                          setSchoolData((currVal: any) => ({
-                            ...currVal,
-                            packagePermissions: normalizePackagePermissions(
-                              pkgSnap.data().permissions || {},
-                            ),
-                          }));
-                        }
-                        setLoading(false);
-                        applySchoolContext('ready');
-                      }, (error) => {
-                        if (shouldIgnoreFirestoreListenerError(error)) return;
-                        console.error("Error fetching package for school", error);
-                        setLoading(false);
-                        applySchoolContext('ready');
-                      });
-                    } else {
-                      if (!schoolInfo.planId && unsubscribePackage) {
-                        unsubscribePackage();
-                        unsubscribePackage = null;
-                      }
-                      setLoading(false);
-                      applySchoolContext('ready');
-                    }
-                  } else {
-                    setSchoolData(null);
-                    setLoading(false);
-                    applySchoolContext('not_found');
-                  }
-                }, (error) => {
-                  if (shouldIgnoreFirestoreListenerError(error)) return;
-                  if (isFirestoreOfflineError(error) || !navigator.onLine) {
-                    void getCachedSnapshot(CACHE_COLLECTION_KEYS.school, authUser.uid, normalizedSchoolId).then(
-                      (cached) => {
-                        if (cached?.data) {
-                          setSchoolData(cached.data);
-                          setOfflineStale(true);
-                          setOfflineDataStale(true);
-                          applySchoolContext('ready');
-                        } else {
-                          applySchoolContext('loading');
-                        }
-                        setLoading(false);
-                      },
-                    );
-                    return;
-                  }
-                  if (isFirestorePermissionDenied(error)) {
-                    setSchoolData(null);
-                    setLoading(false);
-                    applySchoolContext('permission_denied');
-                    return;
-                  }
-                  handleFirestoreError(error, OperationType.GET, `AuthContext:schools/${normalizedSchoolId}`);
-                  setLoading(false);
-                  applySchoolContext('not_found');
+            if (normalizedSchoolId && roleRequiresSchoolBootstrap(data.role)) {
+              if (boundSchoolIdRef.current === normalizedSchoolId && schoolReadyRef.current) {
+                applySchoolContext('ready');
+                setLoading(false);
+                logSchoolBootstrap('SCHOOL_ALREADY_BOUND', {
+                  uid: authUser.uid,
+                  schoolId: normalizedSchoolId,
+                  reason: 'skip_resubscribe',
                 });
               } else {
-                setLoading(false);
-                applySchoolContext('ready');
+                bindSchoolDocument(normalizedSchoolId);
               }
+            } else if (roleRequiresSchoolBootstrap(data.role)) {
+              if (unsubscribeSchool) {
+                unsubscribeSchool();
+                unsubscribeSchool = null;
+              }
+              if (unsubscribePackage) {
+                unsubscribePackage();
+                unsubscribePackage = null;
+              }
+              boundSchoolIdRef.current = null;
+              schoolReadyRef.current = false;
+              setSchoolData(null);
+              applySchoolContext('unlinked');
+              setLoading(false);
+              logSchoolBootstrap('UNLINKED', {
+                uid: authUser.uid,
+                email: authUser.email,
+                role: roleLabel,
+                reason: 'no_schoolId_on_users_doc',
+              });
             } else {
-              if (roleRequiresSchoolBootstrap(data.role)) {
-                applySchoolContext('unlinked');
-              } else {
-                applySchoolContext('ready');
-              }
+              applySchoolContext('ready');
               setLoading(false);
             }
           } else {
@@ -626,6 +752,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       unsubscribeAuth();
       if (unsubscribeProfile) unsubscribeProfile();
       if (unsubscribeSchool) unsubscribeSchool();
+      if (unsubscribePackage) unsubscribePackage();
+      if (schoolContextTimeoutRef.current) {
+        clearTimeout(schoolContextTimeoutRef.current);
+        schoolContextTimeoutRef.current = null;
+      }
     };
   }, []);
 
