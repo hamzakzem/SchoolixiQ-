@@ -110,6 +110,9 @@ export type SchoolixChatShellProps = {
   showEmptyThreadIntro?: boolean;
   renderEmptyThreadIntro?: () => React.ReactNode;
   chatActor?: ChatDeleteActor | null;
+  /** Super Admin hard-delete via Admin API */
+  onPermanentDeleteMessage?: (msg: Record<string, unknown>) => Promise<void> | void;
+  canPermanentDelete?: boolean;
 };
 
 const SCROLL_THRESHOLD = 80;
@@ -181,6 +184,8 @@ export function SchoolixChatShell({
   showEmptyThreadIntro = true,
   renderEmptyThreadIntro,
   chatActor,
+  onPermanentDeleteMessage,
+  canPermanentDelete = false,
 }: SchoolixChatShellProps) {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -206,6 +211,33 @@ export function SchoolixChatShell({
       }
     },
     [chatActor, isRtl],
+  );
+
+  const handlePermanentDeleteMessage = useCallback(
+    async (msg: Record<string, unknown>) => {
+      if (!canPermanentDelete || !onPermanentDeleteMessage) return;
+      const msgId = String(msg.id ?? '');
+      if (!msgId) return;
+      if (
+        !window.confirm(
+          isRtl
+            ? 'حذف نهائي؟ لا يمكن التراجع عن هذا الإجراء.'
+            : 'Delete permanently? This cannot be undone.',
+        )
+      ) {
+        return;
+      }
+      try {
+        await onPermanentDeleteMessage(msg);
+        toast.success(isRtl ? 'تم الحذف النهائي' : 'Permanently deleted');
+      } catch (err) {
+        console.error('Permanent delete failed:', err);
+        toast.error(
+          isRtl ? 'تعذر الحذف النهائي' : 'Could not permanently delete',
+        );
+      }
+    },
+    [canPermanentDelete, onPermanentDeleteMessage, isRtl],
   );
   const messageElMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevMessageCountRef = useRef(0);
@@ -783,6 +815,8 @@ export function SchoolixChatShell({
                             onReply={handleReply}
                             onDelete={handleDeleteMessage}
                             canDelete={chatActor ? canDeleteChatMessage(msg, chatActor) : false}
+                            onPermanentDelete={handlePermanentDeleteMessage}
+                            canPermanentDelete={canPermanentDelete}
                             formatMessageTime={formatMessageTime}
                             incomingAvatar={!isMe ? renderIncomingMessageAvatar?.() : undefined}
                             outgoingAvatar={isMe ? renderOutgoingMessageAvatar?.() : undefined}

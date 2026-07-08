@@ -9,6 +9,7 @@ import dotEnv from 'dotenv';
 import fs from 'fs';
 import crypto from 'crypto';
 import { runSchoolPermanentDelete } from './schoolPermanentDelete.mjs';
+import { permanentlyDeleteMessage } from './schoolMessageCleanup.mjs';
 import { runUserPermanentDelete } from './userPermanentDelete.mjs';
 import {
   applyDistributorCoupon,
@@ -1316,6 +1317,13 @@ async function startServer() {
         confirm,
         schoolName: schoolName != null ? String(schoolName) : undefined,
         confirmName: body.confirmName != null ? String(body.confirmName) : undefined,
+        bucket: (() => {
+          try {
+            return getStorage().bucket();
+          } catch {
+            return null;
+          }
+        })(),
       });
 
       await logAudit(req, 'PERMANENT_DELETE_SCHOOL', {
@@ -1336,6 +1344,50 @@ async function startServer() {
         ok: false,
         error: error.message || 'Internal Server Error',
         message: error.message || 'فشل الحذف النهائي للمدرسة',
+      });
+    }
+  });
+
+  // Super Admin only — hard-delete a chat message (Admin SDK; client deleteDoc forbidden for non-superadmin)
+  app.post('/api/admin/messages/permanent-delete', verifyAdmin, async (req: any, res: any) => {
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'الحذف النهائي للرسائل مسموح لمدير النظام فقط',
+        });
+      }
+      const messageId = String(req.body?.messageId || '').trim();
+      if (!messageId) {
+        return res.status(400).json({ error: 'MESSAGE_ID_REQUIRED', message: 'معرّف الرسالة مطلوب' });
+      }
+      let bucket = null;
+      try {
+        bucket = getStorage().bucket();
+      } catch {
+        bucket = null;
+      }
+      const result = await permanentlyDeleteMessage(getDb(), {
+        messageId,
+        deletedBy: req.user.uid,
+        bucket,
+      });
+      if (!result.ok) {
+        return res.status(404).json({ error: result.error || 'NOT_FOUND', message: 'الرسالة غير موجودة' });
+      }
+      await logAudit(req, 'DELETE_MESSAGE', {
+        metadata: {
+          messageId,
+          targetConversation: result.conversationId,
+          conversationDeleted: result.conversationDeleted,
+        },
+      });
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('Permanent Delete Message Error:', error);
+      res.status(500).json({
+        error: error.message || 'Internal Server Error',
+        message: error.message || 'فشل الحذف النهائي للرسالة',
       });
     }
   });

@@ -29,6 +29,9 @@ export type ChatMessageBubbleProps = {
   onReply?: (msg: Record<string, unknown>) => void;
   onDelete?: (msg: Record<string, unknown>) => void;
   canDelete?: boolean;
+  /** Super Admin permanent delete via Admin API */
+  onPermanentDelete?: (msg: Record<string, unknown>) => void;
+  canPermanentDelete?: boolean;
   formatMessageTime: (ts: unknown) => string;
   incomingAvatar?: React.ReactNode;
   outgoingAvatar?: React.ReactNode;
@@ -43,6 +46,8 @@ function ActionMenu({
   onSelect,
   onDelete,
   showDelete,
+  onPermanentDelete,
+  showPermanentDelete,
   onClose,
 }: {
   isRtl: boolean;
@@ -51,6 +56,8 @@ function ActionMenu({
   onSelect: () => void;
   onDelete?: () => void;
   showDelete?: boolean;
+  onPermanentDelete?: () => void;
+  showPermanentDelete?: boolean;
   onClose: () => void;
 }) {
   const soon = isRtl ? 'قريباً' : 'Coming soon';
@@ -109,6 +116,20 @@ function ActionMenu({
           {isRtl ? 'حذف' : 'Delete'}
         </button>
       ) : null}
+      {showPermanentDelete && onPermanentDelete ? (
+        <button
+          type="button"
+          role="menuitem"
+          className="sx-chat-action-item sx-chat-action-item--danger"
+          onClick={() => {
+            onPermanentDelete();
+            onClose();
+          }}
+        >
+          <Trash2 size={15} />
+          {isRtl ? 'حذف نهائي' : 'Delete Permanently'}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -125,6 +146,8 @@ export function ChatMessageBubble({
   onReply,
   onDelete,
   canDelete = false,
+  onPermanentDelete,
+  canPermanentDelete = false,
   formatMessageTime,
   incomingAvatar,
   outgoingAvatar,
@@ -291,6 +314,8 @@ export function ChatMessageBubble({
                   onSelect={() => onToggleSelect?.(msgId)}
                   onDelete={() => onDelete?.(msg)}
                   showDelete={canDelete && !isDeleted}
+                  onPermanentDelete={() => onPermanentDelete?.(msg)}
+                  showPermanentDelete={canPermanentDelete}
                   onClose={() => setMenuOpen(false)}
                 />
               </>

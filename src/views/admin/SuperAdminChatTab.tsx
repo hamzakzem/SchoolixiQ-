@@ -22,21 +22,29 @@ import {
   shouldMarkThreadUnread,
   unreadIdsForReceiver,
 } from '../../lib/chatThreadMessages';
+import {
+  filterMessagesForAccess,
+  resolveMessagingAccess,
+} from '../../lib/messagingAccess';
+import { adminPermanentDeleteMessage } from '../../lib/adminApi';
 
 const BROADCAST_ID = '__broadcast__';
 
 function canUsePlatformChat(profile: { role?: string; schoolId?: string } | null) {
-  return (
-    profile?.role === 'superadmin' ||
-    profile?.role === 'platform_assistant' ||
-    (profile?.role === 'assistant' && !profile?.schoolId)
-  );
+  if (!profile) return false;
+  const access = resolveMessagingAccess(profile as Record<string, unknown>);
+  return access.canAccessPlatformInbox;
 }
 
 export default function SuperAdminChatTab() {
   const { profile } = useAuth();
   const { isRtl } = useLanguage();
   const { config } = useSystemConfig();
+  const messagingAccess = useMemo(
+    () => resolveMessagingAccess(profile as Record<string, unknown> | null),
+    [profile],
+  );
+  const isPlatformAssistantView = messagingAccess.role === 'platform_assistant';
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -170,12 +178,21 @@ export default function SuperAdminChatTab() {
     const untrackMessages = openChatSnapshotListener('SuperAdminChatTab:messages');
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data() as any
+      const docs = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as any),
       }));
+      const filtered = filterMessagesForAccess(
+        docs,
+        messagingAccess,
+        profile.uid,
+      );
 
-      const sorted = applyThreadMessagesIfChanged(docs, messagesSigRef, setMessages);
+      const sorted = applyThreadMessagesIfChanged(
+        filtered,
+        messagesSigRef,
+        setMessages,
+      );
 
       if (!messagesFirstSnapshotRef.current) {
         messagesFirstSnapshotRef.current = true;
@@ -200,7 +217,7 @@ export default function SuperAdminChatTab() {
       unsubscribe();
       untrackMessages();
     };
-  }, [profile?.uid, profile?.role, profile?.schoolId, activeContact?.id]);
+  }, [profile?.uid, profile?.role, profile?.schoolId, activeContact?.id, messagingAccess]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -232,10 +249,13 @@ export default function SuperAdminChatTab() {
       conversationId: convId,
       schoolId: school.id,
       senderId: profile.uid,
-      senderName: profile.name || 'إدارة المنصة',
-      senderRole: profile.role || 'superadmin',
+      senderName:
+        profile.name ||
+        (isPlatformAssistantView ? 'System Assistant' : 'إدارة المنصة'),
+      senderRole: messagingAccess.role || profile.role || 'superadmin',
       receiverId: 'admin',
       audience: 'school_admin',
+      visibilityScope: isPlatformAssistantView ? 'platform_ops' : 'platform',
       content: messageText || attachmentLabel,
       fileUrl: file?.fileUrl || null,
       fileType: file?.fileType || null,
@@ -250,6 +270,7 @@ export default function SuperAdminChatTab() {
         conversationId: convId,
         schoolId: school.id,
         participants: ['super_admin', 'admin'],
+        visibilityScope: isPlatformAssistantView ? 'platform_ops' : 'platform',
         lastMessage: messageText || attachmentLabel,
         updatedAt: serverTimestamp(),
       },
@@ -259,7 +280,7 @@ export default function SuperAdminChatTab() {
     const q = query(
       collection(db, 'users'),
       where('schoolId', '==', school.id),
-      where('role', 'in', ['admin', 'assistant']),
+      where('role', 'in', ['admin', 'assistant', 'school_assistant']),
     );
     const adminSnaps = await getDocs(q);
     const adminIds = adminSnaps.docs.map((d) => d.id);
@@ -277,9 +298,22 @@ export default function SuperAdminChatTab() {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newMessage.trim() && !selectedFile) || !profile?.uid || !activeContact) return;
+    if (!messagingAccess.canAccessPlatformInbox) {
+      toast.error(isRtl ? 'لا صلاحية للمراسلة' : 'No messaging permission');
+      return;
+    }
 
     const messageText = newMessage.trim();
     const isBroadcast = activeContact.id === BROADCAST_ID;
+
+    if (isBroadcast && isPlatformAssistantView) {
+      toast.error(
+        isRtl
+          ? 'البث الجماعي متاح لمدير النظام فقط'
+          : 'Broadcast is Super Admin only',
+      );
+      return;
+    }
 
     if (isBroadcast && selectedFile) {
       toast.error(isRtl ? 'البث الجماعي يدعم النص فقط حالياً' : 'Broadcast supports text only');
@@ -429,7 +463,15 @@ export default function SuperAdminChatTab() {
   return (
     <SchoolixChatShell
       isRtl={isRtl}
-      listTitle={isRtl ? 'المحادثات والمدارس' : 'School Chats'}
+      listTitle={
+        isPlatformAssistantView
+          ? isRtl
+            ? 'رسائل العمليات — System Assistant'
+            : 'Ops Inbox — System Assistant'
+          : isRtl
+            ? 'رسائل الإدارة العليا'
+            : 'Super Admin Messages'
+      }
       searchPlaceholder={isRtl ? 'بحث باسم المدرسة...' : 'Search schools...'}
       searchTerm={searchTerm}
       onSearchChange={setSearchTerm}
@@ -456,7 +498,12 @@ export default function SuperAdminChatTab() {
       onClearFile={() => setSelectedFile(null)}
       onFileChange={handleFileChange}
       fileInputRef={fileInputRef}
-      headerStatusText={headerStatus}
+      headerStatusText={
+        headerStatus ||
+        (isPlatformAssistantView
+          ? messagingAccess.displayLabelEn
+          : undefined)
+      }
       isLoadingContacts={!contactsLoaded}
       disableAttachments={activeContact?.id === BROADCAST_ID}
       inputPlaceholder={
@@ -466,6 +513,7 @@ export default function SuperAdminChatTab() {
       }
       emptyListMessage={isRtl ? 'لا توجد مدارس مطابقة' : 'No matching schools'}
       listTopContent={
+        !isPlatformAssistantView ? (
         <button
           type="button"
           onClick={() => {
@@ -487,6 +535,13 @@ export default function SuperAdminChatTab() {
             </p>
           </div>
         </button>
+        ) : (
+          <div className="mx-2 mb-2 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 text-[11px] font-bold text-blue-700 dark:text-blue-300">
+            {isRtl
+              ? 'صندوق رسائل مساعد المنصة — لا يشمل رسائل السوبر أدمن الخاصة'
+              : 'System Assistant inbox — excludes Super Admin private messages'}
+          </div>
+        )
       }
       renderListAvatar={(contact, isSelected) => renderContactAvatar(contact, isSelected, 'list')}
       renderHeaderAvatar={() =>
@@ -509,7 +564,19 @@ export default function SuperAdminChatTab() {
           </ChatAvatarFrame>
         );
       }}
-      renderRoleBadge={() => <RoleBadge label={isRtl ? 'مدرسة' : 'School'} />}
+      renderRoleBadge={() => (
+        <RoleBadge
+          label={
+            isPlatformAssistantView
+              ? isRtl
+                ? 'System Assistant'
+                : 'System Assistant'
+              : isRtl
+                ? 'مدرسة'
+                : 'School'
+          }
+        />
+      )}
       renderEmptyThreadIntro={() => (activeContact?.id === BROADCAST_ID ? broadcastIntro : null)}
       showEmptyThreadIntro
       headerTrailing={
@@ -519,9 +586,23 @@ export default function SuperAdminChatTab() {
       }
       chatActor={
         profile
-          ? { uid: profile.uid, role: profile.role ?? 'superadmin', schoolId: profile.schoolId }
+          ? {
+              uid: profile.uid,
+              role: messagingAccess.role || profile.role || 'superadmin',
+              schoolId: profile.schoolId,
+              permissions: Array.isArray(profile.permissions)
+                ? profile.permissions
+                : undefined,
+            }
           : null
       }
+      canPermanentDelete={messagingAccess.canDelete}
+      onPermanentDeleteMessage={async (msg) => {
+        const id = String(msg.id ?? '');
+        if (!id) return;
+        await adminPermanentDeleteMessage(id);
+        setMessages((prev) => prev.filter((m) => m.id !== id));
+      }}
     />
   );
 }

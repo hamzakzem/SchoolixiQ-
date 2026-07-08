@@ -328,3 +328,11 @@ export async function adminListPendingDistributors() {
   }
   return json as { items: Record<string, unknown>[] };
 }
+
+/** Super Admin only — hard-delete a system_messages document via Admin SDK. */
+export async function adminPermanentDeleteMessage(messageId: string) {
+  const json = await adminApiPost('/api/admin/messages/permanent-delete', {
+    messageId,
+  });
+  return json;
+}

@@ -44,12 +44,32 @@ service cloud.firestore {
       );
     }
 
+    function isPlatformAssistant() {
+      return signedIn() && (
+        userRole() == 'platform_assistant'
+        || (
+          userRole() == 'assistant'
+          && (!userDoc().keys().hasAll(['schoolId']) || userDoc().schoolId == '' || userDoc().schoolId == null)
+        )
+      );
+    }
+
+    function isSchoolAssistant() {
+      return userRole() in ['school_assistant']
+        || (
+          userRole() == 'assistant'
+          && userDoc().keys().hasAll(['schoolId'])
+          && userDoc().schoolId is string
+          && userDoc().schoolId.size() > 0
+        );
+    }
+
     function isAdmin() {
       return userRole() in ['admin', 'school_admin'];
     }
 
     function isAssistant() {
-      return userRole() == 'assistant';
+      return userRole() == 'assistant' || userRole() == 'school_assistant';
     }
 
     function isTeacher() {
@@ -153,11 +173,11 @@ service cloud.firestore {
     }
 
     function isSchoolStaffRole() {
-      return userRole() in ['admin', 'school_admin', 'assistant', 'teacher', 'staff'];
+      return userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher', 'staff'];
     }
 
     function isSchoolManagementRole() {
-      return userRole() in ['admin', 'school_admin', 'assistant'];
+      return userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant'];
     }
 
     function isSchoolMember(schoolId) {
@@ -536,19 +556,58 @@ service cloud.firestore {
           request.auth.uid in data.participants
           || ('admin' in data.participants && isAdmin() && hasSchoolId(data) && userSchoolId() == data.schoolId)
           || ('super_admin' in data.participants && isSuperAdmin())
+          || (
+            'super_admin' in data.participants
+            && isPlatformAssistant()
+            && (
+              !data.keys().hasAll(['visibilityScope'])
+              || !(data.visibilityScope in ['superadmin_private', 'superadmin_only'])
+            )
+          )
         );
+    }
+
+    function isSuperAdminPrivateMessage() {
+      return resource.data.keys().hasAll(['visibilityScope'])
+        && resource.data.visibilityScope in ['superadmin_private', 'superadmin_only'];
     }
 
     function canReadSystemMessage() {
       return isSuperAdmin()
+        || (
+          isPlatformAssistant()
+          && !isSuperAdminPrivateMessage()
+          && (
+            resource.data.receiverId == request.auth.uid
+            || resource.data.senderId == request.auth.uid
+            || resource.data.receiverId == 'super_admin'
+            || resource.data.receiverId == 'admin'
+            || resource.data.audience == 'school_admin'
+          )
+        )
         || (signedIn() && resource.data.receiverId == request.auth.uid)
         || (signedIn() && resource.data.senderId == request.auth.uid)
         || (signedIn() && isAdmin() && resource.data.receiverId == 'admin' && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId)
-        || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && isSchoolStaffRole());
+        || (
+          signedIn()
+          && hasSchoolId(resource.data)
+          && userSchoolId() == resource.data.schoolId
+          && isSchoolStaffRole()
+          && !isPlatformAssistant()
+        );
     }
 
     function canWriteSystemMessage() {
       return isSuperAdmin()
+        || (
+          isPlatformAssistant()
+          && hasSchoolId(request.resource.data)
+          && request.resource.data.senderId == request.auth.uid
+          && (
+            !request.resource.data.keys().hasAll(['visibilityScope'])
+            || !(request.resource.data.visibilityScope in ['superadmin_private', 'superadmin_only'])
+          )
+        )
         || (signedIn() && hasSchoolId(request.resource.data) && canWriteSchoolData(request.resource.data.schoolId))
         || (
           signedIn()
@@ -556,6 +615,20 @@ service cloud.firestore {
           && hasSchoolId(request.resource.data)
           && sameSchoolRequest()
           && isSchoolOperationallyActive(request.resource.data.schoolId)
+        );
+    }
+
+    function canSoftDeleteSystemMessage() {
+      return signedIn()
+        && resource.data.keys().hasAll(['senderId'])
+        && (
+          isSuperAdmin()
+          || resource.data.senderId == request.auth.uid
+          || (
+            isSchoolManagementRole()
+            && hasSchoolId(resource.data)
+            && userSchoolId() == resource.data.schoolId
+          )
         );
     }
 
@@ -1185,21 +1258,28 @@ service cloud.firestore {
     match /system_messages/{messageId} {
       allow read, get, list: if canReadSystemMessage();
       allow create: if canWriteSystemMessage();
-      allow update: if isSuperAdmin()
-        || canReadSystemMessage();
-      allow delete: if isSuperAdmin();
+      // Soft-delete / read receipts only — permanent delete MUST use Admin API (allow delete: false for clients except broken legacy; blocked below)
+      allow update: if canSoftDeleteSystemMessage()
+        || (
+          canReadSystemMessage()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt', 'updatedAt'])
+        );
+      // Client hard-delete disabled — Super Admin uses POST /api/admin/messages/permanent-delete
+      allow delete: if false;
     }
 
     match /conversations/{conversationId} {
       allow read, get, list: if isSuperAdmin()
+        || isPlatformAssistant()
         || isConversationParticipant(resource.data);
       allow create, update: if isSuperAdmin()
+        || isPlatformAssistant()
         || (
           signedIn()
           && hasSchoolId(request.resource.data)
           && isConversationParticipant(request.resource.data)
-      );
-      allow delete: if isSuperAdmin();
+        );
+      allow delete: if false;
     }
     
     // -------------------------------------------------------------------------
