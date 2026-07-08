@@ -330,10 +330,10 @@ function asPermissionList(raw) {
   }
   return [];
 }
-function normalizeConversationVisibility(data) {
-  if (!data) return "school_private";
+function getExplicitVisibility(data) {
+  if (!data) return null;
   const explicit = String(data.visibility ?? data.visibilityScope ?? "").toLowerCase().trim();
-  if (explicit === "superadmin_private" || explicit === "superadmin_only") {
+  if (explicit === "superadmin_private" || explicit === "superadmin_only" || explicit === "platform") {
     return "superadmin_private";
   }
   if (explicit === "platform_operations" || explicit === "platform_ops") {
@@ -342,32 +342,18 @@ function normalizeConversationVisibility(data) {
   if (explicit === "school_private" || explicit === "school") {
     return "school_private";
   }
-  if (explicit === "platform") return "superadmin_private";
-  const createdByRole = String(data.createdByRole ?? data.senderRole ?? "").toLowerCase().trim();
-  if (createdByRole === "superadmin" || createdByRole === "super_admin") {
-    return "superadmin_private";
-  }
-  const conversationId = String(data.conversationId ?? data.id ?? "");
-  const isPlatformThread = conversationId.startsWith("superadmin_");
-  if (isPlatformThread && ["admin", "school_admin", "staff", "assistant", "school_assistant"].includes(
-    createdByRole
-  )) {
-    return "platform_operations";
-  }
-  if (isPlatformThread) return "superadmin_private";
-  return "school_private";
+  return null;
 }
 function authorizeConversationAccess(user, conversation) {
   if (!user || !conversation) return false;
   const role = String(user.role || "").toLowerCase();
   const permissions = asPermissionList(user.permissions);
-  const visibility = normalizeConversationVisibility(conversation);
   if (role === "superadmin" || role === "super_admin") return true;
   if (role === "platform_assistant") {
-    if (visibility === "superadmin_private") return false;
     const hasOps = permissions.some((p) => PLATFORM_OPS_PERMISSIONS.has(p));
     if (!hasOps) return false;
-    return visibility === "platform_operations";
+    const explicit = getExplicitVisibility(conversation);
+    return explicit === "platform_operations";
   }
   if (["admin", "school_admin", "staff", "school_assistant", "assistant"].includes(role)) {
     const userSchool = String(user.schoolId || "").trim();

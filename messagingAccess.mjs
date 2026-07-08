@@ -22,6 +22,27 @@ function asPermissionList(raw) {
   return [];
 }
 
+function getExplicitVisibility(data) {
+  if (!data) return null;
+  const explicit = String(data.visibility ?? data.visibilityScope ?? '')
+    .toLowerCase()
+    .trim();
+  if (
+    explicit === 'superadmin_private' ||
+    explicit === 'superadmin_only' ||
+    explicit === 'platform'
+  ) {
+    return 'superadmin_private';
+  }
+  if (explicit === 'platform_operations' || explicit === 'platform_ops') {
+    return 'platform_operations';
+  }
+  if (explicit === 'school_private' || explicit === 'school') {
+    return 'school_private';
+  }
+  return null;
+}
+
 export function normalizeConversationVisibility(data) {
   if (!data) return 'school_private';
   const explicit = String(data.visibility ?? data.visibilityScope ?? '')
@@ -72,10 +93,10 @@ export function authorizeConversationAccess(user, conversation) {
   if (role === 'superadmin' || role === 'super_admin') return true;
 
   if (role === 'platform_assistant') {
-    if (visibility === 'superadmin_private') return false;
     const hasOps = permissions.some((p) => PLATFORM_OPS_PERMISSIONS.has(p));
     if (!hasOps) return false;
-    return visibility === 'platform_operations';
+    const explicit = getExplicitVisibility(conversation);
+    return explicit === 'platform_operations';
   }
 
   if (['admin', 'school_admin', 'staff', 'school_assistant', 'assistant'].includes(role)) {

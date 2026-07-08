@@ -67,8 +67,33 @@ function normalizeRoleLabel(role: unknown): string {
     .trim();
 }
 
+/** Explicit visibility stamp only — no legacy inference (used for platform assistant). */
+export function getExplicitVisibility(
+  data: Record<string, unknown> | null | undefined,
+): MessagingVisibility | null {
+  if (!data) return null;
+  const explicit = String(data.visibility ?? data.visibilityScope ?? '')
+    .toLowerCase()
+    .trim();
+  if (
+    explicit === 'superadmin_private' ||
+    explicit === 'superadmin_only' ||
+    explicit === 'platform'
+  ) {
+    return 'superadmin_private';
+  }
+  if (explicit === 'platform_operations' || explicit === 'platform_ops') {
+    return 'platform_operations';
+  }
+  if (explicit === 'school_private' || explicit === 'school') {
+    return 'school_private';
+  }
+  return null;
+}
+
 /**
  * Read-only visibility normalize for legacy docs (no Firestore write).
+ * Super Admin / school roles may use inference; platform assistants must not.
  */
 export function normalizeConversationVisibility(
   data: Record<string, unknown> | null | undefined,
@@ -277,9 +302,10 @@ export function authorizeConversationAccess(
   const visibility = normalizeConversationVisibility(conversationOrMessage);
 
   if (access.role === 'platform_assistant') {
-    if (visibility === 'superadmin_private') return false;
     if (!access.canAccessPlatformInbox) return false;
-    return visibility === 'platform_operations';
+    // Assistants: explicit visibility stamp only — no legacy OR inference
+    const explicit = getExplicitVisibility(conversationOrMessage);
+    return explicit === 'platform_operations';
   }
 
   if (!access.allowedVisibilities.includes(visibility)) return false;
@@ -328,26 +354,7 @@ export function filterMessagesForAccess(
     permissions: access.permissions,
   };
 
-  return messages.filter((m) => {
-    const senderId = String(m.senderId ?? '');
-    const receiverId = String(m.receiverId ?? '');
-
-    // Own direct DM always OK when visibility allows or missing+own
-    if (
-      access.role === 'platform_assistant' &&
-      (senderId === viewerUid || receiverId === viewerUid)
-    ) {
-      const vis = normalizeConversationVisibility(m);
-      // Still block SA private even if somehow addressed to assistant uid
-      if (vis === 'superadmin_private') return false;
-      return (
-        vis === 'platform_operations' ||
-        String(m.createdByRole ?? m.senderRole ?? '') === 'platform_assistant'
-      );
-    }
-
-    return authorizeConversationAccess(profile, m);
-  });
+  return messages.filter((m) => authorizeConversationAccess(profile, m));
 }
 
 export function filterConversationsForAccess(

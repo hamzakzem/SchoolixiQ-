@@ -52,8 +52,31 @@ export function buildPlatformOpsThreadMessagesQuery(
 }
 
 /**
+ * Platform Assistant — conversations inbox (visibility-only, no participants/receiverId OR).
+ */
+export function buildPlatformOpsConversationsQuery(): Query {
+  return query(
+    collection(db, 'conversations'),
+    where('visibility', '==', 'platform_operations'),
+    orderBy('updatedAt', 'desc'),
+  );
+}
+
+/**
+ * Platform Assistant — unread ops messages (visibility-only).
+ */
+export function buildPlatformOpsUnreadMessagesQuery(): Query {
+  return query(
+    collection(db, 'system_messages'),
+    where('visibility', '==', 'platform_operations'),
+    where('read', '==', false),
+  );
+}
+
+/**
  * Fallback for legacy school→platform support messages that lack `visibility`
  * but were sent by school roles (never Super Admin).
+ * @deprecated Platform assistants must NOT use this — visibility-only queries only.
  */
 export function buildLegacySchoolSupportThreadQuery(
   schoolId: string,

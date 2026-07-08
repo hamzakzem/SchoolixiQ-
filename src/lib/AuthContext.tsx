@@ -100,6 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /** Set only after SAVE_TOKEN_SUCCESS or permission denied — never on default/skip. */
   const pushRegistrationDoneRef = useRef<'success' | 'denied' | null>(null);
   const loginLoggedRef = useRef<string | null>(null);
+  const messagingAccessRoleRef = useRef<string | null>(null);
   const profileSnapshotRef = useRef<{
     uid: string;
     role: string;
@@ -350,6 +351,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const uidToClear = lastUserIdRef.current;
         profileSnapshotRef.current = null;
         loginLoggedRef.current = null;
+        messagingAccessRoleRef.current = null;
         setLogoutLogSnapshot(null);
 
         if (uidToClear) {
@@ -696,7 +698,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
           if (loginLoggedRef.current !== authUser.uid) {
             loginLoggedRef.current = authUser.uid;
-            // Drop any offline message/conversation snapshots that could leak across roles
+            messagingAccessRoleRef.current = roleLabel;
             void clearMessagingCache(authUser.uid).catch((err) => {
               console.warn('[Auth] clearMessagingCache failed:', err);
             });
@@ -709,6 +711,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 email: authUser.email,
               }),
             );
+          } else if (messagingAccessRoleRef.current !== roleLabel) {
+            const prevRole = messagingAccessRoleRef.current;
+            messagingAccessRoleRef.current = roleLabel;
+            console.info('[Auth] messaging role changed — clearing message cache', {
+              uid: authUser.uid,
+              from: prevRole,
+              to: roleLabel,
+            });
+            void clearMessagingCache(authUser.uid).catch((err) => {
+              console.warn('[Auth] clearMessagingCache failed:', err);
+            });
           }
 
           if (

@@ -621,8 +621,9 @@ service cloud.firestore {
     function canPlatformAssistantReadMessage() {
       return isPlatformAssistant()
         && platformAssistantHasOpsPermission()
-        && !isSuperAdminPrivateMessage()
-        && isPlatformOperationsMessage();
+        && resource.data.keys().hasAll(['visibility'])
+        && resource.data.visibility == 'platform_operations'
+        && !isSuperAdminPrivateMessage();
     }
 
     function canReadSystemMessage() {
@@ -679,7 +680,8 @@ service cloud.firestore {
         || (
           isPlatformAssistant()
           && platformAssistantHasOpsPermission()
-          && resolvedConversationVisibility(resource.data) == 'platform_operations'
+          && resource.data.keys().hasAll(['visibility'])
+          && resource.data.visibility == 'platform_operations'
         )
         || (
           !isPlatformAssistant()
