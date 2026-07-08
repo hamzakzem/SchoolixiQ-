@@ -8,10 +8,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import dotEnv from "dotenv";
 import fs from "fs";
-import crypto from "crypto";
-import { registerDismissalRoutes } from "./dismissalApi.mjs";
-import { registerDismissalRecoveryRoute } from "./dismissalRecoveryWorker.mjs";
-import { registerDismissalCompactionRoute } from "./dismissalCompactionWorker.mjs";
+import crypto2 from "crypto";
 
 // schoolPermanentDelete.mjs
 var SCHOOL_SCOPED_COLLECTIONS = [
@@ -31,6 +28,8 @@ var SCHOOL_SCOPED_COLLECTIONS = [
   "inventory",
   "notifications",
   "dismissal_requests",
+  "dismissal_logs",
+  "dismissal_snapshots",
   "id_cards",
   "student_archives",
   "staff",
@@ -316,6 +315,24 @@ function normalizeMonthKey(monthKey) {
   }
   return m;
 }
+function assertDistributorApprovedForCoupons(distributor) {
+  const status = String(distributor.status || "").toLowerCase();
+  if (status === "pending") {
+    const err = new Error("DISTRIBUTOR_PENDING");
+    err.code = "DISTRIBUTOR_PENDING";
+    throw err;
+  }
+  if (status === "rejected" || distributor.canLogin === false) {
+    const err = new Error("DISTRIBUTOR_INACTIVE");
+    err.code = "DISTRIBUTOR_INACTIVE";
+    throw err;
+  }
+  if (distributor.active === false) {
+    const err = new Error("DISTRIBUTOR_INACTIVE");
+    err.code = "DISTRIBUTOR_INACTIVE";
+    throw err;
+  }
+}
 function buildCommissionDocId(distributorId, schoolId, monthKey) {
   return `${distributorId}_${schoolId}_${monthKey}`;
 }
@@ -480,11 +497,7 @@ async function applyDistributorCoupon({
     throw err;
   }
   const distributor = distributorSnap.data() || {};
-  if (distributor.active === false) {
-    const err = new Error("DISTRIBUTOR_INACTIVE");
-    err.code = "DISTRIBUTOR_INACTIVE";
-    throw err;
-  }
+  assertDistributorApprovedForCoupons(distributor);
   const trackingFields = buildDistributorTrackingFields(
     coupon,
     distributor,
@@ -707,13 +720,188 @@ async function setSchoolDistributorCommissionPaused({
   return { schoolId, paused: paused === true };
 }
 
+// distributorApproval.mjs
+import crypto from "crypto";
+var DISTRIBUTORS_COL = "distributors";
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+function normalizePhone(phone) {
+  return String(phone || "").trim();
+}
+async function registerDistributorApplication(db, adminSdk, input) {
+  const name = String(input.name || "").trim();
+  const phone = normalizePhone(input.phone);
+  const address = String(input.address || "").trim();
+  const governorate = String(input.governorate || "").trim();
+  const email = normalizeEmail(input.email);
+  if (!name || !phone || !address || !governorate) {
+    const err = new Error("\u062C\u0645\u064A\u0639 \u0627\u0644\u062D\u0642\u0648\u0644 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629 \u064A\u062C\u0628 \u062A\u0639\u0628\u0626\u062A\u0647\u0627");
+    err.code = "INVALID_BODY";
+    throw err;
+  }
+  const existingByPhone = await db.collection(DISTRIBUTORS_COL).where("phone", "==", phone).where("status", "in", ["pending", "active"]).limit(1).get();
+  if (!existingByPhone.empty) {
+    const err = new Error("\u064A\u0648\u062C\u062F \u0637\u0644\u0628 \u0623\u0648 \u062D\u0633\u0627\u0628 \u0645\u0648\u0632\u0639 \u0645\u0633\u062C\u0644 \u0628\u0647\u0630\u0627 \u0627\u0644\u0631\u0642\u0645 \u0645\u0633\u0628\u0642\u0627\u064B");
+    err.code = "PHONE_ALREADY_REGISTERED";
+    throw err;
+  }
+  if (email) {
+    const existingByEmail = await db.collection(DISTRIBUTORS_COL).where("email", "==", email).where("status", "in", ["pending", "active"]).limit(1).get();
+    if (!existingByEmail.empty) {
+      const err = new Error("\u064A\u0648\u062C\u062F \u0637\u0644\u0628 \u0623\u0648 \u062D\u0633\u0627\u0628 \u0645\u0648\u0632\u0639 \u0645\u0633\u062C\u0644 \u0628\u0647\u0630\u0627 \u0627\u0644\u0628\u0631\u064A\u062F \u0645\u0633\u0628\u0642\u0627\u064B");
+      err.code = "EMAIL_ALREADY_REGISTERED";
+      throw err;
+    }
+  }
+  const FieldValue = adminSdk.firestore.FieldValue;
+  const ref = db.collection(DISTRIBUTORS_COL).doc();
+  await ref.set({
+    name,
+    phone,
+    address,
+    governorate,
+    email: email || "",
+    status: "pending",
+    canLogin: false,
+    active: false,
+    commissionPercent: 10,
+    source: "self_registration",
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
+  });
+  return { id: ref.id, status: "pending" };
+}
+async function listPendingDistributors(db) {
+  const snap = await db.collection(DISTRIBUTORS_COL).where("status", "==", "pending").get();
+  return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })).sort((a, b) => {
+    const aSec = a.createdAt?.seconds || 0;
+    const bSec = b.createdAt?.seconds || 0;
+    return bSec - aSec;
+  });
+}
+async function approveDistributor({
+  db,
+  authAdmin,
+  adminSdk,
+  distributorId,
+  actorUid,
+  password,
+  syncClaims
+}) {
+  const ref = db.collection(DISTRIBUTORS_COL).doc(distributorId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    const err = new Error("DISTRIBUTOR_NOT_FOUND");
+    err.code = "DISTRIBUTOR_NOT_FOUND";
+    throw err;
+  }
+  const data = snap.data() || {};
+  if (data.status === "active" && data.canLogin === true) {
+    return { alreadyActive: true, distributorId, userId: data.userId || null };
+  }
+  if (data.status === "rejected") {
+    const err = new Error("DISTRIBUTOR_REJECTED");
+    err.code = "DISTRIBUTOR_REJECTED";
+    throw err;
+  }
+  const FieldValue = adminSdk.firestore.FieldValue;
+  let userId = String(data.userId || "").trim();
+  const email = normalizeEmail(data.email);
+  const displayName = String(data.name || "\u0645\u0648\u0632\u0639");
+  if (!userId && email) {
+    let uid = "";
+    const securePass = String(password || "").trim() || `${crypto.randomBytes(16).toString("hex")}SecureP1!`;
+    try {
+      const existing = await authAdmin.getUserByEmail(email);
+      uid = existing.uid;
+      const updateParams = { emailVerified: true, displayName };
+      if (password) {
+        updateParams.password = password;
+      } else {
+        const hasPassword = existing.providerData.some((p) => p.providerId === "password");
+        if (!hasPassword) updateParams.password = securePass;
+      }
+      await authAdmin.updateUser(uid, updateParams);
+    } catch (authError) {
+      if (authError.code === "auth/user-not-found") {
+        const created = await authAdmin.createUser({
+          email,
+          password: securePass,
+          displayName,
+          emailVerified: true
+        });
+        uid = created.uid;
+      } else {
+        throw authError;
+      }
+    }
+    await db.collection("users").doc(uid).set(
+      {
+        uid,
+        email,
+        name: displayName,
+        role: "distributor",
+        distributorId,
+        phone: data.phone || "",
+        status: "active",
+        schoolId: "",
+        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+    await syncClaims(uid, "distributor", "");
+    userId = uid;
+  }
+  await ref.update({
+    status: "active",
+    canLogin: true,
+    active: true,
+    ...userId ? { userId } : {},
+    approvedAt: FieldValue.serverTimestamp(),
+    approvedBy: actorUid,
+    updatedAt: FieldValue.serverTimestamp()
+  });
+  return {
+    alreadyActive: false,
+    distributorId,
+    userId: userId || null,
+    userCreated: Boolean(userId),
+    needsEmailForLogin: !userId
+  };
+}
+async function rejectDistributor({ db, adminSdk, distributorId, actorUid, reason }) {
+  const ref = db.collection(DISTRIBUTORS_COL).doc(distributorId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    const err = new Error("DISTRIBUTOR_NOT_FOUND");
+    err.code = "DISTRIBUTOR_NOT_FOUND";
+    throw err;
+  }
+  const FieldValue = adminSdk.firestore.FieldValue;
+  await ref.update({
+    status: "rejected",
+    canLogin: false,
+    active: false,
+    rejectedAt: FieldValue.serverTimestamp(),
+    rejectedBy: actorUid,
+    rejectionReason: String(reason || "").trim(),
+    updatedAt: FieldValue.serverTimestamp()
+  });
+  return { distributorId, status: "rejected" };
+}
+
 // roleHierarchy.ts
 var ROLE_RANK = {
   superadmin: 100,
   super_admin: 100,
+  platform_assistant: 90,
   admin: 80,
   school_admin: 80,
   staff: 60,
+  school_assistant: 55,
+  /** @deprecated legacy — maps via normalizeEffectiveRole */
   assistant: 55,
   teacher: 50,
   parent: 40,
@@ -721,12 +909,42 @@ var ROLE_RANK = {
   distributor: 25,
   student: 20
 };
+var PLATFORM_ASSISTANT_PERMISSION_HINTS = /* @__PURE__ */ new Set([
+  "manage_packages",
+  "manage_schools",
+  "view_requests",
+  "manage_distributors",
+  "manage_users",
+  "system_settings",
+  "view_backups",
+  "manage_subscriptions",
+  "manage_system"
+]);
 function normalizeRole(role) {
   if (!role) return "";
-  return role === "super_admin" ? "superadmin" : role;
+  if (role === "super_admin") return "superadmin";
+  return role;
+}
+function normalizeEffectiveRole(role, schoolId, userData) {
+  const r = normalizeRole(role);
+  if (!r) return "";
+  if (r === "platform_assistant" || r === "school_assistant") return r;
+  if (r === "assistant") {
+    const type = String(userData?.assistantType ?? userData?.assistantScope ?? "").toLowerCase().trim();
+    if (type === "platform") return "platform_assistant";
+    if (type === "school") return "school_assistant";
+    const sid = schoolId ? String(schoolId).trim() : "";
+    if (sid) return "school_assistant";
+    const perms = userData?.permissions;
+    if (Array.isArray(perms) && perms.some((p) => PLATFORM_ASSISTANT_PERMISSION_HINTS.has(String(p)))) {
+      return "platform_assistant";
+    }
+    return sid ? "school_assistant" : "platform_assistant";
+  }
+  return r;
 }
 function roleRank(role) {
-  return ROLE_RANK[normalizeRole(role)] ?? 0;
+  return ROLE_RANK[normalizeEffectiveRole(role) || normalizeRole(role)] ?? 0;
 }
 function isSuperAdminRole(role) {
   return normalizeRole(role) === "superadmin";
@@ -735,57 +953,63 @@ function isSchoolAdminRole(role) {
   const r = normalizeRole(role);
   return r === "admin" || r === "school_admin";
 }
-function isSystemAssistant(role, schoolId) {
-  return normalizeRole(role) === "assistant" && !schoolId;
-}
-function canActorUseAdminApi(role, schoolId) {
-  const r = normalizeRole(role);
+function canActorUseAdminApi(role, schoolId, userData) {
+  const r = normalizeEffectiveRole(role, schoolId, userData);
   if (isSuperAdminRole(r)) return true;
   if (isSchoolAdminRole(r)) return true;
-  if (r === "staff" || r === "assistant") {
-    return !isSystemAssistant(r, schoolId);
+  if (r === "platform_assistant") return true;
+  if (r === "staff" || r === "school_assistant" || r === "assistant") {
+    return Boolean(schoolId && String(schoolId).trim());
   }
   return false;
 }
 function canActorCreateRole(actorRole, targetRole, actorSchoolId) {
-  const actor = normalizeRole(actorRole);
+  const actor = normalizeEffectiveRole(actorRole, actorSchoolId);
   const target = normalizeRole(targetRole);
   if (!target) return false;
   if (target === "superadmin") return actor === "superadmin";
   if (target === "distributor") return actor === "superadmin";
-  if (isSystemAssistant(actor, actorSchoolId)) return false;
+  if (actor === "platform_assistant") return false;
   if (["admin", "school_admin"].includes(target)) {
     return actor === "superadmin";
   }
-  if (target === "assistant" && !actorSchoolId) {
+  if (target === "platform_assistant") {
     return actor === "superadmin";
+  }
+  if (target === "assistant") {
+    return false;
   }
   if (isSuperAdminRole(actor)) return true;
   if (isSchoolAdminRole(actor)) {
-    return ["teacher", "parent", "guard", "staff", "assistant", "student"].includes(
-      target
-    );
+    return [
+      "teacher",
+      "parent",
+      "guard",
+      "staff",
+      "school_assistant",
+      "student"
+    ].includes(target);
   }
-  if (actor === "staff" || actor === "assistant") {
+  if (actor === "staff" || actor === "school_assistant") {
     return target === "parent";
   }
   return false;
 }
 function canActorSyncClaims(actorRole, targetRole, actorSchoolId) {
-  const actor = normalizeRole(actorRole);
+  const actor = normalizeEffectiveRole(actorRole, actorSchoolId);
   const target = normalizeRole(targetRole);
   if (!target) return false;
   if (isSuperAdminRole(actor)) return true;
-  if (isSystemAssistant(actor, actorSchoolId)) return false;
+  if (actor === "platform_assistant") return false;
   if (isSchoolAdminRole(actor)) {
     return roleRank(target) < roleRank("admin");
   }
   return false;
 }
 function canActorDeleteStudent(actorRole, actorSchoolId) {
-  const actor = normalizeRole(actorRole);
+  const actor = normalizeEffectiveRole(actorRole, actorSchoolId);
   if (isSuperAdminRole(actor)) return true;
-  if (isSystemAssistant(actor, actorSchoolId)) return false;
+  if (actor === "platform_assistant") return false;
   return isSchoolAdminRole(actor);
 }
 
@@ -1383,6 +1607,7 @@ async function startServer() {
     "admin",
     "school_admin",
     "assistant",
+    "school_assistant",
     "staff"
   ];
   const STUDENT_PHOTO_UPLOAD_ROLES = [
@@ -1391,6 +1616,7 @@ async function startServer() {
     "admin",
     "school_admin",
     "assistant",
+    "school_assistant",
     "staff"
   ];
   const isSuperAdminRole3 = (role) => role === "superadmin" || role === "super_admin";
@@ -1529,7 +1755,7 @@ async function startServer() {
       try {
         const bucket = getStorage().bucket();
         const file = bucket.file(storagePath);
-        const token = crypto.randomUUID();
+        const token = crypto2.randomUUID();
         await file.save(buffer, {
           metadata: {
             contentType,
@@ -1679,23 +1905,53 @@ async function startServer() {
       if (!targetRole) {
         return res.status(400).json({ error: "ROLE_REQUIRED", message: "\u062F\u0648\u0631 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0645\u0637\u0644\u0648\u0628" });
       }
+      let effectiveSchoolId = schoolId ? String(schoolId).trim() : "";
+      let resolvedAssistantType = null;
+      if (targetRole === "assistant") {
+        return res.status(400).json({
+          error: "LEGACY_ASSISTANT_ROLE_FORBIDDEN",
+          message: "\u0627\u0633\u062A\u062E\u062F\u0645 platform_assistant \u0623\u0648 school_assistant \u0628\u062F\u0644\u0627\u064B \u0645\u0646 assistant"
+        });
+      }
+      if (targetRole === "platform_assistant") {
+        resolvedAssistantType = "platform";
+        effectiveSchoolId = "";
+        safeAdditionalData.assistantType = "platform";
+        delete safeAdditionalData.assistantScope;
+      } else if (targetRole === "school_assistant") {
+        resolvedAssistantType = "school";
+        if (!effectiveSchoolId) {
+          return res.status(400).json({
+            error: "SCHOOL_ASSISTANT_SCHOOL_ID_REQUIRED",
+            message: "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0645\u0637\u0644\u0648\u0628 \u0644\u0645\u0633\u0627\u0639\u062F \u0627\u0644\u0645\u062F\u0631\u0633\u0629"
+          });
+        }
+        safeAdditionalData.assistantType = "school";
+        delete safeAdditionalData.assistantScope;
+      }
       if (!canActorCreateRole(req.user.role, targetRole, req.user.schoolId)) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u0625\u0646\u0634\u0627\u0621 \u0645\u0633\u062A\u062E\u062F\u0645 \u0628\u0647\u0630\u0627 \u0627\u0644\u062F\u0648\u0631"
         });
       }
-      if (targetRole === "assistant" && !schoolId && req.user.role !== "superadmin") {
+      if (targetRole === "platform_assistant" && req.user.role !== "superadmin") {
         return res.status(403).json({
           error: "FORBIDDEN",
-          message: "\u0625\u0646\u0634\u0627\u0621 \u0645\u0633\u0627\u0639\u062F \u0627\u0644\u0646\u0638\u0627\u0645 \u0645\u0633\u0645\u0648\u062D \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
+          message: "\u0625\u0646\u0634\u0627\u0621 \u0645\u0633\u0627\u0639\u062F \u0627\u0644\u0645\u0646\u0635\u0629 \u0645\u0633\u0645\u0648\u062D \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
         });
       }
       if (!canActorUseAdminApi(req.user.role, req.user.schoolId)) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u0627\u0644\u0642\u064A\u0627\u0645 \u0628\u0647\u0630\u0647 \u0627\u0644\u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u0625\u062F\u0627\u0631\u064A\u0629" });
       }
       if (req.user.role !== "superadmin") {
-        if (!schoolId || schoolId !== req.user.schoolId) {
+        if (targetRole === "platform_assistant") {
+          return res.status(403).json({
+            error: "FORBIDDEN",
+            message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u0625\u0646\u0634\u0627\u0621 \u0645\u0633\u0627\u0639\u062F \u0627\u0644\u0645\u0646\u0635\u0629"
+          });
+        }
+        if (!effectiveSchoolId || effectiveSchoolId !== req.user.schoolId) {
           return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u0625\u0646\u0634\u0627\u0621 \u0645\u0633\u062A\u062E\u062F\u0645\u064A\u0646 \u0644\u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649" });
         }
       }
@@ -1721,7 +1977,7 @@ async function startServer() {
               });
             }
           } else {
-            if (existingUserData?.schoolId && existingUserData.schoolId !== schoolId && req.user.role !== "superadmin") {
+            if (existingUserData?.schoolId && existingUserData.schoolId !== effectiveSchoolId && req.user.role !== "superadmin") {
               return res.status(400).json({
                 error: "USER_ALREADY_IN_ANOTHER_SCHOOL",
                 message: "\u0647\u0630\u0627 \u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0645\u0633\u062C\u0644 \u0628\u0627\u0644\u0641\u0639\u0644 \u0644\u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649"
@@ -1738,7 +1994,7 @@ async function startServer() {
         } else {
           const hasPassword = existingUser.providerData.some((p) => p.providerId === "password");
           if (!hasPassword) {
-            updateParams.password = crypto.randomBytes(16).toString("hex") + "SecureP1!";
+            updateParams.password = crypto2.randomBytes(16).toString("hex") + "SecureP1!";
             console.log(`Setting dynamic random password for existing Google user: ${redactUid(uid)}`);
           }
         }
@@ -1749,7 +2005,7 @@ async function startServer() {
         }
       } catch (authError) {
         if (authError.code === "auth/user-not-found") {
-          const generatedSecurePass = crypto.randomBytes(16).toString("hex") + "SecureP1!";
+          const generatedSecurePass = crypto2.randomBytes(16).toString("hex") + "SecureP1!";
           const userRecord = await admin.auth().createUser({
             email: emailLower,
             password: password || generatedSecurePass,
@@ -1763,13 +2019,13 @@ async function startServer() {
           throw authError;
         }
       }
-      if (role === "student" && schoolId) {
+      if (role === "student" && effectiveSchoolId) {
         let shouldIncrement = true;
-        if (isExistingUser && existingUserData?.schoolId === schoolId && existingUserData?.role === "student") {
+        if (isExistingUser && existingUserData?.schoolId === effectiveSchoolId && existingUserData?.role === "student") {
           shouldIncrement = false;
         }
         await db.runTransaction(async (transaction) => {
-          const schoolRef = db.collection("schools").doc(schoolId);
+          const schoolRef = db.collection("schools").doc(effectiveSchoolId);
           const schoolSnap = await transaction.get(schoolRef);
           if (!schoolSnap.exists) throw new Error("\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
           const schoolData = schoolSnap.data();
@@ -1784,8 +2040,8 @@ async function startServer() {
             uid,
             email: emailLower,
             name: displayName,
-            role,
-            schoolId,
+            role: targetRole,
+            schoolId: effectiveSchoolId,
             ...safeAdditionalData,
             createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
@@ -1793,7 +2049,7 @@ async function startServer() {
             id: uid,
             email: emailLower,
             name: displayName,
-            schoolId,
+            schoolId: effectiveSchoolId,
             ...safeAdditionalData,
             createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
@@ -1803,20 +2059,20 @@ async function startServer() {
             });
           }
         });
-        await syncUserClaims(uid, role, schoolId, additionalData?.permissions || null);
+        await syncUserClaims(uid, targetRole, effectiveSchoolId, additionalData?.permissions || null);
       } else {
-        await syncUserClaims(uid, role, schoolId, additionalData?.permissions || null);
+        await syncUserClaims(uid, targetRole, effectiveSchoolId, additionalData?.permissions || null);
         await db.collection("users").doc(uid).set({
           uid,
           email: emailLower,
           name: displayName,
-          role,
-          schoolId,
+          role: targetRole,
+          schoolId: effectiveSchoolId,
           ...safeAdditionalData,
           createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
       }
-      await logAudit(req, "CREATE_USER", { after: { email: emailLower, role, schoolId } });
+      await logAudit(req, "CREATE_USER", { after: { email: emailLower, role: targetRole, schoolId: effectiveSchoolId, assistantType: resolvedAssistantType } });
       res.json({
         success: true,
         message: "\u062A\u0645 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0628\u0646\u062C\u0627\u062D",
@@ -2098,6 +2354,89 @@ async function startServer() {
         ok: false,
         error: error.message || "Internal Server Error",
         message: error.message || "\u0641\u0634\u0644 \u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0645\u062F\u0631\u0633\u0629"
+      });
+    }
+  });
+  app.post("/api/public/distributors/register", async (req, res) => {
+    const body = req.body || {};
+    try {
+      const result = await registerDistributorApplication(getDb(), admin, {
+        name: body.name,
+        phone: body.phone,
+        address: body.address,
+        governorate: body.governorate,
+        email: body.email
+      });
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      res.status(error.code === "PHONE_ALREADY_REGISTERED" || error.code === "EMAIL_ALREADY_REGISTERED" ? 409 : 400).json({
+        error: error.code || "REGISTER_FAILED",
+        message: error.message || "\u0641\u0634\u0644 \u062A\u0633\u062C\u064A\u0644 \u0637\u0644\u0628 \u0627\u0644\u0645\u0648\u0632\u0639"
+      });
+    }
+  });
+  app.get("/api/admin/distributors/pending", verifyAdmin, async (req, res) => {
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
+      }
+      const items = await listPendingDistributors(getDb());
+      res.json({ ok: true, items });
+    } catch (error) {
+      res.status(500).json({ error: error.message || "Internal Server Error" });
+    }
+  });
+  app.post("/api/admin/distributors/approve", verifyAdmin, async (req, res) => {
+    const distributorId = String(req.body?.distributorId || "").trim();
+    const password = req.body?.password;
+    if (!distributorId) {
+      return res.status(400).json({ error: "DISTRIBUTOR_ID_REQUIRED", message: "distributorId \u0645\u0637\u0644\u0648\u0628" });
+    }
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
+      }
+      const result = await approveDistributor({
+        db: getDb(),
+        authAdmin: admin.auth(),
+        adminSdk: admin,
+        distributorId,
+        actorUid: req.user.uid,
+        password,
+        syncClaims: syncUserClaims
+      });
+      await logAudit(req, "DISTRIBUTOR_APPROVE", { metadata: { distributorId, result } });
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      res.status(error.code === "DISTRIBUTOR_NOT_FOUND" ? 404 : 400).json({
+        error: error.code || "APPROVE_FAILED",
+        message: error.message || "\u0641\u0634\u0644 \u0642\u0628\u0648\u0644 \u0627\u0644\u0645\u0648\u0632\u0639"
+      });
+    }
+  });
+  app.post("/api/admin/distributors/reject", verifyAdmin, async (req, res) => {
+    const distributorId = String(req.body?.distributorId || "").trim();
+    const reason = req.body?.reason;
+    if (!distributorId) {
+      return res.status(400).json({ error: "DISTRIBUTOR_ID_REQUIRED", message: "distributorId \u0645\u0637\u0644\u0648\u0628" });
+    }
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
+      }
+      const result = await rejectDistributor({
+        db: getDb(),
+        adminSdk: admin,
+        distributorId,
+        actorUid: req.user.uid,
+        reason
+      });
+      await logAudit(req, "DISTRIBUTOR_REJECT", { metadata: { distributorId, result } });
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      res.status(error.code === "DISTRIBUTOR_NOT_FOUND" ? 404 : 400).json({
+        error: error.code || "REJECT_FAILED",
+        message: error.message || "\u0641\u0634\u0644 \u0631\u0641\u0636 \u0627\u0644\u0645\u0648\u0632\u0639"
       });
     }
   });
@@ -2424,13 +2763,6 @@ async function startServer() {
       res.status(500).json({ success: false, error: error.message || "Push poll failed" });
     }
   });
-  registerDismissalRoutes(app, {
-    getDb,
-    verifyToken,
-    jsonParser: express.json(),
-  });
-  registerDismissalRecoveryRoute(app, { getDb, resolveCronSecret });
-  registerDismissalCompactionRoute(app, { getDb, resolveCronSecret });
   app.all("/api/*", (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.status(404).json({

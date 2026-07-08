@@ -6,6 +6,8 @@ export type NotificationRouteRole =
   | 'admin'
   | 'staff'
   | 'assistant'
+  | 'school_assistant'
+  | 'platform_assistant'
   | 'superadmin'
   | 'super_admin'
   | 'guard'
@@ -40,6 +42,8 @@ export function normalizeDashboardRole(
 ): NotificationRouteRole {
   const role = (userRole || profileRole || '').toLowerCase();
   if (role === 'super_admin') return 'superadmin';
+  if (role === 'platform_assistant') return 'platform_assistant';
+  if (role === 'school_assistant') return 'school_assistant';
   return role as NotificationRouteRole;
 }
 
@@ -115,7 +119,11 @@ export function resolveNotificationTab(
   role: NotificationRouteRole | '',
 ): string | null {
   const route = resolveRouteTarget(notification);
-  const isSchoolAdmin = role === 'admin' || role === 'staff' || role === 'assistant';
+  const isSchoolAdmin =
+    role === 'admin' ||
+    role === 'staff' ||
+    role === 'assistant' ||
+    role === 'school_assistant';
 
   switch (route) {
     case 'homework':

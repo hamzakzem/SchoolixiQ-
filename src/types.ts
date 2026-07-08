@@ -1,7 +1,10 @@
 export enum UserRole {
   SUPERADMIN = 'superadmin',
   ADMIN = 'admin',
+  /** @deprecated legacy — use PLATFORM_ASSISTANT or SCHOOL_ASSISTANT */
   ASSISTANT = 'assistant',
+  PLATFORM_ASSISTANT = 'platform_assistant',
+  SCHOOL_ASSISTANT = 'school_assistant',
   TEACHER = 'teacher',
   PARENT = 'parent',
   STAFF = 'staff',
@@ -15,6 +18,10 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   schoolId: string;
+  /** Explicit assistant type: platform | school */
+  assistantType?: 'platform' | 'school';
+  /** @deprecated prefer assistantType / platform_assistant|school_assistant roles */
+  assistantScope?: 'platform' | 'school';
   /** Linked distributor record when role is distributor */
   distributorId?: string;
   status?: 'active' | 'pending' | 'suspended';
@@ -30,7 +37,7 @@ export interface UserProfile {
   assignedClassNames?: string;
   preferredClassId?: string;
   preferredSubject?: string;
-  permissions?: Record<string, boolean>;
+  permissions?: Record<string, boolean> | string[];
   salary?: number;
   privilegeRestrictions?: {
     tuitionEscalationLevel?: number;

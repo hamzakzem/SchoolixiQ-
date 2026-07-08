@@ -20,6 +20,7 @@ import { UserProfile } from '../types';
 import {
   resolveProfileSchoolId,
   roleRequiresSchoolBootstrap,
+  normalizeEffectiveRole,
   type SchoolContextStatus,
   isFirestorePermissionDenied,
   isFirestoreNetworkError,
@@ -190,9 +191,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const cached = await getCachedProfileForUser(uid);
     if (!cached) return false;
     const data = cached.data;
+    const effectiveRole = normalizeEffectiveRole(data);
     const nextProfile = {
       uid,
       ...data,
+      role: (effectiveRole || data.role) as UserProfile['role'],
+      assistantType:
+        effectiveRole === 'platform_assistant'
+          ? 'platform'
+          : effectiveRole === 'school_assistant'
+            ? 'school'
+            : (data as UserProfile).assistantType,
     } as UserProfile;
     setProfile(nextProfile);
     setProfileFromCache(true);
@@ -203,7 +212,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(false);
 
     const schoolId = resolveProfileSchoolId(data);
-    const needsSchool = roleRequiresSchoolBootstrap(data.role);
+    const needsSchool = roleRequiresSchoolBootstrap(effectiveRole || data.role, data);
 
     if (!needsSchool) {
       applySchoolContext('ready');
@@ -644,7 +653,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
           const resolvedSchoolId = resolveProfileSchoolId(data);
           const normalizedSchoolId = resolvedSchoolId || '';
-          const roleLabel = String(data.role || 'unknown');
+          const effectiveRole = normalizeEffectiveRole(data);
+          const roleLabel = effectiveRole || String(data.role || 'unknown');
+          const assistantType =
+            effectiveRole === 'platform_assistant'
+              ? 'platform'
+              : effectiveRole === 'school_assistant'
+                ? 'school'
+                : undefined;
 
           logSchoolBootstrap({
             uid: authUser.uid,
@@ -658,6 +674,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const nextProfile = {
             uid: authUser.uid,
             ...data,
+            role: (effectiveRole || data.role) as UserProfile['role'],
+            ...(assistantType ? { assistantType } : {}),
             schoolId: normalizedSchoolId,
             permissions: resolvedPermissions as UserProfile['permissions'],
           } as UserProfile;
@@ -702,9 +720,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           triggerNativePushRegistration(authUser.uid, 'profile_snapshot');
           triggerWebPushRegistration(authUser.uid, 'profile_snapshot');
 
-          if (normalizedSchoolId && roleRequiresSchoolBootstrap(data.role)) {
+          if (normalizedSchoolId && roleRequiresSchoolBootstrap(data.role, data)) {
             await bindSchoolDocument(normalizedSchoolId, roleLabel);
-          } else if (roleRequiresSchoolBootstrap(data.role)) {
+          } else if (roleRequiresSchoolBootstrap(data.role, data)) {
             if (unsubscribeSchool) {
               unsubscribeSchool();
               unsubscribeSchool = null;

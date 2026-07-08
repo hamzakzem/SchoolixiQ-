@@ -28,6 +28,7 @@ const BROADCAST_ID = '__broadcast__';
 function canUsePlatformChat(profile: { role?: string; schoolId?: string } | null) {
   return (
     profile?.role === 'superadmin' ||
+    profile?.role === 'platform_assistant' ||
     (profile?.role === 'assistant' && !profile?.schoolId)
   );
 }

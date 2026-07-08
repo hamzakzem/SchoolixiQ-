@@ -30,6 +30,7 @@ const MANAGER_ROLES = new Set([
   'admin',
   'school_admin',
   'assistant',
+  'school_assistant',
   'superadmin',
   'super_admin',
 ]);

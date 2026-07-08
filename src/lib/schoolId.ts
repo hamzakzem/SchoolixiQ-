@@ -69,13 +69,118 @@ export const SCHOOL_BOUND_ROLES = new Set([
   'school_admin',
   'staff',
   'teacher',
-  'assistant',
   'guard',
+  'school_assistant',
 ]);
 
-export function roleRequiresSchoolBootstrap(role: unknown): boolean {
-  if (role == null) return false;
-  return SCHOOL_BOUND_ROLES.has(String(role).toLowerCase().trim());
+/** Platform-level permission ids used to infer legacy platform assistants */
+export const PLATFORM_ASSISTANT_PERMISSION_HINTS = new Set([
+  'manage_packages',
+  'manage_schools',
+  'view_requests',
+  'manage_distributors',
+  'manage_users',
+  'system_settings',
+  'view_backups',
+  'manage_subscriptions',
+  'manage_system',
+]);
+
+export type AssistantScope = 'platform' | 'school';
+
+/**
+ * Resolve assistant scope from explicit fields or legacy signals (read-only).
+ * Prefer role platform_assistant / school_assistant, then assistantType / assistantScope.
+ */
+export function resolveAssistantScope(
+  data: Record<string, unknown>,
+  resolvedSchoolId: string | null,
+): AssistantScope {
+  const role = String(data.role ?? '').toLowerCase().trim();
+  if (role === 'platform_assistant') return 'platform';
+  if (role === 'school_assistant') return 'school';
+
+  const assistantType = String(data.assistantType ?? '').toLowerCase().trim();
+  if (assistantType === 'platform' || assistantType === 'school') {
+    return assistantType;
+  }
+
+  const explicit = String(data.assistantScope ?? '').toLowerCase().trim();
+  if (explicit === 'platform' || explicit === 'school') {
+    return explicit;
+  }
+  if (resolvedSchoolId) {
+    return 'school';
+  }
+  const perms = data.permissions;
+  if (Array.isArray(perms)) {
+    const hasPlatformHint = perms.some((p) =>
+      PLATFORM_ASSISTANT_PERMISSION_HINTS.has(String(p)),
+    );
+    if (hasPlatformHint) return 'platform';
+  }
+  if (!resolvedSchoolId) {
+    return 'platform';
+  }
+  return 'school';
+}
+
+/**
+ * Normalize stored role for runtime (read-only — no Firestore writes).
+ * Maps legacy role:"assistant" → platform_assistant | school_assistant.
+ */
+export function normalizeEffectiveRole(
+  data: Record<string, unknown> | null | undefined,
+): string {
+  if (!data) return '';
+  const raw = String(data.role ?? '').toLowerCase().trim();
+  if (!raw) return '';
+  if (raw === 'super_admin') return 'superadmin';
+  if (raw === 'platform_assistant' || raw === 'school_assistant') return raw;
+  if (raw === 'assistant') {
+    const schoolId = resolveProfileSchoolId(data);
+    return resolveAssistantScope(data, schoolId) === 'platform'
+      ? 'platform_assistant'
+      : 'school_assistant';
+  }
+  return raw;
+}
+
+export function isPlatformAssistantProfile(
+  profile: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!profile) return false;
+  return normalizeEffectiveRole(profile) === 'platform_assistant';
+}
+
+export function isSchoolAssistantProfile(
+  profile: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!profile) return false;
+  return normalizeEffectiveRole(profile) === 'school_assistant';
+}
+
+/** Any school-bound or platform assistant (including legacy role:"assistant"). */
+export function isAssistantRole(role: unknown): boolean {
+  const r = String(role ?? '').toLowerCase().trim();
+  return r === 'assistant' || r === 'platform_assistant' || r === 'school_assistant';
+}
+
+export function roleRequiresSchoolBootstrap(
+  role: unknown,
+  profileData?: Record<string, unknown> | null,
+): boolean {
+  const effective = profileData
+    ? normalizeEffectiveRole(profileData)
+    : String(role ?? '').toLowerCase().trim();
+
+  if (effective === 'platform_assistant') return false;
+  if (effective === 'school_assistant') return true;
+  if (effective === 'assistant' && profileData) {
+    return resolveAssistantScope(profileData, resolveProfileSchoolId(profileData)) === 'school';
+  }
+  if (role == null && !effective) return false;
+  return SCHOOL_BOUND_ROLES.has(effective || String(role).toLowerCase().trim());
 }
 
 /** Result of resolving schools/{schoolId} for school-bound roles */
@@ -106,10 +211,6 @@ export function isFirestoreNetworkError(error: unknown): boolean {
     /network error/i.test(message) ||
     /client is offline/i.test(message)
   );
-}
-
-export function isAssistantRole(role: unknown): boolean {
-  return String(role ?? '').toLowerCase().trim() === 'assistant';
 }
 
 export function isFirestorePermissionDenied(error: unknown): boolean {

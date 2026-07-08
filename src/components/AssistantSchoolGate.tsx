@@ -10,6 +10,8 @@ import {
   ASSISTANT_SCHOOL_PERMISSION_AR,
   ASSISTANT_SCHOOL_NETWORK_ERROR_AR,
   isAssistantRole,
+  isPlatformAssistantProfile,
+  isSchoolAssistantProfile,
   resolveProfileSchoolId,
 } from '../lib/schoolId';
 import { PageLoadingSkeleton } from './ui/Skeleton';
@@ -81,12 +83,20 @@ export function AssistantSchoolGate({ children }: AssistantSchoolGateProps) {
   } = useAuth();
   const { isRtl } = useLanguage();
 
-  const isAssistant =
-    profile?.role === UserRole.ASSISTANT || isAssistantRole(profile?.role);
+  const isSchoolAssistant =
+    profile?.role === UserRole.SCHOOL_ASSISTANT ||
+    profile?.role === 'school_assistant' ||
+    isSchoolAssistantProfile(profile as Record<string, unknown>);
 
-  if (!isAssistant) {
+  if (!isSchoolAssistant) {
     return <>{children}</>;
   }
+
+  if (isPlatformAssistantProfile(profile as Record<string, unknown>)) {
+    return <>{children}</>;
+  }
+
+  const isAssistant = isSchoolAssistant || isAssistantRole(profile?.role);
 
   const profileSchoolId = resolveProfileSchoolId(profile as Record<string, unknown> | null | undefined)
     ?? (profile?.schoolId ? String(profile.schoolId).trim() : null);

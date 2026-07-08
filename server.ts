@@ -448,6 +448,7 @@ async function startServer() {
     'admin',
     'school_admin',
     'assistant',
+    'school_assistant',
     'staff',
   ];
 
@@ -457,6 +458,7 @@ async function startServer() {
     'admin',
     'school_admin',
     'assistant',
+    'school_assistant',
     'staff',
   ];
 
@@ -812,6 +814,34 @@ async function startServer() {
         return res.status(400).json({ error: 'ROLE_REQUIRED', message: 'دور المستخدم مطلوب' });
       }
 
+      let effectiveSchoolId = schoolId ? String(schoolId).trim() : '';
+      let resolvedAssistantType: 'platform' | 'school' | null = null;
+
+      if (targetRole === 'assistant') {
+        return res.status(400).json({
+          error: 'LEGACY_ASSISTANT_ROLE_FORBIDDEN',
+          message:
+            'استخدم platform_assistant أو school_assistant بدلاً من assistant',
+        });
+      }
+
+      if (targetRole === 'platform_assistant') {
+        resolvedAssistantType = 'platform';
+        effectiveSchoolId = '';
+        safeAdditionalData.assistantType = 'platform';
+        delete safeAdditionalData.assistantScope;
+      } else if (targetRole === 'school_assistant') {
+        resolvedAssistantType = 'school';
+        if (!effectiveSchoolId) {
+          return res.status(400).json({
+            error: 'SCHOOL_ASSISTANT_SCHOOL_ID_REQUIRED',
+            message: 'معرّف المدرسة مطلوب لمساعد المدرسة',
+          });
+        }
+        safeAdditionalData.assistantType = 'school';
+        delete safeAdditionalData.assistantScope;
+      }
+
       if (!canActorCreateRole(req.user.role, targetRole, req.user.schoolId)) {
         return res.status(403).json({
           error: 'FORBIDDEN',
@@ -819,10 +849,10 @@ async function startServer() {
         });
       }
 
-      if (targetRole === 'assistant' && !schoolId && req.user.role !== 'superadmin') {
+      if (targetRole === 'platform_assistant' && req.user.role !== 'superadmin') {
         return res.status(403).json({
           error: 'FORBIDDEN',
-          message: 'إنشاء مساعد النظام مسموح لمدير النظام فقط',
+          message: 'إنشاء مساعد المنصة مسموح لمدير النظام فقط',
         });
       }
 
@@ -833,7 +863,13 @@ async function startServer() {
 
       // 2. Enforce school boundary verification for multi-tenancy
       if (req.user.role !== 'superadmin') {
-        if (!schoolId || schoolId !== req.user.schoolId) {
+        if (targetRole === 'platform_assistant') {
+          return res.status(403).json({
+            error: 'FORBIDDEN',
+            message: 'غير مسموح لك بإنشاء مساعد المنصة',
+          });
+        }
+        if (!effectiveSchoolId || effectiveSchoolId !== req.user.schoolId) {
           return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مسموح لك بإنشاء مستخدمين لمدرسة أخرى' });
         }
       }
@@ -867,7 +903,7 @@ async function startServer() {
             }
           } else {
             // For non-parent roles, enforce school exclusivity
-            if (existingUserData?.schoolId && existingUserData.schoolId !== schoolId && req.user.role !== 'superadmin') {
+            if (existingUserData?.schoolId && existingUserData.schoolId !== effectiveSchoolId && req.user.role !== 'superadmin') {
               return res.status(400).json({ 
                 error: 'USER_ALREADY_IN_ANOTHER_SCHOOL', 
                 message: 'هذا البريد الإلكتروني مسجل بالفعل لمدرسة أخرى' 
@@ -917,14 +953,14 @@ async function startServer() {
         }
       }
 
-      if (role === 'student' && schoolId) {
+      if (role === 'student' && effectiveSchoolId) {
         let shouldIncrement = true;
-        if (isExistingUser && existingUserData?.schoolId === schoolId && existingUserData?.role === 'student') {
+        if (isExistingUser && existingUserData?.schoolId === effectiveSchoolId && existingUserData?.role === 'student') {
           shouldIncrement = false;
         }
 
         await db.runTransaction(async (transaction) => {
-          const schoolRef = db.collection('schools').doc(schoolId);
+          const schoolRef = db.collection('schools').doc(effectiveSchoolId);
           const schoolSnap = await transaction.get(schoolRef);
           
           if (!schoolSnap.exists) throw new Error('المدرسة غير موجودة');
@@ -943,8 +979,8 @@ async function startServer() {
             uid,
             email: emailLower,
             name: displayName,
-            role,
-            schoolId,
+            role: targetRole,
+            schoolId: effectiveSchoolId,
             ...safeAdditionalData,
             createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp(),
           }, { merge: true });
@@ -954,7 +990,7 @@ async function startServer() {
             id: uid,
             email: emailLower,
             name: displayName,
-            schoolId,
+            schoolId: effectiveSchoolId,
             ...safeAdditionalData,
             createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp(),
           }, { merge: true });
@@ -967,22 +1003,22 @@ async function startServer() {
         });
 
         // Sync custom claims safely OUTSIDE the database transaction
-        await syncUserClaims(uid, role, schoolId, additionalData?.permissions || null);
+        await syncUserClaims(uid, targetRole, effectiveSchoolId, additionalData?.permissions || null);
       } else {
-        await syncUserClaims(uid, role, schoolId, additionalData?.permissions || null);
+        await syncUserClaims(uid, targetRole, effectiveSchoolId, additionalData?.permissions || null);
 
         await db.collection('users').doc(uid).set({
           uid,
           email: emailLower,
           name: displayName,
-          role,
-          schoolId,
+          role: targetRole,
+          schoolId: effectiveSchoolId,
           ...safeAdditionalData,
           createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
       }
 
-      await logAudit(req, 'CREATE_USER', { after: { email: emailLower, role, schoolId } });
+      await logAudit(req, 'CREATE_USER', { after: { email: emailLower, role: targetRole, schoolId: effectiveSchoolId, assistantType: resolvedAssistantType } });
       res.json({
         success: true,
         message: 'تم إنشاء المستخدم بنجاح',

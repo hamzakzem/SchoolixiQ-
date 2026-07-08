@@ -45,7 +45,7 @@ export default function AssistantsManagement() {
         const q = query(
           collection(db, 'users'),
           where('schoolId', '==', profile.schoolId),
-          where('role', '==', UserRole.ASSISTANT),
+          where('role', 'in', [UserRole.SCHOOL_ASSISTANT, UserRole.ASSISTANT]),
           limit(100)
         );
         const snap = await getDocs(q);
@@ -108,9 +108,10 @@ export default function AssistantsManagement() {
           email: formData.email.toLowerCase(),
           password: formData.password,
           displayName: formData.name,
-          role: UserRole.ASSISTANT,
+          role: UserRole.SCHOOL_ASSISTANT,
           schoolId: profile.schoolId,
           additionalData: {
+            assistantType: 'school',
             permissions: resolvedPermissions,
             salary: Number(formData.salary) || 0,
             status: 'active'

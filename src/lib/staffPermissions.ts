@@ -6,7 +6,7 @@ import {
 } from './featureRegistry';
 
 /** Roles that use custom string[] permissions from Staff Management. */
-export const CUSTOM_PERMISSION_ROLES = ['staff', 'assistant'] as const;
+export const CUSTOM_PERMISSION_ROLES = ['staff', 'assistant', 'school_assistant'] as const;
 
 /** Roles with full dashboard access within the school package (custom array ignored). */
 export const PACKAGE_PERMISSION_ROLES = ['admin', 'school_admin'] as const;
@@ -80,7 +80,8 @@ export function canAccessAdminMenuItem(
       role === 'admin' ||
       role === 'school_admin' ||
       role === 'staff' ||
-      role === 'assistant'
+      role === 'assistant' ||
+      role === 'school_assistant'
     );
   }
 

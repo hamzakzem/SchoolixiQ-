@@ -15,7 +15,11 @@ import {
 import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
 import { Toaster, toast } from "react-hot-toast";
 import { UserRole } from "./types";
-import { normalizeSchoolId } from "./lib/schoolId";
+import {
+  normalizeSchoolId,
+  isPlatformAssistantProfile,
+  isSchoolAssistantProfile,
+} from "./lib/schoolId";
 import { AssistantSchoolGate } from "./components/AssistantSchoolGate";
 import {
   ShieldCheck,
@@ -755,19 +759,23 @@ const AppContent = () => {
       );
     }
 
-    // Check school expiration for everyone except super admin
+    // Check school expiration for everyone except super admin / platform assistants
     if (
       profile?.role &&
       profile.role !== UserRole.SUPERADMIN &&
+      profile.role !== UserRole.PLATFORM_ASSISTANT &&
+      profile.role !== "platform_assistant" &&
+      !isPlatformAssistantProfile(profile as Record<string, unknown>) &&
       schoolData?.subscriptionExpiresAt
     ) {
       const expiry = new Date(schoolData.subscriptionExpiresAt);
       if (expiry.getTime() < new Date().getTime()) {
-        const isManagement = [
-          UserRole.ADMIN,
-          UserRole.STAFF,
-          UserRole.ASSISTANT,
-        ].includes(profile.role);
+        const isManagement =
+          profile.role === UserRole.ADMIN ||
+          profile.role === UserRole.STAFF ||
+          profile.role === UserRole.SCHOOL_ASSISTANT ||
+          profile.role === "school_assistant" ||
+          isSchoolAssistantProfile(profile as Record<string, unknown>);
         return (
           <div
             className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6"
@@ -806,7 +814,22 @@ const AppContent = () => {
     switch (profile?.role) {
       case UserRole.SUPERADMIN:
         return <SuperAdminDashboard />;
+      case UserRole.PLATFORM_ASSISTANT:
+      case "platform_assistant":
+        return <SuperAdminDashboard />;
+      case UserRole.SCHOOL_ASSISTANT:
+      case "school_assistant":
+        return (
+          <AssistantSchoolGate>
+            <AdminDashboard />
+          </AssistantSchoolGate>
+        );
       case UserRole.ASSISTANT:
+        // Legacy role:"assistant" — normalizeEffectiveRole in AuthContext maps most cases;
+        // keep fallback for stale snapshots.
+        if (isPlatformAssistantProfile(profile as Record<string, unknown>)) {
+          return <SuperAdminDashboard />;
+        }
         return (
           <AssistantSchoolGate>
             <AdminDashboard />

@@ -101,8 +101,10 @@ const SCHOOL_ADMIN_INSTALL_ROLES = new Set<string>([
   UserRole.ADMIN,
   UserRole.STAFF,
   UserRole.ASSISTANT,
+  UserRole.SCHOOL_ASSISTANT,
   'school_admin',
   UserRole.SUPERADMIN,
+  UserRole.PLATFORM_ASSISTANT,
   'super_admin',
 ]);
 
@@ -120,10 +122,14 @@ export function getRoleDashboardLabel(role?: string | null): string {
   switch (role) {
     case UserRole.SUPERADMIN:
     case 'super_admin':
+    case UserRole.PLATFORM_ASSISTANT:
+    case 'platform_assistant':
       return 'super_admin';
     case UserRole.ADMIN:
     case UserRole.STAFF:
     case UserRole.ASSISTANT:
+    case UserRole.SCHOOL_ASSISTANT:
+    case 'school_assistant':
     case 'school_admin':
       return 'admin';
     case UserRole.TEACHER:

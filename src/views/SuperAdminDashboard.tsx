@@ -119,6 +119,7 @@ import {
   getPackagePermissionCheckboxFeatures,
   type PackagePermissions,
 } from "../lib/featureRegistry";
+import { isPlatformAssistantProfile, resolveAssistantScope, resolveProfileSchoolId } from "../lib/schoolId";
 
 const DEFAULT_PACKAGES = [
   {
@@ -183,6 +184,10 @@ function isGuardianAccountRole(role?: string | null): boolean {
   return GUARDIAN_ACCOUNT_ROLES.has(String(role || ""));
 }
 
+function isPlatformTeamAssistant(user: Record<string, unknown> & { role?: string }) {
+  return isPlatformAssistantProfile(user);
+}
+
 export default function SuperAdminDashboard() {
   const { profile, logout } = useAuth();
   const { t, isRtl, setLanguage, language } = useLanguage();
@@ -197,13 +202,22 @@ export default function SuperAdminDashboard() {
     profile?.email?.toLowerCase() || "",
   );
 
-  const hasPermission = (permission: string) => {
+  const canAccess = (permission: string) => {
     if (profile?.role === "superadmin") return true;
-    if (profile?.role === "assistant" && !profile?.schoolId) {
-      return profile?.permissions?.includes(permission);
+    if (profile && isPlatformAssistantProfile(profile as Record<string, unknown>)) {
+      const perms = profile.permissions;
+      if (!Array.isArray(perms)) return false;
+      if (perms.includes(permission)) return true;
+      // Aliases for clearer permission names used in docs / new creates
+      if (permission === "manage_subscriptions" && perms.includes("view_requests")) return true;
+      if (permission === "manage_system" && perms.includes("system_settings")) return true;
+      if (permission === "view_requests" && perms.includes("manage_subscriptions")) return true;
+      if (permission === "system_settings" && perms.includes("manage_system")) return true;
+      return false;
     }
     return false;
   };
+  const hasPermission = canAccess;
 
   const [schools, setSchools] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
@@ -629,6 +643,7 @@ export default function SuperAdminDashboard() {
     email: "",
     role: "parent",
     schoolId: "",
+    assistantType: "platform" as "platform" | "school",
     permissions: [] as string[],
     password: "",
     confirmPassword: "",
@@ -637,8 +652,11 @@ export default function SuperAdminDashboard() {
   const SYSTEM_PERMISSIONS: Record<string, string> = {
     manage_schools: t('sidebar_schools'),
     manage_packages: t('sidebar_packages'),
+    manage_subscriptions: t('sidebar_requests'),
     view_requests: t('sidebar_requests'),
+    manage_distributors: "الموزعون والكوبونات",
     manage_users: t('sidebar_users'),
+    manage_system: t('sidebar_settings'),
     system_settings: t('sidebar_settings'),
     view_backups: t('sidebar_backups'),
   };
@@ -1384,13 +1402,36 @@ export default function SuperAdminDashboard() {
           toast.error("كلمتا المرور غير متطابقتين");
           return;
         }
+        const isPlatformCreate =
+          newUser.role === "platform_assistant" ||
+          (newUser.role === "assistant" && newUser.assistantType === "platform");
+        const isSchoolAssistantCreate =
+          newUser.role === "school_assistant" ||
+          (newUser.role === "assistant" && newUser.assistantType === "school");
+
+        if (isSchoolAssistantCreate && !newUser.schoolId) {
+          toast.error("يجب اختيار المدرسة لمساعد المدرسة");
+          return;
+        }
+
+        const resolvedRole = isPlatformCreate
+          ? "platform_assistant"
+          : isSchoolAssistantCreate
+            ? "school_assistant"
+            : newUser.role;
+
         await adminCreateUser({
           email: newUser.email.toLowerCase(),
           password: newUser.password,
           displayName: newUser.name,
-          role: newUser.role,
-          schoolId: newUser.schoolId || "",
+          role: resolvedRole,
+          schoolId: isPlatformCreate ? "" : newUser.schoolId || "",
           additionalData: {
+            ...(isPlatformCreate || isSchoolAssistantCreate
+              ? {
+                  assistantType: isPlatformCreate ? "platform" : "school",
+                }
+              : {}),
             permissions: newUser.permissions || [],
           },
         });
@@ -1405,6 +1446,7 @@ export default function SuperAdminDashboard() {
         email: "",
         role: "parent",
         schoolId: "",
+        assistantType: "platform",
         permissions: [],
         password: "",
         confirmPassword: "",
@@ -2035,7 +2077,7 @@ export default function SuperAdminDashboard() {
                     )}
                   </button>
                 )}
-                {profile?.role === "superadmin" && (
+                {hasPermission("manage_distributors") && (
                   <button
                     onClick={() => {
                       navigateToTab("distributors");
@@ -2060,7 +2102,7 @@ export default function SuperAdminDashboard() {
                     )}
                   </button>
                 )}
-                {profile?.role === "superadmin" && (
+                {hasPermission("manage_distributors") && (
                   <button
                     onClick={() => {
                       navigateToTab("distributor_requests");
@@ -3328,8 +3370,9 @@ export default function SuperAdminDashboard() {
                           setNewUser({
                             name: "",
                             email: "",
-                            role: "assistant",
+                            role: "platform_assistant",
                             schoolId: "",
+                            assistantType: "platform",
                             permissions: [],
                             password: "",
                             confirmPassword: "",
@@ -3356,9 +3399,7 @@ export default function SuperAdminDashboard() {
                     <AdminStatCard
                       title="المساعدين التقنيين"
                       value={
-                        users.filter(
-                          (u) => u.role === "assistant" && !u.schoolId,
-                        ).length
+                        users.filter((u) => isPlatformTeamAssistant(u)).length
                       }
                       hint="صلاحيات مخصصة"
                       color="text-blue-600"
@@ -3382,7 +3423,7 @@ export default function SuperAdminDashboard() {
                           .filter(
                             (u) =>
                               u.role === "superadmin" ||
-                              (u.role === "assistant" && !u.schoolId),
+                              isPlatformTeamAssistant(u),
                           )
                           .map((user) => (
                             <tr
@@ -3413,17 +3454,24 @@ export default function SuperAdminDashboard() {
                                 {user.email}
                               </td>
                               <td className="px-6 py-4">
-                                <span
-                                  className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${
-                                    user.role === "superadmin"
-                                      ? "bg-purple-100 text-purple-600 border border-purple-200"
-                                      : "bg-blue-100 text-blue-600 border border-blue-200"
-                                  }`}
-                                >
-                                  {user.role === "superadmin"
-                                    ? "Super Admin (الكل)"
-                                    : "System Assistant (مساعد منسق)"}
-                                </span>
+                                <div className="flex flex-col gap-1 items-start">
+                                  <span
+                                    className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${
+                                      user.role === "superadmin"
+                                        ? "bg-purple-100 text-purple-600 border border-purple-200"
+                                        : "bg-blue-100 text-blue-600 border border-blue-200"
+                                    }`}
+                                  >
+                                    {user.role === "superadmin"
+                                      ? "Super Admin (الكل)"
+                                      : "مساعد منصة"}
+                                  </span>
+                                  {user.role !== "superadmin" && (
+                                    <span className="px-2 py-0.5 rounded-md text-[8px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                                      Platform Team
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-6 py-4">
                                 <div className="flex flex-wrap gap-1">
@@ -3487,8 +3535,16 @@ export default function SuperAdminDashboard() {
                                           setNewUser({
                                             name: user.name,
                                             email: user.email,
-                                            role: user.role,
+                                            role: isPlatformAssistantProfile(user)
+                                              ? "platform_assistant"
+                                              : user.role === "school_assistant"
+                                                ? "school_assistant"
+                                                : user.role,
                                             schoolId: user.schoolId || "",
+                                            assistantType: resolveAssistantScope(
+                                              user,
+                                              resolveProfileSchoolId(user),
+                                            ),
                                             permissions: user.permissions || [],
                                             password: "",
                                             confirmPassword: "",
@@ -3641,8 +3697,16 @@ export default function SuperAdminDashboard() {
                                             setNewUser({
                                               name: user.name,
                                               email: user.email,
-                                              role: user.role,
+                                              role: isPlatformAssistantProfile(user)
+                                                ? "platform_assistant"
+                                                : user.role === "school_assistant"
+                                                  ? "school_assistant"
+                                                  : user.role,
                                               schoolId: user.schoolId || "",
+                                              assistantType: resolveAssistantScope(
+                                                user,
+                                                resolveProfileSchoolId(user),
+                                              ),
                                               permissions: user.permissions || [],
                                               password: "",
                                               confirmPassword: "",
@@ -5881,37 +5945,64 @@ export default function SuperAdminDashboard() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">
-                    الدور
+                    الدور / نوع العضو
                   </label>
                   <select
                     value={newUser.role}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, role: e.target.value as any })
-                    }
+                    onChange={(e) => {
+                      const role = e.target.value;
+                      const assistantType =
+                        role === "platform_assistant"
+                          ? "platform"
+                          : role === "school_assistant"
+                            ? "school"
+                            : newUser.assistantType;
+                      setNewUser({
+                        ...newUser,
+                        role: role as any,
+                        assistantType,
+                        schoolId:
+                          role === "platform_assistant" ? "" : newUser.schoolId,
+                        permissions:
+                          role === "school_assistant" ? [] : newUser.permissions,
+                      });
+                    }}
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all font-bold"
                   >
                     <option value="parent">ولي أمر</option>
                     <option value="teacher">معلم</option>
                     <option value="staff">موظف إداري</option>
-                    <option value="assistant">مساعد</option>
+                    <option value="platform_assistant">مساعد منصة</option>
+                    <option value="school_assistant">مساعد مدرسة</option>
                     <option value="admin">مدير مدرسة</option>
                     {isMasterAdmin && (
                       <option value="superadmin">مدير نظام (Super)</option>
                     )}
                   </select>
                 </div>
+                {newUser.role !== "platform_assistant" && (
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">
-                    المدرسة (اختياري)
+                    المدرسة
+                    {newUser.role === "school_assistant"
+                      ? " (مطلوب)"
+                      : " (اختياري)"}
                   </label>
                   <select
                     value={newUser.schoolId}
                     onChange={(e) =>
-                      setNewUser({ ...newUser, schoolId: e.target.value })
+                      setNewUser({
+                        ...newUser,
+                        schoolId: e.target.value,
+                      })
                     }
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all font-bold"
                   >
-                    <option value="">لا يوجد (فريق المنصة)</option>
+                    <option value="">
+                      {newUser.role === "school_assistant"
+                        ? "— اختر المدرسة —"
+                        : "لا يوجد"}
+                    </option>
                     {schools.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
@@ -5919,6 +6010,7 @@ export default function SuperAdminDashboard() {
                     ))}
                   </select>
                 </div>
+                )}
               </div>
 
               {!editingUser && (
@@ -6002,13 +6094,21 @@ export default function SuperAdminDashboard() {
                 </>
               )}
 
-              {newUser.role === "assistant" && !newUser.schoolId && (
+              {newUser.role === "platform_assistant" && (
                 <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30">
                   <h4 className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3">
-                    تخصيص صلاحيات المساعد
+                    تخصيص صلاحيات مساعد المنصة
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
-                    {Object.entries(SYSTEM_PERMISSIONS).map(([key, label]) => (
+                    {[
+                      "manage_schools",
+                      "manage_packages",
+                      "manage_subscriptions",
+                      "manage_users",
+                      "manage_system",
+                      "manage_distributors",
+                      "view_backups",
+                    ].map((key) => (
                       <label
                         key={key}
                         className="flex items-center gap-2 cursor-pointer"
@@ -6026,7 +6126,7 @@ export default function SuperAdminDashboard() {
                           className="rounded text-blue-600 border-slate-300 transition-all"
                         />
                         <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                          {label}
+                          {SYSTEM_PERMISSIONS[key] || key}
                         </span>
                       </label>
                     ))}
@@ -6052,6 +6152,7 @@ export default function SuperAdminDashboard() {
                       email: "",
                       role: "parent",
                       schoolId: "",
+                      assistantType: "platform",
                       permissions: [],
                       password: "",
                       confirmPassword: "",
@@ -6083,8 +6184,8 @@ export default function SuperAdminDashboard() {
           hasPermission("manage_schools") && { id: "accounts", label: t('sidebar_accounts'), icon: Lock },
           profile?.role === "superadmin" && { id: "team", label: t('sidebar_team'), icon: ShieldCheck },
           hasPermission("manage_packages") && { id: "packages", label: t('sidebar_packages'), icon: Plus },
-          profile?.role === "superadmin" && { id: "distributors", label: "الموزعون", icon: Tag },
-          profile?.role === "superadmin" && { id: "distributor_requests", label: "طلبات الموزعين", icon: ClipboardList },
+          hasPermission("manage_distributors") && { id: "distributors", label: "الموزعون", icon: Tag },
+          hasPermission("manage_distributors") && { id: "distributor_requests", label: "طلبات الموزعين", icon: ClipboardList },
           hasPermission("view_requests") && { id: "requests", label: t('sidebar_requests'), icon: Mail },
           hasPermission("manage_schools") && { id: "chat", label: t('sidebar_chat'), icon: MessageSquare },
           hasPermission("manage_users") && { id: "users", label: t('sidebar_users'), icon: Users },
