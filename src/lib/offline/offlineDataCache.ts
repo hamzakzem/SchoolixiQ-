@@ -174,6 +174,26 @@ export async function clearUserDataCache(userId: string): Promise<number> {
   return toDelete.length;
 }
 
+/** Clear messaging-related offline snapshots so unauthorized threads cannot leak after role changes. */
+export async function clearMessagingCache(userId: string): Promise<number> {
+  if (!userId) return 0;
+  const all = await withStore<CachedSnapshotEntry[]>('readonly', (store) => store.getAll());
+  const messagingKeys = new Set([
+    CACHE_COLLECTION_KEYS.messages,
+    'system_messages',
+    'conversations',
+    'messages',
+  ]);
+  const toDelete = all.filter(
+    (e) => e.userId === userId && messagingKeys.has(e.collectionKey),
+  );
+  for (const entry of toDelete) {
+    await withStore('readwrite', (store) => store.delete(entry.id));
+  }
+  console.info('[OfflineCache] CLEAR_MESSAGING', { userId, removed: toDelete.length });
+  return toDelete.length;
+}
+
 export async function getDataCacheMeta(userId?: string): Promise<DataCacheMeta> {
   const all = await withStore<CachedSnapshotEntry[]>('readonly', (store) => store.getAll());
   const scoped = userId ? all.filter((e) => e.userId === userId) : all;

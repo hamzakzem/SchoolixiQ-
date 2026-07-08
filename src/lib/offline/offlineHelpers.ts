@@ -19,12 +19,24 @@ export type SendChatMessageInput = {
   fileUrl?: string | null;
   fileType?: string | null;
   fileName?: string | null;
+  /** Defaults: school→platform = platform_operations; else school_private */
+  visibility?: 'superadmin_private' | 'platform_operations' | 'school_private';
 };
 
 export async function sendChatMessageOfflineSafe(
   input: SendChatMessageInput,
 ): Promise<{ mode: 'online' | 'queued'; messageId: string }> {
   const clientMutationId = createClientMutationId();
+  const visibility =
+    input.visibility ||
+    (input.receiverId === 'super_admin'
+      ? 'platform_operations'
+      : 'school_private');
+  const allowedRoles =
+    visibility === 'platform_operations'
+      ? ['superadmin', 'platform_assistant', 'admin', 'school_admin']
+      : ['admin', 'school_admin', 'staff', 'school_assistant', 'teacher', 'parent'];
+
   const messageData = withMessageRetentionFields({
     conversationId: input.conversationId,
     schoolId: input.schoolId,
@@ -40,6 +52,11 @@ export async function sendChatMessageOfflineSafe(
     read: false,
     clientMutationId,
     messageStatus: 'pending_local',
+    createdBy: input.actor.userId,
+    createdByRole: input.senderRole,
+    visibility,
+    visibilityScope: visibility,
+    allowedRoles,
   });
 
   const messageResult = await safeFirestoreAdd('system_messages', messageData, {
@@ -58,6 +75,11 @@ export async function sendChatMessageOfflineSafe(
       lastMessage: input.content,
       updatedAt: serverTimestamp(),
       clientMutationId,
+      createdBy: input.actor.userId,
+      createdByRole: input.senderRole,
+      visibility,
+      visibilityScope: visibility,
+      allowedRoles,
     },
     { module: 'messages', actor: input.actor, clientMutationId },
     { merge: true },

@@ -10,6 +10,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { runSchoolPermanentDelete } from './schoolPermanentDelete.mjs';
 import { permanentlyDeleteMessage } from './schoolMessageCleanup.mjs';
+import { authorizeConversationAccess } from './messagingAccess.mjs';
 import { runUserPermanentDelete } from './userPermanentDelete.mjs';
 import {
   applyDistributorCoupon,
@@ -1389,6 +1390,50 @@ async function startServer() {
         error: error.message || 'Internal Server Error',
         message: error.message || 'فشل الحذف النهائي للرسالة',
       });
+    }
+  });
+
+  // Authorize + return conversation messages (server-side isolation)
+  app.post('/api/admin/messages/authorize-conversation', verifyAdmin, async (req: any, res: any) => {
+    try {
+      const conversationId = String(req.body?.conversationId || '').trim();
+      if (!conversationId) {
+        return res.status(400).json({ error: 'CONVERSATION_ID_REQUIRED' });
+      }
+      const db = getDb();
+      const convSnap = await db.collection('conversations').doc(conversationId).get();
+      const conversation = convSnap.exists
+        ? { id: convSnap.id, ...(convSnap.data() || {}) }
+        : { conversationId, id: conversationId };
+
+      // Load actor permissions from Firestore when missing from token
+      let permissions = req.user.permissions || null;
+      if (!permissions) {
+        const userSnap = await db.collection('users').doc(req.user.uid).get();
+        permissions = userSnap.data()?.permissions || [];
+      }
+
+      const allowed = authorizeConversationAccess(
+        {
+          uid: req.user.uid,
+          role: req.user.role,
+          schoolId: req.user.schoolId,
+          permissions,
+        },
+        conversation,
+      );
+
+      if (!allowed) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          allowed: false,
+          message: 'غير مصرح بالوصول إلى هذه المحادثة',
+        });
+      }
+
+      res.json({ success: true, allowed: true, conversation });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
   });
 

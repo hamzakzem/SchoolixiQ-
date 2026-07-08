@@ -49,6 +49,7 @@ import { initOfflineSystem, pauseOfflineSync, resumeOfflineSync } from './offlin
 import {
   CACHE_COLLECTION_KEYS,
   cacheSnapshot,
+  clearMessagingCache,
   clearUserDataCache,
   getCachedProfileForUser,
   getCachedSnapshot,
@@ -695,6 +696,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
           if (loginLoggedRef.current !== authUser.uid) {
             loginLoggedRef.current = authUser.uid;
+            // Drop any offline message/conversation snapshots that could leak across roles
+            void clearMessagingCache(authUser.uid).catch((err) => {
+              console.warn('[Auth] clearMessagingCache failed:', err);
+            });
             import('./loginLog').then(({ writeLoginLog }) =>
               writeLoginLog({
                 userId: authUser.uid,

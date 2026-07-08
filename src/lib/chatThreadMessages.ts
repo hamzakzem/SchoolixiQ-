@@ -33,6 +33,49 @@ export function buildThreadMessagesQuery(
   );
 }
 
+/**
+ * Platform Assistant thread query — excludes Super Admin private messages at the query layer
+ * so Firestore rules do not reject the entire snapshot when mixed visibilities exist.
+ */
+export function buildPlatformOpsThreadMessagesQuery(
+  schoolId: string,
+  conversationId: string,
+): Query {
+  return query(
+    collection(db, 'system_messages'),
+    where('schoolId', '==', schoolId),
+    where('conversationId', '==', conversationId),
+    where('visibility', '==', 'platform_operations'),
+    orderBy('createdAt', 'desc'),
+    limit(CHAT_MESSAGES_LIMIT),
+  );
+}
+
+/**
+ * Fallback for legacy school→platform support messages that lack `visibility`
+ * but were sent by school roles (never Super Admin).
+ */
+export function buildLegacySchoolSupportThreadQuery(
+  schoolId: string,
+  conversationId: string,
+): Query {
+  return query(
+    collection(db, 'system_messages'),
+    where('schoolId', '==', schoolId),
+    where('conversationId', '==', conversationId),
+    where('senderRole', 'in', [
+      'admin',
+      'school_admin',
+      'staff',
+      'assistant',
+      'school_assistant',
+      'platform_assistant',
+    ]),
+    orderBy('createdAt', 'desc'),
+    limit(CHAT_MESSAGES_LIMIT),
+  );
+}
+
 export function sortThreadMessagesChronological<T extends ThreadMessage>(
   docs: T[],
 ): T[] {

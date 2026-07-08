@@ -18,11 +18,14 @@ import { markSystemMessagesRead } from '../../lib/chatMessageReads';
 import { markChatPerf, openChatSnapshotListener, resetChatPerf } from '../../lib/chatPerf';
 import {
   applyThreadMessagesIfChanged,
+  buildLegacySchoolSupportThreadQuery,
+  buildPlatformOpsThreadMessagesQuery,
   buildThreadMessagesQuery,
   shouldMarkThreadUnread,
   unreadIdsForReceiver,
 } from '../../lib/chatThreadMessages';
 import {
+  filterConversationsForAccess,
   filterMessagesForAccess,
   resolveMessagingAccess,
 } from '../../lib/messagingAccess';
@@ -97,60 +100,108 @@ export default function SuperAdminChatTab() {
     });
     const untrackSchools = openChatSnapshotListener('SuperAdminChatTab:schools');
 
-    // Fetch all unread messages meant for superadmin
-    const qUnread = query(
-      collection(db, 'system_messages'),
-      where('receiverId', '==', 'super_admin'),
-      where('read', '==', false)
+    // Platform assistants: only ops visibility — avoids rules rejection on SA private docs
+    const qUnread = isPlatformAssistantView
+      ? query(
+          collection(db, 'system_messages'),
+          where('receiverId', '==', 'super_admin'),
+          where('visibility', '==', 'platform_operations'),
+          where('read', '==', false),
+        )
+      : query(
+          collection(db, 'system_messages'),
+          where('receiverId', '==', 'super_admin'),
+          where('read', '==', false),
+        );
+    const unsubUnread = onSnapshot(
+      qUnread,
+      (snapshot) => {
+        const counts: Record<string, number> = {};
+        snapshot.docs.forEach((docSnap) => {
+          const msg = { id: docSnap.id, ...docSnap.data() } as Record<string, unknown>;
+          if (
+            filterMessagesForAccess(
+              [msg],
+              messagingAccess,
+              profile?.uid || '',
+              profile as Record<string, unknown>,
+            ).length === 0
+          ) {
+            return;
+          }
+          const schoolId = String(msg.schoolId ?? '');
+          if (!schoolId) return;
+          counts[schoolId] = (counts[schoolId] || 0) + 1;
+        });
+        setUnreadCounts(counts);
+      },
+      (err) => {
+        console.warn('Unread listener error:', err);
+        // Fallback without composite visibility index: client-filter only for SA
+        if (!isPlatformAssistantView) return;
+        setUnreadCounts({});
+      },
     );
-    const unsubUnread = onSnapshot(qUnread, (snapshot) => {
-      const counts: Record<string, number> = {};
-      snapshot.docs.forEach(doc => {
-        const msg = doc.data() as any;
-        counts[msg.schoolId] = (counts[msg.schoolId] || 0) + 1;
-      });
-      setUnreadCounts(counts);
-    });
     const untrackUnread = openChatSnapshotListener('SuperAdminChatTab:unread');
 
-    const qConversations = query(
-      collection(db, "conversations"),
-      where("participants", "array-contains", "super_admin"),
-      orderBy("updatedAt", "desc")
-    );
-    
-    const unsubConversations = onSnapshot(qConversations, (snapshot) => {
-      setLastInteractionTimes(prev => {
-        const next = { ...prev };
-        let changed = false;
-        snapshot.docs.forEach(doc => {
-          const data = doc.data();
-          if (data.updatedAt && data.schoolId) {
-            const time = data.updatedAt.toMillis();
-            if (next[data.schoolId] !== time) {
-              next[data.schoolId] = time;
+    const qConversations = isPlatformAssistantView
+      ? query(
+          collection(db, 'conversations'),
+          where('participants', 'array-contains', 'super_admin'),
+          where('visibility', '==', 'platform_operations'),
+          orderBy('updatedAt', 'desc'),
+        )
+      : query(
+          collection(db, 'conversations'),
+          where('participants', 'array-contains', 'super_admin'),
+          orderBy('updatedAt', 'desc'),
+        );
+
+    const unsubConversations = onSnapshot(
+      qConversations,
+      (snapshot) => {
+        const raw = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const allowed = filterConversationsForAccess(
+          raw as Record<string, unknown>[],
+          messagingAccess,
+          profile as Record<string, unknown>,
+        );
+
+        setLastInteractionTimes((prev) => {
+          const next = { ...prev };
+          let changed = false;
+          allowed.forEach((data) => {
+            const schoolId = String(data.schoolId ?? '');
+            const updatedAt = data.updatedAt as { toMillis?: () => number } | undefined;
+            if (updatedAt?.toMillis && schoolId) {
+              const time = updatedAt.toMillis();
+              if (next[schoolId] !== time) {
+                next[schoolId] = time;
+                changed = true;
+              }
+            }
+          });
+          return changed ? next : prev;
+        });
+        setLastMessageSnippets((prev) => {
+          const next = { ...prev };
+          let changed = false;
+          allowed.forEach((data) => {
+            const schoolId = String(data.schoolId ?? '');
+            const lastMessage = data.lastMessage;
+            if (!lastMessage || !schoolId) return;
+            if (next[schoolId] !== lastMessage) {
+              next[schoolId] = String(lastMessage);
               changed = true;
             }
-          }
+          });
+          return changed ? next : prev;
         });
-        return changed ? next : prev;
-      });
-      setLastMessageSnippets(prev => {
-        const next = { ...prev };
-        let changed = false;
-        snapshot.docs.forEach(docSnap => {
-          const data = docSnap.data();
-          if (!data.lastMessage || !data.schoolId) return;
-          if (next[data.schoolId] !== data.lastMessage) {
-            next[data.schoolId] = data.lastMessage;
-            changed = true;
-          }
-        });
-        return changed ? next : prev;
-      });
-    }, (err) => {
-      console.warn("Conversations listener error:", err);
-    });
+      },
+      (err) => {
+        console.warn('Conversations listener error:', err);
+      },
+    );
     const untrackConversations = openChatSnapshotListener('SuperAdminChatTab:conversations');
 
     return () => {
@@ -161,7 +212,13 @@ export default function SuperAdminChatTab() {
       untrackUnread();
       untrackConversations();
     };
-  }, [profile?.role, profile?.schoolId]);
+  }, [
+    profile?.role,
+    profile?.schoolId,
+    profile?.uid,
+    messagingAccess,
+    isPlatformAssistantView,
+  ]);
 
   useEffect(() => {
     if (!profile?.uid || !activeContact || activeContact.id === BROADCAST_ID) {
@@ -174,26 +231,22 @@ export default function SuperAdminChatTab() {
     messagesFirstSnapshotRef.current = false;
 
     const convId = `superadmin_${activeContact.id}`;
-    const q = buildThreadMessagesQuery(activeContact.id, convId);
     const untrackMessages = openChatSnapshotListener('SuperAdminChatTab:messages');
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as any),
-      }));
+    const mergeAndApply = (docs: Record<string, unknown>[]) => {
+      const byId = new Map<string, Record<string, unknown>>();
+      for (const d of docs) byId.set(String(d.id), d);
       const filtered = filterMessagesForAccess(
-        docs,
+        Array.from(byId.values()),
         messagingAccess,
         profile.uid,
+        profile as Record<string, unknown>,
       );
-
       const sorted = applyThreadMessagesIfChanged(
-        filtered,
+        filtered as any[],
         messagesSigRef,
         setMessages,
       );
-
       if (!messagesFirstSnapshotRef.current) {
         messagesFirstSnapshotRef.current = true;
         markChatPerf('messages_first_snapshot', 'SuperAdminChatTab', {
@@ -201,14 +254,73 @@ export default function SuperAdminChatTab() {
           count: sorted.length,
         });
       }
-
       prevMessagesLength.current = sorted.length;
       isFirstLoad.current = false;
-
       const unreadIds = unreadIdsForReceiver(sorted, ['super_admin']);
       if (shouldMarkThreadUnread(unreadIds, unreadKeyRef)) {
         markSystemMessagesRead(unreadIds, 'SuperAdminChatTab');
       }
+    };
+
+    if (isPlatformAssistantView) {
+      // Two scoped queries — never fetch superadmin_private docs (rules would deny the whole list)
+      const opsDocs = new Map<string, Record<string, unknown>>();
+      const legacyDocs = new Map<string, Record<string, unknown>>();
+      const flush = () => {
+        mergeAndApply([
+          ...Array.from(opsDocs.values()),
+          ...Array.from(legacyDocs.values()),
+        ]);
+      };
+
+      const unsubOps = onSnapshot(
+        buildPlatformOpsThreadMessagesQuery(activeContact.id, convId),
+        (snap) => {
+          opsDocs.clear();
+          snap.docs.forEach((d) => opsDocs.set(d.id, { id: d.id, ...d.data() }));
+          flush();
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'SuperAdminChatTab:ops_messages');
+        },
+      );
+      const unsubLegacy = onSnapshot(
+        buildLegacySchoolSupportThreadQuery(activeContact.id, convId),
+        (snap) => {
+          legacyDocs.clear();
+          snap.docs.forEach((d) => {
+            const data = d.data() as Record<string, unknown>;
+            // Skip any doc that somehow has SA private visibility
+            if (
+              data.visibility === 'superadmin_private' ||
+              data.visibilityScope === 'superadmin_private'
+            ) {
+              return;
+            }
+            legacyDocs.set(d.id, { id: d.id, ...data });
+          });
+          flush();
+        },
+        (error) => {
+          // Composite indexes may be missing for legacy path — non-fatal
+          console.warn('[SuperAdminChatTab] legacy support query:', error);
+        },
+      );
+
+      return () => {
+        unsubOps();
+        unsubLegacy();
+        untrackMessages();
+      };
+    }
+
+    const q = buildThreadMessagesQuery(activeContact.id, convId);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as any),
+      }));
+      mergeAndApply(docs);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'SuperAdminChatTab:system_messages');
     });
@@ -217,7 +329,14 @@ export default function SuperAdminChatTab() {
       unsubscribe();
       untrackMessages();
     };
-  }, [profile?.uid, profile?.role, profile?.schoolId, activeContact?.id, messagingAccess]);
+  }, [
+    profile?.uid,
+    profile?.role,
+    profile?.schoolId,
+    activeContact?.id,
+    messagingAccess,
+    isPlatformAssistantView,
+  ]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -244,6 +363,14 @@ export default function SuperAdminChatTab() {
 
     const convId = `superadmin_${school.id}`;
     const attachmentLabel = isRtl ? 'ملف مرفق' : 'Attachment';
+    // Super Admin → school is private. Platform Assistant → school is ops only.
+    const visibility = isPlatformAssistantView
+      ? 'platform_operations'
+      : 'superadmin_private';
+    const allowedRoles = isPlatformAssistantView
+      ? ['superadmin', 'platform_assistant', 'admin', 'school_admin']
+      : ['superadmin', 'admin', 'school_admin'];
+    const actorRole = messagingAccess.role || profile.role || 'superadmin';
 
     await addDoc(collection(db, 'system_messages'), withMessageRetentionFields({
       conversationId: convId,
@@ -252,10 +379,14 @@ export default function SuperAdminChatTab() {
       senderName:
         profile.name ||
         (isPlatformAssistantView ? 'System Assistant' : 'إدارة المنصة'),
-      senderRole: messagingAccess.role || profile.role || 'superadmin',
+      senderRole: actorRole,
       receiverId: 'admin',
       audience: 'school_admin',
-      visibilityScope: isPlatformAssistantView ? 'platform_ops' : 'platform',
+      createdBy: profile.uid,
+      createdByRole: actorRole,
+      visibility,
+      visibilityScope: visibility,
+      allowedRoles,
       content: messageText || attachmentLabel,
       fileUrl: file?.fileUrl || null,
       fileType: file?.fileType || null,
@@ -270,7 +401,11 @@ export default function SuperAdminChatTab() {
         conversationId: convId,
         schoolId: school.id,
         participants: ['super_admin', 'admin'],
-        visibilityScope: isPlatformAssistantView ? 'platform_ops' : 'platform',
+        createdBy: profile.uid,
+        createdByRole: actorRole,
+        visibility,
+        visibilityScope: visibility,
+        allowedRoles,
         lastMessage: messageText || attachmentLabel,
         updatedAt: serverTimestamp(),
       },

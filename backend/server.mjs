@@ -313,6 +313,71 @@ async function runSchoolPermanentDelete({
   };
 }
 
+// messagingAccess.mjs
+var PLATFORM_OPS_PERMISSIONS = /* @__PURE__ */ new Set([
+  "manage_schools",
+  "manage_subscriptions",
+  "view_requests",
+  "manage_users",
+  "manage_packages",
+  "manage_system",
+  "system_settings"
+]);
+function asPermissionList(raw) {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (raw && typeof raw === "object") {
+    return Object.entries(raw).filter(([, v]) => v === true).map(([k]) => k);
+  }
+  return [];
+}
+function normalizeConversationVisibility(data) {
+  if (!data) return "school_private";
+  const explicit = String(data.visibility ?? data.visibilityScope ?? "").toLowerCase().trim();
+  if (explicit === "superadmin_private" || explicit === "superadmin_only") {
+    return "superadmin_private";
+  }
+  if (explicit === "platform_operations" || explicit === "platform_ops") {
+    return "platform_operations";
+  }
+  if (explicit === "school_private" || explicit === "school") {
+    return "school_private";
+  }
+  if (explicit === "platform") return "superadmin_private";
+  const createdByRole = String(data.createdByRole ?? data.senderRole ?? "").toLowerCase().trim();
+  if (createdByRole === "superadmin" || createdByRole === "super_admin") {
+    return "superadmin_private";
+  }
+  const conversationId = String(data.conversationId ?? data.id ?? "");
+  const isPlatformThread = conversationId.startsWith("superadmin_");
+  if (isPlatformThread && ["admin", "school_admin", "staff", "assistant", "school_assistant"].includes(
+    createdByRole
+  )) {
+    return "platform_operations";
+  }
+  if (isPlatformThread) return "superadmin_private";
+  return "school_private";
+}
+function authorizeConversationAccess(user, conversation) {
+  if (!user || !conversation) return false;
+  const role = String(user.role || "").toLowerCase();
+  const permissions = asPermissionList(user.permissions);
+  const visibility = normalizeConversationVisibility(conversation);
+  if (role === "superadmin" || role === "super_admin") return true;
+  if (role === "platform_assistant") {
+    if (visibility === "superadmin_private") return false;
+    const hasOps = permissions.some((p) => PLATFORM_OPS_PERMISSIONS.has(p));
+    if (!hasOps) return false;
+    return visibility === "platform_operations";
+  }
+  if (["admin", "school_admin", "staff", "school_assistant", "assistant"].includes(role)) {
+    const userSchool = String(user.schoolId || "").trim();
+    const convSchool = String(conversation.schoolId || "").trim();
+    if (!userSchool || !convSchool || userSchool !== convSchool) return false;
+    return true;
+  }
+  return false;
+}
+
 // userPermanentDelete.mjs
 var NOTIFICATION_RECIPIENT_FIELDS = ["userId", "recipientId", "receiverId"];
 async function deleteDocsWhere(db, collectionName, field, value) {
@@ -2555,6 +2620,41 @@ async function startServer() {
         error: error.message || "Internal Server Error",
         message: error.message || "\u0641\u0634\u0644 \u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0631\u0633\u0627\u0644\u0629"
       });
+    }
+  });
+  app.post("/api/admin/messages/authorize-conversation", verifyAdmin, async (req, res) => {
+    try {
+      const conversationId = String(req.body?.conversationId || "").trim();
+      if (!conversationId) {
+        return res.status(400).json({ error: "CONVERSATION_ID_REQUIRED" });
+      }
+      const db = getDb();
+      const convSnap = await db.collection("conversations").doc(conversationId).get();
+      const conversation = convSnap.exists ? { id: convSnap.id, ...convSnap.data() || {} } : { conversationId, id: conversationId };
+      let permissions = req.user.permissions || null;
+      if (!permissions) {
+        const userSnap = await db.collection("users").doc(req.user.uid).get();
+        permissions = userSnap.data()?.permissions || [];
+      }
+      const allowed = authorizeConversationAccess(
+        {
+          uid: req.user.uid,
+          role: req.user.role,
+          schoolId: req.user.schoolId,
+          permissions
+        },
+        conversation
+      );
+      if (!allowed) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          allowed: false,
+          message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0628\u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629"
+        });
+      }
+      res.json({ success: true, allowed: true, conversation });
+    } catch (error) {
+      res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   });
   app.post("/api/public/distributors/register", async (req, res) => {

@@ -556,35 +556,78 @@ service cloud.firestore {
           request.auth.uid in data.participants
           || ('admin' in data.participants && isAdmin() && hasSchoolId(data) && userSchoolId() == data.schoolId)
           || ('super_admin' in data.participants && isSuperAdmin())
-          || (
-            'super_admin' in data.participants
-            && isPlatformAssistant()
-            && (
-              !data.keys().hasAll(['visibilityScope'])
-              || !(data.visibilityScope in ['superadmin_private', 'superadmin_only'])
-            )
-          )
+        );
+    }
+
+    function resolvedConversationVisibility(data) {
+      return data.keys().hasAll(['visibility']) && data.visibility in ['superadmin_private', 'platform_operations', 'school_private']
+        ? data.visibility
+        : data.keys().hasAll(['visibilityScope']) && data.visibilityScope in ['superadmin_private', 'superadmin_only']
+          ? 'superadmin_private'
+          : data.keys().hasAll(['visibilityScope']) && data.visibilityScope in ['platform_operations', 'platform_ops']
+            ? 'platform_operations'
+            : data.keys().hasAll(['createdByRole']) && data.createdByRole in ['superadmin', 'super_admin']
+              ? 'superadmin_private'
+              : data.keys().hasAll(['createdByRole']) && data.createdByRole in ['admin', 'school_admin', 'staff', 'assistant', 'school_assistant']
+                ? 'platform_operations'
+                : 'superadmin_private';
+    }
+
+    function platformAssistantHasOpsPermission() {
+      return userExists()
+        && userDoc().keys().hasAll(['permissions'])
+        && userDoc().permissions is list
+        && (
+          'manage_schools' in userDoc().permissions
+          || 'manage_subscriptions' in userDoc().permissions
+          || 'view_requests' in userDoc().permissions
+          || 'manage_users' in userDoc().permissions
+          || 'manage_packages' in userDoc().permissions
+          || 'manage_system' in userDoc().permissions
+          || 'system_settings' in userDoc().permissions
         );
     }
 
     function isSuperAdminPrivateMessage() {
-      return resource.data.keys().hasAll(['visibilityScope'])
-        && resource.data.visibilityScope in ['superadmin_private', 'superadmin_only'];
+      return (
+        (resource.data.keys().hasAll(['visibility']) && resource.data.visibility == 'superadmin_private')
+        || (resource.data.keys().hasAll(['visibilityScope']) && resource.data.visibilityScope in ['superadmin_private', 'superadmin_only', 'platform'])
+        || (
+          resource.data.keys().hasAll(['senderRole'])
+          && resource.data.senderRole in ['superadmin', 'super_admin']
+          && !(resource.data.keys().hasAll(['visibility']) && resource.data.visibility == 'platform_operations')
+        )
+        || (
+          resource.data.keys().hasAll(['createdByRole'])
+          && resource.data.createdByRole in ['superadmin', 'super_admin']
+          && !(resource.data.keys().hasAll(['visibility']) && resource.data.visibility == 'platform_operations')
+        )
+      );
+    }
+
+    function isPlatformOperationsMessage() {
+      return (
+        (resource.data.keys().hasAll(['visibility']) && resource.data.visibility == 'platform_operations')
+        || (resource.data.keys().hasAll(['visibilityScope']) && resource.data.visibilityScope in ['platform_operations', 'platform_ops'])
+        || (
+          // Legacy school → platform support request
+          resource.data.receiverId == 'super_admin'
+          && resource.data.keys().hasAll(['senderRole'])
+          && resource.data.senderRole in ['admin', 'school_admin', 'staff', 'assistant', 'school_assistant']
+        )
+      );
+    }
+
+    function canPlatformAssistantReadMessage() {
+      return isPlatformAssistant()
+        && platformAssistantHasOpsPermission()
+        && !isSuperAdminPrivateMessage()
+        && isPlatformOperationsMessage();
     }
 
     function canReadSystemMessage() {
       return isSuperAdmin()
-        || (
-          isPlatformAssistant()
-          && !isSuperAdminPrivateMessage()
-          && (
-            resource.data.receiverId == request.auth.uid
-            || resource.data.senderId == request.auth.uid
-            || resource.data.receiverId == 'super_admin'
-            || resource.data.receiverId == 'admin'
-            || resource.data.audience == 'school_admin'
-          )
-        )
+        || canPlatformAssistantReadMessage()
         || (signedIn() && resource.data.receiverId == request.auth.uid)
         || (signedIn() && resource.data.senderId == request.auth.uid)
         || (signedIn() && isAdmin() && resource.data.receiverId == 'admin' && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId)
@@ -601,12 +644,11 @@ service cloud.firestore {
       return isSuperAdmin()
         || (
           isPlatformAssistant()
+          && platformAssistantHasOpsPermission()
           && hasSchoolId(request.resource.data)
           && request.resource.data.senderId == request.auth.uid
-          && (
-            !request.resource.data.keys().hasAll(['visibilityScope'])
-            || !(request.resource.data.visibilityScope in ['superadmin_private', 'superadmin_only'])
-          )
+          && request.resource.data.keys().hasAll(['visibility'])
+          && request.resource.data.visibility == 'platform_operations'
         )
         || (signedIn() && hasSchoolId(request.resource.data) && canWriteSchoolData(request.resource.data.schoolId))
         || (
@@ -629,6 +671,19 @@ service cloud.firestore {
             && hasSchoolId(resource.data)
             && userSchoolId() == resource.data.schoolId
           )
+        );
+    }
+
+    function canReadConversationDoc() {
+      return isSuperAdmin()
+        || (
+          isPlatformAssistant()
+          && platformAssistantHasOpsPermission()
+          && resolvedConversationVisibility(resource.data) == 'platform_operations'
+        )
+        || (
+          !isPlatformAssistant()
+          && isConversationParticipant(resource.data)
         );
     }
 
@@ -1269,13 +1324,17 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
-      allow read, get, list: if isSuperAdmin()
-        || isPlatformAssistant()
-        || isConversationParticipant(resource.data);
+      allow read, get, list: if canReadConversationDoc();
       allow create, update: if isSuperAdmin()
-        || isPlatformAssistant()
+        || (
+          isPlatformAssistant()
+          && platformAssistantHasOpsPermission()
+          && request.resource.data.keys().hasAll(['visibility'])
+          && request.resource.data.visibility == 'platform_operations'
+        )
         || (
           signedIn()
+          && !isPlatformAssistant()
           && hasSchoolId(request.resource.data)
           && isConversationParticipant(request.resource.data)
         );
