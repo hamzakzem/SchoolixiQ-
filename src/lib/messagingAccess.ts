@@ -1,8 +1,16 @@
 /**
  * Central messaging access layer — sole authority for chat visibility.
- * Platform assistants NEVER fall back to reading all school↔platform threads.
+ * Platform assistants NEVER fall back to participants/receiverId/schoolId alone.
  */
 
+import {
+  buildConversationPrivacyStamp,
+  computePrivacyHash,
+  verifyPrivacyHash,
+  extractConversationPrivacy,
+  type ConversationPrivacy,
+  type ConversationPrivacyVisibility,
+} from './conversationPrivacy';
 import {
   isPlatformAssistantProfile,
   isSchoolAssistantProfile,
@@ -10,10 +18,7 @@ import {
   resolveProfileSchoolId,
 } from './schoolId';
 
-export type MessagingVisibility =
-  | 'superadmin_private'
-  | 'platform_operations'
-  | 'school_private';
+export type MessagingVisibility = ConversationPrivacyVisibility;
 
 export type MessagingScope =
   | 'platform_all'
@@ -27,14 +32,10 @@ export type MessagingAccess = {
   scope: MessagingScope;
   schoolId: string | null;
   allowedCollections: string[];
-  /** Permanent hard-delete via Admin API only */
   canDelete: boolean;
-  /** Soft-delete own / school-scoped messages in UI */
   canSoftDelete: boolean;
   canViewAll: boolean;
-  /** Platform assistant may open ops inbox only when explicitly permitted */
   canAccessPlatformInbox: boolean;
-  /** Visibilities this actor may read */
   allowedVisibilities: MessagingVisibility[];
   permissions: string[];
   displayLabelAr: string;
@@ -62,17 +63,15 @@ function asPermissionList(raw: unknown): string[] {
 }
 
 function normalizeRoleLabel(role: unknown): string {
-  return String(role ?? '')
-    .toLowerCase()
-    .trim();
+  return String(role ?? '').toLowerCase().trim();
 }
 
-/** Explicit visibility stamp only — no legacy inference (used for platform assistant). */
 export function getExplicitVisibility(
   data: Record<string, unknown> | null | undefined,
 ): MessagingVisibility | null {
-  if (!data) return null;
-  const explicit = String(data.visibility ?? data.visibilityScope ?? '')
+  const privacy = extractConversationPrivacy(data);
+  if (privacy) return privacy.visibility;
+  const explicit = String(data?.visibility ?? data?.visibilityScope ?? '')
     .toLowerCase()
     .trim();
   if (
@@ -81,6 +80,9 @@ export function getExplicitVisibility(
     explicit === 'platform'
   ) {
     return 'superadmin_private';
+  }
+  if (explicit === 'platform_assistant_private') {
+    return 'platform_assistant_private';
   }
   if (explicit === 'platform_operations' || explicit === 'platform_ops') {
     return 'platform_operations';
@@ -91,40 +93,13 @@ export function getExplicitVisibility(
   return null;
 }
 
-/**
- * Read-only visibility normalize for legacy docs (no Firestore write).
- * Super Admin / school roles may use inference; platform assistants must not.
- */
+/** Legacy inference — Super Admin / school roles only; never for platform assistant. */
 export function normalizeConversationVisibility(
   data: Record<string, unknown> | null | undefined,
 ): MessagingVisibility {
+  const explicit = getExplicitVisibility(data);
+  if (explicit) return explicit;
   if (!data) return 'school_private';
-
-  const explicit = String(
-    data.visibility ?? data.visibilityScope ?? '',
-  )
-    .toLowerCase()
-    .trim();
-
-  if (
-    explicit === 'superadmin_private' ||
-    explicit === 'superadmin_only'
-  ) {
-    return 'superadmin_private';
-  }
-  if (
-    explicit === 'platform_operations' ||
-    explicit === 'platform_ops'
-  ) {
-    return 'platform_operations';
-  }
-  if (explicit === 'school_private' || explicit === 'school') {
-    return 'school_private';
-  }
-  // Legacy "platform" without ops marker was used for SA→school — treat as private
-  if (explicit === 'platform') {
-    return 'superadmin_private';
-  }
 
   const createdByRole = normalizeRoleLabel(
     data.createdByRole ?? data.senderRole,
@@ -134,27 +109,16 @@ export function normalizeConversationVisibility(
   }
 
   const conversationId = String(data.conversationId ?? data.id ?? '');
-  const isPlatformThread = conversationId.startsWith('superadmin_');
-
-  if (
-    isPlatformThread &&
-    (createdByRole === 'admin' ||
-      createdByRole === 'school_admin' ||
-      createdByRole === 'staff' ||
-      createdByRole === 'assistant' ||
-      createdByRole === 'school_assistant')
-  ) {
-    // School → platform support requests (ops)
-    return 'platform_operations';
-  }
-
-  if (isPlatformThread) {
-    // Unmarked platform thread — secure default: Super Admin private
+  if (conversationId.startsWith('superadmin_')) {
+    if (
+      ['admin', 'school_admin', 'staff', 'assistant', 'school_assistant'].includes(
+        createdByRole,
+      )
+    ) {
+      return 'platform_operations';
+    }
     return 'superadmin_private';
   }
-
-  const schoolId = resolveProfileSchoolId(data) || String(data.schoolId ?? '');
-  if (schoolId) return 'school_private';
 
   return 'school_private';
 }
@@ -181,9 +145,7 @@ export function resolveMessagingAccess(
 
   const role =
     normalizeEffectiveRole(user) ||
-    String(user.role ?? '')
-      .toLowerCase()
-      .trim();
+    String(user.role ?? '').toLowerCase().trim();
   const schoolId = resolveProfileSchoolId(user);
   const permissions = asPermissionList(user.permissions);
 
@@ -199,6 +161,7 @@ export function resolveMessagingAccess(
       canAccessPlatformInbox: true,
       allowedVisibilities: [
         'superadmin_private',
+        'platform_assistant_private',
         'platform_operations',
         'school_private',
       ],
@@ -209,7 +172,6 @@ export function resolveMessagingAccess(
   }
 
   if (role === 'platform_assistant' || isPlatformAssistantProfile(user)) {
-    // No empty-permissions fallback — must have an explicit ops permission
     const canAccessPlatformInbox = permissions.some((p) =>
       PLATFORM_OPS_PERMISSIONS.has(p),
     );
@@ -224,9 +186,8 @@ export function resolveMessagingAccess(
       canSoftDelete: true,
       canViewAll: false,
       canAccessPlatformInbox,
-      // Assistants NEVER receive superadmin_private
       allowedVisibilities: canAccessPlatformInbox
-        ? ['platform_operations']
+        ? ['platform_operations', 'platform_assistant_private']
         : [],
       permissions,
       displayLabelAr: 'مساعد منصة',
@@ -252,8 +213,11 @@ export function resolveMessagingAccess(
       canSoftDelete: true,
       canViewAll: false,
       canAccessPlatformInbox: false,
-      // School may see SA messages to them + their own school threads + ops they started
-      allowedVisibilities: ['school_private', 'superadmin_private', 'platform_operations'],
+      allowedVisibilities: [
+        'school_private',
+        'superadmin_private',
+        'platform_operations',
+      ],
       permissions,
       displayLabelAr:
         role === 'school_assistant' || role === 'assistant'
@@ -288,7 +252,42 @@ export function resolveMessagingAccess(
   return { ...empty, role };
 }
 
-/** Strict authorization for a conversation or message document. */
+function authorizeByPrivacyVisibility(
+  user: Record<string, unknown>,
+  privacy: ConversationPrivacy,
+  access: MessagingAccess,
+  doc: Record<string, unknown>,
+): boolean {
+  const uid = String(user.uid ?? '');
+  const role = access.role;
+
+  switch (privacy.visibility) {
+    case 'superadmin_private':
+      return role === 'superadmin' || privacy.ownerUserId === uid;
+    case 'platform_assistant_private':
+      return role === 'superadmin' || privacy.ownerUserId === uid;
+    case 'platform_operations':
+      if (role === 'superadmin') return true;
+      if (role === 'platform_assistant') {
+        return (
+          access.canAccessPlatformInbox &&
+          (privacy.allowedUserIds.length === 0 ||
+            privacy.allowedUserIds.includes(uid))
+        );
+      }
+      return false;
+    case 'school_private': {
+      const userSchool = access.schoolId || resolveProfileSchoolId(user) || '';
+      const docSchool =
+        resolveProfileSchoolId(doc) || String(doc.schoolId ?? '');
+      return !!userSchool && !!docSchool && userSchool === docSchool;
+    }
+    default:
+      return false;
+  }
+}
+
+/** Strict authorization — conversationPrivacy + privacyHash required for assistants. */
 export function authorizeConversationAccess(
   user: Record<string, unknown> | null | undefined,
   conversationOrMessage: Record<string, unknown> | null | undefined,
@@ -299,15 +298,61 @@ export function authorizeConversationAccess(
 
   if (access.canViewAll) return true;
 
-  const visibility = normalizeConversationVisibility(conversationOrMessage);
+  const privacy = extractConversationPrivacy(conversationOrMessage);
+  const uid = String(user?.uid ?? '');
 
   if (access.role === 'platform_assistant') {
     if (!access.canAccessPlatformInbox) return false;
-    // Assistants: explicit visibility stamp only — no legacy OR inference
-    const explicit = getExplicitVisibility(conversationOrMessage);
-    return explicit === 'platform_operations';
+    if (!privacy) return false;
+    if (!verifyPrivacyHash(conversationOrMessage)) return false;
+    if (privacy.visibility === 'superadmin_private') return false;
+    if (privacy.visibility === 'platform_assistant_private') {
+      return privacy.ownerUserId === uid;
+    }
+    if (privacy.visibility === 'platform_operations') {
+      return authorizeByPrivacyVisibility(user!, privacy, access, conversationOrMessage);
+    }
+    return false;
   }
 
+  if (privacy) {
+    if (!verifyPrivacyHash(conversationOrMessage)) {
+      return access.role === 'superadmin';
+    }
+    const visibility = privacy.visibility;
+    if (!access.allowedVisibilities.includes(visibility)) return false;
+    if (access.scope === 'school' || access.scope === 'school_participants') {
+      const sid =
+        resolveProfileSchoolId(conversationOrMessage) ||
+        String(conversationOrMessage.schoolId ?? '');
+      if (access.schoolId && sid && access.schoolId !== sid) {
+        const audience = String(conversationOrMessage.audience ?? '');
+        const receiverId = String(conversationOrMessage.receiverId ?? '');
+        if (
+          audience === 'school_admin' ||
+          receiverId === 'admin' ||
+          receiverId === uid
+        ) {
+          return authorizeByPrivacyVisibility(
+            user!,
+            privacy,
+            access,
+            conversationOrMessage,
+          );
+        }
+        return false;
+      }
+    }
+    return authorizeByPrivacyVisibility(
+      user!,
+      privacy,
+      access,
+      conversationOrMessage,
+    );
+  }
+
+  // Legacy path — school/superadmin only; assistants never reach here
+  const visibility = normalizeConversationVisibility(conversationOrMessage);
   if (!access.allowedVisibilities.includes(visibility)) return false;
 
   if (access.scope === 'school' || access.scope === 'school_participants') {
@@ -315,7 +360,6 @@ export function authorizeConversationAccess(
       resolveProfileSchoolId(conversationOrMessage) ||
       String(conversationOrMessage.schoolId ?? '');
     if (!access.schoolId || !sid || access.schoolId !== sid) {
-      // Allow school to read their platform thread directed at them
       const audience = String(conversationOrMessage.audience ?? '');
       const receiverId = String(conversationOrMessage.receiverId ?? '');
       if (
@@ -323,7 +367,7 @@ export function authorizeConversationAccess(
         sid === access.schoolId &&
         (audience === 'school_admin' ||
           receiverId === 'admin' ||
-          receiverId === String(user?.uid ?? ''))
+          receiverId === uid)
       ) {
         return true;
       }
@@ -337,23 +381,23 @@ export function authorizeConversationAccess(
 export function isSuperAdminPrivateMessage(
   msg: Record<string, unknown>,
 ): boolean {
+  const privacy = extractConversationPrivacy(msg);
+  if (privacy) return privacy.visibility === 'superadmin_private';
   return normalizeConversationVisibility(msg) === 'superadmin_private';
 }
 
 export function filterMessagesForAccess(
   messages: Record<string, unknown>[],
   access: MessagingAccess,
-  viewerUid: string,
+  _viewerUid: string,
   viewerProfile?: Record<string, unknown> | null,
 ): Record<string, unknown>[] {
   if (access.canViewAll || access.scope === 'platform_all') return messages;
-
   const profile = viewerProfile || {
     role: access.role,
     schoolId: access.schoolId || '',
     permissions: access.permissions,
   };
-
   return messages.filter((m) => authorizeConversationAccess(profile, m));
 }
 
@@ -371,28 +415,53 @@ export function filterConversationsForAccess(
   return conversations.filter((c) => authorizeConversationAccess(profile, c));
 }
 
-/** Fields to stamp on new conversation / message writes. */
+export { buildConversationPrivacyStamp } from './conversationPrivacy';
+
+/** @deprecated use buildConversationPrivacyStamp */
 export function buildMessagingMeta(params: {
   actorUid: string;
   actorRole: string;
   visibility: MessagingVisibility;
   schoolId?: string | null;
   allowedRoles?: string[];
+  allowedUserIds?: string[];
 }): Record<string, unknown> {
-  const allowedRoles =
-    params.allowedRoles ||
-    (params.visibility === 'superadmin_private'
-      ? ['superadmin']
-      : params.visibility === 'platform_operations'
-        ? ['superadmin', 'platform_assistant']
-        : ['admin', 'school_admin', 'staff', 'school_assistant', 'teacher', 'parent']);
-
   return {
-    createdBy: params.actorUid,
-    createdByRole: params.actorRole,
-    visibility: params.visibility,
-    visibilityScope: params.visibility,
-    allowedRoles,
-    ...(params.schoolId ? { schoolId: params.schoolId } : {}),
+    ...buildConversationPrivacyStamp({
+      ownerUserId: params.actorUid,
+      ownerRole: params.actorRole,
+      visibility: params.visibility,
+      allowedRoles: params.allowedRoles,
+      allowedUserIds: params.allowedUserIds,
+      schoolId: params.schoolId,
+    }),
   };
 }
+
+export function redactNotificationBodyForRecipient(params: {
+  recipientRole: string;
+  recipientUserId: string;
+  messageDoc?: Record<string, unknown> | null;
+  fullMessage: string;
+}): string {
+  const { recipientRole, recipientUserId, messageDoc, fullMessage } = params;
+  if (recipientRole !== 'platform_assistant') return fullMessage;
+  if (!messageDoc) return 'لديك رسالة جديدة';
+  if (!authorizeConversationAccess(
+    { uid: recipientUserId, role: 'platform_assistant', permissions: [] },
+    messageDoc,
+  )) {
+    return 'لديك رسالة جديدة';
+  }
+  const privacy = extractConversationPrivacy(messageDoc);
+  if (
+    privacy?.visibility === 'platform_assistant_private' &&
+    privacy.ownerUserId !== recipientUserId
+  ) {
+    return 'لديك رسالة جديدة';
+  }
+  return fullMessage;
+}
+
+// Re-export for tests
+export { computePrivacyHash, verifyPrivacyHash, extractConversationPrivacy };

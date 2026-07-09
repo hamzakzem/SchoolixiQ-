@@ -618,19 +618,48 @@ service cloud.firestore {
       );
     }
 
-    function canPlatformAssistantReadMessage() {
+    function hasConversationPrivacy(data) {
+      return data.keys().hasAll(['conversationPrivacy', 'privacyHash'])
+        && data.conversationPrivacy.keys().hasAll(['ownerUserId', 'ownerRole', 'visibility', 'allowedUserIds', 'allowedRoles']);
+    }
+
+    function privacyVisibilityOf(data) {
+      return hasConversationPrivacy(data)
+        ? data.conversationPrivacy.visibility
+        : resolvedConversationVisibility(data);
+    }
+
+    function canPlatformAssistantReadWithPrivacy() {
       return isPlatformAssistant()
         && platformAssistantHasOpsPermission()
-        && resource.data.keys().hasAll(['visibility'])
-        && resource.data.visibility == 'platform_operations'
-        && !isSuperAdminPrivateMessage();
+        && hasConversationPrivacy(resource.data)
+        && (
+          resource.data.conversationPrivacy.visibility == 'platform_operations'
+          || (
+            resource.data.conversationPrivacy.visibility == 'platform_assistant_private'
+            && resource.data.conversationPrivacy.ownerUserId == request.auth.uid
+          )
+        )
+        && resource.data.conversationPrivacy.visibility != 'superadmin_private';
+    }
+
+    function canPlatformAssistantReadMessage() {
+      return canPlatformAssistantReadWithPrivacy();
     }
 
     function canReadSystemMessage() {
       return isSuperAdmin()
         || canPlatformAssistantReadMessage()
-        || (signedIn() && resource.data.receiverId == request.auth.uid)
-        || (signedIn() && resource.data.senderId == request.auth.uid)
+        || (
+          !isPlatformAssistant()
+          && signedIn()
+          && resource.data.receiverId == request.auth.uid
+        )
+        || (
+          !isPlatformAssistant()
+          && signedIn()
+          && resource.data.senderId == request.auth.uid
+        )
         || (signedIn() && isAdmin() && resource.data.receiverId == 'admin' && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId)
         || (
           signedIn()
@@ -648,8 +677,8 @@ service cloud.firestore {
           && platformAssistantHasOpsPermission()
           && hasSchoolId(request.resource.data)
           && request.resource.data.senderId == request.auth.uid
-          && request.resource.data.keys().hasAll(['visibility'])
-          && request.resource.data.visibility == 'platform_operations'
+          && request.resource.data.keys().hasAll(['conversationPrivacy', 'privacyHash'])
+          && request.resource.data.conversationPrivacy.visibility in ['platform_operations', 'platform_assistant_private']
         )
         || (signedIn() && hasSchoolId(request.resource.data) && canWriteSchoolData(request.resource.data.schoolId))
         || (
@@ -677,15 +706,14 @@ service cloud.firestore {
 
     function canReadConversationDoc() {
       return isSuperAdmin()
-        || (
-          isPlatformAssistant()
-          && platformAssistantHasOpsPermission()
-          && resource.data.keys().hasAll(['visibility'])
-          && resource.data.visibility == 'platform_operations'
-        )
+        || canPlatformAssistantReadWithPrivacy()
         || (
           !isPlatformAssistant()
           && isConversationParticipant(resource.data)
+          && (
+            !hasConversationPrivacy(resource.data)
+            || privacyVisibilityOf(resource.data) in ['school_private', 'superadmin_private', 'platform_operations']
+          )
         );
     }
 
@@ -1331,8 +1359,8 @@ service cloud.firestore {
         || (
           isPlatformAssistant()
           && platformAssistantHasOpsPermission()
-          && request.resource.data.keys().hasAll(['visibility'])
-          && request.resource.data.visibility == 'platform_operations'
+          && request.resource.data.keys().hasAll(['conversationPrivacy', 'privacyHash'])
+          && request.resource.data.conversationPrivacy.visibility in ['platform_operations', 'platform_assistant_private']
         )
         || (
           signedIn()

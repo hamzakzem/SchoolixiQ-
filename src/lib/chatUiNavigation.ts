@@ -17,8 +17,14 @@ export function getChatDevice(): ChatDevice {
   return 'desktop';
 }
 
+/** Tablet (768+) and desktop — split sidebar + thread like Slack / Teams */
 export function isChatTwoColumnLayout(): boolean {
-  return typeof window !== 'undefined' && window.innerWidth >= 1024;
+  return typeof window !== 'undefined' && window.innerWidth >= 768;
+}
+
+/** Phone-only single-surface navigation */
+export function isChatMobileLayout(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth < 768;
 }
 
 export type ChatBackInput = {
@@ -31,12 +37,12 @@ export function resolveChatBackAction(input: ChatBackInput): ChatBackAction {
   const device = getChatDevice();
   const { hasActiveConversation, mobileShowChat } = input;
 
-  if (device === 'desktop') {
+  if (device === 'desktop' || device === 'tablet') {
     if (hasActiveConversation) return 'clear-conversation';
     return 'leave-chat-tab';
   }
 
-  // Mobile / tablet — single-column detail mode: return to list first
+  // Mobile — single-column detail mode: return to list first
   if (mobileShowChat) {
     return 'show-list';
   }
@@ -49,7 +55,7 @@ export function shouldShowChatBackButton(
   mobileShowChat: boolean,
 ): boolean {
   if (!hasActiveConversation) return false;
-  if (isChatTwoColumnLayout()) return false;
+  if (!isChatMobileLayout()) return false;
   return mobileShowChat;
 }
 

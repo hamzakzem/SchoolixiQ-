@@ -194,6 +194,49 @@ export async function clearMessagingCache(userId: string): Promise<number> {
   return toDelete.length;
 }
 
+const ASSISTANT_ALLOWED_VIS = new Set([
+  'platform_operations',
+  'platform_assistant_private',
+]);
+
+function cachedRowAllowedForAssistant(data: unknown): boolean {
+  if (!Array.isArray(data)) return false;
+  return data.every((row) => {
+    if (!row || typeof row !== 'object') return false;
+    const r = row as Record<string, unknown>;
+    const privacy = r.conversationPrivacy as { visibility?: string } | undefined;
+    const vis = String(privacy?.visibility ?? r.visibility ?? '').toLowerCase();
+    return ASSISTANT_ALLOWED_VIS.has(vis);
+  });
+}
+
+/**
+ * Platform assistant: drop cached rows that are not ops/private assistant threads.
+ * Falls back to full clear when structure is unknown.
+ */
+export async function purgeAssistantUnsafeMessagingCache(userId: string): Promise<number> {
+  if (!userId) return 0;
+  const all = await withStore<CachedSnapshotEntry[]>('readonly', (store) => store.getAll());
+  const messagingKeys = new Set([
+    CACHE_COLLECTION_KEYS.messages,
+    'system_messages',
+    'conversations',
+    'messages',
+  ]);
+  let removed = 0;
+  for (const entry of all) {
+    if (entry.userId !== userId || !messagingKeys.has(entry.collectionKey)) continue;
+    if (!cachedRowAllowedForAssistant(entry.data)) {
+      await withStore('readwrite', (store) => store.delete(entry.id));
+      removed += 1;
+    }
+  }
+  if (removed > 0) {
+    console.info('[OfflineCache] PURGE_ASSISTANT_UNSAFE', { userId, removed });
+  }
+  return removed;
+}
+
 export async function getDataCacheMeta(userId?: string): Promise<DataCacheMeta> {
   const all = await withStore<CachedSnapshotEntry[]>('readonly', (store) => store.getAll());
   const scoped = userId ? all.filter((e) => e.userId === userId) : all;

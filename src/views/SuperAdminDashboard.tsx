@@ -3,7 +3,8 @@ import { clsx } from "clsx";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { signOutWithCleanup } from "../lib/authLogout";
-import { adminCreateUser, adminDeleteUser, adminAccrueCommissionOnPaymentConfirmed, adminFinalizeSchoolTracking, adminValidateDistributorCoupon } from "../lib/adminApi";
+import { adminCreateUser, adminDeleteUser, adminAccrueCommissionOnPaymentConfirmed, adminFinalizeSchoolTracking, adminValidateDistributorCoupon, adminPurgeUserConversations } from "../lib/adminApi";
+import { clearMessagingCache } from "../lib/offline/offlineDataCache";
 import { getApiUrl } from "../lib/apiUtils";
 import {
   collection,
@@ -648,6 +649,10 @@ export default function SuperAdminDashboard() {
     password: "",
     confirmPassword: "",
   });
+
+  const [purgeConvTarget, setPurgeConvTarget] = useState<{ id: string; name: string } | null>(null);
+  const [purgeConvConfirm, setPurgeConvConfirm] = useState("");
+  const [purgeConvLoading, setPurgeConvLoading] = useState(false);
 
   const SYSTEM_PERMISSIONS: Record<string, string> = {
     manage_schools: t('sidebar_schools'),
@@ -1514,6 +1519,27 @@ export default function SuperAdminDashboard() {
         message: error?.message,
       });
       toast.error(error.message || "فشل في حذف المستخدم");
+    }
+  };
+
+  const handlePurgeUserConversations = async () => {
+    if (!purgeConvTarget || purgeConvConfirm !== "DELETE") return;
+    const loadingToast = toast.loading("جاري حذف جميع المحادثات نهائياً...");
+    setPurgeConvLoading(true);
+    try {
+      const result = await adminPurgeUserConversations(purgeConvTarget.id, "DELETE");
+      await clearMessagingCache(auth.currentUser?.uid || "").catch(() => undefined);
+      toast.dismiss(loadingToast);
+      toast.success(
+        `تم الحذف: ${result.deleted?.conversations ?? 0} محادثة، ${result.deleted?.system_messages ?? 0} رسالة`,
+      );
+      setPurgeConvTarget(null);
+      setPurgeConvConfirm("");
+    } catch (error: any) {
+      toast.dismiss(loadingToast);
+      toast.error(error?.message || "فشل حذف المحادثات");
+    } finally {
+      setPurgeConvLoading(false);
     }
   };
 
@@ -3555,6 +3581,23 @@ export default function SuperAdminDashboard() {
                                       >
                                         <SettingsIcon size={14} />
                                       </button>
+                                      {isMasterAdmin &&
+                                        isPlatformTeamAssistant(user) && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setPurgeConvTarget({
+                                                id: user.id,
+                                                name: user.name || user.email || user.id,
+                                              });
+                                              setPurgeConvConfirm("");
+                                            }}
+                                            className="p-2 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-slate-400 hover:text-amber-600 rounded-xl transition-all"
+                                            title="حذف جميع محادثات هذا الحساب نهائياً"
+                                          >
+                                            <MessageSquare size={14} />
+                                          </button>
+                                        )}
                                       <button
                                         onClick={() =>
                                           setUserDeleteConfirmId(user.id)
@@ -5901,6 +5944,53 @@ export default function SuperAdminDashboard() {
                   إلغاء
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {purgeConvTarget && (
+        <div className="fixed inset-0 bg-slate-900/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-md p-8 shadow-2xl border border-red-200 dark:border-red-900/40">
+            <h2 className="text-xl font-black text-red-600 dark:text-red-400 mb-3">
+              حذف جميع محادثات الحساب نهائياً
+            </h2>
+            <p className="text-sm font-bold text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+              سيتم حذف جميع المحادثات والرسائل المرتبطة بالحساب{" "}
+              <span className="text-slate-900 dark:text-white">{purgeConvTarget.name}</span>{" "}
+              نهائياً ولا يمكن استرجاعها.
+            </p>
+            <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">
+              اكتب DELETE للتأكيد
+            </label>
+            <input
+              type="text"
+              value={purgeConvConfirm}
+              onChange={(e) => setPurgeConvConfirm(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-red-200 dark:border-red-800 outline-none focus:border-red-500 font-mono font-bold mb-6"
+              placeholder="DELETE"
+              autoComplete="off"
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                disabled={purgeConvLoading || purgeConvConfirm !== "DELETE"}
+                onClick={() => void handlePurgeUserConversations()}
+                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-black disabled:opacity-40"
+              >
+                {purgeConvLoading ? "جاري الحذف..." : "حذف نهائي"}
+              </button>
+              <button
+                type="button"
+                disabled={purgeConvLoading}
+                onClick={() => {
+                  setPurgeConvTarget(null);
+                  setPurgeConvConfirm("");
+                }}
+                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-black"
+              >
+                إلغاء
+              </button>
             </div>
           </div>
         </div>

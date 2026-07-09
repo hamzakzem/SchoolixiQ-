@@ -18,6 +18,8 @@ import { markSystemMessagesRead } from '../../lib/chatMessageReads';
 import { markChatPerf, openChatSnapshotListener, resetChatPerf } from '../../lib/chatPerf';
 import {
   applyThreadMessagesIfChanged,
+  buildAssistantPrivateConversationsQuery,
+  buildAssistantPrivateThreadMessagesQuery,
   buildPlatformOpsConversationsQuery,
   buildPlatformOpsThreadMessagesQuery,
   buildPlatformOpsUnreadMessagesQuery,
@@ -29,7 +31,12 @@ import {
   filterConversationsForAccess,
   filterMessagesForAccess,
   resolveMessagingAccess,
+  buildConversationPrivacyStamp,
 } from '../../lib/messagingAccess';
+import {
+  privacyVisibilityLabel,
+  type ConversationPrivacyVisibility,
+} from '../../lib/conversationPrivacy';
 import {
   auditConversationsForAssistant,
   auditMessagesForAssistant,
@@ -120,6 +127,29 @@ export default function SuperAdminChatTab() {
         );
       };
 
+      const opsContactsRef = { list: [] as Array<{ id: string; name: string; type: string; extra?: any }> };
+      const privateContactsRef = { list: [] as typeof opsContactsRef.list };
+
+      const flushAssistantContacts = () => {
+        const merged = [...opsContactsRef.list, ...privateContactsRef.list];
+        setSchools(merged);
+        setContactsLoaded(true);
+        markChatPerf('contacts_loaded', 'SuperAdminChatTab', {
+          contacts: merged.length,
+          assistantOpsOnly: true,
+        });
+        if (merged.length > 0 && !didAutoSelectRef.current) {
+          didAutoSelectRef.current = true;
+          const first = merged[0];
+          setActiveContact({
+            id: first.id,
+            name: first.name,
+            type: first.type || 'school',
+            extra: first.extra,
+          });
+        }
+      };
+
       const applyOpsConversations = async (raw: Record<string, unknown>[]) => {
         const allowed = auditConversationsForAssistant(
           raw,
@@ -142,25 +172,14 @@ export default function SuperAdminChatTab() {
           id: schoolId,
           name: schoolNameCache.get(schoolId) || schoolId,
           type: 'school',
-          extra: { id: schoolId, name: schoolNameCache.get(schoolId) || schoolId },
+          extra: {
+            id: schoolId,
+            name: schoolNameCache.get(schoolId) || schoolId,
+            privacyVisibility: 'platform_operations',
+          },
         }));
-        setSchools(contacts);
-        setContactsLoaded(true);
-        markChatPerf('contacts_loaded', 'SuperAdminChatTab', {
-          contacts: contacts.length,
-          assistantOpsOnly: true,
-        });
-
-        if (contacts.length > 0 && !didAutoSelectRef.current) {
-          didAutoSelectRef.current = true;
-          const first = contacts[0];
-          setActiveContact({
-            id: first.id,
-            name: first.name,
-            type: 'school',
-            extra: first.extra,
-          });
-        }
+        opsContactsRef.list = contacts;
+        flushAssistantContacts();
 
         setLastInteractionTimes((prev) => {
           const next = { ...prev };
@@ -208,6 +227,33 @@ export default function SuperAdminChatTab() {
         },
       );
 
+      const unsubPrivateConversations = onSnapshot(
+        buildAssistantPrivateConversationsQuery(profile?.uid || ''),
+        (snapshot) => {
+          const raw = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const allowed = auditConversationsForAssistant(
+            raw as Record<string, unknown>[],
+            messagingAccess,
+            profileRecord,
+            'platform_assistant_private',
+            'SuperAdminChatTab:private_conversations',
+          );
+          privateContactsRef.list = allowed.map((c) => ({
+            id: String(c.conversationId ?? c.id ?? ''),
+            name: isRtl ? 'رسالة مباشرة — إدارة المنصة' : 'Direct — Platform Admin',
+            type: 'assistant_private',
+            extra: {
+              conversationId: String(c.conversationId ?? c.id ?? ''),
+              privacyVisibility: 'platform_assistant_private',
+            },
+          }));
+          flushAssistantContacts();
+        },
+        (err) => {
+          console.warn('Private conversations listener error:', err);
+        },
+      );
+
       const unsubUnread = onSnapshot(
         buildPlatformOpsUnreadMessagesQuery(),
         (snapshot) => {
@@ -236,6 +282,7 @@ export default function SuperAdminChatTab() {
       return () => {
         unsubUnread();
         unsubConversations();
+        unsubPrivateConversations();
         untrackSchools();
         untrackUnread();
         untrackConversations();
@@ -365,7 +412,10 @@ export default function SuperAdminChatTab() {
     unreadKeyRef.current = '';
     messagesFirstSnapshotRef.current = false;
 
-    const convId = `superadmin_${activeContact.id}`;
+    const convId =
+      activeContact.type === 'assistant_private'
+        ? String(activeContact.extra?.conversationId ?? activeContact.id)
+        : `superadmin_${activeContact.id}`;
     const untrackMessages = openChatSnapshotListener('SuperAdminChatTab:messages');
 
     const mergeAndApply = (docs: Record<string, unknown>[]) => {
@@ -398,16 +448,18 @@ export default function SuperAdminChatTab() {
     };
 
     if (isPlatformAssistantView) {
-      // Single visibility-only query — no legacy OR fallback
+      const isPrivateThread = activeContact.type === 'assistant_private';
       const unsubscribe = onSnapshot(
-        buildPlatformOpsThreadMessagesQuery(activeContact.id, convId),
+        isPrivateThread
+          ? buildAssistantPrivateThreadMessagesQuery(convId, profile.uid)
+          : buildPlatformOpsThreadMessagesQuery(activeContact.id, convId),
         (snap) => {
           const raw = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
           const filtered = auditMessagesForAssistant(
             raw as Record<string, unknown>[],
             messagingAccess,
             profile as Record<string, unknown>,
-            'platform_operations',
+            isPrivateThread ? 'platform_assistant_private' : 'platform_operations',
             'SuperAdminChatTab:ops_thread',
           );
           mergeAndApply(filtered);
@@ -472,14 +524,20 @@ export default function SuperAdminChatTab() {
 
     const convId = `superadmin_${school.id}`;
     const attachmentLabel = isRtl ? 'ملف مرفق' : 'Attachment';
-    // Super Admin → school is private. Platform Assistant → school is ops only.
     const visibility = isPlatformAssistantView
       ? 'platform_operations'
       : 'superadmin_private';
-    const allowedRoles = isPlatformAssistantView
-      ? ['superadmin', 'platform_assistant', 'admin', 'school_admin']
-      : ['superadmin', 'admin', 'school_admin'];
     const actorRole = messagingAccess.role || profile.role || 'superadmin';
+    const privacyStamp = buildConversationPrivacyStamp({
+      ownerUserId: profile.uid,
+      ownerRole: actorRole,
+      visibility,
+      allowedUserIds: isPlatformAssistantView ? [] : [profile.uid],
+      allowedRoles: isPlatformAssistantView
+        ? ['superadmin', 'platform_assistant', 'admin', 'school_admin']
+        : ['superadmin', 'admin', 'school_admin'],
+      schoolId: school.id,
+    });
 
     await addDoc(collection(db, 'system_messages'), withMessageRetentionFields({
       conversationId: convId,
@@ -491,17 +549,13 @@ export default function SuperAdminChatTab() {
       senderRole: actorRole,
       receiverId: 'admin',
       audience: 'school_admin',
-      createdBy: profile.uid,
-      createdByRole: actorRole,
-      visibility,
-      visibilityScope: visibility,
-      allowedRoles,
       content: messageText || attachmentLabel,
       fileUrl: file?.fileUrl || null,
       fileType: file?.fileType || null,
       fileName: file?.fileName || null,
       createdAt: serverTimestamp(),
       read: false,
+      ...privacyStamp,
     }));
 
     await setDoc(
@@ -510,13 +564,9 @@ export default function SuperAdminChatTab() {
         conversationId: convId,
         schoolId: school.id,
         participants: ['super_admin', 'admin'],
-        createdBy: profile.uid,
-        createdByRole: actorRole,
-        visibility,
-        visibilityScope: visibility,
-        allowedRoles,
         lastMessage: messageText || attachmentLabel,
         updatedAt: serverTimestamp(),
+        ...privacyStamp,
       },
       { merge: true },
     );
@@ -744,9 +794,14 @@ export default function SuperAdminChatTab() {
       fileInputRef={fileInputRef}
       headerStatusText={
         headerStatus ||
-        (isPlatformAssistantView
-          ? messagingAccess.displayLabelEn
-          : undefined)
+        (activeContact?.extra?.privacyVisibility && !isPlatformAssistantView
+          ? privacyVisibilityLabel(
+              activeContact.extra.privacyVisibility as ConversationPrivacyVisibility,
+              isRtl,
+            )
+          : isPlatformAssistantView
+            ? messagingAccess.displayLabelEn
+            : undefined)
       }
       isLoadingContacts={!contactsLoaded}
       disableAttachments={activeContact?.id === BROADCAST_ID}
@@ -755,7 +810,22 @@ export default function SuperAdminChatTab() {
           ? (isRtl ? 'اكتب رسالة البث لجميع المدارس...' : 'Write broadcast message...')
           : (isRtl ? 'اكتب رسالة...' : 'Type a message...')
       }
-      emptyListMessage={isRtl ? 'لا توجد مدارس مطابقة' : 'No matching schools'}
+      emptyListMessage={
+        isPlatformAssistantView
+          ? isRtl
+            ? 'لا توجد محادثات'
+            : 'No conversations'
+          : isRtl
+            ? 'لا توجد مدارس مطابقة'
+            : 'No matching schools'
+      }
+      emptyListDescription={
+        isPlatformAssistantView
+          ? isRtl
+            ? 'ستظهر هنا المحادثات المخصصة لهذا الحساب'
+            : 'Conversations assigned to this account will appear here'
+          : undefined
+      }
       listTopContent={
         !isPlatformAssistantView ? (
         <button

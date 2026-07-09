@@ -6,6 +6,7 @@ import {
   safeFirestoreAdd,
   safeFirestoreSet,
 } from './offlineSync';
+import { buildConversationPrivacyStamp } from '../conversationPrivacy';
 import { withMessageRetentionFields } from '../dataRetention';
 
 export type SendChatMessageInput = {
@@ -32,10 +33,12 @@ export async function sendChatMessageOfflineSafe(
     (input.receiverId === 'super_admin'
       ? 'platform_operations'
       : 'school_private');
-  const allowedRoles =
-    visibility === 'platform_operations'
-      ? ['superadmin', 'platform_assistant', 'admin', 'school_admin']
-      : ['admin', 'school_admin', 'staff', 'school_assistant', 'teacher', 'parent'];
+  const privacyStamp = buildConversationPrivacyStamp({
+    ownerUserId: input.actor.userId,
+    ownerRole: input.senderRole,
+    visibility,
+    schoolId: input.schoolId,
+  });
 
   const messageData = withMessageRetentionFields({
     conversationId: input.conversationId,
@@ -52,11 +55,7 @@ export async function sendChatMessageOfflineSafe(
     read: false,
     clientMutationId,
     messageStatus: 'pending_local',
-    createdBy: input.actor.userId,
-    createdByRole: input.senderRole,
-    visibility,
-    visibilityScope: visibility,
-    allowedRoles,
+    ...privacyStamp,
   });
 
   const messageResult = await safeFirestoreAdd('system_messages', messageData, {
@@ -75,11 +74,7 @@ export async function sendChatMessageOfflineSafe(
       lastMessage: input.content,
       updatedAt: serverTimestamp(),
       clientMutationId,
-      createdBy: input.actor.userId,
-      createdByRole: input.senderRole,
-      visibility,
-      visibilityScope: visibility,
-      allowedRoles,
+      ...privacyStamp,
     },
     { module: 'messages', actor: input.actor, clientMutationId },
     { merge: true },

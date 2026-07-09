@@ -37,6 +37,9 @@ export type ChatMessageBubbleProps = {
   outgoingAvatar?: React.ReactNode;
   messageRef?: (el: HTMLDivElement | null) => void;
   isSearchMatch?: boolean;
+  isSystemMessage?: boolean;
+  isGrouped?: boolean;
+  hideAvatar?: boolean;
 };
 
 function ActionMenu({
@@ -153,6 +156,9 @@ export function ChatMessageBubble({
   outgoingAvatar,
   messageRef,
   isSearchMatch = false,
+  isSystemMessage = false,
+  isGrouped = false,
+  hideAvatar = false,
 }: ChatMessageBubbleProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -198,25 +204,42 @@ export function ChatMessageBubble({
     <motion.div
       ref={messageRef}
       data-msg-id={msgId}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18 }}
-      className={`sx-chat-msg-row flex w-full flex-col mb-2 group/msg relative ${
-        isMe ? 'sx-chat-msg-row--out items-end' : 'sx-chat-msg-row--in items-start'
-      } ${isSearchMatch && isSearchActive ? 'sx-chat-msg--search-match' : ''} ${
-        isSelected ? 'sx-chat-msg--selected' : ''
-      }`}
+      initial={{ opacity: 0, y: isGrouped ? 4 : 8, x: isSystemMessage ? 0 : isMe ? 6 : -6 }}
+      animate={{ opacity: 1, y: 0, x: 0 }}
+      transition={{ duration: isGrouped ? 0.14 : 0.2 }}
+      className={`sx-chat-msg-row sx-enterprise-animate flex w-full flex-col mb-2 group/msg relative ${
+        isSystemMessage
+          ? 'items-center'
+          : isMe
+            ? 'sx-chat-msg-row--out items-end'
+            : 'sx-chat-msg-row--in items-start'
+      } ${isGrouped ? 'sx-chat-msg-row--grouped' : ''} ${
+        isSearchMatch && isSearchActive ? 'sx-chat-msg--search-match' : ''
+      } ${isSelected ? 'sx-chat-msg--selected' : ''}`}
       onClick={selectionMode ? handleClick : undefined}
     >
+      {isSystemMessage ? (
+        <div className="sx-chat-bubble sx-chat-bubble--system px-4 py-2">
+          <p className="text-xs font-semibold" dir="auto">
+            {displayContent}
+          </p>
+          <span className="block text-[9px] opacity-60 mt-1 tabular-nums">
+            {formatMessageTime(msg.createdAt)}
+          </span>
+        </div>
+      ) : (
       <div
         className={`sx-chat-msg-body flex gap-2 min-w-0 max-w-[84%] md:max-w-[72%] ${
           isMe ? 'flex-row-reverse' : 'flex-row'
         }`}
       >
-        {!isMe && incomingAvatar ? (
+        {!isMe && incomingAvatar && !hideAvatar ? (
           <div className="sx-chat-msg-avatar shrink-0 self-end">{incomingAvatar}</div>
         ) : null}
-        {isMe && outgoingAvatar ? (
+        {!isMe && incomingAvatar && hideAvatar ? (
+          <div className="sx-chat-msg-avatar shrink-0 self-end w-8" aria-hidden />
+        ) : null}
+        {isMe && outgoingAvatar && !hideAvatar ? (
           <div className="sx-chat-msg-avatar shrink-0 self-end">{outgoingAvatar}</div>
         ) : null}
 
@@ -342,6 +365,7 @@ export function ChatMessageBubble({
           </div>
         </div>
       </div>
+      )}
     </motion.div>
   );
 }

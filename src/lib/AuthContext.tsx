@@ -54,6 +54,7 @@ import {
   getCachedProfileForUser,
   getCachedSnapshot,
   isFirestoreOfflineError,
+  purgeAssistantUnsafeMessagingCache,
 } from './offline/offlineDataCache';
 import { setOfflineDataStale } from './offline/offlineStatus';
 
@@ -702,6 +703,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             void clearMessagingCache(authUser.uid).catch((err) => {
               console.warn('[Auth] clearMessagingCache failed:', err);
             });
+            if (roleLabel === 'platform_assistant') {
+              void purgeAssistantUnsafeMessagingCache(authUser.uid).catch((err) => {
+                console.warn('[Auth] purgeAssistantUnsafeMessagingCache failed:', err);
+              });
+            }
             import('./loginLog').then(({ writeLoginLog }) =>
               writeLoginLog({
                 userId: authUser.uid,
@@ -722,6 +728,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             void clearMessagingCache(authUser.uid).catch((err) => {
               console.warn('[Auth] clearMessagingCache failed:', err);
             });
+            if (roleLabel === 'platform_assistant') {
+              void purgeAssistantUnsafeMessagingCache(authUser.uid).catch((err) => {
+                console.warn('[Auth] purgeAssistantUnsafeMessagingCache failed:', err);
+              });
+            }
           }
 
           if (

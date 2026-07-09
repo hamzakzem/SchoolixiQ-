@@ -6,31 +6,13 @@ import React, {
   useState,
   Profiler,
 } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
-import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  MessageSquare,
-  Paperclip,
-  Search,
-  SendHorizontal,
-  Smile,
-  X,
-} from 'lucide-react';
-import { ChatMessageBubble } from './ChatMessageBubble';
-import { ContactListSkeleton, MessageListSkeleton } from './ChatSkeletons';
-import {
-  flattenGroupedMessages,
-  QUICK_EMOJIS,
-  truncatePreview,
-} from './chatHelpers';
+import { flattenGroupedMessages } from './chatHelpers';
+import { ChatLayout } from './ChatLayout';
+import { ConversationList } from './ConversationList';
+import { ChatWindow } from './ChatWindow';
 import {
   getChatDevice,
-  isChatTwoColumnLayout,
+  isChatMobileLayout,
   logChatBackVisible,
   shouldShowChatBackButton,
 } from '../../lib/chatUiNavigation';
@@ -106,6 +88,7 @@ export type SchoolixChatShellProps = {
   renderContactMeta?: (contact: ChatShellContact) => React.ReactNode;
   renderRoleBadge?: (contact: ChatShellContact) => React.ReactNode;
   emptyListMessage?: string;
+  emptyListDescription?: string;
   emptyThreadMessage?: string;
   showEmptyThreadIntro?: boolean;
   renderEmptyThreadIntro?: () => React.ReactNode;
@@ -116,26 +99,6 @@ export type SchoolixChatShellProps = {
 };
 
 const SCROLL_THRESHOLD = 80;
-
-function formatListTime(ms: number | undefined, isRtl: boolean): string {
-  if (!ms) return '';
-  const date = new Date(ms);
-  const now = new Date();
-  const isToday =
-    date.getDate() === now.getDate() &&
-    date.getMonth() === now.getMonth() &&
-    date.getFullYear() === now.getFullYear();
-  if (isToday) {
-    return date.toLocaleTimeString(isRtl ? 'ar-SA' : 'en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-  return date.toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 export function SchoolixChatShell({
   isRtl,
@@ -180,6 +143,7 @@ export function SchoolixChatShell({
   renderContactMeta,
   renderRoleBadge,
   emptyListMessage,
+  emptyListDescription,
   emptyThreadMessage,
   showEmptyThreadIntro = true,
   renderEmptyThreadIntro,
@@ -277,7 +241,6 @@ export function SchoolixChatShell({
   const messagesError = isRtl ? 'تعذر تحميل الرسائل' : 'Could not load messages';
   const placeholder = inputPlaceholder ?? (isRtl ? 'اكتب رسالة...' : 'Type a message...');
   const attachSoon = isRtl ? 'إرسال الملفات قريباً' : 'File uploads coming soon';
-  const supportsAttachments = !disableAttachments;
 
   const showMessageSkeleton =
     (isLoadingMessages || threadLoading) && messageCount === 0 && !messagesLoadError;
@@ -433,12 +396,12 @@ export function SchoolixChatShell({
 
   const handleChatBackClick = onChatBack ?? onMobileBack ?? (() => undefined);
 
-  const [isNarrowLayout, setIsNarrowLayout] = useState(
-    () => typeof window !== 'undefined' && !isChatTwoColumnLayout(),
+  const [isMobileLayout, setIsMobileLayout] = useState(
+    () => typeof window !== 'undefined' && isChatMobileLayout(),
   );
 
   useEffect(() => {
-    const syncLayout = () => setIsNarrowLayout(!isChatTwoColumnLayout());
+    const syncLayout = () => setIsMobileLayout(isChatMobileLayout());
     syncLayout();
     window.addEventListener('resize', syncLayout);
     return () => window.removeEventListener('resize', syncLayout);
@@ -454,574 +417,119 @@ export function SchoolixChatShell({
     const device = getChatDevice();
     logChatBackVisible(
       device,
-      isNarrowLayout ? 'detail-mode-single-column' : 'detail-mode',
+      isMobileLayout ? 'detail-mode-single-column' : 'detail-mode',
     );
-  }, [showThreadBack, isNarrowLayout]);
+  }, [showThreadBack, isMobileLayout]);
 
   return (
     <Profiler
       id="SchoolixChatShell"
       onRender={(id, phase, actualDuration) => recordChatRender(id, phase, actualDuration)}
     >
-    <div
-      className="sx-chat-shell h-full min-h-0 w-full max-w-full overflow-hidden flex"
-      dir={isRtl ? 'rtl' : 'ltr'}
-    >
-      {/* Conversation list */}
-      <aside
-        className={`sx-chat-list w-full lg:w-[360px] shrink-0 flex flex-col min-h-0 border-e border-[#0B2345]/10 transition-transform duration-300 ${
-          mobileShowChat ? 'hidden lg:flex' : 'flex sx-chat-list--visible'
-        }`}
-        aria-label={isRtl ? 'قائمة المحادثات' : 'Conversation list'}
-      >
-        <div className="sx-chat-list-header shrink-0 px-4 pt-4 pb-3 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-base font-black text-[#0B2345] dark:text-white font-display tracking-tight">
-              {listTitle}
-            </h2>
-            {listHeaderAction}
-          </div>
-          <div className="relative">
-            <Search
-              size={16}
-              className={`absolute top-1/2 -translate-y-1/2 text-[#0B2345]/40 pointer-events-none ${
-                isRtl ? 'right-3.5' : 'left-3.5'
-              }`}
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder={searchPlaceholder}
-              className={`sx-chat-search w-full rounded-full py-2.5 text-sm font-medium outline-none transition-shadow ${
-                isRtl ? 'pr-10 pl-4' : 'pl-10 pr-4'
-              }`}
-              aria-label={searchPlaceholder}
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-2 pb-2">
-          {listTopContent}
-
-          {isLoadingContacts ? (
-            <ContactListSkeleton />
-          ) : contacts.length === 0 ? (
-            <div className="sx-chat-empty-state mx-2 my-4 p-6 text-center">
-              <div className="sx-chat-empty-icon mx-auto mb-3">
-                <MessageSquare size={28} aria-hidden />
-              </div>
-              <p className="text-sm font-bold text-[#0B2345]/70 dark:text-slate-300">{emptyList}</p>
-            </div>
-          ) : (
-            contacts.map((contact) => {
-              const isSelected = activeContact?.id === contact.id;
-              const unread = unreadCounts[contact.id] || 0;
-              const snippet = lastMessageSnippets[contact.id];
-              const timeLabel = formatListTime(lastInteractionTimes[contact.id], isRtl);
-
-              return (
-                <button
-                  key={contact.id}
-                  type="button"
-                  onClick={() => onSelectContact(contact)}
-                  className={`sx-chat-list-item sx-chat-contact w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${
-                    isSelected ? 'sx-chat-list-item--active sx-chat-contact--active' : ''
-                  }`}
-                  aria-current={isSelected ? 'true' : undefined}
-                  aria-label={contact.name}
-                >
-                  <div className="relative shrink-0">{renderListAvatar(contact, isSelected)}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-bold text-sm truncate text-[#0B2345] dark:text-white">
-                        {contact.name}
-                      </h3>
-                      {timeLabel ? (
-                        <span className="text-[10px] font-semibold text-[#0B2345]/45 shrink-0 tabular-nums">
-                          {timeLabel}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                      {renderRoleBadge?.(contact)}
-                      {renderContactMeta?.(contact)}
-                    </div>
-                    {snippet ? (
-                      <p className="text-xs text-[#0B2345]/55 dark:text-slate-400 truncate mt-1 font-medium">
-                        {snippet}
-                      </p>
-                    ) : contact.subtitle ? (
-                      <p className="text-xs text-[#0B2345]/55 dark:text-slate-400 truncate mt-1">
-                        {contact.subtitle}
-                      </p>
-                    ) : null}
-                  </div>
-                  {unread > 0 && !isSelected ? (
-                    <span
-                      className="shrink-0 min-w-[1.35rem] h-[1.35rem] px-1 flex items-center justify-center rounded-full bg-[#D4AF37] text-[#0B2345] text-[10px] font-black"
-                      aria-label={isRtl ? `${unread} غير مقروء` : `${unread} unread`}
-                    >
-                      {unread > 9 ? '9+' : unread}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })
-          )}
-        </div>
-      </aside>
-
-      {/* Thread panel */}
-      <motion.section
-        className={`sx-chat-thread flex-1 flex flex-col min-w-0 min-h-0 ${
-          mobileShowChat ? 'flex sx-chat-thread--detail' : 'hidden lg:flex'
-        }`}
-        aria-label={isRtl ? 'المحادثة' : 'Chat thread'}
-        initial={false}
-        animate={mobileShowChat ? { x: 0, opacity: 1 } : { x: 0, opacity: 1 }}
-        transition={{ duration: 0.22, ease: 'easeOut' }}
-      >
-        {!activeContact ? (
-          <div className="flex-1 flex items-center justify-center p-6">
-            <div className="sx-chat-empty-state sx-chat-empty-state--desktop max-w-sm w-full p-10 text-center">
-              <div className="sx-chat-empty-icon sx-chat-empty-icon--lg mx-auto mb-5">
-                <MessageSquare size={40} aria-hidden />
-              </div>
-              <p className="text-base font-bold text-[#0B2345] dark:text-white">{emptyThread}</p>
-              <p className="text-sm text-[#0B2345]/55 mt-2">
-                {isRtl ? 'اختر جهة اتصال من القائمة للبدء' : 'Pick a contact from the list to start'}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Selection bar OR normal header */}
-            <AnimatePresence mode="wait">
-              {selectionMode ? (
-                <motion.header
-                  key="selection"
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="sx-chat-header sx-chat-selection-bar shrink-0 sticky top-0 z-30 flex items-center justify-between gap-3 px-3 md:px-5 py-3"
-                >
-                  <button
-                    type="button"
-                    onClick={exitSelection}
-                    className="sx-chat-icon-btn"
-                    aria-label={isRtl ? 'إلغاء التحديد' : 'Cancel selection'}
-                  >
-                    <X size={20} />
-                  </button>
-                  <span className="text-sm font-bold text-[#0B2345] dark:text-white">
-                    {isRtl
-                      ? `${selectedIds.size} محددة`
-                      : `${selectedIds.size} selected`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={copySelected}
-                    disabled={selectedIds.size === 0}
-                    className="sx-chat-icon-btn disabled:opacity-40"
-                    aria-label={isRtl ? 'نسخ المحدد' : 'Copy selected'}
-                  >
-                    <Copy size={18} />
-                  </button>
-                </motion.header>
-              ) : (
-                <motion.header
-                  key="header"
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="sx-chat-header shrink-0 sticky top-0 z-20 flex flex-col border-b border-[#0B2345]/10 bg-white/95 dark:bg-[#0d1528]/95 backdrop-blur-md"
-                >
-                  <div className="flex items-center justify-between gap-3 px-3 md:px-5 py-3">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      {showThreadBack ? (
-                        <button
-                          type="button"
-                          onClick={handleChatBackClick}
-                          className="sx-chat-back-btn sx-chat-icon-btn sx-action-btn sx-action-btn-icon shrink-0"
-                          aria-label={isRtl ? 'رجوع إلى المحادثات' : 'Back to conversations'}
-                        >
-                          {isRtl ? (
-                            <ArrowRight size={20} className="sx-action-icon" strokeWidth={2.4} />
-                          ) : (
-                            <ArrowLeft size={20} className="sx-action-icon" strokeWidth={2.4} />
-                          )}
-                        </button>
-                      ) : null}
-                      {renderHeaderAvatar?.()}
-                      <div className="min-w-0">
-                        <h2 className="font-bold text-[#0B2345] dark:text-white truncate text-sm md:text-base">
-                          {activeContact.name}
-                        </h2>
-                        <p className="text-[11px] md:text-xs font-semibold text-[#0B2345]/55 dark:text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
-                          {isSending ? (
-                            <span className="sx-chat-sending-dot" aria-live="polite">
-                              {isRtl ? 'جاري الإرسال…' : 'Sending…'}
-                            </span>
-                          ) : (
-                            statusText
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setThreadSearchOpen((v) => !v)}
-                        className={`sx-chat-icon-btn ${threadSearchOpen ? 'sx-chat-icon-btn--active' : ''}`}
-                        aria-label={isRtl ? 'بحث في المحادثة' : 'Search in conversation'}
-                        aria-pressed={threadSearchOpen}
-                      >
-                        <Search size={18} />
-                      </button>
-                      {headerTrailing}
-                    </div>
-                  </div>
-
-                  <AnimatePresence>
-                    {threadSearchOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden border-t border-[#0B2345]/8"
-                      >
-                        <div className="px-3 md:px-5 py-2 flex items-center gap-2">
-                          <input
-                            type="search"
-                            value={threadSearchQuery}
-                            onChange={(e) => setThreadSearchQuery(e.target.value)}
-                            placeholder={isRtl ? 'بحث في الرسائل...' : 'Search messages...'}
-                            className="sx-chat-search flex-1 rounded-full py-2 text-sm px-4"
-                            aria-label={isRtl ? 'بحث في الرسائل' : 'Search messages'}
-                          />
-                          {searchMatches.length > 0 && (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="text-[10px] font-bold text-[#0B2345]/50 tabular-nums">
-                                {searchMatchIndex + 1}/{searchMatches.length}
-                              </span>
-                              <button
-                                type="button"
-                                className="sx-chat-icon-btn"
-                                onClick={() => scrollToSearchMatch(searchMatchIndex - 1)}
-                                aria-label={isRtl ? 'السابق' : 'Previous'}
-                              >
-                                <ChevronUp size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                className="sx-chat-icon-btn"
-                                onClick={() => scrollToSearchMatch(searchMatchIndex + 1)}
-                                aria-label={isRtl ? 'التالي' : 'Next'}
-                              >
-                                <ChevronDown size={16} />
-                              </button>
-                            </div>
-                          )}
-                          <button
-                            type="button"
-                            className="sx-chat-icon-btn shrink-0"
-                            onClick={() => {
-                              setThreadSearchOpen(false);
-                              setThreadSearchQuery('');
-                            }}
-                            aria-label={isRtl ? 'إغلاق البحث' : 'Close search'}
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.header>
-              )}
-            </AnimatePresence>
-
-            {/* Messages */}
-            <div className="relative flex-1 min-h-0 flex flex-col">
-              <div
-                ref={messagesContainerRef}
-                onScroll={handleMessagesScroll}
-                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar sx-chat-messages px-3 md:px-6 py-4"
-              >
-                {messagesLoadError ? (
-                  <div className="sx-chat-empty-state mx-auto max-w-md p-6 text-center my-8">
-                    <p className="text-sm font-bold text-rose-600">{messagesError}</p>
-                  </div>
-                ) : showMessageSkeleton ? (
-                  <MessageListSkeleton />
-                ) : null}
-
-                {!showMessageSkeleton &&
-                  showEmptyThreadIntro &&
-                  messageCount === 0 &&
-                  !messagesLoadError &&
-                  (() => {
-                    const customIntro = renderEmptyThreadIntro?.();
-                    if (customIntro) return customIntro;
-                    return (
-                      <div className="flex flex-col items-center justify-center py-8 opacity-80">
-                        <div className="mb-3">{renderHeaderAvatar?.()}</div>
-                        <h3 className="text-sm font-black text-[#0B2345] dark:text-white text-center">
-                          {activeContact.name}
-                        </h3>
-                        <p className="text-[10px] text-[#0B2345]/45 font-bold mt-1">
-                          {isRtl ? 'ابدأ المحادثة الآن' : 'Start the conversation'}
-                        </p>
-                      </div>
-                    );
-                  })()}
-
-                {!showMessageSkeleton &&
-                  Object.entries(groupedMessages).map(([dateStr, dateMsgs]) => (
-                    <div key={dateStr} className="space-y-1 mb-4">
-                      <div className="flex justify-center my-3 sticky top-0 z-[1]">
-                        <span className="sx-chat-date-pill text-[10px] font-bold px-3 py-1 rounded-full">
-                          {dateStr}
-                        </span>
-                      </div>
-                      {(dateMsgs as Record<string, unknown>[]).map((msg) => {
-                        const msgId = String(msg.id);
-                        const isMe = isOutgoingMessage(msg);
-                        const isSearchMatch =
-                          !!threadSearchQuery.trim() &&
-                          String(msg.content ?? '')
-                            .toLowerCase()
-                            .includes(threadSearchQuery.trim().toLowerCase());
-                        const activeSearchHit =
-                          searchMatches.length > 0 &&
-                          searchMatches[searchMatchIndex]?.id === msgId;
-
-                        return (
-                          <ChatMessageBubble
-                            key={msgId}
-                            msg={msg}
-                            isMe={isMe}
-                            isRtl={isRtl}
-                            searchQuery={threadSearchQuery}
-                            isSearchActive={threadSearchOpen && !!threadSearchQuery.trim()}
-                            isSelected={selectedIds.has(msgId)}
-                            selectionMode={selectionMode}
-                            onToggleSelect={(id) => {
-                              setSelectionMode(true);
-                              toggleSelect(id);
-                            }}
-                            onReply={handleReply}
-                            onDelete={handleDeleteMessage}
-                            canDelete={chatActor ? canDeleteChatMessage(msg, chatActor) : false}
-                            onPermanentDelete={handlePermanentDeleteMessage}
-                            canPermanentDelete={canPermanentDelete}
-                            formatMessageTime={formatMessageTime}
-                            incomingAvatar={!isMe ? renderIncomingMessageAvatar?.() : undefined}
-                            outgoingAvatar={isMe ? renderOutgoingMessageAvatar?.() : undefined}
-                            isSearchMatch={isSearchMatch && activeSearchHit}
-                            messageRef={(el) => {
-                              if (el) messageElMap.current.set(msgId, el);
-                              else messageElMap.current.delete(msgId);
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-                  ))}
-                <div ref={messagesEndRef} className="h-px shrink-0" aria-hidden />
-              </div>
-
-              {/* Scroll to bottom */}
-              <AnimatePresence>
-                {showScrollDown && (
-                  <motion.button
-                    type="button"
-                    initial={{ opacity: 0, scale: 0.85, y: 8 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.85, y: 8 }}
-                    transition={{ duration: 0.18 }}
-                    onClick={() => scrollToBottom(true)}
-                    className="sx-chat-scroll-down absolute bottom-4 end-4 z-10"
-                    aria-label={isRtl ? 'الانتقال لآخر رسالة' : 'Scroll to latest message'}
-                  >
-                    <ArrowDown size={18} />
-                    {newBelowCount > 0 && (
-                      <span className="sx-chat-scroll-down-badge">
-                        {newBelowCount > 9 ? '9+' : newBelowCount}
-                      </span>
-                    )}
-                  </motion.button>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Composer */}
-            <div className="sx-chat-composer shrink-0 sticky bottom-0 z-20 border-t border-[#0B2345]/10 bg-white/95 dark:bg-[#0d1528]/95 backdrop-blur-md px-3 md:px-5 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              {replyPreview && (
-                <div className="sx-chat-reply-preview mb-2 flex items-stretch gap-2 rounded-xl border border-[#0B2345]/10 bg-[#F7F8FA] dark:bg-slate-800/50 overflow-hidden">
-                  <div className="w-1 shrink-0 bg-[#D4AF37]" aria-hidden />
-                  <div className="flex-1 min-w-0 py-2 ps-1 pe-2">
-                    <p className="text-[10px] font-bold text-[#D4AF37]">
-                      {isRtl ? `رد على ${replyPreview.label}` : `Reply to ${replyPreview.label}`}
-                    </p>
-                    <p className="text-xs text-[#0B2345]/70 dark:text-slate-300 truncate mt-0.5">
-                      {truncatePreview(replyPreview.content)}
-                    </p>
-                    <p className="text-[9px] text-[#0B2345]/40 mt-1">
-                      {isRtl ? 'معاينة محلية — لن تُحفظ كرد في قاعدة البيانات' : 'Local preview — not saved as reply metadata'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setReplyPreview(null)}
-                    className="sx-chat-icon-btn self-center me-1 shrink-0"
-                    aria-label={isRtl ? 'إلغاء الرد' : 'Cancel reply'}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-
-              {selectedFile ? (
-                <div className="mb-2 flex items-center justify-between gap-3 rounded-2xl border border-[#0B2345]/10 bg-[#F7F8FA] dark:bg-slate-800/60 p-2.5 sx-chat-attachment-preview">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 shrink-0 rounded-xl bg-[#0B2345]/10 text-[#0B2345] flex items-center justify-center">
-                      <Paperclip size={18} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-sm truncate text-[#0B2345] dark:text-white">
-                        {selectedFile.name}
-                      </p>
-                      <p className="text-xs text-[#0B2345]/50">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onClearFile}
-                    className="sx-chat-icon-btn text-rose-500 hover:bg-rose-50"
-                    aria-label={isRtl ? 'إزالة الملف' : 'Remove file'}
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              ) : null}
-
-              <AnimatePresence>
-                {showEmojiStrip && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden mb-2"
-                  >
-                    <div className="flex items-center gap-1 flex-wrap px-1 py-1">
-                      {QUICK_EMOJIS.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          className="sx-chat-emoji-btn"
-                          onClick={() => insertEmoji(emoji)}
-                          aria-label={emoji}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <form
-                onSubmit={handleSendWrapped}
-                className="flex items-end gap-2 max-w-4xl mx-auto"
-              >
-                <div className="flex-1 sx-chat-input-wrap flex items-end gap-0.5 px-1.5 py-1.5">
-                  {supportsAttachments ? (
-                    <>
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        className="hidden"
-                        accept="image/jpeg,image/png,image/gif,video/mp4,video/webm"
-                        onChange={onFileChange}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isSending}
-                        className="sx-chat-icon-btn shrink-0 disabled:opacity-40"
-                        aria-label={isRtl ? 'إرفاق ملف' : 'Attach file'}
-                        title={isRtl ? 'إرفاق صورة أو فيديو' : 'Attach image or video'}
-                      >
-                        <Paperclip size={18} />
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="sx-chat-icon-btn shrink-0 opacity-40 cursor-not-allowed"
-                      aria-label={attachSoon}
-                      title={attachSoon}
-                    >
-                      <Paperclip size={18} />
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => setShowEmojiStrip((v) => !v)}
-                    className={`sx-chat-icon-btn shrink-0 ${showEmojiStrip ? 'sx-chat-icon-btn--active' : ''}`}
-                    aria-label={isRtl ? 'إيموجي' : 'Emoji'}
-                    aria-pressed={showEmojiStrip}
-                  >
-                    <Smile size={18} />
-                  </button>
-
-                  <textarea
-                    ref={textareaRef}
-                    value={newMessage}
-                    onChange={(e) => onNewMessageChange(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendWrapped(e);
-                      }
-                    }}
-                    disabled={isSending}
-                    placeholder={placeholder}
-                    rows={1}
-                    className="flex-1 bg-transparent border-none outline-none resize-none max-h-28 min-h-[40px] py-2 px-1 text-sm font-medium text-[#0B2345] dark:text-white"
-                    aria-label={placeholder}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isSending || (!newMessage.trim() && !selectedFile)}
-                  className="sx-chat-send-btn sx-chat-send shrink-0 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2"
-                  aria-label={isRtl ? 'إرسال' : 'Send'}
-                >
-                  {isSending ? (
-                    <span className="sx-chat-send-spinner" aria-hidden />
-                  ) : (
-                    <SendHorizontal size={18} className={isRtl ? 'rotate-180' : ''} />
-                  )}
-                </button>
-              </form>
-              <p className="hidden md:block text-center text-[10px] text-[#0B2345]/40 font-semibold mt-1.5">
-                {isRtl
-                  ? 'Enter للإرسال · Shift+Enter سطر جديد'
-                  : 'Enter to send · Shift+Enter new line'}
-              </p>
-            </div>
-          </>
-        )}
-      </motion.section>
-    </div>
+      <ChatLayout
+        isRtl={isRtl}
+        isMobile={isMobileLayout}
+        mobileShowChat={mobileShowChat}
+        listPanel={
+          <ConversationList
+            isRtl={isRtl}
+            listTitle={listTitle}
+            searchPlaceholder={searchPlaceholder}
+            searchTerm={searchTerm}
+            onSearchChange={onSearchChange}
+            contacts={contacts}
+            unreadCounts={unreadCounts}
+            lastInteractionTimes={lastInteractionTimes}
+            lastMessageSnippets={lastMessageSnippets}
+            activeContact={activeContact}
+            onSelectContact={onSelectContact}
+            isLoadingContacts={isLoadingContacts}
+            listHeaderAction={listHeaderAction}
+            listTopContent={listTopContent}
+            renderListAvatar={renderListAvatar}
+            renderRoleBadge={renderRoleBadge}
+            renderContactMeta={renderContactMeta}
+            emptyListTitle={emptyList}
+            emptyListDescription={emptyListDescription}
+          />
+        }
+        threadPanel={
+          <ChatWindow
+            isRtl={isRtl}
+            activeContact={activeContact}
+            emptyThreadMessage={emptyThread}
+            showThreadBack={showThreadBack}
+            onChatBack={handleChatBackClick}
+            renderHeaderAvatar={renderHeaderAvatar}
+            renderIncomingMessageAvatar={renderIncomingMessageAvatar}
+            renderOutgoingMessageAvatar={renderOutgoingMessageAvatar}
+            renderRoleBadge={renderRoleBadge}
+            headerStatusText={statusText}
+            headerTrailing={headerTrailing}
+            isSending={isSending}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onExitSelection={exitSelection}
+            onCopySelected={copySelected}
+            threadSearchOpen={threadSearchOpen}
+            onToggleThreadSearch={() => setThreadSearchOpen((v) => !v)}
+            threadSearchQuery={threadSearchQuery}
+            onThreadSearchChange={setThreadSearchQuery}
+            searchMatches={searchMatches}
+            searchMatchIndex={searchMatchIndex}
+            onScrollToSearchMatch={scrollToSearchMatch}
+            onCloseThreadSearch={() => {
+              setThreadSearchOpen(false);
+              setThreadSearchQuery('');
+            }}
+            messagesContainerRef={messagesContainerRef}
+            messagesEndRef={messagesEndRef}
+            onMessagesScroll={handleMessagesScroll}
+            messagesLoadError={messagesLoadError}
+            messagesError={messagesError}
+            showMessageSkeleton={showMessageSkeleton}
+            showEmptyThreadIntro={showEmptyThreadIntro}
+            renderEmptyThreadIntro={renderEmptyThreadIntro}
+            groupedMessages={groupedMessages}
+            messageCount={messageCount}
+            isOutgoingMessage={isOutgoingMessage}
+            formatMessageTime={formatMessageTime}
+            onToggleSelect={(id) => {
+              setSelectionMode(true);
+              toggleSelect(id);
+            }}
+            onReply={handleReply}
+            onDeleteMessage={handleDeleteMessage}
+            chatActor={chatActor}
+            onPermanentDeleteMessage={handlePermanentDeleteMessage}
+            canPermanentDelete={canPermanentDelete}
+            messageElMap={messageElMap}
+            showScrollDown={showScrollDown}
+            newBelowCount={newBelowCount}
+            onScrollToBottom={() => scrollToBottom(true)}
+            composerProps={{
+              isRtl,
+              placeholder,
+              newMessage,
+              onNewMessageChange,
+              onSend: handleSendWrapped,
+              isSending,
+              selectedFile,
+              onClearFile,
+              onFileChange,
+              fileInputRef,
+              disableAttachments,
+              attachSoon,
+              replyPreview,
+              onClearReply: () => setReplyPreview(null),
+              showEmojiStrip,
+              onToggleEmojiStrip: () => setShowEmojiStrip((v) => !v),
+              onInsertEmoji: insertEmoji,
+              textareaRef,
+            }}
+          />
+        }
+      />
     </Profiler>
   );
 }

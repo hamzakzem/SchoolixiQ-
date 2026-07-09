@@ -8,7 +8,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import dotEnv from "dotenv";
 import fs from "fs";
-import crypto2 from "crypto";
+import crypto3 from "crypto";
 
 // schoolMessageCleanup.mjs
 async function deleteSchoolMessages(db, schoolId, opts = {}) {
@@ -313,7 +313,187 @@ async function runSchoolPermanentDelete({
   };
 }
 
+// userConversationPurge.mjs
+async function deleteInBatches(db, refs) {
+  let count = 0;
+  for (let i = 0; i < refs.length; i += 400) {
+    const chunk = refs.slice(i, i + 400);
+    const batch = db.batch();
+    chunk.forEach((ref) => batch.delete(ref));
+    await batch.commit();
+    count += chunk.length;
+  }
+  return count;
+}
+async function collectQueryDocs(db, collectionName, field, value) {
+  const snap = await db.collection(collectionName).where(field, "==", value).get();
+  return snap.docs;
+}
+async function collectArrayContains(db, collectionName, field, value) {
+  try {
+    const snap = await db.collection(collectionName).where(field, "array-contains", value).get();
+    return snap.docs;
+  } catch {
+    return [];
+  }
+}
+function extractStoragePath(fileUrl) {
+  if (!fileUrl || typeof fileUrl !== "string") return null;
+  const pathMatch = fileUrl.match(/\/o\/([^?]+)/);
+  if (!pathMatch) return null;
+  const objectPath = decodeURIComponent(pathMatch[1]);
+  return objectPath.startsWith("chat_files/") ? objectPath : null;
+}
+async function purgeUserConversations(db, targetUserId, opts = {}) {
+  const warnings = [];
+  const deleted = {
+    conversations: 0,
+    system_messages: 0,
+    notifications: 0,
+    storageFiles: 0
+  };
+  if (!targetUserId || typeof targetUserId !== "string") {
+    throw new Error("targetUserId required");
+  }
+  const conversationIds = /* @__PURE__ */ new Set();
+  const messageRefs = /* @__PURE__ */ new Map();
+  const storagePaths = /* @__PURE__ */ new Set();
+  const trackMessageDoc = (docSnap) => {
+    messageRefs.set(docSnap.id, docSnap.ref);
+    const data = docSnap.data() || {};
+    if (data.conversationId) conversationIds.add(String(data.conversationId));
+    const path2 = extractStoragePath(data.fileUrl);
+    if (path2) storagePaths.add(path2);
+  };
+  try {
+    const bySender = await collectQueryDocs(db, "system_messages", "senderId", targetUserId);
+    bySender.forEach(trackMessageDoc);
+  } catch (e) {
+    warnings.push(`messages senderId: ${e?.message || e}`);
+  }
+  try {
+    const byReceiver = await collectQueryDocs(db, "system_messages", "receiverId", targetUserId);
+    byReceiver.forEach(trackMessageDoc);
+  } catch (e) {
+    warnings.push(`messages receiverId: ${e?.message || e}`);
+  }
+  const conversationRefs = /* @__PURE__ */ new Map();
+  const trackConversation = (docSnap) => {
+    conversationRefs.set(docSnap.id, docSnap.ref);
+    conversationIds.add(docSnap.id);
+  };
+  try {
+    const byOwner = await collectQueryDocs(
+      db,
+      "conversations",
+      "conversationPrivacy.ownerUserId",
+      targetUserId
+    );
+    byOwner.forEach(trackConversation);
+  } catch (e) {
+    warnings.push(`conversations ownerUserId: ${e?.message || e}`);
+  }
+  try {
+    const byAllowed = await collectArrayContains(
+      db,
+      "conversations",
+      "conversationPrivacy.allowedUserIds",
+      targetUserId
+    );
+    byAllowed.forEach(trackConversation);
+  } catch (e) {
+    warnings.push(`conversations allowedUserIds: ${e?.message || e}`);
+  }
+  try {
+    const byCreated = await collectQueryDocs(db, "conversations", "createdBy", targetUserId);
+    byCreated.forEach(trackConversation);
+  } catch (e) {
+    warnings.push(`conversations createdBy: ${e?.message || e}`);
+  }
+  try {
+    const byParticipant = await collectArrayContains(db, "conversations", "participants", targetUserId);
+    byParticipant.forEach(trackConversation);
+  } catch (e) {
+    warnings.push(`conversations participants: ${e?.message || e}`);
+  }
+  for (const convId of conversationIds) {
+    try {
+      const threadMsgs = await db.collection("system_messages").where("conversationId", "==", convId).get();
+      threadMsgs.docs.forEach(trackMessageDoc);
+    } catch (e) {
+      warnings.push(`thread ${convId}: ${e?.message || e}`);
+    }
+  }
+  try {
+    deleted.system_messages = await deleteInBatches(db, [...messageRefs.values()]);
+  } catch (e) {
+    warnings.push(`delete messages: ${e?.message || e}`);
+  }
+  try {
+    deleted.conversations = await deleteInBatches(db, [...conversationRefs.values()]);
+  } catch (e) {
+    warnings.push(`delete conversations: ${e?.message || e}`);
+  }
+  try {
+    const notifByUser = await collectQueryDocs(db, "notifications", "userId", targetUserId);
+    const chatNotifs = notifByUser.filter((d) => {
+      const t = String(d.data()?.type ?? "");
+      return ["system", "chat", "message"].includes(t);
+    });
+    deleted.notifications += await deleteInBatches(
+      db,
+      chatNotifs.map((d) => d.ref)
+    );
+  } catch (e) {
+    warnings.push(`notifications userId: ${e?.message || e}`);
+  }
+  for (const convId of conversationIds) {
+    try {
+      const metaNotifs = await db.collection("notifications").where("metadata.conversationId", "==", convId).get();
+      if (!metaNotifs.empty) {
+        deleted.notifications += await deleteInBatches(
+          db,
+          metaNotifs.docs.map((d) => d.ref)
+        );
+      }
+    } catch {
+    }
+  }
+  const bucket = opts.bucket || null;
+  if (bucket && storagePaths.size > 0) {
+    for (const objectPath of storagePaths) {
+      try {
+        await bucket.file(objectPath).delete({ ignoreNotFound: true });
+        deleted.storageFiles += 1;
+      } catch (e) {
+        warnings.push(`storage ${objectPath}: ${e?.message || e}`);
+      }
+    }
+  }
+  const auditEntry = {
+    action: "PURGE_USER_CONVERSATIONS",
+    actorId: opts.actorId || null,
+    targetUserId,
+    deletedConversations: deleted.conversations,
+    deletedMessages: deleted.system_messages,
+    deletedNotifications: deleted.notifications,
+    deletedStorageFiles: deleted.storageFiles,
+    conversationIds: [...conversationIds],
+    timestamp: /* @__PURE__ */ new Date(),
+    createdAt: /* @__PURE__ */ new Date()
+  };
+  await db.collection("audit_logs").add(auditEntry);
+  return {
+    ok: true,
+    targetUserId,
+    deleted,
+    warnings,
+    auditEntry
+  };
+}
+
 // messagingAccess.mjs
+import crypto from "crypto";
 var PLATFORM_OPS_PERMISSIONS = /* @__PURE__ */ new Set([
   "manage_schools",
   "manage_subscriptions",
@@ -330,35 +510,65 @@ function asPermissionList(raw) {
   }
   return [];
 }
-function getExplicitVisibility(data) {
+function extractConversationPrivacy(data) {
   if (!data) return null;
-  const explicit = String(data.visibility ?? data.visibilityScope ?? "").toLowerCase().trim();
-  if (explicit === "superadmin_private" || explicit === "superadmin_only" || explicit === "platform") {
-    return "superadmin_private";
+  const raw = data.conversationPrivacy;
+  if (!raw || typeof raw !== "object") return null;
+  const visibility = String(raw.visibility ?? "").toLowerCase().trim();
+  if (![
+    "superadmin_private",
+    "platform_assistant_private",
+    "platform_operations",
+    "school_private"
+  ].includes(visibility)) {
+    return null;
   }
-  if (explicit === "platform_operations" || explicit === "platform_ops") {
-    return "platform_operations";
-  }
-  if (explicit === "school_private" || explicit === "school") {
-    return "school_private";
-  }
-  return null;
+  const ownerUserId = String(raw.ownerUserId ?? "").trim();
+  if (!ownerUserId) return null;
+  return {
+    ownerUserId,
+    ownerRole: String(raw.ownerRole ?? "").toLowerCase().trim(),
+    visibility,
+    allowedUserIds: Array.isArray(raw.allowedUserIds) ? raw.allowedUserIds.map(String) : [],
+    allowedRoles: Array.isArray(raw.allowedRoles) ? raw.allowedRoles.map(String) : []
+  };
+}
+function computePrivacyHash(privacy) {
+  const ids = [...privacy.allowedUserIds || []].map(String).sort().join(",");
+  const payload = `${privacy.ownerUserId}|${privacy.visibility}|${ids}`;
+  return crypto.createHash("sha256").update(payload).digest("hex");
+}
+function verifyPrivacyHash(doc) {
+  const privacy = extractConversationPrivacy(doc);
+  if (!privacy) return false;
+  const stored = String(doc.privacyHash ?? "").trim();
+  if (!stored) return false;
+  return computePrivacyHash(privacy) === stored;
 }
 function authorizeConversationAccess(user, conversation) {
   if (!user || !conversation) return false;
   const role = String(user.role || "").toLowerCase();
   const permissions = asPermissionList(user.permissions);
+  const uid = String(user.uid || "");
   if (role === "superadmin" || role === "super_admin") return true;
+  const privacy = extractConversationPrivacy(conversation);
   if (role === "platform_assistant") {
     const hasOps = permissions.some((p) => PLATFORM_OPS_PERMISSIONS.has(p));
     if (!hasOps) return false;
-    const explicit = getExplicitVisibility(conversation);
-    return explicit === "platform_operations";
+    if (!privacy) return false;
+    if (!verifyPrivacyHash(conversation)) return false;
+    if (privacy.visibility === "superadmin_private") return false;
+    if (privacy.visibility === "platform_assistant_private") {
+      return privacy.ownerUserId === uid;
+    }
+    if (privacy.visibility === "platform_operations") return true;
+    return false;
   }
   if (["admin", "school_admin", "staff", "school_assistant", "assistant"].includes(role)) {
     const userSchool = String(user.schoolId || "").trim();
     const convSchool = String(conversation.schoolId || "").trim();
     if (!userSchool || !convSchool || userSchool !== convSchool) return false;
+    if (privacy && !verifyPrivacyHash(conversation)) return role === "superadmin";
     return true;
   }
   return false;
@@ -923,7 +1133,7 @@ async function setSchoolDistributorCommissionPaused({
 }
 
 // distributorApproval.mjs
-import crypto from "crypto";
+import crypto2 from "crypto";
 var DISTRIBUTORS_COL = "distributors";
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -1013,7 +1223,7 @@ async function approveDistributor({
   const displayName = String(data.name || "\u0645\u0648\u0632\u0639");
   if (!userId && email) {
     let uid = "";
-    const securePass = String(password || "").trim() || `${crypto.randomBytes(16).toString("hex")}SecureP1!`;
+    const securePass = String(password || "").trim() || `${crypto2.randomBytes(16).toString("hex")}SecureP1!`;
     try {
       const existing = await authAdmin.getUserByEmail(email);
       uid = existing.uid;
@@ -1957,7 +2167,7 @@ async function startServer() {
       try {
         const bucket = getStorage().bucket();
         const file = bucket.file(storagePath);
-        const token = crypto2.randomUUID();
+        const token = crypto3.randomUUID();
         await file.save(buffer, {
           metadata: {
             contentType,
@@ -2196,7 +2406,7 @@ async function startServer() {
         } else {
           const hasPassword = existingUser.providerData.some((p) => p.providerId === "password");
           if (!hasPassword) {
-            updateParams.password = crypto2.randomBytes(16).toString("hex") + "SecureP1!";
+            updateParams.password = crypto3.randomBytes(16).toString("hex") + "SecureP1!";
             console.log(`Setting dynamic random password for existing Google user: ${redactUid(uid)}`);
           }
         }
@@ -2207,7 +2417,7 @@ async function startServer() {
         }
       } catch (authError) {
         if (authError.code === "auth/user-not-found") {
-          const generatedSecurePass = crypto2.randomBytes(16).toString("hex") + "SecureP1!";
+          const generatedSecurePass = crypto3.randomBytes(16).toString("hex") + "SecureP1!";
           const userRecord = await admin.auth().createUser({
             email: emailLower,
             password: password || generatedSecurePass,
@@ -2605,6 +2815,52 @@ async function startServer() {
       res.status(500).json({
         error: error.message || "Internal Server Error",
         message: error.message || "\u0641\u0634\u0644 \u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0631\u0633\u0627\u0644\u0629"
+      });
+    }
+  });
+  app.post("/api/admin/messages/purge-user-conversations", verifyAdmin, async (req, res) => {
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0645\u062D\u0627\u062F\u062B\u0627\u062A \u0645\u0633\u0645\u0648\u062D \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
+        });
+      }
+      const targetUserId = String(req.body?.targetUserId || "").trim();
+      const confirm = String(req.body?.confirm || "").trim();
+      if (!targetUserId) {
+        return res.status(400).json({ error: "TARGET_USER_REQUIRED", message: "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0645\u0637\u0644\u0648\u0628" });
+      }
+      if (confirm !== "DELETE") {
+        return res.status(400).json({
+          error: "CONFIRM_REQUIRED",
+          message: "\u064A\u062C\u0628 \u0643\u062A\u0627\u0628\u0629 DELETE \u0644\u0644\u062A\u0623\u0643\u064A\u062F"
+        });
+      }
+      let bucket = null;
+      try {
+        bucket = getStorage().bucket();
+      } catch {
+        bucket = null;
+      }
+      const result = await purgeUserConversations(getDb(), targetUserId, {
+        bucket,
+        actorId: req.user.uid
+      });
+      await logAudit(req, "PURGE_USER_CONVERSATIONS", {
+        metadata: {
+          targetUserId,
+          deletedConversations: result.deleted.conversations,
+          deletedMessages: result.deleted.system_messages,
+          deletedNotifications: result.deleted.notifications
+        }
+      });
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Purge User Conversations Error:", error);
+      res.status(500).json({
+        error: error.message || "Internal Server Error",
+        message: error.message || "\u0641\u0634\u0644 \u062D\u0630\u0641 \u0645\u062D\u0627\u062F\u062B\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645"
       });
     }
   });

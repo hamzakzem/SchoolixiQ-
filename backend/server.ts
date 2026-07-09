@@ -10,6 +10,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { runSchoolPermanentDelete } from './schoolPermanentDelete.mjs';
 import { permanentlyDeleteMessage } from './schoolMessageCleanup.mjs';
+import { purgeUserConversations } from './userConversationPurge.mjs';
 import { authorizeConversationAccess } from './messagingAccess.mjs';
 import { runUserPermanentDelete } from './userPermanentDelete.mjs';
 import {
@@ -1389,6 +1390,54 @@ async function startServer() {
       res.status(500).json({
         error: error.message || 'Internal Server Error',
         message: error.message || 'فشل الحذف النهائي للرسالة',
+      });
+    }
+  });
+
+  // Super Admin only — permanently purge all conversations/messages for a user
+  app.post('/api/admin/messages/purge-user-conversations', verifyAdmin, async (req: any, res: any) => {
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'الحذف النهائي للمحادثات مسموح لمدير النظام فقط',
+        });
+      }
+      const targetUserId = String(req.body?.targetUserId || '').trim();
+      const confirm = String(req.body?.confirm || '').trim();
+      if (!targetUserId) {
+        return res.status(400).json({ error: 'TARGET_USER_REQUIRED', message: 'معرّف المستخدم مطلوب' });
+      }
+      if (confirm !== 'DELETE') {
+        return res.status(400).json({
+          error: 'CONFIRM_REQUIRED',
+          message: 'يجب كتابة DELETE للتأكيد',
+        });
+      }
+      let bucket = null;
+      try {
+        bucket = getStorage().bucket();
+      } catch {
+        bucket = null;
+      }
+      const result = await purgeUserConversations(getDb(), targetUserId, {
+        bucket,
+        actorId: req.user.uid,
+      });
+      await logAudit(req, 'PURGE_USER_CONVERSATIONS', {
+        metadata: {
+          targetUserId,
+          deletedConversations: result.deleted.conversations,
+          deletedMessages: result.deleted.system_messages,
+          deletedNotifications: result.deleted.notifications,
+        },
+      });
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('Purge User Conversations Error:', error);
+      res.status(500).json({
+        error: error.message || 'Internal Server Error',
+        message: error.message || 'فشل حذف محادثات المستخدم',
       });
     }
   });

@@ -1,7 +1,6 @@
 import {
   authorizeConversationAccess,
   getExplicitVisibility,
-  normalizeConversationVisibility,
   type MessagingAccess,
 } from './messagingAccess';
 
@@ -23,7 +22,7 @@ export function logMessageAccessDebug(
   console.info('[MESSAGE_ACCESS_DEBUG]', payload);
 }
 
-export function auditConversationsForAssistant(
+function auditRowsForAssistant(
   raw: Record<string, unknown>[],
   access: MessagingAccess,
   profile: Record<string, unknown>,
@@ -34,19 +33,12 @@ export function auditConversationsForAssistant(
   let rejectedPrivateCount = 0;
 
   for (const row of raw) {
-    const explicit = getExplicitVisibility(row);
-    const normalized = normalizeConversationVisibility(row);
-    if (
-      explicit !== 'platform_operations' ||
-      normalized === 'superadmin_private' ||
-      !authorizeConversationAccess(profile, row)
-    ) {
+    if (!authorizeConversationAccess(profile, row)) {
+      const vis = getExplicitVisibility(row);
       if (
-        normalized === 'superadmin_private' ||
-        explicit === 'superadmin_private' ||
-        String(row.createdByRole ?? row.senderRole ?? '')
-          .toLowerCase()
-          .includes('superadmin')
+        vis === 'superadmin_private' ||
+        (row.conversationPrivacy as { visibility?: string } | undefined)?.visibility ===
+          'superadmin_private'
       ) {
         rejectedPrivateCount += 1;
       }
@@ -64,13 +56,28 @@ export function auditConversationsForAssistant(
       String(c.conversationId ?? c.id ?? ''),
     ),
     returnedVisibilityValues: allowed.map(
-      (c) => getExplicitVisibility(c) ?? normalizeConversationVisibility(c),
+      (c) =>
+        getExplicitVisibility(c) ||
+        String(
+          (c.conversationPrivacy as { visibility?: string } | undefined)
+            ?.visibility ?? 'unknown',
+        ),
     ),
     rejectedPrivateCount,
     source,
   });
 
   return allowed;
+}
+
+export function auditConversationsForAssistant(
+  raw: Record<string, unknown>[],
+  access: MessagingAccess,
+  profile: Record<string, unknown>,
+  queryVisibility: string,
+  source: string,
+): Record<string, unknown>[] {
+  return auditRowsForAssistant(raw, access, profile, queryVisibility, source);
 }
 
 export function auditMessagesForAssistant(
@@ -80,47 +87,5 @@ export function auditMessagesForAssistant(
   queryVisibility: string,
   source: string,
 ): Record<string, unknown>[] {
-  const allowed: Record<string, unknown>[] = [];
-  let rejectedPrivateCount = 0;
-
-  for (const row of raw) {
-    const explicit = getExplicitVisibility(row);
-    const normalized = normalizeConversationVisibility(row);
-    if (
-      explicit !== 'platform_operations' ||
-      normalized === 'superadmin_private' ||
-      !authorizeConversationAccess(profile, row)
-    ) {
-      if (
-        normalized === 'superadmin_private' ||
-        explicit === 'superadmin_private' ||
-        ['superadmin', 'super_admin'].includes(
-          String(row.createdByRole ?? row.senderRole ?? '').toLowerCase(),
-        )
-      ) {
-        rejectedPrivateCount += 1;
-      }
-      continue;
-    }
-    allowed.push(row);
-  }
-
-  logMessageAccessDebug({
-    userId: String(profile.uid ?? ''),
-    role: access.role,
-    assistantScope: access.scope,
-    queryVisibility,
-    returnedConversationIds: [
-      ...new Set(
-        allowed.map((m) => String(m.conversationId ?? m.id ?? '')),
-      ),
-    ],
-    returnedVisibilityValues: allowed.map(
-      (m) => getExplicitVisibility(m) ?? normalizeConversationVisibility(m),
-    ),
-    rejectedPrivateCount,
-    source,
-  });
-
-  return allowed;
+  return auditRowsForAssistant(raw, access, profile, queryVisibility, source);
 }

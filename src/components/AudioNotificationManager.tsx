@@ -18,6 +18,11 @@ import {
 } from "../lib/notificationSound";
 import { isNotificationVisibleToUser } from "../lib/notificationVisibility";
 import {
+  authorizeConversationAccess,
+  redactNotificationBodyForRecipient,
+} from "../lib/messagingAccess";
+import { normalizeEffectiveRole } from "../lib/schoolId";
+import {
   ensureNotificationSession,
   resetNotificationSession,
   hydrateListenerSnapshot,
@@ -233,6 +238,21 @@ export const AudioNotificationManager: React.FC = () => {
         query(collection(db, "system_messages"), where("receiverId", "==", user.uid)),
         `messages:${user.uid}`,
         (_id, data) => {
+              const effectiveRole = normalizeEffectiveRole(profile as Record<string, unknown>);
+              const row = data as Record<string, unknown>;
+              if (
+                effectiveRole === 'platform_assistant' &&
+                !authorizeConversationAccess(
+                  {
+                    uid: user.uid,
+                    role: 'platform_assistant',
+                    permissions: (profile as { permissions?: unknown }).permissions,
+                  },
+                  row,
+                )
+              ) {
+                return;
+              }
               const senderName = (data.senderName as string) || (profile.language === "ar" ? "مستخدم" : "User");
               const senderRole = data.senderRole as string | undefined;
               const senderRoleText =
@@ -242,7 +262,16 @@ export const AudioNotificationManager: React.FC = () => {
               const title = profile.language === "ar"
                 ? `رسالة جديدة من ${senderName} (${senderRoleText})`
                 : `New message from ${senderName} (${senderRoleText})`;
-              const body = (data.content as string) || "";
+              const rawBody = (data.content as string) || "";
+              const body =
+                effectiveRole === 'platform_assistant'
+                  ? redactNotificationBodyForRecipient({
+                      recipientRole: 'platform_assistant',
+                      recipientUserId: user.uid,
+                      messageDoc: row,
+                      fullMessage: rawBody,
+                    })
+                  : rawBody;
               playPremiumNotificationSound();
               triggerNativeNotification(title, body, "message", _id);
             },

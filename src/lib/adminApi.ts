@@ -329,6 +329,18 @@ export async function adminListPendingDistributors() {
   return json as { items: Record<string, unknown>[] };
 }
 
+/** Super Admin only — permanently purge all chat data for a user. */
+export async function adminPurgeUserConversations(
+  targetUserId: string,
+  confirm: 'DELETE',
+) {
+  const json = await adminApiPost('/api/admin/messages/purge-user-conversations', {
+    targetUserId,
+    confirm,
+  });
+  return json;
+}
+
 /** Super Admin only — hard-delete a system_messages document via Admin SDK. */
 export async function adminPermanentDeleteMessage(messageId: string) {
   const json = await adminApiPost('/api/admin/messages/permanent-delete', {

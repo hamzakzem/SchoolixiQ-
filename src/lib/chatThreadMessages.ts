@@ -20,6 +20,7 @@ export type ThreadMessage = {
   [key: string]: unknown;
 };
 
+/** Super Admin — full thread (legacy + privacy-stamped). */
 export function buildThreadMessagesQuery(
   schoolId: string,
   conversationId: string,
@@ -33,10 +34,7 @@ export function buildThreadMessagesQuery(
   );
 }
 
-/**
- * Platform Assistant thread query — excludes Super Admin private messages at the query layer
- * so Firestore rules do not reject the entire snapshot when mixed visibilities exist.
- */
+/** Platform Assistant — ops thread (privacy-enforced at query layer). */
 export function buildPlatformOpsThreadMessagesQuery(
   schoolId: string,
   conversationId: string,
@@ -45,57 +43,54 @@ export function buildPlatformOpsThreadMessagesQuery(
     collection(db, 'system_messages'),
     where('schoolId', '==', schoolId),
     where('conversationId', '==', conversationId),
-    where('visibility', '==', 'platform_operations'),
+    where('conversationPrivacy.visibility', '==', 'platform_operations'),
     orderBy('createdAt', 'desc'),
     limit(CHAT_MESSAGES_LIMIT),
   );
 }
 
-/**
- * Platform Assistant — conversations inbox (visibility-only, no participants/receiverId OR).
- */
+/** Platform Assistant — private SA→assistant thread. */
+export function buildAssistantPrivateThreadMessagesQuery(
+  conversationId: string,
+  assistantUid: string,
+): Query {
+  return query(
+    collection(db, 'system_messages'),
+    where('conversationId', '==', conversationId),
+    where('conversationPrivacy.visibility', '==', 'platform_assistant_private'),
+    where('conversationPrivacy.ownerUserId', '==', assistantUid),
+    orderBy('createdAt', 'desc'),
+    limit(CHAT_MESSAGES_LIMIT),
+  );
+}
+
+/** Platform Assistant inbox — platform_operations conversations only. */
 export function buildPlatformOpsConversationsQuery(): Query {
   return query(
     collection(db, 'conversations'),
-    where('visibility', '==', 'platform_operations'),
+    where('conversationPrivacy.visibility', '==', 'platform_operations'),
     orderBy('updatedAt', 'desc'),
   );
 }
 
-/**
- * Platform Assistant — unread ops messages (visibility-only).
- */
-export function buildPlatformOpsUnreadMessagesQuery(): Query {
+/** Platform Assistant inbox — direct private threads with Super Admin. */
+export function buildAssistantPrivateConversationsQuery(
+  assistantUid: string,
+): Query {
   return query(
-    collection(db, 'system_messages'),
-    where('visibility', '==', 'platform_operations'),
-    where('read', '==', false),
+    collection(db, 'conversations'),
+    where('conversationPrivacy.visibility', '==', 'platform_assistant_private'),
+    where('conversationPrivacy.ownerUserId', '==', assistantUid),
+    orderBy('updatedAt', 'desc'),
   );
 }
 
-/**
- * Fallback for legacy school→platform support messages that lack `visibility`
- * but were sent by school roles (never Super Admin).
- * @deprecated Platform assistants must NOT use this — visibility-only queries only.
- */
-export function buildLegacySchoolSupportThreadQuery(
-  schoolId: string,
-  conversationId: string,
-): Query {
+/** Platform Assistant — unread ops messages (privacy-only). */
+export function buildPlatformOpsUnreadMessagesQuery(): Query {
   return query(
     collection(db, 'system_messages'),
-    where('schoolId', '==', schoolId),
-    where('conversationId', '==', conversationId),
-    where('senderRole', 'in', [
-      'admin',
-      'school_admin',
-      'staff',
-      'assistant',
-      'school_assistant',
-      'platform_assistant',
-    ]),
-    orderBy('createdAt', 'desc'),
-    limit(CHAT_MESSAGES_LIMIT),
+    where('conversationPrivacy.visibility', '==', 'platform_operations'),
+    where('read', '==', false),
   );
 }
 
