@@ -34,6 +34,20 @@ export function buildThreadMessagesQuery(
   );
 }
 
+/** Platform Assistant — owned thread messages (school / distributor / private). */
+export function buildAssistantOwnedThreadMessagesQuery(
+  conversationId: string,
+  assistantUid: string,
+): Query {
+  return query(
+    collection(db, 'system_messages'),
+    where('conversationId', '==', conversationId),
+    where('conversationPrivacy.ownerUserId', '==', assistantUid),
+    orderBy('createdAt', 'desc'),
+    limit(CHAT_MESSAGES_LIMIT),
+  );
+}
+
 /** Platform Assistant — ops thread (privacy-enforced at query layer). */
 export function buildPlatformOpsThreadMessagesQuery(
   schoolId: string,
@@ -64,7 +78,19 @@ export function buildAssistantPrivateThreadMessagesQuery(
   );
 }
 
-/** Platform Assistant inbox — platform_operations conversations only. */
+/** Platform Assistant inbox — owned platform_operations conversations only. */
+export function buildAssistantOwnedOpsConversationsQuery(
+  assistantUid: string,
+): Query {
+  return query(
+    collection(db, 'conversations'),
+    where('conversationPrivacy.visibility', '==', 'platform_operations'),
+    where('conversationPrivacy.ownerUserId', '==', assistantUid),
+    orderBy('updatedAt', 'desc'),
+  );
+}
+
+/** @deprecated Use buildAssistantOwnedOpsConversationsQuery — global ops inbox leaks cross-assistant threads */
 export function buildPlatformOpsConversationsQuery(): Query {
   return query(
     collection(db, 'conversations'),
@@ -85,7 +111,19 @@ export function buildAssistantPrivateConversationsQuery(
   );
 }
 
-/** Platform Assistant — unread ops messages (privacy-only). */
+/** Platform Assistant — unread owned ops messages. */
+export function buildAssistantOwnedOpsUnreadMessagesQuery(
+  assistantUid: string,
+): Query {
+  return query(
+    collection(db, 'system_messages'),
+    where('conversationPrivacy.visibility', '==', 'platform_operations'),
+    where('conversationPrivacy.ownerUserId', '==', assistantUid),
+    where('read', '==', false),
+  );
+}
+
+/** @deprecated Use buildAssistantOwnedOpsUnreadMessagesQuery */
 export function buildPlatformOpsUnreadMessagesQuery(): Query {
   return query(
     collection(db, 'system_messages'),

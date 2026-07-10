@@ -115,7 +115,9 @@ export function authorizeConversationAccess(user, conversation) {
     if (privacy.visibility === 'platform_assistant_private') {
       return privacy.ownerUserId === uid;
     }
-    if (privacy.visibility === 'platform_operations') return true;
+    if (privacy.visibility === 'platform_operations') {
+      return privacy.ownerUserId === uid || privacy.allowedUserIds.includes(uid);
+    }
     return false;
   }
 

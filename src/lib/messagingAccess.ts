@@ -271,8 +271,7 @@ function authorizeByPrivacyVisibility(
       if (role === 'platform_assistant') {
         return (
           access.canAccessPlatformInbox &&
-          (privacy.allowedUserIds.length === 0 ||
-            privacy.allowedUserIds.includes(uid))
+          (privacy.ownerUserId === uid || privacy.allowedUserIds.includes(uid))
         );
       }
       return false;

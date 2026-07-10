@@ -633,14 +633,20 @@ service cloud.firestore {
       return isPlatformAssistant()
         && platformAssistantHasOpsPermission()
         && hasConversationPrivacy(resource.data)
+        && resource.data.conversationPrivacy.visibility != 'superadmin_private'
         && (
-          resource.data.conversationPrivacy.visibility == 'platform_operations'
+          (
+            resource.data.conversationPrivacy.visibility == 'platform_operations'
+            && (
+              resource.data.conversationPrivacy.ownerUserId == request.auth.uid
+              || request.auth.uid in resource.data.conversationPrivacy.allowedUserIds
+            )
+          )
           || (
             resource.data.conversationPrivacy.visibility == 'platform_assistant_private'
             && resource.data.conversationPrivacy.ownerUserId == request.auth.uid
           )
-        )
-        && resource.data.conversationPrivacy.visibility != 'superadmin_private';
+        );
     }
 
     function canPlatformAssistantReadMessage() {

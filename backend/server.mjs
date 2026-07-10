@@ -3,12 +3,12 @@ import express from "express";
 import compression from "compression";
 import path from "path";
 import { fileURLToPath } from "url";
-import admin from "firebase-admin";
+import admin2 from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import dotEnv from "dotenv";
 import fs from "fs";
-import crypto3 from "crypto";
+import crypto4 from "crypto";
 
 // schoolMessageCleanup.mjs
 async function deleteSchoolMessages(db, schoolId, opts = {}) {
@@ -21,6 +21,16 @@ async function deleteSchoolMessages(db, schoolId, opts = {}) {
   };
   if (!schoolId || typeof schoolId !== "string") {
     throw new Error("schoolId required");
+  }
+  const bucket = opts.bucket || null;
+  let conversationIdsForStorage = [`superadmin_${schoolId}`];
+  try {
+    const convSnap = await db.collection("conversations").where("schoolId", "==", schoolId).get();
+    conversationIdsForStorage = [
+      .../* @__PURE__ */ new Set([...conversationIdsForStorage, ...convSnap.docs.map((d) => d.id)])
+    ];
+  } catch (e) {
+    warnings.push(`conversation id prefetch: ${e?.message || e}`);
   }
   async function deleteBySchoolId(collectionName) {
     let count = 0;
@@ -46,6 +56,25 @@ async function deleteSchoolMessages(db, schoolId, opts = {}) {
     deleted.conversations = await deleteBySchoolId("conversations");
   } catch (e) {
     warnings.push(`conversations: ${e?.message || e}`);
+  }
+  if (bucket) {
+    for (const convId of conversationIdsForStorage) {
+      try {
+        const [files] = await bucket.getFiles({ prefix: `chat_files/${convId}/` });
+        await Promise.all(
+          files.map(async (file) => {
+            try {
+              await file.delete({ ignoreNotFound: true });
+              deleted.storageFiles += 1;
+            } catch (fileErr) {
+              warnings.push(`storage ${file.name}: ${fileErr?.message || fileErr}`);
+            }
+          })
+        );
+      } catch (e) {
+        warnings.push(`storage conv ${convId}: ${e?.message || e}`);
+      }
+    }
   }
   try {
     const legacyConvId = `superadmin_${schoolId}`;
@@ -73,7 +102,6 @@ async function deleteSchoolMessages(db, schoolId, opts = {}) {
   } catch (e) {
     warnings.push(`notifications chat filter: ${e?.message || e}`);
   }
-  const bucket = opts.bucket || null;
   if (bucket) {
     const prefixes = [
       `chat_files/superadmin_${schoolId}/`,
@@ -561,7 +589,9 @@ function authorizeConversationAccess(user, conversation) {
     if (privacy.visibility === "platform_assistant_private") {
       return privacy.ownerUserId === uid;
     }
-    if (privacy.visibility === "platform_operations") return true;
+    if (privacy.visibility === "platform_operations") {
+      return privacy.ownerUserId === uid || privacy.allowedUserIds.includes(uid);
+    }
     return false;
   }
   if (["admin", "school_admin", "staff", "school_assistant", "assistant"].includes(role)) {
@@ -572,6 +602,241 @@ function authorizeConversationAccess(user, conversation) {
     return true;
   }
   return false;
+}
+
+// startConversation.mjs
+import admin from "firebase-admin";
+
+// chatConversationKeys.mjs
+import crypto2 from "crypto";
+function assistantSchoolConversationKey(assistantUid, schoolId) {
+  return `platform_assistant:${assistantUid}:school:${schoolId}`;
+}
+function assistantSuperAdminConversationKey(assistantUid, superAdminUid) {
+  return `platform_assistant:${assistantUid}:superadmin:${superAdminUid}`;
+}
+function assistantDistributorConversationKey(assistantUid, distributorId) {
+  return `platform_assistant:${assistantUid}:distributor:${distributorId}`;
+}
+function defaultAllowedRoles(visibility) {
+  switch (visibility) {
+    case "superadmin_private":
+      return ["superadmin"];
+    case "platform_assistant_private":
+      return ["superadmin", "platform_assistant"];
+    case "platform_operations":
+      return ["superadmin", "platform_assistant", "admin", "school_admin"];
+    default:
+      return [];
+  }
+}
+function computePrivacyHash2(privacy) {
+  const ids = [...privacy.allowedUserIds || []].map(String).sort().join(",");
+  const payload = `${privacy.ownerUserId}|${privacy.visibility}|${ids}`;
+  return crypto2.createHash("sha256").update(payload).digest("hex");
+}
+function buildConversationPrivacyStamp(params) {
+  const allowedUserIds = params.allowedUserIds ?? [];
+  const allowedRoles = params.allowedRoles ?? defaultAllowedRoles(params.visibility);
+  const conversationPrivacy = {
+    ownerUserId: params.ownerUserId,
+    ownerRole: params.ownerRole,
+    visibility: params.visibility,
+    allowedUserIds,
+    allowedRoles
+  };
+  const privacyHash = computePrivacyHash2(conversationPrivacy);
+  return {
+    conversationPrivacy,
+    privacyHash,
+    visibility: params.visibility,
+    visibilityScope: params.visibility,
+    createdBy: params.ownerUserId,
+    createdByRole: params.ownerRole,
+    allowedRoles,
+    allowedUserIds,
+    ...params.schoolId ? { schoolId: params.schoolId } : {},
+    ...params.distributorId ? { distributorId: params.distributorId } : {}
+  };
+}
+
+// startConversation.mjs
+var SCHOOL_CONTACT_PERMS = /* @__PURE__ */ new Set(["manage_schools", "view_requests"]);
+var DISTRIBUTOR_CONTACT_PERMS = /* @__PURE__ */ new Set(["manage_distributors"]);
+var SUPERADMIN_CONTACT_PERMS = /* @__PURE__ */ new Set(["manage_users", "manage_system"]);
+function asPermissionList2(raw) {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (raw && typeof raw === "object") {
+    return Object.entries(raw).filter(([, v]) => v === true).map(([k]) => k);
+  }
+  return [];
+}
+function hasAnyPermission(permissions, required) {
+  const set = new Set(permissions);
+  for (const p of required) {
+    if (set.has(p)) return true;
+  }
+  return false;
+}
+async function resolveSchoolAdminIds(db, schoolId) {
+  const snap = await db.collection("users").where("schoolId", "==", schoolId).where("role", "in", ["admin", "school_admin", "assistant", "school_assistant"]).get();
+  return snap.docs.map((d) => d.id);
+}
+async function startConversation(db, actor, input) {
+  const uid = String(actor.uid || "").trim();
+  const role = String(actor.role || "").toLowerCase();
+  const permissions = asPermissionList2(actor.permissions);
+  const contactType = String(input.contactType || "").toLowerCase().trim();
+  const contactId = String(input.contactId || "").trim();
+  if (!uid) {
+    const err = new Error("UID required");
+    err.code = "UNAUTHORIZED";
+    throw err;
+  }
+  if (role !== "platform_assistant") {
+    const err = new Error("\u0645\u0633\u0645\u0648\u062D \u0644\u0645\u0633\u0627\u0639\u062F \u0627\u0644\u0645\u0646\u0635\u0629 \u0641\u0642\u0637");
+    err.code = "FORBIDDEN";
+    err.status = 403;
+    throw err;
+  }
+  if (!contactType || !contactId) {
+    const err = new Error("contactType and contactId required");
+    err.code = "INVALID_BODY";
+    err.status = 400;
+    throw err;
+  }
+  const FieldValue = admin.firestore.FieldValue;
+  let conversationKey = "";
+  let conversationId = "";
+  let privacyStamp = null;
+  let participants = [uid];
+  let schoolId = null;
+  let distributorId = null;
+  let contactName = contactId;
+  if (contactType === "school") {
+    if (!hasAnyPermission(permissions, SCHOOL_CONTACT_PERMS)) {
+      const err = new Error("\u0644\u0627 \u0635\u0644\u0627\u062D\u064A\u0629 \u0644\u0645\u0631\u0627\u0633\u0644\u0629 \u0627\u0644\u0645\u062F\u0627\u0631\u0633");
+      err.code = "FORBIDDEN";
+      err.status = 403;
+      throw err;
+    }
+    const schoolSnap = await db.collection("schools").doc(contactId).get();
+    if (!schoolSnap.exists) {
+      const err = new Error("\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
+      err.code = "NOT_FOUND";
+      err.status = 404;
+      throw err;
+    }
+    const schoolData = schoolSnap.data() || {};
+    contactName = String(schoolData.name || contactId);
+    schoolId = contactId;
+    conversationKey = assistantSchoolConversationKey(uid, contactId);
+    conversationId = conversationKey;
+    const adminIds = await resolveSchoolAdminIds(db, contactId);
+    participants = [uid, ...adminIds];
+    privacyStamp = buildConversationPrivacyStamp({
+      ownerUserId: uid,
+      ownerRole: "platform_assistant",
+      visibility: "platform_operations",
+      allowedUserIds: [uid],
+      allowedRoles: ["superadmin", "platform_assistant", "admin", "school_admin"],
+      schoolId: contactId
+    });
+  } else if (contactType === "superadmin") {
+    if (!hasAnyPermission(permissions, SUPERADMIN_CONTACT_PERMS)) {
+      const err = new Error("\u0644\u0627 \u0635\u0644\u0627\u062D\u064A\u0629 \u0644\u0645\u0631\u0627\u0633\u0644\u0629 \u0645\u062F\u064A\u0631\u064A \u0627\u0644\u0646\u0638\u0627\u0645");
+      err.code = "FORBIDDEN";
+      err.status = 403;
+      throw err;
+    }
+    const userSnap = await db.collection("users").doc(contactId).get();
+    if (!userSnap.exists) {
+      const err = new Error("\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+      err.code = "NOT_FOUND";
+      err.status = 404;
+      throw err;
+    }
+    const userData = userSnap.data() || {};
+    const targetRole = String(userData.role || "").toLowerCase();
+    if (!["superadmin", "super_admin"].includes(targetRole)) {
+      const err = new Error("\u062C\u0647\u0629 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0644\u064A\u0633\u062A \u0633\u0648\u0628\u0631 \u0623\u062F\u0645\u0646");
+      err.code = "INVALID_CONTACT";
+      err.status = 400;
+      throw err;
+    }
+    contactName = String(userData.name || userData.displayName || userData.email || contactId);
+    conversationKey = assistantSuperAdminConversationKey(uid, contactId);
+    conversationId = conversationKey;
+    participants = [uid, contactId];
+    privacyStamp = buildConversationPrivacyStamp({
+      ownerUserId: uid,
+      ownerRole: "platform_assistant",
+      visibility: "platform_assistant_private",
+      allowedUserIds: [uid, contactId],
+      allowedRoles: ["superadmin", "platform_assistant"]
+    });
+  } else if (contactType === "distributor") {
+    if (!hasAnyPermission(permissions, DISTRIBUTOR_CONTACT_PERMS)) {
+      const err = new Error("\u0644\u0627 \u0635\u0644\u0627\u062D\u064A\u0629 \u0644\u0645\u0631\u0627\u0633\u0644\u0629 \u0627\u0644\u0645\u0648\u0632\u0639\u064A\u0646");
+      err.code = "FORBIDDEN";
+      err.status = 403;
+      throw err;
+    }
+    const distSnap = await db.collection("distributors").doc(contactId).get();
+    if (!distSnap.exists) {
+      const err = new Error("\u0627\u0644\u0645\u0648\u0632\u0639 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+      err.code = "NOT_FOUND";
+      err.status = 404;
+      throw err;
+    }
+    const distData = distSnap.data() || {};
+    contactName = String(distData.name || contactId);
+    distributorId = contactId;
+    conversationKey = assistantDistributorConversationKey(uid, contactId);
+    conversationId = conversationKey;
+    participants = [uid];
+    privacyStamp = buildConversationPrivacyStamp({
+      ownerUserId: uid,
+      ownerRole: "platform_assistant",
+      visibility: "platform_operations",
+      allowedUserIds: [uid],
+      allowedRoles: ["superadmin", "platform_assistant"],
+      distributorId: contactId
+    });
+  } else {
+    const err = new Error("\u0646\u0648\u0639 \u062C\u0647\u0629 \u0627\u062A\u0635\u0627\u0644 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645");
+    err.code = "INVALID_CONTACT_TYPE";
+    err.status = 400;
+    throw err;
+  }
+  const convRef = db.collection("conversations").doc(conversationId);
+  const existing = await convRef.get();
+  const payload = {
+    conversationId,
+    conversationKey,
+    contactType,
+    contactId,
+    participants,
+    lastMessage: existing.exists ? existing.data()?.lastMessage || "" : "",
+    updatedAt: FieldValue.serverTimestamp(),
+    ...privacyStamp
+  };
+  if (!existing.exists) {
+    payload.createdAt = FieldValue.serverTimestamp();
+  }
+  await convRef.set(payload, { merge: true });
+  return {
+    ok: true,
+    conversationId,
+    conversationKey,
+    contactType,
+    contactId,
+    contactName,
+    schoolId,
+    distributorId,
+    created: !existing.exists,
+    conversationPrivacy: privacyStamp.conversationPrivacy
+  };
 }
 
 // userPermanentDelete.mjs
@@ -1133,7 +1398,7 @@ async function setSchoolDistributorCommissionPaused({
 }
 
 // distributorApproval.mjs
-import crypto2 from "crypto";
+import crypto3 from "crypto";
 var DISTRIBUTORS_COL = "distributors";
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -1223,7 +1488,7 @@ async function approveDistributor({
   const displayName = String(data.name || "\u0645\u0648\u0632\u0639");
   if (!userId && email) {
     let uid = "";
-    const securePass = String(password || "").trim() || `${crypto2.randomBytes(16).toString("hex")}SecureP1!`;
+    const securePass = String(password || "").trim() || `${crypto3.randomBytes(16).toString("hex")}SecureP1!`;
     try {
       const existing = await authAdmin.getUserByEmail(email);
       uid = existing.uid;
@@ -1709,8 +1974,8 @@ var serviceAccount = {
 };
 if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+    admin2.initializeApp({
+      credential: admin2.credential.cert(serviceAccount),
       storageBucket: firebaseConfig.storageBucket
       // Added
     });
@@ -1720,7 +1985,7 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   }
 } else {
   try {
-    admin.initializeApp({
+    admin2.initializeApp({
       storageBucket: firebaseConfig.storageBucket
       // Added
     });
@@ -1731,10 +1996,10 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
 }
 var getDb = () => {
   const dbId = firebaseConfig.firestoreDatabaseId;
-  if (admin.apps.length === 0) {
+  if (admin2.apps.length === 0) {
     return getFirestore();
   }
-  return getFirestore(admin.app(), dbId || "(default)");
+  return getFirestore(admin2.app(), dbId || "(default)");
 };
 var MIN_CRON_SECRET_LEN = 32;
 function isProductionEnv() {
@@ -1833,7 +2098,7 @@ async function startServer() {
       if (val instanceof Date) {
         return val;
       }
-      if (val instanceof admin.firestore.FieldValue || val instanceof admin.firestore.Timestamp || val instanceof admin.firestore.GeoPoint || val instanceof admin.firestore.DocumentReference) {
+      if (val instanceof admin2.firestore.FieldValue || val instanceof admin2.firestore.Timestamp || val instanceof admin2.firestore.GeoPoint || val instanceof admin2.firestore.DocumentReference) {
         return val;
       }
       if (val.constructor && [
@@ -1869,7 +2134,7 @@ async function startServer() {
       const db = getDb();
       const user = req.user || {};
       const sanitizedDetails = details ? sanitizeForFirestore(details) : {};
-      const expiresAt = admin.firestore.Timestamp.fromMillis(
+      const expiresAt = admin2.firestore.Timestamp.fromMillis(
         Date.now() + 90 * 24 * 60 * 60 * 1e3
       );
       await db.collection("audit_logs").add({
@@ -1880,8 +2145,8 @@ async function startServer() {
         ip: req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress,
         userAgent: req.headers["user-agent"],
         details: sanitizedDetails,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: admin2.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin2.firestore.FieldValue.serverTimestamp(),
         expiresAt
       });
     } catch (error) {
@@ -1913,7 +2178,7 @@ async function startServer() {
         console.warn(`[SECURITY] Custom claims size (${Buffer.byteLength(claimsStr, "utf8")} bytes) exceeds limit for UID: ${redactUid(uid)}. Stripping nested permissions 'p' to avoid claims exception.`);
         claims.p = null;
       }
-      await admin.auth().setCustomUserClaims(uid, claims);
+      await admin2.auth().setCustomUserClaims(uid, claims);
       console.log(`Claims synced for user ${redactUid(uid)}: role=${role}, sv=${securityVersion}`);
     } catch (error) {
       console.error(`Error setting claims for user ${redactUid(uid)}:`, error);
@@ -1929,7 +2194,7 @@ async function startServer() {
     }
     const token = authHeader.split("Bearer ")[1];
     try {
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const decodedToken = await admin2.auth().verifyIdToken(token);
       const email = decodedToken.email?.toLowerCase();
       let isBootstrapAdmin = false;
       if (getBootstrapAdmins().includes(email) && decodedToken.email_verified === true) {
@@ -2006,7 +2271,7 @@ async function startServer() {
     }
     const token = authHeader.split("Bearer ")[1];
     try {
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const decodedToken = await admin2.auth().verifyIdToken(token);
       req.user = decodedToken;
       next();
     } catch (e) {
@@ -2167,7 +2432,7 @@ async function startServer() {
       try {
         const bucket = getStorage().bucket();
         const file = bucket.file(storagePath);
-        const token = crypto3.randomUUID();
+        const token = crypto4.randomUUID();
         await file.save(buffer, {
           metadata: {
             contentType,
@@ -2374,7 +2639,7 @@ async function startServer() {
       let isExistingUser = false;
       let existingUserData = null;
       try {
-        const existingUser = await admin.auth().getUserByEmail(emailLower);
+        const existingUser = await admin2.auth().getUserByEmail(emailLower);
         uid = existingUser.uid;
         console.log(`User already exists in Auth: ${redactUid(uid)}`);
         const userDoc = await db.collection("users").doc(uid).get();
@@ -2406,19 +2671,19 @@ async function startServer() {
         } else {
           const hasPassword = existingUser.providerData.some((p) => p.providerId === "password");
           if (!hasPassword) {
-            updateParams.password = crypto3.randomBytes(16).toString("hex") + "SecureP1!";
+            updateParams.password = crypto4.randomBytes(16).toString("hex") + "SecureP1!";
             console.log(`Setting dynamic random password for existing Google user: ${redactUid(uid)}`);
           }
         }
         if (displayName) updateParams.displayName = displayName;
         if (Object.keys(updateParams).length > 1 || updateParams.emailVerified) {
-          await admin.auth().updateUser(uid, updateParams);
+          await admin2.auth().updateUser(uid, updateParams);
           console.log(`Updated existing Auth user: ${redactUid(uid)}, verified: true, hasPasswordUpd: ${!!updateParams.password}`);
         }
       } catch (authError) {
         if (authError.code === "auth/user-not-found") {
-          const generatedSecurePass = crypto3.randomBytes(16).toString("hex") + "SecureP1!";
-          const userRecord = await admin.auth().createUser({
+          const generatedSecurePass = crypto4.randomBytes(16).toString("hex") + "SecureP1!";
+          const userRecord = await admin2.auth().createUser({
             email: emailLower,
             password: password || generatedSecurePass,
             // Ensure a password is set securely
@@ -2455,7 +2720,7 @@ async function startServer() {
             role: targetRole,
             schoolId: effectiveSchoolId,
             ...safeAdditionalData,
-            createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp()
+            createdAt: isExistingUser ? existingUserData.createdAt : admin2.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
           transaction.set(db.collection("students").doc(uid), {
             id: uid,
@@ -2463,11 +2728,11 @@ async function startServer() {
             name: displayName,
             schoolId: effectiveSchoolId,
             ...safeAdditionalData,
-            createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp()
+            createdAt: isExistingUser ? existingUserData.createdAt : admin2.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
           if (shouldIncrement) {
             transaction.update(schoolRef, {
-              studentCount: admin.firestore.FieldValue.increment(1)
+              studentCount: admin2.firestore.FieldValue.increment(1)
             });
           }
         });
@@ -2481,7 +2746,7 @@ async function startServer() {
           role: targetRole,
           schoolId: effectiveSchoolId,
           ...safeAdditionalData,
-          createdAt: isExistingUser ? existingUserData.createdAt : admin.firestore.FieldValue.serverTimestamp()
+          createdAt: isExistingUser ? existingUserData.createdAt : admin2.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
       }
       await logAudit(req, "CREATE_USER", { after: { email: emailLower, role: targetRole, schoolId: effectiveSchoolId, assistantType: resolvedAssistantType } });
@@ -2545,7 +2810,7 @@ async function startServer() {
       const plan = req.body;
       const docRef = await db.collection("packages").add({
         ...plan,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
+        createdAt: admin2.firestore.FieldValue.serverTimestamp()
       });
       await logAudit(req, "CREATE_PLAN", { after: plan });
       res.json({ id: docRef.id });
@@ -2561,7 +2826,7 @@ async function startServer() {
       const beforeDoc = await db.collection("packages").doc(id).get();
       await db.collection("packages").doc(id).update({
         ...req.body,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: admin2.firestore.FieldValue.serverTimestamp()
       });
       await logAudit(req, "UPDATE_PLAN", { before: beforeDoc.data() || null, after: req.body });
       res.json({ success: true });
@@ -2603,7 +2868,7 @@ async function startServer() {
       const targetRole = beforeData.role;
       let authExists = false;
       try {
-        await admin.auth().getUser(userId);
+        await admin2.auth().getUser(userId);
         authExists = true;
       } catch (authError) {
         if (authError.code !== "auth/user-not-found") {
@@ -2630,8 +2895,8 @@ async function startServer() {
       }
       const result = await runUserPermanentDelete({
         db,
-        authAdmin: admin.auth(),
-        adminSdk: admin,
+        authAdmin: admin2.auth(),
+        adminSdk: admin2,
         userId
       });
       await logAudit(req, "DELETE_USER", {
@@ -2668,7 +2933,7 @@ async function startServer() {
       const usersQuery = await db.collection("users").where("schoolId", "==", schoolId).get();
       const userDeletions = usersQuery.docs.map(async (uDoc) => {
         try {
-          await admin.auth().deleteUser(uDoc.id);
+          await admin2.auth().deleteUser(uDoc.id);
         } catch (e) {
         }
         await uDoc.ref.delete();
@@ -2743,7 +3008,7 @@ async function startServer() {
       }
       const result = await runSchoolPermanentDelete({
         db: getDb(),
-        authAdmin: admin.auth(),
+        authAdmin: admin2.auth(),
         schoolId,
         confirm,
         schoolName: schoolName != null ? String(schoolName) : void 0,
@@ -2899,10 +3164,54 @@ async function startServer() {
       res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   });
+  app.post("/api/messages/start-conversation", verifyAdmin, async (req, res) => {
+    try {
+      const contactType = String(req.body?.contactType || "").trim();
+      const contactId = String(req.body?.contactId || "").trim();
+      if (!contactType || !contactId) {
+        return res.status(400).json({
+          error: "INVALID_BODY",
+          message: "contactType and contactId required"
+        });
+      }
+      let permissions = req.user.permissions || null;
+      if (!permissions) {
+        const userSnap = await getDb().collection("users").doc(req.user.uid).get();
+        permissions = userSnap.data()?.permissions || [];
+      }
+      const result = await startConversation(
+        getDb(),
+        {
+          uid: req.user.uid,
+          role: req.user.role,
+          permissions
+        },
+        { contactType, contactId }
+      );
+      await logAudit(req, "START_CONVERSATION", {
+        metadata: {
+          contactType,
+          contactId,
+          conversationId: result.conversationId,
+          created: result.created
+        }
+      });
+      res.json({ success: true, ...result });
+    } catch (error) {
+      const status = error.status || 500;
+      if (status >= 500) {
+        console.error("Start Conversation Error:", error);
+      }
+      res.status(status).json({
+        error: error.code || "START_CONVERSATION_FAILED",
+        message: error.message || "\u0641\u0634\u0644 \u0628\u062F\u0621 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629"
+      });
+    }
+  });
   app.post("/api/public/distributors/register", async (req, res) => {
     const body = req.body || {};
     try {
-      const result = await registerDistributorApplication(getDb(), admin, {
+      const result = await registerDistributorApplication(getDb(), admin2, {
         name: body.name,
         phone: body.phone,
         address: body.address,
@@ -2940,8 +3249,8 @@ async function startServer() {
       }
       const result = await approveDistributor({
         db: getDb(),
-        authAdmin: admin.auth(),
-        adminSdk: admin,
+        authAdmin: admin2.auth(),
+        adminSdk: admin2,
         distributorId,
         actorUid: req.user.uid,
         password,
@@ -2968,7 +3277,7 @@ async function startServer() {
       }
       const result = await rejectDistributor({
         db: getDb(),
-        adminSdk: admin,
+        adminSdk: admin2,
         distributorId,
         actorUid: req.user.uid,
         reason
@@ -3001,7 +3310,7 @@ async function startServer() {
       }
       const result = await applyDistributorCoupon({
         db: getDb(),
-        adminSdk: admin,
+        adminSdk: admin2,
         schoolId,
         couponCode,
         actorUid: req.user.uid
@@ -3035,7 +3344,7 @@ async function startServer() {
       }
       const counts = await generateMonthlyCommissions({
         db: getDb(),
-        adminSdk: admin,
+        adminSdk: admin2,
         monthKey
       });
       await logAudit(req, "DISTRIBUTOR_GENERATE_MONTHLY", {
@@ -3061,7 +3370,7 @@ async function startServer() {
       }
       const result = await markCommissionPaid({
         db: getDb(),
-        adminSdk: admin,
+        adminSdk: admin2,
         commissionId,
         paidBy: req.user.uid,
         notes
@@ -3096,7 +3405,7 @@ async function startServer() {
       }
       const result = await markDistributorMonthCommissionsPaid({
         db: getDb(),
-        adminSdk: admin,
+        adminSdk: admin2,
         distributorId,
         monthKey,
         paidBy: req.user.uid,
@@ -3125,7 +3434,7 @@ async function startServer() {
       }
       const result = await setSchoolDistributorCommissionPaused({
         db: getDb(),
-        adminSdk: admin,
+        adminSdk: admin2,
         schoolId,
         paused,
         pausedBy: req.user.uid
@@ -3165,12 +3474,12 @@ async function startServer() {
         transaction.delete(db.collection("users").doc(id));
         if (schoolId) {
           transaction.update(db.collection("schools").doc(schoolId), {
-            studentCount: admin.firestore.FieldValue.increment(-1)
+            studentCount: admin2.firestore.FieldValue.increment(-1)
           });
         }
       });
       try {
-        await admin.auth().deleteUser(id);
+        await admin2.auth().deleteUser(id);
       } catch (authError) {
       }
       await logAudit(req, "DELETE_STUDENT", { before: beforeData, metadata: { targetId: id } });
@@ -3205,7 +3514,7 @@ async function startServer() {
         let hasMore = true;
         let isFirstInColl = true;
         while (hasMore) {
-          let query = db.collection(collName).orderBy(admin.firestore.FieldPath.documentId()).limit(1e3);
+          let query = db.collection(collName).orderBy(admin2.firestore.FieldPath.documentId()).limit(1e3);
           if (lastDoc) {
             query = query.startAfter(lastDoc);
           }
@@ -3293,7 +3602,7 @@ async function startServer() {
     try {
       const db = getDb();
       const limit = Math.min(Number(req.body?.limit) || 50, 100);
-      const results = await pollRecentNotificationsForPush(db, admin, limit);
+      const results = await pollRecentNotificationsForPush(db, admin2, limit);
       res.json({
         success: true,
         processed: results.length,
@@ -3357,7 +3666,7 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
     try {
       const db = getDb();
-      setupNotificationPushListener(db, admin);
+      setupNotificationPushListener(db, admin2);
     } catch (e) {
       console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
     }

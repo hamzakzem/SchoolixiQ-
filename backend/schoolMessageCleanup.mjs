@@ -24,6 +24,20 @@ export async function deleteSchoolMessages(db, schoolId, opts = {}) {
     throw new Error('schoolId required');
   }
 
+  const bucket = opts.bucket || null;
+  let conversationIdsForStorage = [`superadmin_${schoolId}`];
+  try {
+    const convSnap = await db
+      .collection('conversations')
+      .where('schoolId', '==', schoolId)
+      .get();
+    conversationIdsForStorage = [
+      ...new Set([...conversationIdsForStorage, ...convSnap.docs.map((d) => d.id)]),
+    ];
+  } catch (e) {
+    warnings.push(`conversation id prefetch: ${e?.message || e}`);
+  }
+
   async function deleteBySchoolId(collectionName) {
     let count = 0;
     const snap = await db
@@ -53,6 +67,27 @@ export async function deleteSchoolMessages(db, schoolId, opts = {}) {
     deleted.conversations = await deleteBySchoolId('conversations');
   } catch (e) {
     warnings.push(`conversations: ${e?.message || e}`);
+  }
+
+  // Storage attachments for every conversation tied to this school (all visibility types)
+  if (bucket) {
+    for (const convId of conversationIdsForStorage) {
+      try {
+        const [files] = await bucket.getFiles({ prefix: `chat_files/${convId}/` });
+        await Promise.all(
+          files.map(async (file) => {
+            try {
+              await file.delete({ ignoreNotFound: true });
+              deleted.storageFiles += 1;
+            } catch (fileErr) {
+              warnings.push(`storage ${file.name}: ${fileErr?.message || fileErr}`);
+            }
+          }),
+        );
+      } catch (e) {
+        warnings.push(`storage conv ${convId}: ${e?.message || e}`);
+      }
+    }
   }
 
   // Conversation docs keyed as superadmin_{schoolId} may lack schoolId on old data
@@ -90,7 +125,6 @@ export async function deleteSchoolMessages(db, schoolId, opts = {}) {
     warnings.push(`notifications chat filter: ${e?.message || e}`);
   }
 
-  const bucket = opts.bucket || null;
   if (bucket) {
     const prefixes = [
       `chat_files/superadmin_${schoolId}/`,

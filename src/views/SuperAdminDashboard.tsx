@@ -5,6 +5,7 @@ import { sendEmailVerification } from "firebase/auth";
 import { signOutWithCleanup } from "../lib/authLogout";
 import { adminCreateUser, adminDeleteUser, adminAccrueCommissionOnPaymentConfirmed, adminFinalizeSchoolTracking, adminValidateDistributorCoupon, adminPurgeUserConversations } from "../lib/adminApi";
 import { clearMessagingCache } from "../lib/offline/offlineDataCache";
+import { resolveMessagingAccess } from "../lib/messagingAccess";
 import { getApiUrl } from "../lib/apiUtils";
 import {
   collection,
@@ -219,6 +220,10 @@ export default function SuperAdminDashboard() {
     return false;
   };
   const hasPermission = canAccess;
+  const canAccessPlatformChat = useMemo(
+    () => resolveMessagingAccess(profile as Record<string, unknown> | null).canAccessPlatformInbox,
+    [profile],
+  );
 
   const [schools, setSchools] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
@@ -2181,7 +2186,7 @@ export default function SuperAdminDashboard() {
                     )}
                   </button>
                 )}
-                {hasPermission("manage_schools") && (
+                {canAccessPlatformChat && (
                   <button
                     onClick={() => {
                       navigateToTab("chat");
@@ -6277,7 +6282,7 @@ export default function SuperAdminDashboard() {
           hasPermission("manage_distributors") && { id: "distributors", label: "الموزعون", icon: Tag },
           hasPermission("manage_distributors") && { id: "distributor_requests", label: "طلبات الموزعين", icon: ClipboardList },
           hasPermission("view_requests") && { id: "requests", label: t('sidebar_requests'), icon: Mail },
-          hasPermission("manage_schools") && { id: "chat", label: t('sidebar_chat'), icon: MessageSquare },
+          canAccessPlatformChat && { id: "chat", label: t('sidebar_chat'), icon: MessageSquare },
           hasPermission("manage_users") && { id: "users", label: t('sidebar_users'), icon: Users },
           hasPermission("manage_users") && { id: "parents", label: t('sidebar_parents'), icon: Users },
           hasPermission("system_settings") && { id: "settings", label: t('sidebar_settings'), icon: SettingsIcon },

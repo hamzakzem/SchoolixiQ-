@@ -18,15 +18,25 @@ import { markSystemMessagesRead } from '../../lib/chatMessageReads';
 import { markChatPerf, openChatSnapshotListener, resetChatPerf } from '../../lib/chatPerf';
 import {
   applyThreadMessagesIfChanged,
+  buildAssistantOwnedOpsConversationsQuery,
+  buildAssistantOwnedOpsUnreadMessagesQuery,
+  buildAssistantOwnedThreadMessagesQuery,
   buildAssistantPrivateConversationsQuery,
   buildAssistantPrivateThreadMessagesQuery,
-  buildPlatformOpsConversationsQuery,
-  buildPlatformOpsThreadMessagesQuery,
-  buildPlatformOpsUnreadMessagesQuery,
   buildThreadMessagesQuery,
   shouldMarkThreadUnread,
   unreadIdsForReceiver,
 } from '../../lib/chatThreadMessages';
+import {
+  assistantSchoolConversationKey,
+  resolveConversationIdForContact,
+  superAdminSchoolConversationKey,
+} from '../../lib/chatConversationKeys';
+import {
+  loadAssistantContactDirectory,
+  resolveAssistantDirectoryPermissions,
+  type ChatDirectoryContact,
+} from '../../lib/chatContactDirectory';
 import {
   filterConversationsForAccess,
   filterMessagesForAccess,
@@ -41,7 +51,7 @@ import {
   auditConversationsForAssistant,
   auditMessagesForAssistant,
 } from '../../lib/messageAccessDebug';
-import { adminPermanentDeleteMessage } from '../../lib/adminApi';
+import { adminPermanentDeleteMessage, startPlatformConversation } from '../../lib/adminApi';
 
 const BROADCAST_ID = '__broadcast__';
 
@@ -68,6 +78,10 @@ export default function SuperAdminChatTab() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [schools, setSchools] = useState<any[]>([]);
+  const [assistantInbox, setAssistantInbox] = useState<any[]>([]);
+  const [contactDirectory, setContactDirectory] = useState<ChatDirectoryContact[]>([]);
+  const [assistantListMode, setAssistantListMode] = useState<'inbox' | 'contacts'>('inbox');
+  const [directoryLoaded, setDirectoryLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeContact, setActiveContact] = useState<{ id: string, name: string, type: string, extra?: any } | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
@@ -95,6 +109,34 @@ export default function SuperAdminChatTab() {
       messagesFirstSnapshotRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isPlatformAssistantView || !profile) return;
+    let cancelled = false;
+
+    const refreshDirectory = async () => {
+      const contacts = await loadAssistantContactDirectory(profile.permissions);
+      if (!cancelled) {
+        setContactDirectory(contacts);
+        setDirectoryLoaded(true);
+      }
+    };
+
+    void refreshDirectory();
+
+    const gates = resolveAssistantDirectoryPermissions(profile.permissions);
+    let unsubSchools: (() => void) | undefined;
+    if (gates.canSeeSchools) {
+      unsubSchools = onSnapshot(collection(db, 'schools'), () => {
+        void refreshDirectory();
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      unsubSchools?.();
+    };
+  }, [isPlatformAssistantView, profile?.uid, profile?.permissions]);
 
   useEffect(() => {
     if (!canUsePlatformChat(profile)) return;
@@ -132,7 +174,7 @@ export default function SuperAdminChatTab() {
 
       const flushAssistantContacts = () => {
         const merged = [...opsContactsRef.list, ...privateContactsRef.list];
-        setSchools(merged);
+        setAssistantInbox(merged);
         setContactsLoaded(true);
         markChatPerf('contacts_loaded', 'SuperAdminChatTab', {
           contacts: merged.length,
@@ -168,16 +210,60 @@ export default function SuperAdminChatTab() {
         ];
         await hydrateSchoolNames(schoolIds);
 
-        const contacts = schoolIds.map((schoolId) => ({
-          id: schoolId,
-          name: schoolNameCache.get(schoolId) || schoolId,
-          type: 'school',
-          extra: {
-            id: schoolId,
-            name: schoolNameCache.get(schoolId) || schoolId,
-            privacyVisibility: 'platform_operations',
-          },
-        }));
+        const contacts = allowed.map((c) => {
+          const contactType = String(
+            c.contactType || (c.schoolId ? 'school' : c.distributorId ? 'distributor' : 'school'),
+          );
+          const contactId = String(c.contactId || c.schoolId || c.distributorId || c.id || '');
+          const convId = String(c.conversationId || c.id || '');
+          let name = contactId;
+          if (contactType === 'school') {
+            const schoolId = String(c.schoolId || contactId);
+            name = schoolNameCache.get(schoolId) || schoolId;
+            return {
+              id: schoolId,
+              name,
+              contactType,
+              type: 'school',
+              extra: {
+                id: schoolId,
+                name,
+                contactType,
+                contactId: schoolId,
+                conversationId: convId,
+                schoolId,
+                privacyVisibility: 'platform_operations',
+              },
+            };
+          }
+          if (contactType === 'distributor') {
+            return {
+              id: convId,
+              name: String(c.contactName || contactId),
+              contactType,
+              type: 'distributor',
+              extra: {
+                contactType,
+                contactId,
+                conversationId: convId,
+                distributorId: contactId,
+                privacyVisibility: 'platform_operations',
+              },
+            };
+          }
+          return {
+            id: convId,
+            name: String(c.contactName || contactId),
+            contactType,
+            type: contactType,
+            extra: {
+              contactType,
+              contactId,
+              conversationId: convId,
+              privacyVisibility: 'platform_operations',
+            },
+          };
+        });
         opsContactsRef.list = contacts;
         flushAssistantContacts();
 
@@ -215,14 +301,14 @@ export default function SuperAdminChatTab() {
       };
 
       const unsubConversations = onSnapshot(
-        buildPlatformOpsConversationsQuery(),
+        buildAssistantOwnedOpsConversationsQuery(profile?.uid || ''),
         (snapshot) => {
           const raw = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
           void applyOpsConversations(raw as Record<string, unknown>[]);
         },
         (err) => {
           console.warn('Ops conversations listener error:', err);
-          setSchools([]);
+          setAssistantInbox([]);
           setContactsLoaded(true);
         },
       );
@@ -255,7 +341,7 @@ export default function SuperAdminChatTab() {
       );
 
       const unsubUnread = onSnapshot(
-        buildPlatformOpsUnreadMessagesQuery(),
+        buildAssistantOwnedOpsUnreadMessagesQuery(profile?.uid || ''),
         (snapshot) => {
           const raw = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
           const allowed = auditMessagesForAssistant(
@@ -412,10 +498,17 @@ export default function SuperAdminChatTab() {
     unreadKeyRef.current = '';
     messagesFirstSnapshotRef.current = false;
 
-    const convId =
-      activeContact.type === 'assistant_private'
-        ? String(activeContact.extra?.conversationId ?? activeContact.id)
-        : `superadmin_${activeContact.id}`;
+    const convId = isPlatformAssistantView
+      ? resolveConversationIdForContact({
+          contactType: activeContact.type,
+          contactId: String(activeContact.extra?.contactId || activeContact.id),
+          assistantUid: profile.uid,
+          conversationId: activeContact.extra?.conversationId as string | undefined,
+        })
+      : String(
+          activeContact.extra?.conversationId
+            ?? superAdminSchoolConversationKey(profile.uid, activeContact.id),
+        );
     const untrackMessages = openChatSnapshotListener('SuperAdminChatTab:messages');
 
     const mergeAndApply = (docs: Record<string, unknown>[]) => {
@@ -452,7 +545,7 @@ export default function SuperAdminChatTab() {
       const unsubscribe = onSnapshot(
         isPrivateThread
           ? buildAssistantPrivateThreadMessagesQuery(convId, profile.uid)
-          : buildPlatformOpsThreadMessagesQuery(activeContact.id, convId),
+          : buildAssistantOwnedThreadMessagesQuery(convId, profile.uid),
         (snap) => {
           const raw = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
           const filtered = auditMessagesForAssistant(
@@ -522,7 +615,12 @@ export default function SuperAdminChatTab() {
   ) => {
     if (!profile?.uid) return;
 
-    const convId = `superadmin_${school.id}`;
+    const convId = isPlatformAssistantView
+      ? String(
+          (school as { extra?: { conversationId?: string } }).extra?.conversationId
+            ?? assistantSchoolConversationKey(profile.uid, school.id),
+        )
+      : superAdminSchoolConversationKey(profile.uid, school.id);
     const attachmentLabel = isRtl ? 'ملف مرفق' : 'Attachment';
     const visibility = isPlatformAssistantView
       ? 'platform_operations'
@@ -532,7 +630,7 @@ export default function SuperAdminChatTab() {
       ownerUserId: profile.uid,
       ownerRole: actorRole,
       visibility,
-      allowedUserIds: isPlatformAssistantView ? [] : [profile.uid],
+      allowedUserIds: [profile.uid],
       allowedRoles: isPlatformAssistantView
         ? ['superadmin', 'platform_assistant', 'admin', 'school_admin']
         : ['superadmin', 'admin', 'school_admin'],
@@ -541,6 +639,7 @@ export default function SuperAdminChatTab() {
 
     await addDoc(collection(db, 'system_messages'), withMessageRetentionFields({
       conversationId: convId,
+      conversationKey: convId,
       schoolId: school.id,
       senderId: profile.uid,
       senderName:
@@ -562,8 +661,13 @@ export default function SuperAdminChatTab() {
       doc(db, 'conversations', convId),
       {
         conversationId: convId,
+        conversationKey: convId,
+        contactType: 'school',
+        contactId: school.id,
         schoolId: school.id,
-        participants: ['super_admin', 'admin'],
+        participants: isPlatformAssistantView
+          ? [profile.uid, 'admin']
+          : ['super_admin', 'admin'],
         lastMessage: messageText || attachmentLabel,
         updatedAt: serverTimestamp(),
         ...privacyStamp,
@@ -630,7 +734,17 @@ export default function SuperAdminChatTab() {
       let filePayload: { fileUrl: string | null; fileType: string | null; fileName: string | null } | undefined;
 
       if (selectedFile && !isBroadcast) {
-        const convId = `superadmin_${activeContact.id}`;
+        const convId = isPlatformAssistantView
+          ? resolveConversationIdForContact({
+              contactType: activeContact.type,
+              contactId: String(activeContact.extra?.contactId || activeContact.id),
+              assistantUid: profile.uid,
+              conversationId: activeContact.extra?.conversationId as string | undefined,
+            })
+          : String(
+              activeContact.extra?.conversationId
+                ?? superAdminSchoolConversationKey(profile.uid, activeContact.id),
+            );
         const fileExt = selectedFile.name.split('.').pop();
         const path = `chat_files/${convId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const storageRef = ref(storage, path);
@@ -674,7 +788,10 @@ export default function SuperAdminChatTab() {
     return '';
   };
 
-  const filteredSchools = schools.filter(s => 
+  const assistantSourceList = assistantListMode === 'contacts' ? contactDirectory : assistantInbox;
+  const listSource = isPlatformAssistantView ? assistantSourceList : schools;
+
+  const filteredSchools = listSource.filter(s =>
     (s.name && s.name.toLowerCase().includes(searchTerm.toLowerCase()))
   ).sort((a, b) => {
     const timeA = lastInteractionTimes[a.id] || 0;
@@ -698,11 +815,11 @@ export default function SuperAdminChatTab() {
     return acc;
   }, {} as Record<string, any[]>), [messages, isRtl]);
 
-  const shellContacts: ChatShellContact[] = filteredSchools.map((school) => ({
-    id: school.id,
-    name: school.name,
-    type: 'school',
-    extra: school,
+  const shellContacts: ChatShellContact[] = filteredSchools.map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    type: entry.type || entry.contactType || 'school',
+    extra: entry.extra || entry,
   }));
 
   const renderContactAvatar = (contact: ChatShellContact, isSelected: boolean, size: 'list' | 'header' | 'message' = 'list') => {
@@ -766,7 +883,13 @@ export default function SuperAdminChatTab() {
             ? 'رسائل الإدارة العليا'
             : 'Super Admin Messages'
       }
-      searchPlaceholder={isRtl ? 'بحث باسم المدرسة...' : 'Search schools...'}
+      searchPlaceholder={
+        isPlatformAssistantView
+          ? assistantListMode === 'contacts'
+            ? (isRtl ? 'بحث في جهات الاتصال...' : 'Search contacts...')
+            : (isRtl ? 'بحث في المحادثات...' : 'Search conversations...')
+          : (isRtl ? 'بحث باسم المدرسة...' : 'Search schools...')
+      }
       searchTerm={searchTerm}
       onSearchChange={setSearchTerm}
       contacts={shellContacts}
@@ -774,8 +897,51 @@ export default function SuperAdminChatTab() {
       lastInteractionTimes={lastInteractionTimes}
       lastMessageSnippets={lastMessageSnippets}
       activeContact={activeShellContact}
-      onSelectContact={(contact) => {
-        setActiveContact({ id: contact.id, name: contact.name, type: contact.type || 'school', extra: contact.extra });
+      onSelectContact={async (contact) => {
+        if (isPlatformAssistantView && assistantListMode === 'contacts') {
+          const contactType = String(contact.type || contact.extra?.contactType || 'school');
+          const contactId = String(contact.extra?.contactId || contact.id);
+          try {
+            setIsLoading(true);
+            const result = await startPlatformConversation(contactType, contactId);
+            const listId =
+              contactType === 'school' || contactType === 'distributor'
+                ? contactId
+                : result.conversationId;
+            setActiveContact({
+              id: listId,
+              name: result.contactName || contact.name,
+              type: contactType === 'superadmin' ? 'assistant_private' : contactType,
+              extra: {
+                ...contact.extra,
+                conversationId: result.conversationId,
+                contactType,
+                contactId,
+                schoolId: result.schoolId ?? contact.extra?.schoolId,
+                privacyVisibility:
+                  contactType === 'superadmin'
+                    ? 'platform_assistant_private'
+                    : 'platform_operations',
+              },
+            });
+            setAssistantListMode('inbox');
+            setMobileShowChat(true);
+          } catch (error) {
+            console.error('start-conversation failed:', error);
+            toast.error(
+              isRtl ? 'تعذر بدء المحادثة' : 'Could not start conversation',
+            );
+          } finally {
+            setIsLoading(false);
+          }
+          return;
+        }
+        setActiveContact({
+          id: contact.id,
+          name: contact.name,
+          type: contact.type || 'school',
+          extra: contact.extra,
+        });
         setMobileShowChat(true);
       }}
       mobileShowChat={mobileShowChat}
@@ -803,7 +969,13 @@ export default function SuperAdminChatTab() {
             ? messagingAccess.displayLabelEn
             : undefined)
       }
-      isLoadingContacts={!contactsLoaded}
+      isLoadingContacts={
+        isPlatformAssistantView
+          ? assistantListMode === 'contacts'
+            ? !directoryLoaded
+            : !contactsLoaded
+          : !contactsLoaded
+      }
       disableAttachments={activeContact?.id === BROADCAST_ID}
       inputPlaceholder={
         activeContact?.id === BROADCAST_ID
@@ -812,18 +984,26 @@ export default function SuperAdminChatTab() {
       }
       emptyListMessage={
         isPlatformAssistantView
-          ? isRtl
-            ? 'لا توجد محادثات'
-            : 'No conversations'
+          ? assistantListMode === 'contacts'
+            ? isRtl
+              ? 'لا توجد جهات اتصال'
+              : 'No contacts available'
+            : isRtl
+              ? 'لا توجد محادثات'
+              : 'No conversations'
           : isRtl
             ? 'لا توجد مدارس مطابقة'
             : 'No matching schools'
       }
       emptyListDescription={
         isPlatformAssistantView
-          ? isRtl
-            ? 'ستظهر هنا المحادثات المخصصة لهذا الحساب'
-            : 'Conversations assigned to this account will appear here'
+          ? assistantListMode === 'contacts'
+            ? isRtl
+              ? 'ستظهر هنا المدارس والجهات المسموح بها حسب صلاحياتك'
+              : 'Schools and contacts allowed by your permissions appear here'
+            : isRtl
+              ? 'لا توجد محادثات لهذا الحساب. اختر جهة اتصال لبدء محادثة جديدة.'
+              : 'No conversations for this account. Pick a contact to start a new chat.'
           : undefined
       }
       listTopContent={
@@ -850,10 +1030,36 @@ export default function SuperAdminChatTab() {
           </div>
         </button>
         ) : (
-          <div className="mx-2 mb-2 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 text-[11px] font-bold text-blue-700 dark:text-blue-300">
-            {isRtl
-              ? 'صندوق رسائل مساعد المنصة — لا يشمل رسائل السوبر أدمن الخاصة'
-              : 'System Assistant inbox — excludes Super Admin private messages'}
+          <div className="mx-2 mb-2 space-y-2">
+            <div className="flex rounded-xl bg-[#0B2345]/5 dark:bg-white/5 p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => setAssistantListMode('inbox')}
+                className={`flex-1 rounded-lg py-2 text-[11px] font-bold transition-colors ${
+                  assistantListMode === 'inbox'
+                    ? 'bg-white dark:bg-[#141c2e] text-[#0B2345] dark:text-white shadow-sm'
+                    : 'text-[#0B2345]/55 dark:text-slate-400'
+                }`}
+              >
+                {isRtl ? 'محادثاتي' : 'My chats'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAssistantListMode('contacts')}
+                className={`flex-1 rounded-lg py-2 text-[11px] font-bold transition-colors ${
+                  assistantListMode === 'contacts'
+                    ? 'bg-white dark:bg-[#141c2e] text-[#0B2345] dark:text-white shadow-sm'
+                    : 'text-[#0B2345]/55 dark:text-slate-400'
+                }`}
+              >
+                {isRtl ? 'جهات الاتصال' : 'Contacts'}
+              </button>
+            </div>
+            <div className="px-1 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 text-[11px] font-bold text-blue-700 dark:text-blue-300">
+              {isRtl
+                ? 'دليل جهات الاتصال منفصل عن محادثات السوبر أدمن الخاصة'
+                : 'Contact directory is separate from Super Admin private threads'}
+            </div>
           </div>
         )
       }
@@ -878,19 +1084,22 @@ export default function SuperAdminChatTab() {
           </ChatAvatarFrame>
         );
       }}
-      renderRoleBadge={() => (
-        <RoleBadge
-          label={
-            isPlatformAssistantView
-              ? isRtl
-                ? 'System Assistant'
-                : 'System Assistant'
-              : isRtl
-                ? 'مدرسة'
-                : 'School'
-          }
-        />
-      )}
+      renderRoleBadge={(contact) => {
+        const contactType = String(contact.type || contact.extra?.contactType || 'school');
+        const labels: Record<string, { ar: string; en: string }> = {
+          school: { ar: 'مدرسة', en: 'School' },
+          superadmin: { ar: 'سوبر أدمن', en: 'Super Admin' },
+          distributor: { ar: 'موزع', en: 'Distributor' },
+          assistant_private: { ar: 'رسالة مباشرة', en: 'Direct' },
+          platform_assistant: { ar: 'مساعد المنصة', en: 'Assistant' },
+        };
+        const label = labels[contactType] || labels.school;
+        return (
+          <RoleBadge
+            label={isPlatformAssistantView ? (isRtl ? label.ar : label.en) : (isRtl ? 'مدرسة' : 'School')}
+          />
+        );
+      }}
       renderEmptyThreadIntro={() => (activeContact?.id === BROADCAST_ID ? broadcastIntro : null)}
       showEmptyThreadIntro
       headerTrailing={

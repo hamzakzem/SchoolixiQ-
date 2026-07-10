@@ -12,6 +12,7 @@ import { runSchoolPermanentDelete } from './schoolPermanentDelete.mjs';
 import { permanentlyDeleteMessage } from './schoolMessageCleanup.mjs';
 import { purgeUserConversations } from './userConversationPurge.mjs';
 import { authorizeConversationAccess } from './messagingAccess.mjs';
+import { startConversation } from './startConversation.mjs';
 import { runUserPermanentDelete } from './userPermanentDelete.mjs';
 import {
   applyDistributorCoupon,
@@ -1483,6 +1484,56 @@ async function startServer() {
       res.json({ success: true, allowed: true, conversation });
     } catch (error: any) {
       res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  // Platform Assistant — start/open isolated conversation (server-side privacy)
+  app.post('/api/messages/start-conversation', verifyAdmin, async (req: any, res: any) => {
+    try {
+      const contactType = String(req.body?.contactType || '').trim();
+      const contactId = String(req.body?.contactId || '').trim();
+      if (!contactType || !contactId) {
+        return res.status(400).json({
+          error: 'INVALID_BODY',
+          message: 'contactType and contactId required',
+        });
+      }
+
+      let permissions = req.user.permissions || null;
+      if (!permissions) {
+        const userSnap = await getDb().collection('users').doc(req.user.uid).get();
+        permissions = userSnap.data()?.permissions || [];
+      }
+
+      const result = await startConversation(
+        getDb(),
+        {
+          uid: req.user.uid,
+          role: req.user.role,
+          permissions,
+        },
+        { contactType, contactId },
+      );
+
+      await logAudit(req, 'START_CONVERSATION', {
+        metadata: {
+          contactType,
+          contactId,
+          conversationId: result.conversationId,
+          created: result.created,
+        },
+      });
+
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const status = error.status || 500;
+      if (status >= 500) {
+        console.error('Start Conversation Error:', error);
+      }
+      res.status(status).json({
+        error: error.code || 'START_CONVERSATION_FAILED',
+        message: error.message || 'فشل بدء المحادثة',
+      });
     }
   });
 

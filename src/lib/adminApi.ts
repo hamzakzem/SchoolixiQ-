@@ -348,3 +348,27 @@ export async function adminPermanentDeleteMessage(messageId: string) {
   });
   return json;
 }
+
+export type StartConversationResult = {
+  success?: boolean;
+  ok?: boolean;
+  conversationId: string;
+  conversationKey: string;
+  contactType: string;
+  contactId: string;
+  contactName?: string;
+  schoolId?: string | null;
+  distributorId?: string | null;
+  created?: boolean;
+};
+
+export async function startPlatformConversation(
+  contactType: string,
+  contactId: string,
+): Promise<StartConversationResult> {
+  const json = await adminApiPost('/api/messages/start-conversation', {
+    contactType,
+    contactId,
+  });
+  return json as StartConversationResult;
+}
