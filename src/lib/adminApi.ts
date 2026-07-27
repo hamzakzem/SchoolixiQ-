@@ -372,3 +372,65 @@ export async function startPlatformConversation(
   });
   return json as StartConversationResult;
 }
+
+export type ChatDirectorySchoolsResponse = {
+  ok?: boolean;
+  schools: Array<{
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+    status: string;
+  }>;
+  schoolsCount?: number;
+  errorCode?: string | null;
+};
+
+/** Platform Assistant — safe school list via Admin SDK (no client schools query). */
+export async function fetchChatDirectorySchools(): Promise<ChatDirectorySchoolsResponse> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('No auth token available');
+  await assertBackendReachable('/api/messages/chat-directory/schools');
+  const response = await fetch(getApiUrl('/api/messages/chat-directory/schools'), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'X-Authorization': `Bearer ${token}`,
+    },
+  });
+  const json = await response.json();
+  if (!response.ok) {
+    throw new Error(String(json.message || json.error || 'Failed to load chat directory schools'));
+  }
+  return json as ChatDirectorySchoolsResponse;
+}
+
+export async function adminAssignConversation(
+  conversationId: string,
+  assigneeUserId: string,
+  firstResponseDueMinutes?: number,
+) {
+  return adminApiPost('/api/admin/chat/conversations/assign', {
+    conversationId,
+    assigneeUserId,
+    ...(firstResponseDueMinutes != null ? { firstResponseDueMinutes } : {}),
+  });
+}
+
+export async function adminTransferConversation(
+  conversationId: string,
+  toUserId: string,
+  reason?: string,
+) {
+  return adminApiPost('/api/admin/chat/conversations/transfer', {
+    conversationId,
+    toUserId,
+    ...(reason ? { reason } : {}),
+  });
+}
+
+export async function adminUnassignConversation(conversationId: string) {
+  return adminApiPost('/api/admin/chat/conversations/unassign', { conversationId });
+}
+
+export async function adminCloseConversation(conversationId: string) {
+  return adminApiPost('/api/admin/chat/conversations/close', { conversationId });
+}

@@ -82,6 +82,7 @@ import { pageTransitionProps } from "../lib/motion";
 
 import SolarLoading from "../components/SolarLoading";
 import ParentChatTab from "./ParentChatTab";
+import { DashboardSmartAssistant } from "../components/smart-assistant/DashboardSmartAssistant";
 import { invokeChatBack } from "../lib/chatUiBridge";
 import ParentSchedules from "./parent/ParentSchedules";
 import ParentDismissalTab from "./parent/ParentDismissalTab";
@@ -2668,6 +2669,7 @@ export default function ParentDashboard() {
           </div>
         )}
       </AnimatePresence>
+      <DashboardSmartAssistant hidden={activeTab === "chat"} />
     </>
   );
 }

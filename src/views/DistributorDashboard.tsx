@@ -18,6 +18,7 @@ import { useAuth } from "../lib/AuthContext";
 import { useLanguage } from "../lib/LanguageContext";
 import { signOutWithCleanup } from "../lib/authLogout";
 import { fetchDistributorDashboard } from "../lib/distributorApi";
+import { DashboardSmartAssistant } from "../components/smart-assistant/DashboardSmartAssistant";
 import type {
   DistributorDashboardStats,
   DistributorMonthlyCommission,
@@ -550,6 +551,7 @@ export default function DistributorDashboard() {
           );
         })}
       </nav>
+      <DashboardSmartAssistant hidden={activeTab === "chat"} />
     </div>
   );
 }

@@ -97,6 +97,7 @@ import { useSystemConfig } from "../lib/SystemConfigContext";
 import SchoolixLogo from "../components/SchoolixLogo";
 import { isCustomAppLogo } from "../lib/brandAssets";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
+import { DashboardSmartAssistant } from "../components/smart-assistant/DashboardSmartAssistant";
 import { invokeChatBack } from "../lib/chatUiBridge";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
@@ -6306,6 +6307,7 @@ export default function SuperAdminDashboard() {
         desktopDrawerEnabled={false}
       />
       ) : null}
+      <DashboardSmartAssistant hidden={activeTab === "chat"} />
     </div>
   );
 }

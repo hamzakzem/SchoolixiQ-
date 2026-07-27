@@ -54,6 +54,7 @@ export type ChatWindowProps = {
   onCopySelected: () => void;
   threadSearchOpen: boolean;
   onToggleThreadSearch: () => void;
+  onOpenChatSettings?: () => void;
   threadSearchQuery: string;
   onThreadSearchChange: (value: string) => void;
   searchMatches: { id: string }[];
@@ -104,6 +105,7 @@ export function ChatWindow({
   onCopySelected,
   threadSearchOpen,
   onToggleThreadSearch,
+  onOpenChatSettings,
   threadSearchQuery,
   onThreadSearchChange,
   searchMatches,
@@ -250,14 +252,17 @@ export function ChatWindow({
                 >
                   <Search size={18} />
                 </button>
-                <button
-                  type="button"
-                  className="sx-chat-icon-btn"
-                  aria-label={isRtl ? 'إعدادات المحادثة' : 'Conversation settings'}
-                  title={isRtl ? 'إعدادات المحادثة' : 'Conversation settings'}
-                >
-                  <Settings2 size={18} />
-                </button>
+                {onOpenChatSettings ? (
+                  <button
+                    type="button"
+                    className="sx-chat-icon-btn"
+                    aria-label={isRtl ? 'إعدادات المحادثة' : 'Conversation settings'}
+                    title={isRtl ? 'إعدادات المحادثة' : 'Conversation settings'}
+                    onClick={onOpenChatSettings}
+                  >
+                    <Settings2 size={18} />
+                  </button>
+                ) : null}
                 {headerTrailing}
               </div>
             </div>

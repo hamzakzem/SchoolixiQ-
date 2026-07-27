@@ -51,7 +51,9 @@ import {
   auditConversationsForAssistant,
   auditMessagesForAssistant,
 } from '../../lib/messageAccessDebug';
-import { adminPermanentDeleteMessage, startPlatformConversation } from '../../lib/adminApi';
+import { adminPermanentDeleteMessage, startPlatformConversation, adminCloseConversation } from '../../lib/adminApi';
+import { ChatSettingsPanel } from '../../components/chat/ChatSettingsPanel';
+import { ChatControlCenter } from '../../components/chat/ChatControlCenter';
 
 const BROADCAST_ID = '__broadcast__';
 
@@ -70,6 +72,10 @@ export default function SuperAdminChatTab() {
     [profile],
   );
   const isPlatformAssistantView = messagingAccess.role === 'platform_assistant';
+  const isSuperAdminChatView =
+    messagingAccess.role === 'superadmin' || String(profile?.role || '').toLowerCase() === 'super_admin';
+  const [chatSettingsOpen, setChatSettingsOpen] = useState(false);
+  const threadSearchControlsRef = useRef<{ open: () => void } | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -115,7 +121,10 @@ export default function SuperAdminChatTab() {
     let cancelled = false;
 
     const refreshDirectory = async () => {
-      const contacts = await loadAssistantContactDirectory(profile.permissions);
+      const contacts = await loadAssistantContactDirectory(profile.permissions, {
+        uid: profile.uid,
+        role: messagingAccess.role || profile.role,
+      });
       if (!cancelled) {
         setContactDirectory(contacts);
         setDirectoryLoaded(true);
@@ -872,6 +881,8 @@ export default function SuperAdminChatTab() {
   ) : null;
 
   return (
+    <div className="flex h-full min-h-0 w-full">
+      <div className="flex-1 min-w-0 min-h-0">
     <SchoolixChatShell
       isRtl={isRtl}
       listTitle={
@@ -1126,6 +1137,53 @@ export default function SuperAdminChatTab() {
         await adminPermanentDeleteMessage(id);
         setMessages((prev) => prev.filter((m) => m.id !== id));
       }}
+      onOpenChatSettings={() => {
+        if (activeContact && activeContact.id !== BROADCAST_ID) setChatSettingsOpen(true);
+      }}
+      onThreadSearchControls={(controls) => {
+        threadSearchControlsRef.current = controls;
+      }}
     />
+      </div>
+      {isSuperAdminChatView && !isPlatformAssistantView ? (
+        <div className="hidden xl:flex w-[min(22rem,32vw)] shrink-0 min-h-0 border-s border-[#0B2345]/10">
+          <ChatControlCenter isRtl={isRtl} isSuperAdmin={isSuperAdminChatView} />
+        </div>
+      ) : null}
+      <ChatSettingsPanel
+        isRtl={isRtl}
+        isOpen={chatSettingsOpen}
+        onClose={() => setChatSettingsOpen(false)}
+        activeContact={activeShellContact}
+        conversationId={
+          activeContact?.extra?.conversationId
+            ? String(activeContact.extra.conversationId)
+            : undefined
+        }
+        privacyVisibility={
+          activeContact?.extra?.privacyVisibility
+            ? String(activeContact.extra.privacyVisibility)
+            : undefined
+        }
+        isSuperAdmin={isSuperAdminChatView}
+        onOpenThreadSearch={() => threadSearchControlsRef.current?.open()}
+        onCloseConversation={async () => {
+          const convId = activeContact?.extra?.conversationId
+            ? String(activeContact.extra.conversationId)
+            : '';
+          if (!convId || !isSuperAdminChatView) return;
+          await adminCloseConversation(convId);
+          setChatSettingsOpen(false);
+          toast.success(isRtl ? 'أُغلقت المحادثة' : 'Conversation closed');
+        }}
+        onPermanentDelete={
+          isSuperAdminChatView && activeContact?.id !== BROADCAST_ID
+            ? () => {
+                toast(isRtl ? 'استخدم حذف الرسالة من قائمة الرسالة' : 'Use per-message delete from the thread menu');
+              }
+            : undefined
+        }
+      />
+    </div>
   );
 }

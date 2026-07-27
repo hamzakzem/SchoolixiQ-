@@ -96,6 +96,8 @@ export type SchoolixChatShellProps = {
   /** Super Admin hard-delete via Admin API */
   onPermanentDeleteMessage?: (msg: Record<string, unknown>) => Promise<void> | void;
   canPermanentDelete?: boolean;
+  onOpenChatSettings?: () => void;
+  onThreadSearchControls?: (controls: { open: () => void }) => void;
 };
 
 const SCROLL_THRESHOLD = 80;
@@ -150,6 +152,8 @@ export function SchoolixChatShell({
   chatActor,
   onPermanentDeleteMessage,
   canPermanentDelete = false,
+  onOpenChatSettings,
+  onThreadSearchControls,
 }: SchoolixChatShellProps) {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -215,6 +219,13 @@ export function SchoolixChatShell({
   const [threadSearchOpen, setThreadSearchOpen] = useState(false);
   const [threadSearchQuery, setThreadSearchQuery] = useState('');
   const [searchMatchIndex, setSearchMatchIndex] = useState(0);
+
+  useEffect(() => {
+    if (!onThreadSearchControls) return;
+    onThreadSearchControls({
+      open: () => setThreadSearchOpen(true),
+    });
+  }, [onThreadSearchControls]);
   const [replyPreview, setReplyPreview] = useState<ReplyPreview | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
@@ -473,6 +484,7 @@ export function SchoolixChatShell({
             onCopySelected={copySelected}
             threadSearchOpen={threadSearchOpen}
             onToggleThreadSearch={() => setThreadSearchOpen((v) => !v)}
+            onOpenChatSettings={onOpenChatSettings}
             threadSearchQuery={threadSearchQuery}
             onThreadSearchChange={setThreadSearchQuery}
             searchMatches={searchMatches}

@@ -39,6 +39,7 @@ import { GlobalFooter } from '../components/GlobalFooter';
 import { MOTION_DURATION, MOTION_EASE, prefersReducedMotion } from '../lib/motion';
 import { LandingNavbar } from '../components/landing/LandingNavbar';
 import { LandingWhatsAppFab } from '../components/landing/LandingWhatsAppFab';
+import { SmartAssistantWidget } from '../components/smart-assistant/SmartAssistantWidget';
 import { LandingTechSection } from '../components/landing/LandingTechSection';
 import { LandingHeroMockup } from '../components/landing/LandingHeroMockup';
 import { LandingDistributorSection } from '../components/landing/LandingDistributorSection';
@@ -736,6 +737,7 @@ export default function LandingPage() {
       </SectionShell>
 
       <LandingWhatsAppFab whatsappNumber={config.whatsappNumber} />
+      <SmartAssistantWidget isRtl />
 
       {/* Footer */}
       <footer id="contact" className="landing-footer-wrap pb-6">

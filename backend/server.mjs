@@ -3,7 +3,7 @@ import express from "express";
 import compression from "compression";
 import path from "path";
 import { fileURLToPath } from "url";
-import admin2 from "firebase-admin";
+import admin4 from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import dotEnv from "dotenv";
@@ -1947,6 +1947,391 @@ async function pollRecentNotificationsForPush(db, adminSdk, limit = 50) {
   return results;
 }
 
+// chatAssignment.mjs
+import admin2 from "firebase-admin";
+function isSuperAdmin(role) {
+  const r = String(role || "").toLowerCase();
+  return r === "superadmin" || r === "super_admin";
+}
+async function getConversation(db, conversationId) {
+  const ref = db.collection("conversations").doc(conversationId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    const err = new Error("\u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
+    err.code = "NOT_FOUND";
+    err.status = 404;
+    throw err;
+  }
+  return { ref, data: { id: snap.id, ...snap.data() } };
+}
+async function resolveUserName(db, userId) {
+  if (!userId) return null;
+  const snap = await db.collection("users").doc(userId).get();
+  if (!snap.exists) return userId;
+  const d = snap.data() || {};
+  return String(d.name || d.displayName || d.email || userId);
+}
+function defaultAssignment() {
+  return {
+    assignedToUserId: null,
+    assignedToName: null,
+    assignedToRole: null,
+    assignedBy: null,
+    assignedAt: null,
+    status: "unassigned",
+    lastResponseAt: null,
+    firstResponseDueAt: null,
+    transferHistory: []
+  };
+}
+function withAssigneePrivacy(data, assigneeUserId) {
+  const prev = data.conversationPrivacy;
+  if (!prev || typeof prev !== "object" || !assigneeUserId) return {};
+  const visibility = String(prev.visibility || "");
+  if (visibility === "superadmin_private") return {};
+  const allowed = Array.isArray(prev.allowedUserIds) ? prev.allowedUserIds.map(String).filter(Boolean) : [];
+  if (!allowed.includes(assigneeUserId)) allowed.push(assigneeUserId);
+  const conversationPrivacy = {
+    ...prev,
+    allowedUserIds: allowed
+  };
+  return {
+    conversationPrivacy,
+    privacyHash: computePrivacyHash2(conversationPrivacy)
+  };
+}
+async function assignConversation(db, actor, input) {
+  if (!isSuperAdmin(actor.role)) {
+    const err = new Error("\u062A\u0639\u064A\u064A\u0646 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0627\u062A \u0644\u0644\u0633\u0648\u0628\u0631 \u0623\u062F\u0645\u0646 \u0641\u0642\u0637");
+    err.status = 403;
+    throw err;
+  }
+  const conversationId = String(input.conversationId || "").trim();
+  const assigneeUserId = String(input.assigneeUserId || "").trim();
+  if (!conversationId || !assigneeUserId) {
+    const err = new Error("conversationId and assigneeUserId required");
+    err.status = 400;
+    throw err;
+  }
+  const assigneeSnap = await db.collection("users").doc(assigneeUserId).get();
+  if (!assigneeSnap.exists) {
+    const err = new Error("\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+    err.status = 404;
+    throw err;
+  }
+  const assignee = assigneeSnap.data() || {};
+  const assigneeRole = String(input.assigneeRole || assignee.role || "").toLowerCase();
+  if (!["platform_assistant", "superadmin", "super_admin"].includes(assigneeRole)) {
+    const err = new Error("\u0646\u0648\u0639 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645 \u0644\u0644\u062A\u0639\u064A\u064A\u0646");
+    err.status = 400;
+    throw err;
+  }
+  const { ref, data } = await getConversation(db, conversationId);
+  const FieldValue = admin2.firestore.FieldValue;
+  const now = FieldValue.serverTimestamp();
+  const dueMinutes = Number(input.firstResponseDueMinutes || 30);
+  const dueAt = admin2.firestore.Timestamp.fromMillis(Date.now() + dueMinutes * 60 * 1e3);
+  const assigneeName = await resolveUserName(db, assigneeUserId);
+  const prev = data.conversationAssignment || defaultAssignment();
+  const conversationAssignment = {
+    assignedToUserId: assigneeUserId,
+    assignedToName: assigneeName,
+    assignedToRole: assigneeRole.includes("super") ? "superadmin" : "platform_assistant",
+    assignedBy: actor.uid,
+    assignedAt: now,
+    status: "assigned",
+    lastResponseAt: prev.lastResponseAt || null,
+    firstResponseDueAt: dueAt,
+    transferHistory: prev.transferHistory || []
+  };
+  await ref.set(
+    {
+      conversationAssignment,
+      updatedAt: now,
+      ...withAssigneePrivacy(data, assigneeUserId)
+    },
+    { merge: true }
+  );
+  return { ok: true, conversationId, conversationAssignment };
+}
+async function transferConversation(db, actor, input) {
+  if (!isSuperAdmin(actor.role)) {
+    const err = new Error("\u062A\u062D\u0648\u064A\u0644 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0627\u062A \u0644\u0644\u0633\u0648\u0628\u0631 \u0623\u062F\u0645\u0646 \u0641\u0642\u0637");
+    err.status = 403;
+    throw err;
+  }
+  const conversationId = String(input.conversationId || "").trim();
+  const toUserId = String(input.toUserId || "").trim();
+  if (!conversationId || !toUserId) {
+    const err = new Error("conversationId and toUserId required");
+    err.status = 400;
+    throw err;
+  }
+  const { ref, data } = await getConversation(db, conversationId);
+  const prev = data.conversationAssignment || defaultAssignment();
+  const FieldValue = admin2.firestore.FieldValue;
+  const now = FieldValue.serverTimestamp();
+  const toName = await resolveUserName(db, toUserId);
+  const toSnap = await db.collection("users").doc(toUserId).get();
+  const toRole = String(toSnap.data()?.role || "").toLowerCase();
+  const entry = {
+    fromUserId: prev.assignedToUserId || null,
+    fromName: prev.assignedToName || null,
+    toUserId,
+    toName,
+    transferredBy: actor.uid,
+    reason: String(input.reason || "").trim() || null,
+    transferredAt: now
+  };
+  const conversationAssignment = {
+    ...prev,
+    assignedToUserId: toUserId,
+    assignedToName: toName,
+    assignedToRole: toRole.includes("super") ? "superadmin" : "platform_assistant",
+    assignedBy: actor.uid,
+    assignedAt: now,
+    status: "assigned",
+    transferHistory: [...prev.transferHistory || [], entry]
+  };
+  await ref.set(
+    {
+      conversationAssignment,
+      updatedAt: now,
+      ...withAssigneePrivacy(data, toUserId)
+    },
+    { merge: true }
+  );
+  return { ok: true, conversationId, conversationAssignment };
+}
+async function unassignConversation(db, actor, input) {
+  if (!isSuperAdmin(actor.role)) {
+    const err = new Error("\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u062A\u0639\u064A\u064A\u0646 \u0644\u0644\u0633\u0648\u0628\u0631 \u0623\u062F\u0645\u0646 \u0641\u0642\u0637");
+    err.status = 403;
+    throw err;
+  }
+  const conversationId = String(input.conversationId || "").trim();
+  const { ref, data } = await getConversation(db, conversationId);
+  const prev = data.conversationAssignment || defaultAssignment();
+  const FieldValue = admin2.firestore.FieldValue;
+  const conversationAssignment = {
+    ...prev,
+    assignedToUserId: null,
+    assignedToName: null,
+    assignedToRole: null,
+    status: "unassigned",
+    assignedBy: actor.uid,
+    assignedAt: FieldValue.serverTimestamp()
+  };
+  await ref.set(
+    { conversationAssignment, updatedAt: FieldValue.serverTimestamp() },
+    { merge: true }
+  );
+  return { ok: true, conversationId, conversationAssignment };
+}
+async function closeConversation(db, actor, input) {
+  if (!isSuperAdmin(actor.role)) {
+    const err = new Error("\u0625\u063A\u0644\u0627\u0642 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0627\u062A \u0644\u0644\u0633\u0648\u0628\u0631 \u0623\u062F\u0645\u0646 \u0641\u0642\u0637");
+    err.status = 403;
+    throw err;
+  }
+  const conversationId = String(input.conversationId || "").trim();
+  const { ref, data } = await getConversation(db, conversationId);
+  const prev = data.conversationAssignment || defaultAssignment();
+  const FieldValue = admin2.firestore.FieldValue;
+  const conversationAssignment = {
+    ...prev,
+    status: "closed",
+    assignedBy: actor.uid,
+    assignedAt: FieldValue.serverTimestamp()
+  };
+  await ref.set(
+    { conversationAssignment, updatedAt: FieldValue.serverTimestamp() },
+    { merge: true }
+  );
+  return { ok: true, conversationId, conversationAssignment };
+}
+async function getConversationAssignment(db, actor, conversationId) {
+  const { data } = await getConversation(db, conversationId);
+  const role = String(actor.role || "").toLowerCase();
+  const assignment = data.conversationAssignment || defaultAssignment();
+  if (!isSuperAdmin(role)) {
+    if (role === "platform_assistant") {
+      const allowed = data.conversationPrivacy?.allowedUserIds || [];
+      const owner = data.conversationPrivacy?.ownerUserId;
+      const canView = assignment.assignedToUserId === actor.uid || allowed.includes(actor.uid) || owner === actor.uid;
+      if (!canView) {
+        const err = new Error("\u063A\u064A\u0631 \u0645\u0635\u0631\u062D");
+        err.status = 403;
+        throw err;
+      }
+    } else {
+      const err = new Error("\u063A\u064A\u0631 \u0645\u0635\u0631\u062D");
+      err.status = 403;
+      throw err;
+    }
+  }
+  return {
+    ok: true,
+    conversationId,
+    conversationAssignment: assignment,
+    conversationPrivacy: data.conversationPrivacy || null,
+    schoolId: data.schoolId || null,
+    contactType: data.contactType || null,
+    contactId: data.contactId || null
+  };
+}
+
+// chatDirectory.mjs
+var SCHOOL_CONTACT_PERMS2 = /* @__PURE__ */ new Set(["manage_schools", "view_requests"]);
+function asPermissionList3(raw) {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (raw && typeof raw === "object") {
+    return Object.entries(raw).filter(([, v]) => v === true).map(([k]) => k);
+  }
+  return [];
+}
+function mapSafeSchool(doc) {
+  const data = doc.data() || {};
+  const status = String(data.status ?? data.lifecycleStatus ?? "active").toLowerCase();
+  if (status === "deleted" || status === "archived") return null;
+  if (data.deletedAt || data.permanentlyDeletedAt) return null;
+  return {
+    id: doc.id,
+    name: String(data.name ?? doc.id),
+    logoUrl: data.logoUrl ? String(data.logoUrl) : null,
+    status,
+    contactType: "school"
+  };
+}
+async function loadSafeSchoolDirectory(db, actor) {
+  const uid = String(actor.uid || "");
+  const role = String(actor.role || "").toLowerCase();
+  const permissions = asPermissionList3(actor.permissions);
+  const canSeeSchools = permissions.some((p) => SCHOOL_CONTACT_PERMS2.has(p));
+  if (role !== "platform_assistant") {
+    const err = new Error("FORBIDDEN");
+    err.status = 403;
+    throw err;
+  }
+  if (!canSeeSchools) {
+    return { schools: [], schoolsCount: 0, queryStarted: false };
+  }
+  const snap = await db.collection("schools").get();
+  const schools = snap.docs.map(mapSafeSchool).filter(Boolean);
+  schools.sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  return {
+    schools,
+    schoolsCount: schools.length,
+    queryStarted: true,
+    uid,
+    effectiveRole: role,
+    permissions,
+    errorCode: null
+  };
+}
+
+// chatEscalationWorker.mjs
+import admin3 from "firebase-admin";
+var DEFAULT_CONFIG = {
+  enabled: true,
+  firstResponseTimeoutMinutes: 30,
+  inactivityTimeoutMinutes: 120,
+  escalationTarget: "superadmin",
+  notifySuperAdmin: true
+};
+async function loadConfig(db) {
+  try {
+    const snap = await db.collection("system_config").doc("chat_escalation").get();
+    if (snap.exists) return { ...DEFAULT_CONFIG, ...snap.data() };
+  } catch {
+  }
+  return DEFAULT_CONFIG;
+}
+async function findSuperAdminUid(db) {
+  const snap = await db.collection("users").where("role", "in", ["superadmin", "super_admin"]).limit(1).get();
+  return snap.empty ? null : snap.docs[0].id;
+}
+async function findNextAssistant(db, excludeUid) {
+  const snap = await db.collection("users").where("role", "==", "platform_assistant").limit(20).get();
+  const candidate = snap.docs.find((d) => d.id !== excludeUid);
+  return candidate ? candidate.id : null;
+}
+function isOverdue(dueAt) {
+  if (!dueAt) return false;
+  const ms = typeof dueAt.toMillis === "function" ? dueAt.toMillis() : Number(dueAt);
+  return ms > 0 && Date.now() > ms;
+}
+async function runChatEscalation(db, opts = {}) {
+  const config = await loadConfig(db);
+  if (!config.enabled) {
+    return { ok: true, skipped: true, reason: "disabled", escalated: 0 };
+  }
+  const snap = await db.collection("conversations").where("conversationAssignment.status", "in", ["assigned", "waiting"]).get();
+  let escalated = 0;
+  const results = [];
+  const systemActor = { uid: opts.actorUid || "system", role: "superadmin" };
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    const assignment = data.conversationAssignment;
+    if (!assignment) continue;
+    if (assignment.assignedToRole === "superadmin") continue;
+    const overdue = isOverdue(assignment.firstResponseDueAt) || assignment.status === "waiting" && isOverdue(assignment.lastResponseAt);
+    if (!overdue) continue;
+    let targetUid = null;
+    if (config.escalationTarget === "next_available_assistant") {
+      targetUid = await findNextAssistant(db, assignment.assignedToUserId);
+    }
+    if (!targetUid) {
+      targetUid = await findSuperAdminUid(db);
+    }
+    if (!targetUid || targetUid === assignment.assignedToUserId) continue;
+    const transferResult = await transferConversation(db, systemActor, {
+      conversationId: doc.id,
+      toUserId: targetUid,
+      reason: "auto_escalation_no_response"
+    });
+    const FieldValue = admin3.firestore.FieldValue;
+    await doc.ref.set(
+      {
+        conversationAssignment: {
+          ...transferResult.conversationAssignment,
+          status: "escalated"
+        },
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+    await db.collection("audit_logs").add({
+      action: "CHAT_ESCALATION",
+      actorId: systemActor.uid,
+      conversationId: doc.id,
+      fromUserId: assignment.assignedToUserId,
+      toUserId: targetUid,
+      createdAt: /* @__PURE__ */ new Date(),
+      timestamp: /* @__PURE__ */ new Date()
+    });
+    if (config.notifySuperAdmin) {
+      const notifTargets = [targetUid];
+      if (assignment.assignedToUserId) notifTargets.push(assignment.assignedToUserId);
+      for (const uid of [...new Set(notifTargets)]) {
+        await db.collection("notifications").add({
+          userId: uid,
+          title: "\u062A\u0635\u0639\u064A\u062F \u0645\u062D\u0627\u062F\u062B\u0629",
+          message: "\u062A\u0645 \u062A\u062D\u0648\u064A\u0644 \u0645\u062D\u0627\u062F\u062B\u0629 \u0628\u0633\u0628\u0628 \u062A\u0623\u062E\u0631 \u0627\u0644\u0631\u062F",
+          type: "chat",
+          schoolId: data.schoolId || null,
+          read: false,
+          createdAt: FieldValue.serverTimestamp(),
+          metadata: { conversationId: doc.id, routeTarget: "chat" }
+        });
+      }
+    }
+    escalated += 1;
+    results.push({ conversationId: doc.id, toUserId: targetUid });
+  }
+  return { ok: true, escalated, results, config };
+}
+
 // server.ts
 dotEnv.config();
 var __filename = fileURLToPath(import.meta.url);
@@ -1974,8 +2359,8 @@ var serviceAccount = {
 };
 if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   try {
-    admin2.initializeApp({
-      credential: admin2.credential.cert(serviceAccount),
+    admin4.initializeApp({
+      credential: admin4.credential.cert(serviceAccount),
       storageBucket: firebaseConfig.storageBucket
       // Added
     });
@@ -1985,7 +2370,7 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   }
 } else {
   try {
-    admin2.initializeApp({
+    admin4.initializeApp({
       storageBucket: firebaseConfig.storageBucket
       // Added
     });
@@ -1996,10 +2381,10 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
 }
 var getDb = () => {
   const dbId = firebaseConfig.firestoreDatabaseId;
-  if (admin2.apps.length === 0) {
+  if (admin4.apps.length === 0) {
     return getFirestore();
   }
-  return getFirestore(admin2.app(), dbId || "(default)");
+  return getFirestore(admin4.app(), dbId || "(default)");
 };
 var MIN_CRON_SECRET_LEN = 32;
 function isProductionEnv() {
@@ -2098,7 +2483,7 @@ async function startServer() {
       if (val instanceof Date) {
         return val;
       }
-      if (val instanceof admin2.firestore.FieldValue || val instanceof admin2.firestore.Timestamp || val instanceof admin2.firestore.GeoPoint || val instanceof admin2.firestore.DocumentReference) {
+      if (val instanceof admin4.firestore.FieldValue || val instanceof admin4.firestore.Timestamp || val instanceof admin4.firestore.GeoPoint || val instanceof admin4.firestore.DocumentReference) {
         return val;
       }
       if (val.constructor && [
@@ -2134,7 +2519,7 @@ async function startServer() {
       const db = getDb();
       const user = req.user || {};
       const sanitizedDetails = details ? sanitizeForFirestore(details) : {};
-      const expiresAt = admin2.firestore.Timestamp.fromMillis(
+      const expiresAt = admin4.firestore.Timestamp.fromMillis(
         Date.now() + 90 * 24 * 60 * 60 * 1e3
       );
       await db.collection("audit_logs").add({
@@ -2145,8 +2530,8 @@ async function startServer() {
         ip: req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress,
         userAgent: req.headers["user-agent"],
         details: sanitizedDetails,
-        timestamp: admin2.firestore.FieldValue.serverTimestamp(),
-        createdAt: admin2.firestore.FieldValue.serverTimestamp(),
+        timestamp: admin4.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin4.firestore.FieldValue.serverTimestamp(),
         expiresAt
       });
     } catch (error) {
@@ -2178,7 +2563,7 @@ async function startServer() {
         console.warn(`[SECURITY] Custom claims size (${Buffer.byteLength(claimsStr, "utf8")} bytes) exceeds limit for UID: ${redactUid(uid)}. Stripping nested permissions 'p' to avoid claims exception.`);
         claims.p = null;
       }
-      await admin2.auth().setCustomUserClaims(uid, claims);
+      await admin4.auth().setCustomUserClaims(uid, claims);
       console.log(`Claims synced for user ${redactUid(uid)}: role=${role}, sv=${securityVersion}`);
     } catch (error) {
       console.error(`Error setting claims for user ${redactUid(uid)}:`, error);
@@ -2194,7 +2579,7 @@ async function startServer() {
     }
     const token = authHeader.split("Bearer ")[1];
     try {
-      const decodedToken = await admin2.auth().verifyIdToken(token);
+      const decodedToken = await admin4.auth().verifyIdToken(token);
       const email = decodedToken.email?.toLowerCase();
       let isBootstrapAdmin = false;
       if (getBootstrapAdmins().includes(email) && decodedToken.email_verified === true) {
@@ -2271,7 +2656,7 @@ async function startServer() {
     }
     const token = authHeader.split("Bearer ")[1];
     try {
-      const decodedToken = await admin2.auth().verifyIdToken(token);
+      const decodedToken = await admin4.auth().verifyIdToken(token);
       req.user = decodedToken;
       next();
     } catch (e) {
@@ -2639,7 +3024,7 @@ async function startServer() {
       let isExistingUser = false;
       let existingUserData = null;
       try {
-        const existingUser = await admin2.auth().getUserByEmail(emailLower);
+        const existingUser = await admin4.auth().getUserByEmail(emailLower);
         uid = existingUser.uid;
         console.log(`User already exists in Auth: ${redactUid(uid)}`);
         const userDoc = await db.collection("users").doc(uid).get();
@@ -2677,13 +3062,13 @@ async function startServer() {
         }
         if (displayName) updateParams.displayName = displayName;
         if (Object.keys(updateParams).length > 1 || updateParams.emailVerified) {
-          await admin2.auth().updateUser(uid, updateParams);
+          await admin4.auth().updateUser(uid, updateParams);
           console.log(`Updated existing Auth user: ${redactUid(uid)}, verified: true, hasPasswordUpd: ${!!updateParams.password}`);
         }
       } catch (authError) {
         if (authError.code === "auth/user-not-found") {
           const generatedSecurePass = crypto4.randomBytes(16).toString("hex") + "SecureP1!";
-          const userRecord = await admin2.auth().createUser({
+          const userRecord = await admin4.auth().createUser({
             email: emailLower,
             password: password || generatedSecurePass,
             // Ensure a password is set securely
@@ -2720,7 +3105,7 @@ async function startServer() {
             role: targetRole,
             schoolId: effectiveSchoolId,
             ...safeAdditionalData,
-            createdAt: isExistingUser ? existingUserData.createdAt : admin2.firestore.FieldValue.serverTimestamp()
+            createdAt: isExistingUser ? existingUserData.createdAt : admin4.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
           transaction.set(db.collection("students").doc(uid), {
             id: uid,
@@ -2728,11 +3113,11 @@ async function startServer() {
             name: displayName,
             schoolId: effectiveSchoolId,
             ...safeAdditionalData,
-            createdAt: isExistingUser ? existingUserData.createdAt : admin2.firestore.FieldValue.serverTimestamp()
+            createdAt: isExistingUser ? existingUserData.createdAt : admin4.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
           if (shouldIncrement) {
             transaction.update(schoolRef, {
-              studentCount: admin2.firestore.FieldValue.increment(1)
+              studentCount: admin4.firestore.FieldValue.increment(1)
             });
           }
         });
@@ -2746,7 +3131,7 @@ async function startServer() {
           role: targetRole,
           schoolId: effectiveSchoolId,
           ...safeAdditionalData,
-          createdAt: isExistingUser ? existingUserData.createdAt : admin2.firestore.FieldValue.serverTimestamp()
+          createdAt: isExistingUser ? existingUserData.createdAt : admin4.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
       }
       await logAudit(req, "CREATE_USER", { after: { email: emailLower, role: targetRole, schoolId: effectiveSchoolId, assistantType: resolvedAssistantType } });
@@ -2810,7 +3195,7 @@ async function startServer() {
       const plan = req.body;
       const docRef = await db.collection("packages").add({
         ...plan,
-        createdAt: admin2.firestore.FieldValue.serverTimestamp()
+        createdAt: admin4.firestore.FieldValue.serverTimestamp()
       });
       await logAudit(req, "CREATE_PLAN", { after: plan });
       res.json({ id: docRef.id });
@@ -2826,7 +3211,7 @@ async function startServer() {
       const beforeDoc = await db.collection("packages").doc(id).get();
       await db.collection("packages").doc(id).update({
         ...req.body,
-        updatedAt: admin2.firestore.FieldValue.serverTimestamp()
+        updatedAt: admin4.firestore.FieldValue.serverTimestamp()
       });
       await logAudit(req, "UPDATE_PLAN", { before: beforeDoc.data() || null, after: req.body });
       res.json({ success: true });
@@ -2868,7 +3253,7 @@ async function startServer() {
       const targetRole = beforeData.role;
       let authExists = false;
       try {
-        await admin2.auth().getUser(userId);
+        await admin4.auth().getUser(userId);
         authExists = true;
       } catch (authError) {
         if (authError.code !== "auth/user-not-found") {
@@ -2895,8 +3280,8 @@ async function startServer() {
       }
       const result = await runUserPermanentDelete({
         db,
-        authAdmin: admin2.auth(),
-        adminSdk: admin2,
+        authAdmin: admin4.auth(),
+        adminSdk: admin4,
         userId
       });
       await logAudit(req, "DELETE_USER", {
@@ -2933,7 +3318,7 @@ async function startServer() {
       const usersQuery = await db.collection("users").where("schoolId", "==", schoolId).get();
       const userDeletions = usersQuery.docs.map(async (uDoc) => {
         try {
-          await admin2.auth().deleteUser(uDoc.id);
+          await admin4.auth().deleteUser(uDoc.id);
         } catch (e) {
         }
         await uDoc.ref.delete();
@@ -3008,7 +3393,7 @@ async function startServer() {
       }
       const result = await runSchoolPermanentDelete({
         db: getDb(),
-        authAdmin: admin2.auth(),
+        authAdmin: admin4.auth(),
         schoolId,
         confirm,
         schoolName: schoolName != null ? String(schoolName) : void 0,
@@ -3208,10 +3593,125 @@ async function startServer() {
       });
     }
   });
+  async function loadActorPermissions(req) {
+    if (req.user?.permissions != null) return req.user.permissions;
+    const userSnap = await getDb().collection("users").doc(req.user.uid).get();
+    return userSnap.data()?.permissions || [];
+  }
+  app.get("/api/messages/chat-directory/schools", verifyAdmin, async (req, res) => {
+    try {
+      const permissions = await loadActorPermissions(req);
+      const result = await loadSafeSchoolDirectory(getDb(), {
+        uid: req.user.uid,
+        role: req.user.role,
+        permissions
+      });
+      res.json({
+        ok: true,
+        schools: result.schools,
+        schoolsCount: result.schoolsCount,
+        errorCode: result.errorCode ?? null
+      });
+    } catch (error) {
+      const status = error.status || 500;
+      if (status >= 500) console.error("Chat directory schools error:", error);
+      res.status(status).json({
+        error: error.message || "CHAT_DIRECTORY_FAILED",
+        errorCode: status === 403 ? "FORBIDDEN" : "API_ERROR",
+        schools: []
+      });
+    }
+  });
+  app.get("/api/admin/chat/conversations/:conversationId/assignment", verifyAdmin, async (req, res) => {
+    try {
+      const conversationId = String(req.params.conversationId || "").trim();
+      if (!conversationId) {
+        return res.status(400).json({ error: "INVALID_CONVERSATION_ID" });
+      }
+      const result = await getConversationAssignment(getDb(), req.user, conversationId);
+      res.json(result);
+    } catch (error) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || "GET_ASSIGNMENT_FAILED" });
+    }
+  });
+  app.post("/api/admin/chat/conversations/assign", verifyAdmin, async (req, res) => {
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
+      }
+      const result = await assignConversation(getDb(), req.user, {
+        conversationId: req.body?.conversationId,
+        assigneeUserId: req.body?.assigneeUserId,
+        assigneeRole: req.body?.assigneeRole,
+        firstResponseDueMinutes: req.body?.firstResponseDueMinutes
+      });
+      await logAudit(req, "CHAT_ASSIGN_CONVERSATION", {
+        metadata: { conversationId: result.conversationId, assigneeUserId: req.body?.assigneeUserId }
+      });
+      res.json(result);
+    } catch (error) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || "ASSIGN_FAILED" });
+    }
+  });
+  app.post("/api/admin/chat/conversations/transfer", verifyAdmin, async (req, res) => {
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
+      }
+      const result = await transferConversation(getDb(), req.user, {
+        conversationId: req.body?.conversationId,
+        toUserId: req.body?.toUserId,
+        reason: req.body?.reason
+      });
+      await logAudit(req, "CHAT_TRANSFER_CONVERSATION", {
+        metadata: { conversationId: result.conversationId, toUserId: req.body?.toUserId }
+      });
+      res.json(result);
+    } catch (error) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || "TRANSFER_FAILED" });
+    }
+  });
+  app.post("/api/admin/chat/conversations/unassign", verifyAdmin, async (req, res) => {
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
+      }
+      const result = await unassignConversation(getDb(), req.user, {
+        conversationId: req.body?.conversationId
+      });
+      await logAudit(req, "CHAT_UNASSIGN_CONVERSATION", {
+        metadata: { conversationId: result.conversationId }
+      });
+      res.json(result);
+    } catch (error) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || "UNASSIGN_FAILED" });
+    }
+  });
+  app.post("/api/admin/chat/conversations/close", verifyAdmin, async (req, res) => {
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
+      }
+      const result = await closeConversation(getDb(), req.user, {
+        conversationId: req.body?.conversationId
+      });
+      await logAudit(req, "CHAT_CLOSE_CONVERSATION", {
+        metadata: { conversationId: result.conversationId }
+      });
+      res.json(result);
+    } catch (error) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || "CLOSE_FAILED" });
+    }
+  });
   app.post("/api/public/distributors/register", async (req, res) => {
     const body = req.body || {};
     try {
-      const result = await registerDistributorApplication(getDb(), admin2, {
+      const result = await registerDistributorApplication(getDb(), admin4, {
         name: body.name,
         phone: body.phone,
         address: body.address,
@@ -3249,8 +3749,8 @@ async function startServer() {
       }
       const result = await approveDistributor({
         db: getDb(),
-        authAdmin: admin2.auth(),
-        adminSdk: admin2,
+        authAdmin: admin4.auth(),
+        adminSdk: admin4,
         distributorId,
         actorUid: req.user.uid,
         password,
@@ -3277,7 +3777,7 @@ async function startServer() {
       }
       const result = await rejectDistributor({
         db: getDb(),
-        adminSdk: admin2,
+        adminSdk: admin4,
         distributorId,
         actorUid: req.user.uid,
         reason
@@ -3310,7 +3810,7 @@ async function startServer() {
       }
       const result = await applyDistributorCoupon({
         db: getDb(),
-        adminSdk: admin2,
+        adminSdk: admin4,
         schoolId,
         couponCode,
         actorUid: req.user.uid
@@ -3344,7 +3844,7 @@ async function startServer() {
       }
       const counts = await generateMonthlyCommissions({
         db: getDb(),
-        adminSdk: admin2,
+        adminSdk: admin4,
         monthKey
       });
       await logAudit(req, "DISTRIBUTOR_GENERATE_MONTHLY", {
@@ -3370,7 +3870,7 @@ async function startServer() {
       }
       const result = await markCommissionPaid({
         db: getDb(),
-        adminSdk: admin2,
+        adminSdk: admin4,
         commissionId,
         paidBy: req.user.uid,
         notes
@@ -3405,7 +3905,7 @@ async function startServer() {
       }
       const result = await markDistributorMonthCommissionsPaid({
         db: getDb(),
-        adminSdk: admin2,
+        adminSdk: admin4,
         distributorId,
         monthKey,
         paidBy: req.user.uid,
@@ -3434,7 +3934,7 @@ async function startServer() {
       }
       const result = await setSchoolDistributorCommissionPaused({
         db: getDb(),
-        adminSdk: admin2,
+        adminSdk: admin4,
         schoolId,
         paused,
         pausedBy: req.user.uid
@@ -3474,12 +3974,12 @@ async function startServer() {
         transaction.delete(db.collection("users").doc(id));
         if (schoolId) {
           transaction.update(db.collection("schools").doc(schoolId), {
-            studentCount: admin2.firestore.FieldValue.increment(-1)
+            studentCount: admin4.firestore.FieldValue.increment(-1)
           });
         }
       });
       try {
-        await admin2.auth().deleteUser(id);
+        await admin4.auth().deleteUser(id);
       } catch (authError) {
       }
       await logAudit(req, "DELETE_STUDENT", { before: beforeData, metadata: { targetId: id } });
@@ -3514,7 +4014,7 @@ async function startServer() {
         let hasMore = true;
         let isFirstInColl = true;
         while (hasMore) {
-          let query = db.collection(collName).orderBy(admin2.firestore.FieldPath.documentId()).limit(1e3);
+          let query = db.collection(collName).orderBy(admin4.firestore.FieldPath.documentId()).limit(1e3);
           if (lastDoc) {
             query = query.startAfter(lastDoc);
           }
@@ -3602,7 +4102,7 @@ async function startServer() {
     try {
       const db = getDb();
       const limit = Math.min(Number(req.body?.limit) || 50, 100);
-      const results = await pollRecentNotificationsForPush(db, admin2, limit);
+      const results = await pollRecentNotificationsForPush(db, admin4, limit);
       res.json({
         success: true,
         processed: results.length,
@@ -3612,6 +4112,19 @@ async function startServer() {
     } catch (error) {
       console.error("[Notifications] PUSH_SEND_ERROR poll", error);
       res.status(500).json({ success: false, error: error.message || "Push poll failed" });
+    }
+  });
+  app.post("/api/internal/chat-escalation/run", express.json(), async (req, res) => {
+    const secret = resolveCronSecret(process.env.CHAT_CRON_SECRET, process.env.CRON_SECRET);
+    if (!secret || req.headers["x-cron-secret"] !== secret) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    try {
+      const result = await runChatEscalation(getDb(), { actorUid: "system" });
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("[ChatEscalation] error", error);
+      res.status(500).json({ success: false, error: error.message || "Chat escalation failed" });
     }
   });
   app.all("/api/*", (req, res) => {
@@ -3666,7 +4179,7 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
     try {
       const db = getDb();
-      setupNotificationPushListener(db, admin2);
+      setupNotificationPushListener(db, admin4);
     } catch (e) {
       console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
     }

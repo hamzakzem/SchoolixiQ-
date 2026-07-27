@@ -26,4 +26,15 @@ for (const [srcName, destName] of pairs) {
   fs.copyFileSync(src, dest);
 }
 
+const chatModules = ['chatAssignment.mjs', 'chatDirectory.mjs', 'chatEscalationWorker.mjs'];
+for (const name of chatModules) {
+  const src = path.join(root, name);
+  const dest = path.join(backendDir, name);
+  if (!fs.existsSync(src)) {
+    console.error(`FAIL: missing ${name} at ${src}`);
+    process.exit(1);
+  }
+  fs.copyFileSync(src, dest);
+}
+
 console.log('OK: staged backend build sources into backend/');

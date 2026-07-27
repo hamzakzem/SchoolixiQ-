@@ -40,6 +40,15 @@ import {
   setupNotificationPushListener,
   pollRecentNotificationsForPush,
 } from './notificationPushDispatch.ts';
+import {
+  assignConversation,
+  transferConversation,
+  unassignConversation,
+  closeConversation,
+  getConversationAssignment,
+} from './chatAssignment.mjs';
+import { loadSafeSchoolDirectory } from './chatDirectory.mjs';
+import { runChatEscalation } from './chatEscalationWorker.mjs';
 
 dotEnv.config();
 
@@ -1537,6 +1546,128 @@ async function startServer() {
     }
   });
 
+  async function loadActorPermissions(req: any): Promise<unknown> {
+    if (req.user?.permissions != null) return req.user.permissions;
+    const userSnap = await getDb().collection('users').doc(req.user.uid).get();
+    return userSnap.data()?.permissions || [];
+  }
+
+  app.get('/api/messages/chat-directory/schools', verifyAdmin, async (req: any, res: any) => {
+    try {
+      const permissions = await loadActorPermissions(req);
+      const result = await loadSafeSchoolDirectory(getDb(), {
+        uid: req.user.uid,
+        role: req.user.role,
+        permissions,
+      });
+      res.json({
+        ok: true,
+        schools: result.schools,
+        schoolsCount: result.schoolsCount,
+        errorCode: result.errorCode ?? null,
+      });
+    } catch (error: any) {
+      const status = error.status || 500;
+      if (status >= 500) console.error('Chat directory schools error:', error);
+      res.status(status).json({
+        error: error.message || 'CHAT_DIRECTORY_FAILED',
+        errorCode: status === 403 ? 'FORBIDDEN' : 'API_ERROR',
+        schools: [],
+      });
+    }
+  });
+
+  app.get('/api/admin/chat/conversations/:conversationId/assignment', verifyAdmin, async (req: any, res: any) => {
+    try {
+      const conversationId = String(req.params.conversationId || '').trim();
+      if (!conversationId) {
+        return res.status(400).json({ error: 'INVALID_CONVERSATION_ID' });
+      }
+      const result = await getConversationAssignment(getDb(), req.user, conversationId);
+      res.json(result);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || 'GET_ASSIGNMENT_FAILED' });
+    }
+  });
+
+  app.post('/api/admin/chat/conversations/assign', verifyAdmin, async (req: any, res: any) => {
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
+      }
+      const result = await assignConversation(getDb(), req.user, {
+        conversationId: req.body?.conversationId,
+        assigneeUserId: req.body?.assigneeUserId,
+        assigneeRole: req.body?.assigneeRole,
+        firstResponseDueMinutes: req.body?.firstResponseDueMinutes,
+      });
+      await logAudit(req, 'CHAT_ASSIGN_CONVERSATION', {
+        metadata: { conversationId: result.conversationId, assigneeUserId: req.body?.assigneeUserId },
+      });
+      res.json(result);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || 'ASSIGN_FAILED' });
+    }
+  });
+
+  app.post('/api/admin/chat/conversations/transfer', verifyAdmin, async (req: any, res: any) => {
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
+      }
+      const result = await transferConversation(getDb(), req.user, {
+        conversationId: req.body?.conversationId,
+        toUserId: req.body?.toUserId,
+        reason: req.body?.reason,
+      });
+      await logAudit(req, 'CHAT_TRANSFER_CONVERSATION', {
+        metadata: { conversationId: result.conversationId, toUserId: req.body?.toUserId },
+      });
+      res.json(result);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || 'TRANSFER_FAILED' });
+    }
+  });
+
+  app.post('/api/admin/chat/conversations/unassign', verifyAdmin, async (req: any, res: any) => {
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
+      }
+      const result = await unassignConversation(getDb(), req.user, {
+        conversationId: req.body?.conversationId,
+      });
+      await logAudit(req, 'CHAT_UNASSIGN_CONVERSATION', {
+        metadata: { conversationId: result.conversationId },
+      });
+      res.json(result);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || 'UNASSIGN_FAILED' });
+    }
+  });
+
+  app.post('/api/admin/chat/conversations/close', verifyAdmin, async (req: any, res: any) => {
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
+      }
+      const result = await closeConversation(getDb(), req.user, {
+        conversationId: req.body?.conversationId,
+      });
+      await logAudit(req, 'CHAT_CLOSE_CONVERSATION', {
+        metadata: { conversationId: result.conversationId },
+      });
+      res.json(result);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || 'CLOSE_FAILED' });
+    }
+  });
+
   // --- Distributor registration & approval ---
   app.post('/api/public/distributors/register', async (req: any, res: any) => {
     const body = req.body || {};
@@ -2020,6 +2151,21 @@ async function startServer() {
     } catch (error: any) {
       console.error('[Notifications] PUSH_SEND_ERROR poll', error);
       res.status(500).json({ success: false, error: error.message || 'Push poll failed' });
+    }
+  });
+
+  // Cloud Scheduler: POST /api/internal/chat-escalation/run with header X-Cron-Secret
+  app.post('/api/internal/chat-escalation/run', express.json(), async (req: any, res: any) => {
+    const secret = resolveCronSecret(process.env.CHAT_CRON_SECRET, process.env.CRON_SECRET);
+    if (!secret || req.headers['x-cron-secret'] !== secret) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    try {
+      const result = await runChatEscalation(getDb(), { actorUid: 'system' });
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('[ChatEscalation] error', error);
+      res.status(500).json({ success: false, error: error.message || 'Chat escalation failed' });
     }
   });
 

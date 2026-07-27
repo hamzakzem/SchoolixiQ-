@@ -61,6 +61,7 @@ import { useNotificationBadges } from "../lib/NotificationBadgeContext";
 import { useNotificationRouteRedirect, normalizeDashboardRole } from "../lib/useNotificationRouteRedirect";
 import { canAccessAdminMenuItem } from "../lib/staffPermissions";
 import { DashboardShell } from "../components/layout/DashboardShell";
+import { DashboardSmartAssistant } from "../components/smart-assistant/DashboardSmartAssistant";
 import {
   attachSectionLabels,
   ADMIN_NAV_SECTIONS,
@@ -1431,6 +1432,7 @@ export default function AdminDashboard() {
           </AnimatePresence>
         </div>
       </DashboardShell>
+      <DashboardSmartAssistant hidden={activeTab === "chat"} />
 
       {schoolData?.subscriptionExpiresAt &&
         schoolData?.status === "active" &&

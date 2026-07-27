@@ -813,6 +813,11 @@ service cloud.firestore {
       allow create, update, delete: if isSuperAdmin();
     }
 
+    match /system_config/{docId} {
+      allow read, get, list: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
     // Schools — public read for login/footer/onboarding; scoped writes.
     match /schools/{schoolId} {
       allow read, get, list: if true;
@@ -1361,19 +1366,39 @@ service cloud.firestore {
 
     match /conversations/{conversationId} {
       allow read, get, list: if canReadConversationDoc();
-      allow create, update: if isSuperAdmin()
+      // conversationAssignment is written only via Admin SDK (/api/admin/chat/*).
+      // Non–super-admin clients must not mutate assignment fields.
+      allow create: if isSuperAdmin()
         || (
           isPlatformAssistant()
           && platformAssistantHasOpsPermission()
           && request.resource.data.keys().hasAll(['conversationPrivacy', 'privacyHash'])
           && request.resource.data.conversationPrivacy.visibility in ['platform_operations', 'platform_assistant_private']
+          && !request.resource.data.keys().hasAny(['conversationAssignment'])
         )
         || (
           signedIn()
           && !isPlatformAssistant()
           && hasSchoolId(request.resource.data)
           && isConversationParticipant(request.resource.data)
+          && !request.resource.data.keys().hasAny(['conversationAssignment'])
         );
+      allow update: if isSuperAdmin()
+        || (
+          (
+            isPlatformAssistant()
+            && platformAssistantHasOpsPermission()
+            && request.resource.data.keys().hasAll(['conversationPrivacy', 'privacyHash'])
+            && request.resource.data.conversationPrivacy.visibility in ['platform_operations', 'platform_assistant_private']
+          )
+          || (
+            signedIn()
+            && !isPlatformAssistant()
+            && hasSchoolId(request.resource.data)
+            && isConversationParticipant(request.resource.data)
+          )
+        )
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['conversationAssignment']);
       allow delete: if false;
     }
     
