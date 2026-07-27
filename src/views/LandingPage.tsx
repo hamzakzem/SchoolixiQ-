@@ -251,6 +251,20 @@ export default function LandingPage() {
   const [packages, setPackages] = useState<any[]>([]);
   const [openFaq, setOpenFaq] = useState<string | null>(null);
   const reduced = prefersReducedMotion();
+  const heroVisualRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (reduced) return;
+    const el = heroVisualRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const y = Math.min(28, Math.max(0, window.scrollY * 0.06));
+      el.style.setProperty('--lp-parallax-y', String(y));
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [reduced]);
 
   const navLinks = useMemo(() => {
     const links: { href: string; label: string }[] = [
@@ -383,13 +397,14 @@ export default function LandingPage() {
                 </p>
               </div>
             </div>
-            <div className="landing-hero__visual">
+            <div className="landing-hero__visual" ref={heroVisualRef}>
               {config.heroImageUrl ? (
                 <img
                   src={config.heroImageUrl}
                   alt=""
                   className="rounded-3xl border border-[rgba(255,255,255,0.08)] shadow-2xl w-full object-cover max-h-[440px] landing-fade-up"
                   loading="lazy"
+                  decoding="async"
                 />
               ) : (
                 <LandingHeroMockup />

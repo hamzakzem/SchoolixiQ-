@@ -31,10 +31,8 @@ type DashboardSidebarProps = {
 };
 
 function navItemClasses(variant: DashboardShellVariant, active: boolean) {
-  const isDark = variant === 'superadmin' || variant === 'admin-dark';
   return clsx(
-    'sx-nav-item w-full',
-    isDark && 'sx-nav-item--dark',
+    'sx-nav-item w-full sx-nav-item--dark',
     active && 'sx-nav-item--active',
   );
 }
@@ -42,11 +40,10 @@ function navItemClasses(variant: DashboardShellVariant, active: boolean) {
 function sidebarSurface(variant: DashboardShellVariant) {
   switch (variant) {
     case 'admin-dark':
-      return 'bg-sx-primary text-white border-sx-primary/20';
     case 'superadmin':
-      return 'bg-slate-950 text-white border-slate-800';
+      return 'sx-sidebar--navy text-white border-white/10';
     default:
-      return 'bg-sx-card text-sx-text border-sx-border dark:bg-slate-900 dark:border-slate-800';
+      return 'sx-sidebar--navy text-white border-white/10';
   }
 }
 
@@ -127,10 +124,7 @@ export function DashboardSidebar({
           <div className="h-full flex flex-col min-w-0">
             <div
               className={clsx(
-                'sx-sidebar-brand',
-                variant === 'light'
-                  ? 'border-sx-border dark:border-slate-800'
-                  : 'border-white/10',
+                'sx-sidebar-brand border-white/10',
                 isCollapsed && 'justify-center',
               )}
             >
@@ -138,12 +132,12 @@ export function DashboardSidebar({
                 {isCustomSchoolLogo(schoolLogoUrl) ? (
                   <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
                 ) : (
-                  <SchoolixLogo size={isCollapsed ? 32 : 36} surface={variant === 'light' ? 'dark' : 'light'} />
+                  <SchoolixLogo size={isCollapsed ? 32 : 36} surface="light" />
                 )}
               </div>
               {!isCollapsed ? (
                 <div className="min-w-0" dir={isRtl ? 'rtl' : 'ltr'}>
-                  <h2 className="font-semibold leading-tight truncate text-sm">{portalTitle}</h2>
+                  <h2 className="font-semibold leading-tight truncate text-sm text-white">{portalTitle}</h2>
                   {portalSubtitle ? (
                     <p className="text-[10px] uppercase tracking-wider text-sx-accent font-semibold truncate mt-0.5">
                       {portalSubtitle}
@@ -157,14 +151,7 @@ export function DashboardSidebar({
               {groups.map(({ section, items }) => (
                 <div key={section.id}>
                   {!isCollapsed && section.label ? (
-                    <p
-                      className={clsx(
-                        'px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.14em]',
-                        variant === 'light'
-                          ? 'text-slate-400'
-                          : 'text-white/45',
-                      )}
-                    >
+                    <p className="px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
                       {sectionLabels?.[section.id] ?? section.label}
                     </p>
                   ) : null}
@@ -211,7 +198,7 @@ export function DashboardMobileSidebarOverlay({
       <button
         type="button"
         aria-label="Close menu"
-        className="fixed inset-0 lg:hidden print:hidden z-[var(--sx-z-drawer-backdrop)] bg-slate-900/40 backdrop-blur-sm"
+        className="fixed inset-0 md:hidden print:hidden z-[var(--sx-z-drawer-backdrop)] bg-slate-900/40 backdrop-blur-sm"
         onClick={onClose}
       />
       <motion.aside
@@ -219,7 +206,7 @@ export function DashboardMobileSidebarOverlay({
         animate={{ x: 0 }}
         exit={{ x: isRtl ? 280 : -280 }}
         className={clsx(
-          'fixed inset-y-0 w-[min(88vw,360px)] max-w-[360px] lg:hidden print:hidden pt-[env(safe-area-inset-top,0px)] z-[var(--sx-z-drawer)]',
+          'fixed inset-y-0 w-[min(88vw,360px)] max-w-[360px] md:hidden print:hidden pt-[env(safe-area-inset-top,0px)] z-[var(--sx-z-drawer)]',
           isRtl ? 'right-0' : 'left-0',
         )}
       >

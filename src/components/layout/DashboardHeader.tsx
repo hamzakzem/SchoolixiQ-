@@ -39,8 +39,9 @@ export function DashboardHeader({
   return (
     <header
       className={clsx(
-        'sx-dashboard-header min-h-14 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2',
-        'bg-sx-card/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-sx-border dark:border-slate-800',
+        'sx-dashboard-header sx-glass min-h-[var(--sx-header-height)] h-[var(--sx-header-height)]',
+        'pt-[env(safe-area-inset-top,0px)]',
+        'border-b border-sx-border/80 dark:border-slate-800',
         'flex items-center justify-between px-4 md:px-6 shrink-0 sticky top-0 print:hidden',
         'z-[var(--sx-z-header)]',
         className,

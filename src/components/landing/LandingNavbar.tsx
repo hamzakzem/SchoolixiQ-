@@ -51,7 +51,7 @@ export function LandingNavbar({
             to="/login"
             variant="primary"
             icon={<LogIn size={14} />}
-            className="hidden sm:inline-flex !min-h-[40px] !py-2 !px-4 !text-[12px]"
+            className="hidden md:inline-flex !min-h-[40px] !py-2 !px-4 !text-[12px]"
           >
             {loginLabel}
           </LandingButton>
