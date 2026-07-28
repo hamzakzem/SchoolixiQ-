@@ -1,9 +1,6 @@
 import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
-import {
-  LANDING_SEED_RULES,
-  type SmartAssistantScope,
-} from '../../lib/smartAssistantEngine';
+import { type SmartAssistantScope } from '../../lib/smartAssistantEngine';
 import { SmartAssistantWidget } from './SmartAssistantWidget';
 
 function scopeForRole(role?: string | null): SmartAssistantScope | null {
@@ -29,8 +26,9 @@ export function DashboardSmartAssistant({ hidden }: { hidden?: boolean }) {
   return (
     <SmartAssistantWidget
       isRtl={isRtl}
-      rules={LANDING_SEED_RULES}
       scope={scope}
+      userId={profile.uid}
+      userRole={String(profile.role || scope)}
     />
   );
 }

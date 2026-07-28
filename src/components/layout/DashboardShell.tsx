@@ -96,6 +96,8 @@ export function DashboardShell({
     <div
       className={clsx(
         'sx-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout bg-sx-surface transition-colors print:overflow-visible print:h-auto print:block',
+        !isMobile && 'sx-shell--with-sidebar',
+        !isMobile && sidebarCollapsed && 'sx-shell--sidebar-collapsed',
         className,
       )}
       dir={isRtl ? 'rtl' : 'ltr'}

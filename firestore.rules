@@ -1602,6 +1602,41 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
+    // Rule-based Smart Assistant (catalog public read; Super Admin writes)
+    // -------------------------------------------------------------------------
+    match /assistant_categories/{id} {
+      allow read, get, list: if true;
+      allow create, update, delete: if isSuperAdmin();
+    }
+    match /assistant_flows/{id} {
+      allow read, get, list: if true;
+      allow create, update, delete: if isSuperAdmin();
+    }
+    match /assistant_answers/{id} {
+      allow read, get, list: if true;
+      allow create, update, delete: if isSuperAdmin();
+    }
+    match /assistant_keywords/{id} {
+      allow read, get, list: if true;
+      allow create, update, delete: if isSuperAdmin();
+    }
+    match /assistant_tickets/{id} {
+      allow create: if true
+        && request.resource.data.keys().hasAll(['question', 'scope', 'conversationId', 'status', 'createdAt']);
+      allow read, get, list: if isSuperAdmin()
+        || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isSuperAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'closedAt']);
+      allow delete: if isSuperAdmin();
+    }
+    match /assistant_events/{id} {
+      allow create: if true
+        && request.resource.data.keys().hasAll(['type', 'scope', 'createdAt']);
+      allow read, get, list: if isSuperAdmin();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // -------------------------------------------------------------------------
     // Default deny — no broad authenticated fallback
     // -------------------------------------------------------------------------
   }

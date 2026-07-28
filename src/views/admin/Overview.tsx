@@ -292,11 +292,11 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-1">
-          <h2 className="text-sm font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+          <h2 className="sx-type-h2 !text-sm !tracking-wider uppercase text-slate-700 dark:text-slate-200">
             {isRtl ? 'مؤشرات المدرسة' : 'School Metrics'}
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 md:gap-3">
           <StatCard
             title={t('totalStudents')}
             value={stats.students}
@@ -380,7 +380,7 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
                 <button
                   type="button"
                   onClick={() => setShowLocationModal(true)}
-                  className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                  className="sx-btn sx-btn-primary !h-10 !min-h-10 !px-4 !text-xs"
                 >
                   <Edit2 size={14} />
                   <span>{isRtl ? 'تحديث السجل' : 'Update Profile'}</span>
@@ -390,7 +390,7 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
                     href={schoolInfo.googleMapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                    className="sx-btn sx-btn-secondary !h-10 !min-h-10 !px-4 !text-xs"
                   >
                     <MapPin size={14} />
                     <span>{isRtl ? 'الموقع على الخريطة' : 'View on Map'}</span>
@@ -884,7 +884,7 @@ function StatCard({
     <Wrapper
       type={action ? 'button' : undefined}
       onClick={action}
-      className={`sx-card w-full p-4 md:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm text-right transition-all ${
+      className={`sx-kpi-card w-full text-start ${
         action
           ? `cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${styles.ring}`
           : ''
@@ -892,15 +892,15 @@ function StatCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 mb-3">
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <p className="sx-kpi-card__label">
               {title}
             </p>
             {action ? <Settings2 size={12} className="text-slate-300 shrink-0" /> : null}
           </div>
           <p
-            className={`text-2xl md:text-3xl font-black tabular-nums ${
-              isZero ? 'text-slate-300 dark:text-slate-600' : 'text-slate-900 dark:text-white'
+            className={`sx-kpi-card__value tabular-nums ${
+              isZero ? 'text-slate-300 dark:text-slate-600 !text-xl' : ''
             }`}
           >
             {showAnimatedNumber ? (
@@ -913,13 +913,13 @@ function StatCard({
             ) : null}
           </p>
           {isZero && emptyHint ? (
-            <p className="text-[10px] font-bold text-slate-400 mt-2">{emptyHint}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1.5">{emptyHint}</p>
           ) : null}
         </div>
         <div
-          className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${styles.badge}`}
+          className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${styles.badge}`}
         >
-          <Icon size={20} className={styles.icon} />
+          <Icon size={18} className={styles.icon} />
         </div>
       </div>
     </Wrapper>

@@ -36,8 +36,17 @@
 
   /* Layout metrics */
   --sx-icon-size: 18px;
-  --sx-touch-min: 40px;
+  --sx-touch-min: 44px;
   --sx-action-height: 44px;
+  --sx-btn-height: 44px;
+  --sx-btn-padding-y: 16px;
+  --sx-btn-padding-x: 24px;
+  --sx-btn-radius: 12px;
+  --sx-font-h1: clamp(1.75rem, 3.2vw, 2.5rem);
+  --sx-font-h2: clamp(1.2rem, 2.2vw, 1.5rem);
+  --sx-font-body: 0.9375rem;
+  --sx-leading-body: 1.7;
+  --sx-leading-tight: 1.25;
   --sx-header-height: 64px;
   --sx-header-icon-btn: 40px;
   --sx-action-gap: 8px;

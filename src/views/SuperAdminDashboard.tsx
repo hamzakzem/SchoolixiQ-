@@ -77,6 +77,7 @@ import {
   CreditCard,
   Bell,
   Tag,
+  Bot,
 } from "lucide-react";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { toast } from "react-hot-toast";
@@ -103,6 +104,7 @@ import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
 import AuditLogsViewer from "./admin/AuditLogsViewer";
 import LandingPageSettings from "./superadmin/LandingPageSettings";
+import SmartAssistantAdminTab from "./superadmin/SmartAssistantAdminTab";
 import { SuperAdminSchoolRecordList } from "../components/superadmin/SuperAdminSchoolRecordList";
 import {
   SuperAdminSchoolsFilterBar,
@@ -253,6 +255,7 @@ export default function SuperAdminDashboard() {
     | "diagnostics"
     | "audit_logs"
     | "landing_page"
+    | "smart_assistant"
     | "distributors"
     | "distributor_requests"
   >("schools");
@@ -2315,6 +2318,29 @@ export default function SuperAdminDashboard() {
                           className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                         >
                           صفحة الهبوط
+                        </div>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigateToTab("smart_assistant");
+                        if (isMobile) setIsSidebarOpen(false);
+                      }}
+                      title={isSidebarCollapsed ? "المساعد الذكي" : undefined}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "smart_assistant" ? "sx-nav-item--active" : ""}`}
+                    >
+                      <Bot
+                        size={isSidebarCollapsed ? 24 : 20}
+                        className="shrink-0"
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate">المساعد الذكي</span>
+                      )}
+                      {isSidebarCollapsed && (
+                        <div
+                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                        >
+                          المساعد الذكي
                         </div>
                       )}
                     </button>
@@ -4979,6 +5005,14 @@ export default function SuperAdminDashboard() {
               ) : activeTab === "landing_page" ? (
                 profile?.role === "superadmin" ? (
                   <LandingPageSettings />
+                ) : (
+                  <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
+                    {isRtl ? "غير مصرح" : "Not authorized"}
+                  </div>
+                )
+              ) : activeTab === "smart_assistant" ? (
+                profile?.role === "superadmin" ? (
+                  <SmartAssistantAdminTab isRtl={isRtl} />
                 ) : (
                   <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
                     {isRtl ? "غير مصرح" : "Not authorized"}

@@ -2070,21 +2070,23 @@
   justify-content: center;
   gap: 0.5rem;
   min-height: 44px;
-  padding: 0.65rem 1.35rem;
-  border-radius: 14px;
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 12px;
   font-size: 0.875rem;
   font-weight: 800;
   font-family: inherit;
   line-height: 1.2;
   text-decoration: none;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   transition:
-    transform 0.22s ease,
-    box-shadow 0.22s ease,
-    background 0.22s ease,
-    border-color 0.22s ease,
-    color 0.22s ease;
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    filter 180ms ease;
   white-space: nowrap;
 }
 
@@ -2101,7 +2103,8 @@
 
 .landing-page .lp-landing-btn--lg {
   min-height: 48px;
-  padding: 0.75rem 1.65rem;
+  height: 48px;
+  padding: 0 28px;
   font-size: 0.9375rem;
 }
 

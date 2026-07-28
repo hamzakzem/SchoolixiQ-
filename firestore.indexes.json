@@ -122,15 +122,6 @@
       ]
     },
     {
-      "collectionGroup": "system_messages",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "conversationId", "order": "ASCENDING" },
-        { "fieldPath": "conversationPrivacy.ownerUserId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "schools",
       "queryScope": "COLLECTION",
       "fields": [
