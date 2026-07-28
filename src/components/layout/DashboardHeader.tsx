@@ -1,6 +1,8 @@
 import React from 'react';
-import { ChevronRight, Menu } from 'lucide-react';
+import { ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { clsx } from 'clsx';
+import SchoolixLogo from '../SchoolixLogo';
+import { isCustomSchoolLogo } from '../../lib/brandAssets';
 
 export type BreadcrumbItem = {
   label: string;
@@ -18,6 +20,10 @@ type DashboardHeaderProps = {
   onMenuToggle: () => void;
   menuCollapsed?: boolean;
   showMenuToggle?: boolean;
+  /** Optional brand mark in navbar (SaaS chrome). */
+  brandTitle?: string;
+  schoolLogoUrl?: string;
+  showBrand?: boolean;
   trailing?: React.ReactNode;
   className?: string;
 };
@@ -33,90 +39,98 @@ export function DashboardHeader({
   onMenuToggle,
   menuCollapsed,
   showMenuToggle = true,
+  brandTitle,
+  schoolLogoUrl,
+  showBrand = true,
   trailing,
   className,
 }: DashboardHeaderProps) {
+  const CollapseIcon = menuCollapsed
+    ? isRtl
+      ? PanelLeftClose
+      : PanelLeftOpen
+    : isRtl
+      ? PanelLeftOpen
+      : PanelLeftClose;
+
   return (
     <header
-      className={clsx(
-        'sx-dashboard-header sx-glass min-h-[var(--sx-header-height)] h-[var(--sx-header-height)]',
-        'pt-[env(safe-area-inset-top,0px)]',
-        'border-b border-sx-border/80 dark:border-slate-800',
-        'flex items-center justify-between px-4 md:px-6 shrink-0 sticky top-0 print:hidden',
-        'z-[var(--sx-z-header)]',
-        className,
-      )}
+      className={clsx('sx-app-header sx-dashboard-header print:hidden', className)}
+      dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="sx-app-header__start">
         {showMenuToggle ? (
           <button
             type="button"
             onClick={onMenuToggle}
-            className="sx-header-action-btn text-slate-500 hover:text-sx-primary bg-sx-surface hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 hidden md:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
-            aria-label={isRtl ? 'القائمة' : 'Menu'}
+            className="sx-header-action-btn sx-app-header__icon-btn hidden md:inline-flex"
+            aria-label={isRtl ? 'طي القائمة' : 'Toggle sidebar'}
+            aria-pressed={Boolean(menuCollapsed)}
           >
-            <Menu size={20} className={menuCollapsed ? (isRtl ? '-rotate-90' : 'rotate-90') : ''} />
+            <CollapseIcon size={18} strokeWidth={2} />
           </button>
+        ) : null}
+
+        {showBrand ? (
+          <div className="sx-app-header__brand">
+            <div className="sx-app-header__logo">
+              {isCustomSchoolLogo(schoolLogoUrl) ? (
+                <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
+              ) : (
+                <SchoolixLogo size={28} surface="dark" />
+              )}
+            </div>
+            {brandTitle ? (
+              <span className="sx-app-header__brand-name hidden lg:inline">{brandTitle}</span>
+            ) : null}
+            <span className="sx-app-header__divider hidden sm:block" aria-hidden />
+          </div>
         ) : null}
 
         {showBack && onBack ? (
           <button
             type="button"
             onClick={onBack}
-            className="sx-header-action-btn text-slate-500 hover:text-sx-primary lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
+            className="sx-header-action-btn sx-app-header__icon-btn lg:hidden"
             aria-label={isRtl ? 'رجوع' : 'Back'}
           >
-            <ChevronRight
-              size={20}
-              className={isRtl ? '' : 'rotate-180'}
-            />
+            <ChevronRight size={18} className={isRtl ? '' : 'rotate-180'} strokeWidth={2} />
           </button>
         ) : null}
 
-        <div className="min-w-0">
+        <div className="sx-app-header__title-block min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 ? (
-            <nav className="hidden md:flex items-center gap-1 text-[11px] font-semibold text-slate-400 mb-0.5">
+            <nav className="sx-app-header__crumbs hidden md:flex" aria-label="Breadcrumb">
               {breadcrumbs.map((crumb, i) => (
                 <React.Fragment key={`${crumb.label}-${i}`}>
                   {i > 0 ? (
                     <ChevronRight
                       size={12}
-                      className={clsx('opacity-50', isRtl && 'rotate-180')}
+                      className={clsx('sx-app-header__crumb-sep', isRtl && 'rotate-180')}
+                      aria-hidden
                     />
                   ) : null}
                   {crumb.onClick ? (
-                    <button
-                      type="button"
-                      onClick={crumb.onClick}
-                      className="hover:text-sx-primary transition-colors"
-                    >
+                    <button type="button" onClick={crumb.onClick} className="sx-app-header__crumb">
                       {crumb.label}
                     </button>
                   ) : (
-                    <span>{crumb.label}</span>
+                    <span className="sx-app-header__crumb sx-app-header__crumb--current">
+                      {crumb.label}
+                    </span>
                   )}
                 </React.Fragment>
               ))}
             </nav>
           ) : eyebrow ? (
-            <p className="text-[10px] font-bold uppercase tracking-wider text-sx-accent truncate">
-              {eyebrow}
-            </p>
+            <p className="sx-app-header__eyebrow">{eyebrow}</p>
           ) : null}
-          <h1 className="text-sm md:text-base font-semibold text-sx-text dark:text-white truncate leading-tight">
-            {title}
-          </h1>
-          {subtitle ? (
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate hidden sm:block">
-              {subtitle}
-            </p>
-          ) : null}
+          <h1 className="sx-app-header__title">{title}</h1>
+          {subtitle ? <p className="sx-app-header__subtitle hidden sm:block">{subtitle}</p> : null}
         </div>
       </div>
 
-      {trailing ? (
-        <div className="sx-header-actions">{trailing}</div>
-      ) : null}
+      {trailing ? <div className="sx-app-header__end sx-header-actions">{trailing}</div> : null}
     </header>
   );
 }

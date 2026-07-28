@@ -45,10 +45,10 @@ export type DashboardShellProps = {
   showNotifications?: boolean;
   setShowNotifications?: (show: boolean) => void;
   className?: string;
-  /** Hide smart assistant (e.g. on chat fullscreen). */
   hideSmartAssistant?: boolean;
 };
 
+/** Unified AppShell — fixed sidebar + sticky header + scrollable content. */
 export function DashboardShell({
   variant = 'light',
   menuItems,
@@ -85,12 +85,11 @@ export function DashboardShell({
 
   useEffect(() => {
     if (isTablet) setIsSidebarCollapsed(true);
-  }, [isTablet]);
+    if (isMobile) setIsSidebarCollapsed(false);
+  }, [isTablet, isMobile]);
 
   const handleMenuToggle = useCallback(() => {
-    if (!isMobile) {
-      setIsSidebarCollapsed((v) => !v);
-    }
+    if (!isMobile) setIsSidebarCollapsed((v) => !v);
   }, [isMobile]);
 
   const handleHeaderBack = useCallback(() => {
@@ -104,7 +103,9 @@ export function DashboardShell({
   return (
     <div
       className={clsx(
-        'sx-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout bg-sx-surface transition-colors print:overflow-visible print:h-auto print:block',
+        'sx-shell sx-app-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout',
+        'bg-[var(--sx-surface,#F8FAFC)] transition-colors',
+        'print:overflow-visible print:h-auto print:block',
         !isMobile && 'sx-shell--with-sidebar',
         !isMobile && sidebarCollapsed && 'sx-shell--sidebar-collapsed',
         className,
@@ -149,6 +150,9 @@ export function DashboardShell({
           onMenuToggle={handleMenuToggle}
           menuCollapsed={sidebarCollapsed}
           showMenuToggle={!isMobile}
+          brandTitle={portalTitle}
+          schoolLogoUrl={schoolLogoUrl}
+          showBrand
           trailing={
             <>
               {headerTrailing}

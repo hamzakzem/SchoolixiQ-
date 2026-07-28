@@ -48,9 +48,10 @@
   --sx-leading-body: 1.7;
   --sx-leading-tight: 1.25;
   --sx-header-height: 72px;
-  --sx-header-icon-btn: 40px;
+  --sx-header-height-tablet: 64px;
+  --sx-header-icon-btn: 36px;
   --sx-action-gap: 8px;
-  --sx-sidebar-width: 280px;
+  --sx-sidebar-width: 260px;
   --sx-sidebar-collapsed: 80px;
   --sx-assistant-panel-width: 420px;
   --sx-space-1: 4px;
@@ -61,10 +62,10 @@
   --sx-space-6: 32px;
   --sx-z-assistant: 110;
 
-  /* Glass */
-  --sx-glass-bg: rgba(255, 255, 255, 0.72);
-  --sx-glass-border: rgba(255, 255, 255, 0.35);
-  --sx-glass-blur: 14px;
+  /* Glass — subtle enterprise chrome */
+  --sx-glass-bg: rgba(255, 255, 255, 0.92);
+  --sx-glass-border: rgba(226, 232, 240, 0.9);
+  --sx-glass-blur: 10px;
 
   /* Stacking order */
   --sx-z-content: 0;
@@ -83,6 +84,12 @@
   --color-sx-card: var(--sx-bg);
   --color-sx-border: var(--sx-border);
   --color-sx-text: var(--sx-primary);
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --sx-header-height: var(--sx-header-height-tablet, 64px);
+  }
 }
 
 @media (min-width: 768px) {

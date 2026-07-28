@@ -39,6 +39,7 @@ import {
 import {
   setupNotificationPushListener,
   pollRecentNotificationsForPush,
+  processNotificationPush,
 } from './notificationPushDispatch.ts';
 import {
   assignConversation,
@@ -2127,6 +2128,168 @@ async function startServer() {
     } catch (error: any) {
       console.error('[TuitionCron] error', error);
       res.status(500).json({ success: false, error: error.message || 'Cron handler failed' });
+    }
+  });
+
+  // Enterprise push: POST /api/notifications/send (superadmin)
+  app.post('/api/notifications/send', verifyAdmin, express.json({ limit: '1mb' }), async (req: any, res: any) => {
+    try {
+      const role = String(req.user?.role || '').toLowerCase();
+      if (!['superadmin', 'super_admin'].includes(role)) {
+        return res.status(403).json({ success: false, error: 'Forbidden: Super Admin only' });
+      }
+
+      const body = req.body || {};
+      const targetType = String(body.targetType || body.target || 'user').toLowerCase();
+      const title = String(body.title || '').trim();
+      const message = String(body.body || body.message || '').trim();
+      const type = String(body.type || 'system').toLowerCase();
+      const schoolId = body.schoolId ? String(body.schoolId) : '';
+      const userId = body.userId ? String(body.userId) : '';
+      const targetRole = body.role ? String(body.role).toLowerCase() : '';
+      const imageUrl = body.imageUrl ? String(body.imageUrl) : '';
+      const actionUrl = body.actionUrl ? String(body.actionUrl) : '';
+      const routeTarget = String(body.routeTarget || body.data?.routeTarget || type || 'system');
+      const extraData = body.data && typeof body.data === 'object' ? body.data : {};
+
+      if (!title || !message) {
+        return res.status(400).json({ success: false, error: 'title and body/message are required' });
+      }
+
+      const db = getDb();
+      const recipientIds = new Set<string>();
+
+      if (targetType === 'user') {
+        if (!userId) return res.status(400).json({ success: false, error: 'userId required' });
+        recipientIds.add(userId);
+      } else if (targetType === 'school') {
+        if (!schoolId) return res.status(400).json({ success: false, error: 'schoolId required' });
+        const snap = await db.collection('users').where('schoolId', '==', schoolId).limit(500).get();
+        snap.docs.forEach((d) => recipientIds.add(d.id));
+      } else if (targetType === 'role') {
+        const roleFilter = targetRole || 'teacher';
+        let snap;
+        if (schoolId) {
+          snap = await db
+            .collection('users')
+            .where('schoolId', '==', schoolId)
+            .where('role', '==', roleFilter)
+            .limit(500)
+            .get();
+        } else {
+          snap = await db.collection('users').where('role', '==', roleFilter).limit(500).get();
+        }
+        snap.docs.forEach((d: { id: string }) => recipientIds.add(d.id));
+        if (roleFilter === 'admin' || roleFilter === 'school_admin') {
+          const alt = roleFilter === 'admin' ? 'school_admin' : 'admin';
+          let snap2;
+          if (schoolId) {
+            snap2 = await db
+              .collection('users')
+              .where('schoolId', '==', schoolId)
+              .where('role', '==', alt)
+              .limit(500)
+              .get();
+          } else {
+            snap2 = await db.collection('users').where('role', '==', alt).limit(500).get();
+          }
+          snap2.docs.forEach((d: { id: string }) => recipientIds.add(d.id));
+        }
+      } else if (targetType === 'all' || targetType === 'all_users') {
+        const snap = await db.collection('users').limit(1000).get();
+        snap.docs.forEach((d) => recipientIds.add(d.id));
+      } else if (targetType === 'all_schools') {
+        const roles = ['admin', 'school_admin', 'teacher', 'parent', 'staff', 'assistant'];
+        for (const r of roles) {
+          const snap = await db.collection('users').where('role', '==', r).limit(400).get();
+          snap.docs.forEach((d) => recipientIds.add(d.id));
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'targetType must be one of: user, school, role, all, all_schools',
+        });
+      }
+
+      const recipients = Array.from(recipientIds);
+      if (!recipients.length) {
+        return res.status(404).json({ success: false, error: 'No recipients found' });
+      }
+
+      const batchSize = 400;
+      let created = 0;
+      const createdIds: string[] = [];
+
+      for (let i = 0; i < recipients.length; i += batchSize) {
+        const chunk = recipients.slice(i, i + batchSize);
+        const batch = db.batch();
+        for (const uid of chunk) {
+          const ref = db.collection('notifications').doc();
+          batch.set(ref, {
+            title,
+            message,
+            type,
+            schoolId: schoolId || 'system',
+            userId: uid,
+            recipientId: uid,
+            receiverId: uid,
+            senderId: req.user.uid,
+            senderRole: 'superadmin',
+            read: false,
+            category: type,
+            routeTarget,
+            imageUrl: imageUrl || null,
+            actionUrl: actionUrl || null,
+            metadata: {
+              ...extraData,
+              routeTarget,
+              imageUrl: imageUrl || null,
+              actionUrl: actionUrl || null,
+              source: 'superadmin_broadcast',
+              category: type,
+            },
+            pushDelivery: { status: 'pending' },
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          createdIds.push(ref.id);
+          created += 1;
+        }
+        await batch.commit();
+      }
+
+      await db.collection('notification_logs').add({
+        sender: req.user.uid,
+        receiver: targetType,
+        type,
+        status: 'queued',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        title,
+        recipientCount: created,
+        targetType,
+        schoolId: schoolId || null,
+        role: targetRole || null,
+      });
+
+      // Eager push for first few (listener covers the rest)
+      const eager = createdIds.slice(0, 25);
+      const pushResults = [];
+      for (const id of eager) {
+        const snap = await db.collection('notifications').doc(id).get();
+        if (!snap.exists) continue;
+        const result = await processNotificationPush(db, admin, id, snap.data() as Record<string, unknown>);
+        if (result) pushResults.push(result);
+      }
+
+      res.json({
+        success: true,
+        created,
+        targetType,
+        eagerPush: pushResults.length,
+        note: 'Push is dispatched by FCM gateway listener; eager push processed for first recipients.',
+      });
+    } catch (error: any) {
+      console.error('[Notifications] SEND_API_ERROR', error);
+      res.status(500).json({ success: false, error: error.message || 'Send failed' });
     }
   });
 

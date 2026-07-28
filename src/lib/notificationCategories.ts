@@ -122,7 +122,7 @@ export const NOTIFICATION_CATEGORIES: NotificationCategoryConfig[] = [
     bgColor: 'bg-slate-50',
     borderColor: 'border-slate-200',
     tabIds: [],
-    typeAliases: ['system'],
+    typeAliases: ['system', 'security', 'login', 'password', 'maintenance', 'update'],
   },
 ];
 

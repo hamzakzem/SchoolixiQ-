@@ -1,6 +1,6 @@
 // Bump SHELL_CACHE / RUNTIME_CACHE on production deploys that change hashed /assets/* bundles.
-const SHELL_CACHE = 'schoolix-shell-v12';
-const RUNTIME_CACHE = 'schoolix-runtime-v12';
+const SHELL_CACHE = 'schoolix-shell-v13';
+const RUNTIME_CACHE = 'schoolix-runtime-v13';
 const PRECACHE_FALLBACK = [
   '/index.html',
   '/manifest.json',
@@ -202,18 +202,35 @@ self.addEventListener('push', (event) => {
   } catch {
     payload = { body: event.data?.text() };
   }
-  const data = payload.notification ? { ...payload, ...payload.data } : payload;
+  const data = payload.data
+    ? { ...payload.data, ...(payload.notification || {}) }
+    : payload.notification
+      ? { ...payload, ...payload.notification, ...payload.data }
+      : payload;
   const title = data.title || payload.notification?.title || 'Schoolix IQ';
-  const body = data.body || payload.notification?.body || 'إشعار جديد';
+  const body = data.body || payload.notification?.body || data.message || 'إشعار جديد';
   const route = data.routeTarget || data.route || data.type || '/';
-  const url = data.url || `/?tab=${encodeURIComponent(route)}`;
+  const url = data.url || data.actionUrl || `/?tab=${encodeURIComponent(route)}`;
+  const silent = data.sound === '0' || data.silent === true || data.silent === 'true';
+  const vibrate =
+    data.vibration === '0' ? undefined : Array.isArray(data.vibrate) ? data.vibrate : [120, 60, 120];
   const options = {
     body,
-    icon: '/favicon.ico',
+    icon: data.icon || '/brand/schoolixiq-logo.png',
     badge: '/favicon.ico',
-    vibrate: [100, 50, 100],
-    tag: data.notificationId || data.dedupKey || undefined,
-    data: { url, route, routeTarget: route, notificationId: data.notificationId },
+    image: data.image || data.imageUrl || undefined,
+    vibrate,
+    silent: Boolean(silent),
+    requireInteraction: false,
+    tag: data.notificationId || data.dedupKey || `sx-${Date.now()}`,
+    renotify: true,
+    data: {
+      url,
+      route,
+      routeTarget: route,
+      notificationId: data.notificationId,
+      type: data.type,
+    },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
@@ -221,15 +238,25 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = event.notification.data?.url || '/';
+  const route = event.notification.data?.routeTarget || event.notification.data?.route;
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const client of list) {
         if ('focus' in client) {
           client.postMessage({
             type: 'NOTIFICATION_CLICK',
-            route: event.notification.data?.route,
-            routeTarget: event.notification.data?.routeTarget || event.notification.data?.route,
+            route,
+            routeTarget: route,
+            url: targetUrl,
+            notificationId: event.notification.data?.notificationId,
           });
+          if (typeof client.navigate === 'function' && targetUrl) {
+            try {
+              client.navigate(targetUrl);
+            } catch {
+              /* ignore navigate failures */
+            }
+          }
           return client.focus();
         }
       }

@@ -1639,6 +1639,10 @@ service cloud.firestore {
       allow read, get, list: if true;
       allow create, update, delete: if isSuperAdmin();
     }
+    match /notification_logs/{id} {
+      allow read, get, list: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin();
+    }
 
     // -------------------------------------------------------------------------
     // Default deny — no broad authenticated fallback

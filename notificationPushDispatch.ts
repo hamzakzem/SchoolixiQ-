@@ -126,33 +126,105 @@ async function resolveUserTokens(
   db: Firestore,
   userId: string,
   notifSchoolId: string,
-): Promise<string[]> {
+): Promise<{ tokens: string[]; skipReason?: string; userData?: Record<string, unknown> }> {
   let userTokens: string[] = [];
+  let userData: Record<string, unknown> | undefined;
 
   if (userId === 'super_admin') {
     const superAdminsSnap = await db.collection('users').where('role', '==', 'superadmin').get();
     superAdminsSnap.docs.forEach((docSnap) => {
-      const tokens = docSnap.data().fcmTokens;
-      if (Array.isArray(tokens)) userTokens.push(...tokens);
+      const data = docSnap.data() || {};
+      userTokens.push(...collectTokensFromUserDoc(data));
     });
-  } else {
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) return [];
-    const userData = userDoc.data() || {};
-    if (
-      notifSchoolId &&
-      notifSchoolId !== 'system' &&
-      userData.schoolId &&
-      userData.schoolId !== notifSchoolId
-    ) {
-      logPush('PUSH_SEND_SKIPPED', { userId, reason: 'school_mismatch', schoolId: notifSchoolId });
-      return [];
-    }
-    const tokens = userData.fcmTokens;
-    if (Array.isArray(tokens)) userTokens.push(...tokens);
+    return { tokens: Array.from(new Set(userTokens.filter(Boolean))) };
   }
 
-  return Array.from(new Set(userTokens.filter((t) => typeof t === 'string' && t.trim().length > 0)));
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists) return { tokens: [], skipReason: 'user_missing' };
+  userData = (userDoc.data() || {}) as Record<string, unknown>;
+  if (
+    notifSchoolId &&
+    notifSchoolId !== 'system' &&
+    userData.schoolId &&
+    userData.schoolId !== notifSchoolId
+  ) {
+    logPush('PUSH_SEND_SKIPPED', { userId, reason: 'school_mismatch', schoolId: notifSchoolId });
+    return { tokens: [], skipReason: 'school_mismatch', userData };
+  }
+
+  userTokens = collectTokensFromUserDoc(userData);
+  return {
+    tokens: Array.from(new Set(userTokens.filter((t) => typeof t === 'string' && t.trim().length > 0))),
+    userData,
+  };
+}
+
+function collectTokensFromUserDoc(userData: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const flat = userData.fcmTokens;
+  if (Array.isArray(flat)) {
+    for (const t of flat) {
+      if (typeof t === 'string' && t.trim()) out.push(t.trim());
+    }
+  }
+  const devices = userData.fcmDevices;
+  if (Array.isArray(devices)) {
+    for (const d of devices) {
+      if (d && typeof d === 'object' && typeof (d as { token?: string }).token === 'string') {
+        const token = (d as { token: string }).token.trim();
+        if (token) out.push(token);
+      }
+    }
+  }
+  return out;
+}
+
+function preferenceAllowsPush(userData: Record<string, unknown> | undefined, type: string): boolean {
+  if (!userData) return true;
+  const prefs = (userData.notificationPreferences || {}) as Record<string, unknown>;
+  if (prefs.externalPush === false) return false;
+
+  const t = type.toLowerCase();
+  const map: Record<string, string[]> = {
+    messages: ['chat', 'message'],
+    chat: ['chat', 'message'],
+    tuition: ['tuition', 'payment', 'payroll'],
+    payments: ['tuition', 'payment', 'payroll'],
+    homework: ['homework'],
+    attendance: ['attendance'],
+    behavior: ['behavior', 'grade', 'report'],
+    announcements: ['announcement'],
+    system: ['system', 'security', 'login', 'password', 'maintenance'],
+    marketing: ['marketing', 'promo'],
+  };
+
+  for (const [key, types] of Object.entries(map)) {
+    if (types.includes(t) && prefs[key] === false) return false;
+  }
+  return true;
+}
+
+async function writeNotificationAuditLog(
+  db: Firestore,
+  adminSdk: typeof admin,
+  entry: {
+    sender?: string;
+    receiver: string;
+    type: string;
+    status: string;
+    notificationId: string;
+    schoolId?: string;
+    title?: string;
+  },
+): Promise<void> {
+  try {
+    await db.collection('notification_logs').add({
+      ...entry,
+      createdAt: adminSdk.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('[Notifications] AUDIT_LOG_WRITE_FAILED', err);
+  }
 }
 
 export async function dispatchPushForNotificationDoc(
@@ -184,13 +256,41 @@ export async function dispatchPushForNotificationDoc(
   logPush('PUSH_SEND_START', { notifId, userId, type, schoolId: notifSchoolId });
 
   try {
-    const userTokens = await resolveUserTokens(db, userId, notifSchoolId);
+    const resolved = await resolveUserTokens(db, userId, notifSchoolId);
+    const userTokens = resolved.tokens;
+
+    if (!preferenceAllowsPush(resolved.userData, type)) {
+      await writePushDelivery(docRef, adminSdk, {
+        status: 'skipped',
+        reason: 'preference_disabled',
+      });
+      await writeNotificationAuditLog(db, adminSdk, {
+        sender: String(notif.senderId || 'system'),
+        receiver: userId,
+        type,
+        status: 'skipped_preference',
+        notificationId: notifId,
+        schoolId: notifSchoolId,
+        title,
+      });
+      logPush('PUSH_SEND_SKIPPED', { notifId, userId, reason: 'preference_disabled' });
+      return { notifId, status: 'skipped', reason: 'preference_disabled' };
+    }
 
     if (userTokens.length === 0) {
       await writePushDelivery(docRef, adminSdk, {
         status: 'no_tokens',
         successCount: 0,
         failureCount: 0,
+      });
+      await writeNotificationAuditLog(db, adminSdk, {
+        sender: String(notif.senderId || 'system'),
+        receiver: userId,
+        type,
+        status: 'no_tokens',
+        notificationId: notifId,
+        schoolId: notifSchoolId,
+        title,
       });
       logPush('PUSH_SEND_SKIPPED', { notifId, userId, reason: 'no_tokens' });
       return { notifId, status: 'no_tokens', reason: 'no_tokens' };
@@ -203,10 +303,30 @@ export async function dispatchPushForNotificationDoc(
 
     const metadata = (notif.metadata as Record<string, unknown> | undefined) || {};
     const dedupKey = typeof metadata.dedupKey === 'string' ? metadata.dedupKey : '';
+    const imageUrl =
+      typeof metadata.imageUrl === 'string'
+        ? metadata.imageUrl
+        : typeof notif.imageUrl === 'string'
+          ? notif.imageUrl
+          : '';
+    const actionUrl =
+      typeof metadata.actionUrl === 'string'
+        ? metadata.actionUrl
+        : typeof notif.actionUrl === 'string'
+          ? notif.actionUrl
+          : clickUrl;
+
+    const prefs = (resolved.userData?.notificationPreferences || {}) as Record<string, unknown>;
+    const soundEnabled = prefs.sound !== false;
+    const vibrationEnabled = prefs.vibration !== false;
 
     const messages = userTokens.map((token) => ({
       token,
-      notification: { title, body: message },
+      notification: {
+        title,
+        body: message,
+        ...(imageUrl ? { imageUrl } : {}),
+      },
       data: {
         type,
         schoolId: notifSchoolId,
@@ -214,16 +334,46 @@ export async function dispatchPushForNotificationDoc(
         notificationId: notifId,
         routeTarget,
         route: routeTarget,
-        url: clickUrl,
+        url: actionUrl,
         ...(dedupKey ? { dedupKey } : {}),
+        ...(imageUrl ? { imageUrl } : {}),
+        sound: soundEnabled ? '1' : '0',
+        vibration: vibrationEnabled ? '1' : '0',
       },
-      webpush: appUrl ? { fcmOptions: { link: clickUrl } } : undefined,
+      webpush: {
+        ...(appUrl ? { fcmOptions: { link: actionUrl } } : {}),
+        notification: {
+          title,
+          body: message,
+          icon: '/brand/schoolixiq-logo.png',
+          badge: '/favicon.ico',
+          ...(imageUrl ? { image: imageUrl } : {}),
+          ...(vibrationEnabled ? { vibrate: [120, 60, 120] } : {}),
+          ...(soundEnabled ? {} : { silent: true }),
+        },
+      },
       android: {
         priority: 'high' as const,
-        notification: { sound: 'default' },
+        notification: {
+          sound: soundEnabled ? 'default' : undefined,
+          channelId: 'schoolix_default',
+          ...(imageUrl ? { imageUrl } : {}),
+          ...(vibrationEnabled ? { defaultVibrateTimings: true } : { defaultVibrateTimings: false }),
+        },
       },
       apns: {
-        payload: { aps: { sound: 'default', badge: 1 } },
+        payload: {
+          aps: {
+            sound: soundEnabled ? 'default' : undefined,
+            badge: 1,
+            ...(vibrationEnabled ? {} : {}),
+          },
+        },
+        ...(imageUrl
+          ? {
+              fcmOptions: { imageUrl },
+            }
+          : {}),
       },
     }));
 
@@ -242,13 +392,7 @@ export async function dispatchPushForNotificationDoc(
     });
 
     if (invalidTokens.length > 0 && userId !== 'super_admin') {
-      await db
-        .collection('users')
-        .doc(userId)
-        .update({
-          fcmTokens: adminSdk.firestore.FieldValue.arrayRemove(...invalidTokens),
-        })
-        .catch(() => {});
+      await pruneInvalidTokens(db, adminSdk, userId, invalidTokens);
       logPush('PUSH_SEND_SUCCESS', {
         notifId,
         prunedTokens: invalidTokens.length,
@@ -260,6 +404,16 @@ export async function dispatchPushForNotificationDoc(
       status,
       successCount: response.successCount,
       failureCount: response.failureCount,
+    });
+
+    await writeNotificationAuditLog(db, adminSdk, {
+      sender: String(notif.senderId || 'system'),
+      receiver: userId,
+      type,
+      status,
+      notificationId: notifId,
+      schoolId: notifSchoolId,
+      title,
     });
 
     logPush('PUSH_SEND_SUCCESS', {
@@ -277,8 +431,51 @@ export async function dispatchPushForNotificationDoc(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     await writePushDelivery(docRef, adminSdk, { status: 'error', error: message }).catch(() => {});
+    await writeNotificationAuditLog(db, adminSdk, {
+      sender: String(notif.senderId || 'system'),
+      receiver: userId,
+      type,
+      status: 'error',
+      notificationId: notifId,
+      schoolId: notifSchoolId,
+      title,
+    }).catch(() => {});
     logPush('PUSH_SEND_ERROR', { notifId, error: message });
     return { notifId, status: 'error', reason: message };
+  }
+}
+
+async function pruneInvalidTokens(
+  db: Firestore,
+  adminSdk: typeof admin,
+  userId: string,
+  invalidTokens: string[],
+): Promise<void> {
+  try {
+    const ref = db.collection('users').doc(userId);
+    const snap = await ref.get();
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+    const invalid = new Set(invalidTokens);
+    const nextTokens = (Array.isArray(data.fcmTokens) ? data.fcmTokens : []).filter(
+      (t: unknown) => typeof t === 'string' && !invalid.has(t),
+    );
+    const nextDevices = (Array.isArray(data.fcmDevices) ? data.fcmDevices : []).filter(
+      (d: { token?: string }) => !(d && typeof d.token === 'string' && invalid.has(d.token)),
+    );
+    await ref.update({
+      fcmTokens: nextTokens,
+      fcmDevices: nextDevices,
+      fcmTokenUpdatedAt: adminSdk.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch {
+    await db
+      .collection('users')
+      .doc(userId)
+      .update({
+        fcmTokens: adminSdk.firestore.FieldValue.arrayRemove(...invalidTokens),
+      })
+      .catch(() => {});
   }
 }
 

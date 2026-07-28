@@ -434,3 +434,20 @@ export async function adminUnassignConversation(conversationId: string) {
 export async function adminCloseConversation(conversationId: string) {
   return adminApiPost('/api/admin/chat/conversations/close', { conversationId });
 }
+
+export async function sendEnterprisePushNotification(payload: {
+  targetType: string;
+  schoolId?: string;
+  role?: string;
+  userId?: string;
+  title: string;
+  body: string;
+  type?: string;
+  imageUrl?: string;
+  actionUrl?: string;
+  routeTarget?: string;
+  data?: Record<string, unknown>;
+}) {
+  const json = await adminApiPost('/api/notifications/send', payload as Record<string, unknown>);
+  return json as { success?: boolean; created?: number; error?: string };
+}

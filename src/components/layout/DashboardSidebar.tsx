@@ -30,25 +30,8 @@ type DashboardSidebarProps = {
   docked?: boolean;
 };
 
-function navItemClasses(variant: DashboardShellVariant, active: boolean) {
-  return clsx(
-    'sx-nav-item w-full sx-nav-item--dark',
-    active && 'sx-nav-item--active',
-  );
-}
-
-function sidebarSurface(variant: DashboardShellVariant) {
-  switch (variant) {
-    case 'admin-dark':
-    case 'superadmin':
-      return 'sx-sidebar--navy text-white border-white/10';
-    default:
-      return 'sx-sidebar--navy text-white border-white/10';
-  }
-}
-
 export function DashboardSidebar({
-  variant,
+  variant: _variant,
   menuItems,
   sections,
   activeTab,
@@ -69,108 +52,115 @@ export function DashboardSidebar({
     ? groupMenuBySection(menuItems, sections)
     : [{ section: { id: 'all', label: '' }, items: menuItems }];
 
-  const renderNavButton = (item: DashboardMenuItem) => (
-    <button
-      key={item.id}
-      type="button"
-      onClick={() => {
-        onTabChange(item.id);
-        onCloseMobile();
-      }}
-      title={isCollapsed ? item.label : undefined}
-      className={clsx(
-        navItemClasses(variant, activeTab === item.id),
-        isCollapsed ? 'justify-center px-0 py-3' : 'items-center gap-3 px-3 py-2.5',
-      )}
-      dir={isRtl ? 'rtl' : 'ltr'}
-    >
-      <item.icon size={isCollapsed ? 20 : 18} className="sx-action-icon shrink-0" strokeWidth={2.25} />
-      {!isCollapsed ? (
-        <span className="truncate flex-1 text-left rtl:text-right">{item.label}</span>
-      ) : null}
-      {!isCollapsed && item.badge != null && item.badge > 0 ? (
-        <span className="min-w-[20px] h-5 px-1 rounded-full bg-sx-accent text-sx-primary text-[10px] font-black flex items-center justify-center">
-          {item.badge > 99 ? '99+' : item.badge}
-        </span>
-      ) : null}
-      {isCollapsed ? (
-        <div
-          className={clsx(
-            'absolute hidden group-hover:block bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none',
-            isRtl ? 'right-[calc(100%+8px)]' : 'left-[calc(100%+8px)]',
-          )}
-        >
-          {item.label}
-        </div>
-      ) : null}
-    </button>
-  );
+  const renderNavButton = (item: DashboardMenuItem) => {
+    const active = activeTab === item.id;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={() => {
+          onTabChange(item.id);
+          onCloseMobile();
+        }}
+        title={isCollapsed ? item.label : undefined}
+        className={clsx(
+          'sx-nav-item sx-nav-item--dark sx-app-nav-item group relative',
+          active && 'sx-nav-item--active',
+          isCollapsed ? 'sx-app-nav-item--collapsed' : 'sx-app-nav-item--expanded',
+        )}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        aria-current={active ? 'page' : undefined}
+      >
+        <span className="sx-app-nav-item__rail" aria-hidden />
+        <item.icon
+          size={isCollapsed ? 20 : 18}
+          className="sx-action-icon shrink-0"
+          strokeWidth={2}
+        />
+        {!isCollapsed ? (
+          <span className="sx-app-nav-item__label truncate flex-1">{item.label}</span>
+        ) : null}
+        {!isCollapsed && item.badge != null && item.badge > 0 ? (
+          <span className="sx-app-nav-item__badge">
+            {item.badge > 99 ? '99+' : item.badge}
+          </span>
+        ) : null}
+        {isCollapsed ? (
+          <span
+            className={clsx(
+              'sx-app-nav-tooltip',
+              isRtl ? 'sx-app-nav-tooltip--rtl' : 'sx-app-nav-tooltip--ltr',
+            )}
+          >
+            {item.label}
+          </span>
+        ) : null}
+      </button>
+    );
+  };
 
   return (
     <AnimatePresence mode="wait">
-      {(docked || isOpen) ? (
+      {docked || isOpen ? (
         <motion.aside
           layout
-          transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           className={clsx(
-            'sx-dashboard-sidebar sx-shell-sidebar overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)] border',
+            'sx-dashboard-sidebar sx-shell-sidebar sx-app-sidebar sx-sidebar--navy overflow-hidden print:hidden',
+            'pt-[env(safe-area-inset-top,0px)]',
             docked && 'sx-shell-sidebar--docked',
             !docked && isOpen && 'sx-shell-sidebar--drawer',
             isCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
-            isRtl ? 'border-l' : 'border-r',
-            sidebarSurface(variant),
           )}
         >
-          <div className="h-full flex flex-col min-w-0">
+          <div className="sx-app-sidebar__inner h-full flex flex-col min-w-0">
             <div
               className={clsx(
-                'sx-sidebar-brand border-white/10',
-                isCollapsed && 'justify-center',
+                'sx-sidebar-brand sx-app-sidebar__brand',
+                isCollapsed && 'sx-app-sidebar__brand--collapsed',
               )}
             >
               <div className="sx-sidebar-brand__logo">
                 {isCustomSchoolLogo(schoolLogoUrl) ? (
                   <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
                 ) : (
-                  <SchoolixLogo size={isCollapsed ? 32 : 36} surface="light" />
+                  <SchoolixLogo size={isCollapsed ? 28 : 32} surface="light" />
                 )}
               </div>
               {!isCollapsed ? (
                 <div className="min-w-0" dir={isRtl ? 'rtl' : 'ltr'}>
-                  <h2 className="font-semibold leading-tight truncate text-sm text-white">{portalTitle}</h2>
+                  <h2 className="sx-app-sidebar__title truncate">{portalTitle}</h2>
                   {portalSubtitle ? (
-                    <p className="text-[10px] uppercase tracking-wider text-sx-accent font-semibold truncate mt-0.5">
-                      {portalSubtitle}
-                    </p>
+                    <p className="sx-app-sidebar__subtitle truncate">{portalSubtitle}</p>
                   ) : null}
                 </div>
               ) : null}
             </div>
 
-            <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-3 custom-scrollbar">
+            <nav className="sx-app-sidebar__nav flex-1 overflow-y-auto custom-scrollbar">
               {groups.map(({ section, items }) => (
-                <div key={section.id}>
+                <div key={section.id} className="sx-app-sidebar__group">
                   {!isCollapsed && section.label ? (
-                    <p className="px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+                    <p className="sx-app-sidebar__section">
                       {sectionLabels?.[section.id] ?? section.label}
                     </p>
                   ) : null}
-                  <div className="space-y-1">{items.map(renderNavButton)}</div>
+                  <div className="sx-app-sidebar__items">{items.map(renderNavButton)}</div>
                 </div>
               ))}
             </nav>
 
-            <div className="p-3 border-t border-inherit">
+            <div className="sx-app-sidebar__footer">
               <button
                 type="button"
                 onClick={onLogout}
                 title={isCollapsed ? logoutLabel : undefined}
                 className={clsx(
-                  'sx-btn sx-btn-ghost w-full text-[var(--sx-danger)] hover:!bg-red-500/10',
-                  isCollapsed ? 'justify-center py-3 sx-btn-icon' : 'items-center gap-3 px-3 py-2.5',
+                  'sx-app-sidebar__logout',
+                  isCollapsed && 'sx-app-sidebar__logout--collapsed',
                 )}
               >
-                <LogOut size={isCollapsed ? 22 : 18} className="sx-icon sx-icon-danger shrink-0" />
+                <LogOut size={isCollapsed ? 20 : 17} className="shrink-0" strokeWidth={2} />
                 {!isCollapsed ? <span>{logoutLabel}</span> : null}
               </button>
             </div>
@@ -198,7 +188,7 @@ export function DashboardMobileSidebarOverlay({
       <button
         type="button"
         aria-label="Close menu"
-        className="fixed inset-0 md:hidden print:hidden z-[var(--sx-z-drawer-backdrop)] bg-slate-900/40 backdrop-blur-sm"
+        className="fixed inset-0 md:hidden print:hidden z-[var(--sx-z-drawer-backdrop)] bg-[#0B1F3A]/35"
         onClick={onClose}
       />
       <motion.aside

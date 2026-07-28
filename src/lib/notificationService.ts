@@ -28,6 +28,14 @@ import {
   isResourceExhaustedError,
   logWriteSkippedDuplicate,
 } from './firestoreQuota';
+import {
+  registerDevice as upsertFcmDevice,
+  removeDevice as removeFcmDevice,
+} from './fcmDeviceRegistry';
+import {
+  saveNotificationPreferences,
+  type NotificationPreferences,
+} from './notificationPreferences';
 
 const markedReadNotificationIds = new Set<string>();
 
@@ -738,5 +746,36 @@ export const notificationService = {
       console.error('Error creating renewal request:', error);
       return false;
     }
-  }
+  },
+
+  /** Alias used by enterprise push layer. */
+  async sendNotification(payload: NotificationPayload) {
+    return this.send(payload);
+  },
+
+  async registerDevice(
+    userId: string,
+    input: {
+      token: string;
+      platform?: string;
+      deviceId?: string;
+      browser?: string;
+      deviceName?: string;
+      notificationPermission?: string;
+    },
+  ) {
+    return upsertFcmDevice(userId, input);
+  },
+
+  async removeDevice(userId: string, opts?: { deviceId?: string; token?: string }) {
+    return removeFcmDevice(userId, opts);
+  },
+
+  async updatePreferences(
+    uid: string,
+    current: NotificationPreferences,
+    patch: Partial<NotificationPreferences>,
+  ) {
+    return saveNotificationPreferences(uid, current, patch);
+  },
 };

@@ -1,5 +1,5 @@
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
-import { doc, updateDoc, getDocFromServer, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { doc, getDocFromServer } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db, auth } from './firebase';
 import { getServiceWorkerUrl } from './serviceWorkerRegistration';
@@ -13,6 +13,11 @@ import {
   isResourceExhaustedError,
   logWriteSkippedDuplicate,
 } from './firestoreQuota';
+import {
+  getOrCreateDeviceId,
+  registerDevice,
+  removeDevice,
+} from './fcmDeviceRegistry';
 
 let webMessaging: ReturnType<typeof getMessaging> | null = null;
 let currentWebToken: string | null = null;
@@ -219,13 +224,7 @@ export function getLastWebPushRegistrationError(): string | null {
 }
 
 function getDeviceId(): string {
-  const key = 'schoolix_device_id';
-  let id = localStorage.getItem(key);
-  if (!id) {
-    id = 'web_' + crypto.randomUUID();
-    localStorage.setItem(key, id);
-  }
-  return id;
+  return getOrCreateDeviceId();
 }
 
 async function isServiceWorkerActive(): Promise<boolean> {
@@ -368,45 +367,34 @@ async function saveTokenToFirestore(userId: string, token: string): Promise<void
     return;
   }
 
-  const userRef = doc(db, 'users', userId);
   const path = `users/${userId}`;
-
-  try {
-    const existingTokens = await readUserTokensFromServer(userId);
-    if (existingTokens.includes(token)) {
-      logWriteSkippedDuplicate('web_fcm_token', { userId, tokenPrefix: token.slice(0, 12) });
-      return;
-    }
-  } catch (readErr) {
-    if (isResourceExhaustedError(readErr)) {
-      handleResourceExhausted('web_fcm_token_read');
-      return;
-    }
-    /* proceed with save attempt if read failed for other reasons */
-  }
+  const deviceId = getDeviceId();
 
   console.info('[FCM] SAVE_TOKEN_START', {
     userId,
     path,
     databaseId: getFirestoreDatabaseId(),
     tokenPrefix: token.slice(0, 12),
+    deviceId,
   });
+
   try {
-    await updateDoc(userRef, {
-      fcmTokens: arrayUnion(token),
-      fcmTokenUpdatedAt: serverTimestamp(),
-      fcmDevices: arrayUnion({
-        token,
-        platform: 'web',
-        deviceId: getDeviceId(),
-        updatedAt: new Date().toISOString(),
-      }),
+    const result = await registerDevice(userId, {
+      token,
+      platform: 'web',
+      deviceId,
+      notificationPermission:
+        typeof Notification !== 'undefined' ? Notification.permission : undefined,
     });
+    if (!result.ok) {
+      throw new Error(result.reason || 'device_register_failed');
+    }
     console.info('[FCM] SAVE_TOKEN_SUCCESS', {
       userId,
       path,
       databaseId: getFirestoreDatabaseId(),
       tokenPrefix: token.slice(0, 12),
+      deviceId: result.deviceId,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -654,7 +642,16 @@ export async function autoRegisterWebPushToken(
   if (localToken) {
     const alreadySaved = await isTokenSavedInFirestore(userId, localToken);
     if (alreadySaved) {
+      // Refresh device lastActive / metadata without prompting
+      await registerDevice(userId, {
+        token: localToken,
+        platform: 'web',
+        deviceId: getDeviceId(),
+        notificationPermission: Notification.permission,
+      });
       logWriteSkippedDuplicate('web_fcm_auto_register', { userId, tokenPrefix: localToken.slice(0, 12) });
+      currentWebToken = localToken;
+      attachForegroundMessageListener();
       return { ok: true, token: localToken, tokenPrefix: localToken.slice(0, 12) };
     }
   }
@@ -855,9 +852,9 @@ export async function unregisterWebPushToken(userId: string): Promise<void> {
   }
 
   try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      fcmTokens: arrayRemove(currentWebToken),
+    await removeDevice(userId, {
+      deviceId: getDeviceId(),
+      token: currentWebToken,
     });
     localStorage.removeItem('schoolix_fcm_token_web');
     currentWebToken = null;

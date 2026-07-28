@@ -108,6 +108,7 @@ import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
 import AuditLogsViewer from "./admin/AuditLogsViewer";
 import LandingPageSettings from "./superadmin/LandingPageSettings";
 import SmartAssistantAdminTab from "./superadmin/SmartAssistantAdminTab";
+import NotificationManagementTab from "./superadmin/NotificationManagementTab";
 import { SuperAdminSchoolRecordList } from "../components/superadmin/SuperAdminSchoolRecordList";
 import {
   SuperAdminSchoolsFilterBar,
@@ -259,6 +260,7 @@ export default function SuperAdminDashboard() {
     | "audit_logs"
     | "landing_page"
     | "smart_assistant"
+    | "notification_management"
     | "distributors"
     | "distributor_requests"
   >("schools");
@@ -2349,6 +2351,29 @@ export default function SuperAdminDashboard() {
                           className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
                         >
                           المساعد الذكي
+                        </div>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigateToTab("notification_management");
+                        if (isMobile) setIsSidebarOpen(false);
+                      }}
+                      title={isSidebarCollapsed ? (isRtl ? "إدارة الإشعارات" : "Notifications") : undefined}
+                      className={`w-full flex ${isSidebarCollapsed ? "justify-center px-0" : "items-center gap-3.5 px-4 md:px-5"} py-3.5 md:py-4 sx-nav-item sx-nav-item--dark group relative ${activeTab === "notification_management" ? "sx-nav-item--active" : ""}`}
+                    >
+                      <Bell
+                        size={isSidebarCollapsed ? 24 : 20}
+                        className="shrink-0"
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate">{isRtl ? "إدارة الإشعارات" : "Notifications"}</span>
+                      )}
+                      {isSidebarCollapsed && (
+                        <div
+                          className={`absolute ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"} hidden group-hover:block bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none`}
+                        >
+                          {isRtl ? "إدارة الإشعارات" : "Notifications"}
                         </div>
                       )}
                     </button>
@@ -5025,6 +5050,14 @@ export default function SuperAdminDashboard() {
               ) : activeTab === "smart_assistant" ? (
                 profile?.role === "superadmin" ? (
                   <SmartAssistantAdminTab isRtl={isRtl} />
+                ) : (
+                  <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
+                    {isRtl ? "غير مصرح" : "Not authorized"}
+                  </div>
+                )
+              ) : activeTab === "notification_management" ? (
+                profile?.role === "superadmin" ? (
+                  <NotificationManagementTab isRtl={isRtl} />
                 ) : (
                   <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">
                     {isRtl ? "غير مصرح" : "Not authorized"}

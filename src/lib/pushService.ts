@@ -1,28 +1,25 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
-import { db, auth } from './firebase';
-import { doc, updateDoc, getDocFromServer, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { auth } from './firebase';
 import { toast } from 'react-hot-toast';
 import { isLogoutInProgress } from './logoutGuard';
 import {
   handleResourceExhausted,
   isQuotaWritePaused,
   isResourceExhaustedError,
-  logWriteSkippedDuplicate,
 } from './firestoreQuota';
+import {
+  getOrCreateDeviceId,
+  registerDevice,
+  removeDevice,
+  detectPlatformLabel,
+} from './fcmDeviceRegistry';
 
 let currentPushToken: string | null = null;
 let pendingToken: string | null = null;
 let activeUserId: string | null = null;
 let listenersReady = false;
 let registerPromise: Promise<void> | null = null;
-
-function nativePlatformLabel(): 'android' | 'ios' | 'unknown' {
-  const platform = Capacitor.getPlatform();
-  if (platform === 'android') return 'android';
-  if (platform === 'ios') return 'ios';
-  return 'unknown';
-}
 
 function logPlatformDetected(): void {
   console.info('[NativePush] PLATFORM_DETECTED', {
@@ -35,17 +32,6 @@ function canSaveTokenForUser(userId: string): boolean {
   if (isLogoutInProgress()) return false;
   const currentUid = auth.currentUser?.uid;
   return Boolean(currentUid && currentUid === userId);
-}
-
-async function nativeTokenAlreadySaved(userId: string, token: string): Promise<boolean> {
-  try {
-    const snap = await getDocFromServer(doc(db, 'users', userId));
-    if (!snap.exists()) return false;
-    const tokens = snap.data()?.fcmTokens;
-    return Array.isArray(tokens) && tokens.includes(token);
-  } catch {
-    return false;
-  }
 }
 
 async function saveNativeTokenToFirestore(userId: string, token: string): Promise<boolean> {
@@ -64,35 +50,23 @@ async function saveNativeTokenToFirestore(userId: string, token: string): Promis
     return false;
   }
 
-  if (currentPushToken === token) {
-    const alreadySaved = await nativeTokenAlreadySaved(userId, token);
-    if (alreadySaved) {
-      logWriteSkippedDuplicate('native_fcm_token', { userId, tokenPrefix: token.slice(0, 12) });
-      return true;
-    }
-  }
-
   try {
-    const alreadySaved = await nativeTokenAlreadySaved(userId, token);
-    if (alreadySaved) {
-      logWriteSkippedDuplicate('native_fcm_token', { userId, tokenPrefix: token.slice(0, 12) });
-      currentPushToken = token;
-      return true;
-    }
-
-    await updateDoc(doc(db, 'users', userId), {
-      fcmTokens: arrayUnion(token),
-      fcmTokenUpdatedAt: serverTimestamp(),
-      fcmDevices: arrayUnion({
-        token,
-        platform: nativePlatformLabel(),
-        updatedAt: new Date().toISOString(),
-      }),
+    const result = await registerDevice(userId, {
+      token,
+      platform: detectPlatformLabel(),
+      deviceId: getOrCreateDeviceId(),
+      deviceName: `Capacitor ${Capacitor.getPlatform()}`,
     });
+    if (!result.ok) {
+      console.error('[NativePush] TOKEN_SAVE_ERROR', { userId, path, reason: result.reason });
+      return false;
+    }
+    currentPushToken = token;
     console.info('[NativePush] TOKEN_SAVE_SUCCESS', {
       userId,
       path,
       tokenPrefix: token.slice(0, 12),
+      deviceId: result.deviceId,
     });
     return true;
   } catch (error) {
@@ -236,7 +210,7 @@ export const registerForPushNotifications = async (
 };
 
 export const unregisterPushToken = async (userId: string) => {
-  if (!Capacitor.isNativePlatform() || !currentPushToken || !userId) {
+  if (!Capacitor.isNativePlatform() || !userId) {
     return;
   }
 
@@ -249,9 +223,9 @@ export const unregisterPushToken = async (userId: string) => {
   }
 
   try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      fcmTokens: arrayRemove(currentPushToken),
+    await removeDevice(userId, {
+      deviceId: getOrCreateDeviceId(),
+      token: currentPushToken || undefined,
     });
     console.info('[NativePush] TOKEN_REMOVE_SUCCESS', { userId });
     currentPushToken = null;
