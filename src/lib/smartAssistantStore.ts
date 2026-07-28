@@ -291,3 +291,64 @@ export async function loadOpenTicketsCount(): Promise<number> {
     return 0;
   }
 }
+
+export type AssistantUiSettings = {
+  nameAr: string;
+  nameEn: string;
+  logoUrl: string;
+  introAr: string;
+  introEn: string;
+  visibleSections: SmartAssistantScope[];
+  visibility: 'public' | 'school_users' | 'platform_only';
+  quickButtons: Array<{ id: string; labelAr: string; answerId?: string }>;
+};
+
+export const DEFAULT_ASSISTANT_SETTINGS: AssistantUiSettings = {
+  nameAr: 'مساعد SchoolixIQ',
+  nameEn: 'Schoolix Assistant',
+  logoUrl: '',
+  introAr: 'مرحباً! اختر قسماً أو ابحث بكلمة مفتاحية لأجد لك الحل بسرعة.',
+  introEn: 'Welcome! Pick a category or search a keyword for a quick answer.',
+  visibleSections: ['landing', 'school_admin', 'parent', 'teacher', 'distributor'],
+  visibility: 'public',
+  quickButtons: [],
+};
+
+export async function loadAssistantSettings(): Promise<AssistantUiSettings> {
+  try {
+    const snap = await getDocs(collection(db, 'assistant_settings'));
+    const row = snap.docs.find((d) => d.id === 'global') || snap.docs[0];
+    if (!row) return DEFAULT_ASSISTANT_SETTINGS;
+    return { ...DEFAULT_ASSISTANT_SETTINGS, ...(row.data() as Partial<AssistantUiSettings>) };
+  } catch {
+    return DEFAULT_ASSISTANT_SETTINGS;
+  }
+}
+
+export function subscribeAssistantSettings(
+  onData: (s: AssistantUiSettings) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, 'assistant_settings', 'global'),
+    (snap) => {
+      if (!snap.exists()) {
+        onData(DEFAULT_ASSISTANT_SETTINGS);
+        return;
+      }
+      onData({ ...DEFAULT_ASSISTANT_SETTINGS, ...(snap.data() as Partial<AssistantUiSettings>) });
+    },
+    () => onData(DEFAULT_ASSISTANT_SETTINGS),
+  );
+}
+
+export async function saveAssistantSettings(data: AssistantUiSettings): Promise<void> {
+  await setDoc(doc(db, 'assistant_settings', 'global'), data, { merge: true });
+}
+
+export async function upsertKeyword(data: AssistantKeyword): Promise<void> {
+  await setDoc(doc(db, COL.keywords, data.id), data, { merge: true });
+}
+
+export async function deleteKeyword(id: string): Promise<void> {
+  await deleteDoc(doc(db, COL.keywords, id));
+}

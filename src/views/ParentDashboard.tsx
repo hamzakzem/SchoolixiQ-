@@ -82,7 +82,10 @@ import { pageTransitionProps } from "../lib/motion";
 
 import SolarLoading from "../components/SolarLoading";
 import ParentChatTab from "./ParentChatTab";
-import { DashboardSmartAssistant } from "../components/smart-assistant/DashboardSmartAssistant";
+import {
+  DashboardSmartAssistant,
+  SmartAssistantNavButton,
+} from "../components/smart-assistant/DashboardSmartAssistant";
 import { invokeChatBack } from "../lib/chatUiBridge";
 import ParentSchedules from "./parent/ParentSchedules";
 import ParentDismissalTab from "./parent/ParentDismissalTab";
@@ -273,6 +276,7 @@ export default function ParentDashboard() {
     }
   }, []);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     if (isTablet) setIsSidebarCollapsed(true);
@@ -1596,11 +1600,15 @@ export default function ParentDashboard() {
       );
     }
 
-    const effectiveCollapsed = isTablet || isSidebarCollapsed;
+    const effectiveCollapsed = isSidebarCollapsed;
 
     return (
       <div
-        className="parent-app sx-dashboard-context sx-dashboard-layout sx-shell-layout min-h-[100dvh] flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0"
+        className={clsx(
+          'parent-app sx-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0',
+          !isMobile && 'sx-shell--with-sidebar',
+          !isMobile && effectiveCollapsed && 'sx-shell--sidebar-collapsed',
+        )}
         dir={isRtl ? "rtl" : "ltr"}
       >
         {!isMobile ? (
@@ -1611,7 +1619,7 @@ export default function ParentDashboard() {
               className={clsx(
                 'parent-dashboard-menu sx-dashboard-sidebar sx-shell-sidebar border-slate-200 transition-colors overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)]',
                 'sx-shell-sidebar--docked',
-                (isTablet || isSidebarCollapsed) && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
+                effectiveCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
                 isRtl ? 'border-l' : 'border-r',
               )}
             >
@@ -1694,13 +1702,14 @@ export default function ParentDashboard() {
           <div className="px-4 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 min-w-0">
-                {isDesktop ? (
+                {!isMobile ? (
                 <button
+                  type="button"
                   onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="parent-icon-btn hidden lg:inline-flex shrink-0 bg-[#F7F8FA]"
+                  className="parent-icon-btn hidden md:inline-flex shrink-0 bg-[#F7F8FA]"
                   aria-label={isRtl ? "القائمة" : "Menu"}
                 >
-                  <Menu size={20} />
+                  <Menu size={20} className={isSidebarCollapsed ? (isRtl ? "-rotate-90" : "rotate-90") : ""} />
                 </button>
                 ) : null}
                 {activeTab !== "home" && (
@@ -1730,6 +1739,9 @@ export default function ParentDashboard() {
                   <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
                   <LanguageToggle />
                   <ThemeToggle />
+                  {activeTab !== "chat" ? (
+                    <SmartAssistantNavButton isRtl={isRtl} onClick={() => setAssistantOpen(true)} />
+                  ) : null}
                 <button
                   onClick={handleLogout}
                   className="parent-icon-btn text-rose-500"
@@ -2669,7 +2681,11 @@ export default function ParentDashboard() {
           </div>
         )}
       </AnimatePresence>
-      <DashboardSmartAssistant hidden={activeTab === "chat"} />
+      <DashboardSmartAssistant
+        hidden={activeTab === "chat"}
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+      />
     </>
   );
 }

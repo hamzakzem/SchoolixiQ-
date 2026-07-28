@@ -15,12 +15,16 @@ import {
   deleteFlow,
   loadAssistantAnalytics,
   loadAssistantTickets,
+  loadAssistantSettings,
+  saveAssistantSettings,
+  DEFAULT_ASSISTANT_SETTINGS,
   seedAssistantCatalogIfEmpty,
   subscribeAssistantCatalog,
   upsertAnswer,
   upsertCategory,
   upsertFlow,
   type AssistantAnalytics,
+  type AssistantUiSettings,
 } from '../../lib/smartAssistantStore';
 import type { AssistantTicket } from '../../lib/smartAssistantEngine';
 
@@ -35,27 +39,41 @@ const SCOPES: SmartAssistantScope[] = [
   'distributor',
 ];
 
+const SECTION_SCOPES: SmartAssistantScope[] = [
+  'landing',
+  'school_admin',
+  'parent',
+  'teacher',
+  'distributor',
+];
+
 function newId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
 export default function SmartAssistantAdminTab({ isRtl = true }: { isRtl?: boolean }) {
   const [catalog, setCatalog] = useState<AssistantCatalog | null>(null);
-  const [tab, setTab] = useState<'content' | 'tickets' | 'analytics'>('content');
+  const [tab, setTab] = useState<'dashboard' | 'content' | 'tickets' | 'analytics' | 'settings'>('dashboard');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedFlowId, setSelectedFlowId] = useState<string>('');
   const [editingAnswer, setEditingAnswer] = useState<AssistantAnswer | null>(null);
   const [tickets, setTickets] = useState<AssistantTicket[]>([]);
   const [analytics, setAnalytics] = useState<AssistantAnalytics | null>(null);
+  const [settings, setSettings] = useState<AssistantUiSettings>(DEFAULT_ASSISTANT_SETTINGS);
   const [busy, setBusy] = useState(false);
+  const [newQuickLabel, setNewQuickLabel] = useState('');
 
   useEffect(() => subscribeAssistantCatalog(setCatalog), []);
 
   useEffect(() => {
-    if (tab === 'tickets') {
+    void loadAssistantSettings().then(setSettings).catch(() => setSettings(DEFAULT_ASSISTANT_SETTINGS));
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'tickets' || tab === 'dashboard') {
       void loadAssistantTickets().then(setTickets).catch(() => setTickets([]));
     }
-    if (tab === 'analytics') {
+    if (tab === 'analytics' || tab === 'dashboard') {
       void loadAssistantAnalytics().then(setAnalytics).catch(() => setAnalytics(null));
     }
   }, [tab]);
@@ -154,9 +172,23 @@ export default function SmartAssistantAdminTab({ isRtl = true }: { isRtl?: boole
     }
   };
 
+  const saveSettings = async () => {
+    setBusy(true);
+    try {
+      await saveAssistantSettings(settings);
+      toast.success(isRtl ? 'تم حفظ الإعدادات' : 'Settings saved');
+    } catch {
+      toast.error(isRtl ? 'فشل حفظ الإعدادات' : 'Settings save failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!catalog) {
     return <div className="p-6 text-sm font-bold text-slate-500">{isRtl ? 'جاري التحميل…' : 'Loading…'}</div>;
   }
+
+  const openTickets = tickets.filter((t) => t.status === 'open').length;
 
   return (
     <div className="space-y-4" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -169,23 +201,48 @@ export default function SmartAssistantAdminTab({ isRtl = true }: { isRtl?: boole
               {isRtl ? 'إدارة المساعد الذكي' : 'Smart Assistant Management'}
             </h2>
           </div>
-          <div className="sx-section-toolbar">
+          <div className="sx-section-toolbar flex flex-wrap gap-2">
             <button type="button" className="sx-btn sx-btn-secondary !h-10 !min-h-10 !text-xs" onClick={() => void seedNow()} disabled={busy}>
               <Upload size={14} />
               {isRtl ? 'زرع المحتوى الافتراضي' : 'Seed defaults'}
             </button>
-            <button type="button" className="sx-btn sx-btn-ghost !h-10 !min-h-10 !text-xs" onClick={() => setTab('content')}>
-              {isRtl ? 'المحتوى' : 'Content'}
-            </button>
-            <button type="button" className="sx-btn sx-btn-ghost !h-10 !min-h-10 !text-xs" onClick={() => setTab('tickets')}>
-              {isRtl ? 'التذاكر' : 'Tickets'}
-            </button>
-            <button type="button" className="sx-btn sx-btn-ghost !h-10 !min-h-10 !text-xs" onClick={() => setTab('analytics')}>
-              {isRtl ? 'التقارير' : 'Analytics'}
-            </button>
+            {(
+              [
+                ['dashboard', isRtl ? 'لوحة' : 'Dashboard'],
+                ['content', isRtl ? 'المحتوى' : 'Content'],
+                ['tickets', isRtl ? 'التذاكر' : 'Tickets'],
+                ['analytics', isRtl ? 'التقارير' : 'Analytics'],
+                ['settings', isRtl ? 'إعدادات' : 'Settings'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`sx-btn !h-10 !min-h-10 !text-xs ${tab === id ? 'sx-btn-primary' : 'sx-btn-ghost'}`}
+                onClick={() => setTab(id)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
+
+      {tab === 'dashboard' ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { l: isRtl ? 'أحداث البحث' : 'Search events', v: analytics?.keywordHits ?? '—' },
+            { l: isRtl ? 'أكثر الأسئلة' : 'Top question', v: analytics?.topQueries?.[0]?.query || '—' },
+            { l: isRtl ? 'غير محلولة' : 'Unresolved', v: analytics?.unresolved ?? '—' },
+            { l: isRtl ? 'تذاكر مفتوحة' : 'Open tickets', v: openTickets },
+          ].map((x) => (
+            <div key={x.l} className="sx-kpi-card">
+              <p className="sx-kpi-card__label">{x.l}</p>
+              <p className="sx-kpi-card__value text-base truncate">{String(x.v)}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {tab === 'analytics' && analytics ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -424,6 +481,113 @@ export default function SmartAssistantAdminTab({ isRtl = true }: { isRtl?: boole
               <p className="text-sm text-slate-400">{isRtl ? 'اختر إجابة للتحرير أو أضف واحدةً جديدة.' : 'Select or add an answer.'}</p>
             )}
           </div>
+        </div>
+      ) : null}
+
+      {tab === 'settings' ? (
+        <div className="sx-section space-y-4 max-w-2xl">
+          <h3 className="font-black">{isRtl ? 'إعدادات المساعد' : 'Assistant settings'}</h3>
+          <label className="block text-[11px] font-bold text-slate-500">{isRtl ? 'اسم المساعد (عربي)' : 'Name (AR)'}</label>
+          <input className="w-full rounded-xl border px-3 py-2 text-sm" value={settings.nameAr} onChange={(e) => setSettings({ ...settings, nameAr: e.target.value })} />
+          <label className="block text-[11px] font-bold text-slate-500">{isRtl ? 'اسم المساعد (إنجليزي)' : 'Name (EN)'}</label>
+          <input className="w-full rounded-xl border px-3 py-2 text-sm" value={settings.nameEn} onChange={(e) => setSettings({ ...settings, nameEn: e.target.value })} />
+          <label className="block text-[11px] font-bold text-slate-500">{isRtl ? 'رابط الشعار' : 'Logo URL'}</label>
+          <input className="w-full rounded-xl border px-3 py-2 text-sm" value={settings.logoUrl} onChange={(e) => setSettings({ ...settings, logoUrl: e.target.value })} placeholder="https://…" />
+          <label className="block text-[11px] font-bold text-slate-500">{isRtl ? 'رسالة البداية (عربي)' : 'Intro (AR)'}</label>
+          <textarea className="w-full rounded-xl border px-3 py-2 text-sm min-h-[80px]" value={settings.introAr} onChange={(e) => setSettings({ ...settings, introAr: e.target.value })} />
+          <label className="block text-[11px] font-bold text-slate-500">{isRtl ? 'رسالة البداية (إنجليزي)' : 'Intro (EN)'}</label>
+          <textarea className="w-full rounded-xl border px-3 py-2 text-sm min-h-[80px]" value={settings.introEn} onChange={(e) => setSettings({ ...settings, introEn: e.target.value })} />
+          <label className="block text-[11px] font-bold text-slate-500">{isRtl ? 'الأقسام الظاهرة' : 'Visible sections'}</label>
+          <div className="flex flex-wrap gap-1">
+            {SECTION_SCOPES.map((s) => {
+              const on = settings.visibleSections.includes(s);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  className={`text-[10px] font-bold px-2 py-1 rounded-full border ${on ? 'bg-[#D4AF37]/20 border-[#D4AF37]' : 'border-slate-200'}`}
+                  onClick={() =>
+                    setSettings({
+                      ...settings,
+                      visibleSections: on
+                        ? settings.visibleSections.filter((x) => x !== s)
+                        : [...settings.visibleSections, s],
+                    })
+                  }
+                >
+                  {s}
+                </button>
+              );
+            })}
+          </div>
+          <label className="block text-[11px] font-bold text-slate-500">{isRtl ? 'صلاحيات العرض' : 'Visibility'}</label>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ['public', isRtl ? 'عام' : 'Public'],
+                ['school_users', isRtl ? 'مستخدمو المدارس' : 'School users'],
+                ['platform_only', isRtl ? 'المنصة فقط' : 'Platform only'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`sx-btn !h-10 !min-h-10 !text-xs ${settings.visibility === id ? 'sx-btn-primary' : 'sx-btn-secondary'}`}
+                onClick={() => setSettings({ ...settings, visibility: id })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="block text-[11px] font-bold text-slate-500">{isRtl ? 'أزرار سريعة' : 'Quick buttons'}</label>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 rounded-xl border px-3 py-2 text-sm"
+              value={newQuickLabel}
+              onChange={(e) => setNewQuickLabel(e.target.value)}
+              placeholder={isRtl ? 'نص الزر' : 'Button label'}
+            />
+            <button
+              type="button"
+              className="sx-btn sx-btn-secondary !h-10 !min-h-10 !text-xs"
+              onClick={() => {
+                if (!newQuickLabel.trim()) return;
+                setSettings({
+                  ...settings,
+                  quickButtons: [
+                    ...settings.quickButtons,
+                    { id: newId('qb'), labelAr: newQuickLabel.trim(), answerId: editingAnswer?.id },
+                  ],
+                });
+                setNewQuickLabel('');
+              }}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+          <ul className="space-y-1">
+            {settings.quickButtons.map((qb) => (
+              <li key={qb.id} className="flex justify-between text-sm border rounded-xl px-3 py-2">
+                <span>{qb.labelAr}</span>
+                <button
+                  type="button"
+                  className="text-rose-500"
+                  onClick={() =>
+                    setSettings({
+                      ...settings,
+                      quickButtons: settings.quickButtons.filter((x) => x.id !== qb.id),
+                    })
+                  }
+                >
+                  <Trash2 size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="sx-btn sx-btn-primary" disabled={busy} onClick={() => void saveSettings()}>
+            <Save size={14} />
+            {isRtl ? 'حفظ الإعدادات' : 'Save settings'}
+          </button>
         </div>
       ) : null}
     </div>

@@ -5,6 +5,10 @@ import { MobileNavigationDock } from '../MobileNavigationDock';
 import { GlobalFooter } from '../GlobalFooter';
 import { DashboardHeader, type BreadcrumbItem } from './DashboardHeader';
 import { DashboardSidebar } from './DashboardSidebar';
+import {
+  DashboardSmartAssistant,
+  SmartAssistantNavButton,
+} from '../smart-assistant/DashboardSmartAssistant';
 import { useDevice } from '../../lib/useDevice';
 import {
   type DashboardMenuItem,
@@ -41,6 +45,8 @@ export type DashboardShellProps = {
   showNotifications?: boolean;
   setShowNotifications?: (show: boolean) => void;
   className?: string;
+  /** Hide smart assistant (e.g. on chat fullscreen). */
+  hideSmartAssistant?: boolean;
 };
 
 export function DashboardShell({
@@ -71,26 +77,29 @@ export function DashboardShell({
   showNotifications = false,
   setShowNotifications,
   className,
+  hideSmartAssistant = false,
 }: DashboardShellProps) {
-  const { isMobile, isTablet, isDesktop } = useDevice();
+  const { isMobile, isTablet } = useDevice();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     if (isTablet) setIsSidebarCollapsed(true);
   }, [isTablet]);
 
   const handleMenuToggle = useCallback(() => {
-    if (isDesktop) {
+    if (!isMobile) {
       setIsSidebarCollapsed((v) => !v);
     }
-  }, [isDesktop]);
+  }, [isMobile]);
 
   const handleHeaderBack = useCallback(() => {
     if (activeTab === 'chat' && invokeChatBack()) return;
     onBack?.();
   }, [activeTab, onBack]);
 
-  const sidebarCollapsed = isTablet || isSidebarCollapsed;
+  const sidebarCollapsed = isSidebarCollapsed;
+  const assistantHidden = hideSmartAssistant || activeTab === 'chat';
 
   return (
     <div
@@ -139,10 +148,13 @@ export function DashboardShell({
           onBack={onBack ? handleHeaderBack : undefined}
           onMenuToggle={handleMenuToggle}
           menuCollapsed={sidebarCollapsed}
-          showMenuToggle={isDesktop}
+          showMenuToggle={!isMobile}
           trailing={
             <>
               {headerTrailing}
+              {!assistantHidden ? (
+                <SmartAssistantNavButton isRtl={isRtl} onClick={() => setAssistantOpen(true)} />
+              ) : null}
               {!isMobile ? (
                 <OfflineQueueTrigger variant="header" className="inline-flex" />
               ) : null}
@@ -194,6 +206,12 @@ export function DashboardShell({
           />
         ) : null}
       </div>
+
+      <DashboardSmartAssistant
+        hidden={assistantHidden}
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+      />
     </div>
   );
 }

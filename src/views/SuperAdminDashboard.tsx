@@ -98,7 +98,10 @@ import { useSystemConfig } from "../lib/SystemConfigContext";
 import SchoolixLogo from "../components/SchoolixLogo";
 import { isCustomAppLogo } from "../lib/brandAssets";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
-import { DashboardSmartAssistant } from "../components/smart-assistant/DashboardSmartAssistant";
+import {
+  DashboardSmartAssistant,
+  SmartAssistantNavButton,
+} from "../components/smart-assistant/DashboardSmartAssistant";
 import { invokeChatBack } from "../lib/chatUiBridge";
 import { SuperAdminBackupsTab } from "./SuperAdminBackupsTab";
 import { SuperAdminDiagnostics } from "./SuperAdminDiagnostics";
@@ -284,6 +287,7 @@ export default function SuperAdminDashboard() {
   const [viewingPackage, setViewingPackage] = useState<any | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const { isMobile, isTablet, isDesktop } = useDevice();
   const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [showNewUserPasswordConfirm, setShowNewUserPasswordConfirm] = useState(false);
@@ -1966,7 +1970,11 @@ export default function SuperAdminDashboard() {
 
   return (
     <div
-      className="sx-dashboard-context sx-dashboard-layout sx-shell-layout min-h-[100dvh] bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block"
+      className={clsx(
+        'sx-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block',
+        !isMobile && 'sx-shell--with-sidebar',
+        !isMobile && isSidebarCollapsed && 'sx-shell--sidebar-collapsed',
+      )}
       dir={isRtl ? "rtl" : "ltr"}
     >
       {!isMobile ? (
@@ -1977,7 +1985,7 @@ export default function SuperAdminDashboard() {
             className={clsx(
               'bg-slate-900 dark:bg-black text-white sx-dashboard-sidebar sx-shell-sidebar border-slate-800 dark:border-slate-800 transition-colors overflow-hidden pt-[env(safe-area-inset-top,0px)]',
               'sx-shell-sidebar--docked',
-              (isTablet || isSidebarCollapsed) && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
+              isSidebarCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
               isRtl ? 'border-l' : 'border-r',
             )}
           >
@@ -2491,16 +2499,17 @@ export default function SuperAdminDashboard() {
       <main className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
         <header className="sx-dashboard-header pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors shadow-sm relative z-[var(--sx-z-header)] print:hidden">
           <div className="flex items-center gap-2 min-w-0">
-            {isDesktop ? (
+            {!isMobile ? (
             <button
+              type="button"
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="sx-header-action-btn hidden lg:inline-flex text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 shrink-0"
+              className="sx-header-action-btn hidden md:inline-flex text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 shrink-0"
             >
               <Menu
                 size={20}
                 className={
                   isSidebarCollapsed
-                    ? "rotate-90 transition-transform"
+                    ? `${isRtl ? "-rotate-90" : "rotate-90"} transition-transform`
                     : "transition-transform"
                 }
               />
@@ -2533,6 +2542,9 @@ export default function SuperAdminDashboard() {
             <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
             <LanguageToggle />
             <ThemeToggle />
+            {activeTab !== "chat" ? (
+              <SmartAssistantNavButton isRtl={isRtl} onClick={() => setAssistantOpen(true)} />
+            ) : null}
 
             <button
               onClick={() => setShowNotifications(!showNotifications)}
@@ -6341,7 +6353,11 @@ export default function SuperAdminDashboard() {
         desktopDrawerEnabled={false}
       />
       ) : null}
-      <DashboardSmartAssistant hidden={activeTab === "chat"} />
+      <DashboardSmartAssistant
+        hidden={activeTab === "chat"}
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+      />
     </div>
   );
 }

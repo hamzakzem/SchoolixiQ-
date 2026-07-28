@@ -1,6 +1,12 @@
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { type SmartAssistantScope } from '../../lib/smartAssistantEngine';
+import {
+  subscribeAssistantSettings,
+  type AssistantUiSettings,
+  DEFAULT_ASSISTANT_SETTINGS,
+} from '../../lib/smartAssistantStore';
 import { SmartAssistantWidget } from './SmartAssistantWidget';
 
 function scopeForRole(role?: string | null): SmartAssistantScope | null {
@@ -15,20 +21,119 @@ function scopeForRole(role?: string | null): SmartAssistantScope | null {
   return null;
 }
 
-/** Floating rule-based helper on authenticated dashboards (hidden on chat full-screen tabs). */
-export function DashboardSmartAssistant({ hidden }: { hidden?: boolean }) {
+function visibilityAllows(settings: AssistantUiSettings, role?: string | null): boolean {
+  const v = settings.visibility || 'public';
+  if (v === 'public') return true;
+  const r = String(role || '').toLowerCase();
+  if (v === 'platform_only') {
+    return r === 'superadmin' || r === 'super_admin' || r === 'platform_assistant';
+  }
+  return ['admin', 'school_admin', 'teacher', 'parent', 'guard', 'distributor'].includes(r);
+}
+
+export function SmartAssistantNavButton({
+  isRtl,
+  onClick,
+  className,
+  label,
+}: {
+  isRtl: boolean;
+  onClick: () => void;
+  className?: string;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={className || 'sx-assistant-nav-btn shrink-0'}
+      aria-label={label || (isRtl ? 'مساعد SchoolixIQ' : 'SchoolixIQ Assistant')}
+    >
+      <span aria-hidden>🤖</span>
+      <span className="hidden sm:inline">
+        {label || (isRtl ? 'مساعد SchoolixIQ' : 'Assistant')}
+      </span>
+    </button>
+  );
+}
+
+function useAssistantSettings() {
+  const [settings, setSettings] = useState<AssistantUiSettings>(DEFAULT_ASSISTANT_SETTINGS);
+  useEffect(() => subscribeAssistantSettings(setSettings), []);
+  return settings;
+}
+
+/** Navbar-triggered rule-based assistant panel (no floating FAB on dashboards). */
+export function DashboardSmartAssistant({
+  hidden,
+  open,
+  onOpenChange,
+}: {
+  hidden?: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { profile } = useAuth();
   const { isRtl } = useLanguage();
+  const settings = useAssistantSettings();
   const scope = scopeForRole(profile?.role);
 
   if (hidden || !scope || !profile?.uid) return null;
+  if (!visibilityAllows(settings, profile.role)) return null;
 
   return (
     <SmartAssistantWidget
+      variant="panel"
+      open={open}
+      onOpenChange={onOpenChange}
       isRtl={isRtl}
       scope={scope}
       userId={profile.uid}
       userRole={String(profile.role || scope)}
+      assistantName={isRtl ? settings.nameAr : settings.nameEn}
+      introText={isRtl ? settings.introAr : settings.introEn}
+      logoUrl={settings.logoUrl || undefined}
     />
+  );
+}
+
+/** Self-contained host: nav button + panel. Use in custom dashboards without DashboardShell. */
+export function DashboardSmartAssistantHost({
+  hidden,
+  isRtl: isRtlProp,
+}: {
+  hidden?: boolean;
+  isRtl?: boolean;
+}) {
+  const { profile } = useAuth();
+  const { isRtl: langRtl } = useLanguage();
+  const isRtl = isRtlProp ?? langRtl;
+  const [open, setOpen] = useState(false);
+  const settings = useAssistantSettings();
+  const scope = scopeForRole(profile?.role);
+
+  if (hidden || !scope || !profile?.uid) return null;
+  if (!visibilityAllows(settings, profile.role)) return null;
+
+  return (
+    <>
+      <SmartAssistantNavButton
+        isRtl={isRtl}
+        onClick={() => setOpen(true)}
+        label={isRtl ? settings.nameAr : settings.nameEn}
+      />
+      <SmartAssistantWidget
+        variant="panel"
+        open={open}
+        onOpenChange={setOpen}
+        isRtl={isRtl}
+        scope={scope}
+        userId={profile.uid}
+        userRole={String(profile.role || scope)}
+        assistantName={isRtl ? settings.nameAr : settings.nameEn}
+        introText={isRtl ? settings.introAr : settings.introEn}
+        logoUrl={settings.logoUrl || undefined}
+      />
+    </>
   );
 }

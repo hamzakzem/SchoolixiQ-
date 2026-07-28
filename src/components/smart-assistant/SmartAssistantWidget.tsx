@@ -47,29 +47,50 @@ export function SmartAssistantWidget({
   userId = null,
   userRole = 'guest',
   catalog: catalogProp,
+  variant = 'fab',
+  open: openProp,
+  onOpenChange,
+  assistantName,
+  introText,
+  logoUrl,
 }: {
   isRtl?: boolean;
   scope?: SmartAssistantScope;
   userId?: string | null;
   userRole?: string;
   catalog?: AssistantCatalog;
+  /** fab = floating (landing); panel = navbar side drawer */
+  variant?: 'fab' | 'panel';
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  assistantName?: string;
+  introText?: string;
+  logoUrl?: string;
 }) {
   const { isMobile } = useDevice();
   const reduced = prefersReducedMotion();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const controlled = typeof openProp === 'boolean';
+  const open = controlled ? openProp : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (!controlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [catalog, setCatalog] = useState<AssistantCatalog>(catalogProp || getSeedCatalog());
   const [session, setSession] = useState<AssistantSession>(() => createAssistantSession(scope));
   const [mode, setMode] = useState<ViewMode>('home');
   const [activeCategory, setActiveCategory] = useState<AssistantCategory | null>(null);
   const [activeFlow, setActiveFlow] = useState<AssistantFlow | null>(null);
   const [activeAnswer, setActiveAnswer] = useState<AssistantAnswer | null>(null);
+  const defaultIntro = introText || smartAssistantIntro(isRtl);
   const [lines, setLines] = useState<ChatLine[]>([
-    { id: 'intro', kind: 'bot', text: smartAssistantIntro(isRtl) },
+    { id: 'intro', kind: 'bot', text: defaultIntro },
   ]);
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [ticketBusy, setTicketBusy] = useState(false);
   const [resolvedPrompt, setResolvedPrompt] = useState(false);
+  const displayName = assistantName || (isRtl ? 'مساعد SchoolixIQ' : 'SchoolixIQ Assistant');
 
   useEffect(() => {
     if (catalogProp) {
@@ -85,9 +106,9 @@ export function SmartAssistantWidget({
     setActiveCategory(null);
     setActiveFlow(null);
     setActiveAnswer(null);
-    setLines([{ id: 'intro', kind: 'bot', text: smartAssistantIntro(isRtl) }]);
+    setLines([{ id: 'intro', kind: 'bot', text: introText || smartAssistantIntro(isRtl) }]);
     setResolvedPrompt(false);
-  }, [scope, isRtl]);
+  }, [scope, isRtl, introText]);
 
   const cats = useMemo(() => categoriesForScope(catalog, scope), [catalog, scope]);
 
@@ -271,45 +292,64 @@ export function SmartAssistantWidget({
     runAssistantAction(action);
   };
 
-  const panelClass = isMobile
-    ? 'fixed inset-0 z-50 flex flex-col bg-[#0B1F3A]/40 backdrop-blur-[2px]'
-    : 'fixed z-50 bottom-40 end-4 w-[min(94vw,24rem)]';
+  const isPanel = variant === 'panel';
+  const panelClass = isPanel
+    ? 'sx-assistant-panel-overlay'
+    : isMobile
+      ? 'fixed inset-0 z-50 flex flex-col bg-[#0B1F3A]/40 backdrop-blur-[2px]'
+      : 'fixed z-50 bottom-40 end-4 w-[min(94vw,24rem)]';
 
-  const cardClass = isMobile
-    ? 'm-auto w-full max-w-lg h-[min(92dvh,720px)] rounded-t-3xl sm:rounded-3xl border border-white/10 bg-white dark:bg-[#0d1528] shadow-2xl overflow-hidden flex flex-col'
-    : 'w-full max-h-[min(78vh,640px)] rounded-2xl border border-[#0B1F3A]/12 bg-white/95 dark:bg-[#0d1528]/95 backdrop-blur-md shadow-2xl overflow-hidden flex flex-col';
+  const cardClass = isPanel
+    ? 'sx-assistant-panel'
+    : isMobile
+      ? 'm-auto w-full max-w-lg h-[min(92dvh,720px)] rounded-t-3xl sm:rounded-3xl border border-white/10 bg-white dark:bg-[#0d1528] shadow-2xl overflow-hidden flex flex-col'
+      : 'w-full max-h-[min(78vh,640px)] rounded-2xl border border-[#0B1F3A]/12 bg-white/95 dark:bg-[#0d1528]/95 backdrop-blur-md shadow-2xl overflow-hidden flex flex-col';
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fixed z-40 bottom-24 end-4 w-14 h-14 rounded-full bg-[#0B1F3A] text-[#D4AF37] shadow-xl flex items-center justify-center hover:scale-105 transition-transform ring-2 ring-[#D4AF37]/35 animate-pulse"
-        aria-label="مساعد SchoolixIQ"
-      >
-        <span className="text-lg font-black">S</span>
-      </button>
+      {!isPanel ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="fixed z-40 bottom-24 end-4 w-14 h-14 rounded-full bg-[#0B1F3A] text-[#D4AF37] shadow-xl flex items-center justify-center hover:scale-105 transition-transform ring-2 ring-[#D4AF37]/35 animate-pulse"
+          aria-label={displayName}
+        >
+          <span className="text-lg font-black">S</span>
+        </button>
+      ) : null}
 
       <AnimatePresence>
         {open ? (
           <motion.div
-            initial={reduced ? { opacity: 1 } : { opacity: 0, y: 18, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduced ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.97 }}
+            initial={reduced ? { opacity: 1 } : isPanel ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
+            exit={reduced ? { opacity: 0 } : isPanel ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.97 }}
             transition={{ duration: 0.22 }}
             className={panelClass}
             dir={isRtl ? 'rtl' : 'ltr'}
+            onClick={isPanel ? () => setOpen(false) : undefined}
           >
-            {isMobile ? (
+            {!isPanel && isMobile ? (
               <button type="button" className="flex-1" aria-label="close" onClick={() => setOpen(false)} />
             ) : null}
-            <div className={cardClass}>
+            <div
+              className={cardClass}
+              onClick={isPanel ? (e) => e.stopPropagation() : undefined}
+              role={isPanel ? 'dialog' : undefined}
+              aria-modal={isPanel || undefined}
+              aria-label={displayName}
+            >
               <header className="shrink-0 flex items-center justify-between gap-2 px-3 py-3 bg-[#0B1F3A] text-white">
-                <div className="min-w-0">
-                  <p className="text-sm font-black truncate">مساعد SchoolixIQ</p>
-                  <p className="text-[10px] opacity-70">
-                    {isRtl ? 'قواعد جاهزة — بدون ذكاء اصطناعي' : 'Rule-based — no AI'}
-                  </p>
+                <div className="min-w-0 flex items-center gap-2">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 shrink-0" />
+                  ) : null}
+                  <div className="min-w-0">
+                    <p className="text-sm font-black truncate">{displayName}</p>
+                    <p className="text-[10px] opacity-70">
+                      {isRtl ? 'قواعد جاهزة — بدون ذكاء اصطناعي' : 'Rule-based — no AI'}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <button

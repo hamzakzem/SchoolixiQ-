@@ -13,9 +13,9 @@
   --sx-gold-subtle-hover: rgba(212, 175, 55, 0.2);
   --sx-gold-border: rgba(212, 175, 55, 0.35);
   --sx-bg: #ffffff;
-  --sx-surface: #f4f6f9;
+  --sx-surface: #f8fafc;
   --sx-surface-elevated: #ffffff;
-  --sx-border: #e5e7eb;
+  --sx-border: #e2e8f0;
   --sx-muted: #64748b;
   --sx-danger: #dc2626;
   --sx-danger-hover: #b91c1c;
@@ -47,11 +47,19 @@
   --sx-font-body: 0.9375rem;
   --sx-leading-body: 1.7;
   --sx-leading-tight: 1.25;
-  --sx-header-height: 64px;
+  --sx-header-height: 72px;
   --sx-header-icon-btn: 40px;
   --sx-action-gap: 8px;
-  --sx-sidebar-width: 260px;
-  --sx-sidebar-collapsed: 72px;
+  --sx-sidebar-width: 280px;
+  --sx-sidebar-collapsed: 80px;
+  --sx-assistant-panel-width: 420px;
+  --sx-space-1: 4px;
+  --sx-space-2: 8px;
+  --sx-space-3: 12px;
+  --sx-space-4: 16px;
+  --sx-space-5: 24px;
+  --sx-space-6: 32px;
+  --sx-z-assistant: 110;
 
   /* Glass */
   --sx-glass-bg: rgba(255, 255, 255, 0.72);

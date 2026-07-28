@@ -52,10 +52,10 @@ export function DashboardHeader({
           <button
             type="button"
             onClick={onMenuToggle}
-            className="sx-header-action-btn text-slate-500 hover:text-sx-primary bg-sx-surface hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 hidden lg:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
+            className="sx-header-action-btn text-slate-500 hover:text-sx-primary bg-sx-surface hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 hidden md:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
             aria-label={isRtl ? 'القائمة' : 'Menu'}
           >
-            <Menu size={20} className={menuCollapsed ? 'rotate-90' : ''} />
+            <Menu size={20} className={menuCollapsed ? (isRtl ? '-rotate-90' : 'rotate-90') : ''} />
           </button>
         ) : null}
 

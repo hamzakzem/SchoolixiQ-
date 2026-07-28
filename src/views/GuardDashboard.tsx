@@ -22,7 +22,7 @@ import { DismissalTimeline } from '../components/dismissal/DismissalTimeline';
 import { isPackageFeatureEnabled } from '../lib/featureRegistry';
 import { motion } from 'motion/react';
 import { pageTransitionProps } from '../lib/motion';
-import { DashboardSmartAssistant } from '../components/smart-assistant/DashboardSmartAssistant';
+import { DashboardSmartAssistantHost } from '../components/smart-assistant/DashboardSmartAssistant';
 import '../styles/dismissal-workflow.css';
 
 export default function GuardDashboard() {
@@ -122,6 +122,7 @@ export default function GuardDashboard() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <DashboardSmartAssistantHost isRtl />
           <button
             type="button"
             onClick={() => setShowNotifications(true)}
@@ -288,7 +289,6 @@ export default function GuardDashboard() {
           )}
         </DismissalWorkflowListShell>
       </motion.main>
-      <DashboardSmartAssistant />
     </div>
   );
 }

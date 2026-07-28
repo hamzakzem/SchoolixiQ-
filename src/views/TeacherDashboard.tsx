@@ -80,7 +80,6 @@ import {
   isRedactedCredentialValue,
 } from "../lib/userProfile";
 import { DashboardShell } from "../components/layout/DashboardShell";
-import { DashboardSmartAssistant } from "../components/smart-assistant/DashboardSmartAssistant";
 import {
   attachSectionLabels,
   TEACHER_ITEM_SECTIONS,
@@ -2395,7 +2394,6 @@ export default function TeacherDashboard() {
             </motion.div>
           </AnimatePresence>
     </DashboardShell>
-    <DashboardSmartAssistant hidden={activeTab === "chat"} />
 
         {/* HomeWork Modal */}
         <AnimatePresence>

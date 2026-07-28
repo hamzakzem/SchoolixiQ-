@@ -18,7 +18,7 @@ import { useAuth } from "../lib/AuthContext";
 import { useLanguage } from "../lib/LanguageContext";
 import { signOutWithCleanup } from "../lib/authLogout";
 import { fetchDistributorDashboard } from "../lib/distributorApi";
-import { DashboardSmartAssistant } from "../components/smart-assistant/DashboardSmartAssistant";
+import { DashboardSmartAssistantHost } from "../components/smart-assistant/DashboardSmartAssistant";
 import type {
   DistributorDashboardStats,
   DistributorMonthlyCommission,
@@ -527,9 +527,12 @@ export default function DistributorDashboard() {
             <p className="sx-dist-header__eyebrow">{isRtl ? "مرحباً" : "Welcome"}</p>
             <h2>{distributor?.name || profile?.name}</h2>
           </div>
-          <div className="hidden lg:flex items-center gap-2">
-            <LanguageToggle />
-            <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-2">
+              <LanguageToggle />
+              <ThemeToggle />
+            </div>
+            <DashboardSmartAssistantHost hidden={activeTab === "chat"} isRtl={isRtl} />
           </div>
         </header>
         <main className="sx-dist-content">{renderContent()}</main>
@@ -551,7 +554,6 @@ export default function DistributorDashboard() {
           );
         })}
       </nav>
-      <DashboardSmartAssistant hidden={activeTab === "chat"} />
     </div>
   );
 }
