@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LogIn, Menu, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -21,14 +21,29 @@ export function LandingNavbar({
 }) {
   const [open, setOpen] = useState(false);
   const reduced = prefersReducedMotion();
+  const demoHref = resolveDemoHref(links);
 
   const close = () => setOpen(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   return (
     <header className="landing-navbar">
       <div className="landing-navbar__inner">
         <Link to="/" className="landing-navbar__brand" onClick={close}>
-          <LandingCircularLogoWithLabel size={40} appName={appName} />
+          <LandingCircularLogoWithLabel size={36} appName={appName} />
         </Link>
 
         <nav className="landing-navbar__links" aria-label="التنقل الرئيسي">
@@ -41,28 +56,29 @@ export function LandingNavbar({
 
         <div className="landing-navbar__actions">
           <LandingButton
-            href={resolveDemoHref(links)}
-            variant="secondary"
-            className="hidden md:inline-flex !min-h-[40px] !py-2 !px-4 !text-[12px]"
-          >
-            {demoLabel}
-          </LandingButton>
-          <LandingButton
             to="/login"
-            variant="primary"
-            icon={<LogIn size={14} />}
-            className="hidden md:inline-flex !min-h-[40px] !py-2 !px-4 !text-[12px]"
+            variant="secondary"
+            icon={<LogIn size={14} strokeWidth={1.75} />}
+            className="landing-navbar__btn landing-navbar__btn--login"
           >
             {loginLabel}
+          </LandingButton>
+          <LandingButton
+            href={demoHref}
+            variant="primary"
+            className="landing-navbar__btn landing-navbar__btn--cta"
+          >
+            {demoLabel}
           </LandingButton>
           <button
             type="button"
             className="landing-navbar__menu-btn"
             aria-label={open ? 'إغلاق القائمة' : 'فتح القائمة'}
             aria-expanded={open}
+            aria-controls="landing-mobile-drawer"
             onClick={() => setOpen((v) => !v)}
           >
-            {open ? <X size={18} /> : <Menu size={18} />}
+            {open ? <X size={18} strokeWidth={1.75} /> : <Menu size={18} strokeWidth={1.75} />}
           </button>
         </div>
       </div>
@@ -81,6 +97,7 @@ export function LandingNavbar({
               onClick={close}
             />
             <motion.nav
+              id="landing-mobile-drawer"
               className="landing-drawer"
               aria-label="قائمة الجوال"
               initial={reduced ? { opacity: 1 } : { x: '100%' }}
@@ -88,23 +105,32 @@ export function LandingNavbar({
               exit={reduced ? { opacity: 0 } : { x: '100%' }}
               transition={{ duration: reduced ? 0.01 : 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
-              <div className="flex items-center justify-between mb-4 pb-4 border-b border-[rgba(255,255,255,0.06)]">
-                <span className="font-black text-white">{appName}</span>
-                <button type="button" onClick={close} className="text-[#8b9cb3]" aria-label="إغلاق">
-                  <X size={20} />
+              <div className="landing-drawer__head">
+                <LandingCircularLogoWithLabel size={34} appName={appName} />
+                <button
+                  type="button"
+                  onClick={close}
+                  className="landing-drawer__close"
+                  aria-label="إغلاق"
+                >
+                  <X size={18} strokeWidth={1.75} />
                 </button>
               </div>
-              {links.map(({ href, label }) => (
-                <a key={href} href={href} onClick={close}>
-                  {label}
-                </a>
-              ))}
-              <div className="mt-auto pt-4 flex flex-col gap-2 border-t border-[rgba(255,255,255,0.06)] landing-drawer__actions">
-                <LandingButton href={resolveDemoHref(links)} variant="secondary" fullWidth onClick={close}>
-                  {demoLabel}
-                </LandingButton>
-                <LandingButton to="/login" variant="primary" fullWidth onClick={close}>
+
+              <div className="landing-drawer__links">
+                {links.map(({ href, label }) => (
+                  <a key={href} href={href} onClick={close}>
+                    {label}
+                  </a>
+                ))}
+              </div>
+
+              <div className="landing-drawer__actions">
+                <LandingButton to="/login" variant="secondary" fullWidth onClick={close}>
                   {loginLabel}
+                </LandingButton>
+                <LandingButton href={demoHref} variant="primary" fullWidth onClick={close}>
+                  {demoLabel}
                 </LandingButton>
               </div>
             </motion.nav>
