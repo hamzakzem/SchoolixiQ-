@@ -104,7 +104,7 @@ export function DashboardHeader({
 
         <div className="sx-app-header__title-block min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 ? (
-            <nav className="sx-app-header__crumbs hidden md:flex" aria-label="Breadcrumb">
+            <nav className="sx-app-header__crumbs hidden lg:flex" aria-label="Breadcrumb">
               {breadcrumbs.map((crumb, i) => (
                 <React.Fragment key={`${crumb.label}-${i}`}>
                   {i > 0 ? (
@@ -127,10 +127,10 @@ export function DashboardHeader({
               ))}
             </nav>
           ) : eyebrow ? (
-            <p className="sx-app-header__eyebrow">{eyebrow}</p>
+            <p className="sx-app-header__eyebrow hidden lg:block">{eyebrow}</p>
           ) : null}
           <h1 className="sx-app-header__title">{title}</h1>
-          {subtitle ? <p className="sx-app-header__subtitle hidden lg:block">{subtitle}</p> : null}
+          {subtitle ? <p className="sx-app-header__subtitle hidden xl:block">{subtitle}</p> : null}
         </div>
       </div>
 

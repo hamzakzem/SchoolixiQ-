@@ -669,38 +669,39 @@ body {
   color: var(--color-text-main) !important;
 }
 
-/* 2. Header (الشريط العلوي) styling - Premium corporate Navy Blue with gold highlight and high-contrast white content */
-/* Exclude mobile panel sheets (notifications / quick access / more) — they use sx-mobile-panel-header-v3 */
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header),
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) {
+/* 2. Header (الشريط العلوي) — navy/gold legacy chrome
+   Exclude premium SaaS dashboard navbar (sx-app-header / sx-dashboard-header)
+   and mobile panel sheets (sx-mobile-panel-header-v3). */
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header),
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.sx-app-header__title):not(.sx-app-header__eyebrow):not(.sx-app-header__subtitle):not(.sx-app-header__title-block):not(.sx-app-header__brand):not(.sx-app-header__start):not(.sx-app-header__end):not(.sx-app-header__center) {
   background-color: #0B2345 !important;
   color: #FFFFFF !important;
   border-bottom: 2px solid #D4A64A !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) *:not(input):not(select):not(textarea):not(button):not(a),
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) *:not(input):not(select):not(textarea):not(button):not(a) {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) *:not(input):not(select):not(textarea):not(button):not(a),
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) *:not(input):not(select):not(textarea):not(button):not(a) {
   color: #FFFFFF !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) input,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) select,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) input,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) select {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) input,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) select,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) input,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) select {
   background-color: rgba(255, 255, 255, 0.1) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   color: #FFFFFF !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) input::placeholder,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) input::placeholder {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) input::placeholder,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) input::placeholder {
   color: rgba(255, 255, 255, 0.5) !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) button,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) button,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) a {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) button,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) a,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) button,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) a {
   background-color: #D4A64A !important;
   border: 1px solid #D4A64A !important;
   color: #0B2345 !important;
@@ -708,19 +709,19 @@ header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a,
   box-shadow: 0 2px 8px rgba(212, 166, 74, 0.2) !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) button *,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a *,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) button *,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) a * {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) button *,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) a *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) button *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) a * {
   color: #0B2345 !important;
   stroke: #0B2345 !important;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) button:hover,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a:hover,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) button:hover,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) a:hover {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) button:hover,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) a:hover,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) button:hover,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) a:hover {
   background-color: #0B2345 !important;
   color: #D4A64A !important;
   border-color: #D4A64A !important;
@@ -728,10 +729,10 @@ header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a:hover,
   transform: translateY(-1px) !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) button:hover *,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header) a:hover *,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) button:hover *,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header) a:hover * {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) button:hover *,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) a:hover *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) button:hover *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header) a:hover * {
   color: #D4A64A !important;
   stroke: #D4A64A !important;
 }
