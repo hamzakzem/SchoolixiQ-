@@ -48,10 +48,10 @@ export function SmartAssistantNavButton({
     <button
       type="button"
       onClick={onClick}
-      className={className || 'sx-assistant-nav-btn shrink-0'}
+      className={className || 'sx-ds-assistant-btn shrink-0'}
       aria-label={label || (isRtl ? 'مساعد SchoolixIQ' : 'SchoolixIQ Assistant')}
     >
-      <Sparkles className="sx-assistant-nav-btn__icon" size={16} strokeWidth={1.75} aria-hidden />
+      <Sparkles className="sx-ds-assistant-btn__icon" size={16} strokeWidth={1.75} aria-hidden />
       <span className="hidden sm:inline">{text}</span>
     </button>
   );

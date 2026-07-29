@@ -1267,8 +1267,8 @@ export default function AdminDashboard() {
             <button
               type="button"
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`sx-header-action-btn relative active:scale-95 shrink-0 ${
-                showNotifications ? "bg-sx-accent" : ""
+              className={`sx-ds-icon-btn relative active:scale-95 shrink-0 ${
+                showNotifications ? "is-active" : ""
               }`}
             >
               <Bell size={18} strokeWidth={1.75} />
@@ -1287,7 +1287,7 @@ export default function AdminDashboard() {
               />
             ) : null}
             <div className="hidden lg:flex items-center">
-              <div className="sx-app-header__avatar" title={profile?.name}>
+              <div className="sx-ds-avatar" title={profile?.name}>
                 {profile?.name?.[0]}
               </div>
             </div>

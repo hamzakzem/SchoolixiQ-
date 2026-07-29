@@ -672,36 +672,36 @@ body {
 /* 2. Header (الشريط العلوي) — navy/gold legacy chrome
    Exclude premium SaaS dashboard navbar (sx-app-header / sx-dashboard-header)
    and mobile panel sheets (sx-mobile-panel-header-v3). */
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar),
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-app-header__title):not(.sx-app-header__eyebrow):not(.sx-app-header__subtitle):not(.sx-app-header__title-block):not(.sx-app-header__brand):not(.sx-app-header__start):not(.sx-app-header__end):not(.sx-app-header__center) {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar),
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar):not(.sx-app-header__title):not(.sx-app-header__eyebrow):not(.sx-app-header__subtitle):not(.sx-app-header__title-block):not(.sx-app-header__brand):not(.sx-app-header__start):not(.sx-app-header__end):not(.sx-app-header__center) {
   background-color: #0B2345 !important;
   color: #FFFFFF !important;
   border-bottom: 2px solid #D4A64A !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) *:not(input):not(select):not(textarea):not(button):not(a),
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) *:not(input):not(select):not(textarea):not(button):not(a) {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) *:not(input):not(select):not(textarea):not(button):not(a),
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) *:not(input):not(select):not(textarea):not(button):not(a) {
   color: #FFFFFF !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) input,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) select,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) input,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) select {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) input,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) select,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) input,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) select {
   background-color: rgba(255, 255, 255, 0.1) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   color: #FFFFFF !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) input::placeholder,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) input::placeholder {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) input::placeholder,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) input::placeholder {
   color: rgba(255, 255, 255, 0.5) !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) button,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) a,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) button,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) a {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) button,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) a,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) button,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) a {
   background-color: #D4A64A !important;
   border: 1px solid #D4A64A !important;
   color: #0B2345 !important;
@@ -709,19 +709,19 @@ header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header)
   box-shadow: 0 2px 8px rgba(212, 166, 74, 0.2) !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) button *,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) a *,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) button *,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) a * {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) button *,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) a *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) button *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) a * {
   color: #0B2345 !important;
   stroke: #0B2345 !important;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) button:hover,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) a:hover,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) button:hover,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) a:hover {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) button:hover,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) a:hover,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) button:hover,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) a:hover {
   background-color: #0B2345 !important;
   color: #D4A64A !important;
   border-color: #D4A64A !important;
@@ -729,10 +729,10 @@ header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header)
   transform: translateY(-1px) !important;
 }
 
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) button:hover *,
-header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) a:hover *,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) button:hover *,
-[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar) a:hover * {
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) button:hover *,
+header:not(.sx-mobile-panel-header-v3):not(.sx-notif-header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) a:hover *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) button:hover *,
+[class*="header"]:not(.student-card-print):not([class*="aside"]):not([class*="sx-mobile-panel-header"]):not(.sx-notif-header):not(.sx-drawer-services-header):not(.sx-dock-sheet__header):not(.sx-app-header):not(.sx-dashboard-header):not(.parent-app-header):not(.sx-legacy-chrome-header):not(.landing-navbar):not(.sx-guard-app-header):not(.sx-dist-header):not(.sx-ds-topbar) a:hover * {
   color: #D4A64A !important;
   stroke: #D4A64A !important;
 }

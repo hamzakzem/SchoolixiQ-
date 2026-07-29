@@ -1973,7 +1973,7 @@ export default function SuperAdminDashboard() {
   return (
     <div
       className={clsx(
-        'sx-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block',
+        'sx-ds-shell sx-shell sx-app-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout bg-transparent flex font-sans transition-colors duration-300 print:h-auto print:block',
         !isMobile && 'sx-shell--with-sidebar',
         !isMobile && isSidebarCollapsed && 'sx-shell--sidebar-collapsed',
       )}
@@ -1985,15 +1985,14 @@ export default function SuperAdminDashboard() {
             layout
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             className={clsx(
-              'bg-slate-900 dark:bg-black text-white sx-dashboard-sidebar sx-shell-sidebar border-slate-800 dark:border-slate-800 transition-colors overflow-hidden pt-[env(safe-area-inset-top,0px)]',
+              'sx-ds-sidebar sx-shell-sidebar text-white overflow-hidden pt-[env(safe-area-inset-top,0px)]',
               'sx-shell-sidebar--docked',
-              isSidebarCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
-              isRtl ? 'border-l' : 'border-r',
+              isSidebarCollapsed && 'sx-shell-sidebar--collapsed',
             )}
           >
             <div className="h-full flex flex-col overflow-hidden w-full">
               <div
-                className={`sx-sidebar-brand p-6 flex ${isSidebarCollapsed ? "justify-center border-b border-transparent" : "items-center gap-4 border-b border-slate-700 dark:border-slate-800"} pb-6`}
+                className={`sx-ds-sidebar__brand flex ${isSidebarCollapsed ? "sx-ds-sidebar__brand--collapsed justify-center" : "items-center gap-3"}`}
               >
                 {isCustomAppLogo(config.appLogo) ? (
                   <img
@@ -2522,13 +2521,13 @@ export default function SuperAdminDashboard() {
       ) : null}
 
       <main className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className="sx-app-header sx-dashboard-header sx-legacy-chrome-header flex items-center justify-between px-4 sm:px-5 shrink-0 relative z-[var(--sx-z-header)] print:hidden">
+        <header className="sx-ds-topbar sx-ds-topbar--flex px-4 sm:px-5 shrink-0 relative z-[var(--sx-z-header)] print:hidden">
           <div className="flex items-center gap-2.5 min-w-0">
             {!isMobile ? (
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="sx-header-action-btn sx-app-header__icon-btn hidden md:inline-flex shrink-0"
+              className="sx-ds-icon-btn hidden md:inline-flex shrink-0"
               aria-label={isRtl ? 'القائمة' : 'Menu'}
             >
               <Menu
@@ -2547,7 +2546,7 @@ export default function SuperAdminDashboard() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 onClick={handleBack}
-                className="sx-header-action-btn sx-app-header__icon-btn shrink-0"
+                className="sx-ds-icon-btn shrink-0"
                 aria-label={isRtl ? 'رجوع' : 'Back'}
               >
                 <ArrowRight
@@ -2558,11 +2557,11 @@ export default function SuperAdminDashboard() {
                 <span className="hidden sm:inline text-xs font-semibold ms-1">{t('back')}</span>
               </motion.button>
             )}
-            <div className="sx-app-header__title-block min-w-0">
-              <p className="sx-app-header__eyebrow">{isRtl ? 'منصة' : 'Platform'}</p>
+            <div className="sx-ds-topbar__title-block min-w-0">
+              <p className="sx-ds-topbar__eyebrow">{isRtl ? 'منصة' : 'Platform'}</p>
               <h2
                 id="super-admin-header"
-                className="sx-app-header__title truncate max-w-[140px] xs:max-w-[200px] sm:max-w-none"
+                className="sx-ds-topbar__title truncate max-w-[140px] xs:max-w-[200px] sm:max-w-none"
               >
                 {t('system_management')}
               </h2>
@@ -2578,8 +2577,8 @@ export default function SuperAdminDashboard() {
 
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`sx-header-action-btn relative active:scale-95 ${
-                showNotifications ? "bg-sx-accent" : ""
+              className={`sx-ds-icon-btn relative active:scale-95 ${
+                showNotifications ? "is-active" : ""
               }`}
             >
               <Bell size={18} strokeWidth={1.75} />
@@ -2591,7 +2590,7 @@ export default function SuperAdminDashboard() {
             </button>
             <div className="hidden md:flex items-center gap-2 me-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden />
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <span className="text-[11px] font-semibold text-white/55">
                 {t('system_status_ok')}
               </span>
             </div>

@@ -484,9 +484,9 @@ export default function DistributorDashboard() {
   };
 
   return (
-    <div className="sx-dist-shell" dir={isRtl ? "rtl" : "ltr"}>
-      <aside className="sx-dist-sidebar hidden lg:flex">
-        <div className="sx-dist-sidebar__brand">
+    <div className="sx-dist-shell sx-ds-shell sx-app-shell" dir={isRtl ? "rtl" : "ltr"}>
+      <aside className="sx-dist-sidebar sx-ds-sidebar hidden lg:flex">
+        <div className="sx-dist-sidebar__brand sx-ds-sidebar__brand">
           <SchoolixLogo size={28} surface="light" />
           <div>
             <p className="sx-dist-sidebar__eyebrow">SchoolixIQ</p>
@@ -522,7 +522,7 @@ export default function DistributorDashboard() {
       </aside>
 
       <div className="sx-dist-main">
-        <header className="sx-dist-header">
+        <header className="sx-dist-header sx-ds-topbar sx-ds-topbar--flex">
           <div>
             <p className="sx-dist-header__eyebrow">{isRtl ? "مرحباً" : "Welcome"}</p>
             <h2>{distributor?.name || profile?.name}</h2>

@@ -113,12 +113,14 @@ export default function GuardDashboard() {
 
   return (
     <div className="min-h-screen bg-[#06182f]" dir="rtl">
-      <header className="bg-[#06182f] border-b border-[rgba(201,162,39,0.2)] px-6 py-4 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <SchoolixLogo size={32} surface="dark" />
-          <div>
-            <h1 className="font-bold text-white text-lg">بوابة التسريح — الحارس</h1>
-            <p className="text-xs text-[var(--dw-slate-muted)]">{schoolData?.name}</p>
+      <header className="sx-ds-topbar sx-ds-topbar--flex px-5 md:px-6 sticky top-0 z-20">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="sx-ds-topbar__logo">
+            <SchoolixLogo size={26} surface="light" />
+          </div>
+          <div className="sx-ds-topbar__title-block min-w-0">
+            <h1 className="sx-ds-topbar__title">بوابة التسريح — الحارس</h1>
+            <p className="sx-ds-topbar__subtitle">{schoolData?.name}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -126,10 +128,10 @@ export default function GuardDashboard() {
           <button
             type="button"
             onClick={() => setShowNotifications(true)}
-            className="relative p-2 rounded-xl bg-white/10 hover:bg-white/15"
+            className="sx-ds-icon-btn relative"
             aria-label="الإشعارات"
           >
-            <Bell size={18} className="text-white" />
+            <Bell size={18} strokeWidth={1.75} />
             {totalUnread > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
                 {totalUnread > 9 ? '9+' : totalUnread}
@@ -139,10 +141,10 @@ export default function GuardDashboard() {
           <button
             type="button"
             onClick={() => signOutWithCleanup()}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/15"
+            className="sx-ds-icon-btn"
             aria-label="تسجيل الخروج"
           >
-            <LogOut size={18} className="text-white" />
+            <LogOut size={18} strokeWidth={1.75} />
           </button>
         </div>
       </header>

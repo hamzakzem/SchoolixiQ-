@@ -1605,7 +1605,7 @@ export default function ParentDashboard() {
     return (
       <div
         className={clsx(
-          'parent-app sx-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0',
+          'parent-app sx-ds-shell sx-shell sx-app-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout flex font-sans transition-colors duration-300 print:overflow-visible print:h-auto print:block print:pb-0',
           !isMobile && 'sx-shell--with-sidebar',
           !isMobile && effectiveCollapsed && 'sx-shell--sidebar-collapsed',
         )}
@@ -1617,14 +1617,13 @@ export default function ParentDashboard() {
               layout
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               className={clsx(
-                'parent-dashboard-menu sx-dashboard-sidebar sx-shell-sidebar border-slate-200 transition-colors overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)]',
+                'parent-dashboard-menu sx-ds-sidebar sx-shell-sidebar overflow-hidden print:hidden pt-[env(safe-area-inset-top,0px)]',
                 'sx-shell-sidebar--docked',
-                effectiveCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
-                isRtl ? 'border-l' : 'border-r',
+                effectiveCollapsed && 'sx-shell-sidebar--collapsed',
               )}
             >
               <div className="h-full flex flex-col overflow-hidden w-full">
-                <div className={`sx-sidebar-brand p-6 flex ${effectiveCollapsed ? 'justify-center border-b border-transparent' : 'items-center gap-3 border-b border-slate-100 dark:border-slate-800'} pb-6`}>
+                <div className={`sx-ds-sidebar__brand flex ${effectiveCollapsed ? 'sx-ds-sidebar__brand--collapsed justify-center' : 'items-center gap-3'}`}>
                   {isCustomAppLogo(config.appLogo) ? (
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
                       <img
@@ -1698,18 +1697,18 @@ export default function ParentDashboard() {
         ) : null}
 
         <div className="sx-dashboard-content sx-shell-content flex-1 flex flex-col min-h-[100dvh] bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className="sx-app-header sx-dashboard-header parent-app-header sx-legacy-chrome-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
-          <div className="px-4 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2">
+        <header className="sx-ds-topbar sx-ds-topbar--stack parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
+          <div className="sx-ds-topbar__inner px-4">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 min-w-0">
                 {!isMobile ? (
                 <button
                   type="button"
                   onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="parent-icon-btn hidden md:inline-flex shrink-0 bg-[#F7F8FA]"
+                  className="sx-ds-icon-btn hidden md:inline-flex shrink-0"
                   aria-label={isRtl ? "القائمة" : "Menu"}
                 >
-                  <Menu size={20} className={isSidebarCollapsed ? (isRtl ? "-rotate-90" : "rotate-90") : ""} />
+                  <Menu size={18} strokeWidth={1.75} className={isSidebarCollapsed ? (isRtl ? "-rotate-90" : "rotate-90") : ""} />
                 </button>
                 ) : null}
                 {activeTab !== "home" && (
@@ -1717,20 +1716,21 @@ export default function ParentDashboard() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     onClick={handleBack}
-                    className="parent-icon-btn shrink-0 bg-[#F7F8FA]"
+                    className="sx-ds-icon-btn shrink-0"
                     aria-label={isRtl ? "رجوع" : "Back"}
                   >
                     <ArrowRight
                       size={18}
+                      strokeWidth={1.75}
                       className={isRtl ? "" : "rotate-180"}
                     />
                   </motion.button>
                 )}
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold text-[#0B2345]/50 uppercase tracking-wide">
+                <div className="sx-ds-topbar__title-block min-w-0">
+                  <p className="sx-ds-topbar__eyebrow">
                     {t("parentWelcome")}
                   </p>
-                  <p className="text-sm font-semibold text-[#0B2345] dark:text-white truncate max-w-[140px] sm:max-w-xs">
+                  <p className="sx-ds-topbar__title truncate max-w-[140px] sm:max-w-xs">
                     {profile?.name}
                   </p>
                 </div>

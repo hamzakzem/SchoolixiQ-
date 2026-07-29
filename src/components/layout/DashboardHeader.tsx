@@ -23,15 +23,12 @@ type DashboardHeaderProps = {
   brandTitle?: string;
   schoolLogoUrl?: string;
   showBrand?: boolean;
-  /** Center zone — typically global search */
   center?: React.ReactNode;
   trailing?: React.ReactNode;
   className?: string;
 };
 
-/**
- * Premium SaaS navbar — brand · page context · search · actions
- */
+/** Dashboard topbar — Landing navbar design language */
 export function DashboardHeader({
   isRtl,
   eyebrow,
@@ -51,16 +48,13 @@ export function DashboardHeader({
   className,
 }: DashboardHeaderProps) {
   return (
-    <header
-      className={clsx('sx-app-header sx-dashboard-header print:hidden', className)}
-      dir={isRtl ? 'rtl' : 'ltr'}
-    >
-      <div className="sx-app-header__start">
+    <header className={clsx('sx-ds-topbar print:hidden', className)} dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="sx-ds-topbar__start">
         {showMenuToggle ? (
           <button
             type="button"
             onClick={onMenuToggle}
-            className="sx-header-action-btn sx-app-header__icon-btn hidden md:inline-flex"
+            className="sx-ds-icon-btn hidden md:inline-flex"
             aria-label={isRtl ? 'طي القائمة' : 'Toggle sidebar'}
             aria-pressed={Boolean(menuCollapsed)}
           >
@@ -77,16 +71,16 @@ export function DashboardHeader({
         ) : null}
 
         {showBrand ? (
-          <div className="sx-app-header__brand" aria-hidden={false}>
-            <div className="sx-app-header__logo">
+          <div className="sx-ds-topbar__brand">
+            <div className="sx-ds-topbar__logo">
               {isCustomSchoolLogo(schoolLogoUrl) ? (
                 <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
               ) : (
-                <SchoolixLogo size={26} surface="dark" />
+                <SchoolixLogo size={26} surface="light" />
               )}
             </div>
             {brandTitle ? (
-              <span className="sx-app-header__brand-name hidden xl:inline">{brandTitle}</span>
+              <span className="sx-ds-topbar__brand-name hidden xl:inline">{brandTitle}</span>
             ) : null}
           </div>
         ) : null}
@@ -95,31 +89,31 @@ export function DashboardHeader({
           <button
             type="button"
             onClick={onBack}
-            className="sx-header-action-btn sx-app-header__icon-btn lg:hidden"
+            className="sx-ds-icon-btn lg:hidden"
             aria-label={isRtl ? 'رجوع' : 'Back'}
           >
             <ChevronRight size={18} className={isRtl ? '' : 'rotate-180'} strokeWidth={1.75} />
           </button>
         ) : null}
 
-        <div className="sx-app-header__title-block min-w-0">
+        <div className="sx-ds-topbar__title-block min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 ? (
-            <nav className="sx-app-header__crumbs hidden lg:flex" aria-label="Breadcrumb">
+            <nav className="sx-ds-topbar__crumbs hidden lg:flex" aria-label="Breadcrumb">
               {breadcrumbs.map((crumb, i) => (
                 <React.Fragment key={`${crumb.label}-${i}`}>
                   {i > 0 ? (
                     <ChevronRight
                       size={11}
-                      className={clsx('sx-app-header__crumb-sep opacity-40', isRtl && 'rotate-180')}
+                      className={clsx('opacity-40', isRtl && 'rotate-180')}
                       aria-hidden
                     />
                   ) : null}
                   {crumb.onClick ? (
-                    <button type="button" onClick={crumb.onClick} className="sx-app-header__crumb">
+                    <button type="button" onClick={crumb.onClick} className="sx-ds-topbar__crumb">
                       {crumb.label}
                     </button>
                   ) : (
-                    <span className="sx-app-header__crumb sx-app-header__crumb--current">
+                    <span className="sx-ds-topbar__crumb sx-ds-topbar__crumb--current">
                       {crumb.label}
                     </span>
                   )}
@@ -127,25 +121,25 @@ export function DashboardHeader({
               ))}
             </nav>
           ) : eyebrow ? (
-            <p className="sx-app-header__eyebrow hidden lg:block">{eyebrow}</p>
+            <p className="sx-ds-topbar__eyebrow hidden lg:block">{eyebrow}</p>
           ) : null}
-          <h1 className="sx-app-header__title">{title}</h1>
-          {subtitle ? <p className="sx-app-header__subtitle hidden xl:block">{subtitle}</p> : null}
+          <h1 className="sx-ds-topbar__title">{title}</h1>
+          {subtitle ? <p className="sx-ds-topbar__subtitle hidden xl:block">{subtitle}</p> : null}
         </div>
       </div>
 
       {center ? (
-        <div className="sx-app-header__center hidden md:flex">
-          <div className="sx-app-header__search-host">{center}</div>
+        <div className="sx-ds-topbar__center hidden md:flex">
+          <div className="sx-ds-topbar__search-host">{center}</div>
         </div>
       ) : (
-        <div className="sx-app-header__center" aria-hidden />
+        <div className="sx-ds-topbar__center" aria-hidden />
       )}
 
       {trailing ? (
-        <div className="sx-app-header__end sx-header-actions">{trailing}</div>
+        <div className="sx-ds-topbar__end sx-header-actions">{trailing}</div>
       ) : (
-        <div className="sx-app-header__end" aria-hidden />
+        <div className="sx-ds-topbar__end" aria-hidden />
       )}
     </header>
   );

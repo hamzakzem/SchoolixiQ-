@@ -30,9 +30,7 @@ type DashboardSidebarProps = {
   docked?: boolean;
 };
 
-/**
- * Premium fixed navy sidebar — compact rows, gold active rail, RTL/LTR.
- */
+/** Dashboard sidebar — Landing navy brand language */
 export function DashboardSidebar({
   variant: _variant,
   menuItems,
@@ -67,26 +65,26 @@ export function DashboardSidebar({
         }}
         title={isCollapsed ? item.label : undefined}
         className={clsx(
-          'sx-nav-item sx-nav-item--dark sx-app-nav-item group relative',
-          active && 'sx-nav-item--active',
-          isCollapsed ? 'sx-app-nav-item--collapsed' : 'sx-app-nav-item--expanded',
+          'sx-ds-nav-item group',
+          active && 'is-active',
+          isCollapsed && 'sx-ds-nav-item--collapsed',
         )}
         dir={isRtl ? 'rtl' : 'ltr'}
         aria-current={active ? 'page' : undefined}
       >
-        <span className="sx-app-nav-item__rail" aria-hidden />
+        <span className="sx-ds-nav-item__rail" aria-hidden />
         <item.icon size={isCollapsed ? 19 : 17} className="shrink-0" strokeWidth={1.75} />
         {!isCollapsed ? (
-          <span className="sx-app-nav-item__label truncate flex-1 text-start">{item.label}</span>
+          <span className="sx-ds-nav-item__label">{item.label}</span>
         ) : null}
         {!isCollapsed && item.badge != null && item.badge > 0 ? (
-          <span className="sx-app-nav-item__badge">{item.badge > 99 ? '99+' : item.badge}</span>
+          <span className="sx-ds-nav-item__badge">{item.badge > 99 ? '99+' : item.badge}</span>
         ) : null}
         {isCollapsed ? (
           <span
             className={clsx(
-              'sx-app-nav-tooltip',
-              isRtl ? 'sx-app-nav-tooltip--rtl' : 'sx-app-nav-tooltip--ltr',
+              'sx-ds-nav-tooltip',
+              isRtl ? 'sx-ds-nav-tooltip--rtl' : 'sx-ds-nav-tooltip--ltr',
             )}
           >
             {item.label}
@@ -103,21 +101,21 @@ export function DashboardSidebar({
           layout
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
           className={clsx(
-            'sx-dashboard-sidebar sx-shell-sidebar sx-app-sidebar sx-sidebar--navy overflow-hidden print:hidden',
+            'sx-ds-sidebar sx-shell-sidebar overflow-hidden print:hidden',
             'pt-[env(safe-area-inset-top,0px)]',
             docked && 'sx-shell-sidebar--docked',
             !docked && isOpen && 'sx-shell-sidebar--drawer',
-            isCollapsed && 'sx-dashboard-sidebar--collapsed sx-shell-sidebar--collapsed',
+            isCollapsed && 'sx-shell-sidebar--collapsed',
           )}
         >
-          <div className="sx-app-sidebar__inner h-full flex flex-col min-w-0">
+          <div className="sx-ds-sidebar__inner">
             <div
               className={clsx(
-                'sx-sidebar-brand sx-app-sidebar__brand',
-                isCollapsed && 'sx-app-sidebar__brand--collapsed',
+                'sx-ds-sidebar__brand',
+                isCollapsed && 'sx-ds-sidebar__brand--collapsed',
               )}
             >
-              <div className="sx-sidebar-brand__logo">
+              <div className="sx-ds-sidebar__logo">
                 {isCustomSchoolLogo(schoolLogoUrl) ? (
                   <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
                 ) : (
@@ -126,36 +124,33 @@ export function DashboardSidebar({
               </div>
               {!isCollapsed ? (
                 <div className="min-w-0" dir={isRtl ? 'rtl' : 'ltr'}>
-                  <h2 className="sx-app-sidebar__title truncate">{portalTitle}</h2>
+                  <h2 className="sx-ds-sidebar__title truncate">{portalTitle}</h2>
                   {portalSubtitle ? (
-                    <p className="sx-app-sidebar__subtitle truncate">{portalSubtitle}</p>
+                    <p className="sx-ds-sidebar__subtitle truncate">{portalSubtitle}</p>
                   ) : null}
                 </div>
               ) : null}
             </div>
 
-            <nav className="sx-app-sidebar__nav flex-1 overflow-y-auto custom-scrollbar" aria-label="Primary">
+            <nav className="sx-ds-sidebar__nav custom-scrollbar" aria-label="Primary">
               {groups.map(({ section, items }) => (
-                <div key={section.id} className="sx-app-sidebar__group">
+                <div key={section.id} className="sx-ds-sidebar__group">
                   {!isCollapsed && section.label ? (
-                    <p className="sx-app-sidebar__section">
+                    <p className="sx-ds-sidebar__section">
                       {sectionLabels?.[section.id] ?? section.label}
                     </p>
                   ) : null}
-                  <div className="sx-app-sidebar__items">{items.map(renderNavButton)}</div>
+                  <div className="sx-ds-sidebar__items">{items.map(renderNavButton)}</div>
                 </div>
               ))}
             </nav>
 
-            <div className="sx-app-sidebar__footer">
+            <div className="sx-ds-sidebar__footer">
               <button
                 type="button"
                 onClick={onLogout}
                 title={isCollapsed ? logoutLabel : undefined}
-                className={clsx(
-                  'sx-app-sidebar__logout',
-                  isCollapsed && 'sx-app-sidebar__logout--collapsed',
-                )}
+                className={clsx('sx-ds-logout', isCollapsed && 'sx-ds-logout--collapsed')}
               >
                 <LogOut size={isCollapsed ? 18 : 16} className="shrink-0" strokeWidth={1.75} />
                 {!isCollapsed ? <span>{logoutLabel}</span> : null}
@@ -193,7 +188,7 @@ export function DashboardMobileSidebarOverlay({
         animate={{ x: 0 }}
         exit={{ x: isRtl ? 280 : -280 }}
         className={clsx(
-          'fixed inset-y-0 w-[min(88vw,320px)] max-w-[320px] md:hidden print:hidden pt-[env(safe-area-inset-top,0px)] z-[var(--sx-z-drawer)]',
+          'sx-ds-sidebar fixed inset-y-0 w-[min(88vw,320px)] max-w-[320px] md:hidden print:hidden pt-[env(safe-area-inset-top,0px)] z-[var(--sx-z-drawer)]',
           isRtl ? 'right-0' : 'left-0',
         )}
       >

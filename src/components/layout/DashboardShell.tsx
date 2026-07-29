@@ -106,7 +106,7 @@ export function DashboardShell({
   return (
     <div
       className={clsx(
-        'sx-shell sx-app-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout',
+        'sx-ds-shell sx-shell sx-app-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout',
         'print:overflow-visible print:h-auto print:block',
         !isMobile && 'sx-shell--with-sidebar',
         !isMobile && sidebarCollapsed && 'sx-shell--sidebar-collapsed',
