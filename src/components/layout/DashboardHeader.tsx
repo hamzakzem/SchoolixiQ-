@@ -32,7 +32,7 @@ type DashboardHeaderProps = {
 
 /**
  * Internal dashboard navbar — brand · page title · actions
- * RTL/LTR via logical start/end. Does not affect Landing.
+ * RTL/LTR via dir + CSS logical properties. Does not affect Landing.
  */
 export function DashboardHeader({
   isRtl,
@@ -58,25 +58,18 @@ export function DashboardHeader({
       className={clsx('sx-ds-topbar sx-dash-navbar print:hidden', className)}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      {/* Brand zone — inline-start (right in RTL, left in LTR) */}
+      {/* inline-start: brand + chrome controls */}
       <div className="sx-ds-topbar__start">
         {showMenuToggle ? (
           <button
             type="button"
             onClick={onMenuToggle}
-            className="sx-ds-icon-btn hidden md:inline-flex"
+            className="sx-ds-icon-btn sx-ds-icon-btn--menu hidden md:inline-flex"
             aria-label={isRtl ? 'طي القائمة' : 'Toggle sidebar'}
             aria-pressed={Boolean(menuCollapsed)}
+            data-collapsed={menuCollapsed ? 'true' : 'false'}
           >
-            <PanelLeft
-              size={18}
-              strokeWidth={1.75}
-              className={clsx(
-                'transition-transform duration-200',
-                menuCollapsed && (isRtl ? 'rotate-180' : ''),
-                !menuCollapsed && (isRtl ? '' : 'rotate-180'),
-              )}
-            />
+            <PanelLeft size={18} strokeWidth={1.75} className="sx-ds-topbar__menu-icon" />
           </button>
         ) : null}
 
@@ -84,46 +77,44 @@ export function DashboardHeader({
           <button
             type="button"
             onClick={onBack}
-            className="sx-ds-icon-btn md:hidden"
+            className="sx-ds-icon-btn sx-ds-icon-btn--back md:hidden"
             aria-label={isRtl ? 'رجوع' : 'Back'}
           >
-            <ChevronRight size={18} className={isRtl ? '' : 'rotate-180'} strokeWidth={1.75} />
+            <ChevronRight size={18} strokeWidth={1.75} className="sx-ds-topbar__back-icon" />
           </button>
         ) : null}
 
         {showBrand ? (
           <div className="sx-ds-topbar__brand">
-            <div className="sx-ds-topbar__logo">
+            <div className="sx-ds-topbar__logo" aria-hidden={false}>
               {isCustomSchoolLogo(schoolLogoUrl) ? (
-                <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
+                <img src={schoolLogoUrl} alt="" className="sx-ds-topbar__logo-img" />
               ) : (
                 <SchoolixLogo size={24} surface="light" />
               )}
             </div>
-            <div className="sx-ds-topbar__brand-text min-w-0">
-              {brandTitle ? (
-                <span className="sx-ds-topbar__brand-name">{brandTitle}</span>
-              ) : null}
-              {brandSubtitle ? (
-                <span className="sx-ds-topbar__brand-desc">{brandSubtitle}</span>
-              ) : null}
-            </div>
+            {(brandTitle || brandSubtitle) ? (
+              <div className="sx-ds-topbar__brand-text">
+                {brandTitle ? (
+                  <span className="sx-ds-topbar__brand-name">{brandTitle}</span>
+                ) : null}
+                {brandSubtitle ? (
+                  <span className="sx-ds-topbar__brand-desc">{brandSubtitle}</span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
 
-      {/* Page title — center */}
+      {/* center: page identity */}
       <div className="sx-ds-topbar__center">
         {breadcrumbs && breadcrumbs.length > 0 ? (
-          <nav className="sx-ds-topbar__crumbs hidden lg:flex" aria-label="Breadcrumb">
+          <nav className="sx-ds-topbar__crumbs" aria-label="Breadcrumb">
             {breadcrumbs.map((crumb, i) => (
               <React.Fragment key={`${crumb.label}-${i}`}>
                 {i > 0 ? (
-                  <ChevronRight
-                    size={12}
-                    className={clsx('opacity-35', isRtl && 'rotate-180')}
-                    aria-hidden
-                  />
+                  <ChevronRight size={12} className="sx-ds-topbar__crumb-sep" aria-hidden />
                 ) : null}
                 {crumb.onClick ? (
                   <button type="button" onClick={crumb.onClick} className="sx-ds-topbar__crumb">
@@ -141,12 +132,14 @@ export function DashboardHeader({
         <h1 className="sx-ds-topbar__title">{title}</h1>
       </div>
 
-      {/* Actions — inline-end (left in RTL, right in LTR) */}
-      <div className="sx-ds-topbar__end sx-header-actions">
+      {/* inline-end: utilities + notifications / assistant / profile */}
+      <div className="sx-ds-topbar__end">
         {center ? (
-          <div className="sx-ds-topbar__utility hidden lg:block">{center}</div>
+          <div className="sx-ds-topbar__utility">{center}</div>
         ) : null}
-        {trailing}
+        {trailing ? (
+          <div className="sx-ds-topbar__actions sx-header-actions">{trailing}</div>
+        ) : null}
       </div>
     </header>
   );
