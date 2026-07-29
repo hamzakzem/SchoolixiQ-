@@ -2522,16 +2522,18 @@ export default function SuperAdminDashboard() {
       ) : null}
 
       <main className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className="sx-dashboard-header pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors shadow-sm relative z-[var(--sx-z-header)] print:hidden">
-          <div className="flex items-center gap-2 min-w-0">
+        <header className="sx-app-header sx-dashboard-header sx-legacy-chrome-header flex items-center justify-between px-4 sm:px-5 shrink-0 relative z-[var(--sx-z-header)] print:hidden">
+          <div className="flex items-center gap-2.5 min-w-0">
             {!isMobile ? (
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="sx-header-action-btn hidden md:inline-flex text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 shrink-0"
+              className="sx-header-action-btn sx-app-header__icon-btn hidden md:inline-flex shrink-0"
+              aria-label={isRtl ? 'القائمة' : 'Menu'}
             >
               <Menu
-                size={20}
+                size={18}
+                strokeWidth={1.75}
                 className={
                   isSidebarCollapsed
                     ? `${isRtl ? "-rotate-90" : "rotate-90"} transition-transform`
@@ -2540,28 +2542,31 @@ export default function SuperAdminDashboard() {
               />
             </button>
             ) : null}
-            <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-1 shrink-0 hidden sm:block"></div>
             {activeTab !== "schools" && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 onClick={handleBack}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all font-bold text-xs shadow-sm active:scale-95 group shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sx-gold)]"
+                className="sx-header-action-btn sx-app-header__icon-btn shrink-0"
                 aria-label={isRtl ? 'رجوع' : 'Back'}
               >
                 <ArrowRight
-                  size={14}
-                  className="transition-transform group-hover:translate-x-0.5"
+                  size={16}
+                  strokeWidth={1.75}
+                  className="transition-transform"
                 />
-                <span className="hidden xs:inline">{t('back')}</span>
+                <span className="hidden sm:inline text-xs font-semibold ms-1">{t('back')}</span>
               </motion.button>
             )}
-            <h2
-              id="super-admin-header"
-              className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white font-display tracking-tight truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none"
-            >
-              {t('system_management')}
-            </h2>
+            <div className="sx-app-header__title-block min-w-0">
+              <p className="sx-app-header__eyebrow">{isRtl ? 'منصة' : 'Platform'}</p>
+              <h2
+                id="super-admin-header"
+                className="sx-app-header__title truncate max-w-[140px] xs:max-w-[200px] sm:max-w-none"
+              >
+                {t('system_management')}
+              </h2>
+            </div>
           </div>
           <div className="sx-header-actions sx-dock-duplicate-hide lg:flex">
             <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
@@ -2573,27 +2578,22 @@ export default function SuperAdminDashboard() {
 
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`sx-header-action-btn border transition-all duration-300 relative active:scale-95 ${
-                showNotifications
-                  ? "bg-[#D4A64A] border-[#D4A64A] text-[#0B2345] shadow-lg shadow-[#D4A64A]/20"
-                  : "bg-[#0B2345] border-[#D4A64A]/30 text-[#D4A64A] hover:bg-[#D4A64A] hover:text-[#0B2345] hover:border-[#D4A64A]"
+              className={`sx-header-action-btn relative active:scale-95 ${
+                showNotifications ? "bg-sx-accent" : ""
               }`}
             >
-              <Bell size={18} className="transition-transform duration-300 group-hover:scale-110" />
+              <Bell size={18} strokeWidth={1.75} />
               {totalUnread > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-[#0B2345] rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                <span className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 bg-red-500 border-2 border-white rounded-full text-[9px] font-bold text-white flex items-center justify-center">
                   {totalUnread > 9 ? '9+' : totalUnread}
                 </span>
               )}
             </button>
-            <div className="text-left md:block hidden">
-              <p className="text-[10px] text-slate-400 leading-none mb-1 uppercase tracking-widest font-bold">
-                {t('system_status')}
-              </p>
-              <div className="flex items-center gap-2 font-bold text-green-500 text-sm">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <div className="hidden md:flex items-center gap-2 me-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden />
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                 {t('system_status_ok')}
-              </div>
+              </span>
             </div>
           </div>
 

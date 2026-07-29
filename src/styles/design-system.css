@@ -2660,7 +2660,7 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__footer {
   max-height: 100dvh;
   overflow: hidden;
   position: relative;
-  background: var(--sx-navy, #0b1f3a);
+  background: #0b1f3a !important;
   color: #f8fafc;
   border-color: rgba(255, 255, 255, 0.08) !important;
 }

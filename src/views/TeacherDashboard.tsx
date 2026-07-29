@@ -147,7 +147,7 @@ export const getGradeTypeLabel = (val: string, isRtl: boolean) => {
 
 export default function TeacherDashboard() {
   const { profile, schoolData } = useAuth();
-  const { t, isRtl, language, setLanguage } = useLanguage();
+  const { t, isRtl } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const { totalUnread: badgeTotalUnread, tabBadges } = useNotificationBadges();
   useNotificationRouteRedirect(normalizeDashboardRole(undefined, profile?.role), (tab) =>
@@ -1373,37 +1373,18 @@ export default function TeacherDashboard() {
       }}
       headerTrailing={
         <>
-          <div className="hidden lg:block text-right ml-4">
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none mb-1">
-              {t("todayDate")}
-            </p>
-            <p className="text-xs font-bold text-sx-text dark:text-white">
-              {new Date().toLocaleDateString(
-                language === "ar" ? "ar-EG" : "en-US",
-                {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                },
-              )}
-            </p>
-          </div>
-          <div className="h-6 w-px bg-sx-border dark:bg-slate-800 mx-1 hidden lg:block" />
-          <div className="flex items-center gap-2 md:gap-3 shrink-0 sx-dock-duplicate-hide lg:flex">
+          <div className="flex items-center gap-1.5 shrink-0 sx-dock-duplicate-hide lg:flex sx-header-actions">
             <LanguageToggle />
             <button
               type="button"
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`w-10 h-10 md:w-11 md:h-11 rounded-xl border transition-all duration-300 flex items-center justify-center relative group active:scale-95 shrink-0 ${
-                showNotifications
-                  ? "bg-sx-accent border-sx-accent text-sx-primary shadow-lg shadow-sx-accent/25"
-                  : "bg-sx-primary border-sx-accent/30 text-sx-accent hover:bg-sx-accent hover:text-sx-primary"
+              className={`sx-header-action-btn relative active:scale-95 shrink-0 ${
+                showNotifications ? "bg-sx-accent" : ""
               }`}
             >
-              <Bell size={18} />
+              <Bell size={18} strokeWidth={1.75} />
               {notifications.filter((n) => !n.read).length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-sx-primary rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                <span className="absolute -top-1 -end-1 w-4.5 h-4.5 min-w-[18px] px-1 bg-red-500 border-2 border-white rounded-full text-[9px] font-bold text-white flex items-center justify-center">
                   {(badgeTotalUnread || notifications.filter((n) => !n.read).length) > 9
                     ? "9+"
                     : badgeTotalUnread || notifications.filter((n) => !n.read).length}
@@ -1418,6 +1399,11 @@ export default function TeacherDashboard() {
               userRole="teacher"
             />
           ) : null}
+          <div className="hidden lg:flex items-center">
+            <div className="sx-app-header__avatar" title={profile?.name}>
+              {profile?.name?.[0]}
+            </div>
+          </div>
         </>
       }
       showFooter={false}

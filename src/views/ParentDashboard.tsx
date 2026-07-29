@@ -1698,7 +1698,7 @@ export default function ParentDashboard() {
         ) : null}
 
         <div className="sx-dashboard-content sx-shell-content flex-1 flex flex-col min-h-[100dvh] bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className="sx-dashboard-header parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
+        <header className="sx-app-header sx-dashboard-header parent-app-header sx-legacy-chrome-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
           <div className="px-4 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 min-w-0">

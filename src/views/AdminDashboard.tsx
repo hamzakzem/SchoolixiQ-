@@ -1252,12 +1252,14 @@ export default function AdminDashboard() {
         }
         showBack={activeTab !== "overview"}
         onBack={handleBack}
+        headerCenter={
+          <div className="hidden md:block w-full">
+            <GlobalSearch onNavigate={navigateToTab} />
+          </div>
+        }
         headerTrailing={
           <>
             <PwaInstallPrompt variant="header" />
-            <div className="hidden md:block">
-              <GlobalSearch onNavigate={navigateToTab} />
-            </div>
             <div className="sx-dock-duplicate-hide lg:flex items-center sx-header-actions">
             <LanguageToggle />
             <ThemeToggle />
@@ -1265,15 +1267,13 @@ export default function AdminDashboard() {
             <button
               type="button"
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`sx-header-action-btn border transition-all duration-300 relative active:scale-95 shrink-0 ${
-                showNotifications
-                  ? "bg-sx-accent border-sx-accent text-sx-primary shadow-lg shadow-sx-accent/25"
-                  : "bg-sx-primary border-sx-accent/30 text-sx-accent hover:bg-sx-accent hover:text-sx-primary"
+              className={`sx-header-action-btn relative active:scale-95 shrink-0 ${
+                showNotifications ? "bg-sx-accent" : ""
               }`}
             >
-              <Bell size={18} />
+              <Bell size={18} strokeWidth={1.75} />
               {totalUnread > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 border-2 border-sx-primary rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                <span className="absolute -top-1 -end-1 w-4.5 h-4.5 min-w-[18px] px-1 bg-red-500 border-2 border-white rounded-full text-[9px] font-bold text-white flex items-center justify-center">
                   {totalUnread > 9 ? "9+" : totalUnread}
                 </span>
               )}
@@ -1286,8 +1286,8 @@ export default function AdminDashboard() {
                 userRole={profile?.role || "admin"}
               />
             ) : null}
-            <div className="hidden lg:flex items-center gap-2">
-              <div className="w-9 h-9 bg-sx-primary rounded-xl flex items-center justify-center text-white font-bold text-sm">
+            <div className="hidden lg:flex items-center">
+              <div className="sx-app-header__avatar" title={profile?.name}>
                 {profile?.name?.[0]}
               </div>
             </div>

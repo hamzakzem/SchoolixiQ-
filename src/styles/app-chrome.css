@@ -1,0 +1,568 @@
+/**
+ * SchoolixIQ — Premium App Chrome (Navbar + Sidebar)
+ * Visual language: Linear / Notion / Vercel / HubSpot
+ * Colors: Navy #0B1F3A · Gold #D4AF37 · Surface #F8FAFC
+ */
+
+/* ═══════════════════════════════════════════
+   App Shell canvas
+   ═══════════════════════════════════════════ */
+.sx-app-shell.sx-shell-layout {
+  background: #f8fafc;
+}
+
+html.dark .sx-app-shell.sx-shell-layout {
+  background: #061525;
+}
+
+/* ═══════════════════════════════════════════
+   Navbar — 72px · glass · no ornaments
+   ═══════════════════════════════════════════ */
+.sx-app-header.sx-dashboard-header {
+  --sx-chrome-h: var(--sx-header-height, 72px);
+  box-sizing: border-box;
+  height: var(--sx-chrome-h);
+  min-height: var(--sx-chrome-h);
+  max-height: var(--sx-chrome-h);
+  margin: 0;
+  padding: 0 20px;
+  padding-top: env(safe-area-inset-top, 0px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  background: rgba(255, 255, 255, 0.86);
+  border: none;
+  border-bottom: none;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  z-index: var(--sx-z-header, 40);
+}
+
+html.dark .sx-app-header.sx-dashboard-header {
+  background: rgba(11, 31, 58, 0.88);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Legacy Parent / SuperAdmin headers (not DashboardHeader grid) */
+.sx-legacy-chrome-header.sx-app-header {
+  display: flex;
+  grid-template-columns: unset;
+  height: auto;
+  min-height: var(--sx-header-height, 72px);
+  max-height: none;
+  align-items: center;
+}
+
+.sx-legacy-chrome-header.parent-app-header {
+  display: block;
+  padding: 0;
+}
+
+.sx-legacy-chrome-header.parent-app-header > div {
+  min-height: var(--sx-header-height, 72px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 0.5rem;
+}
+
+.sx-legacy-chrome-header .sx-header-action-btn {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  box-shadow: none;
+}
+
+.sx-legacy-chrome-header .sx-header-action-btn:hover {
+  background: rgba(15, 23, 42, 0.04);
+  color: #0b1f3a;
+}
+
+.sx-legacy-chrome-header .sx-header-action-btn.bg-sx-accent {
+  background: rgba(212, 175, 55, 0.16) !important;
+  color: #0b1f3a !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sx-app-header.sx-dashboard-header {
+    padding-inline: 16px;
+  }
+}
+
+.sx-app-header__start {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  justify-self: start;
+}
+
+.sx-app-header__center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: min(420px, 42vw);
+  justify-self: center;
+}
+
+.sx-app-header__end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  justify-self: end;
+}
+
+.sx-app-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sx-app-header__logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 2px rgba(11, 31, 58, 0.04);
+}
+
+.sx-app-header__brand-name {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: #0b1f3a;
+  max-width: 128px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.dark .sx-app-header__brand-name {
+  color: #f8fafc;
+}
+
+/* No decorative divider lines */
+.sx-app-header__divider {
+  display: none !important;
+}
+
+.sx-app-header__title-block {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sx-app-header__eyebrow {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  text-decoration: none;
+  border: none;
+}
+
+.sx-app-header__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #0b1f3a;
+  text-decoration: none;
+  border: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.dark .sx-app-header__title {
+  color: #f8fafc;
+}
+
+.sx-app-header__subtitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sx-app-header__crumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.sx-app-header__crumb {
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: none;
+}
+
+.sx-app-header__crumb:hover {
+  color: #0b1f3a;
+}
+
+.sx-app-header__crumb--current {
+  color: #64748b;
+}
+
+.sx-app-header__icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: #64748b;
+  background: transparent;
+  border: none;
+}
+
+.sx-app-header__icon-btn:hover {
+  color: #0b1f3a;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+html.dark .sx-app-header__icon-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sx-app-header .sx-header-actions {
+  gap: 6px;
+}
+
+.sx-app-header .sx-header-action-btn {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  box-shadow: none;
+}
+
+.sx-app-header .sx-header-action-btn:hover {
+  background: rgba(15, 23, 42, 0.04);
+  color: #0b1f3a;
+}
+
+/* Soften loud notification toggle styles inside premium chrome */
+.sx-app-header .sx-header-action-btn.bg-sx-primary,
+.sx-app-header .sx-header-action-btn.bg-sx-accent {
+  background: rgba(11, 31, 58, 0.04) !important;
+  color: #0b1f3a !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.sx-app-header .sx-header-action-btn.bg-sx-accent {
+  background: rgba(212, 175, 55, 0.16) !important;
+  color: #0b1f3a !important;
+}
+
+/* Profile avatar in chrome */
+.sx-app-header__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0b1f3a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+/* Smart Assistant — premium chip */
+.sx-assistant-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  color: #0b1f3a;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  box-shadow: 0 1px 2px rgba(11, 31, 58, 0.04);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.sx-assistant-nav-btn:hover {
+  border-color: rgba(212, 175, 55, 0.45);
+  background: rgba(212, 175, 55, 0.08);
+  box-shadow: none;
+}
+
+.sx-assistant-nav-btn__icon {
+  width: 16px;
+  height: 16px;
+  color: #d4af37;
+  flex-shrink: 0;
+}
+
+html.dark .sx-assistant-nav-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+}
+
+/* Center search host */
+.sx-app-header__search-host {
+  width: 100%;
+}
+
+.sx-app-header__search-host > * {
+  width: 100%;
+}
+
+/* ═══════════════════════════════════════════
+   Sidebar — elegant navy · fixed 100vh
+   ═══════════════════════════════════════════ */
+.sx-app-sidebar.sx-shell-sidebar,
+.sx-shell-sidebar.sx-app-sidebar {
+  background: #0b1f3a !important;
+  color: #f8fafc;
+  border: none !important;
+}
+
+@media (min-width: 768px) {
+  .sx-shell--with-sidebar .sx-shell-sidebar.sx-shell-sidebar--docked {
+    width: 260px;
+    box-shadow: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: none;
+  }
+
+  .sx-shell--with-sidebar[dir='rtl'] .sx-shell-sidebar.sx-shell-sidebar--docked {
+    border-right: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: none;
+  }
+
+  .sx-shell--with-sidebar.sx-shell--sidebar-collapsed .sx-shell-sidebar.sx-shell-sidebar--docked,
+  .sx-shell--with-sidebar .sx-shell-sidebar.sx-shell-sidebar--docked.sx-shell-sidebar--collapsed {
+    width: 80px;
+  }
+
+  .sx-shell--with-sidebar .sx-shell-content {
+    margin-left: 260px;
+  }
+
+  .sx-shell--with-sidebar.sx-shell--sidebar-collapsed .sx-shell-content {
+    margin-left: 80px;
+  }
+
+  .sx-shell--with-sidebar[dir='rtl'] .sx-shell-content {
+    margin-left: 0;
+    margin-right: 260px;
+  }
+
+  .sx-shell--with-sidebar[dir='rtl'].sx-shell--sidebar-collapsed .sx-shell-content {
+    margin-right: 80px;
+  }
+}
+
+.sx-app-sidebar__brand.sx-sidebar-brand {
+  height: var(--sx-header-height, 72px);
+  min-height: var(--sx-header-height, 72px);
+  max-height: var(--sx-header-height, 72px);
+  padding: 0 18px;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+}
+
+.sx-app-sidebar__brand--collapsed {
+  padding-inline: 0;
+  justify-content: center;
+}
+
+.sx-app-sidebar .sx-sidebar-brand__logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sx-app-sidebar__title {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: #f8fafc;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.sx-app-sidebar__subtitle {
+  margin: 2px 0 0;
+  font-size: 10px;
+  font-weight: 550;
+  color: rgba(212, 175, 55, 0.85);
+  letter-spacing: 0.02em;
+}
+
+.sx-app-sidebar__nav {
+  padding: 14px 10px 18px;
+}
+
+.sx-app-sidebar__group + .sx-app-sidebar__group {
+  margin-top: 18px;
+}
+
+.sx-app-sidebar__section {
+  margin: 0 0 8px;
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(248, 250, 252, 0.38);
+}
+
+.sx-app-sidebar__items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Compact professional nav rows */
+.sx-app-sidebar .sx-app-nav-item.sx-nav-item {
+  min-height: 36px;
+  height: 36px;
+  padding: 0 10px 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  color: rgba(248, 250, 252, 0.72);
+  background: transparent;
+  box-shadow: none;
+  transform: none !important;
+}
+
+.sx-app-sidebar .sx-app-nav-item.sx-nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f8fafc;
+  transform: none !important;
+}
+
+.sx-app-sidebar .sx-app-nav-item.sx-nav-item--active {
+  background: rgba(212, 175, 55, 0.1);
+  color: #ffffff;
+}
+
+.sx-app-sidebar .sx-app-nav-item.sx-nav-item--active svg {
+  color: #d4af37;
+}
+
+.sx-app-sidebar .sx-app-nav-item__rail {
+  inset-block: 9px;
+  width: 2.5px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.sx-app-sidebar .sx-nav-item--active .sx-app-nav-item__rail {
+  background: #d4af37;
+}
+
+.sx-app-sidebar .sx-app-nav-item--collapsed {
+  width: 100%;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  justify-content: center;
+}
+
+.sx-app-sidebar .sx-app-nav-item__badge {
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  background: #d4af37;
+  color: #0b1f3a;
+}
+
+.sx-app-sidebar__footer {
+  padding: 12px 10px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sx-app-sidebar__logout {
+  height: 36px;
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 550;
+  color: #fca5a5;
+  background: transparent;
+}
+
+.sx-app-sidebar__logout:hover {
+  background: rgba(248, 113, 113, 0.1);
+  color: #fecaca;
+}
+
+.sx-app-sidebar__logout--collapsed {
+  width: 100%;
+  justify-content: center;
+  padding: 0;
+}
+
+/* Content breathing room under premium chrome */
+.sx-app-shell .sx-shell-content-inner:not([class*='!p-0']) {
+  padding: 20px 24px 32px;
+}
+
+@media (max-width: 767px) {
+  .sx-app-header.sx-dashboard-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-inline: 12px;
+  }
+
+  .sx-app-header__center {
+    display: none;
+  }
+
+  .sx-app-shell .sx-shell-content-inner:not([class*='!p-0']) {
+    padding: 14px 14px 24px;
+  }
+}

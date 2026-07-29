@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { type SmartAssistantScope } from '../../lib/smartAssistantEngine';
@@ -42,6 +43,7 @@ export function SmartAssistantNavButton({
   className?: string;
   label?: string;
 }) {
+  const text = label || (isRtl ? 'المساعد' : 'Assistant');
   return (
     <button
       type="button"
@@ -49,10 +51,8 @@ export function SmartAssistantNavButton({
       className={className || 'sx-assistant-nav-btn shrink-0'}
       aria-label={label || (isRtl ? 'مساعد SchoolixIQ' : 'SchoolixIQ Assistant')}
     >
-      <span aria-hidden>🤖</span>
-      <span className="hidden sm:inline">
-        {label || (isRtl ? 'مساعد SchoolixIQ' : 'Assistant')}
-      </span>
+      <Sparkles className="sx-assistant-nav-btn__icon" size={16} strokeWidth={1.75} aria-hidden />
+      <span className="hidden sm:inline">{text}</span>
     </button>
   );
 }

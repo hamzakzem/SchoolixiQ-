@@ -30,6 +30,9 @@ type DashboardSidebarProps = {
   docked?: boolean;
 };
 
+/**
+ * Premium fixed navy sidebar — compact rows, gold active rail, RTL/LTR.
+ */
 export function DashboardSidebar({
   variant: _variant,
   menuItems,
@@ -72,18 +75,12 @@ export function DashboardSidebar({
         aria-current={active ? 'page' : undefined}
       >
         <span className="sx-app-nav-item__rail" aria-hidden />
-        <item.icon
-          size={isCollapsed ? 20 : 18}
-          className="sx-action-icon shrink-0"
-          strokeWidth={2}
-        />
+        <item.icon size={isCollapsed ? 19 : 17} className="shrink-0" strokeWidth={1.75} />
         {!isCollapsed ? (
-          <span className="sx-app-nav-item__label truncate flex-1">{item.label}</span>
+          <span className="sx-app-nav-item__label truncate flex-1 text-start">{item.label}</span>
         ) : null}
         {!isCollapsed && item.badge != null && item.badge > 0 ? (
-          <span className="sx-app-nav-item__badge">
-            {item.badge > 99 ? '99+' : item.badge}
-          </span>
+          <span className="sx-app-nav-item__badge">{item.badge > 99 ? '99+' : item.badge}</span>
         ) : null}
         {isCollapsed ? (
           <span
@@ -104,7 +101,7 @@ export function DashboardSidebar({
       {docked || isOpen ? (
         <motion.aside
           layout
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
           className={clsx(
             'sx-dashboard-sidebar sx-shell-sidebar sx-app-sidebar sx-sidebar--navy overflow-hidden print:hidden',
             'pt-[env(safe-area-inset-top,0px)]',
@@ -124,7 +121,7 @@ export function DashboardSidebar({
                 {isCustomSchoolLogo(schoolLogoUrl) ? (
                   <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
                 ) : (
-                  <SchoolixLogo size={isCollapsed ? 28 : 32} surface="light" />
+                  <SchoolixLogo size={isCollapsed ? 26 : 30} surface="light" />
                 )}
               </div>
               {!isCollapsed ? (
@@ -137,7 +134,7 @@ export function DashboardSidebar({
               ) : null}
             </div>
 
-            <nav className="sx-app-sidebar__nav flex-1 overflow-y-auto custom-scrollbar">
+            <nav className="sx-app-sidebar__nav flex-1 overflow-y-auto custom-scrollbar" aria-label="Primary">
               {groups.map(({ section, items }) => (
                 <div key={section.id} className="sx-app-sidebar__group">
                   {!isCollapsed && section.label ? (
@@ -160,7 +157,7 @@ export function DashboardSidebar({
                   isCollapsed && 'sx-app-sidebar__logout--collapsed',
                 )}
               >
-                <LogOut size={isCollapsed ? 20 : 17} className="shrink-0" strokeWidth={2} />
+                <LogOut size={isCollapsed ? 18 : 16} className="shrink-0" strokeWidth={1.75} />
                 {!isCollapsed ? <span>{logoutLabel}</span> : null}
               </button>
             </div>
@@ -188,7 +185,7 @@ export function DashboardMobileSidebarOverlay({
       <button
         type="button"
         aria-label="Close menu"
-        className="fixed inset-0 md:hidden print:hidden z-[var(--sx-z-drawer-backdrop)] bg-[#0B1F3A]/35"
+        className="fixed inset-0 md:hidden print:hidden z-[var(--sx-z-drawer-backdrop)] bg-[#0B1F3A]/40"
         onClick={onClose}
       />
       <motion.aside
@@ -196,7 +193,7 @@ export function DashboardMobileSidebarOverlay({
         animate={{ x: 0 }}
         exit={{ x: isRtl ? 280 : -280 }}
         className={clsx(
-          'fixed inset-y-0 w-[min(88vw,360px)] max-w-[360px] md:hidden print:hidden pt-[env(safe-area-inset-top,0px)] z-[var(--sx-z-drawer)]',
+          'fixed inset-y-0 w-[min(88vw,320px)] max-w-[320px] md:hidden print:hidden pt-[env(safe-area-inset-top,0px)] z-[var(--sx-z-drawer)]',
           isRtl ? 'right-0' : 'left-0',
         )}
       >

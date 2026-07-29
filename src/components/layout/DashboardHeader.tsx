@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronRight, PanelLeft } from 'lucide-react';
 import { clsx } from 'clsx';
 import SchoolixLogo from '../SchoolixLogo';
 import { isCustomSchoolLogo } from '../../lib/brandAssets';
@@ -20,14 +20,18 @@ type DashboardHeaderProps = {
   onMenuToggle: () => void;
   menuCollapsed?: boolean;
   showMenuToggle?: boolean;
-  /** Optional brand mark in navbar (SaaS chrome). */
   brandTitle?: string;
   schoolLogoUrl?: string;
   showBrand?: boolean;
+  /** Center zone — typically global search */
+  center?: React.ReactNode;
   trailing?: React.ReactNode;
   className?: string;
 };
 
+/**
+ * Premium SaaS navbar — brand · page context · search · actions
+ */
 export function DashboardHeader({
   isRtl,
   eyebrow,
@@ -42,17 +46,10 @@ export function DashboardHeader({
   brandTitle,
   schoolLogoUrl,
   showBrand = true,
+  center,
   trailing,
   className,
 }: DashboardHeaderProps) {
-  const CollapseIcon = menuCollapsed
-    ? isRtl
-      ? PanelLeftClose
-      : PanelLeftOpen
-    : isRtl
-      ? PanelLeftOpen
-      : PanelLeftClose;
-
   return (
     <header
       className={clsx('sx-app-header sx-dashboard-header print:hidden', className)}
@@ -67,23 +64,30 @@ export function DashboardHeader({
             aria-label={isRtl ? 'طي القائمة' : 'Toggle sidebar'}
             aria-pressed={Boolean(menuCollapsed)}
           >
-            <CollapseIcon size={18} strokeWidth={2} />
+            <PanelLeft
+              size={18}
+              strokeWidth={1.75}
+              className={clsx(
+                'transition-transform duration-200',
+                menuCollapsed && (isRtl ? 'rotate-180' : ''),
+                !menuCollapsed && (isRtl ? '' : 'rotate-180'),
+              )}
+            />
           </button>
         ) : null}
 
         {showBrand ? (
-          <div className="sx-app-header__brand">
+          <div className="sx-app-header__brand" aria-hidden={false}>
             <div className="sx-app-header__logo">
               {isCustomSchoolLogo(schoolLogoUrl) ? (
                 <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
               ) : (
-                <SchoolixLogo size={28} surface="dark" />
+                <SchoolixLogo size={26} surface="dark" />
               )}
             </div>
             {brandTitle ? (
-              <span className="sx-app-header__brand-name hidden lg:inline">{brandTitle}</span>
+              <span className="sx-app-header__brand-name hidden xl:inline">{brandTitle}</span>
             ) : null}
-            <span className="sx-app-header__divider hidden sm:block" aria-hidden />
           </div>
         ) : null}
 
@@ -94,7 +98,7 @@ export function DashboardHeader({
             className="sx-header-action-btn sx-app-header__icon-btn lg:hidden"
             aria-label={isRtl ? 'رجوع' : 'Back'}
           >
-            <ChevronRight size={18} className={isRtl ? '' : 'rotate-180'} strokeWidth={2} />
+            <ChevronRight size={18} className={isRtl ? '' : 'rotate-180'} strokeWidth={1.75} />
           </button>
         ) : null}
 
@@ -105,8 +109,8 @@ export function DashboardHeader({
                 <React.Fragment key={`${crumb.label}-${i}`}>
                   {i > 0 ? (
                     <ChevronRight
-                      size={12}
-                      className={clsx('sx-app-header__crumb-sep', isRtl && 'rotate-180')}
+                      size={11}
+                      className={clsx('sx-app-header__crumb-sep opacity-40', isRtl && 'rotate-180')}
                       aria-hidden
                     />
                   ) : null}
@@ -126,11 +130,23 @@ export function DashboardHeader({
             <p className="sx-app-header__eyebrow">{eyebrow}</p>
           ) : null}
           <h1 className="sx-app-header__title">{title}</h1>
-          {subtitle ? <p className="sx-app-header__subtitle hidden sm:block">{subtitle}</p> : null}
+          {subtitle ? <p className="sx-app-header__subtitle hidden lg:block">{subtitle}</p> : null}
         </div>
       </div>
 
-      {trailing ? <div className="sx-app-header__end sx-header-actions">{trailing}</div> : null}
+      {center ? (
+        <div className="sx-app-header__center hidden md:flex">
+          <div className="sx-app-header__search-host">{center}</div>
+        </div>
+      ) : (
+        <div className="sx-app-header__center" aria-hidden />
+      )}
+
+      {trailing ? (
+        <div className="sx-app-header__end sx-header-actions">{trailing}</div>
+      ) : (
+        <div className="sx-app-header__end" aria-hidden />
+      )}
     </header>
   );
 }

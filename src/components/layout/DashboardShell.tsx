@@ -36,6 +36,8 @@ export type DashboardShellProps = {
   breadcrumbs?: BreadcrumbItem[];
   showBack?: boolean;
   onBack?: () => void;
+  /** Center navbar slot (global search). */
+  headerCenter?: React.ReactNode;
   headerTrailing?: React.ReactNode;
   children: React.ReactNode;
   showFooter?: boolean;
@@ -48,7 +50,7 @@ export type DashboardShellProps = {
   hideSmartAssistant?: boolean;
 };
 
-/** Unified AppShell — fixed sidebar + sticky header + scrollable content. */
+/** Unified premium AppShell — fixed sidebar + sticky navbar + scroll body. */
 export function DashboardShell({
   variant = 'light',
   menuItems,
@@ -68,6 +70,7 @@ export function DashboardShell({
   breadcrumbs,
   showBack,
   onBack,
+  headerCenter,
   headerTrailing,
   children,
   showFooter = false,
@@ -104,7 +107,6 @@ export function DashboardShell({
     <div
       className={clsx(
         'sx-shell sx-app-shell sx-dashboard-context sx-dashboard-layout sx-shell-layout',
-        'bg-[var(--sx-surface,#F8FAFC)] transition-colors',
         'print:overflow-visible print:h-auto print:block',
         !isMobile && 'sx-shell--with-sidebar',
         !isMobile && sidebarCollapsed && 'sx-shell--sidebar-collapsed',
@@ -153,6 +155,7 @@ export function DashboardShell({
           brandTitle={portalTitle}
           schoolLogoUrl={schoolLogoUrl}
           showBrand
+          center={headerCenter}
           trailing={
             <>
               {headerTrailing}
