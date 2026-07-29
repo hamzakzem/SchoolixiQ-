@@ -21,19 +21,24 @@ type DashboardHeaderProps = {
   menuCollapsed?: boolean;
   showMenuToggle?: boolean;
   brandTitle?: string;
+  brandSubtitle?: string;
   schoolLogoUrl?: string;
   showBrand?: boolean;
+  /** Optional utility slot (e.g. search) rendered with actions */
   center?: React.ReactNode;
   trailing?: React.ReactNode;
   className?: string;
 };
 
-/** Dashboard topbar — Bootstrap dark navbar (bg-dark → Navy) */
+/**
+ * Internal dashboard navbar — brand · page title · actions
+ * RTL/LTR via logical start/end. Does not affect Landing.
+ */
 export function DashboardHeader({
   isRtl,
-  eyebrow,
+  eyebrow: _eyebrow,
   title,
-  subtitle,
+  subtitle: _subtitle,
   breadcrumbs,
   showBack,
   onBack,
@@ -41,6 +46,7 @@ export function DashboardHeader({
   menuCollapsed,
   showMenuToggle = true,
   brandTitle,
+  brandSubtitle,
   schoolLogoUrl,
   showBrand = true,
   center,
@@ -48,7 +54,11 @@ export function DashboardHeader({
   className,
 }: DashboardHeaderProps) {
   return (
-    <header className={clsx('sx-ds-topbar print:hidden', className)} dir={isRtl ? 'rtl' : 'ltr'}>
+    <header
+      className={clsx('sx-ds-topbar sx-dash-navbar print:hidden', className)}
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
+      {/* Brand zone — inline-start (right in RTL, left in LTR) */}
       <div className="sx-ds-topbar__start">
         {showMenuToggle ? (
           <button
@@ -70,77 +80,74 @@ export function DashboardHeader({
           </button>
         ) : null}
 
-        {showBrand ? (
-          <div className="sx-ds-topbar__brand">
-            <div className="sx-ds-topbar__logo">
-              {isCustomSchoolLogo(schoolLogoUrl) ? (
-                <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
-              ) : (
-                <SchoolixLogo size={26} surface="light" />
-              )}
-            </div>
-            {brandTitle ? (
-              <span className="sx-ds-topbar__brand-name hidden xl:inline">{brandTitle}</span>
-            ) : null}
-          </div>
-        ) : null}
-
         {showBack && onBack ? (
           <button
             type="button"
             onClick={onBack}
-            className="sx-ds-icon-btn lg:hidden"
+            className="sx-ds-icon-btn md:hidden"
             aria-label={isRtl ? 'رجوع' : 'Back'}
           >
             <ChevronRight size={18} className={isRtl ? '' : 'rotate-180'} strokeWidth={1.75} />
           </button>
         ) : null}
 
-        <div className="sx-ds-topbar__title-block min-w-0">
-          {breadcrumbs && breadcrumbs.length > 0 ? (
-            <nav className="sx-ds-topbar__crumbs hidden lg:flex" aria-label="Breadcrumb">
-              {breadcrumbs.map((crumb, i) => (
-                <React.Fragment key={`${crumb.label}-${i}`}>
-                  {i > 0 ? (
-                    <ChevronRight
-                      size={11}
-                      className={clsx('opacity-40', isRtl && 'rotate-180')}
-                      aria-hidden
-                    />
-                  ) : null}
-                  {crumb.onClick ? (
-                    <button type="button" onClick={crumb.onClick} className="sx-ds-topbar__crumb">
-                      {crumb.label}
-                    </button>
-                  ) : (
-                    <span className="sx-ds-topbar__crumb sx-ds-topbar__crumb--current">
-                      {crumb.label}
-                    </span>
-                  )}
-                </React.Fragment>
-              ))}
-            </nav>
-          ) : eyebrow ? (
-            <p className="sx-ds-topbar__eyebrow hidden lg:block">{eyebrow}</p>
-          ) : null}
-          <h1 className="sx-ds-topbar__title">{title}</h1>
-          {subtitle ? <p className="sx-ds-topbar__subtitle hidden xl:block">{subtitle}</p> : null}
-        </div>
+        {showBrand ? (
+          <div className="sx-ds-topbar__brand">
+            <div className="sx-ds-topbar__logo">
+              {isCustomSchoolLogo(schoolLogoUrl) ? (
+                <img src={schoolLogoUrl} alt="" className="w-full h-full object-contain p-0.5" />
+              ) : (
+                <SchoolixLogo size={24} surface="light" />
+              )}
+            </div>
+            <div className="sx-ds-topbar__brand-text min-w-0">
+              {brandTitle ? (
+                <span className="sx-ds-topbar__brand-name">{brandTitle}</span>
+              ) : null}
+              {brandSubtitle ? (
+                <span className="sx-ds-topbar__brand-desc">{brandSubtitle}</span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      {center ? (
-        <div className="sx-ds-topbar__center hidden md:flex">
-          <div className="sx-ds-topbar__search-host">{center}</div>
-        </div>
-      ) : (
-        <div className="sx-ds-topbar__center" aria-hidden />
-      )}
+      {/* Page title — center */}
+      <div className="sx-ds-topbar__center">
+        {breadcrumbs && breadcrumbs.length > 0 ? (
+          <nav className="sx-ds-topbar__crumbs hidden lg:flex" aria-label="Breadcrumb">
+            {breadcrumbs.map((crumb, i) => (
+              <React.Fragment key={`${crumb.label}-${i}`}>
+                {i > 0 ? (
+                  <ChevronRight
+                    size={12}
+                    className={clsx('opacity-35', isRtl && 'rotate-180')}
+                    aria-hidden
+                  />
+                ) : null}
+                {crumb.onClick ? (
+                  <button type="button" onClick={crumb.onClick} className="sx-ds-topbar__crumb">
+                    {crumb.label}
+                  </button>
+                ) : (
+                  <span className="sx-ds-topbar__crumb sx-ds-topbar__crumb--current">
+                    {crumb.label}
+                  </span>
+                )}
+              </React.Fragment>
+            ))}
+          </nav>
+        ) : null}
+        <h1 className="sx-ds-topbar__title">{title}</h1>
+      </div>
 
-      {trailing ? (
-        <div className="sx-ds-topbar__end sx-header-actions">{trailing}</div>
-      ) : (
-        <div className="sx-ds-topbar__end" aria-hidden />
-      )}
+      {/* Actions — inline-end (left in RTL, right in LTR) */}
+      <div className="sx-ds-topbar__end sx-header-actions">
+        {center ? (
+          <div className="sx-ds-topbar__utility hidden lg:block">{center}</div>
+        ) : null}
+        {trailing}
+      </div>
     </header>
   );
 }

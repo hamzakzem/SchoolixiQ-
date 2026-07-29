@@ -153,6 +153,7 @@ export function DashboardShell({
           menuCollapsed={sidebarCollapsed}
           showMenuToggle={!isMobile}
           brandTitle={portalTitle}
+          brandSubtitle={portalSubtitle}
           schoolLogoUrl={schoolLogoUrl}
           showBrand
           center={headerCenter}

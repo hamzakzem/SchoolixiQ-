@@ -52,7 +52,7 @@ export function SmartAssistantNavButton({
       aria-label={label || (isRtl ? 'مساعد SchoolixIQ' : 'SchoolixIQ Assistant')}
     >
       <Sparkles className="sx-ds-assistant-btn__icon" size={16} strokeWidth={1.75} aria-hidden />
-      <span className="hidden sm:inline">{text}</span>
+      <span className="hidden lg:inline">{text}</span>
     </button>
   );
 }
