@@ -28,7 +28,7 @@ type DashboardHeaderProps = {
   className?: string;
 };
 
-/** Dashboard topbar — Landing navbar design language */
+/** Dashboard topbar — Bootstrap dark navbar (bg-dark → Navy) */
 export function DashboardHeader({
   isRtl,
   eyebrow,

@@ -30,7 +30,7 @@ type DashboardSidebarProps = {
   docked?: boolean;
 };
 
-/** Dashboard sidebar — Landing navy brand language */
+/** Dashboard sidebar — Bootstrap dark SaaS (matches navy navbar) */
 export function DashboardSidebar({
   variant: _variant,
   menuItems,
