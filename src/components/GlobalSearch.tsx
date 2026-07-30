@@ -180,7 +180,7 @@ export default function GlobalSearch({
 
   return (
     <div className="sx-global-search" dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* Desktop / tablet premium field */}
+      {/* Desktop / tablet premium field — single control */}
       <label className="sx-global-search__field sx-global-search__field--bar">
         <Search size={18} strokeWidth={1.75} className="sx-global-search__icon" aria-hidden />
         <input
@@ -197,15 +197,12 @@ export default function GlobalSearch({
           onFocus={openSearch}
           onClick={openSearch}
         />
-        <kbd className="sx-global-search__hint" aria-hidden>
-          {isRtl ? 'بحث' : 'Search'}
-        </kbd>
       </label>
 
-      {/* Mobile icon → full modal */}
+      {/* Mobile only — icon opens full modal (never sx-nav__btn: avoids desktop duplicate) */}
       <button
         type="button"
-        className="sx-global-search__mobile-btn sx-nav__btn"
+        className="sx-global-search__mobile-btn"
         onClick={openSearch}
         aria-label={isRtl ? 'بحث' : 'Search'}
       >

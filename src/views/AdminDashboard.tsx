@@ -1252,11 +1252,7 @@ export default function AdminDashboard() {
         }
         showBack={activeTab !== "overview"}
         onBack={handleBack}
-        headerCenter={
-          <div className="hidden md:block w-full">
-            <GlobalSearch onNavigate={navigateToTab} />
-          </div>
-        }
+        headerCenter={<GlobalSearch onNavigate={navigateToTab} />}
         headerTrailing={
           <>
             <PwaInstallPrompt variant="header" />
