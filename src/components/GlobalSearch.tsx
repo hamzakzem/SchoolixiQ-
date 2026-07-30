@@ -33,6 +33,82 @@ const TYPE_META: Record<
   homework: { icon: BookOpen, ar: 'واجب', en: 'Homework' },
 };
 
+function useIsMobileSearch() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  return isMobile;
+}
+
+function ResultsList({
+  loading,
+  term,
+  results,
+  isRtl,
+  onPick,
+}: {
+  loading: boolean;
+  term: string;
+  results: SearchResult[];
+  isRtl: boolean;
+  onPick: (tabId: string) => void;
+}) {
+  return (
+    <>
+      {loading && (
+        <p className="sx-global-search__empty">
+          {isRtl ? 'جاري التحميل...' : 'Loading...'}
+        </p>
+      )}
+      {!loading && term.trim().length < 2 && (
+        <p className="sx-global-search__empty">
+          {isRtl ? 'اكتب حرفين على الأقل' : 'Type at least 2 characters'}
+        </p>
+      )}
+      {!loading &&
+        term.trim().length >= 2 &&
+        results.map((r) => {
+          const meta = TYPE_META[r.type];
+          const Icon = meta.icon;
+          return (
+            <button
+              key={`${r.type}-${r.id}`}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onPick(r.tabId)}
+              className="sx-global-search__result"
+            >
+              <span className="sx-global-search__result-icon">
+                <Icon size={16} />
+              </span>
+              <span className="sx-global-search__result-copy">
+                <span className="sx-global-search__result-title">{r.label}</span>
+                <span className="sx-global-search__result-meta">
+                  {isRtl ? meta.ar : meta.en}
+                  {r.sublabel ? ` · ${r.sublabel}` : ''}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      {!loading && term.trim().length >= 2 && results.length === 0 && (
+        <p className="sx-global-search__empty">
+          {isRtl ? 'لا نتائج' : 'No results'}
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function GlobalSearch({
   onNavigate,
 }: {
@@ -40,19 +116,24 @@ export default function GlobalSearch({
 }) {
   const { profile } = useAuth();
   const { isRtl } = useLanguage();
-  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobileSearch();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [active, setActive] = useState(false);
   const [term, setTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [pool, setPool] = useState<SearchResult[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const fieldInputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const placeholder = isRtl
     ? 'ابحث عن طالب، مدرسة، رسالة...'
     : 'Search students, schools, messages...';
 
+  const shouldLoad = Boolean(profile?.schoolId) && (active || mobileOpen);
+
   useEffect(() => {
-    if (!profile?.schoolId || !open) return;
+    if (!profile?.schoolId || !shouldLoad) return;
 
     let cancelled = false;
     const schoolId = profile.schoolId;
@@ -158,7 +239,7 @@ export default function GlobalSearch({
     return () => {
       cancelled = true;
     };
-  }, [profile?.schoolId, open]);
+  }, [profile?.schoolId, shouldLoad]);
 
   const results = useMemo(() => {
     const q = term.trim().toLowerCase();
@@ -173,14 +254,32 @@ export default function GlobalSearch({
   }, [pool, term]);
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
+    if (mobileOpen) inputRef.current?.focus();
+  }, [mobileOpen]);
 
-  const openSearch = () => setOpen(true);
+  useEffect(() => {
+    if (isMobile || !active) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) {
+        setActive(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [active, isMobile]);
+
+  const pick = (tabId: string) => {
+    onNavigate(tabId);
+    setTerm('');
+    setActive(false);
+    setMobileOpen(false);
+  };
+
+  const showInlinePanel = !isMobile && active && term.trim().length >= 2;
 
   return (
-    <div className="sx-global-search" dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* Desktop / tablet premium field — single control */}
+    <div className="sx-global-search" dir={isRtl ? 'rtl' : 'ltr'} ref={rootRef}>
+      {/* Desktop / tablet — permanently visible; focus only, no modal */}
       <label className="sx-global-search__field sx-global-search__field--bar">
         <Search size={18} strokeWidth={1.75} className="sx-global-search__icon" aria-hidden />
         <input
@@ -190,35 +289,57 @@ export default function GlobalSearch({
           placeholder={placeholder}
           value={term}
           aria-label={isRtl ? 'بحث شامل' : 'Global search'}
+          aria-expanded={showInlinePanel}
+          aria-controls="sx-global-search-panel"
           autoComplete="off"
           spellCheck={false}
-          onChange={(e) => {
-            setTerm(e.target.value);
-            if (!open) setOpen(true);
+          onChange={(e) => setTerm(e.target.value)}
+          onFocus={() => {
+            if (!isMobile) setActive(true);
           }}
-          onFocus={openSearch}
-          onClick={openSearch}
         />
       </label>
 
-      {/* Mobile only — icon opens full modal (never sx-nav__btn: avoids desktop duplicate) */}
+      <AnimatePresence>
+        {showInlinePanel && (
+          <motion.div
+            id="sx-global-search-panel"
+            role="listbox"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.16 }}
+            className="sx-global-search__panel"
+          >
+            <ResultsList
+              loading={loading}
+              term={term}
+              results={results}
+              isRtl={isRtl}
+              onPick={pick}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile — icon opens full search */}
       <button
         type="button"
         className="sx-global-search__mobile-btn"
-        onClick={openSearch}
+        onClick={() => setMobileOpen(true)}
         aria-label={isRtl ? 'بحث' : 'Search'}
       >
         <Search size={18} strokeWidth={1.75} aria-hidden />
       </button>
 
       <AnimatePresence>
-        {open && (
+        {isMobile && mobileOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="sx-global-search__overlay"
-            onClick={() => setOpen(false)}
+            onClick={() => setMobileOpen(false)}
           >
             <motion.div
               initial={{ opacity: 0, y: -12, scale: 0.98 }}
@@ -242,7 +363,7 @@ export default function GlobalSearch({
                 />
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={() => setMobileOpen(false)}
                   className="sx-global-search__close"
                   aria-label={isRtl ? 'إغلاق' : 'Close'}
                 >
@@ -251,50 +372,13 @@ export default function GlobalSearch({
               </div>
 
               <div className="sx-global-search__results">
-                {loading && (
-                  <p className="sx-global-search__empty">
-                    {isRtl ? 'جاري التحميل...' : 'Loading...'}
-                  </p>
-                )}
-                {!loading && term.length < 2 && (
-                  <p className="sx-global-search__empty">
-                    {isRtl ? 'اكتب حرفين على الأقل' : 'Type at least 2 characters'}
-                  </p>
-                )}
-                {!loading &&
-                  term.length >= 2 &&
-                  results.map((r) => {
-                    const meta = TYPE_META[r.type];
-                    const Icon = meta.icon;
-                    return (
-                      <button
-                        key={`${r.type}-${r.id}`}
-                        type="button"
-                        onClick={() => {
-                          onNavigate(r.tabId);
-                          setOpen(false);
-                          setTerm('');
-                        }}
-                        className="sx-global-search__result"
-                      >
-                        <span className="sx-global-search__result-icon">
-                          <Icon size={16} />
-                        </span>
-                        <span className="sx-global-search__result-copy">
-                          <span className="sx-global-search__result-title">{r.label}</span>
-                          <span className="sx-global-search__result-meta">
-                            {isRtl ? meta.ar : meta.en}
-                            {r.sublabel ? ` · ${r.sublabel}` : ''}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                {!loading && term.length >= 2 && results.length === 0 && (
-                  <p className="sx-global-search__empty">
-                    {isRtl ? 'لا نتائج' : 'No results'}
-                  </p>
-                )}
+                <ResultsList
+                  loading={loading}
+                  term={term}
+                  results={results}
+                  isRtl={isRtl}
+                  onPick={pick}
+                />
               </div>
             </motion.div>
           </motion.div>
