@@ -299,33 +299,13 @@ html.dark .sx-ds-shell {
 
 .sx-nav__center,
 .sx-ds-topbar__center {
-  /* True visual center — independent of brand/actions width */
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: 0;
-  width: 520px;
-  max-width: min(520px, calc(100% - 20rem));
-  z-index: 1;
+  width: 100%;
+  max-width: 480px;
   justify-self: center;
-  pointer-events: none;
-}
-
-.sx-nav__center > *,
-.sx-ds-topbar__center > * {
-  pointer-events: auto;
-}
-
-.sx-nav__start,
-.sx-ds-topbar__start,
-.sx-nav__end,
-.sx-ds-topbar__end {
-  position: relative;
-  z-index: 2;
 }
 
 .sx-nav__end,
@@ -422,16 +402,18 @@ html.dark .sx-ds-shell {
   display: none !important;
 }
 
-/* ── Premium global search (navbar) ── */
+/* ── Global search field only (navbar slot unchanged) ── */
 .sx-nav__search {
   width: 100%;
   max-width: 100%;
   display: flex;
   justify-content: center;
+  min-width: 0;
 }
 
 .sx-nav__search > * {
   width: 100%;
+  min-width: 0;
 }
 
 .sx-global-search {
@@ -440,27 +422,28 @@ html.dark .sx-ds-shell {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
 }
 
 .sx-global-search__field--bar {
   display: none;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.625rem;
   box-sizing: border-box;
-  width: 520px;
-  max-width: 100%;
-  height: 46px;
-  padding-inline: 18px;
+  width: 100%;
+  height: 44px;
+  padding-inline: 14px 16px;
+  margin: 0;
   border: 0 !important;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.92);
   cursor: text;
   box-shadow: none !important;
   outline: none !important;
   text-decoration: none !important;
   transition:
-    background 0.22s ease,
+    background 0.2s ease,
     box-shadow 0.22s ease;
 }
 
@@ -469,7 +452,6 @@ html.dark .sx-ds-shell {
     display: flex !important;
   }
 
-  /* Must beat any later .sx-nav__btn display rules */
   .sx-nav .sx-global-search__mobile-btn,
   .sx-ds-topbar .sx-global-search__mobile-btn,
   .sx-global-search__mobile-btn {
@@ -478,44 +460,57 @@ html.dark .sx-ds-shell {
 }
 
 .sx-global-search__field--bar:hover {
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16) !important;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12) !important;
 }
 
 .sx-global-search__field--bar:focus-within {
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2) !important;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16) !important;
 }
 
 .sx-global-search__icon {
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.55);
+  display: block;
+  width: 18px;
+  height: 18px;
+  color: rgba(255, 255, 255, 0.5);
   stroke: currentColor;
   transition: color 0.2s ease;
 }
 
+.sx-global-search__field--bar:hover .sx-global-search__icon {
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .sx-global-search__field--bar:focus-within .sx-global-search__icon {
-  color: #d4af37;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .sx-global-search__input {
   flex: 1 1 auto;
   min-width: 0;
   height: 100%;
+  padding: 0;
+  margin: 0;
   border: 0 !important;
   outline: none !important;
   background: transparent !important;
   color: #ffffff !important;
   font-size: 0.875rem;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  line-height: 1.25;
+  letter-spacing: -0.011em;
   box-shadow: none !important;
   text-decoration: none !important;
 }
 
 .sx-global-search__input::placeholder {
-  color: rgba(255, 255, 255, 0.45);
-  font-weight: 500;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  opacity: 1;
 }
 
 .sx-global-search__input::-webkit-search-decoration,
@@ -699,19 +694,18 @@ html.dark .sx-ds-shell {
 @media (min-width: 768px) and (max-width: 1023px) {
   .sx-nav__center,
   .sx-ds-topbar__center {
-    width: 340px;
-    max-width: min(340px, calc(100% - 14rem));
-  }
-
-  .sx-nav__search {
-    width: 100%;
+    max-width: 360px;
   }
 
   .sx-global-search__field--bar {
-    width: 340px;
-    height: 42px;
-    border-radius: 14px;
-    padding-inline: 16px;
+    height: 40px;
+    padding-inline: 12px 14px;
+    border-radius: 12px;
+  }
+
+  .sx-global-search__input,
+  .sx-global-search__input::placeholder {
+    font-size: 0.8125rem;
   }
 }
 
@@ -1220,13 +1214,11 @@ html.dark .sx-ds-shell {
 
   .sx-nav__center,
   .sx-ds-topbar__center {
-    width: 340px;
-    max-width: min(340px, calc(100% - 14rem));
+    max-width: 360px;
   }
 
   .sx-global-search__field--bar {
-    width: 340px;
-    height: 42px;
+    height: 40px;
   }
 }
 

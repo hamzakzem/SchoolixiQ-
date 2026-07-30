@@ -190,6 +190,8 @@ export default function GlobalSearch({
           placeholder={placeholder}
           value={term}
           aria-label={isRtl ? 'بحث شامل' : 'Global search'}
+          autoComplete="off"
+          spellCheck={false}
           onChange={(e) => {
             setTerm(e.target.value);
             if (!open) setOpen(true);
