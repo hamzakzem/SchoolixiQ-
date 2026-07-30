@@ -157,6 +157,7 @@ export function DashboardShell({
           schoolLogoUrl={schoolLogoUrl}
           showBrand
           center={headerCenter}
+          onLogout={onLogout}
           trailing={
             <>
               {headerTrailing}
