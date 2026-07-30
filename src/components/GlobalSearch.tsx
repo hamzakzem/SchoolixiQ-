@@ -45,6 +45,11 @@ export default function GlobalSearch({
   const [loading, setLoading] = useState(false);
   const [pool, setPool] = useState<SearchResult[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fieldInputRef = useRef<HTMLInputElement>(null);
+
+  const placeholder = isRtl
+    ? 'ابحث عن طالب، مدرسة، رسالة...'
+    : 'Search students, schools, messages...';
 
   useEffect(() => {
     if (!profile?.schoolId || !open) return;
@@ -171,24 +176,40 @@ export default function GlobalSearch({
     if (open) inputRef.current?.focus();
   }, [open]);
 
+  const openSearch = () => setOpen(true);
+
   return (
-    <>
+    <div className="sx-global-search" dir={isRtl ? 'rtl' : 'ltr'}>
+      {/* Desktop / tablet premium field */}
+      <label className="sx-global-search__field sx-global-search__field--bar">
+        <Search size={18} strokeWidth={1.75} className="sx-global-search__icon" aria-hidden />
+        <input
+          ref={fieldInputRef}
+          type="search"
+          className="sx-global-search__input"
+          placeholder={placeholder}
+          value={term}
+          aria-label={isRtl ? 'بحث شامل' : 'Global search'}
+          onChange={(e) => {
+            setTerm(e.target.value);
+            if (!open) setOpen(true);
+          }}
+          onFocus={openSearch}
+          onClick={openSearch}
+        />
+        <kbd className="sx-global-search__hint" aria-hidden>
+          {isRtl ? 'بحث' : 'Search'}
+        </kbd>
+      </label>
+
+      {/* Mobile icon → full modal */}
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 text-xs font-bold hover:border-[#D4A64A]/40 transition-all"
-        aria-label={isRtl ? 'بحث شامل' : 'Global search'}
-      >
-        <Search size={14} />
-        <span>{isRtl ? 'بحث...' : 'Search...'}</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="md:hidden w-11 h-11 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500"
+        className="sx-global-search__mobile-btn sx-nav__btn"
+        onClick={openSearch}
         aria-label={isRtl ? 'بحث' : 'Search'}
       >
-        <Search size={18} />
+        <Search size={18} strokeWidth={1.75} aria-hidden />
       </button>
 
       <AnimatePresence>
@@ -197,36 +218,47 @@ export default function GlobalSearch({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-start justify-center pt-[10vh] px-4"
+            className="sx-global-search__overlay"
             onClick={() => setOpen(false)}
           >
             <motion.div
               initial={{ opacity: 0, y: -12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.98 }}
-              className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+              className="sx-global-search__modal"
               onClick={(e) => e.stopPropagation()}
               dir={isRtl ? 'rtl' : 'ltr'}
+              role="dialog"
+              aria-modal="true"
+              aria-label={isRtl ? 'بحث شامل' : 'Global search'}
             >
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                <Search size={18} className="text-slate-400 shrink-0" />
+              <div className="sx-global-search__modal-field">
+                <Search size={18} strokeWidth={1.75} className="sx-global-search__icon" aria-hidden />
                 <input
                   ref={inputRef}
                   value={term}
                   onChange={(e) => setTerm(e.target.value)}
-                  placeholder={isRtl ? 'ابحث في مدرستك فقط...' : 'Search your school only...'}
-                  className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-800 dark:text-white"
+                  placeholder={placeholder}
+                  className="sx-global-search__modal-input"
                 />
-                <button type="button" onClick={() => setOpen(false)} className="text-slate-400">
-                  <X size={18} />
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="sx-global-search__close"
+                  aria-label={isRtl ? 'إغلاق' : 'Close'}
+                >
+                  <X size={18} strokeWidth={1.75} />
                 </button>
               </div>
-              <div className="max-h-[50vh] overflow-y-auto p-2">
+
+              <div className="sx-global-search__results">
                 {loading && (
-                  <p className="text-xs font-bold text-slate-400 p-3">{isRtl ? 'جاري التحميل...' : 'Loading...'}</p>
+                  <p className="sx-global-search__empty">
+                    {isRtl ? 'جاري التحميل...' : 'Loading...'}
+                  </p>
                 )}
                 {!loading && term.length < 2 && (
-                  <p className="text-xs font-bold text-slate-400 p-3">
+                  <p className="sx-global-search__empty">
                     {isRtl ? 'اكتب حرفين على الأقل' : 'Type at least 2 characters'}
                   </p>
                 )}
@@ -244,27 +276,31 @@ export default function GlobalSearch({
                           setOpen(false);
                           setTerm('');
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-right transition-colors"
+                        className="sx-global-search__result"
                       >
-                        <Icon size={16} className="text-[#0B2345] dark:text-[#D4A64A] shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-black text-slate-900 dark:text-white truncate">{r.label}</p>
-                          <p className="text-[10px] font-bold text-slate-400">
+                        <span className="sx-global-search__result-icon">
+                          <Icon size={16} />
+                        </span>
+                        <span className="sx-global-search__result-copy">
+                          <span className="sx-global-search__result-title">{r.label}</span>
+                          <span className="sx-global-search__result-meta">
                             {isRtl ? meta.ar : meta.en}
                             {r.sublabel ? ` · ${r.sublabel}` : ''}
-                          </p>
-                        </div>
+                          </span>
+                        </span>
                       </button>
                     );
                   })}
                 {!loading && term.length >= 2 && results.length === 0 && (
-                  <p className="text-xs font-bold text-slate-400 p-3">{isRtl ? 'لا نتائج' : 'No results'}</p>
+                  <p className="sx-global-search__empty">
+                    {isRtl ? 'لا نتائج' : 'No results'}
+                  </p>
                 )}
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 }
