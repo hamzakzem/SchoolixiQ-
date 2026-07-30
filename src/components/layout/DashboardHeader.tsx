@@ -4,6 +4,7 @@ import { clsx } from 'clsx';
 import SchoolixLogo from '../SchoolixLogo';
 import { isCustomSchoolLogo } from '../../lib/brandAssets';
 import { useAuth } from '../../lib/AuthContext';
+import { LanguageToggle } from '../LanguageToggle';
 
 export type BreadcrumbItem = {
   label: string;
@@ -170,6 +171,8 @@ export function DashboardHeader({
       <div className="sx-nav__end">
         <div className="sx-nav__actions sx-header-actions">
           {trailing}
+
+          <LanguageToggle variant="icon" />
 
           {showProfileMenu && displayName ? (
             <div className="sx-nav__profile" ref={profileWrapRef}>

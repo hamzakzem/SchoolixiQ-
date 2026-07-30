@@ -109,14 +109,28 @@ html.dark .sx-ds-shell {
 .sx-ds-topbar button,
 .sx-nav a,
 .sx-ds-topbar a,
-.sx-nav span,
-.sx-ds-topbar span,
 .sx-nav h1,
-.sx-ds-topbar h1 {
+.sx-ds-topbar h1,
+.sx-nav .sx-nav__brand-name,
+.sx-nav .sx-nav__brand-meta {
   border-block-end: 0 !important;
   border-bottom: 0 !important;
   text-decoration: none !important;
+}
+
+.sx-nav button,
+.sx-ds-topbar button,
+.sx-nav a,
+.sx-ds-topbar a {
   box-shadow: none !important;
+}
+
+/* Keep notification badge ring; kill underline on plain text spans */
+.sx-nav span:not([class*='rounded-full']):not(.absolute),
+.sx-ds-topbar span:not([class*='rounded-full']):not(.absolute) {
+  border-block-end: 0 !important;
+  border-bottom: 0 !important;
+  text-decoration: none !important;
 }
 
 .sx-nav button::after,
@@ -127,6 +141,150 @@ html.dark .sx-ds-shell {
 .sx-ds-topbar button::before {
   content: none !important;
   display: none !important;
+}
+
+/* Hard-stop gold/underline pollution on navbar chrome classes */
+.sx-nav .sx-header-actions,
+.sx-ds-topbar .sx-header-actions,
+.sx-nav__actions,
+.sx-header-actions.sx-nav__actions {
+  border: 0 !important;
+  border-bottom: 0 !important;
+  border-block-end: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  text-decoration: none !important;
+}
+
+.sx-nav .sx-header-action-btn,
+.sx-ds-topbar .sx-header-action-btn {
+  border: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
+}
+
+/* Hide page-level text LanguageToggle inside dashboard navbar (icon one is injected) */
+.sx-nav .sx-lang-toggle--default,
+.sx-ds-topbar .sx-lang-toggle--default {
+  display: none !important;
+}
+
+/* Icon language switch — matches other 40×40 actions */
+.sx-nav .sx-lang-toggle--icon,
+.sx-ds-topbar .sx-lang-toggle--icon {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sx-nav .sx-lang-toggle__btn,
+.sx-ds-topbar .sx-lang-toggle__btn {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sx-nav .sx-lang-toggle__btn:hover,
+.sx-ds-topbar .sx-lang-toggle__btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.sx-nav .sx-lang-toggle__btn svg {
+  width: 18px;
+  height: 18px;
+  color: inherit !important;
+  stroke: currentColor !important;
+}
+
+.sx-nav .sx-lang-toggle__menu {
+  position: absolute;
+  inset-block-start: calc(100% + 8px);
+  inset-inline-end: 0;
+  z-index: 70;
+  min-width: 148px;
+  padding: 0.375rem;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(6, 21, 37, 0.18);
+  border: 0;
+}
+
+.sx-nav .sx-lang-toggle__item {
+  display: flex !important;
+  align-items: center;
+  width: 100% !important;
+  max-width: none !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding-inline: 0.75rem !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #0b1f3a !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+  box-shadow: none !important;
+}
+
+.sx-nav .sx-lang-toggle__item:hover,
+.sx-nav .sx-lang-toggle__item.is-active {
+  background: rgba(11, 31, 58, 0.06) !important;
+}
+
+/* Theme toggle inside navbar — same 40×40 geometry */
+.sx-nav #theme-toggle,
+.sx-ds-topbar #theme-toggle,
+.sx-nav .sx-btn#theme-toggle {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
+  transform: none !important;
+}
+
+.sx-nav #theme-toggle:hover,
+.sx-ds-topbar #theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.sx-nav #theme-toggle svg,
+.sx-nav #theme-toggle * {
+  color: inherit !important;
+  stroke: currentColor !important;
 }
 
 /* Zones */

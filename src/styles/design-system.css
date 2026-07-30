@@ -3263,18 +3263,26 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__sticky {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  border: none;
+  border-bottom: none;
+  box-shadow: none;
+  text-decoration: none;
 }
 
 .sx-header-action-btn {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
   padding: 0;
-  border-radius: 10px;
+  border-radius: 12px;
+  border: none;
+  border-bottom: none;
+  box-shadow: none;
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: background 160ms ease, color 160ms ease;
 }
 
 .sx-header-dropdown {
