@@ -601,7 +601,7 @@ html.dark .sx-ds-shell {
 }
 
 /* Force trailing nested action groups to same geometry */
-.sx-nav__actions button:not(.sx-nav__profile-item),
+.sx-nav__actions button:not(.sx-nav__profile-item):not(.sx-nav__chat-btn):not(.sx-lang-toggle__item),
 .sx-nav__actions .sx-ds-icon-btn,
 .sx-nav__actions .sx-header-action-btn {
   width: 40px !important;
@@ -613,6 +613,65 @@ html.dark .sx-ds-shell {
   border-bottom: 0 !important;
   box-shadow: none !important;
   text-decoration: none !important;
+}
+
+/* Chat shortcut — height 40; desktop label, tablet/mobile icon-only */
+.sx-nav__chat-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  width: auto !important;
+  min-width: 40px !important;
+  max-width: none !important;
+  padding-inline: 0.75rem !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  box-shadow: none !important;
+  text-decoration: none !important;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sx-nav__chat-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.sx-nav__chat-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: inherit !important;
+  stroke: currentColor !important;
+}
+
+.sx-nav__chat-btn__label {
+  line-height: 1;
+  white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+  .sx-nav__chat-btn {
+    width: 40px !important;
+    max-width: 40px !important;
+    padding-inline: 0 !important;
+  }
+
+  .sx-nav__chat-btn__label {
+    display: none !important;
+  }
 }
 
 .sx-nav__btn--menu {
@@ -735,14 +794,14 @@ html.dark .sx-ds-shell {
   position: absolute;
   inset-block-start: calc(100% + 8px);
   inset-inline-end: 0;
-  z-index: 60;
-  width: 220px;
+  z-index: 70;
+  width: 240px;
   padding: 0.5rem;
   border-radius: 12px;
-  background: #ffffff;
-  color: #0b1f3a;
-  box-shadow: 0 12px 32px rgba(6, 21, 37, 0.18);
-  border: 0;
+  background: #ffffff !important;
+  color: #0b1f3a !important;
+  box-shadow: 0 12px 32px rgba(6, 21, 37, 0.16);
+  border: 0 !important;
 }
 
 .sx-nav__profile-menu-head {
@@ -760,7 +819,7 @@ html.dark .sx-ds-shell {
 .sx-nav__profile-menu-copy {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0.15rem;
   min-width: 0;
   text-align: start;
 }
@@ -768,27 +827,44 @@ html.dark .sx-ds-shell {
 .sx-nav__profile-menu-name {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #0b1f3a;
+  color: #0b1f3a !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sx-nav__profile-menu-school {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b !important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sx-nav__profile-menu-role {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 500;
-  color: rgba(11, 31, 58, 0.55);
+  color: #94a3b8 !important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.sx-nav__profile-menu-divider {
+  height: 1px;
+  margin: 0.25rem 0.35rem 0.5rem;
+  background: #e2e8f0;
+  border: 0;
+}
+
 .sx-nav__profile-item {
-  display: flex;
+  display: flex !important;
   align-items: center;
   gap: 0.5rem;
   width: 100% !important;
   max-width: none !important;
+  min-width: 0 !important;
   height: 40px !important;
   min-height: 40px !important;
   padding-inline: 0.625rem !important;
@@ -801,18 +877,27 @@ html.dark .sx-ds-shell {
   cursor: pointer;
   text-align: start;
   box-shadow: none !important;
+  text-decoration: none !important;
 }
 
 .sx-nav__profile-item:hover {
-  background: rgba(11, 31, 58, 0.06) !important;
+  background: #f1f5f9 !important;
+  color: #0b1f3a !important;
+}
+
+.sx-nav__profile-item svg {
+  color: inherit !important;
+  stroke: currentColor !important;
+  flex-shrink: 0;
 }
 
 .sx-nav__profile-item--danger {
-  color: #b91c1c !important;
+  color: #dc2626 !important;
 }
 
 .sx-nav__profile-item--danger:hover {
-  background: rgba(185, 28, 28, 0.08) !important;
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
 }
 
 .sx-nav--has-profile .sx-nav__actions .sx-ds-avatar:not(.sx-nav-profile__avatar):not(.sx-nav__avatar) {

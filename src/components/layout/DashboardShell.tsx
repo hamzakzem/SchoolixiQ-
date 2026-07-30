@@ -158,6 +158,13 @@ export function DashboardShell({
           showBrand
           center={headerCenter}
           onLogout={onLogout}
+          onOpenChat={() => onTabChange('chat')}
+          onOpenSettings={
+            menuItems.some((item) => item.id === 'settings')
+              ? () => onTabChange('settings')
+              : undefined
+          }
+          showChatButton={menuItems.some((item) => item.id === 'chat')}
           trailing={
             <>
               {headerTrailing}

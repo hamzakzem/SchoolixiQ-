@@ -1,5 +1,12 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { ChevronRight, LogOut, PanelLeft, UserRound } from 'lucide-react';
+import {
+  ChevronRight,
+  LogOut,
+  MessageSquare,
+  PanelLeft,
+  Settings,
+  UserRound,
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import SchoolixLogo from '../SchoolixLogo';
 import { isCustomSchoolLogo } from '../../lib/brandAssets';
@@ -33,8 +40,12 @@ type DashboardHeaderProps = {
   profileName?: string;
   profileRole?: string;
   profileImageUrl?: string;
+  schoolName?: string;
   onLogout?: () => void;
+  onOpenChat?: () => void;
+  onOpenSettings?: () => void;
   showProfileMenu?: boolean;
+  showChatButton?: boolean;
   className?: string;
 };
 
@@ -52,8 +63,8 @@ function roleLabel(role: string | undefined, isRtl: boolean): string {
 }
 
 /**
- * Internal dashboard navbar — Brand | Global Search | Actions
- * No page title. Logical CSS for RTL/LTR. Landing untouched.
+ * Internal dashboard navbar — Brand | Search | Actions
+ * Actions: notifications (via trailing) · assistant · language · chat · profile
  */
 export function DashboardHeader({
   isRtl,
@@ -75,11 +86,15 @@ export function DashboardHeader({
   profileName,
   profileRole,
   profileImageUrl,
+  schoolName,
   onLogout,
+  onOpenChat,
+  onOpenSettings,
   showProfileMenu = true,
+  showChatButton = true,
   className,
 }: DashboardHeaderProps) {
-  const { profile } = useAuth();
+  const { profile, schoolData } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileWrapRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -87,7 +102,15 @@ export function DashboardHeader({
   const displayName = (profileName || profile?.name || '').trim();
   const displayRole = profileRole || roleLabel(profile?.role, isRtl);
   const displayImage = profileImageUrl || profile?.photoURL || '';
+  const displaySchool = (
+    schoolName ||
+    (schoolData as { name?: string } | null)?.name ||
+    brandSubtitle ||
+    brandTitle ||
+    ''
+  ).trim();
   const initial = (displayName || '?').charAt(0).toUpperCase();
+  const chatLabel = isRtl ? 'الدردشة' : 'Chat';
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -117,7 +140,6 @@ export function DashboardHeader({
     >
       <span className="sr-only">{title}</span>
 
-      {/* Brand — inline-start */}
       <div className="sx-nav__start">
         {showMenuToggle ? (
           <button
@@ -162,17 +184,28 @@ export function DashboardHeader({
         ) : null}
       </div>
 
-      {/* Global search — center */}
       <div className="sx-nav__center">
         {center ? <div className="sx-nav__search">{center}</div> : null}
       </div>
 
-      {/* Actions — inline-end */}
       <div className="sx-nav__end">
         <div className="sx-nav__actions sx-header-actions">
           {trailing}
 
           <LanguageToggle variant="icon" />
+
+          {showChatButton && onOpenChat ? (
+            <button
+              type="button"
+              className="sx-nav__chat-btn"
+              onClick={onOpenChat}
+              aria-label={chatLabel}
+              title={chatLabel}
+            >
+              <MessageSquare size={18} strokeWidth={1.75} aria-hidden />
+              <span className="sx-nav__chat-btn__label">{chatLabel}</span>
+            </button>
+          ) : null}
 
           {showProfileMenu && displayName ? (
             <div className="sx-nav__profile" ref={profileWrapRef}>
@@ -206,9 +239,30 @@ export function DashboardHeader({
                     </span>
                     <div className="sx-nav__profile-menu-copy">
                       <span className="sx-nav__profile-menu-name">{displayName}</span>
+                      {displaySchool ? (
+                        <span className="sx-nav__profile-menu-school">{displaySchool}</span>
+                      ) : null}
                       <span className="sx-nav__profile-menu-role">{displayRole}</span>
                     </div>
                   </div>
+
+                  <div className="sx-nav__profile-menu-divider" aria-hidden />
+
+                  {onOpenSettings ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="sx-nav__profile-item"
+                      onClick={() => {
+                        setProfileOpen(false);
+                        onOpenSettings();
+                      }}
+                    >
+                      <Settings size={15} strokeWidth={1.75} aria-hidden />
+                      <span>{isRtl ? 'الإعدادات' : 'Settings'}</span>
+                    </button>
+                  ) : null}
+
                   {onLogout ? (
                     <button
                       type="button"
