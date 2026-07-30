@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, LogOut, PanelLeft, UserRound } from 'lucide-react';
+import { ChevronRight, LogOut, PanelLeft, UserRound } from 'lucide-react';
 import { clsx } from 'clsx';
 import SchoolixLogo from '../SchoolixLogo';
 import { isCustomSchoolLogo } from '../../lib/brandAssets';
@@ -13,6 +13,7 @@ export type BreadcrumbItem = {
 type DashboardHeaderProps = {
   isRtl: boolean;
   eyebrow?: string;
+  /** Kept for shell API / a11y — not rendered as centered title */
   title: string;
   subtitle?: string;
   breadcrumbs?: BreadcrumbItem[];
@@ -25,10 +26,9 @@ type DashboardHeaderProps = {
   brandSubtitle?: string;
   schoolLogoUrl?: string;
   showBrand?: boolean;
-  /** Optional utility slot (e.g. search) — desktop only via CSS */
+  /** Global search slot — rendered in center */
   center?: React.ReactNode;
   trailing?: React.ReactNode;
-  /** Optional explicit profile override (otherwise reads AuthContext) */
   profileName?: string;
   profileRole?: string;
   profileImageUrl?: string;
@@ -51,8 +51,8 @@ function roleLabel(role: string | undefined, isRtl: boolean): string {
 }
 
 /**
- * Enterprise SaaS dashboard navbar (Linear / Vercel / Stripe style).
- * Brand · page title · actions. Logical CSS for RTL/LTR. Landing untouched.
+ * Internal dashboard navbar — Brand | Global Search | Actions
+ * No page title. Logical CSS for RTL/LTR. Landing untouched.
  */
 export function DashboardHeader({
   isRtl,
@@ -112,13 +112,17 @@ export function DashboardHeader({
         className,
       )}
       dir={isRtl ? 'rtl' : 'ltr'}
+      aria-label={title || (isRtl ? 'شريط التنقل' : 'Dashboard navigation')}
     >
+      <span className="sr-only">{title}</span>
+
+      {/* Brand — inline-start */}
       <div className="sx-nav__start">
         {showMenuToggle ? (
           <button
             type="button"
             onClick={onMenuToggle}
-            className="sx-nav__icon-btn sx-nav__icon-btn--menu"
+            className="sx-nav__btn sx-nav__btn--menu"
             aria-label={isRtl ? 'طي القائمة' : 'Toggle sidebar'}
             aria-pressed={Boolean(menuCollapsed)}
             data-collapsed={menuCollapsed ? 'true' : 'false'}
@@ -131,7 +135,7 @@ export function DashboardHeader({
           <button
             type="button"
             onClick={onBack}
-            className="sx-nav__icon-btn sx-nav__icon-btn--back"
+            className="sx-nav__btn sx-nav__btn--back"
             aria-label={isRtl ? 'رجوع' : 'Back'}
           >
             <ChevronRight size={18} strokeWidth={1.75} className="sx-nav__back-icon" />
@@ -157,13 +161,13 @@ export function DashboardHeader({
         ) : null}
       </div>
 
+      {/* Global search — center */}
       <div className="sx-nav__center">
-        <h1 className="sx-nav__title">{title}</h1>
+        {center ? <div className="sx-nav__search">{center}</div> : null}
       </div>
 
+      {/* Actions — inline-end */}
       <div className="sx-nav__end">
-        {center ? <div className="sx-nav__utility">{center}</div> : null}
-
         <div className="sx-nav__actions sx-header-actions">
           {trailing}
 
@@ -171,10 +175,11 @@ export function DashboardHeader({
             <div className="sx-nav__profile" ref={profileWrapRef}>
               <button
                 type="button"
-                className="sx-nav__profile-trigger"
+                className="sx-nav__btn sx-nav__btn--profile"
                 aria-haspopup="menu"
                 aria-expanded={profileOpen}
                 aria-controls={menuId}
+                aria-label={displayName}
                 onClick={() => setProfileOpen((v) => !v)}
               >
                 <span className="sx-nav__avatar sx-ds-avatar sx-nav-profile__avatar">
@@ -184,16 +189,6 @@ export function DashboardHeader({
                     initial
                   )}
                 </span>
-                <span className="sx-nav__profile-meta">
-                  <span className="sx-nav__profile-name">{displayName}</span>
-                  <span className="sx-nav__profile-role">{displayRole}</span>
-                </span>
-                <ChevronDown
-                  size={14}
-                  strokeWidth={2}
-                  className={clsx('sx-nav__profile-caret', profileOpen && 'is-open')}
-                  aria-hidden
-                />
               </button>
 
               {profileOpen ? (
