@@ -23,7 +23,14 @@ for (const [srcName, destName] of pairs) {
     console.error(`FAIL: missing ${srcName} at ${src}`);
     process.exit(1);
   }
-  fs.copyFileSync(src, dest);
+  if (srcName === 'server.ts') {
+    // Root server.ts imports backend modules via ./backend/*; rewrite for backend/ runtime.
+    const raw = fs.readFileSync(src, 'utf8');
+    const rewritten = raw.replaceAll("from './backend/roleHierarchy.ts'", "from './roleHierarchy.ts'");
+    fs.writeFileSync(dest, rewritten);
+  } else {
+    fs.copyFileSync(src, dest);
+  }
 }
 
 const chatModules = ['chatAssignment.mjs', 'chatDirectory.mjs', 'chatEscalationWorker.mjs'];

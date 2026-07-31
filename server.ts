@@ -35,7 +35,7 @@ import {
   canActorDeleteStudent,
   normalizeRole,
   isSuperAdminRole,
-} from './roleHierarchy.ts';
+} from './backend/roleHierarchy.ts';
 import {
   setupNotificationPushListener,
   pollRecentNotificationsForPush,
