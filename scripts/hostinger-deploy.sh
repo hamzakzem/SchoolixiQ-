@@ -146,9 +146,13 @@ write_lftp_mirror_script() {
         printf 'mirror -R --delete --parallel=3 --verbose -X assets/ -X index.html -X sw.js "%s/" .\n' "$LOCAL_DIR"
         ;;
       shell-upload)
-        printf '%s\n' '!echo "[deploy] phase: upload index.html + sw.js last"'
-        printf 'put -O . "%s/index.html"\n' "$LOCAL_DIR"
+        # Shell last = zero-downtime: assets already on CDN/disk before HTML points at new hashes.
+        printf '%s\n' '!echo "[deploy] phase: upload shell last (htaccess, precache, sw, index.html)"'
+        printf 'put -O . "%s/.htaccess"\n' "$LOCAL_DIR"
+        printf 'put -O ./assets "%s/assets/.htaccess"\n' "$LOCAL_DIR"
+        printf 'put -O . "%s/sw-precache.json"\n' "$LOCAL_DIR"
         printf 'put -O . "%s/sw.js"\n' "$LOCAL_DIR"
+        printf 'put -O . "%s/index.html"\n' "$LOCAL_DIR"
         ;;
       assets-prune)
         printf '%s\n' '!echo "[deploy] phase: prune stale assets"'
@@ -198,7 +202,7 @@ echo "[deploy] phase 2: atomic mirror upload (${MIRROR_TIMEOUT_SEC} timeout per 
 for step in \
   "assets-upload:upload new hashed assets (keep old until shell updated)" \
   "body-sync:sync static files (exclude assets shell)" \
-  "shell-upload:upload index.html + sw.js" \
+  "shell-upload:upload shell last (sw + index.html)" \
   "assets-prune:remove stale hashed assets"; do
   phase="${step%%:*}"
   label="${step#*:}"

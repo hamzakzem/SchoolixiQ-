@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const distDir = path.resolve('dist');
@@ -15,7 +15,20 @@ const forbidden = [
 
 const files = await readdir(distAssets);
 const jsFiles = files.filter((f) => f.endsWith('.js'));
+const cssFiles = files.filter((f) => f.endsWith('.css'));
 let failed = false;
+
+async function mustExist(relFromDist, label) {
+  const full = path.join(distDir, relFromDist.replace(/^\//, ''));
+  try {
+    await access(full);
+    return true;
+  } catch {
+    console.error(`FAIL missing ${label || 'file'}: ${relFromDist}`);
+    failed = true;
+    return false;
+  }
+}
 
 for (const file of jsFiles) {
   const content = await readFile(path.join(distAssets, file), 'utf8');
@@ -28,31 +41,62 @@ for (const file of jsFiles) {
 }
 
 const indexHtml = await readFile(path.join(distDir, 'index.html'), 'utf8');
+
+// Every asset referenced by index.html must exist on disk
+const indexAssetRefs = [
+  ...indexHtml.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g),
+].map((m) => m[1]);
+if (indexAssetRefs.length === 0) {
+  console.error('FAIL index.html: no /assets/* references');
+  failed = true;
+} else {
+  for (const ref of indexAssetRefs) {
+    await mustExist(ref, 'index.html asset');
+  }
+  console.log(`OK: index.html references ${indexAssetRefs.length} assets (all present)`);
+}
+
 const entryMatch = indexHtml.match(/src="(\/assets\/index-[^"]+\.js)"/);
 if (!entryMatch) {
   console.error('FAIL index.html: missing entry script');
   failed = true;
 } else {
   const entryPath = entryMatch[1].replace(/^\//, '');
-  const entryFile = path.join(distDir, entryPath);
   try {
-    const entryContent = await readFile(entryFile, 'utf8');
+    const entryContent = await readFile(path.join(distDir, entryPath), 'utf8');
     console.log(`OK: entry bundle -> ${entryMatch[1]}`);
-    const chunkRefs = [...entryContent.matchAll(/assets\/[A-Za-z0-9_.-]+\.js/g)].map((m) => m[0]);
-    const uniqueChunks = [...new Set(chunkRefs)];
-    for (const chunk of uniqueChunks) {
-      const chunkPath = path.join(distDir, chunk);
-      try {
-        await readFile(chunkPath, 'utf8');
-      } catch {
-        console.error(`FAIL missing chunk referenced by entry bundle: ${chunk}`);
-        failed = true;
+
+    // Collect absolute and relative hashed chunk refs from every JS bundle
+    const needed = new Set();
+    const absRe = /["'`](\/?assets\/[A-Za-z0-9_.-]+\.(?:js|css))["'`]/g;
+    const relImportRe = /import\(["'`]\.\/([A-Za-z0-9_.-]+\.js)["'`]\)/g;
+
+    for (const file of jsFiles) {
+      const content = await readFile(path.join(distAssets, file), 'utf8');
+      for (const m of content.matchAll(absRe)) {
+        needed.add(m[1].replace(/^\//, ''));
+      }
+      for (const m of content.matchAll(relImportRe)) {
+        needed.add(`assets/${m[1]}`);
       }
     }
-    const superAdminChunk = uniqueChunks.find((c) => c.includes('SuperAdminDashboard-'));
-    if (superAdminChunk) {
-      console.log(`OK: SuperAdminDashboard chunk -> ${superAdminChunk}`);
+
+    let missing = 0;
+    for (const chunk of needed) {
+      try {
+        await access(path.join(distDir, chunk));
+      } catch {
+        console.error(`FAIL missing chunk referenced by bundles: ${chunk}`);
+        failed = true;
+        missing += 1;
+      }
     }
+    console.log(
+      `OK: verified ${needed.size - missing}/${needed.size} hashed chunks referenced by JS bundles`,
+    );
+
+    const superAdminChunk = [...needed].find((c) => c.includes('SuperAdminDashboard-'));
+    if (superAdminChunk) console.log(`OK: SuperAdminDashboard chunk -> ${superAdminChunk}`);
   } catch {
     console.error(`FAIL entry bundle missing on disk: ${entryPath}`);
     failed = true;
@@ -79,7 +123,9 @@ if (!adminChunk) {
 try {
   const precache = JSON.parse(await readFile(path.join(distDir, 'sw-precache.json'), 'utf8'));
   const assets = Array.isArray(precache.assets) ? precache.assets : [];
-  const hashed = assets.filter((a) => typeof a === 'string' && /^\/assets\/.+\.(js|mjs|css)(\?|$)/i.test(a));
+  const hashed = assets.filter(
+    (a) => typeof a === 'string' && /^\/assets\/.+\.(js|mjs|css)(\?|$)/i.test(a),
+  );
   if (hashed.length > 0) {
     console.error('FAIL sw-precache.json must not list hashed Vite chunks:', hashed);
     failed = true;
@@ -93,9 +139,14 @@ try {
 
 try {
   const sw = await readFile(path.join(distDir, 'sw.js'), 'utf8');
-  if (!sw.includes('schoolix-shell-v15')) {
-    console.error('FAIL sw.js: expected SHELL_CACHE schoolix-shell-v15');
+  if (!sw.includes('schoolix-shell-v16') && !sw.includes("schoolix-shell-${SW_VERSION}") && !sw.includes('v16')) {
+    // Template uses SW_VERSION = 'v16' → schoolix-shell-v16 at runtime string
+  }
+  if (!sw.includes("const SW_VERSION = 'v16'") && !sw.includes('schoolix-shell-v16')) {
+    console.error('FAIL sw.js: expected SW_VERSION v16');
     failed = true;
+  } else {
+    console.log('OK: sw.js version v16');
   }
   if (!sw.includes('never persist hashed') && !sw.includes('Hard guard: never persist hashed')) {
     console.error('FAIL sw.js: missing hashed-asset cache guard');
@@ -103,8 +154,36 @@ try {
   } else {
     console.log('OK: sw.js rejects hashed /assets cache');
   }
+  if (!sw.includes('skipWaiting')) {
+    console.error('FAIL sw.js: missing skipWaiting');
+    failed = true;
+  }
+  if (!sw.includes('clients.claim')) {
+    console.error('FAIL sw.js: missing clients.claim');
+    failed = true;
+  }
 } catch (err) {
   console.error('FAIL reading sw.js', err);
+  failed = true;
+}
+
+try {
+  const htaccess = await readFile(path.join(distDir, '.htaccess'), 'utf8');
+  if (!/Cache-Control.*no-cache/i.test(htaccess) || !htaccess.includes('index.html')) {
+    console.error('FAIL .htaccess: index.html must be no-cache');
+    failed = true;
+  } else {
+    console.log('OK: .htaccess no-cache for index.html');
+  }
+  const assetsHt = await readFile(path.join(distDir, 'assets/.htaccess'), 'utf8');
+  if (!assetsHt.includes('immutable')) {
+    console.error('FAIL assets/.htaccess: expected immutable cache');
+    failed = true;
+  } else {
+    console.log('OK: assets/.htaccess immutable');
+  }
+} catch (err) {
+  console.error('FAIL reading htaccess', err);
   failed = true;
 }
 
@@ -122,4 +201,6 @@ if (failed) {
   process.exit(1);
 }
 
-console.log(`OK: ${jsFiles.length} bundles — no legacy Google auth patterns`);
+console.log(
+  `OK: ${jsFiles.length} JS + ${cssFiles.length} CSS bundles — production integrity checks passed`,
+);

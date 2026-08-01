@@ -1,7 +1,12 @@
-// Bump SHELL_CACHE on every production deploy that changes the app shell.
-// Hashed /assets/*.js|css must NEVER be precached or runtime-cached (prevents white-screen chunk mismatch).
-const SHELL_CACHE = 'schoolix-shell-v15';
-const RUNTIME_CACHE = 'schoolix-runtime-v15';
+/**
+ * SchoolixIQ production Service Worker (v16)
+ * - Never cache hashed Vite /assets/*.js|css (prevents white-screen after deploy)
+ * - Purge ALL stale caches on activate so old customers migrate automatically
+ * - Network-only for application chunks; shell-only precache
+ */
+const SW_VERSION = 'v16';
+const SHELL_CACHE = `schoolix-shell-${SW_VERSION}`;
+const RUNTIME_CACHE = `schoolix-runtime-${SW_VERSION}`;
 const PRECACHE_FALLBACK = [
   '/index.html',
   '/manifest.json',
@@ -25,7 +30,6 @@ function filterShellPrecache(urls) {
   return [...new Set(urls)].filter((url) => {
     if (!url || typeof url !== 'string') return false;
     if (isHashedAssetUrl(url)) return false;
-    // Never precache the SW script or API routes
     if (url.includes('/api/')) return false;
     if (url.endsWith('/sw.js') || url.includes('/sw.js?')) return false;
     return true;
@@ -39,51 +43,61 @@ async function notifyClients(payload) {
   }
 }
 
-async function purgeAllSchoolixCaches() {
+async function purgeAllCaches() {
   const keys = await caches.keys();
   await Promise.all(keys.map((key) => caches.delete(key)));
-  console.log('[SW] OLD_CACHE_CLEANED', keys);
+  console.log('[SW] ALL_CACHES_DELETED', keys);
   return keys;
+}
+
+async function precacheShell() {
+  const cache = await caches.open(SHELL_CACHE);
+  let extras = [];
+  try {
+    const res = await fetch('/sw-precache.json', { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      extras = Array.isArray(json.assets) ? json.assets : [];
+    }
+  } catch {
+    /* offline install */
+  }
+  const urls = filterShellPrecache([...PRECACHE_FALLBACK, ...extras]);
+  await Promise.allSettled(
+    urls.map(async (url) => {
+      try {
+        await cache.add(url);
+      } catch (err) {
+        console.warn('[SW] precache skip', url, err);
+      }
+    }),
+  );
+  return urls.length;
 }
 
 async function purgeAndReloadClients(reason) {
   if (shellReloadSent) return;
   shellReloadSent = true;
-  await purgeAllSchoolixCaches();
-  await notifyClients({ type: 'SW_STALE_CHUNK_RELOAD', reason: reason || 'stale_chunk' });
+  await purgeAllCaches();
+  await notifyClients({
+    type: 'SW_STALE_CHUNK_RELOAD',
+    reason: reason || 'stale_chunk',
+    version: SW_VERSION,
+  });
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(SHELL_CACHE);
-      let extras = [];
-      try {
-        const res = await fetch('/sw-precache.json', { cache: 'no-store' });
-        if (res.ok) {
-          const json = await res.json();
-          extras = Array.isArray(json.assets) ? json.assets : [];
-        }
-      } catch {
-        // Offline install — use fallback list only.
-      }
-
-      const urls = filterShellPrecache([...PRECACHE_FALLBACK, ...extras]);
-      const results = await Promise.allSettled(
-        urls.map(async (url) => {
-          try {
-            await cache.add(url);
-          } catch (err) {
-            console.warn('[SW] precache skip', url, err);
-          }
-        }),
-      );
-      const ok = results.filter((r) => r.status === 'fulfilled').length;
-      console.log('[SW] APP_SHELL_CACHE_READY', { total: urls.length, cached: ok });
+      // Drop every previous cache before installing this SW shell.
+      await purgeAllCaches();
+      const count = await precacheShell();
+      console.log('[SW] APP_SHELL_CACHE_READY', { version: SW_VERSION, count });
       await notifyClients({
         type: 'SW_APP_SHELL_CACHE_READY',
+        version: SW_VERSION,
         updatedAt: new Date().toISOString(),
-        count: ok,
+        count,
       });
     })(),
   );
@@ -93,13 +107,24 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
+      // Delete ALL caches that are not this version (covers schoolix-* and legacy names).
       const keys = await caches.keys();
       const stale = keys.filter((key) => key !== SHELL_CACHE && key !== RUNTIME_CACHE);
       if (stale.length > 0) {
         await Promise.all(stale.map((key) => caches.delete(key)));
         console.log('[SW] OLD_CACHE_CLEANED', stale);
       }
+      // Ensure shell exists after purge of unrelated keys
+      const remaining = await caches.keys();
+      if (!remaining.includes(SHELL_CACHE)) {
+        await precacheShell();
+      }
       await self.clients.claim();
+      await notifyClients({
+        type: 'SW_ACTIVATED',
+        version: SW_VERSION,
+        updatedAt: new Date().toISOString(),
+      });
     })(),
   );
 });
@@ -132,28 +157,26 @@ async function cachePut(cacheName, request, response) {
   if (!response || response.status !== 200 || response.type !== 'basic') return;
   // Hard guard: never persist hashed Vite chunks
   if (isHashedBundle(request)) return;
+  try {
+    const path = new URL(request.url).pathname;
+    if (path.startsWith('/assets/')) return;
+  } catch {
+    /* ignore */
+  }
   const cache = await caches.open(cacheName);
   await cache.put(request, response.clone());
-  console.log('[SW] CACHE_UPDATED', request.url);
-  await notifyClients({
-    type: 'SW_CACHE_UPDATED',
-    url: request.url,
-    updatedAt: new Date().toISOString(),
-  });
 }
 
+/** Always network for HTML so clients never stick to a pre-deploy shell. */
 async function navigationFallback(request) {
   try {
     const response = await fetch(request, { cache: 'no-store' });
     if (response.ok) {
       const shellCache = await caches.open(SHELL_CACHE);
-      const indexReq = new Request('/index.html');
-      await shellCache.put(indexReq, response.clone());
-      console.log('[SW] CACHE_UPDATED', '/index.html');
+      await shellCache.put(new Request('/index.html'), response.clone());
     }
     return response;
   } catch {
-    console.log('[SW] NAVIGATION_FALLBACK', request.url);
     const cached = await caches.match('/index.html');
     if (cached) return cached;
     return Response.error();
@@ -164,9 +187,7 @@ async function navigationFallback(request) {
 async function hashedBundleStrategy(request) {
   try {
     const response = await fetch(request, { cache: 'no-store' });
-    if (response.ok) {
-      return response;
-    }
+    if (response.ok) return response;
     if (response.status === 404) {
       await purgeAndReloadClients('hashed_asset_404');
     }
@@ -186,6 +207,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Hashed app chunks: network only (before any cache.match)
   if (isHashedBundle(event.request)) {
     event.respondWith(hashedBundleStrategy(event.request));
     return;
@@ -196,11 +218,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Shell / static: network-first with cache fallback (icons, manifest, etc.)
+  // Shell / static icons: network-first, never under /assets/
   event.respondWith(
     (async () => {
       try {
-        const networkResponse = await fetch(event.request);
+        const networkResponse = await fetch(event.request, { cache: 'no-store' });
         if (networkResponse && networkResponse.ok) {
           await cachePut(RUNTIME_CACHE, event.request, networkResponse);
         }
@@ -216,8 +238,16 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('message', (event) => {
   const type = event.data?.type;
-  if (type === 'SX_PURGE_CACHES') {
-    event.waitUntil(purgeAllSchoolixCaches());
+  if (type === 'SX_PURGE_CACHES' || type === 'SX_SKIP_WAITING') {
+    event.waitUntil(
+      (async () => {
+        if (type === 'SX_SKIP_WAITING') {
+          await self.skipWaiting();
+        }
+        await purgeAllCaches();
+        await precacheShell();
+      })(),
+    );
   }
 });
 
@@ -280,7 +310,7 @@ self.addEventListener('notificationclick', (event) => {
             try {
               client.navigate(targetUrl);
             } catch {
-              /* ignore navigate failures */
+              /* ignore */
             }
           }
           return client.focus();

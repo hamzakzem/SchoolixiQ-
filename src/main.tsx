@@ -147,34 +147,21 @@ createRoot(document.getElementById('root')!).render(
   </SystemConfigProvider>
 );
 
-// PWA Service Worker Registration with strict cache-busting & update-forcing for mobile/iPad compatibility
+// PWA Service Worker — register + force update check. Reload-on-replace handled in installChunkLoadRecovery.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    const buildVersion = SW_BUILD_VERSION;
-    navigator.serviceWorker.register(getServiceWorkerUrl())
+    navigator.serviceWorker
+      .register(getServiceWorkerUrl())
       .then((registration) => {
-        console.log('Schoolix PWA ServiceWorker successfully registered with scope: ', registration.scope);
-
+        console.log('Schoolix PWA ServiceWorker registered:', registration.scope, SW_BUILD_VERSION);
         registration.update();
-
-        registration.addEventListener('updatefound', () => {
-          const installingWorker = registration.installing;
-          if (!installingWorker || !navigator.serviceWorker.controller) return;
-          installingWorker.addEventListener('statechange', () => {
-            if (installingWorker.state !== 'activated') return;
-            const reloadKey = `schoolix_sw_reload_${buildVersion}`;
-            if (sessionStorage.getItem(reloadKey)) return;
-            sessionStorage.setItem(reloadKey, '1');
-            console.log('New Schoolix service worker activated — reloading once to apply shell cache.');
-            window.location.reload();
-          });
+        // Check for updates on tab focus (customers stay on latest shell without clearing cache)
+        window.addEventListener('focus', () => {
+          registration.update().catch(() => undefined);
         });
       })
       .catch((error) => {
         console.error('Schoolix PWA ServiceWorker registration failed: ', error);
-        console.warn(
-          '[SW] If running in Android WebView with server.url, service worker support depends on WebView version — open online once to precache the app shell.',
-        );
       });
   });
 }
