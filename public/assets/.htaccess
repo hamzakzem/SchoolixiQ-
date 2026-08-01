@@ -1,4 +1,12 @@
 # Vite content-hashed bundles — safe to cache forever (filename changes each build).
+<IfModule mod_mime.c>
+  AddType application/javascript .js .mjs
+  AddType text/css .css
+</IfModule>
+
 <IfModule mod_headers.c>
   Header set Cache-Control "public, max-age=31536000, immutable"
+  <FilesMatch "\.(js|mjs)$">
+    Header set Content-Type "application/javascript; charset=utf-8"
+  </FilesMatch>
 </IfModule>

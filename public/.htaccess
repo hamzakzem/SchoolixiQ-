@@ -60,6 +60,17 @@ DirectoryIndex index.html index.php
     Header set Pragma "no-cache"
     Header set Expires "0"
   </Files>
+
+  <Files "sw-precache.json">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </Files>
+
+  # Ensure JS modules keep correct MIME even when proxies strip defaults.
+  <FilesMatch "\.(js|mjs)$">
+    Header set Content-Type "application/javascript; charset=utf-8"
+  </FilesMatch>
 </IfModule>
 
 # --- SPA routing: never rewrite real /assets/* files to index.html ---

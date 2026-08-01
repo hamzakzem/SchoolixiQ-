@@ -1,7 +1,7 @@
 // Bump SHELL_CACHE on every production deploy that changes the app shell.
 // Hashed /assets/*.js|css must NEVER be precached or runtime-cached (prevents white-screen chunk mismatch).
-const SHELL_CACHE = 'schoolix-shell-v14';
-const RUNTIME_CACHE = 'schoolix-runtime-v14';
+const SHELL_CACHE = 'schoolix-shell-v15';
+const RUNTIME_CACHE = 'schoolix-runtime-v15';
 const PRECACHE_FALLBACK = [
   '/index.html',
   '/manifest.json',

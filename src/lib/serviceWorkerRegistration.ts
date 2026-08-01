@@ -1,5 +1,5 @@
 /** Single service worker URL — FCM token must bind to the same script as PWA registration. */
-export const SW_BUILD_VERSION = '2026-08-01-v14';
+export const SW_BUILD_VERSION = '2026-08-01-v15';
 
 export function getServiceWorkerUrl(): string {
   if (typeof import.meta !== 'undefined' && import.meta.env?.PROD) {
@@ -8,28 +8,39 @@ export function getServiceWorkerUrl(): string {
   return '/sw.js';
 }
 
-const RECOVER_KEY = 'schoolix_chunk_recover_v14';
+const RECOVER_KEY = 'schoolix_chunk_recover_v15';
 
-function isChunkLoadError(reason: unknown): boolean {
+export function isChunkLoadError(reason: unknown): boolean {
   const msg = String(
     (reason as { message?: string })?.message || reason || '',
   );
-  return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Loading chunk [\d]+ failed|ChunkLoadError/i.test(
+  return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Loading chunk [\d]+ failed|ChunkLoadError|CSS_CHUNK_LOAD_FAILED/i.test(
     msg,
   );
 }
 
 /** Clear SW caches, unregister workers, reload once — recovers from stale Vite chunks. */
-export async function recoverFromStaleChunks(reason = 'unknown'): Promise<void> {
+export async function recoverFromStaleChunks(
+  reason = 'unknown',
+  opts?: { delayMs?: number },
+): Promise<void> {
   if (typeof window === 'undefined') return;
   try {
-    if (sessionStorage.getItem(RECOVER_KEY)) return;
+    if (sessionStorage.getItem(RECOVER_KEY)) {
+      // Already attempted once this tab session — hard navigate home to break loops.
+      window.location.replace('/');
+      return;
+    }
     sessionStorage.setItem(RECOVER_KEY, '1');
   } catch {
     /* private mode */
   }
 
   console.warn('[SW] recovering from stale chunk', reason);
+
+  if (opts?.delayMs && opts.delayMs > 0) {
+    await new Promise((r) => window.setTimeout(r, opts.delayMs));
+  }
 
   try {
     if ('caches' in window) {
@@ -44,12 +55,17 @@ export async function recoverFromStaleChunks(reason = 'unknown'): Promise<void> 
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
       await Promise.all(regs.map((r) => r.unregister()));
+      // Ask any still-controlling worker to purge (best-effort)
+      navigator.serviceWorker.controller?.postMessage({ type: 'SX_PURGE_CACHES' });
     }
   } catch {
     /* ignore */
   }
 
-  window.location.reload();
+  // Cache-bust navigation so index.html is not served from HTTP cache mid-deploy
+  const url = new URL(window.location.href);
+  url.searchParams.set('_sx_recover', String(Date.now()));
+  window.location.replace(url.toString());
 }
 
 /** Wire chunk-failure recovery (dynamic import / SW message). Safe to call once. */

@@ -51,22 +51,27 @@ import {
   onSnapshot,
   deleteDoc,
 } from "firebase/firestore";
-import { useState, useEffect, lazy, Suspense, Component, ReactNode, ErrorInfo } from "react";
+import { useState, useEffect, Suspense, Component, ReactNode, ErrorInfo } from "react";
 import { motion } from "motion/react";
 import { captureException } from "./lib/sentryWrapper";
 import { DistributorAccessScreen } from "./components/DistributorAccessScreen";
 import type { DistributorRecord } from "./types/distributor";
+import { lazyWithChunkRecovery } from "./lib/lazyWithChunkRecovery";
+import {
+  ChunkLoadRecovery,
+  shouldUseChunkRecovery,
+} from "./components/ChunkLoadRecovery";
 
 // Views (Lazy-Loaded for Performance Optimization)
-const Login = lazy(() => import("./views/Login"));
-const AdminDashboard = lazy(() => import("./views/AdminDashboard"));
-const GuardDashboard = lazy(() => import("./views/GuardDashboard"));
-const ParentDashboard = lazy(() => import("./views/ParentDashboard"));
-const SuperAdminDashboard = lazy(() => import("./views/SuperAdminDashboard"));
-const TeacherDashboard = lazy(() => import("./views/TeacherDashboard"));
-const DistributorDashboard = lazy(() => import("./views/DistributorDashboard"));
-const PublicStudentVerify = lazy(() => import("./views/PublicStudentVerify"));
-const LandingPage = lazy(() => import("./views/LandingPage"));
+const Login = lazyWithChunkRecovery(() => import("./views/Login"));
+const AdminDashboard = lazyWithChunkRecovery(() => import("./views/AdminDashboard"));
+const GuardDashboard = lazyWithChunkRecovery(() => import("./views/GuardDashboard"));
+const ParentDashboard = lazyWithChunkRecovery(() => import("./views/ParentDashboard"));
+const SuperAdminDashboard = lazyWithChunkRecovery(() => import("./views/SuperAdminDashboard"));
+const TeacherDashboard = lazyWithChunkRecovery(() => import("./views/TeacherDashboard"));
+const DistributorDashboard = lazyWithChunkRecovery(() => import("./views/DistributorDashboard"));
+const PublicStudentVerify = lazyWithChunkRecovery(() => import("./views/PublicStudentVerify"));
+const LandingPage = lazyWithChunkRecovery(() => import("./views/LandingPage"));
 
 import {
   logFirestoreBackendDebug,
@@ -1630,6 +1635,10 @@ class SafeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
 
 function FallbackComponent({ error }: { error?: Error | null }) {
   const [showDetails, setShowDetails] = useState(false);
+
+  if (shouldUseChunkRecovery(error)) {
+    return <ChunkLoadRecovery error={error} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-transparent p-6 text-center">
