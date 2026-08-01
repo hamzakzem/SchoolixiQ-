@@ -1,8 +1,7 @@
 name: Deploy Frontend to Hostinger
 
-# Production deploy currently handled by Hostinger Deployments auto-deploy from main.
-# SFTP disabled until remote path is verified.
-# This workflow is a build/verify gate only (VAPID + dist integrity).
+# Build + production reliability gates. Hostinger Deployments auto-deploy from main.
+# Broken releases are blocked here before users can receive them.
 on:
   push:
     branches:
@@ -16,7 +15,7 @@ concurrency:
 jobs:
   build-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -40,13 +39,25 @@ jobs:
           fi
           echo "VITE_FIREBASE_VAPID_KEY is set (length=${#VITE_FIREBASE_VAPID_KEY})."
 
-      - name: Build frontend (static only)
+      - name: Build production release (web + server)
         env:
           VITE_APP_URL: https://schoolixiq.com
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_ANDROID_APK_URL: ${{ secrets.VITE_ANDROID_APK_URL }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-        run: npm run build:web
+          ANDROID_APK_DOWNLOAD_URL: ${{ secrets.ANDROID_APK_DOWNLOAD_URL }}
+        run: npm run build:full
+
+      - name: Require Android APK in dist before release
+        env:
+          ANDROID_APK_DOWNLOAD_URL: ${{ secrets.ANDROID_APK_DOWNLOAD_URL }}
+        run: npm run stage:apk:require
+
+      - name: Verify production release artifacts
+        run: npm run verify:production
+
+      - name: Verify production server start + SPA routes
+        run: npm run verify:server-start
 
       - name: Verify VAPID key embedded in web bundle
         env:
@@ -72,14 +83,6 @@ jobs:
             exit 1
           fi
 
-      - name: Require Android APK in dist before deploy
-        env:
-          ANDROID_APK_DOWNLOAD_URL: ${{ secrets.ANDROID_APK_DOWNLOAD_URL }}
-        run: npm run stage:apk:require
-
-      - name: Verify web build integrity
-        run: npm run verify:web-build
-
       - name: Verify no legacy Google auth in web bundle
         run: |
           set -e
@@ -92,17 +95,21 @@ jobs:
           done
           echo "No deprecated Google Identity / Capacitor web fallback patterns in dist/assets/"
 
-      - name: Verify dist output
+      - name: Verify Node Web App dist output
         run: |
+          set -e
           test -f dist/index.html
           test -f dist/.htaccess
-          rm -f dist/server.mjs dist/server.cjs dist/server.cjs.map 2>/dev/null || true
+          test -f dist/server.mjs
+          test -f dist/firebase-applet-config.json
+          test -d dist/assets
           ls -la dist/
+          ls -lh dist/server.mjs
           if test -f dist/downloads/schoolixiq.apk; then
             echo "APK present in dist/downloads/schoolixiq.apk"
             ls -lh dist/downloads/schoolixiq.apk
           else
-            echo "::error::dist/downloads/schoolixiq.apk missing — set GitHub secret ANDROID_APK_DOWNLOAD_URL (direct HTTPS APK URL) or place public/downloads/schoolixiq.apk before build"
+            echo "::error::dist/downloads/schoolixiq.apk missing — set GitHub secret ANDROID_APK_DOWNLOAD_URL or place public/downloads/schoolixiq.apk before build"
             exit 1
           fi
 
@@ -118,15 +125,38 @@ jobs:
           path: schoolixiq-dist.zip
           retention-days: 7
 
-      # Production deploy currently handled by Hostinger Deployments auto-deploy from main.
-      # SFTP disabled until HOSTINGER_FTP_REMOTE_DIR is verified in hPanel.
-      # - name: Install lftp
-      # - name: Test Hostinger SFTP port
-      # - name: Deploy to Hostinger (SFTP)
-
       - name: Build summary
         run: |
-          echo "### Frontend build/verify gate" >> "$GITHUB_STEP_SUMMARY"
-          echo "Build and verification passed. Production deploy is handled by **Hostinger Deployments** (auto-deploy from \`main\`)." >> "$GITHUB_STEP_SUMMARY"
-          echo "SFTP upload is disabled until \`HOSTINGER_FTP_REMOTE_DIR\` is confirmed." >> "$GITHUB_STEP_SUMMARY"
-          echo "Artifact \`schoolixiq-dist\` retained for 7 days if manual upload is needed." >> "$GITHUB_STEP_SUMMARY"
+          echo "### Production build/verify gate" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`npm run build:full\` (web + Node server)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`npm run verify:production\` (dist + server.mjs + chunks)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`npm run verify:server-start\` (boot + SPA routes)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Artifact \`schoolixiq-dist\` retained for 7 days." >> "$GITHUB_STEP_SUMMARY"
+
+  production-health:
+    name: Live production health
+    needs: build-verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for Hostinger auto-deploy window
+        run: |
+          # Hostinger Deployments usually finish shortly after push; allow cutover.
+          WAIT="${PRODUCTION_HEALTH_WAIT_SEC:-90}"
+          if [ -z "$WAIT" ]; then WAIT=90; fi
+          echo "Waiting ${WAIT}s for Hostinger cutover..."
+          sleep "$WAIT"
+        env:
+          PRODUCTION_HEALTH_WAIT_SEC: ${{ vars.PRODUCTION_HEALTH_WAIT_SEC }}
+
+      - name: Probe homepage + login (HTTP 200)
+        env:
+          PRODUCTION_HEALTH_URL: ${{ secrets.PRODUCTION_HEALTH_URL }}
+          PRODUCTION_HEALTH_ROUTES: /,/login
+          PRODUCTION_HEALTH_RETRIES: "5"
+          PRODUCTION_HEALTH_RETRY_MS: "10000"
+        run: node scripts/verify-deploy-health.mjs

@@ -138,16 +138,24 @@ write_lftp_mirror_script() {
 
     case "$phase" in
       assets-upload)
+        # 1) Hashed Vite chunks first — never publish new index.html before these exist.
         printf '%s\n' '!echo "[deploy] phase: upload assets (no delete)"'
         printf 'mirror -R --parallel=4 --verbose "%s/assets/" ./assets/\n' "$LOCAL_DIR"
         ;;
+      server-upload)
+        # 2) Node Web App entry + config (before shell so restart never races missing server.mjs).
+        printf '%s\n' '!echo "[deploy] phase: upload server entry + config"'
+        printf 'put -O . "%s/server.mjs"\n' "$LOCAL_DIR"
+        printf 'put -O . "%s/firebase-applet-config.json"\n' "$LOCAL_DIR"
+        ;;
       body-sync)
-        printf '%s\n' '!echo "[deploy] phase: sync body (exclude shell + assets)"'
-        printf 'mirror -R --delete --parallel=3 --verbose -X assets/ -X index.html -X sw.js "%s/" .\n' "$LOCAL_DIR"
+        # 3) Remaining static files (exclude shell + assets + server entry already uploaded).
+        printf '%s\n' '!echo "[deploy] phase: sync body (exclude shell + assets + server)"'
+        printf 'mirror -R --delete --parallel=3 --verbose -X assets/ -X index.html -X sw.js -X server.mjs -X firebase-applet-config.json "%s/" .\n' "$LOCAL_DIR"
         ;;
       shell-upload)
-        # Shell last = zero-downtime: assets already on CDN/disk before HTML points at new hashes.
-        printf '%s\n' '!echo "[deploy] phase: upload shell last (htaccess, precache, sw, index.html)"'
+        # 4) Config + SW, then index.html LAST = atomic SPA cutover.
+        printf '%s\n' '!echo "[deploy] phase: upload config + shell last (index.html final)"'
         printf 'put -O . "%s/.htaccess"\n' "$LOCAL_DIR"
         printf 'put -O ./assets "%s/assets/.htaccess"\n' "$LOCAL_DIR"
         printf 'put -O . "%s/sw-precache.json"\n' "$LOCAL_DIR"
@@ -198,12 +206,28 @@ if ! resolve_remote_dir; then
   exit 1
 fi
 
+# Fail fast if local dist is not a Node Web App release (prevents partial uploads).
+if [[ ! -f "${LOCAL_DIR}/index.html" ]]; then
+  echo "::error title=Invalid dist::${LOCAL_DIR}/index.html missing — refuse deploy"
+  exit 1
+fi
+if [[ ! -d "${LOCAL_DIR}/assets" ]]; then
+  echo "::error title=Invalid dist::${LOCAL_DIR}/assets missing — refuse deploy"
+  exit 1
+fi
+if [[ ! -f "${LOCAL_DIR}/server.mjs" ]]; then
+  echo "::error title=Invalid dist::${LOCAL_DIR}/server.mjs missing — Node Web App cannot start"
+  exit 1
+fi
+
 echo "[deploy] phase 2: atomic mirror upload (${MIRROR_TIMEOUT_SEC} timeout per step) -> '${REMOTE}'"
+echo "[deploy] order: assets -> server -> body/config -> index.html last"
 for step in \
-  "assets-upload:upload new hashed assets (keep old until shell updated)" \
-  "body-sync:sync static files (exclude assets shell)" \
-  "shell-upload:upload shell last (sw + index.html)" \
-  "assets-prune:remove stale hashed assets"; do
+  "assets-upload:1/4 upload new hashed assets (keep old until shell updated)" \
+  "server-upload:2/4 upload server.mjs + firebase config" \
+  "body-sync:3/4 sync remaining static files (exclude shell/assets/server)" \
+  "shell-upload:4/4 upload config + SW; index.html LAST" \
+  "assets-prune:prune stale hashed assets after cutover"; do
   phase="${step%%:*}"
   label="${step#*:}"
   if ! run_mirror_phase "$phase" "$label"; then
@@ -213,5 +237,5 @@ for step in \
   fi
 done
 
-echo "SFTP deploy OK: ${REMOTE}"
+echo "SFTP deploy OK (atomic): ${REMOTE}"
 exit 0

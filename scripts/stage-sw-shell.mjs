@@ -16,7 +16,7 @@ const assets = [
 ];
 
 const payload = {
-  version: 16,
+  version: 17,
   updatedAt: new Date().toISOString(),
   assets,
 };

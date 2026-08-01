@@ -1,10 +1,12 @@
 /**
- * SchoolixIQ production Service Worker (v16)
+ * SchoolixIQ production Service Worker (v17)
  * - Never cache hashed Vite /assets/*.js|css (prevents white-screen after deploy)
- * - Purge ALL stale caches on activate so old customers migrate automatically
+ * - Purge ALL stale caches on install + activate so old customers migrate automatically
+ * - skipWaiting + clients.claim for immediate activation
  * - Network-only for application chunks; shell-only precache
+ * - Chunk 404 / network errors trigger client recovery reload
  */
-const SW_VERSION = 'v16';
+const SW_VERSION = 'v17';
 const SHELL_CACHE = `schoolix-shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `schoolix-runtime-${SW_VERSION}`;
 const PRECACHE_FALLBACK = [
@@ -107,18 +109,10 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      // Delete ALL caches that are not this version (covers schoolix-* and legacy names).
-      const keys = await caches.keys();
-      const stale = keys.filter((key) => key !== SHELL_CACHE && key !== RUNTIME_CACHE);
-      if (stale.length > 0) {
-        await Promise.all(stale.map((key) => caches.delete(key)));
-        console.log('[SW] OLD_CACHE_CLEANED', stale);
-      }
-      // Ensure shell exists after purge of unrelated keys
-      const remaining = await caches.keys();
-      if (!remaining.includes(SHELL_CACHE)) {
-        await precacheShell();
-      }
+      // Drop every cache name (including older schoolix-* shells), then rebuild this version only.
+      await purgeAllCaches();
+      await precacheShell();
+      console.log('[SW] OLD_CACHE_CLEANED_AND_SHELL_REBUILT', { version: SW_VERSION });
       await self.clients.claim();
       await notifyClients({
         type: 'SW_ACTIVATED',

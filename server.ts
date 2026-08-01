@@ -160,6 +160,11 @@ function resolveCronSecret(...candidates: Array<string | undefined>): string | n
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
+  console.log('SERVER_BOOT_START', {
+    port: PORT,
+    host: '0.0.0.0',
+    nodeEnv: process.env.NODE_ENV || 'undefined',
+  });
 
   if (isProductionEnv()) {
     if (!resolveCronSecret(process.env.TUITION_CRON_SECRET, process.env.CRON_SECRET)) {
@@ -2394,8 +2399,10 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', async () => {
+    console.log('PORT_LISTENING', { host: '0.0.0.0', port: PORT });
+    console.log('SERVER_READY', { host: '0.0.0.0', port: PORT });
     console.log(`Server running on http://localhost:${PORT}`);
-    
+
     // Server-driven FCM push (skips initial snapshot; 10-minute age cutoff)
     try {
       const db = getDb();

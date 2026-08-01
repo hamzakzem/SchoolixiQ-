@@ -1,8 +1,8 @@
 /** Single service worker URL — FCM token must bind to the same script as PWA registration. */
-export const SW_BUILD_VERSION = '2026-08-01-v16';
+export const SW_BUILD_VERSION = '2026-08-01-v17';
 
-const RECOVER_COUNT_KEY = 'schoolix_chunk_recover_count_v16';
-const RECOVER_DONE_KEY = 'schoolix_chunk_recover_done_v16';
+const RECOVER_COUNT_KEY = 'schoolix_chunk_recover_count_v17';
+const RECOVER_DONE_KEY = 'schoolix_chunk_recover_done_v17';
 const MAX_AUTO_RECOVERIES = 1;
 
 export function getServiceWorkerUrl(): string {
