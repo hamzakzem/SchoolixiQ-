@@ -1,24 +1,22 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const distDir = path.resolve('dist');
-const indexPath = path.join(distDir, 'index.html');
 
-const indexHtml = await readFile(indexPath, 'utf8');
-const assetRefs = [
-  ...indexHtml.matchAll(/(?:src|href)="(\/(?:assets\/[^"]+|[^"]+\.(?:css|js|ico|png|svg|webp)))"/g),
-].map((m) => m[1]);
-
-const staticShell = [
+/**
+ * Precache shell/static only — never hashed Vite chunks under /assets/*.
+ * Hashed JS/CSS must always be network-fetched to avoid post-deploy white screens.
+ */
+const assets = [
   '/index.html',
   '/manifest.json',
   '/brand/schoolixiq-logo.png',
   '/favicon.ico',
+  '/icon.svg',
 ];
 
-const assets = [...new Set([...staticShell, ...assetRefs])];
 const payload = {
-  version: 12,
+  version: 14,
   updatedAt: new Date().toISOString(),
   assets,
 };

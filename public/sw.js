@@ -1,14 +1,57 @@
-// Bump SHELL_CACHE / RUNTIME_CACHE on production deploys that change hashed /assets/* bundles.
-const SHELL_CACHE = 'schoolix-shell-v13';
-const RUNTIME_CACHE = 'schoolix-runtime-v13';
+// Bump SHELL_CACHE on every production deploy that changes the app shell.
+// Hashed /assets/*.js|css must NEVER be precached or runtime-cached (prevents white-screen chunk mismatch).
+const SHELL_CACHE = 'schoolix-shell-v14';
+const RUNTIME_CACHE = 'schoolix-runtime-v14';
 const PRECACHE_FALLBACK = [
   '/index.html',
   '/manifest.json',
   '/brand/schoolixiq-logo.png',
   '/favicon.ico',
+  '/icon.svg',
 ];
 
 let shellReloadSent = false;
+
+function isHashedAssetUrl(url) {
+  try {
+    const path = new URL(url, self.location.origin).pathname;
+    return path.startsWith('/assets/') && /\.(js|mjs|css)(\?|$)/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
+function filterShellPrecache(urls) {
+  return [...new Set(urls)].filter((url) => {
+    if (!url || typeof url !== 'string') return false;
+    if (isHashedAssetUrl(url)) return false;
+    // Never precache the SW script or API routes
+    if (url.includes('/api/')) return false;
+    if (url.endsWith('/sw.js') || url.includes('/sw.js?')) return false;
+    return true;
+  });
+}
+
+async function notifyClients(payload) {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of clients) {
+    client.postMessage(payload);
+  }
+}
+
+async function purgeAllSchoolixCaches() {
+  const keys = await caches.keys();
+  await Promise.all(keys.map((key) => caches.delete(key)));
+  console.log('[SW] OLD_CACHE_CLEANED', keys);
+  return keys;
+}
+
+async function purgeAndReloadClients(reason) {
+  if (shellReloadSent) return;
+  shellReloadSent = true;
+  await purgeAllSchoolixCaches();
+  await notifyClients({ type: 'SW_STALE_CHUNK_RELOAD', reason: reason || 'stale_chunk' });
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -25,7 +68,7 @@ self.addEventListener('install', (event) => {
         // Offline install — use fallback list only.
       }
 
-      const urls = [...new Set([...PRECACHE_FALLBACK, ...extras])];
+      const urls = filterShellPrecache([...PRECACHE_FALLBACK, ...extras]);
       const results = await Promise.allSettled(
         urls.map(async (url) => {
           try {
@@ -51,12 +94,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys();
-      const stale = keys.filter(
-        (key) =>
-          (key.startsWith('schoolix-') || key.startsWith('schoolixiq-')) &&
-          key !== SHELL_CACHE &&
-          key !== RUNTIME_CACHE,
-      );
+      const stale = keys.filter((key) => key !== SHELL_CACHE && key !== RUNTIME_CACHE);
       if (stale.length > 0) {
         await Promise.all(stale.map((key) => caches.delete(key)));
         console.log('[SW] OLD_CACHE_CLEANED', stale);
@@ -87,23 +125,13 @@ function isServiceWorkerScript(request) {
 }
 
 function isHashedBundle(request) {
-  try {
-    const path = new URL(request.url).pathname;
-    return path.startsWith('/assets/') && /\.(js|mjs|css)(\?|$)/i.test(path);
-  } catch {
-    return false;
-  }
-}
-
-async function notifyClients(payload) {
-  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const client of clients) {
-    client.postMessage(payload);
-  }
+  return isHashedAssetUrl(request.url);
 }
 
 async function cachePut(cacheName, request, response) {
   if (!response || response.status !== 200 || response.type !== 'basic') return;
+  // Hard guard: never persist hashed Vite chunks
+  if (isHashedBundle(request)) return;
   const cache = await caches.open(cacheName);
   await cache.put(request, response.clone());
   console.log('[SW] CACHE_UPDATED', request.url);
@@ -116,7 +144,7 @@ async function cachePut(cacheName, request, response) {
 
 async function navigationFallback(request) {
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { cache: 'no-store' });
     if (response.ok) {
       const shellCache = await caches.open(SHELL_CACHE);
       const indexReq = new Request('/index.html');
@@ -126,35 +154,25 @@ async function navigationFallback(request) {
     return response;
   } catch {
     console.log('[SW] NAVIGATION_FALLBACK', request.url);
-    const cached =
-      (await caches.match('/index.html')) ||
-      (await caches.match(new Request('/index.html', { cacheName: SHELL_CACHE })));
+    const cached = await caches.match('/index.html');
     if (cached) return cached;
     return Response.error();
   }
 }
 
+/** Network-only for hashed /assets/*.js|css — never serve or store stale chunks. */
 async function hashedBundleStrategy(request) {
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { cache: 'no-store' });
     if (response.ok) {
-      await cachePut(RUNTIME_CACHE, request, response);
       return response;
     }
     if (response.status === 404) {
-      const cached = await caches.match(request);
-      if (!cached && !shellReloadSent) {
-        shellReloadSent = true;
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-        console.log('[SW] OLD_CACHE_CLEANED', keys);
-        await notifyClients({ type: 'SW_STALE_CHUNK_RELOAD' });
-      }
+      await purgeAndReloadClients('hashed_asset_404');
     }
     return response;
   } catch {
-    const cached = await caches.match(request);
-    if (cached) return cached;
+    await purgeAndReloadClients('hashed_asset_network_error');
     return Response.error();
   }
 }
@@ -164,12 +182,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || event.request.url.includes('/api/')) return;
 
   if (isServiceWorkerScript(event.request)) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
-  if (isHtmlNavigation(event.request)) {
-    event.respondWith(navigationFallback(event.request));
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }
 
@@ -178,21 +191,34 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request)
-        .then(async (networkResponse) => {
-          await cachePut(RUNTIME_CACHE, event.request, networkResponse);
-          return networkResponse;
-        })
-        .catch(async () => {
-          if (cachedResponse) return cachedResponse;
-          return (await caches.match('/')) || (await caches.match('/index.html')) || Response.error();
-        });
+  if (isHtmlNavigation(event.request)) {
+    event.respondWith(navigationFallback(event.request));
+    return;
+  }
 
-      return cachedResponse || fetchPromise;
-    }),
+  // Shell / static: network-first with cache fallback (icons, manifest, etc.)
+  event.respondWith(
+    (async () => {
+      try {
+        const networkResponse = await fetch(event.request);
+        if (networkResponse && networkResponse.ok) {
+          await cachePut(RUNTIME_CACHE, event.request, networkResponse);
+        }
+        return networkResponse;
+      } catch {
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) return cachedResponse;
+        return (await caches.match('/index.html')) || Response.error();
+      }
+    })(),
   );
+});
+
+self.addEventListener('message', (event) => {
+  const type = event.data?.type;
+  if (type === 'SX_PURGE_CACHES') {
+    event.waitUntil(purgeAllSchoolixCaches());
+  }
 });
 
 self.addEventListener('push', (event) => {

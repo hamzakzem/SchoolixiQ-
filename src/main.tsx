@@ -124,13 +124,18 @@ if (typeof window !== 'undefined') {
 }
 
 import { SystemConfigProvider } from './lib/SystemConfigContext.tsx';
-import { getServiceWorkerUrl, SW_BUILD_VERSION } from './lib/serviceWorkerRegistration';
+import {
+  getServiceWorkerUrl,
+  SW_BUILD_VERSION,
+  installChunkLoadRecovery,
+} from './lib/serviceWorkerRegistration';
 import { initPwaInstallCapture, applyPwaStandaloneBodyClass } from './lib/pwaUtils';
 
 import { getDrawerPortalNode } from './lib/drawerPortal';
 
 initPwaInstallCapture();
 applyPwaStandaloneBodyClass();
+installChunkLoadRecovery();
 
 if (typeof document !== 'undefined') {
   getDrawerPortalNode();
@@ -145,13 +150,11 @@ createRoot(document.getElementById('root')!).render(
 // PWA Service Worker Registration with strict cache-busting & update-forcing for mobile/iPad compatibility
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    // Append a unique build version query to force update detection on all mobile/tablet browsers
     const buildVersion = SW_BUILD_VERSION;
     navigator.serviceWorker.register(getServiceWorkerUrl())
       .then((registration) => {
         console.log('Schoolix PWA ServiceWorker successfully registered with scope: ', registration.scope);
-        
-        // Force checking for updates immediately on load
+
         registration.update();
 
         registration.addEventListener('updatefound', () => {
@@ -167,7 +170,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
           });
         });
       })
-        .catch((error) => {
+      .catch((error) => {
         console.error('Schoolix PWA ServiceWorker registration failed: ', error);
         console.warn(
           '[SW] If running in Android WebView with server.url, service worker support depends on WebView version — open online once to precache the app shell.',
