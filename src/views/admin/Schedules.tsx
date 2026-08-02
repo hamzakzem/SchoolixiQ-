@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, addDoc, getDocs } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
+import { useLanguage } from '../../lib/LanguageContext';
 import { Calendar, Save, Printer, Share2, Plus, Trash2, Clock, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { printElement } from '../../lib/printUtils';
 
+/** Firestore schedule keys remain Arabic day names — display labels are presentation-only. */
 const DAYS_OF_WEEK = [
   'الأحد',
   'الإثنين',
@@ -16,10 +18,24 @@ const DAYS_OF_WEEK = [
   'الخميس',
   'الجمعة',
   'السبت'
-];
+] as const;
+
+const DAY_LABEL_EN: Record<string, string> = {
+  الأحد: 'Sunday',
+  الإثنين: 'Monday',
+  الثلاثاء: 'Tuesday',
+  الأربعاء: 'Wednesday',
+  الخميس: 'Thursday',
+  الجمعة: 'Friday',
+  السبت: 'Saturday',
+};
+
+const WORK_DAYS = DAYS_OF_WEEK.slice(0, 5);
 
 export default function Schedules() {
   const { profile } = useAuth();
+  const { isRtl } = useLanguage();
+  const dayLabel = (day: string) => (isRtl ? day : DAY_LABEL_EN[day] || day);
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [schedule, setSchedule] = useState<any>({});
@@ -234,172 +250,197 @@ export default function Schedules() {
         </div>
       </div>
 
-      {/* Schedule UI */}
+      {/* Schedule UI — presentation only */}
       {selectedClassId ? (
-        <div ref={printRef} className="bg-transparent md:bg-white dark:md:bg-slate-900 rounded-2xl border-none md:border md:border-slate-100 dark:md:border-slate-800 shadow-none md:shadow-sm overflow-hidden print:shadow-none print:border-none print:bg-transparent" dir="rtl">
-          
-          <div className="hidden print:block text-center py-6 border-b border-slate-200 dark:border-slate-800 mb-6 font-black text-2xl text-slate-900 dark:text-white">
-            الجدول الأسبوعي - {classes.find(c => c.id === selectedClassId)?.name}
+        <div
+          ref={printRef}
+          className="sx-schedule print:shadow-none print:border-none print:bg-transparent"
+          dir={isRtl ? 'rtl' : 'ltr'}
+        >
+          <div className="hidden print:block text-center py-6 mb-6 font-black text-2xl text-slate-900">
+            {isRtl ? 'الجدول الأسبوعي' : 'Weekly Schedule'} - {classes.find(c => c.id === selectedClassId)?.name}
           </div>
 
-          {/* Desktop View Table */}
-          <div className="sx-table-shell hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden print:hidden">
-          <div className="sx-table-scroll sx-table-scroll--flat overflow-x-auto print:hidden">
-            <table className="sx-table w-full text-right border-collapse">
+          {/* Desktop weekly grid */}
+          <div className="sx-schedule__desktop sx-schedule__panel print:hidden">
+            <table className="sx-schedule__table">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/50">
-                  <th className="p-5 border-b border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-black text-lg w-32 tracking-wide">اليوم</th>
-                  <th className="p-5 border-b border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-black text-lg tracking-wide">الحصص الدراسية (اضغط للإضافة والتعديل)</th>
+                <tr>
+                  <th scope="col">{isRtl ? 'اليوم' : 'Day'}</th>
+                  <th scope="col">{isRtl ? 'الحصص الدراسية' : 'Class periods'}</th>
                 </tr>
               </thead>
               <tbody>
-                {DAYS_OF_WEEK.slice(0, 5).map((day) => ( // Sunday to Thursday
-                  <tr key={day} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors print:hover:bg-transparent group">
-                    <td className="p-5 align-top bg-slate-50/30 dark:bg-slate-800/20">
-                      <div className="font-black text-blue-600 dark:text-blue-400 text-xl flex items-center h-full pt-4">{day}</div>
-                    </td>
-                    <td className="p-5">
-                      <div className="flex flex-wrap gap-4">
-                        {(schedule[day] || []).map((period: any, idx: number) => (
-                          <motion.div 
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            key={idx} 
-                            className="relative bg-white dark:bg-slate-800/80 rounded-2xl p-5 min-w-[220px] max-w-[220px] shadow-sm border border-slate-200 dark:border-slate-700 group/item hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all"
-                          >
-                            <div className="absolute top-0 right-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-black rounded-bl-2xl rounded-tr-2xl flex items-center justify-center text-sm">
-                              {idx + 1}
-                            </div>
-                            <button 
-                              onClick={() => handleRemovePeriod(day, idx)}
-                              className="absolute -top-3 -left-3 bg-red-100 text-red-600 rounded-full p-1.5 opacity-0 group-hover/item:opacity-100 transition-all hover:scale-110 print:hidden hover:bg-red-200 shadow-sm z-10"
-                            >
-                              <X size={14} />
-                            </button>
-                            <div className="space-y-4 mt-2">
-                              <input 
-                                type="text"
-                                value={period.subject}
-                                onChange={(e) => handleUpdatePeriod(day, idx, 'subject', e.target.value)}
-                                placeholder="المادة الدراسية"
-                                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none font-black text-slate-900 dark:text-white placeholder-slate-400 print:border-none print:text-center text-lg transition-all"
-                              />
-                              <input 
-                                type="text"
-                                value={period.teacher}
-                                onChange={(e) => handleUpdatePeriod(day, idx, 'teacher', e.target.value)}
-                                placeholder="اسم المعلم"
-                                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none font-bold text-sm text-slate-600 dark:text-slate-400 placeholder-slate-400 print:border-none print:text-center transition-all"
-                              />
-                              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
-                                <Clock size={14} className="text-slate-400 print:hidden"/>
-                                <input 
-                                  type="text"
-                                  value={period.time}
-                                  onChange={(e) => handleUpdatePeriod(day, idx, 'time', e.target.value)}
-                                  placeholder="وقت الحصة"
-                                  className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-slate-600 dark:text-slate-400 print:text-center placeholder-slate-400"
-                                />
+                {WORK_DAYS.map((day) => {
+                  const periods = schedule[day] || [];
+                  return (
+                    <tr key={day}>
+                      <td className="sx-schedule__day-cell">{dayLabel(day)}</td>
+                      <td>
+                        <div className="sx-schedule__desktop-periods">
+                          {periods.map((period: any, idx: number) => (
+                            <div key={idx} className="sx-schedule__period group/item">
+                              <div className="flex items-start justify-between gap-2 mb-3">
+                                <span className="sx-schedule__period-num">{idx + 1}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePeriod(day, idx)}
+                                  className="sx-schedule__remove-btn print:hidden"
+                                  aria-label={isRtl ? 'حذف الحصة' : 'Remove period'}
+                                >
+                                  <X size={16} />
+                                </button>
                               </div>
-                            </div>
-                          </motion.div>
-                        ))}
-                        
-                        <button 
-                          onClick={() => handleAddPeriod(day)}
-                          className="flex flex-col items-center justify-center gap-3 min-w-[220px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-400 hover:text-blue-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all p-6 print:hidden opacity-70 hover:opacity-100 group/add"
-                        >
-                          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover/add:bg-blue-100 dark:group-hover/add:bg-blue-900/50 group-hover/add:text-blue-600 transition-colors">
-                            <Plus size={24} />
-                          </div>
-                          <span className="font-bold">إضافة حصة جديدة</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          </div>
-
-          {/* Mobile View List */}
-          <div className="md:hidden space-y-6 pb-20 print:hidden">
-            {DAYS_OF_WEEK.slice(0, 5).map((day) => (
-              <div key={day} className="space-y-3">
-                <div className="flex items-center justify-between px-2">
-                   <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-                      {day}
-                   </h3>
-                   <button 
-                     onClick={() => handleAddPeriod(day)}
-                     className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg"
-                   >
-                     <Plus size={20} />
-                   </button>
-                </div>
-                
-                <div className="space-y-4">
-                   {(schedule[day] || []).map((period: any, idx: number) => (
-                      <div key={idx} className="bg-white dark:bg-slate-900 rounded-[1.5rem] p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative space-y-4">
-                         <div className="flex items-center justify-between">
-                            <span className="w-6 h-6 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-black rounded-lg flex items-center justify-center">
-                               {idx + 1}
-                            </span>
-                            <button 
-                               onClick={() => handleRemovePeriod(day, idx)}
-                               className="p-1 text-slate-300 hover:text-red-500"
-                            >
-                               <Trash2 size={16} />
-                            </button>
-                         </div>
-                         
-                         <div className="grid grid-cols-1 gap-3">
-                            <div className="space-y-1">
-                               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">المادة</label>
-                               <input 
-                                 type="text"
-                                 value={period.subject}
-                                 onChange={(e) => handleUpdatePeriod(day, idx, 'subject', e.target.value)}
-                                 className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-blue-500"
-                                 placeholder="اسم المادة"
-                               />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                               <div className="space-y-1">
-                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">المعلم</label>
-                                  <input 
+                              <div className="space-y-3">
+                                <div className="sx-schedule__field">
+                                  <label className="sx-schedule__label">{isRtl ? 'المادة' : 'Subject'}</label>
+                                  <input
+                                    type="text"
+                                    value={period.subject}
+                                    onChange={(e) => handleUpdatePeriod(day, idx, 'subject', e.target.value)}
+                                    placeholder={isRtl ? 'المادة الدراسية' : 'Subject'}
+                                    className="sx-schedule__input"
+                                  />
+                                </div>
+                                <div className="sx-schedule__field">
+                                  <label className="sx-schedule__label">{isRtl ? 'المعلم' : 'Teacher'}</label>
+                                  <input
                                     type="text"
                                     value={period.teacher}
                                     onChange={(e) => handleUpdatePeriod(day, idx, 'teacher', e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 outline-none focus:border-blue-500"
-                                    placeholder="المعلم"
+                                    placeholder={isRtl ? 'اسم المعلم' : 'Teacher name'}
+                                    className="sx-schedule__input sx-schedule__input--sm"
                                   />
-                               </div>
-                               <div className="space-y-1">
-                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">الوقت</label>
-                                  <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5">
-                                     <Clock size={12} className="text-slate-400" />
-                                     <input 
-                                       type="text"
-                                       value={period.time}
-                                       onChange={(e) => handleUpdatePeriod(day, idx, 'time', e.target.value)}
-                                       className="flex-1 bg-transparent border-none outline-none text-[10px] font-bold text-slate-600 dark:text-slate-400"
-                                       placeholder="الوقت"
-                                     />
+                                </div>
+                                <div className="sx-schedule__field">
+                                  <label className="sx-schedule__label">{isRtl ? 'الوقت' : 'Time'}</label>
+                                  <div className="relative">
+                                    <Clock size={14} className="absolute top-1/2 -translate-y-1/2 start-3 text-slate-400 pointer-events-none print:hidden" />
+                                    <input
+                                      type="text"
+                                      value={period.time}
+                                      onChange={(e) => handleUpdatePeriod(day, idx, 'time', e.target.value)}
+                                      placeholder={isRtl ? 'وقت الحصة' : 'Period time'}
+                                      className="sx-schedule__input sx-schedule__input--time ps-9"
+                                    />
                                   </div>
-                               </div>
+                                </div>
+                              </div>
                             </div>
-                         </div>
+                          ))}
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddPeriod(day)}
+                            className="sx-schedule__add-tile print:hidden"
+                          >
+                            <Plus size={22} />
+                            <span>{isRtl ? 'إضافة حصة' : 'Add period'}</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile + tablet day cards */}
+          <div className="sx-schedule__mobile sx-schedule__stack pb-16 print:hidden">
+            {WORK_DAYS.map((day) => {
+              const periods = schedule[day] || [];
+              return (
+                <section key={day} className="sx-schedule__day-card">
+                  <div className="sx-schedule__day-head">
+                    <div>
+                      <h3 className="sx-schedule__day-name">{dayLabel(day)}</h3>
+                      <p className="sx-schedule__day-count">
+                        {periods.length === 0
+                          ? (isRtl ? 'لا حصص بعد' : 'No periods yet')
+                          : (isRtl ? `${periods.length} حصص` : `${periods.length} periods`)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAddPeriod(day)}
+                      className="sx-schedule__add-btn"
+                      aria-label={isRtl ? 'إضافة حصة' : 'Add period'}
+                    >
+                      <Plus size={18} />
+                      <span className="hidden sm:inline">{isRtl ? 'إضافة' : 'Add'}</span>
+                    </button>
+                  </div>
+
+                  <div className="sx-schedule__periods sx-schedule__periods--edit">
+                    {periods.map((period: any, idx: number) => (
+                      <div key={idx} className="sx-schedule__period">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <span className="sx-schedule__period-num">{idx + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePeriod(day, idx)}
+                            className="sx-schedule__remove-btn"
+                            aria-label={isRtl ? 'حذف الحصة' : 'Remove period'}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          <div className="sx-schedule__field">
+                            <label className="sx-schedule__label">{isRtl ? 'المادة' : 'Subject'}</label>
+                            <input
+                              type="text"
+                              value={period.subject}
+                              onChange={(e) => handleUpdatePeriod(day, idx, 'subject', e.target.value)}
+                              className="sx-schedule__input"
+                              placeholder={isRtl ? 'اسم المادة' : 'Subject'}
+                            />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="sx-schedule__field">
+                              <label className="sx-schedule__label">{isRtl ? 'المعلم' : 'Teacher'}</label>
+                              <input
+                                type="text"
+                                value={period.teacher}
+                                onChange={(e) => handleUpdatePeriod(day, idx, 'teacher', e.target.value)}
+                                className="sx-schedule__input sx-schedule__input--sm"
+                                placeholder={isRtl ? 'المعلم' : 'Teacher'}
+                              />
+                            </div>
+                            <div className="sx-schedule__field">
+                              <label className="sx-schedule__label">{isRtl ? 'الوقت' : 'Time'}</label>
+                              <div className="relative">
+                                <Clock size={14} className="absolute top-1/2 -translate-y-1/2 start-3 text-slate-400 pointer-events-none" />
+                                <input
+                                  type="text"
+                                  value={period.time}
+                                  onChange={(e) => handleUpdatePeriod(day, idx, 'time', e.target.value)}
+                                  className="sx-schedule__input sx-schedule__input--time ps-9"
+                                  placeholder={isRtl ? 'الوقت' : 'Time'}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                   ))}
-                   {(schedule[day] || []).length === 0 && (
-                     <div className="py-8 text-center text-slate-400 font-bold bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs">لا توجد حصص مضافة لهذا اليوم</div>
-                   )}
-                </div>
-              </div>
-            ))}
+                    ))}
+
+                    {periods.length === 0 && (
+                      <div className="sx-schedule__empty sm:col-span-2">
+                        <Calendar size={28} strokeWidth={1.75} />
+                        <p className="sx-schedule__empty-title">
+                          {isRtl ? 'لا توجد حصص لهذا اليوم' : 'No classes for this day'}
+                        </p>
+                        <p className="sx-schedule__empty-text">
+                          {isRtl ? 'اضغط إضافة لبدء بناء جدول اليوم.' : 'Tap Add to start building this day’s schedule.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
           </div>
 
           {/* Print View Table */}
@@ -407,21 +448,23 @@ export default function Schedules() {
             <table className="w-full text-center border-collapse border-[1.5pt] border-slate-900 bg-white">
               <thead>
                 <tr className="bg-slate-100 text-slate-900 border-b-[1.5pt] border-slate-900">
-                  <th className="py-4 px-2 font-black text-sm border-l-[1.5pt] border-slate-900 w-32">اليوم / الحصة</th>
-                  {Array.from({ length: Math.max(1, ...DAYS_OF_WEEK.slice(0, 5).map(day => (schedule[day] || []).length)) }).map((_, i) => (
+                  <th className="py-4 px-2 font-black text-sm border-l-[1.5pt] border-slate-900 w-32">
+                    {isRtl ? 'اليوم / الحصة' : 'Day / Period'}
+                  </th>
+                  {Array.from({ length: Math.max(1, ...WORK_DAYS.map(day => (schedule[day] || []).length)) }).map((_, i) => (
                     <th key={i} className="py-4 px-2 font-bold text-sm border-l border-slate-400">
-                      الحصة {i + 1}
+                      {isRtl ? `الحصة ${i + 1}` : `Period ${i + 1}`}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-400">
-                {DAYS_OF_WEEK.slice(0, 5).map(day => {
+                {WORK_DAYS.map(day => {
                   const daySchedule = schedule[day] || [];
-                  const maxPeriodsInTable = Math.max(1, ...DAYS_OF_WEEK.slice(0, 5).map(d => (schedule[d] || []).length));
+                  const maxPeriodsInTable = Math.max(1, ...WORK_DAYS.map(d => (schedule[d] || []).length));
                   return (
                     <tr key={day} className="text-slate-900 border-b last:border-b-0 border-slate-400">
-                      <td className="py-4 px-2 font-black text-sm bg-slate-50 border-l-[1.5pt] border-slate-900">{day}</td>
+                      <td className="py-4 px-2 font-black text-sm bg-slate-50 border-l-[1.5pt] border-slate-900">{dayLabel(day)}</td>
                       {Array.from({ length: maxPeriodsInTable }).map((_, i) => {
                         const period = daySchedule[i];
                         return (
@@ -437,19 +480,26 @@ export default function Schedules() {
                               <span className="text-slate-300 font-bold">-</span>
                             )}
                           </td>
-                        )
+                        );
                       })}
                     </tr>
-                  )
+                  );
                 })}
               </tbody>
             </table>
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 text-slate-500 font-bold">
-          <Calendar size={48} className="text-slate-300 dark:text-slate-700 mb-4" />
-          <p>الرجاء إنشاء بعض الصفوف أولاً</p>
+        <div className="sx-schedule">
+          <div className="sx-schedule__empty">
+            <Calendar size={40} strokeWidth={1.75} />
+            <p className="sx-schedule__empty-title">
+              {isRtl ? 'لا توجد صفوف بعد' : 'No classes yet'}
+            </p>
+            <p className="sx-schedule__empty-text">
+              {isRtl ? 'أنشئ صفوفاً أولاً لبدء إعداد الجدول الأسبوعي.' : 'Create classes first to set up the weekly schedule.'}
+            </p>
+          </div>
         </div>
       )}
       
