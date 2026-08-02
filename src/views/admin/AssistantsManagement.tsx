@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, serverTimestamp, setDoc, doc, updateDoc, getDocs, limit } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { UserPlus, ShieldCheck, Trash2, Save, X, Search, Lock, CheckSquare, Square, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Trash2, Save, X, Search, Lock, CheckSquare, Square, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -10,6 +10,7 @@ import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { UserRole } from '../../types';
 import { getStaffPermissionOptions } from '../../lib/featureRegistry';
 import { canAssignStaffPermission } from '../../lib/staffPermissions';
+import { AppModalPortal } from '../../components/AppModalPortal';
 
 export default function AssistantsManagement() {
   const { profile, schoolData } = useAuth();
@@ -254,157 +255,161 @@ export default function AssistantsManagement() {
         ))}
       </div>
 
-      <AnimatePresence>
-        {showModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md" dir="rtl">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200"
-            >
-              <div className="p-8 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-slate-900 font-display">
-                  {editingAssistant ? 'تعديل صلاحيات المساعد' : 'إضافة مساعد منصة جديد'}
-                </h2>
-                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
-                  <X size={24} />
-                </button>
-              </div>
+      <AppModalPortal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        dir="rtl"
+        size="lg"
+        ariaLabel={editingAssistant ? 'تعديل صلاحيات المساعد' : 'إضافة مساعد جديد'}
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">
+              {editingAssistant ? 'تعديل صلاحيات المساعد' : 'إضافة مساعد جديد'}
+            </h2>
+            <p className="sx-app-modal-panel__subtitle">
+              خصص البيانات والصلاحيات — القائمة قابلة للتمرير بالكامل
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowModal(false)}
+            className="sx-app-modal-panel__close"
+            aria-label="إغلاق"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-              <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">اسم المساعد</label>
-                        <input
-                          required
-                          type="text"
-                          value={formData.name}
-                          onChange={e => setFormData({ ...formData, name: e.target.value })}
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold"
-                          placeholder="الاسم الكامل..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">البريد الإلكتروني</label>
-                        <input
-                          required
-                          type="email"
-                          disabled={!!editingAssistant}
-                          value={formData.email}
-                          onChange={e => setFormData({ ...formData, email: e.target.value })}
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold disabled:bg-slate-50"
-                          placeholder="assistant@school.com"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">الراتب الشهري (د.ع)</label>
-                        <input
-                          type="number"
-                          value={Number.isNaN(formData.salary) ? '' : formData.salary}
-                          onChange={e => setFormData({ ...formData, salary: e.target.value === '' ? 0 : Number(e.target.value) || 0 })}
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold"
-                          placeholder="0"
-                        />
-                      </div>
-                      {!editingAssistant && (
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">كلمة المرور</label>
-                          <div className="relative">
-                            <Lock size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                              required
-                              type={showPassword ? "text" : "password"}
-                              value={formData.password}
-                              onChange={e => setFormData({ ...formData, password: e.target.value })}
-                              className="w-full pr-12 pl-12 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold"
-                              placeholder="••••••••"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1"
-                            >
-                              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {!editingAssistant && (
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">تأكيد كلمة المرور (اختياري)</label>
-                          <div className="relative">
-                            <Lock size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type={showConfirmPassword ? "text" : "password"}
-                              value={formData.confirmPassword}
-                              onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
-                              className="w-full pr-12 pl-12 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition-all font-bold"
-                              placeholder="••••••••"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1"
-                            >
-                              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest leading-none">الصلاحيات المتاحة (اختر الأقسام)</label>
-                      <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[300px] overflow-y-auto custom-scrollbar">
-                        {permissionOptions.map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => togglePermission(opt.id)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all border text-right ${
-                              formData.permissions.includes(opt.id)
-                                ? 'bg-indigo-600 text-white border-transparent shadow-md'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                            }`}
-                          >
-                            {formData.permissions.includes(opt.id) ? (
-                              <CheckSquare size={18} />
-                            ) : (
-                              <Square size={18} className="opacity-40" />
-                            )}
-                            <span className="text-sm font-bold">{opt.label}</span>
-                          </button>
-                        ))}
-                      </div>
+        <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">اسم المساعد</label>
+                  <input
+                    required
+                    type="text"
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-slate-400 transition-all font-bold min-h-11"
+                    placeholder="الاسم الكامل..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">البريد الإلكتروني</label>
+                  <input
+                    required
+                    type="email"
+                    disabled={!!editingAssistant}
+                    value={formData.email}
+                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-slate-400 transition-all font-bold disabled:bg-slate-50 min-h-11"
+                    placeholder="assistant@school.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">الراتب الشهري (د.ع)</label>
+                  <input
+                    type="number"
+                    value={Number.isNaN(formData.salary) ? '' : formData.salary}
+                    onChange={e => setFormData({ ...formData, salary: e.target.value === '' ? 0 : Number(e.target.value) || 0 })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-slate-400 transition-all font-bold min-h-11"
+                    placeholder="0"
+                  />
+                </div>
+                {!editingAssistant && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">كلمة المرور</label>
+                    <div className="relative">
+                      <Lock size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        required
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.password}
+                        onChange={e => setFormData({ ...formData, password: e.target.value })}
+                        className="w-full pr-12 pl-12 py-3 rounded-xl border border-slate-200 outline-none focus:border-slate-400 transition-all font-bold min-h-11"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1 min-w-10 min-h-10"
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
                   </div>
-                </div>
+                )}
+                {!editingAssistant && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">تأكيد كلمة المرور (اختياري)</label>
+                    <div className="relative">
+                      <Lock size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={formData.confirmPassword}
+                        onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                        className="w-full pr-12 pl-12 py-3 rounded-xl border border-slate-200 outline-none focus:border-slate-400 transition-all font-bold min-h-11"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1 min-w-10 min-h-10"
+                      >
+                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-                <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                  >
-                    <Save size={20} />
-                    {isSaving ? 'جاري الحفظ...' : 'حفظ بيانات المساعد'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    className="px-8 py-4 bg-white border border-slate-200 text-slate-500 rounded-xl font-bold hover:bg-slate-100 transition-all active:scale-95"
-                  >
-                    إلغاء
-                  </button>
+              <div className="flex flex-col min-h-0">
+                <label className="block text-xs font-bold text-slate-500 mb-2">
+                  الصلاحيات المتاحة (اختر الأقسام)
+                </label>
+                <div className="sx-selection-panel" role="listbox" aria-multiselectable="true">
+                  {permissionOptions.map((opt) => {
+                    const selected = formData.permissions.includes(opt.id);
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        onClick={() => togglePermission(opt.id)}
+                        className={`sx-selection-panel__option${selected ? ' is-selected' : ''}`}
+                      >
+                        {selected ? <CheckSquare size={18} /> : <Square size={18} className="opacity-40" />}
+                        <span>{opt.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </form>
-            </motion.div>
+              </div>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+
+          <div className="sx-app-modal-panel__footer flex gap-3">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="flex-1 py-3.5 bg-[#0b1f3a] text-white rounded-xl font-bold hover:bg-[#122a4a] transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50 min-h-12"
+            >
+              <Save size={18} />
+              {isSaving ? 'جاري الحفظ...' : 'حفظ بيانات المساعد'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="px-6 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-[0.99] min-h-12"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
 
       <AnimatePresence>
         {confirmDeleteId && (

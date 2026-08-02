@@ -15,6 +15,7 @@ import {
   isFirestoreOfflineError,
 } from '../../lib/offline/offlineDataCache';
 import { setOfflineDataStale } from '../../lib/offline/offlineStatus';
+import { ActionMenu } from '../../components/ui/ActionMenu';
 
 export default function Classes() {
   const { profile } = useAuth();
@@ -245,51 +246,42 @@ export default function Classes() {
                   <LayoutDashboard size={28} />
                 </div>
                 <div className="relative">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveMenu(activeMenu === cls.id ? null : cls.id);
-                    }}
-                    className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all"
-                  >
-                    <MoreVertical size={18} />
-                  </button>
-                  
-                  <AnimatePresence>
-                    {activeMenu === cls.id && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                        className="absolute left-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden"
+                  <ActionMenu
+                    open={activeMenu === cls.id}
+                    onOpenChange={(open) => setActiveMenu(open ? cls.id : null)}
+                    ariaLabel="إجراءات الصف"
+                    align="end"
+                    items={[
+                      {
+                        id: 'edit',
+                        label: 'تعديل الاسم',
+                        icon: <Edit2 size={16} />,
+                        onClick: () => {
+                          setEditingClass(cls);
+                          setNewClass({ name: cls.name });
+                          setShowAddModal(true);
+                        },
+                      },
+                      {
+                        id: 'delete',
+                        label: 'حذف الصف',
+                        icon: <Trash2 size={16} />,
+                        destructive: true,
+                        onClick: () => setConfirmDeleteId(cls.id),
+                      },
+                    ]}
+                    trigger={({ ref, onClick, ...a11y }) => (
+                      <button
+                        ref={ref}
+                        type="button"
+                        onClick={onClick}
+                        {...a11y}
+                        className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all min-w-10 min-h-10"
                       >
-                        <div className="p-2">
-                          <button
-                            onClick={() => {
-                              setEditingClass(cls);
-                              setNewClass({ name: cls.name });
-                              setShowAddModal(true);
-                              setActiveMenu(null);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all group/item"
-                          >
-                            <Edit2 size={16} className="text-slate-400 group-hover/item:text-indigo-600" />
-                            تعديل الاسم
-                          </button>
-                          <button
-                            onClick={() => {
-                              setConfirmDeleteId(cls.id);
-                              setActiveMenu(null);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all group/item"
-                          >
-                            <Trash2 size={16} className="text-red-400 group-hover/item:text-red-600" />
-                            حذف الصف
-                          </button>
-                        </div>
-                      </motion.div>
+                        <MoreVertical size={18} />
+                      </button>
                     )}
-                  </AnimatePresence>
+                  />
                 </div>
               </div>
 
@@ -423,42 +415,51 @@ export default function Classes() {
                         </div>
 
                         <div className="relative">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMovingStudent(movingStudent === student.id ? null : student.id);
-                            }}
-                            className="flex items-center gap-2 px-3 py-2 bg-slate-50 text-slate-500 rounded-xl text-[10px] font-bold hover:bg-slate-900 hover:text-white transition-all shadow-sm"
-                          >
-                            <ArrowRightLeft size={14} />
-                            نقل لصف آخر
-                          </button>
-
-                          <AnimatePresence>
-                            {movingStudent === student.id && (
-                              <motion.div 
-                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                className="absolute left-0 bottom-full mb-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[60] p-2"
+                          <ActionMenu
+                            open={movingStudent === student.id}
+                            onOpenChange={(open) => setMovingStudent(open ? student.id : null)}
+                            ariaLabel="نقل لصف آخر"
+                            preferredSide="top"
+                            align="end"
+                            minWidth={200}
+                            maxWidth={280}
+                            header={
+                              <p className="px-3 py-2 text-[11px] font-bold text-slate-400">
+                                اختر الوجهة
+                              </p>
+                            }
+                            items={
+                              classes.filter((c) => c.id !== selectedClassForStudents.id).length === 0
+                                ? [
+                                    {
+                                      id: 'none',
+                                      label: 'لا توجد صفوف أخرى متاحة',
+                                      disabled: true,
+                                      onClick: () => undefined,
+                                    },
+                                  ]
+                                : classes
+                                    .filter((c) => c.id !== selectedClassForStudents.id)
+                                    .map((targetClass) => ({
+                                      id: targetClass.id,
+                                      label: targetClass.name,
+                                      icon: <Plus size={12} />,
+                                      onClick: () => handleMoveStudent(student.id, targetClass.id),
+                                    }))
+                            }
+                            trigger={({ ref, onClick, ...a11y }) => (
+                              <button
+                                ref={ref}
+                                type="button"
+                                onClick={onClick}
+                                {...a11y}
+                                className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 text-slate-500 rounded-xl text-[10px] font-bold hover:bg-slate-900 hover:text-white transition-all shadow-sm min-h-10"
                               >
-                                <p className="text-[9px] font-bold text-slate-400 px-3 py-2 uppercase tracking-tight">اختر الوجهة:</p>
-                                {classes.filter(c => c.id !== selectedClassForStudents.id).map(targetClass => (
-                                  <button
-                                    key={targetClass.id}
-                                    onClick={() => handleMoveStudent(student.id, targetClass.id)}
-                                    className="w-full text-right px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-between"
-                                  >
-                                    {targetClass.name}
-                                    <Plus size={12} className="text-slate-300" />
-                                  </button>
-                                ))}
-                                {classes.length <= 1 && (
-                                  <p className="text-[9px] text-red-400 px-3 py-2">لا توجد صفوف أخرى متاحة</p>
-                                )}
-                              </motion.div>
+                                <ArrowRightLeft size={14} />
+                                نقل لصف آخر
+                              </button>
                             )}
-                          </AnimatePresence>
+                          />
                         </div>
                       </div>
                     ))}

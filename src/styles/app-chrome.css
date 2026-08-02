@@ -1189,6 +1189,13 @@ html.dark .sx-ds-shell {
   border: 0 !important;
 }
 
+/* Profile menu content when rendered via FloatingMenu portal */
+.sx-floating-menu.sx-nav__profile-menu-portal {
+  width: 240px;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 0.5rem;
+}
+
 .sx-nav__profile-menu-head {
   display: flex;
   align-items: center;

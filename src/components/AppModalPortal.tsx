@@ -25,10 +25,18 @@ export function AppModalPortal({
     if (!open || typeof document === 'undefined') return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', onKey);
     return () => {
       document.body.style.overflow = prev;
+      document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, onClose]);
 
   if (typeof document === 'undefined') return null;
 

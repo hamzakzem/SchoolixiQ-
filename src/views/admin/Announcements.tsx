@@ -439,7 +439,7 @@ export default function Announcements() {
                                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl z-10 overflow-hidden max-h-[28rem] overflow-y-auto custom-scrollbar"
+                                    className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl z-[200] overflow-hidden max-h-[min(28rem,70dvh)] overflow-y-auto overscroll-contain custom-scrollbar"
                                   >
                                     {/* Tabs */}
                                     <div className="flex border-b border-slate-100 dark:border-slate-800">

@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import {
   ChevronRight,
   LogOut,
@@ -12,6 +12,7 @@ import SchoolixLogo from '../SchoolixLogo';
 import { isCustomSchoolLogo } from '../../lib/brandAssets';
 import { useAuth } from '../../lib/AuthContext';
 import { LanguageToggle } from '../LanguageToggle';
+import { FloatingMenu } from '../ui/FloatingMenu';
 
 export type BreadcrumbItem = {
   label: string;
@@ -96,7 +97,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const { profile, schoolData } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
-  const profileWrapRef = useRef<HTMLDivElement>(null);
+  const profileBtnRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
 
   const displayName = (profileName || profile?.name || '').trim();
@@ -111,22 +112,6 @@ export function DashboardHeader({
   ).trim();
   const initial = (displayName || '?').charAt(0).toUpperCase();
   const chatLabel = isRtl ? 'الدردشة' : 'Chat';
-
-  useEffect(() => {
-    if (!profileOpen) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!profileWrapRef.current?.contains(e.target as Node)) setProfileOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setProfileOpen(false);
-    };
-    document.addEventListener('mousedown', onPointer);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onPointer);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [profileOpen]);
 
   return (
     <header
@@ -208,8 +193,9 @@ export function DashboardHeader({
           ) : null}
 
           {showProfileMenu && displayName ? (
-            <div className="sx-nav__profile" ref={profileWrapRef}>
+            <div className="sx-nav__profile">
               <button
+                ref={profileBtnRef}
                 type="button"
                 className="sx-nav__btn sx-nav__btn--profile"
                 aria-haspopup="menu"
@@ -227,58 +213,63 @@ export function DashboardHeader({
                 </span>
               </button>
 
-              {profileOpen ? (
-                <div id={menuId} className="sx-nav__profile-menu" role="menu">
-                  <div className="sx-nav__profile-menu-head">
-                    <span className="sx-nav__avatar sx-nav__avatar--lg sx-ds-avatar">
-                      {displayImage ? (
-                        <img src={displayImage} alt="" className="sx-nav__avatar-img" />
-                      ) : (
-                        <UserRound size={18} strokeWidth={1.75} />
-                      )}
-                    </span>
-                    <div className="sx-nav__profile-menu-copy">
-                      <span className="sx-nav__profile-menu-name">{displayName}</span>
-                      {displaySchool ? (
-                        <span className="sx-nav__profile-menu-school">{displaySchool}</span>
-                      ) : null}
-                      <span className="sx-nav__profile-menu-role">{displayRole}</span>
-                    </div>
+              <FloatingMenu
+                id={menuId}
+                open={profileOpen}
+                onClose={() => setProfileOpen(false)}
+                anchorRef={profileBtnRef}
+                align="end"
+                minWidth={240}
+                maxWidth={280}
+                ariaLabel={displayName}
+                className="sx-nav__profile-menu-portal"
+              >
+                <div className="sx-nav__profile-menu-head">
+                  <span className="sx-nav__avatar sx-nav__avatar--lg sx-ds-avatar">
+                    {displayImage ? (
+                      <img src={displayImage} alt="" className="sx-nav__avatar-img" />
+                    ) : (
+                      <UserRound size={18} strokeWidth={1.75} />
+                    )}
+                  </span>
+                  <div className="sx-nav__profile-menu-copy">
+                    <span className="sx-nav__profile-menu-name">{displayName}</span>
+                    {displaySchool ? (
+                      <span className="sx-nav__profile-menu-school">{displaySchool}</span>
+                    ) : null}
+                    <span className="sx-nav__profile-menu-role">{displayRole}</span>
                   </div>
-
-                  <div className="sx-nav__profile-menu-divider" aria-hidden />
-
-                  {onOpenSettings ? (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="sx-nav__profile-item"
-                      onClick={() => {
-                        setProfileOpen(false);
-                        onOpenSettings();
-                      }}
-                    >
-                      <Settings size={15} strokeWidth={1.75} aria-hidden />
-                      <span>{isRtl ? 'الإعدادات' : 'Settings'}</span>
-                    </button>
-                  ) : null}
-
-                  {onLogout ? (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="sx-nav__profile-item sx-nav__profile-item--danger"
-                      onClick={() => {
-                        setProfileOpen(false);
-                        onLogout();
-                      }}
-                    >
-                      <LogOut size={15} strokeWidth={1.75} aria-hidden />
-                      <span>{isRtl ? 'تسجيل الخروج' : 'Sign out'}</span>
-                    </button>
-                  ) : null}
                 </div>
-              ) : null}
+                <div className="sx-nav__profile-menu-divider" aria-hidden />
+                {onOpenSettings ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="sx-floating-menu__item"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      onOpenSettings();
+                    }}
+                  >
+                    <Settings size={15} strokeWidth={1.75} aria-hidden />
+                    <span>{isRtl ? 'الإعدادات' : 'Settings'}</span>
+                  </button>
+                ) : null}
+                {onLogout ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="sx-floating-menu__item sx-floating-menu__item--danger"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      onLogout();
+                    }}
+                  >
+                    <LogOut size={15} strokeWidth={1.75} aria-hidden />
+                    <span>{isRtl ? 'تسجيل الخروج' : 'Sign out'}</span>
+                  </button>
+                ) : null}
+              </FloatingMenu>
             </div>
           ) : null}
         </div>

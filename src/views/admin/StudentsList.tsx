@@ -20,6 +20,7 @@ import {
 import { setOfflineDataStale } from '../../lib/offline/offlineStatus';
 
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
+import { ActionMenu } from '../../components/ui/ActionMenu';
 
 export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit' }) {
   const { profile } = useAuth();
@@ -893,98 +894,85 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                           </button>
                         )}
                         <div className="relative" data-student-menu>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenu(activeMenu === student.id ? null : student.id);
-                            }}
-                            className={`${activeMenu === student.id ? 'bg-slate-900 text-white shadow-lg' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-900'} p-2.5 rounded-xl transition-all active:scale-95`}
-                          >
-                            <MoreVertical size={18} />
-                          </button>
-                          
-                          <AnimatePresence>
-                            {activeMenu === student.id && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute left-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] overflow-hidden backdrop-blur-xl bg-white/95"
+                          <ActionMenu
+                            open={activeMenu === student.id}
+                            onOpenChange={(open) => setActiveMenu(open ? student.id : null)}
+                            ariaLabel="إجراءات الطالب"
+                            align="end"
+                            items={[
+                              {
+                                id: 'linked',
+                                label: 'عرض الحسابات المربوطة',
+                                icon: <Users size={16} />,
+                                onClick: () => setShowLinkedParentsModal(student),
+                              },
+                              {
+                                id: 'link',
+                                label: 'ربط بولي أمر جديد',
+                                icon: <UserPlus size={16} />,
+                                hidden: isViewOnly,
+                                onClick: () => {
+                                  setShowLinkParentModal(student);
+                                  setParentEmail(student.parentEmail || '');
+                                  setParentName(student.parentName || '');
+                                  setParentPhone(student.parentPhone || '');
+                                  setParentPassword(student.parentPassword || '');
+                                },
+                              },
+                              {
+                                id: 'move',
+                                label: 'نقل لصف آخر',
+                                icon: <ArrowRightLeft size={16} />,
+                                hidden: isViewOnly,
+                                onClick: () => {
+                                  setShowMoveModal(student);
+                                  setTargetClassId(student.classId || '');
+                                },
+                              },
+                              {
+                                id: 'edit',
+                                label: 'تعديل البيانات',
+                                icon: <GraduationCap size={16} />,
+                                hidden: isViewOnly,
+                                onClick: () => {
+                                  setPendingStudentId(null);
+                                  setEditingStudent(student);
+                                  setNewStudent({
+                                    name: student.name,
+                                    registrationNumber: student.registrationNumber,
+                                    classId: student.classId || '',
+                                    parentPhone: student.parentPhone || '',
+                                    driverPhone: student.driverPhone || '',
+                                    parentEmail: student.parentEmail || '',
+                                    parentPassword: student.parentPassword || '',
+                                    photoUrl: student.photoUrl || '',
+                                    email: '',
+                                    password: '',
+                                  });
+                                  setShowAddModal(true);
+                                },
+                              },
+                              {
+                                id: 'delete',
+                                label: 'حذف الطالب',
+                                icon: <Trash2 size={16} />,
+                                destructive: true,
+                                hidden: isViewOnly,
+                                onClick: () => setConfirmDeleteId(student.id),
+                              },
+                            ]}
+                            trigger={({ ref, onClick, ...a11y }) => (
+                              <button
+                                ref={ref}
+                                type="button"
+                                onClick={onClick}
+                                {...a11y}
+                                className={`${activeMenu === student.id ? 'bg-slate-900 text-white shadow-lg' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-900'} p-2.5 rounded-xl transition-all active:scale-95 min-w-10 min-h-10`}
                               >
-                                <div className="p-2.5">
-                                    <button
-                                      onClick={() => { setShowLinkedParentsModal(student); setActiveMenu(null); }}
-                                      className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
-                                    >
-                                      <Users size={16} className="text-slate-400" />
-                                      عرض الحسابات المربوطة
-                                    </button>
-                                    {!isViewOnly && (
-                                      <>
-                                        <button
-                                          onClick={() => {
-                                            setShowLinkParentModal(student);
-                                            setParentEmail(student.parentEmail || '');
-                                            setParentName(student.parentName || '');
-                                            setParentPhone(student.parentPhone || '');
-                                            setParentPassword(student.parentPassword || '');
-                                            setActiveMenu(null);
-                                          }}
-                                          className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all"
-                                        >
-                                          <UserPlus size={16} className="text-slate-400" />
-                                          ربط بولي أمر جديد
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setShowMoveModal(student);
-                                            setTargetClassId(student.classId || '');
-                                            setActiveMenu(null);
-                                          }}
-                                          className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
-                                        >
-                                          <ArrowRightLeft size={16} className="text-slate-400" />
-                                          نقل لصف آخر
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setPendingStudentId(null);
-                                            setEditingStudent(student);
-                                            setNewStudent({
-                                              name: student.name,
-                                              registrationNumber: student.registrationNumber,
-                                              classId: student.classId || '',
-                                              parentPhone: student.parentPhone || '',
-                                              driverPhone: student.driverPhone || '',
-                                              parentEmail: student.parentEmail || '',
-                                              parentPassword: student.parentPassword || '',
-                                              photoUrl: student.photoUrl || '',
-                                              email: '',
-                                              password: ''
-                                            });
-                                            setShowAddModal(true);
-                                            setActiveMenu(null);
-                                          }}
-                                          className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
-                                        >
-                                          <GraduationCap size={16} className="text-slate-400" />
-                                          تعديل البيانات
-                                        </button>
-                                        <div className="h-px bg-slate-100 my-2 mx-2" />
-                                        <button
-                                          onClick={() => { setConfirmDeleteId(student.id); setActiveMenu(null); }}
-                                          className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                        >
-                                          <Trash2 size={16} className="text-red-400" />
-                                          حذف الطالب
-                                        </button>
-                                      </>
-                                    )}
-                                </div>
-                              </motion.div>
+                                <MoreVertical size={18} />
+                              </button>
                             )}
-                          </AnimatePresence>
+                          />
                         </div>
                       </div>
                     </td>
@@ -1009,20 +997,90 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{classes.find(c => c.id === student.classId)?.name || 'غير محدد'}</p>
                   </div>
                   <div className="relative shrink-0" data-student-menu>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenu(activeMenu === student.id ? null : student.id);
-                      }}
-                      className={`p-2 rounded-xl shadow-sm border transition-all active:scale-95 ${
-                        activeMenu === student.id
-                          ? 'bg-slate-900 text-white border-slate-900'
-                          : 'text-slate-400 bg-white border-slate-200'
-                      }`}
-                    >
-                      <MoreVertical size={16} />
-                    </button>
+                    <ActionMenu
+                      open={activeMenu === student.id}
+                      onOpenChange={(open) => setActiveMenu(open ? student.id : null)}
+                      ariaLabel="إجراءات الطالب"
+                      align="end"
+                      items={[
+                        {
+                          id: 'linked',
+                          label: 'عرض الحسابات المربوطة',
+                          icon: <Users size={16} />,
+                          onClick: () => setShowLinkedParentsModal(student),
+                        },
+                        {
+                          id: 'link',
+                          label: 'ربط بولي أمر جديد',
+                          icon: <UserPlus size={16} />,
+                          hidden: isViewOnly,
+                          onClick: () => {
+                            setShowLinkParentModal(student);
+                            setParentEmail(student.parentEmail || '');
+                            setParentName(student.parentName || '');
+                            setParentPhone(student.parentPhone || '');
+                            setParentPassword(student.parentPassword || '');
+                          },
+                        },
+                        {
+                          id: 'edit',
+                          label: 'تعديل البيانات',
+                          icon: <GraduationCap size={16} />,
+                          hidden: isViewOnly,
+                          onClick: () => {
+                            setPendingStudentId(null);
+                            setEditingStudent(student);
+                            setNewStudent({
+                              name: student.name,
+                              registrationNumber: student.registrationNumber,
+                              classId: student.classId || '',
+                              parentPhone: student.parentPhone || '',
+                              driverPhone: student.driverPhone || '',
+                              parentEmail: student.parentEmail || '',
+                              address: student.address || '',
+                              parentPassword: student.parentPassword || '',
+                              photoUrl: student.photoUrl || '',
+                              email: '',
+                              password: '',
+                            });
+                            setShowAddModal(true);
+                          },
+                        },
+                        {
+                          id: 'move',
+                          label: 'نقل لصف آخر',
+                          icon: <ArrowRightLeft size={16} />,
+                          hidden: isViewOnly,
+                          onClick: () => {
+                            setShowMoveModal(student);
+                            setTargetClassId(student.classId || '');
+                          },
+                        },
+                        {
+                          id: 'delete',
+                          label: 'حذف الطالب',
+                          icon: <Trash2 size={16} />,
+                          destructive: true,
+                          hidden: isViewOnly,
+                          onClick: () => setConfirmDeleteId(student.id),
+                        },
+                      ]}
+                      trigger={({ ref, onClick, ...a11y }) => (
+                        <button
+                          ref={ref}
+                          type="button"
+                          onClick={onClick}
+                          {...a11y}
+                          className={`p-2 rounded-xl shadow-sm border transition-all active:scale-95 min-w-10 min-h-10 ${
+                            activeMenu === student.id
+                              ? 'bg-slate-900 text-white border-slate-900'
+                              : 'text-slate-400 bg-white border-slate-200'
+                          }`}
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                      )}
+                    />
                   </div>
                 </div>
 
@@ -1056,102 +1114,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                     </button>
                   )}
                 </div>
-
-                <AnimatePresence>
-                  {activeMenu === student.id && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: -8 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -8 }}
-                      onClick={(e) => e.stopPropagation()}
-                      data-student-menu
-                      className="absolute left-0 top-12 z-[70] w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
-                    >
-                      <div className="p-2.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowLinkedParentsModal(student);
-                            setActiveMenu(null);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
-                        >
-                          <Users size={16} className="text-slate-400" />
-                          عرض الحسابات المربوطة
-                        </button>
-                        {!isViewOnly && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowLinkParentModal(student);
-                                setParentEmail(student.parentEmail || '');
-                                setParentName(student.parentName || '');
-                                setParentPhone(student.parentPhone || '');
-                                setParentPassword(student.parentPassword || '');
-                                setActiveMenu(null);
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all"
-                            >
-                              <UserPlus size={16} className="text-slate-400" />
-                              ربط بولي أمر جديد
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPendingStudentId(null);
-                                setEditingStudent(student);
-                                setNewStudent({
-                                  name: student.name,
-                                  registrationNumber: student.registrationNumber,
-                                  classId: student.classId || '',
-                                  parentPhone: student.parentPhone || '',
-                                  driverPhone: student.driverPhone || '',
-                                  parentEmail: student.parentEmail || '',
-                                  address: student.address || '',
-                                  parentPassword: student.parentPassword || '',
-                                  photoUrl: student.photoUrl || '',
-                                  email: '',
-                                  password: '',
-                                });
-                                setShowAddModal(true);
-                                setActiveMenu(null);
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
-                            >
-                              <GraduationCap size={16} className="text-slate-400" />
-                              تعديل البيانات
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowMoveModal(student);
-                                setTargetClassId(student.classId || '');
-                                setActiveMenu(null);
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl transition-all"
-                            >
-                              <ArrowRightLeft size={16} className="text-slate-400" />
-                              نقل لصف آخر
-                            </button>
-                            <div className="h-px bg-slate-100 my-2 mx-2" />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setConfirmDeleteId(student.id);
-                                setActiveMenu(null);
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-right text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                            >
-                              <Trash2 size={16} className="text-red-400" />
-                              حذف الطالب
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
             ))}
           </div>

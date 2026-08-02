@@ -16,6 +16,7 @@ import {
   DELETED_MESSAGE_LABEL_AR,
   DELETED_MESSAGE_LABEL_EN,
 } from '../../lib/chatMessageDelete';
+import { FloatingMenu, FloatingMenuItem } from '../ui/FloatingMenu';
 
 export type ChatMessageBubbleProps = {
   msg: Record<string, unknown>;
@@ -42,8 +43,11 @@ export type ChatMessageBubbleProps = {
   hideAvatar?: boolean;
 };
 
-function ActionMenu({
+function MessageActionMenu({
   isRtl,
+  open,
+  onClose,
+  anchorRef,
   onCopy,
   onReply,
   onSelect,
@@ -51,9 +55,11 @@ function ActionMenu({
   showDelete,
   onPermanentDelete,
   showPermanentDelete,
-  onClose,
 }: {
   isRtl: boolean;
+  open: boolean;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
   onCopy: () => void;
   onReply: () => void;
   onSelect: () => void;
@@ -61,79 +67,65 @@ function ActionMenu({
   showDelete?: boolean;
   onPermanentDelete?: () => void;
   showPermanentDelete?: boolean;
-  onClose: () => void;
 }) {
   const soon = isRtl ? 'قريباً' : 'Coming soon';
 
   return (
-    <div
-      className="sx-chat-action-menu absolute z-30 min-w-[160px] rounded-xl border border-[#0B2345]/10 bg-white dark:bg-[#141c2e] shadow-lg py-1"
-      style={{ [isRtl ? 'left' : 'right']: 0, top: '100%', marginTop: 4 }}
-      role="menu"
+    <FloatingMenu
+      open={open}
+      onClose={onClose}
+      anchorRef={anchorRef}
+      align={isRtl ? 'start' : 'end'}
+      minWidth={180}
+      maxWidth={260}
+      ariaLabel={isRtl ? 'خيارات الرسالة' : 'Message options'}
     >
-      <button type="button" role="menuitem" className="sx-chat-action-item" onClick={() => { onCopy(); onClose(); }}>
-        <Copy size={15} />
+      <FloatingMenuItem icon={<Copy size={15} />} onClick={() => { onCopy(); onClose(); }}>
         {isRtl ? 'نسخ' : 'Copy'}
-      </button>
-      <button type="button" role="menuitem" className="sx-chat-action-item" onClick={() => { onReply(); onClose(); }}>
-        <CornerUpLeft size={15} />
+      </FloatingMenuItem>
+      <FloatingMenuItem icon={<CornerUpLeft size={15} />} onClick={() => { onReply(); onClose(); }}>
         {isRtl ? 'رد' : 'Reply'}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className="sx-chat-action-item sx-chat-action-item--disabled"
-        title={soon}
-        disabled
-      >
-        <Forward size={15} />
-        {isRtl ? 'إعادة توجيه' : 'Forward'}
-        <span className="text-[9px] opacity-60 ms-auto">{soon}</span>
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className="sx-chat-action-item sx-chat-action-item--disabled"
-        title={soon}
-        disabled
-      >
-        <Star size={15} />
-        {isRtl ? 'مهم' : 'Important'}
-        <span className="text-[9px] opacity-60 ms-auto">{soon}</span>
-      </button>
-      <button type="button" role="menuitem" className="sx-chat-action-item" onClick={() => { onSelect(); onClose(); }}>
-        <Check size={15} />
+      </FloatingMenuItem>
+      <FloatingMenuItem icon={<Forward size={15} />} disabled>
+        <span className="flex items-center gap-2 w-full">
+          {isRtl ? 'إعادة توجيه' : 'Forward'}
+          <span className="text-[10px] opacity-60 ms-auto">{soon}</span>
+        </span>
+      </FloatingMenuItem>
+      <FloatingMenuItem icon={<Star size={15} />} disabled>
+        <span className="flex items-center gap-2 w-full">
+          {isRtl ? 'مهم' : 'Important'}
+          <span className="text-[10px] opacity-60 ms-auto">{soon}</span>
+        </span>
+      </FloatingMenuItem>
+      <FloatingMenuItem icon={<Check size={15} />} onClick={() => { onSelect(); onClose(); }}>
         {isRtl ? 'تحديد' : 'Select'}
-      </button>
+      </FloatingMenuItem>
       {showDelete && onDelete ? (
-        <button
-          type="button"
-          role="menuitem"
-          className="sx-chat-action-item sx-chat-action-item--danger"
+        <FloatingMenuItem
+          icon={<Trash2 size={15} />}
+          destructive
           onClick={() => {
             onDelete();
             onClose();
           }}
         >
-          <Trash2 size={15} />
           {isRtl ? 'حذف' : 'Delete'}
-        </button>
+        </FloatingMenuItem>
       ) : null}
       {showPermanentDelete && onPermanentDelete ? (
-        <button
-          type="button"
-          role="menuitem"
-          className="sx-chat-action-item sx-chat-action-item--danger"
+        <FloatingMenuItem
+          icon={<Trash2 size={15} />}
+          destructive
           onClick={() => {
             onPermanentDelete();
             onClose();
           }}
         >
-          <Trash2 size={15} />
           {isRtl ? 'حذف نهائي' : 'Delete Permanently'}
-        </button>
+        </FloatingMenuItem>
       ) : null}
-    </div>
+    </FloatingMenu>
   );
 }
 
@@ -162,6 +154,8 @@ export function ChatMessageBubble({
 }: ChatMessageBubbleProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const bubbleAnchorRef = useRef<HTMLDivElement>(null);
   const content = String(msg.content ?? '');
   const isDeleted = msg.deleted === true;
   const displayContent = isDeleted
@@ -245,6 +239,7 @@ export function ChatMessageBubble({
 
         <div className="relative flex flex-col min-w-0 max-w-full flex-1">
           <div
+            ref={bubbleAnchorRef}
             className={`sx-chat-bubble w-fit max-w-full min-w-[4.5rem] px-3.5 py-2.5 relative ${
               isMe
                 ? 'sx-chat-bubble--out sx-chat-bubble--outgoing'
@@ -309,6 +304,7 @@ export function ChatMessageBubble({
 
             {!selectionMode && (
               <button
+                ref={menuBtnRef}
                 type="button"
                 className="sx-chat-bubble-menu-btn opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 hidden sm:flex"
                 onClick={(e) => {
@@ -322,27 +318,21 @@ export function ChatMessageBubble({
               </button>
             )}
 
-            {menuOpen && !selectionMode && (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-20 cursor-default"
-                  aria-label={isRtl ? 'إغلاق' : 'Close'}
-                  onClick={() => setMenuOpen(false)}
-                />
-                <ActionMenu
-                  isRtl={isRtl}
-                  onCopy={handleCopy}
-                  onReply={() => onReply?.(msg)}
-                  onSelect={() => onToggleSelect?.(msgId)}
-                  onDelete={() => onDelete?.(msg)}
-                  showDelete={canDelete && !isDeleted}
-                  onPermanentDelete={() => onPermanentDelete?.(msg)}
-                  showPermanentDelete={canPermanentDelete}
-                  onClose={() => setMenuOpen(false)}
-                />
-              </>
-            )}
+            {!selectionMode ? (
+              <MessageActionMenu
+                isRtl={isRtl}
+                open={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                anchorRef={bubbleAnchorRef}
+                onCopy={handleCopy}
+                onReply={() => onReply?.(msg)}
+                onSelect={() => onToggleSelect?.(msgId)}
+                onDelete={() => onDelete?.(msg)}
+                showDelete={canDelete && !isDeleted}
+                onPermanentDelete={() => onPermanentDelete?.(msg)}
+                showPermanentDelete={canPermanentDelete}
+              />
+            ) : null}
           </div>
 
           <div
