@@ -19,9 +19,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -119,7 +119,7 @@ jobs:
           ls -la schoolixiq-dist.zip
 
       - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: schoolixiq-dist
           path: schoolixiq-dist.zip
@@ -138,25 +138,107 @@ jobs:
     needs: build-verify
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Wait for Hostinger auto-deploy window
-        run: |
-          # Hostinger Deployments usually finish shortly after push; allow cutover.
-          WAIT="${PRODUCTION_HEALTH_WAIT_SEC:-90}"
-          if [ -z "$WAIT" ]; then WAIT=90; fi
-          echo "Waiting ${WAIT}s for Hostinger cutover..."
-          sleep "$WAIT"
+      - name: Warm-up wait for Hostinger cutover
         env:
           PRODUCTION_HEALTH_WAIT_SEC: ${{ vars.PRODUCTION_HEALTH_WAIT_SEC }}
+        run: |
+          # Hostinger Node restart / atomic cutover often needs more than 90s.
+          WAIT="${PRODUCTION_HEALTH_WAIT_SEC:-180}"
+          if ! [[ "$WAIT" =~ ^[0-9]+$ ]]; then WAIT=180; fi
+          echo "Warm-up: waiting ${WAIT}s before first live probe (Hostinger deploy/restart window)..."
+          sleep "$WAIT"
+          echo "Warm-up complete. Starting health probes."
 
-      - name: Probe homepage + login (HTTP 200)
+      - name: Probe homepage + login (HTTP 200/3xx with retries)
         env:
           PRODUCTION_HEALTH_URL: ${{ secrets.PRODUCTION_HEALTH_URL }}
-          PRODUCTION_HEALTH_ROUTES: /,/login
-          PRODUCTION_HEALTH_RETRIES: "5"
-          PRODUCTION_HEALTH_RETRY_MS: "10000"
-        run: node scripts/verify-deploy-health.mjs
+        run: |
+          set -u
+          BASE="${PRODUCTION_HEALTH_URL:-https://schoolixiq.com}"
+          BASE="${BASE%/}"
+          ROUTES="/ /login"
+          MAX_ATTEMPTS=10
+          RETRY_DELAY_SEC=15
+          CONNECT_TIMEOUT=20
+          MAX_TIME=45
+
+          echo "Health base URL: ${BASE}"
+          echo "Routes: ${ROUTES}"
+          echo "Attempts: ${MAX_ATTEMPTS} | Retry delay: ${RETRY_DELAY_SEC}s"
+          echo "Accept: HTTP 200–399 (connection errors / 5xx retry)"
+          echo ""
+
+          is_success_status() {
+            local code="$1"
+            [[ "$code" =~ ^[23][0-9][0-9]$ ]]
+          }
+
+          probe_route() {
+            local path="$1"
+            local url="${BASE}${path}"
+            local attempt=1
+            local http_code=""
+            local curl_exit=0
+            local last_err=""
+
+            echo "=== Probe ${url} ==="
+
+            while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+              echo "[attempt ${attempt}/${MAX_ATTEMPTS}] GET ${url}"
+              set +e
+              http_code="$(curl -sS -o /dev/null -w '%{http_code}' \
+                --connect-timeout "$CONNECT_TIMEOUT" \
+                --max-time "$MAX_TIME" \
+                -L \
+                -A 'SchoolixIQ-CI-Health/1.0' \
+                -H 'Accept: text/html,application/xhtml+xml' \
+                "$url" 2>/tmp/health-curl.err)"
+              curl_exit=$?
+              set -e
+
+              if [ "$curl_exit" -ne 0 ]; then
+                last_err="$(tr -d '\r' </tmp/health-curl.err | head -c 300)"
+                echo "  result: curl_exit=${curl_exit} (temporary/network) ${last_err}"
+              else
+                echo "  result: HTTP ${http_code}"
+                if is_success_status "$http_code"; then
+                  echo "OK: ${url} -> HTTP ${http_code}"
+                  return 0
+                fi
+                last_err="HTTP ${http_code}"
+              fi
+
+              if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+                echo "  retrying in ${RETRY_DELAY_SEC}s (Hostinger may still be restarting)..."
+                sleep "$RETRY_DELAY_SEC"
+              fi
+              attempt=$((attempt + 1))
+            done
+
+            echo "::error::FAIL: ${url} after ${MAX_ATTEMPTS} attempts — last=${last_err:-unknown}"
+            return 1
+          }
+
+          failed=0
+          for path in $ROUTES; do
+            if ! probe_route "$path"; then
+              failed=1
+            fi
+            echo ""
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::Live production health failed after warm-up + retries"
+            echo "Check Hostinger Runtime Logs for SERVER_READY / PORT_LISTENING."
+            exit 1
+          fi
+
+          echo "OK: live production health passed (all routes HTTP 200/3xx)"
+          {
+            echo "### Live production health"
+            echo "- Warm-up wait completed"
+            echo "- Probed \`${BASE}/\` and \`${BASE}/login\`"
+            echo "- Accepted HTTP 200–399 with up to ${MAX_ATTEMPTS} attempts / ${RETRY_DELAY_SEC}s delay"
+          } >> "$GITHUB_STEP_SUMMARY"
