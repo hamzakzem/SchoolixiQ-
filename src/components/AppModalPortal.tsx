@@ -8,8 +8,8 @@ export interface AppModalPortalProps {
   onClose: () => void;
   children: React.ReactNode;
   dir?: 'rtl' | 'ltr';
-  /** sm = max-w-sm, md = max-w-lg, lg = max-w-2xl */
-  size?: 'sm' | 'md' | 'lg';
+  /** sm = max-w-sm, md = max-w-lg, lg = max-w-2xl, xl = near-fullscreen workspace */
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   ariaLabel?: string;
 }
 

@@ -115,6 +115,7 @@ import {
   type SchoolSortOption,
 } from "../components/superadmin/SuperAdminSchoolsFilterBar";
 import { SuperAdminSchoolAccountList } from "../components/superadmin/SuperAdminSchoolAccountList";
+import { AppModalPortal } from "../components/AppModalPortal";
 import { DistributorsTab } from "./superadmin/DistributorsTab";
 import { DistributorRequestsTab } from "./superadmin/DistributorRequestsTab";
 import { useSchoolPresenceMap } from "../lib/useSchoolPresenceMap";
@@ -5068,9 +5069,14 @@ export default function SuperAdminDashboard() {
         </div>
       </main>
 
-      {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-md overflow-hidden">
-          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+      <AppModalPortal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        size="lg"
+        dir="rtl"
+        ariaLabel={editingSchool ? "تعديل بيانات المدرسة" : "إضافة مدرسة جديدة"}
+      >
+          <div className="flex flex-col flex-1 min-h-0">
             <div className="p-8 pb-4 shrink-0">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -5652,12 +5658,16 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+      </AppModalPortal>
 
-      {showPackageModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md overflow-hidden">
-          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-2xl shadow-2xl relative border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200 my-8 flex flex-col max-h-[90vh]">
+      <AppModalPortal
+        open={showPackageModal}
+        onClose={() => setShowPackageModal(false)}
+        size="lg"
+        dir="rtl"
+        ariaLabel={editingPackage ? "تعديل باقة اشتراك" : "إضافة باقة اشتراك جديدة"}
+      >
+          <div className="flex flex-col flex-1 min-h-0">
             <div className="p-8 pb-4 shrink-0">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -6030,12 +6040,20 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+      </AppModalPortal>
 
       {purgeConvTarget && (
-        <div className="fixed inset-0 bg-slate-900/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-md p-8 shadow-2xl border border-red-200 dark:border-red-900/40">
+      <AppModalPortal
+        open
+        onClose={() => {
+          setPurgeConvTarget(null);
+          setPurgeConvConfirm("");
+        }}
+        size="sm"
+        dir="rtl"
+        ariaLabel="حذف جميع محادثات الحساب نهائياً"
+      >
+          <div className="p-8 border border-red-200 dark:border-red-900/40 rounded-[2rem]">
             <h2 className="text-xl font-black text-red-600 dark:text-red-400 mb-3">
               حذف جميع محادثات الحساب نهائياً
             </h2>
@@ -6077,12 +6095,17 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
           </div>
-        </div>
+      </AppModalPortal>
       )}
 
-      {showUserModal && (
-        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md p-10 shadow-2xl relative border border-slate-200 animate-in zoom-in-95 duration-200">
+      <AppModalPortal
+        open={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        size="md"
+        dir="rtl"
+        ariaLabel={editingUser ? "تعديل مستخدم" : "إضافة مستخدم جديد"}
+      >
+          <div className="p-10">
             <h2 className="text-2xl font-bold mb-6 text-slate-800">
               {editingUser ? "تعديل مستخدم" : "إضافة مستخدم جديد"}
             </h2>
@@ -6339,16 +6362,14 @@ export default function SuperAdminDashboard() {
               </div>
             </form>
           </div>
-        </div>
+      </AppModalPortal>
+
+      {viewingPackage && (
+        <PackageDetailsModal
+          pkg={viewingPackage}
+          onClose={() => setViewingPackage(null)}
+        />
       )}
-      <AnimatePresence>
-        {viewingPackage && (
-          <PackageDetailsModal
-            pkg={viewingPackage}
-            onClose={() => setViewingPackage(null)}
-          />
-        )}
-      </AnimatePresence>
 
       {/* Floating/Sticky Mobile Navigation Dock for Super Admin */}
       {isMobile ? (
@@ -6402,37 +6423,33 @@ function PackageDetailsModal({
   onClose: () => void;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm"
+    <AppModalPortal
+      open
+      onClose={onClose}
+      size="md"
       dir="rtl"
+      ariaLabel="تفاصيل الباقة"
     >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800"
-      >
-        <div className="p-8 border-b border-slate-50 dark:border-slate-800 flex items-center justify-between transition-colors">
+        <div className="sx-app-modal-panel__header">
           <div>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white transition-colors">
+            <h3 className="sx-app-modal-panel__title">
               {pkg.name}
             </h3>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+            <p className="sx-app-modal-panel__subtitle">
               تفاصيل الباقة المطلوبة
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-2xl transition-all active:scale-95"
+            className="sx-app-modal-panel__close"
+            aria-label="إغلاق"
           >
-            <X size={24} />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="p-8 space-y-6">
+        <div className="sx-app-modal-panel__body space-y-6">
           <div className="grid grid-cols-2 gap-4 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-[2rem] border border-blue-100 dark:border-blue-800/30 transition-colors">
             <div>
               <p className="text-[10px] font-black text-blue-400 uppercase mb-1 tracking-widest">
@@ -6503,16 +6520,16 @@ function PackageDetailsModal({
           </div>
         </div>
 
-        <div className="p-8 bg-slate-50 dark:bg-slate-800/50 flex justify-end transition-colors">
+        <div className="sx-app-modal-panel__footer flex justify-end">
           <button
+            type="button"
             onClick={onClose}
             className="px-10 py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
           >
             إغلاق النافذة
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+    </AppModalPortal>
   );
 }
 

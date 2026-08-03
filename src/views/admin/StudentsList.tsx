@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, deleteDoc, setDoc, runTransaction, increment, arrayUnion, arrayRemove, getDoc, limit, startAfter, orderBy } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { Search, Plus, UserPlus, Filter, MoreVertical, GraduationCap, Copy, Check, Trash2, AlertTriangle, X, Users, ArrowRightLeft, Upload, Edit2, User, Hash, Phone, Mail, Key, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
-import { modalPanelProps } from '../../lib/motion';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { uploadStudentPhoto } from '../../lib/imageUtils';
 import { StudentService } from '../../services/student.service';
@@ -21,6 +18,7 @@ import { setOfflineDataStale } from '../../lib/offline/offlineStatus';
 
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { ActionMenu } from '../../components/ui/ActionMenu';
+import { AppModalPortal } from '../../components/AppModalPortal';
 
 export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit' }) {
   const { profile } = useAuth();
@@ -1150,252 +1148,236 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       </div>
 
 
-      <AnimatePresence>
-        {showLinkedParentsModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-              className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl relative border border-slate-200 overflow-hidden"
-              dir="rtl"
-            >
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-900 font-display">الحسابات المربوطة</h2>
-                  <p className="text-slate-500 text-xs mt-1">أولياء الأمور الذين لديهم وصول لبيانات {showLinkedParentsModal.name}</p>
+      <AppModalPortal
+        open={Boolean(showLinkedParentsModal)}
+        onClose={() => setShowLinkedParentsModal(null)}
+        dir="rtl"
+        size="md"
+        ariaLabel="الحسابات المربوطة"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">الحسابات المربوطة</h2>
+            <p className="sx-app-modal-panel__subtitle">أولياء الأمور الذين لديهم وصول لبيانات {showLinkedParentsModal?.name}</p>
+          </div>
+          <button
+            type="button"
+            className="sx-app-modal-panel__close"
+            onClick={() => setShowLinkedParentsModal(null)}
+            aria-label="إغلاق"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="sx-app-modal-panel__body space-y-3 max-h-[400px] overflow-y-auto pr-1 text-right">
+          {isLoadingParents ? (
+            <div className="py-12 text-center">
+              <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-sm text-slate-400 font-bold">جاري تحميل البيانات...</p>
+            </div>
+          ) : linkedParents.length > 0 ? (
+            linkedParents.map(parent => (
+              <div key={parent.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm transition-all hover:bg-white group">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 border border-slate-200 group-hover:border-slate-900 transition-colors">
+                    <Users size={18} />
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-slate-900 text-sm">{parent.name || 'ولي أمر'}</p>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{parent.email}</p>
+                  </div>
                 </div>
-                <button 
-                  onClick={() => setShowLinkedParentsModal(null)}
-                  className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-400"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 text-right">
-                {isLoadingParents ? (
-                  <div className="py-12 text-center">
-                    <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-sm text-slate-400 font-bold">جاري تحميل البيانات...</p>
-                  </div>
-                ) : linkedParents.length > 0 ? (
-                  linkedParents.map(parent => (
-                    <div key={parent.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm transition-all hover:bg-white group">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 border border-slate-200 group-hover:border-slate-900 transition-colors">
-                          <Users size={18} />
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-slate-900 text-sm">{parent.name || 'ولي أمر'}</p>
-                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{parent.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        <button 
-                          onClick={() => setParentToUnlink({ parentId: parent.id, parentName: parent.name || parent.email })}
-                          className="p-2 text-slate-300 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-all"
-                          title="إلغاء الربط فقط"
-                        >
-                          <ArrowRightLeft size={16} />
-                        </button>
-                        <button 
-                          onClick={() => setParentToDelete({ id: parent.id, name: parent.name || 'ولي أمر', email: parent.email })}
-                          className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                          title="حذف الحساب نهائياً"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-12 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-200 shadow-sm">
-                      <Users size={32} />
-                    </div>
-                    <p className="text-sm text-slate-400 font-bold italic">لا توجد حسابات مربوطة بهذا الطالب</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-8 pt-6 border-t border-slate-100">
-                <button 
-                  onClick={() => setShowLinkedParentsModal(null)}
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all active:scale-95"
-                >
-                  إغلاق النافذة
-                </button>
-              </div>
-
-              <AnimatePresence>
-                {parentToUnlink && (
-                  <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-20 flex items-center justify-center p-8 rounded-[2.5rem]">
-                    <motion.div 
-                      initial={{ scale: 0.9, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.9, opacity: 0 }}
-                      className="text-center"
-                    >
-                      <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100">
-                        <AlertTriangle size={32} />
-                      </div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-2">تأكيد إلغاء الربط</h3>
-                      <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                        هل أنت متأكد من رغبتك في إلغاء ربط الحساب <span className="font-bold text-slate-900">({parentToUnlink.parentName})</span> بهذا الطالب؟
-                      </p>
-                      <div className="flex gap-3">
-                        <button 
-                          onClick={() => setParentToUnlink(null)}
-                          className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all"
-                        >
-                          إلغاء
-                        </button>
-                        <button 
-                          onClick={handleUnlinkParent}
-                          disabled={isLoadingParents}
-                          className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
-                        >
-                          {isLoadingParents ? 'جاري التنفيذ...' : 'إلغاء الربط'}
-                        </button>
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
-
-              <AnimatePresence>
-                {parentToDelete && (
-                  <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-30 flex items-center justify-center p-8 rounded-[2.5rem]">
-                    <motion.div 
-                      initial={{ scale: 0.9, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.9, opacity: 0 }}
-                      className="text-center transition-all"
-                    >
-                      <div className="w-20 h-20 bg-red-100 text-red-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm border border-red-200">
-                        <AlertTriangle size={40} />
-                      </div>
-                      <h3 className="text-2xl font-bold text-slate-900 mb-2">حذف الحساب نهائياً؟</h3>
-                      <p className="text-slate-500 text-sm mb-2 leading-relaxed px-4">
-                        سيتم حذف حساب <span className="font-bold text-slate-900">{parentToDelete.name}</span> نهائياً من النظام (Auth & Firestore).
-                      </p>
-                      <p className="text-red-500 text-[11px] font-bold mb-8 px-4 py-2 bg-red-50 rounded-lg inline-block border border-red-100 mx-4">
-                        تحذير: سيتم إلغاء ربط الولي من جميع الطلاب المرتبطين به في هذه المدرسة.
-                      </p>
-                      <div className="flex gap-4">
-                        <button 
-                          onClick={() => setParentToDelete(null)}
-                          className="flex-1 py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 transition-all active:scale-95"
-                        >
-                          إلغاء
-                        </button>
-                        <button 
-                          onClick={handleDeleteParentAccount}
-                          disabled={isLoadingParents}
-                          className="flex-1 py-4 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 active:scale-95 disabled:opacity-50"
-                        >
-                          {isLoadingParents ? 'جاري الحذف...' : 'حذف نهائي'}
-                        </button>
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showMoveModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-             <motion.div 
-               initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-               animate={{ scale: 1, opacity: 1, y: 0 }} 
-               exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-               className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl relative border border-slate-200"
-             >
-               <h2 className="text-2xl font-bold mb-2 text-slate-900 font-display">نقل الطالب لصف آخر</h2>
-               <p className="text-slate-500 text-xs mb-8 italic">سيتم نقل الطالب {showMoveModal.name} إلى الصف الدراسي الجديد المختار.</p>
-               
-               <form onSubmit={handleMoveStudent} className="space-y-6">
-                 <div>
-                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">اختر الصف الجديد</label>
-                   <select
-                     required
-                     value={targetClassId}
-                     onChange={e => setTargetClassId(e.target.value)}
-                     className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold appearance-none"
-                   >
-                     <option value="">اختر الصف...</option>
-                     {classes.map(c => (
-                       <option key={c.id} value={c.id}>{c.name}</option>
-                     ))}
-                   </select>
-                 </div>
-
-                 <div className="flex gap-4 pt-4">
-                   <button
-                     disabled={isMoving}
-                     type="submit"
-                     className="flex-1 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50"
-                   >
-                     {isMoving ? 'جاري النقل...' : 'تأكيد النقل'}
-                   </button>
-                   <button
-                     type="button"
-                     onClick={() => setShowMoveModal(null)}
-                     className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-                   >
-                     إلغاء
-                   </button>
-                 </div>
-               </form>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {typeof document !== 'undefined' && createPortal(
-        <AnimatePresence>
-          {showAddModal && (
-            <div
-              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md pointer-events-auto"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) closeAddModal();
-              }}
-            >
-              <motion.div
-                {...modalPanelProps()}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-xl shadow-2xl relative border border-slate-200 dark:border-slate-800 max-h-[min(90vh,calc(100dvh-2rem))] flex flex-col overflow-hidden text-right pointer-events-auto"
-              >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 dark:bg-slate-800/40 rounded-full -translate-y-32 translate-x-32 shadow-inner pointer-events-none" />
-                <div className="relative z-10 flex flex-col flex-1 min-h-0 px-6 md:px-10 pt-6 md:pt-8 pointer-events-auto">
-                  <div className="flex items-center justify-between mb-2 shrink-0">
-                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-display flex items-center gap-2">
-                      <GraduationCap className="text-[#0B2345] dark:text-[#D4A64A]" size={28} />
-                      <span>{editingStudent ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}</span>
-                    </h2>
-                    <button
-                      type="button"
-                      onClick={closeAddModal}
-                      className="p-1 px-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all touch-manipulation"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm mb-4 leading-relaxed italic text-right shrink-0">
-                    يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.
-                  </p>
-
-                  <form
-                    noValidate
-                    onSubmit={handleAdd}
-                    className="flex flex-col flex-1 min-h-0 pointer-events-auto"
+                <div className="flex gap-1">
+                  <button 
+                    onClick={() => setParentToUnlink({ parentId: parent.id, parentName: parent.name || parent.email })}
+                    className="p-2 text-slate-300 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-all"
+                    title="إلغاء الربط فقط"
                   >
-                    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6 pb-4 custom-scrollbar">
+                    <ArrowRightLeft size={16} />
+                  </button>
+                  <button 
+                    onClick={() => setParentToDelete({ id: parent.id, name: parent.name || 'ولي أمر', email: parent.email })}
+                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    title="حذف الحساب نهائياً"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-12 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-200 shadow-sm">
+                <Users size={32} />
+              </div>
+              <p className="text-sm text-slate-400 font-bold italic">لا توجد حسابات مربوطة بهذا الطالب</p>
+            </div>
+          )}
+        </div>
+
+        <div className="sx-app-modal-panel__footer">
+          <button 
+            onClick={() => setShowLinkedParentsModal(null)}
+            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all active:scale-95"
+          >
+            إغلاق النافذة
+          </button>
+        </div>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={Boolean(parentToUnlink)}
+        onClose={() => setParentToUnlink(null)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="تأكيد إلغاء الربط"
+      >
+        <div className="sx-app-modal-panel__body text-center">
+          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100">
+            <AlertTriangle size={32} />
+          </div>
+          <h3 className="sx-app-modal-panel__title mb-2">تأكيد إلغاء الربط</h3>
+          <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+            هل أنت متأكد من رغبتك في إلغاء ربط الحساب <span className="font-bold text-slate-900">({parentToUnlink?.parentName})</span> بهذا الطالب؟
+          </p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-3">
+          <button 
+            onClick={() => setParentToUnlink(null)}
+            className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all"
+          >
+            إلغاء
+          </button>
+          <button 
+            onClick={handleUnlinkParent}
+            disabled={isLoadingParents}
+            className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
+          >
+            {isLoadingParents ? 'جاري التنفيذ...' : 'إلغاء الربط'}
+          </button>
+        </div>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={Boolean(parentToDelete)}
+        onClose={() => setParentToDelete(null)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="حذف الحساب نهائياً"
+      >
+        <div className="sx-app-modal-panel__body text-center">
+          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm border border-red-200">
+            <AlertTriangle size={40} />
+          </div>
+          <h3 className="sx-app-modal-panel__title mb-2">حذف الحساب نهائياً؟</h3>
+          <p className="text-slate-500 text-sm mb-2 leading-relaxed px-4">
+            سيتم حذف حساب <span className="font-bold text-slate-900">{parentToDelete?.name}</span> نهائياً من النظام (Auth & Firestore).
+          </p>
+          <p className="text-red-500 text-[11px] font-bold mb-8 px-4 py-2 bg-red-50 rounded-lg inline-block border border-red-100 mx-4">
+            تحذير: سيتم إلغاء ربط الولي من جميع الطلاب المرتبطين به في هذه المدرسة.
+          </p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-4">
+          <button 
+            onClick={() => setParentToDelete(null)}
+            className="flex-1 py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 transition-all active:scale-95"
+          >
+            إلغاء
+          </button>
+          <button 
+            onClick={handleDeleteParentAccount}
+            disabled={isLoadingParents}
+            className="flex-1 py-4 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 active:scale-95 disabled:opacity-50"
+          >
+            {isLoadingParents ? 'جاري الحذف...' : 'حذف نهائي'}
+          </button>
+        </div>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={Boolean(showMoveModal)}
+        onClose={() => setShowMoveModal(null)}
+        dir="rtl"
+        size="md"
+        ariaLabel="نقل الطالب لصف آخر"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">نقل الطالب لصف آخر</h2>
+            <p className="sx-app-modal-panel__subtitle">سيتم نقل الطالب {showMoveModal?.name} إلى الصف الدراسي الجديد المختار.</p>
+          </div>
+        </div>
+        <form onSubmit={handleMoveStudent} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-6">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">اختر الصف الجديد</label>
+              <select
+                required
+                value={targetClassId}
+                onChange={e => setTargetClassId(e.target.value)}
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold appearance-none"
+              >
+                <option value="">اختر الصف...</option>
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="sx-app-modal-panel__footer flex gap-4">
+            <button
+              disabled={isMoving}
+              type="submit"
+              className="flex-1 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50"
+            >
+              {isMoving ? 'جاري النقل...' : 'تأكيد النقل'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMoveModal(null)}
+              className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={showAddModal}
+        onClose={closeAddModal}
+        dir="rtl"
+        size="lg"
+        ariaLabel={editingStudent ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 dark:bg-slate-800/40 rounded-full -translate-y-32 translate-x-32 shadow-inner pointer-events-none" />
+        <div className="sx-app-modal-panel__header relative z-10">
+          <div>
+            <h2 className="sx-app-modal-panel__title flex items-center gap-2">
+              <GraduationCap className="text-[#0B2345] dark:text-[#D4A64A]" size={28} />
+              <span>{editingStudent ? 'تعديل بيانات الطالب' : 'تسجيل طالب جديد'}</span>
+            </h2>
+            <p className="sx-app-modal-panel__subtitle italic">
+              يرجى التأكد من دقة البيانات المدخلة حيث سيتم استخدام الاسم في الوثائق الرسمية والنتائج.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="sx-app-modal-panel__close"
+            onClick={closeAddModal}
+            aria-label="إغلاق"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form
+          noValidate
+          onSubmit={handleAdd}
+          className="flex flex-col flex-1 min-h-0 relative z-10 pointer-events-auto"
+        >
+          <div className="sx-app-modal-panel__body flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6 custom-scrollbar">
 
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60">
                      <div className="flex-1 space-y-2">
@@ -1562,166 +1544,159 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                       </div>
                     </div>
 
-                    </div>
-
-                    <div className="relative z-50 shrink-0 pointer-events-auto bg-white dark:bg-slate-900 pt-4 pb-6 md:pb-8 border-t border-slate-100 dark:border-slate-800 flex gap-4">
-                      <button
-                        type="submit"
-                        className="flex-1 px-8 py-3.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-[#071830] transition-all shadow-xl active:scale-95 text-sm md:text-base border border-transparent touch-manipulation"
-                      >
-                        {editingStudent ? 'حفظ التغييرات' : 'تأكيد وإضافة السجل'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          console.log('ADD_STUDENT_CANCEL_CLICKED');
-                          closeAddModal();
-                        }}
-                        className="px-6 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 text-sm md:text-base touch-manipulation"
-                      >
-                        إلغاء الأمر
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body,
-      )}
-
-      <AnimatePresence>
-        {showLinkParentModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-             <motion.div 
-               initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-               animate={{ scale: 1, opacity: 1, y: 0 }} 
-               exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-               className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl relative border border-slate-200 overflow-hidden"
-             >
-               <div className="relative z-10">
-                 <h2 className="text-2xl font-bold mb-1 text-slate-900 font-display">ربط حساب ولي أمر</h2>
-                 <p className="text-slate-500 text-xs mb-8 leading-relaxed">أدخل البريد الإلكتروني لولي أمر الطالب {showLinkParentModal.name}. سيتمكن ولي الأمر من رؤية النتائج والتبليغات عند التسجيل بهذا البريد.</p>
-                 
-                 <form onSubmit={handleLinkParent} className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">اسم ولي الأمر</label>
-                      <input
-                        required
-                        type="text"
-                        value={parentName}
-                        onChange={e => setParentName(e.target.value)}
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold text-slate-900 text-right"
-                        placeholder="الاسم الكامل لولي الأمر..."
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">البريد الإلكتروني لولي الأمر</label>
-                      <input
-                        required
-                        type="email"
-                        value={parentEmail}
-                        onChange={e => setParentEmail(e.target.value)}
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold text-slate-900 text-left"
-                        placeholder="parent@example.com"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">رقم الهاتف</label>
-                        <input
-                          required
-                          type="text"
-                          value={parentPhone}
-                          onChange={e => setParentPhone(e.target.value)}
-                          className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold text-slate-900"
-                          placeholder="07XXXXXXXXX"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">كلمة السر</label>
-                        <input
-                          required
-                          type="text"
-                          value={parentPassword}
-                          onChange={e => setParentPassword(e.target.value)}
-                          className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-mono"
-                          placeholder="كلمة السر..."
-                        />
-                      </div>
-                    </div>
- 
-                    <div className="flex gap-4 pt-4">
-                      <button
-                        disabled={isLinking}
-                        type="submit"
-                        className="flex-1 px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                      >
-                        {isLinking ? 'جاري الربط...' : 'إتمام عملية الربط'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowLinkParentModal(null);
-                          setParentEmail('');
-                          setParentName('');
-                          setParentPhone('');
-                          setParentPassword('');
-                        }}
-                        className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-                      >
-                        إلغاء
-                      </button>
-                    </div>
-                 </form>
-               </div>
-             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {confirmDeleteId && (
-          <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-md p-8 shadow-2xl border border-slate-200 dark:border-slate-800 text-right"
-              dir="rtl"
+          <div className="sx-app-modal-panel__footer relative z-50 shrink-0 pointer-events-auto flex gap-4">
+            <button
+              type="submit"
+              className="flex-1 px-8 py-3.5 bg-[#0B2345] text-white rounded-xl font-bold hover:bg-[#071830] transition-all shadow-xl active:scale-95 text-sm md:text-base border border-transparent touch-manipulation"
             >
-              <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400 mb-6 mx-auto md:mx-0">
-                <AlertTriangle size={32} />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 font-display">تأكيد حذف الطالب</h2>
-              <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                هل أنت متأكد من حذف سجل الطالب <span className="font-bold text-slate-900 dark:text-white">{students.find(s => s.id === confirmDeleteId)?.name}</span> نهائياً؟ 
-                <span className="block mt-2 text-red-500 font-bold text-xs">هذا الإجراء سيؤدي لحذف كافة البيانات المرتبطة ولا يمكن التراجع عنه.</span>
-              </p>
-              
-              <div className="flex flex-col-reverse md:flex-row-reverse gap-4">
-                <button
-                  disabled={!!isDeleting}
-                  onClick={() => handleDeleteStudent(confirmDeleteId)}
-                  className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 disabled:opacity-50"
-                >
-                  {isDeleting ? 'جاري الحذف...' : 'نعم، احذف السجل'}
-                </button>
-                <button
-                  disabled={!!isDeleting}
-                  onClick={() => setConfirmDeleteId(null)}
-                  className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </motion.div>
+              {editingStudent ? 'حفظ التغييرات' : 'تأكيد وإضافة السجل'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                console.log('ADD_STUDENT_CANCEL_CLICKED');
+                closeAddModal();
+              }}
+              className="px-6 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 text-sm md:text-base touch-manipulation"
+            >
+              إلغاء الأمر
+            </button>
           </div>
-        )}
-      </AnimatePresence>
+        </form>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={Boolean(showLinkParentModal)}
+        onClose={() => {
+          setShowLinkParentModal(null);
+          setParentEmail('');
+          setParentName('');
+          setParentPhone('');
+          setParentPassword('');
+        }}
+        dir="rtl"
+        size="md"
+        ariaLabel="ربط حساب ولي أمر"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">ربط حساب ولي أمر</h2>
+            <p className="sx-app-modal-panel__subtitle">أدخل البريد الإلكتروني لولي أمر الطالب {showLinkParentModal?.name}. سيتمكن ولي الأمر من رؤية النتائج والتبليغات عند التسجيل بهذا البريد.</p>
+          </div>
+        </div>
+        <form onSubmit={handleLinkParent} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-4">
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">اسم ولي الأمر</label>
+              <input
+                required
+                type="text"
+                value={parentName}
+                onChange={e => setParentName(e.target.value)}
+                className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold text-slate-900 text-right"
+                placeholder="الاسم الكامل لولي الأمر..."
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">البريد الإلكتروني لولي الأمر</label>
+              <input
+                required
+                type="email"
+                value={parentEmail}
+                onChange={e => setParentEmail(e.target.value)}
+                className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold text-slate-900 text-left"
+                placeholder="parent@example.com"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">رقم الهاتف</label>
+                <input
+                  required
+                  type="text"
+                  value={parentPhone}
+                  onChange={e => setParentPhone(e.target.value)}
+                  className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-bold text-slate-900"
+                  placeholder="07XXXXXXXXX"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">كلمة السر</label>
+                <input
+                  required
+                  type="text"
+                  value={parentPassword}
+                  onChange={e => setParentPassword(e.target.value)}
+                  className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-mono"
+                  placeholder="كلمة السر..."
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="sx-app-modal-panel__footer flex gap-4">
+            <button
+              disabled={isLinking}
+              type="submit"
+              className="flex-1 px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+            >
+              {isLinking ? 'جاري الربط...' : 'إتمام عملية الربط'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowLinkParentModal(null);
+                setParentEmail('');
+                setParentName('');
+                setParentPhone('');
+                setParentPassword('');
+              }}
+              className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={Boolean(confirmDeleteId)}
+        onClose={() => setConfirmDeleteId(null)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="تأكيد حذف الطالب"
+      >
+        <div className="sx-app-modal-panel__body text-right">
+          <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400 mb-6 mx-auto md:mx-0">
+            <AlertTriangle size={32} />
+          </div>
+          <h2 className="sx-app-modal-panel__title mb-2">تأكيد حذف الطالب</h2>
+          <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+            هل أنت متأكد من حذف سجل الطالب <span className="font-bold text-slate-900 dark:text-white">{students.find(s => s.id === confirmDeleteId)?.name}</span> نهائياً؟ 
+            <span className="block mt-2 text-red-500 font-bold text-xs">هذا الإجراء سيؤدي لحذف كافة البيانات المرتبطة ولا يمكن التراجع عنه.</span>
+          </p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex flex-col-reverse md:flex-row-reverse gap-4">
+          <button
+            disabled={!!isDeleting}
+            onClick={() => handleDeleteStudent(confirmDeleteId)}
+            className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 disabled:opacity-50"
+          >
+            {isDeleting ? 'جاري الحذف...' : 'نعم، احذف السجل'}
+          </button>
+          <button
+            disabled={!!isDeleting}
+            onClick={() => setConfirmDeleteId(null)}
+            className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+          >
+            إلغاء
+          </button>
+        </div>
+      </AppModalPortal>
     </div>
   );
 }

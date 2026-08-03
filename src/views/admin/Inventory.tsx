@@ -5,8 +5,8 @@ import { handleFirestoreError, OperationType } from '../../lib/firestore-errors'
 import { useAuth } from '../../lib/AuthContext';
 import { Package, AlertCircle, Plus, Trash2, Edit2, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../../lib/firebase';
+import { AppModalPortal } from '../../components/AppModalPortal';
 
 export default function Inventory() {
   const { profile } = useAuth();
@@ -201,133 +201,137 @@ export default function Inventory() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-[2rem] w-full max-w-md p-10 shadow-2xl relative border border-slate-200"
-            >
-              <button 
-                onClick={closeModal}
-                className="absolute top-6 left-6 text-slate-400 hover:text-slate-900 transition-colors"
+      <AppModalPortal
+        open={showAddModal}
+        onClose={closeModal}
+        dir="rtl"
+        size="md"
+        ariaLabel={editingItem ? 'تعديل مادة' : 'إضافة مادة للمخزن'}
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">
+              {editingItem ? 'تعديل مادة' : 'إضافة مادة للمخزن'}
+            </h2>
+          </div>
+          <button type="button" className="sx-app-modal-panel__close" onClick={closeModal} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-6">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">اسم المادة</label>
+              <input
+                required
+                type="text"
+                value={formData.itemName}
+                onChange={e => setFormData({ ...formData, itemName: e.target.value })}
+                className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all font-bold"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الفئة</label>
+              <select
+                value={formData.category}
+                onChange={e => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all font-bold appearance-none"
               >
-                <X size={24} />
+                <option value="">اختر الفئة</option>
+                <option value="قرطاسية">قرطاسية</option>
+                <option value="أثاث">أثاث</option>
+                <option value="أجهزة إلكترونية">أجهزة إلكترونية</option>
+                <option value="مختبر">مختبر</option>
+                <option value="أخرى">أخرى</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الكمية</label>
+                <input
+                  required
+                  type="number"
+                  value={Number.isNaN(formData.quantity) ? '' : formData.quantity}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setFormData({ ...formData, quantity: val === '' ? 0 : Number(val) || 0 });
+                  }}
+                  className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الحالة</label>
+                <select
+                  value={formData.status}
+                  onChange={e => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all font-bold appearance-none"
+                >
+                  <option value="جديد">جديد</option>
+                  <option value="مستعمل">مستعمل</option>
+                  <option value="بحاجة لصيانة">بحاجة لصيانة</option>
+                  <option value="تالف">تالف</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="sx-app-modal-panel__footer flex gap-4">
+            <button type="submit" className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95">
+              {editingItem ? 'تحديث البيانات' : 'حفظ المادة'}
+            </button>
+            {editingItem && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(editingItem.id)}
+                className="px-4 py-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all active:scale-95"
+                title="حذف المادة"
+              >
+                <Trash2 size={20} />
               </button>
-              <h2 className="text-2xl font-bold text-slate-900 mb-8 font-display">
-                {editingItem ? 'تعديل مادة' : 'إضافة مادة للمخزن'}
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">اسم المادة</label>
-                  <input
-                    required
-                    type="text"
-                    value={formData.itemName}
-                    onChange={e => setFormData({ ...formData, itemName: e.target.value })}
-                    className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all font-bold"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الفئة</label>
-                  <select
-                    value={formData.category}
-                    onChange={e => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all font-bold appearance-none"
-                  >
-                    <option value="">اختر الفئة</option>
-                    <option value="قرطاسية">قرطاسية</option>
-                    <option value="أثاث">أثاث</option>
-                    <option value="أجهزة إلكترونية">أجهزة إلكترونية</option>
-                    <option value="مختبر">مختبر</option>
-                    <option value="أخرى">أخرى</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الكمية</label>
-                    <input
-                      required
-                      type="number"
-                      value={Number.isNaN(formData.quantity) ? '' : formData.quantity}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setFormData({ ...formData, quantity: val === '' ? 0 : Number(val) || 0 });
-                      }}
-                      className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">الحالة</label>
-                    <select
-                      value={formData.status}
-                      onChange={e => setFormData({ ...formData, status: e.target.value })}
-                      className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all font-bold appearance-none"
-                    >
-                      <option value="جديد">جديد</option>
-                      <option value="مستعمل">مستعمل</option>
-                      <option value="بحاجة لصيانة">بحاجة لصيانة</option>
-                      <option value="تالف">تالف</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-4 mt-6">
-                  <button type="submit" className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95">
-                    {editingItem ? 'تحديث البيانات' : 'حفظ المادة'}
-                  </button>
-                  {editingItem && (
-                    <button 
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(editingItem.id)}
-                      className="px-4 py-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all active:scale-95"
-                      title="حذف المادة"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  )}
-                </div>
-              </form>
-            </motion.div>
+            )}
           </div>
-        )}
-      </AnimatePresence>
+        </form>
+      </AppModalPortal>
 
-      <AnimatePresence>
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl border border-slate-200 text-center"
-            >
-              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Trash2 size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2 font-display">تأكيد الحذف</h3>
-              <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                هل أنت متأكد من حذف هذه المادة من المخزن؟ لا يمكن التراجع عن هذا الإجراء.
-              </p>
-              <div className="flex gap-3">
-                 <button 
-                   onClick={confirmDelete}
-                   className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200 active:scale-95"
-                 >
-                   حذف نهائي
-                 </button>
-                 <button 
-                   onClick={() => setShowDeleteConfirm(null)}
-                   className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-                 >
-                   إلغاء
-                 </button>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={Boolean(showDeleteConfirm)}
+        onClose={() => setShowDeleteConfirm(null)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="تأكيد الحذف"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center shrink-0">
+              <Trash2 size={24} />
+            </div>
+            <div>
+              <h3 className="sx-app-modal-panel__title">تأكيد الحذف</h3>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowDeleteConfirm(null)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__body">
+          <p className="text-slate-500 text-sm leading-relaxed text-center">
+            هل أنت متأكد من حذف هذه المادة من المخزن؟ لا يمكن التراجع عن هذا الإجراء.
+          </p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-3">
+          <button
+            onClick={confirmDelete}
+            className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200 active:scale-95"
+          >
+            حذف نهائي
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(null)}
+            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
+          >
+            إلغاء
+          </button>
+        </div>
+      </AppModalPortal>
     </div>
   );
 }

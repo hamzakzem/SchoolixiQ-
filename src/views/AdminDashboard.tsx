@@ -33,6 +33,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
+import { AppModalPortal } from "../components/AppModalPortal";
 import { motion, AnimatePresence } from "motion/react";
 import { pageTransitionProps } from "../lib/motion";
 import {
@@ -1188,11 +1189,8 @@ export default function AdminDashboard() {
   return (
     <>
       {isExpired && profile?.role !== "superadmin" && (
-        <div
-          className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6"
-          dir="rtl"
-        >
-          <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 text-center shadow-2xl border border-red-100 dark:border-red-900/30">
+        <AppModalPortal open onClose={() => {}} dir="rtl" size="md" ariaLabel="انتهى الاشتراك">
+          <div className="sx-app-modal-panel__body p-10 text-center">
             <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
               <Clock className="text-red-600 dark:text-red-400" size={40} />
             </div>
@@ -1220,7 +1218,7 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
-        </div>
+        </AppModalPortal>
       )}
 
       <DashboardShell
@@ -1437,14 +1435,12 @@ export default function AdminDashboard() {
           />
         )}
 
-      <AnimatePresence>
-        {viewingPackage && (
-          <PackageDetailsModal
-            pkg={viewingPackage}
-            onClose={() => setViewingPackage(null)}
-          />
-        )}
-      </AnimatePresence>
+      {viewingPackage && (
+        <PackageDetailsModal
+          pkg={viewingPackage}
+          onClose={() => setViewingPackage(null)}
+        />
+      )}
     </>
   );
 }
@@ -1457,115 +1453,101 @@ function PackageDetailsModal({
   onClose: () => void;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm"
-      dir="rtl"
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800"
-      >
-        <div className="p-8 border-b border-slate-50 dark:border-slate-800 flex items-center justify-between">
+    <AppModalPortal open onClose={onClose} dir="rtl" size="md" ariaLabel="تفاصيل الباقة">
+      <div className="sx-app-modal-panel__header">
+        <div>
+          <h3 className="sx-app-modal-panel__title">{pkg.name}</h3>
+          <p className="sx-app-modal-panel__subtitle">تفاصيل الباقة المطلوبة</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="sx-app-modal-panel__close"
+          aria-label="إغلاق"
+        >
+          <X size={24} />
+        </button>
+      </div>
+
+      <div className="sx-app-modal-panel__body space-y-6">
+        <div className="grid grid-cols-2 gap-4 p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-[2rem] border border-indigo-100 dark:border-indigo-800/30">
           <div>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white">
-              {pkg.name}
-            </h3>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
-              تفاصيل الباقة المطلوبة
+            <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
+              السعر السنوي
+            </p>
+            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+              {(pkg.priceYearly !== undefined
+                ? pkg.priceYearly
+                : pkg.price) === 0
+                ? "مجاني"
+                : (pkg.priceYearly !== undefined
+                    ? pkg.priceYearly
+                    : pkg.price
+                  ).toLocaleString("ar-IQ")}
+              {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) >
+                0 && <span className="text-xs font-bold mr-1">د.ع</span>}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-2xl transition-all active:scale-95"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <div className="p-8 space-y-6">
-          <div className="grid grid-cols-2 gap-4 p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-[2rem] border border-indigo-100 dark:border-indigo-800/30">
-            <div>
-              <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
-                السعر السنوي
-              </p>
-              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                {(pkg.priceYearly !== undefined
-                  ? pkg.priceYearly
-                  : pkg.price) === 0
-                  ? "مجاني"
-                  : (pkg.priceYearly !== undefined
-                      ? pkg.priceYearly
-                      : pkg.price
-                    ).toLocaleString("ar-IQ")}
-                {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) >
-                  0 && <span className="text-xs font-bold mr-1">د.ع</span>}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
-                السعر الشهري
-              </p>
-              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                {(pkg.priceMonthly !== undefined
-                  ? pkg.priceMonthly
-                  : Math.round((pkg.price || 0) / 12)) === 0
-                  ? "مجاني"
-                  : (pkg.priceMonthly !== undefined
-                      ? pkg.priceMonthly
-                      : Math.round((pkg.price || 0) / 12)
-                    ).toLocaleString("ar-IQ")}
-                {(pkg.priceMonthly !== undefined
-                  ? pkg.priceMonthly
-                  : Math.round((pkg.price || 0) / 12)) > 0 && (
-                  <span className="text-xs font-bold mr-1">د.ع</span>
-                )}
-              </p>
-            </div>
-            <div className="col-span-2 border-t border-indigo-150/40 dark:border-indigo-800/10 pt-4 mt-2 text-right">
-              <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
-                سعة الطلاب
-              </p>
-              <p className="text-xl font-black text-indigo-800 dark:text-indigo-300">
-                {pkg.maxStudents.toLocaleString("ar-IQ")} طالب
-              </p>
-            </div>
-          </div>
-
           <div>
-            <h4 className="text-sm font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-              <ClipboardCheck size={18} className="text-indigo-500" />
-              الميزات المتضمنة:
-            </h4>
-            <div className="grid grid-cols-1 gap-3">
-              {pkg.features.map((f: string) => (
-                <div
-                  key={f}
-                  className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800"
-                >
-                  <CheckCircle size={16} className="text-green-500" />
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                    {f}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
+              السعر الشهري
+            </p>
+            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+              {(pkg.priceMonthly !== undefined
+                ? pkg.priceMonthly
+                : Math.round((pkg.price || 0) / 12)) === 0
+                ? "مجاني"
+                : (pkg.priceMonthly !== undefined
+                    ? pkg.priceMonthly
+                    : Math.round((pkg.price || 0) / 12)
+                  ).toLocaleString("ar-IQ")}
+              {(pkg.priceMonthly !== undefined
+                ? pkg.priceMonthly
+                : Math.round((pkg.price || 0) / 12)) > 0 && (
+                <span className="text-xs font-bold mr-1">د.ع</span>
+              )}
+            </p>
+          </div>
+          <div className="col-span-2 border-t border-indigo-150/40 dark:border-indigo-800/10 pt-4 mt-2 text-right">
+            <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">
+              سعة الطلاب
+            </p>
+            <p className="text-xl font-black text-indigo-800 dark:text-indigo-300">
+              {pkg.maxStudents.toLocaleString("ar-IQ")} طالب
+            </p>
           </div>
         </div>
 
-        <div className="p-8 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
-          <button
-            onClick={onClose}
-            className="sx-btn sx-btn-primary px-10 py-4 rounded-2xl text-sm shadow-xl"
-          >
-            إغلاق
-          </button>
+        <div>
+          <h4 className="text-sm font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <ClipboardCheck size={18} className="text-indigo-500" />
+            الميزات المتضمنة:
+          </h4>
+          <div className="grid grid-cols-1 gap-3">
+            {pkg.features.map((f: string) => (
+              <div
+                key={f}
+                className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800"
+              >
+                <CheckCircle size={16} className="text-green-500" />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                  {f}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+
+      <div className="sx-app-modal-panel__footer flex justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          className="sx-btn sx-btn-primary px-10 py-4 rounded-2xl text-sm shadow-xl"
+        >
+          إغلاق
+        </button>
+      </div>
+    </AppModalPortal>
   );
 }

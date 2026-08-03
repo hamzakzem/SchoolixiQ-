@@ -1,4 +1,3 @@
-import { createPortal } from "react-dom";
 import React, { useState, useEffect, useRef } from "react";
 import { db } from "../../lib/firebase";
 import {
@@ -27,7 +26,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { motion, AnimatePresence } from "motion/react";
+import { AppModalPortal } from "../../components/AppModalPortal";
 import {
   handleFirestoreError,
   OperationType,
@@ -384,12 +383,15 @@ export default function IdCards() {
             <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-4 px-2">
               {isRtl ? "اختر الصف" : "Select Class"}
             </h3>
-            <div className="space-y-2 max-h-48 overflow-y-auto pl-2 pr-1 custom-scrollbar">
+            <div className="sx-selection-panel" role="listbox">
               {classes.map((cls) => (
                 <button
                   key={cls.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selectedClassId === cls.id}
                   onClick={() => setSelectedClassId(cls.id)}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? "bg-indigo-600 text-white shadow-md" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                  className={`sx-selection-panel__option${selectedClassId === cls.id ? " is-selected" : ""}`}
                 >
                   {cls.name}
                 </button>
@@ -401,29 +403,28 @@ export default function IdCards() {
             <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-4 px-2">
               {isRtl ? "اختر الطالب" : "Select Student"}
             </h3>
-            <div className="space-y-2 h-[calc(100vh-180px)] min-h-[600px] overflow-y-auto pl-2 pr-1 custom-scrollbar">
+            <div className="sx-selection-panel" style={{ maxHeight: "calc(100vh - 180px)", minHeight: 600 }} role="listbox">
               {students.map((student) => {
                 const hasCard = !!idCards[student.id];
                 return (
                   <button
                     key={student.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedStudent?.id === student.id}
                     onClick={() => setSelectedStudent(student)}
-                    className={`w-full text-right px-4 py-3 rounded-xl flex items-center justify-between transition-all ${selectedStudent?.id === student.id ? "bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800/30 border" : "bg-transparent border border-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"}`}
+                    className={`sx-selection-panel__option${selectedStudent?.id === student.id ? " is-selected" : ""}`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedStudent?.id === student.id ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"}`}
-                      >
-                        {hasCard ? (
-                          <ShieldCheck size={14} className="text-emerald-500" />
-                        ) : (
-                          student.name[0]
-                        )}
-                      </div>
-                      <span className="font-bold text-sm truncate">
-                        {student.name}
-                      </span>
-                    </div>
+                    <span
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${selectedStudent?.id === student.id ? "bg-white/20 text-inherit" : "bg-slate-100 text-slate-500"}`}
+                    >
+                      {hasCard ? (
+                        <ShieldCheck size={14} className="text-emerald-500" />
+                      ) : (
+                        student.name[0]
+                      )}
+                    </span>
+                    <span className="truncate">{student.name}</span>
                   </button>
                 );
               })}
@@ -638,40 +639,30 @@ export default function IdCards() {
         </div>
       </div>
       
-      {template && (
-        <AnimatePresence>
-          {showPrintModal && (
-            <PrintPreviewModal
-              isOpen={showPrintModal}
-              onClose={() => setShowPrintModal(false)}
-              students={printMode === "single" && selectedStudent ? [selectedStudent] : students.filter((s) => idCards[s.id])}
-              idCards={idCards}
-              isRtl={isRtl}
-              template={template}
-              title={printMode === "single" ? `Student-ID-${selectedStudent?.name || "Card"}` : `Class-IDs-${classes.find((c) => c.id === selectedClassId)?.name || "Class"}`}
-              onAfterPrint={handlePrintComplete}
-            />
-          )}
-        </AnimatePresence>
+      {template && showPrintModal && (
+        <PrintPreviewModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          students={printMode === "single" && selectedStudent ? [selectedStudent] : students.filter((s) => idCards[s.id])}
+          idCards={idCards}
+          isRtl={isRtl}
+          template={template}
+          title={printMode === "single" ? `Student-ID-${selectedStudent?.name || "Card"}` : `Class-IDs-${classes.find((c) => c.id === selectedClassId)?.name || "Class"}`}
+          onAfterPrint={handlePrintComplete}
+        />
       )}
 
-      <AnimatePresence>
-        {showEditModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl relative"
-            >
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="absolute top-6 left-6 rtl:right-6 rtl:left-auto p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors z-10"
-              >
-                <X size={20} />
-              </button>
-
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
+      <AppModalPortal
+        open={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="lg"
+        ariaLabel={currentCard ? (isRtl ? 'تعديل الهوية' : 'Edit ID Card') : (isRtl ? 'إصدار هوية جديدة' : 'Create ID Card')}
+      >
+        <div className="print:hidden flex flex-col max-h-[85vh]">
+          <div className="sx-app-modal-panel__header">
+            <div>
+              <h2 className="sx-app-modal-panel__title">
                 {currentCard
                   ? isRtl
                     ? "تعديل الهوية"
@@ -680,11 +671,20 @@ export default function IdCards() {
                     ? "إصدار هوية جديدة"
                     : "Create ID Card"}
               </h2>
-              <p className="text-slate-500 font-bold mb-6">
-                {selectedStudent?.name}
-              </p>
+              <p className="sx-app-modal-panel__subtitle">{selectedStudent?.name}</p>
+            </div>
+            <button
+              type="button"
+              className="sx-app-modal-panel__close"
+              onClick={() => setShowEditModal(false)}
+              aria-label={isRtl ? 'إغلاق' : 'Close'}
+            >
+              <X size={18} />
+            </button>
+          </div>
 
-              <div className="flex flex-col md:flex-row gap-6">
+          <div className="sx-app-modal-panel__body overflow-y-auto">
+            <div className="flex flex-col md:flex-row gap-6">
                 <div className="md:w-1/3 flex flex-col gap-4">
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">
                     {isRtl ? "صورة الطالب" : "Student Photo"}
@@ -897,11 +897,9 @@ export default function IdCards() {
                   </div>
                 </div>
               </div>
-
-            </motion.div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      </AppModalPortal>
     </div>
   );
 }

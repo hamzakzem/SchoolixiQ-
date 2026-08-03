@@ -23,6 +23,8 @@ export type FloatingMenuProps = {
   className?: string;
   id?: string;
   ariaLabel?: string;
+  /** Focus first actionable item on open (default true). Disable for search-anchored panels. */
+  autoFocus?: boolean;
 };
 
 /**
@@ -43,6 +45,7 @@ export function FloatingMenu({
   className,
   id,
   ariaLabel,
+  autoFocus = true,
 }: FloatingMenuProps) {
   const autoId = useId();
   const menuId = id || autoId;
@@ -125,12 +128,14 @@ export function FloatingMenu({
     window.addEventListener('resize', updatePlacement);
     window.addEventListener('scroll', updatePlacement, true);
 
-    const t = window.setTimeout(() => {
-      const first = menuRef.current?.querySelector<HTMLElement>(
-        '[role="menuitem"]:not([disabled]), [role="option"]:not([disabled]), button:not([disabled])',
-      );
-      first?.focus();
-    }, 20);
+    const t = autoFocus
+      ? window.setTimeout(() => {
+          const first = menuRef.current?.querySelector<HTMLElement>(
+            '[role="menuitem"]:not([disabled]), [role="option"]:not([disabled]), button:not([disabled])',
+          );
+          first?.focus();
+        }, 20)
+      : null;
 
     return () => {
       document.removeEventListener('keydown', onKey);
@@ -138,9 +143,9 @@ export function FloatingMenu({
       document.removeEventListener('touchstart', onPointer);
       window.removeEventListener('resize', updatePlacement);
       window.removeEventListener('scroll', updatePlacement, true);
-      window.clearTimeout(t);
+      if (t != null) window.clearTimeout(t);
     };
-  }, [open, onClose, anchorRef, updatePlacement]);
+  }, [open, onClose, anchorRef, updatePlacement, autoFocus]);
 
   if (!open || typeof document === 'undefined') return null;
 

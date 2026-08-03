@@ -79,6 +79,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { pageTransitionProps } from "../lib/motion";
+import { AppModalPortal } from "../components/AppModalPortal";
 
 import SolarLoading from "../components/SolarLoading";
 import ParentChatTab from "./ParentChatTab";
@@ -2535,152 +2536,148 @@ export default function ParentDashboard() {
       {renderContent()}
 
       {/* Purchase Confirmation Modal */}
-      <AnimatePresence>
-        {purchaseModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative border border-slate-200 dark:border-slate-800"
-            >
-              <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto mb-6 overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
-                {getProductImageUrl(purchaseModal) ? (
-                  <img
-                    src={getProductImageUrl(purchaseModal) || undefined}
-                    alt={getProductName(purchaseModal)}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <ShoppingBag size={32} />
-                )}
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 text-center font-display">
-                {t("confirmPurchase")}
-              </h2>
-              <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-8">
-                {t("purchaseItem")}{" "}
-                <span className="font-bold text-slate-900 dark:text-white">
-                  "{getProductName(purchaseModal)}"
-                </span>{" "}
-                لـ {selectedStudent?.name}
-              </p>
+      {purchaseModal && (
+        <AppModalPortal
+          open
+          onClose={() => setPurchaseModal(null)}
+          dir={isRtl ? "rtl" : "ltr"}
+          size="sm"
+          ariaLabel={t("confirmPurchase")}
+        >
+          <div className="sx-app-modal-panel__body p-8">
+            <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto mb-6 overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
+              {getProductImageUrl(purchaseModal) ? (
+                <img
+                  src={getProductImageUrl(purchaseModal) || undefined}
+                  alt={getProductName(purchaseModal)}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <ShoppingBag size={32} />
+              )}
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 text-center font-display">
+              {t("confirmPurchase")}
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-8">
+              {t("purchaseItem")}{" "}
+              <span className="font-bold text-slate-900 dark:text-white">
+                "{getProductName(purchaseModal)}"
+              </span>{" "}
+              لـ {selectedStudent?.name}
+            </p>
 
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl mb-8 space-y-3">
-                <div className="flex justify-between text-xs font-bold">
-                  <span className="text-slate-500">{t("productPrice")}</span>
-                  <span className="text-slate-900 dark:text-white">
-                    {purchaseModal.price?.toLocaleString()} د.ع
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs font-bold">
-                  <span className="text-slate-500">{t("quantity")}</span>
-                  <span className="text-slate-900 dark:text-white">1</span>
-                </div>
-                <div className="h-px bg-slate-200 dark:border-slate-700 my-2"></div>
-                <div className="flex justify-between text-lg font-black tracking-tight text-indigo-600 dark:text-indigo-400">
-                  <span>{t("total")}</span>
-                  <span>{purchaseModal.price?.toLocaleString()} د.ع</span>
-                </div>
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl mb-8 space-y-3">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-500">{t("productPrice")}</span>
+                <span className="text-slate-900 dark:text-white">
+                  {purchaseModal.price?.toLocaleString()} د.ع
+                </span>
               </div>
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-500">{t("quantity")}</span>
+                <span className="text-slate-900 dark:text-white">1</span>
+              </div>
+              <div className="h-px bg-slate-200 dark:border-slate-700 my-2"></div>
+              <div className="flex justify-between text-lg font-black tracking-tight text-indigo-600 dark:text-indigo-400">
+                <span>{t("total")}</span>
+                <span>{purchaseModal.price?.toLocaleString()} د.ع</span>
+              </div>
+            </div>
 
-              <div className="flex gap-4">
-                <button
-                  disabled={isPurchasing}
-                  onClick={() => handlePurchase(purchaseModal)}
-                  className="flex-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50"
-                >
-                  {isPurchasing ? t("executing") : t("confirmPurchaseBtn")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPurchaseModal(null)}
-                  className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 transition-all"
-                >
-                  {t("cancel")}
-                </button>
-              </div>
-            </motion.div>
+            <div className="flex gap-4">
+              <button
+                disabled={isPurchasing}
+                onClick={() => handlePurchase(purchaseModal)}
+                className="flex-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50"
+              >
+                {isPurchasing ? t("executing") : t("confirmPurchaseBtn")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPurchaseModal(null)}
+                className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 transition-all"
+              >
+                {t("cancel")}
+              </button>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </AppModalPortal>
+      )}
 
       {/* Add Student / Linking Modal */}
-      <AnimatePresence>
-        {showAddStudentModal && (
-          <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6"
-            dir={isRtl ? "rtl" : "ltr"}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative border border-slate-200 dark:border-slate-800"
-            >
-              <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-6">
-                <Users size={32} />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 text-center font-display">
-                {t("linkStudent")}
-              </h2>
-              <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-8">
-                {t("linkStudentDesc")}
-              </p>
-
-              <form onSubmit={handleLinkStudent} className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 mr-1">
-                    {t("registrationNoLabel")}
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    value={linkingRegNumber}
-                    onChange={(e) => setLinkingRegNumber(e.target.value)}
-                    placeholder={t("placeholderRegNo")}
-                    className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 dark:focus:border-blue-400 rounded-2xl outline-none transition-all font-mono text-center text-lg font-bold text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800/30">
-                  <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed font-bold">
-                    {t("disclaimerLostId")}
-                  </p>
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    disabled={isLinking}
-                    className="flex-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {isLinking ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-slate-400 border-t-slate-900 animate-spin rounded-full"></div>
-                        {t("linking")}
-                      </>
-                    ) : (
-                      t("confirmLinking")
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddStudentModal(false);
-                      setLinkingRegNumber("");
-                    }}
-                    className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 transition-all font-sans"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+      <AppModalPortal
+        open={showAddStudentModal}
+        onClose={() => {
+          setShowAddStudentModal(false);
+          setLinkingRegNumber("");
+        }}
+        dir={isRtl ? "rtl" : "ltr"}
+        size="md"
+        ariaLabel={t("linkStudent")}
+      >
+        <div className="sx-app-modal-panel__body p-8">
+          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-6">
+            <Users size={32} />
           </div>
-        )}
-      </AnimatePresence>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 text-center font-display">
+            {t("linkStudent")}
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-8">
+            {t("linkStudentDesc")}
+          </p>
+
+          <form onSubmit={handleLinkStudent} className="space-y-6">
+            <div>
+              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 mr-1">
+                {t("registrationNoLabel")}
+              </label>
+              <input
+                required
+                type="text"
+                value={linkingRegNumber}
+                onChange={(e) => setLinkingRegNumber(e.target.value)}
+                placeholder={t("placeholderRegNo")}
+                className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 dark:focus:border-blue-400 rounded-2xl outline-none transition-all font-mono text-center text-lg font-bold text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800/30">
+              <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed font-bold">
+                {t("disclaimerLostId")}
+              </p>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                type="submit"
+                disabled={isLinking}
+                className="flex-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLinking ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-slate-900 animate-spin rounded-full"></div>
+                    {t("linking")}
+                  </>
+                ) : (
+                  t("confirmLinking")
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddStudentModal(false);
+                  setLinkingRegNumber("");
+                }}
+                className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl font-bold hover:bg-slate-200 transition-all font-sans"
+              >
+                إلغاء
+              </button>
+            </div>
+          </form>
+        </div>
+      </AppModalPortal>
       <DashboardSmartAssistant
         hidden={activeTab === "chat"}
         open={assistantOpen}

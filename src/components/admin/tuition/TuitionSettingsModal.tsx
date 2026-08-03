@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Settings2, X, Users, RefreshCw, AlertCircle, CalendarRange } from 'lucide-react';
+import { Settings2, X, RefreshCw, CalendarRange } from 'lucide-react';
+import { AppModalPortal } from '../../AppModalPortal';
 import { db } from '../../../lib/firebase';
 import { doc, updateDoc, collection, serverTimestamp, setDoc, query, where, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
@@ -143,26 +143,24 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white dark:bg-slate-900 rounded-3xl p-5 w-full max-w-lg border border-slate-200 dark:border-slate-800 shadow-2xl relative my-auto"
-      >
-        <button onClick={onClose} className="absolute top-4 left-4 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors">
-          <X size={18} className="text-slate-500" />
-        </button>
-
-        <div className="text-center mb-5 mt-2">
-          <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl flex items-center justify-center mx-auto mb-3">
+    <AppModalPortal open onClose={onClose} dir="rtl" size="md" ariaLabel="إعدادات الرسوم الدراسية">
+      <div className="sx-app-modal-panel__header">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl flex items-center justify-center shrink-0">
             <Settings2 size={24} />
           </div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">إعدادات الرسوم الدراسية</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mt-1">تحديد القسط الأساسي لكل مرحلة دراسية</p>
+          <div>
+            <h2 className="sx-app-modal-panel__title">إعدادات الرسوم الدراسية</h2>
+            <p className="sx-app-modal-panel__subtitle">تحديد القسط الأساسي لكل مرحلة دراسية</p>
+          </div>
         </div>
+        <button type="button" className="sx-app-modal-panel__close" onClick={onClose} aria-label="إغلاق">
+          <X size={18} />
+        </button>
+      </div>
 
-        <form onSubmit={handleSave} className="space-y-4">
+      <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
+        <div className="sx-app-modal-panel__body space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">اختر الصف / المرحلة</label>
@@ -184,7 +182,7 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">العام الدراسي</label>
                 <div className="relative">
                   <CalendarRange className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                  <input 
+                  <input
                     type="text"
                     className="w-full pl-3 pr-8 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     placeholder="e.g. 2024-2025"
@@ -197,15 +195,11 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
           </div>
 
           {selectedClassId && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="space-y-4"
-            >
+            <div className="space-y-4">
               <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
                 <label className="block text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">إجمالي القسط السنوي (الأساسي)</label>
                 <div className="relative group">
-                  <input 
+                  <input
                     required
                     type="number"
                     min="0"
@@ -236,7 +230,7 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
                   <div className="mb-3">
                     <div className="flex gap-1.5 flex-wrap">
                       {[2, 3, 5, 6, 8, 10, 12].map(num => (
-                        <button 
+                        <button
                           key={num}
                           type="button"
                           onClick={() => setInstallmentDuration(num)}
@@ -248,7 +242,7 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
                     </div>
                   </div>
                 )}
-                
+
                 <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800/30 text-xs">
                    <span className="font-bold text-indigo-700 dark:text-indigo-400">قيمة الدفعة التقريبية:</span>
                    <span className="font-mono font-black text-indigo-800 dark:text-indigo-300">
@@ -258,7 +252,7 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
               </div>
 
               <div className="flex items-start gap-2.5 p-3 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30">
-                 <input 
+                 <input
                    type="checkbox"
                    id="applyToExisting"
                    className="w-4 h-4 mt-0.5 rounded text-orange-600 focus:ring-orange-500 cursor-pointer shrink-0"
@@ -271,18 +265,22 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
                     </p>
                  </label>
               </div>
-
-              <button 
-                type="submit"
-                disabled={loading || !baseTuition}
-                className="w-full py-3 mt-1 bg-slate-900 text-white rounded-xl font-black text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 active:scale-95 disabled:opacity-50"
-              >
-                {loading ? 'جاري الحفظ والجدولة...' : 'تأكيد وحفظ الإعدادات'}
-              </button>
-            </motion.div>
+            </div>
           )}
-        </form>
-      </motion.div>
-    </div>
+        </div>
+
+        {selectedClassId && (
+          <div className="sx-app-modal-panel__footer">
+            <button
+              type="submit"
+              disabled={loading || !baseTuition}
+              className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 active:scale-95 disabled:opacity-50"
+            >
+              {loading ? 'جاري الحفظ والجدولة...' : 'تأكيد وحفظ الإعدادات'}
+            </button>
+          </div>
+        )}
+      </form>
+    </AppModalPortal>
   );
 }

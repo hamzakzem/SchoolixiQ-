@@ -4,10 +4,11 @@ import { printService } from '../../lib/printService';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, limit } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { BarChart3, Trophy, Save, ChevronRight, BookOpen, GraduationCap, Star, Plus, Edit2, Printer, FileText } from 'lucide-react';
+import { BarChart3, Trophy, Save, ChevronRight, BookOpen, GraduationCap, Star, Plus, Edit2, Printer, FileText, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import GradesPrint from '../../components/print/GradesPrint';
 import { motion, AnimatePresence } from 'motion/react';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import { notificationService } from '../../lib/notificationService';
 import { safeFirestoreAdd, safeFirestoreUpdate } from '../../lib/offline/offlineSync';
 import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
@@ -797,30 +798,34 @@ export default function Grades() {
         />
       </div>
 
-      <AnimatePresence>
-        {showAddSubject && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl relative"
-            >
-              <h3 className="text-xl font-bold text-slate-900 mb-6">إضافة مادة لصف {selectedClass?.name}</h3>
-              <input 
-                value={newSubject}
-                onChange={e => setNewSubject(e.target.value)}
-                placeholder="اسم المادة"
-                className="w-full px-5 py-4 rounded-xl border border-slate-200 bg-slate-50 mb-6 outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <div className="flex gap-3">
-                <button onClick={handleAddSubject} className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold">إضافة المادة</button>
-                <button onClick={() => setShowAddSubject(false)} className="px-6 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold">إلغاء</button>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={showAddSubject}
+        onClose={() => setShowAddSubject(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="sm"
+        ariaLabel="إضافة مادة"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">إضافة مادة لصف {selectedClass?.name}</h2>
           </div>
-        )}
-      </AnimatePresence>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowAddSubject(false)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__body">
+          <input
+            value={newSubject}
+            onChange={e => setNewSubject(e.target.value)}
+            placeholder="اسم المادة"
+            className="w-full px-5 py-4 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+          />
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-3">
+          <button onClick={handleAddSubject} className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold min-h-12">إضافة المادة</button>
+          <button onClick={() => setShowAddSubject(false)} className="px-6 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold min-h-12">إلغاء</button>
+        </div>
+      </AppModalPortal>
     </div>
   );
 }

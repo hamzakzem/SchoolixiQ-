@@ -4,7 +4,7 @@ import { collection, query, where, serverTimestamp, setDoc, doc, getDocs, update
 import { useAuth } from '../../lib/AuthContext';
 import { UserPlus, Mail, Phone, ShieldCheck, Trash2, Lock, Save, X, Search, Printer, FileText, Send, Eye, EyeOff, CheckSquare, Square } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { adminCreateUser, adminDeleteUser, adminSyncUserClaims } from '../../lib/adminApi';
 import { printElement } from '../../lib/printUtils';
@@ -28,6 +28,7 @@ import {
 } from '../../lib/teacherClass';
 import { getStaffPermissionOptions } from '../../lib/featureRegistry';
 import { canAssignStaffPermission } from '../../lib/staffPermissions';
+import { AppModalPortal } from '../../components/AppModalPortal';
 
 const STAFF_PERMISSION_ROLES = ['admin', 'school_admin', 'assistant', 'staff'] as const;
 
@@ -857,75 +858,94 @@ export default function StaffList() {
         )}
       </div>
 
-      <AnimatePresence>
-        {showSalaryModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-[70] flex items-center justify-center p-4 backdrop-blur-md" dir="rtl">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl relative border border-slate-200"
-            >
-              <h2 className="text-xl font-bold mb-2 text-slate-900">تعديل راتب الموظف</h2>
-              <p className="text-slate-500 text-sm mb-6">{salaryEditStaff?.name}</p>
-              
-              <form onSubmit={handleUpdateSalary} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">الراتب الجديد (د.ع)</label>
-                  <input
-                    required
-                    autoFocus
-                    type="number"
-                    value={Number.isNaN(newSalary) ? '' : newSalary}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setNewSalary(val === '' ? 0 : Number(val) || 0);
-                    }}
-                    className="w-full px-4 py-4 rounded-xl border-2 border-emerald-100 outline-none focus:border-emerald-500 transition-all font-black text-2xl text-emerald-700 text-center"
-                    placeholder="مثال: 500000"
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="flex-1 py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg flex items-center justify-center gap-2"
-                  >
-                    <Save size={18} />
-                    {isSaving ? 'جاري الحفظ...' : 'تحديث الراتب'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowSalaryModal(false)}
-                    className="px-6 py-4 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200 transition-all"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+      <AppModalPortal
+        open={showSalaryModal}
+        onClose={() => setShowSalaryModal(false)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="تعديل راتب الموظف"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">تعديل راتب الموظف</h2>
+            <p className="sx-app-modal-panel__subtitle">{salaryEditStaff?.name}</p>
           </div>
-        )}
-
-        {showModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md" dir="rtl">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className={`bg-white rounded-[2.5rem] w-full shadow-2xl relative border border-slate-200 flex flex-col max-h-[90vh] ${
-                roleUsesPermissionPicker(newStaff.role) ? 'max-w-2xl' : 'max-w-md'
-              }`}
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowSalaryModal(false)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <form onSubmit={handleUpdateSalary} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">الراتب الجديد (د.ع)</label>
+              <input
+                required
+                autoFocus
+                type="number"
+                value={Number.isNaN(newSalary) ? '' : newSalary}
+                onChange={e => {
+                  const val = e.target.value;
+                  setNewSalary(val === '' ? 0 : Number(val) || 0);
+                }}
+                className="w-full px-4 py-4 rounded-xl border border-slate-200 outline-none focus:border-emerald-500 transition-all font-black text-2xl text-emerald-700 text-center min-h-14"
+                placeholder="مثال: 500000"
+              />
+            </div>
+          </div>
+          <div className="sx-app-modal-panel__footer flex gap-3">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="flex-1 py-3.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 min-h-12"
             >
-              <div className="p-8 pb-4 shrink-0">
-                <h2 className="text-2xl font-bold text-slate-900 font-display">
-                  {editingStaff ? 'تعديل بيانات الموظف' : 'إضافة موظف جديد'}
-                </h2>
-              </div>
-              
-              <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto px-8 py-2 space-y-4">
+              <Save size={18} />
+              {isSaving ? 'جاري الحفظ...' : 'تحديث الراتب'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSalaryModal(false)}
+              className="px-6 py-3.5 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200 transition-all min-h-12"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setEditingStaff(null);
+          resetNewStaff();
+        }}
+        dir="rtl"
+        size={roleUsesPermissionPicker(newStaff.role) ? 'lg' : 'md'}
+        ariaLabel={editingStaff ? 'تعديل بيانات الموظف' : 'إضافة موظف جديد'}
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">
+              {editingStaff ? 'تعديل بيانات الموظف' : 'إضافة موظف جديد'}
+            </h2>
+            <p className="sx-app-modal-panel__subtitle">البيانات والصلاحيات — القوائم قابلة للتمرير بالكامل</p>
+          </div>
+          <button
+            type="button"
+            className="sx-app-modal-panel__close"
+            aria-label="إغلاق"
+            onClick={() => {
+              setShowModal(false);
+              setEditingStaff(null);
+              resetNewStaff();
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-widest">الاسم الكامل</label>
                     <input
@@ -1090,26 +1110,24 @@ export default function StaffList() {
                               })}
                             </div>
                           )}
-                          <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[220px] overflow-y-auto custom-scrollbar">
+                          <div className="sx-selection-panel" role="listbox" aria-multiselectable="true">
                             {schoolClasses.map((schoolClass) => {
                               const selected = newStaff.classIds.includes(schoolClass.id);
                               return (
                                 <button
                                   key={schoolClass.id}
                                   type="button"
+                                  role="option"
+                                  aria-selected={selected}
                                   onClick={() => toggleTeacherClass(schoolClass.id)}
-                                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all border text-right ${
-                                    selected
-                                      ? 'bg-orange-600 text-white border-transparent shadow-md'
-                                      : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'
-                                  }`}
+                                  className={`sx-selection-panel__option${selected ? ' is-selected' : ''}`}
                                 >
                                   {selected ? (
                                     <CheckSquare size={18} />
                                   ) : (
                                     <Square size={18} className="opacity-40" />
                                   )}
-                                  <span className="text-sm font-bold">{schoolClass.name}</span>
+                                  <span>{schoolClass.name}</span>
                                 </button>
                               );
                             })}
@@ -1124,27 +1142,24 @@ export default function StaffList() {
 
                   {roleUsesPermissionPicker(newStaff.role) && (
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest leading-none">الصلاحيات المتاحة (اختر الأقسام)</label>
-                      <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[300px] overflow-y-auto custom-scrollbar">
-                        {permissionOptions.map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => togglePermission(opt.id)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all border text-right ${
-                              newStaff.permissions.includes(opt.id)
-                                ? 'bg-indigo-600 text-white border-transparent shadow-md'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                            }`}
-                          >
-                            {newStaff.permissions.includes(opt.id) ? (
-                              <CheckSquare size={18} />
-                            ) : (
-                              <Square size={18} className="opacity-40" />
-                            )}
-                            <span className="text-sm font-bold">{opt.label}</span>
-                          </button>
-                        ))}
+                      <label className="block text-xs font-bold text-slate-500 mb-2">الصلاحيات المتاحة (اختر الأقسام)</label>
+                      <div className="sx-selection-panel" role="listbox" aria-multiselectable="true">
+                        {permissionOptions.map((opt) => {
+                          const selected = newStaff.permissions.includes(opt.id);
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              onClick={() => togglePermission(opt.id)}
+                              className={`sx-selection-panel__option${selected ? ' is-selected' : ''}`}
+                            >
+                              {selected ? <CheckSquare size={18} /> : <Square size={18} className="opacity-40" />}
+                              <span>{opt.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1212,7 +1227,7 @@ export default function StaffList() {
                   </div>
                 </div>
 
-                <div className="p-8 pt-4 bg-slate-50/50 shrink-0 border-t border-slate-100 flex flex-wrap gap-3">
+          <div className="sx-app-modal-panel__footer flex flex-wrap gap-3">
                   <button
                     type="submit"
                     disabled={
@@ -1225,7 +1240,7 @@ export default function StaffList() {
                           schoolClasses.length === 0 ||
                           newStaff.classIds.length === 0))
                     }
-                    className="flex-1 min-w-[120px] py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg flex items-center justify-center gap-2"
+                    className="flex-1 min-w-[120px] py-3.5 bg-[#0b1f3a] text-white rounded-xl font-bold hover:bg-[#122a4a] transition-all flex items-center justify-center gap-2 min-h-12"
                   >
                     <Save size={18} />
                     {isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}
@@ -1237,7 +1252,7 @@ export default function StaffList() {
                         setShowModal(false);
                         setConfirmDeleteId(editingStaff.id);
                       }}
-                      className="px-6 py-4 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg flex items-center justify-center gap-2"
+                      className="px-6 py-3.5 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all flex items-center justify-center gap-2 min-h-12"
                     >
                       <Trash2 size={18} />
                       حذف
@@ -1250,87 +1265,89 @@ export default function StaffList() {
                       setEditingStaff(null);
                       resetNewStaff();
                     }}
-                    className="px-6 py-4 bg-white border border-slate-200 text-slate-500 rounded-xl font-bold hover:bg-slate-100 transition-all"
+                    className="px-6 py-3.5 bg-white border border-slate-200 text-slate-500 rounded-xl font-bold hover:bg-slate-100 transition-all min-h-12"
                   >
                     إلغاء
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      </AppModalPortal>
 
-      <AnimatePresence>
-        {confirmDeleteId && (
-          <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" dir="rtl">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl border border-slate-200 text-right"
-            >
-              <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-red-600 mb-6">
-                <Trash2 size={32} />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-2 font-display">تأكيد حذف الموظف</h2>
-              <p className="text-slate-500 mb-8 leading-relaxed">
-                هل أنت متأكد من حذف حساب الموظف <span className="font-bold text-slate-900">{staff.find(s => s.id === confirmDeleteId)?.name}</span>؟ 
-                <span className="block mt-2 text-red-500 font-bold text-xs text-right">سيتم فقدان صلاحية الوصول لهذا الحساب فوراً.</span>
-              </p>
-              
-              <div className="flex flex-row-reverse gap-4">
-                <button
-                  disabled={isDeleting}
-                  onClick={() => handleDelete(confirmDeleteId)}
-                  className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                >
-                  {isDeleting ? 'جاري الحذف...' : 'نعم، احذف السجل'}
-                </button>
-                <button
-                  disabled={isDeleting}
-                  onClick={() => setConfirmDeleteId(null)}
-                  className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={Boolean(confirmDeleteId)}
+        onClose={() => setConfirmDeleteId(null)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="تأكيد حذف الموظف"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">تأكيد حذف الموظف</h2>
+            <p className="sx-app-modal-panel__subtitle">
+              {staff.find(s => s.id === confirmDeleteId)?.name}
+            </p>
           </div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showReportModal && (
-          <div className="fixed inset-0 bg-slate-900/60 z-[120] flex items-center justify-center p-4 backdrop-blur-sm" dir="rtl">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
-            >
-              <div className="p-8 border-b border-slate-100 flex items-center justify-between shrink-0 no-print">
-                <div className="text-right">
-                  <h2 className="text-2xl font-bold text-slate-900 font-display">تقرير حضور الكادر</h2>
-                  <p className="text-slate-500 text-sm">بيانات الحالة اليومية لجميع الموظفين</p>
-                </div>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={handlePrintClick}
-                    className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800"
-                  >
-                    <Printer size={18} />
-                    طباعة التقرير
-                  </button>
-                  <button 
-                    onClick={() => setShowReportModal(false)}
-                    className="p-3 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setConfirmDeleteId(null)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__body">
+          <p className="text-slate-500 leading-relaxed font-bold text-sm">
+            هل أنت متأكد من حذف حساب الموظف؟
+            <span className="block mt-2 text-red-500 font-bold text-xs">سيتم فقدان صلاحية الوصول لهذا الحساب فوراً.</span>
+          </p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-3">
+          <button
+            disabled={isDeleting}
+            onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+            className="flex-1 px-6 py-3.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all disabled:opacity-50 min-h-12"
+          >
+            {isDeleting ? 'جاري الحذف...' : 'نعم، احذف السجل'}
+          </button>
+          <button
+            disabled={isDeleting}
+            onClick={() => setConfirmDeleteId(null)}
+            className="px-6 py-3.5 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200 transition-all min-h-12"
+          >
+            إلغاء
+          </button>
+        </div>
+      </AppModalPortal>
 
-              <div ref={reportPrintRef} className="flex-1 overflow-y-auto p-8 bg-white" id="report-content" dir="rtl">
+      <AppModalPortal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        dir="rtl"
+        size="lg"
+        ariaLabel="تقرير حضور الكادر"
+      >
+        <div className="sx-app-modal-panel__header no-print">
+          <div>
+            <h2 className="sx-app-modal-panel__title">تقرير حضور الكادر</h2>
+            <p className="sx-app-modal-panel__subtitle">بيانات الحالة اليومية لجميع الموظفين</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handlePrintClick}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#0b1f3a] text-white rounded-xl font-bold hover:bg-[#122a4a] min-h-10"
+            >
+              <Printer size={16} />
+              طباعة
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReportModal(false)}
+              className="sx-app-modal-panel__close"
+              aria-label="إغلاق"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div ref={reportPrintRef} className="sx-app-modal-panel__body" id="report-content" dir="rtl">
                 <div className="hidden print:block mb-8 text-center border-b-2 border-slate-900 pb-6">
                   <h1 className="text-3xl font-black mb-2">تقرير حضور كادر المدرسة</h1>
                   <p className="text-xl font-bold text-slate-600 font-mono tracking-tighter">التاريخ: {new Date().toLocaleDateString('ar-IQ')}</p>
@@ -1382,13 +1399,8 @@ export default function StaffList() {
                     <div className="w-48 h-px bg-slate-300 mx-auto"></div>
                   </div>
                 </div>
-              </div>
-
-              
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </div>
+      </AppModalPortal>
     </div>
   );
 }

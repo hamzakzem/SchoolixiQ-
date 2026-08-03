@@ -19,6 +19,7 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { NotificationCenter } from "../components/NotificationCenter";
+import { AppModalPortal } from "../components/AppModalPortal";
 import { filterNotificationsForUser } from "../lib/notificationVisibility";
 import {
   Users,
@@ -2382,31 +2383,31 @@ export default function TeacherDashboard() {
     </DashboardShell>
 
         {/* HomeWork Modal */}
-        <AnimatePresence>
-          {showAddHomework && (
-            <div
-              className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md"
-              dir={isRtl ? "rtl" : "ltr"}
+        <AppModalPortal
+          open={showAddHomework}
+          onClose={() => setShowAddHomework(false)}
+          dir={isRtl ? "rtl" : "ltr"}
+          size="md"
+          ariaLabel="إضافة واجب منزلي جديد"
+        >
+          <div className="sx-app-modal-panel__header">
+            <div>
+              <h2 className="sx-app-modal-panel__title">
+                إضافة واجب منزلي جديد
+              </h2>
+            </div>
+            <button
+              type="button"
+              className="sx-app-modal-panel__close"
+              onClick={() => setShowAddHomework(false)}
+              aria-label="إغلاق"
             >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                className="bg-white rounded-[2.5rem] w-full max-w-xl p-8 shadow-2xl relative"
-              >
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-bold text-slate-900 font-display">
-                    إضافة واجب منزلي جديد
-                  </h2>
-                  <button
-                    onClick={() => setShowAddHomework(false)}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    <Plus className="rotate-45" />
-                  </button>
-                </div>
+              <Plus className="rotate-45" />
+            </button>
+          </div>
 
-                <form onSubmit={handleAddHomework} className="space-y-5">
+          <form onSubmit={handleAddHomework} className="flex flex-col flex-1 min-h-0">
+            <div className="sx-app-modal-panel__body space-y-5">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
@@ -2523,249 +2524,254 @@ export default function TeacherDashboard() {
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    className="w-full py-5 sx-btn sx-btn-primary rounded-2xl shadow-xl gap-2"
-                  >
-                    <Send size={18} />
-                    {t("publishHomeworkNow")}
-                  </button>
-                </form>
-              </motion.div>
             </div>
-          )}
-        </AnimatePresence>
+            <div className="sx-app-modal-panel__footer">
+              <button
+                type="submit"
+                className="w-full py-5 sx-btn sx-btn-primary rounded-2xl shadow-xl gap-2"
+              >
+                <Send size={18} />
+                {t("publishHomeworkNow")}
+              </button>
+            </div>
+          </form>
+        </AppModalPortal>
 
         {/* Behavior Modal */}
-        <AnimatePresence>
-          {showAddBehavior && (
-            <div
-              className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md"
-              dir={isRtl ? "rtl" : "ltr"}
+        <AppModalPortal
+          open={showAddBehavior}
+          onClose={() => {
+            setShowAddBehavior(false);
+            setSelectedStudent(null);
+          }}
+          dir={isRtl ? "rtl" : "ltr"}
+          size="md"
+          ariaLabel={t("addBehaviorReport")}
+        >
+          <div className="sx-app-modal-panel__header">
+            <div>
+              <h2 className="sx-app-modal-panel__title">
+                {t("addBehaviorReport")}
+              </h2>
+            </div>
+            <button
+              type="button"
+              className="sx-app-modal-panel__close"
+              onClick={() => {
+                setShowAddBehavior(false);
+                setSelectedStudent(null);
+              }}
+              aria-label="إغلاق"
             >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                className="bg-white rounded-[2.5rem] w-full max-w-xl p-8 shadow-2xl relative"
-              >
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-bold text-slate-900 font-display">
-                    {t("addBehaviorReport")}
-                  </h2>
+              <Plus className="rotate-45" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSendBehaviorReport} className="flex flex-col flex-1 min-h-0">
+            <div className="sx-app-modal-panel__body space-y-6">
+              {selectedStudent && (
+                <div className="p-4 bg-slate-50 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm">
+                      <User size={20} />
+                    </div>
+                    <div>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase">
+                        {t("student")}
+                      </p>
+                      <p className="text-slate-900 font-bold">
+                        {selectedStudent.name}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                  {t("behaviorType")}
+                </label>
+                <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={() => {
-                      setShowAddBehavior(false);
-                      setSelectedStudent(null);
-                    }}
-                    className="text-slate-400 hover:text-slate-600"
+                    type="button"
+                    onClick={() =>
+                      setBehaviorNote({ ...behaviorNote, type: "positive" })
+                    }
+                    className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all border-2 ${behaviorNote.type === "positive" ? "bg-emerald-50 border-emerald-500 text-emerald-700" : "bg-slate-50 border-transparent text-slate-400"}`}
                   >
-                    <Plus className="rotate-45" />
+                    <CheckCircle size={18} />
+                    {t("positiveBehavior")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setBehaviorNote({ ...behaviorNote, type: "warning" })
+                    }
+                    className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all border-2 ${behaviorNote.type === "warning" ? "bg-red-50 border-red-500 text-red-700" : "bg-slate-50 border-transparent text-slate-400"}`}
+                  >
+                    <AlertTriangle size={18} />
+                    {t("warningBehavior")}
                   </button>
                 </div>
+              </div>
 
-                {selectedStudent && (
-                  <div className="p-4 bg-slate-50 rounded-2xl mb-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm">
-                        <User size={20} />
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase">
-                          {t("student")}
-                        </p>
-                        <p className="text-slate-900 font-bold">
-                          {selectedStudent.name}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <form onSubmit={handleSendBehaviorReport} className="space-y-6">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-                      {t("behaviorType")}
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setBehaviorNote({ ...behaviorNote, type: "positive" })
-                        }
-                        className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all border-2 ${behaviorNote.type === "positive" ? "bg-emerald-50 border-emerald-500 text-emerald-700" : "bg-slate-50 border-transparent text-slate-400"}`}
-                      >
-                        <CheckCircle size={18} />
-                        {t("positiveBehavior")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setBehaviorNote({ ...behaviorNote, type: "warning" })
-                        }
-                        className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all border-2 ${behaviorNote.type === "warning" ? "bg-red-50 border-red-500 text-red-700" : "bg-slate-50 border-transparent text-slate-400"}`}
-                      >
-                        <AlertTriangle size={18} />
-                        {t("warningBehavior")}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
-                      {t("behaviorDescription")}
-                    </label>
-                    <textarea
-                      required
-                      rows={4}
-                      value={behaviorNote.description}
-                      onChange={(e) =>
-                        setBehaviorNote({
-                          ...behaviorNote,
-                          description: e.target.value,
-                        })
-                      }
-                      className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border-none font-bold outline-none"
-                      placeholder={t("behaviorDescriptionPlaceholder")}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Send size={18} />
-                    {t("saveReport")}
-                  </button>
-                </form>
-              </motion.div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
+                  {t("behaviorDescription")}
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={behaviorNote.description}
+                  onChange={(e) =>
+                    setBehaviorNote({
+                      ...behaviorNote,
+                      description: e.target.value,
+                    })
+                  }
+                  className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border-none font-bold outline-none"
+                  placeholder={t("behaviorDescriptionPlaceholder")}
+                />
+              </div>
             </div>
-          )}
-        </AnimatePresence>
+            <div className="sx-app-modal-panel__footer">
+              <button
+                type="submit"
+                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+              >
+                <Send size={18} />
+                {t("saveReport")}
+              </button>
+            </div>
+          </form>
+        </AppModalPortal>
 
         {/* Report Modal */}
-        <AnimatePresence>
-          {showAddReport && (
-            <div
-              className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md"
-              dir={isRtl ? "rtl" : "ltr"}
+        <AppModalPortal
+          open={showAddReport}
+          onClose={() => {
+            setShowAddReport(false);
+            setSelectedStudent(null);
+          }}
+          dir={isRtl ? "rtl" : "ltr"}
+          size="md"
+          ariaLabel={t("studentEvaluationReportTitle")}
+        >
+          <div className="sx-app-modal-panel__header">
+            <div>
+              <h2 className="sx-app-modal-panel__title">
+                {t("studentEvaluationReportTitle")}
+              </h2>
+            </div>
+            <button
+              type="button"
+              className="sx-app-modal-panel__close"
+              onClick={() => {
+                setShowAddReport(false);
+                setSelectedStudent(null);
+              }}
+              aria-label="إغلاق"
             >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                className="bg-white rounded-[2.5rem] w-full max-w-xl p-8 shadow-2xl relative"
-              >
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-bold text-slate-900 font-display">
-                    {t("studentEvaluationReportTitle")}
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setShowAddReport(false);
-                      setSelectedStudent(null);
-                    }}
-                    className="text-slate-400 hover:text-slate-600"
+              <Plus className="rotate-45" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSendReport} className="flex flex-col flex-1 min-h-0">
+            <div className="sx-app-modal-panel__body space-y-5">
+              {!selectedStudent ? (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
+                    اختر الطالب
+                  </label>
+                  <select
+                    required
+                    onChange={(e) =>
+                      setSelectedStudent(
+                        students.find((s) => s.id === e.target.value),
+                      )
+                    }
+                    className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border-none font-bold outline-none appearance-none"
                   >
-                    <Plus className="rotate-45" />
+                    <option value="">{t("selectStudentPlaceholder")}</option>
+                    {students.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({assignedClassName || s.classId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-50 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm">
+                      <User size={20} />
+                    </div>
+                    <div>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase">
+                        الطالب
+                      </p>
+                      <p className="text-slate-900 font-bold">
+                        {selectedStudent.name}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudent(null)}
+                    className="text-[10px] font-bold text-indigo-600 hover:underline"
+                  >
+                    {t("change")}
                   </button>
                 </div>
+              )}
 
-                {!selectedStudent ? (
-                  <div className="mb-6">
-                    <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
-                      اختر الطالب
-                    </label>
-                    <select
-                      required
-                      onChange={(e) =>
-                        setSelectedStudent(
-                          students.find((s) => s.id === e.target.value),
-                        )
-                      }
-                      className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border-none font-bold outline-none appearance-none"
-                    >
-                      <option value="">{t("selectStudentPlaceholder")}</option>
-                      {students.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({assignedClassName || s.classId})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-slate-50 rounded-2xl mb-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm">
-                        <User size={20} />
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase">
-                          الطالب
-                        </p>
-                        <p className="text-slate-900 font-bold">
-                          {selectedStudent.name}
-                        </p>
-                      </div>
-                    </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
+                  {t("directReportTo")}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "school", label: t("schoolOnly") },
+                    { id: "parents", label: t("parentsOnly") },
+                    { id: "both", label: t("schoolAndParents") },
+                  ].map((opt) => (
                     <button
-                      onClick={() => setSelectedStudent(null)}
-                      className="text-[10px] font-bold text-indigo-600 hover:underline"
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setReportTarget(opt.id as any)}
+                      className={`py-3 rounded-xl border text-[10px] font-bold transition-all ${reportTarget === opt.id ? "sx-btn sx-btn-primary border-transparent shadow-md" : "sx-btn sx-btn-ghost border-[var(--sx-border)]"}`}
                     >
-                      {t("change")}
+                      {opt.label}
                     </button>
-                  </div>
-                )}
+                  ))}
+                </div>
+              </div>
 
-                <form onSubmit={handleSendReport} className="space-y-5">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
-                      {t("directReportTo")}
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: "school", label: t("schoolOnly") },
-                        { id: "parents", label: t("parentsOnly") },
-                        { id: "both", label: t("schoolAndParents") },
-                      ].map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setReportTarget(opt.id as any)}
-                          className={`py-3 rounded-xl border text-[10px] font-bold transition-all ${reportTarget === opt.id ? "sx-btn sx-btn-primary border-transparent shadow-md" : "sx-btn sx-btn-ghost border-[var(--sx-border)]"}`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
-                      نص التقرير / الملاحظات
-                    </label>
-                    <textarea
-                      required
-                      rows={5}
-                      value={reportContent}
-                      onChange={(e) => setReportContent(e.target.value)}
-                      className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border-none font-bold outline-none"
-                      placeholder={t("reportContentPlaceholder")}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Send size={18} />
-                    {t("sendReportBtn")}
-                  </button>
-                </form>
-              </motion.div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
+                  نص التقرير / الملاحظات
+                </label>
+                <textarea
+                  required
+                  rows={5}
+                  value={reportContent}
+                  onChange={(e) => setReportContent(e.target.value)}
+                  className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border-none font-bold outline-none"
+                  placeholder={t("reportContentPlaceholder")}
+                />
+              </div>
             </div>
-          )}
-        </AnimatePresence>
+            <div className="sx-app-modal-panel__footer">
+              <button
+                type="submit"
+                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+              >
+                <Send size={18} />
+                {t("sendReportBtn")}
+              </button>
+            </div>
+          </form>
+        </AppModalPortal>
     </>
   );
 }

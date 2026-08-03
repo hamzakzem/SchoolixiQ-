@@ -16,9 +16,9 @@ import {
 import { useAuth } from '../../lib/AuthContext';
 import { BookOpen, Edit2, Plus, Save, Trash2, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { isRedactedCredentialValue } from '../../lib/userProfile';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import {
   dedupeSchoolSubjects,
   listTeachersUsingSubject,
@@ -261,82 +261,84 @@ export default function SchoolSubjectsManagement() {
         </div>
       )}
 
-      <AnimatePresence>
-        {showForm && (
-          <motion.form
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            onSubmit={handleSave}
-            className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4 overflow-hidden"
-          >
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
-              {editingSubject ? 'تعديل اسم المادة' : 'اسم المادة الجديدة'}
-            </label>
-            <input
-              type="text"
-              value={subjectName}
-              onChange={(e) => setSubjectName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-900 dark:text-white outline-none focus:border-emerald-500"
-              placeholder="مثال: الرياضيات"
-              autoFocus
-              required
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50"
-              >
-                <Save size={16} />
-                {saving ? 'جاري الحفظ...' : 'حفظ'}
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-5 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </motion.form>
-        )}
-      </AnimatePresence>
+      {showForm && (
+        <form
+          onSubmit={handleSave}
+          className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4"
+        >
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
+            {editingSubject ? 'تعديل اسم المادة' : 'اسم المادة الجديدة'}
+          </label>
+          <input
+            type="text"
+            value={subjectName}
+            onChange={(e) => setSubjectName(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-900 dark:text-white outline-none focus:border-emerald-500 min-h-11"
+            placeholder="مثال: الرياضيات"
+            autoFocus
+            required
+          />
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 min-h-12"
+            >
+              <Save size={16} />
+              {saving ? 'جاري الحفظ...' : 'حفظ'}
+            </button>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="px-5 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold min-h-12"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </form>
+      )}
 
-      <AnimatePresence>
-        {confirmDelete && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+      <AppModalPortal
+        open={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="تأكيد حذف المادة"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h4 className="sx-app-modal-panel__title">تأكيد حذف المادة</h4>
+            <p className="sx-app-modal-panel__subtitle">
+              هل تريد حذف مادة «{confirmDelete?.name}»؟ لن يُسمح بالحذف إذا كانت مخصصة لمعلمين.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="sx-app-modal-panel__close"
+            onClick={() => setConfirmDelete(null)}
+            aria-label="إغلاق"
           >
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700">
-              <h4 className="font-bold text-slate-900 dark:text-white mb-2">تأكيد حذف المادة</h4>
-              <p className="text-sm text-slate-500 mb-6">
-                هل تريد حذف مادة «{confirmDelete.name}»؟ لن يُسمح بالحذف إذا كانت مخصصة لمعلمين.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={saving}
-                  className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 disabled:opacity-50"
-                >
-                  {saving ? 'جاري الحذف...' : 'حذف'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(null)}
-                  className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-xl font-bold"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-3">
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={saving}
+            className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 disabled:opacity-50 min-h-12"
+          >
+            {saving ? 'جاري الحذف...' : 'حذف'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(null)}
+            className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-xl font-bold min-h-12"
+          >
+            إلغاء
+          </button>
+        </div>
+      </AppModalPortal>
     </section>
   );
 }

@@ -32,7 +32,7 @@ import {
   User,
   GraduationCap,
 } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { AppModalPortal } from "../components/AppModalPortal";
 import { toast } from "react-hot-toast";
 import { SchoolixChatShell, type ChatShellContact } from "../components/chat/SchoolixChatShell";
 import { useChatBack } from "../hooks/useChatBack";
@@ -712,216 +712,210 @@ export default function TeacherChatTab() {
       />
 
       {/* School details modal (preserved & polished) */}
-      <AnimatePresence>
-        {showSchoolInfo && schoolInfo && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100 dark:border-slate-800"
-              dir={isRtl ? "rtl" : "ltr"}
+      {showSchoolInfo && schoolInfo && (
+        <AppModalPortal
+          open
+          onClose={() => setShowSchoolInfo(false)}
+          dir={isRtl ? "rtl" : "ltr"}
+          size="md"
+          ariaLabel={isRtl ? "تفاصيل المدرسة" : "School Details"}
+        >
+          <div className="sx-app-modal-panel__header">
+            <h2 className="sx-app-modal-panel__title">
+              {isRtl ? "تفاصيل المدرسة" : "School Details"}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowSchoolInfo(false)}
+              className="sx-app-modal-panel__close"
+              aria-label={isRtl ? "إغلاق" : "Close"}
             >
-              <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex items-center justify-between bg-slate-50 dark:bg-slate-800/45">
-                <h2 className="text-lg font-black text-slate-900 dark:text-white">
-                  {isRtl ? "تفاصيل المدرسة" : "School Details"}
-                </h2>
-                <button
-                  onClick={() => setShowSchoolInfo(false)}
-                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition-colors"
-                >
-                  <X size={18} />
-                </button>
+              <X size={18} />
+            </button>
+          </div>
+          <div className="sx-app-modal-panel__body space-y-6">
+            <div className="flex flex-col items-center justify-center">
+              {schoolInfo.logoUrl ? (
+                <img
+                  src={schoolInfo.logoUrl}
+                  alt="Logo"
+                  className="w-20 h-20 rounded-3xl object-cover shadow-md mb-3 border-2 border-white dark:border-slate-800"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center mb-3 text-indigo-600 dark:text-indigo-400 shadow-inner">
+                  <Building2 size={36} />
+                </div>
+              )}
+              <h3 className="text-base font-black text-slate-900 dark:text-white text-center">
+                {schoolInfo.name}
+              </h3>
+            </div>
+
+            <div className="space-y-4">
+              {schoolInfo.address && (
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-500 rounded-xl shrink-0">
+                    <MapPin size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-450 uppercase">
+                      {isRtl ? "العنوان" : "Address"}
+                    </p>
+                    <p className="text-slate-900 dark:text-white font-bold text-sm">
+                      {schoolInfo.address}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-bold text-slate-700 dark:text-slate-350 text-xs uppercase tracking-wide">
+                  {isRtl ? "أرقام التواصل" : "Contact Numbers"}
+                </h4>
+                {!isEditingSchoolInfo ? (
+                  <button
+                    onClick={handleEditSchoolInfo}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSaveSchoolInfo}
+                    disabled={isLoading}
+                    className="p-1.5 text-indigo-650 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-all font-bold text-xs flex items-center gap-1"
+                  >
+                    <Save size={14} />
+                    {isRtl ? "حفظ" : "Save"}
+                  </button>
+                )}
               </div>
-              <div className="p-6 space-y-6">
-                <div className="flex flex-col items-center justify-center">
-                  {schoolInfo.logoUrl ? (
-                    <img
-                      src={schoolInfo.logoUrl}
-                      alt="Logo"
-                      className="w-20 h-20 rounded-3xl object-cover shadow-md mb-3 border-2 border-white dark:border-slate-800"
-                      referrerPolicy="no-referrer"
+
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-500 rounded-xl shrink-0">
+                  <Phone size={18} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-slate-450 uppercase">
+                    {isRtl ? "رقم الهاتف" : "Phone"}
+                  </p>
+                  {isEditingSchoolInfo ? (
+                    <input
+                      type="tel"
+                      value={editedPhone}
+                      onChange={(e) => setEditedPhone(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-850 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold"
+                      dir="ltr"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center mb-3 text-indigo-600 dark:text-indigo-400 shadow-inner">
-                      <Building2 size={36} />
-                    </div>
+                    <p className="text-slate-900 dark:text-slate-200 font-bold text-sm" dir="ltr">
+                      {schoolInfo.phone || "-"}
+                    </p>
                   )}
-                  <h3 className="text-base font-black text-slate-900 dark:text-white text-center">
-                    {schoolInfo.name}
-                  </h3>
-                </div>
-
-                <div className="space-y-4">
-                  {schoolInfo.address && (
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-500 rounded-xl shrink-0">
-                        <MapPin size={18} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-450 uppercase">
-                          {isRtl ? "العنوان" : "Address"}
-                        </p>
-                        <p className="text-slate-900 dark:text-white font-bold text-sm">
-                          {schoolInfo.address}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-bold text-slate-700 dark:text-slate-350 text-xs uppercase tracking-wide">
-                      {isRtl ? "أرقام التواصل" : "Contact Numbers"}
-                    </h4>
-                    {!isEditingSchoolInfo ? (
-                      <button
-                        onClick={handleEditSchoolInfo}
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleSaveSchoolInfo}
-                        disabled={isLoading}
-                        className="p-1.5 text-indigo-650 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-all font-bold text-xs flex items-center gap-1"
-                      >
-                        <Save size={14} />
-                        {isRtl ? "حفظ" : "Save"}
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-500 rounded-xl shrink-0">
-                      <Phone size={18} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-[10px] font-bold text-slate-450 uppercase">
-                        {isRtl ? "رقم الهاتف" : "Phone"}
-                      </p>
-                      {isEditingSchoolInfo ? (
-                        <input
-                          type="tel"
-                          value={editedPhone}
-                          onChange={(e) => setEditedPhone(e.target.value)}
-                          className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-850 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold"
-                          dir="ltr"
-                        />
-                      ) : (
-                        <p className="text-slate-900 dark:text-slate-200 font-bold text-sm" dir="ltr">
-                          {schoolInfo.phone || "-"}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 bg-emerald-50 dark:bg-[#06241a] text-emerald-500 rounded-xl shrink-0">
-                      <Phone size={18} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-[10px] font-bold text-slate-450 uppercase">
-                        {isRtl ? "واتساب" : "WhatsApp"}
-                      </p>
-                      {isEditingSchoolInfo ? (
-                        <input
-                          type="tel"
-                          value={editedWhatsapp}
-                          onChange={(e) => setEditedWhatsapp(e.target.value)}
-                          className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-850 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold"
-                          dir="ltr"
-                        />
-                      ) : (
-                        <p className="text-slate-900 dark:text-slate-200 font-bold text-sm" dir="ltr">
-                          {schoolInfo.whatsapp || "-"}
-                        </p>
-                      )}
-                    </div>
-                  </div>
                 </div>
               </div>
-            </motion.div>
+
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 bg-emerald-50 dark:bg-[#06241a] text-emerald-500 rounded-xl shrink-0">
+                  <Phone size={18} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-slate-450 uppercase">
+                    {isRtl ? "واتساب" : "WhatsApp"}
+                  </p>
+                  {isEditingSchoolInfo ? (
+                    <input
+                      type="tel"
+                      value={editedWhatsapp}
+                      onChange={(e) => setEditedWhatsapp(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-850 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold"
+                      dir="ltr"
+                    />
+                  ) : (
+                    <p className="text-slate-900 dark:text-slate-200 font-bold text-sm" dir="ltr">
+                      {schoolInfo.whatsapp || "-"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </AppModalPortal>
+      )}
 
       {/* Teacher Contact details Settings modal (preserved & polished) */}
-      <AnimatePresence>
-        {showTeacherContactModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100 dark:border-slate-800"
-              dir={isRtl ? "rtl" : "ltr"}
-            >
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/40">
-                <h2 className="text-base font-black text-slate-900 dark:text-white">
-                  {isRtl ? "أرقام التواصل الخاصة بك" : "Your Contact Numbers"}
-                </h2>
-                <button
-                  onClick={() => setShowTeacherContactModal(false)}
-                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition-colors"
-                >
-                  <X size={18} />
-                </button>
+      <AppModalPortal
+        open={showTeacherContactModal}
+        onClose={() => setShowTeacherContactModal(false)}
+        dir={isRtl ? "rtl" : "ltr"}
+        size="md"
+        ariaLabel={isRtl ? "أرقام التواصل الخاصة بك" : "Your Contact Numbers"}
+      >
+        <div className="sx-app-modal-panel__header">
+          <h2 className="sx-app-modal-panel__title">
+            {isRtl ? "أرقام التواصل الخاصة بك" : "Your Contact Numbers"}
+          </h2>
+          <button
+            type="button"
+            onClick={() => setShowTeacherContactModal(false)}
+            className="sx-app-modal-panel__close"
+            aria-label={isRtl ? "إغلاق" : "Close"}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__body space-y-4">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-2">
+                {isRtl ? "رقم الهاتف" : "Phone Number"}
+              </label>
+              <div className="relative">
+                <Phone
+                  size={16}
+                  className="absolute top-1/2 -translate-y-1/2 text-slate-400 right-4"
+                />
+                <input
+                  type="tel"
+                  value={teacherPhone}
+                  onChange={(e) => setTeacherPhone(e.target.value)}
+                  placeholder="07xxxxxxxx"
+                  className="w-full pl-4 pr-12 py-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
+                  dir="ltr"
+                />
               </div>
-              <div className="p-6 space-y-4">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase mb-2">
-                      {isRtl ? "رقم الهاتف" : "Phone Number"}
-                    </label>
-                    <div className="relative">
-                      <Phone
-                        size={16}
-                        className="absolute top-1/2 -translate-y-1/2 text-slate-400 right-4"
-                      />
-                      <input
-                        type="tel"
-                        value={teacherPhone}
-                        onChange={(e) => setTeacherPhone(e.target.value)}
-                        placeholder="07xxxxxxxx"
-                        className="w-full pl-4 pr-12 py-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
-                        dir="ltr"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase mb-2">
-                      {isRtl ? "رقم الواتساب" : "WhatsApp Number"}
-                    </label>
-                    <div className="relative">
-                      <Phone
-                        size={16}
-                        className="absolute top-1/2 -translate-y-1/2 text-emerald-450 right-4"
-                      />
-                      <input
-                        type="tel"
-                        value={teacherWhatsapp}
-                        onChange={(e) => setTeacherWhatsapp(e.target.value)}
-                        placeholder="07xxxxxxxx"
-                        className="w-full pl-4 pr-12 py-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
-                        dir="ltr"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleSaveTeacherContact}
-                  disabled={isLoading}
-                  className="w-full mt-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                >
-                  {isRtl ? "حفظ التغييرات" : "Save Changes"}
-                </button>
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-2">
+                {isRtl ? "رقم الواتساب" : "WhatsApp Number"}
+              </label>
+              <div className="relative">
+                <Phone
+                  size={16}
+                  className="absolute top-1/2 -translate-y-1/2 text-emerald-450 right-4"
+                />
+                <input
+                  type="tel"
+                  value={teacherWhatsapp}
+                  onChange={(e) => setTeacherWhatsapp(e.target.value)}
+                  placeholder="07xxxxxxxx"
+                  className="w-full pl-4 pr-12 py-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
+                  dir="ltr"
+                />
               </div>
-            </motion.div>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+
+          <button
+            onClick={handleSaveTeacherContact}
+            disabled={isLoading}
+            className="w-full mt-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+          >
+            {isRtl ? "حفظ التغييرات" : "Save Changes"}
+          </button>
+        </div>
+      </AppModalPortal>
     </>
   );
 }

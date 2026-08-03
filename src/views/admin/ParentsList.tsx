@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRem
 import { useAuth } from '../../lib/AuthContext';
 import { Users, Search, Trash2, Mail, User, GraduationCap, AlertTriangle, X, Plus, Phone, Edit2, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 
@@ -449,335 +449,313 @@ export default function ParentsList() {
       )}
 
       {/* Delete/Unlink Confirmation Modal */}
-      <AnimatePresence>
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm border border-slate-200 shadow-2xl text-center"
-            >
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500 border border-red-100">
-                <AlertTriangle size={32} />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2 font-display">فك ارتباط الحساب</h2>
-              <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                هل أنت متأكد من رغبتك في فك ارتباط هذا الحساب بالطالب <span className="font-bold text-slate-900">({showDeleteConfirm.studentName})</span>؟
-              </p>
-              
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowDeleteConfirm(null)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all font-display"
-                >
-                  إلغاء
-                </button>
-                <button 
-                  onClick={handleUnlink}
-                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 font-display"
-                >
-                  تأكيد الفصل
-                </button>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={Boolean(showDeleteConfirm)}
+        onClose={() => setShowDeleteConfirm(null)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="sm"
+        ariaLabel="فك ارتباط الحساب"
+      >
+        <div className="sx-app-modal-panel__body text-center space-y-4">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500 border border-red-100">
+            <AlertTriangle size={32} />
           </div>
-        )}
-      </AnimatePresence>
+          <h2 className="sx-app-modal-panel__title">فك ارتباط الحساب</h2>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            هل أنت متأكد من رغبتك في فك ارتباط هذا الحساب بالطالب <span className="font-bold text-slate-900">({showDeleteConfirm?.studentName})</span>؟
+          </p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-3">
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(null)}
+            className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all font-display min-h-12"
+          >
+            إلغاء
+          </button>
+          <button
+            type="button"
+            onClick={handleUnlink}
+            className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 font-display min-h-12"
+          >
+            تأكيد الفصل
+          </button>
+        </div>
+      </AppModalPortal>
 
       {/* Delete Parent Account Confirmation Modal */}
-      <AnimatePresence>
-        {showDeleteAccountConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm border border-slate-200 shadow-2xl text-center"
-            >
-              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-200 shadow-inner">
-                <Trash2 size={32} />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2 font-display">حذف حساب ولي الأمر</h2>
-              <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                هل أنت متأكد من حذف حساب <span className="font-bold text-slate-900">({showDeleteAccountConfirm.name || showDeleteAccountConfirm.email})</span>؟
-                <br />
-                <span className="text-red-500 text-[10px] mt-2 block font-bold">سيؤدي هذا إلى حذف الحساب تماماً وفك ارتباطه بكافة الطلاب.</span>
-              </p>
-              
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowDeleteAccountConfirm(null)}
-                  disabled={isDeleting}
-                  className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all font-display disabled:opacity-50"
-                >
-                  إلغاء
-                </button>
-                <button 
-                  onClick={handleDeleteParent}
-                  disabled={isDeleting}
-                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 font-display disabled:opacity-50 flex items-center justify-center"
-                >
-                  {isDeleting ? 'جاري الحذف...' : 'تأكيد الحذف'}
-                </button>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={Boolean(showDeleteAccountConfirm)}
+        onClose={() => setShowDeleteAccountConfirm(null)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="sm"
+        ariaLabel="حذف حساب ولي الأمر"
+      >
+        <div className="sx-app-modal-panel__body text-center space-y-4">
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto border border-red-200 shadow-inner">
+            <Trash2 size={32} />
           </div>
-        )}
-      </AnimatePresence>
+          <h2 className="sx-app-modal-panel__title">حذف حساب ولي الأمر</h2>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            هل أنت متأكد من حذف حساب <span className="font-bold text-slate-900">({showDeleteAccountConfirm?.name || showDeleteAccountConfirm?.email})</span>؟
+            <br />
+            <span className="text-red-500 text-[10px] mt-2 block font-bold">سيؤدي هذا إلى حذف الحساب تماماً وفك ارتباطه بكافة الطلاب.</span>
+          </p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-3">
+          <button
+            type="button"
+            onClick={() => setShowDeleteAccountConfirm(null)}
+            disabled={isDeleting}
+            className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all font-display disabled:opacity-50 min-h-12"
+          >
+            إلغاء
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteParent}
+            disabled={isDeleting}
+            className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 font-display disabled:opacity-50 flex items-center justify-center min-h-12"
+          >
+            {isDeleting ? 'جاري الحذف...' : 'تأكيد الحذف'}
+          </button>
+        </div>
+      </AppModalPortal>
 
       {/* Add Parent Modal */}
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-[2.5rem] p-10 w-full max-w-md border border-slate-200 shadow-2xl relative"
-            >
-              <button 
-                onClick={() => setShowAddModal(false)}
-                className="absolute left-6 top-6 p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400"
-              >
-                <X size={20} />
-              </button>
-
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
-                  <User size={32} />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900 font-display">إضافة ولي أمر جديد</h2>
-                <p className="text-slate-500 text-sm mt-1">أنشئ حساباً جديداً لأحد أولياء الأمور</p>
-              </div>
-
-              <form onSubmit={handleAddParent} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 pr-1">اسم ولي الأمر (اختياري)</label>
-                  <input 
-                    type="text"
-                    value={newParent.name}
-                    onChange={(e) => setNewParent({ ...newParent, name: e.target.value })}
-                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold"
-                    placeholder="مثال: محمد علي"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 pr-1">البريد الإلكتروني (مطلوب)</label>
-                  <input 
-                    type="email"
-                    required
-                    value={newParent.email}
-                    onChange={(e) => setNewParent({ ...newParent, email: e.target.value })}
-                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-left"
-                    placeholder="parent@example.com"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 pr-1">كلمة المرور (مطلوب)</label>
-                  <div className="relative">
-                    <input 
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={newParent.password}
-                      onChange={(e) => setNewParent({ ...newParent, password: e.target.value })}
-                      className="w-full pl-12 pr-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-left"
-                      placeholder="******"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 pr-1">رقم الهاتف (اختياري)</label>
-                  <input 
-                    type="tel"
-                    value={newParent.phoneNumber}
-                    onChange={(e) => setNewParent({ ...newParent, phoneNumber: e.target.value })}
-                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold"
-                    placeholder="07XXXXXXXX"
-                  />
-                </div>
-
-                <div className="pt-4">
-                  <button 
-                    type="submit"
-                    disabled={isAdding}
-                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    {isAdding ? 'جاري الإضافة...' : 'إنشاء الحساب'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+      <AppModalPortal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="md"
+        ariaLabel="إضافة ولي أمر جديد"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">إضافة ولي أمر جديد</h2>
+            <p className="sx-app-modal-panel__subtitle">أنشئ حساباً جديداً لأحد أولياء الأمور</p>
           </div>
-        )}
-      </AnimatePresence>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowAddModal(false)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <form onSubmit={handleAddParent} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500 pr-1">اسم ولي الأمر (اختياري)</label>
+              <input
+                type="text"
+                value={newParent.name}
+                onChange={(e) => setNewParent({ ...newParent, name: e.target.value })}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold"
+                placeholder="مثال: محمد علي"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500 pr-1">البريد الإلكتروني (مطلوب)</label>
+              <input
+                type="email"
+                required
+                value={newParent.email}
+                onChange={(e) => setNewParent({ ...newParent, email: e.target.value })}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-left"
+                placeholder="parent@example.com"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500 pr-1">كلمة المرور (مطلوب)</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={newParent.password}
+                  onChange={(e) => setNewParent({ ...newParent, password: e.target.value })}
+                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-left"
+                  placeholder="******"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500 pr-1">رقم الهاتف (اختياري)</label>
+              <input
+                type="tel"
+                value={newParent.phoneNumber}
+                onChange={(e) => setNewParent({ ...newParent, phoneNumber: e.target.value })}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold"
+                placeholder="07XXXXXXXX"
+              />
+            </div>
+          </div>
+          <div className="sx-app-modal-panel__footer">
+            <button
+              type="submit"
+              disabled={isAdding}
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 min-h-12"
+            >
+              {isAdding ? 'جاري الإضافة...' : 'إنشاء الحساب'}
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
 
       {/* Edit Parent Modal */}
-      <AnimatePresence>
-        {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-[2.5rem] p-10 w-full max-w-md border border-slate-200 shadow-2xl relative"
-            >
-              <button 
-                onClick={() => setShowEditModal(null)}
-                className="absolute left-6 top-6 p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400"
-              >
-                <X size={20} />
-              </button>
-
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
-                  <Edit2 size={32} />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900 font-display">تعديل بيانات ولي الأمر</h2>
-                <p className="text-slate-500 text-sm mt-1">تعديل معلومات التواصل والحساب</p>
-              </div>
-
-              <form onSubmit={handleUpdateParent} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 pr-1">البريد الإلكتروني (غير قابل للتعديل)</label>
-                  <input 
-                    type="email"
-                    disabled
-                    value={showEditModal.email}
-                    className="w-full px-5 py-4 bg-slate-100 border border-slate-200 rounded-2xl text-slate-500 font-bold opacity-70 cursor-not-allowed"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 pr-1">اسم ولي الأمر</label>
-                  <input 
-                    type="text"
-                    required
-                    value={showEditModal.name}
-                    onChange={(e) => setShowEditModal({ ...showEditModal, name: e.target.value })}
-                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold"
-                    placeholder="الاسم الكامل"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 pr-1">رقم الهاتف</label>
-                  <input 
-                    type="tel"
-                    value={showEditModal.phoneNumber || ""}
-                    onChange={(e) => setShowEditModal({ ...showEditModal, phoneNumber: e.target.value })}
-                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold"
-                    placeholder="رقم الهاتف"
-                  />
-                </div>
-
-                <div className="pt-4">
-                  <button 
-                    type="submit"
-                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold font-display shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95"
-                  >
-                    حفظ التغييرات
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+      <AppModalPortal
+        open={Boolean(showEditModal)}
+        onClose={() => setShowEditModal(null)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="md"
+        ariaLabel="تعديل بيانات ولي الأمر"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">تعديل بيانات ولي الأمر</h2>
+            <p className="sx-app-modal-panel__subtitle">تعديل معلومات التواصل والحساب</p>
           </div>
-        )}
-      </AnimatePresence>
-
-      {/* Link Student Modal */}
-      <AnimatePresence>
-        {showLinkModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-[2.5rem] p-10 w-full max-w-md border border-slate-200 shadow-2xl relative max-h-[85vh] flex flex-col"
-            >
-              <button 
-                onClick={() => {
-                  setShowLinkModal(null);
-                  setStudentSearch('');
-                }}
-                className="absolute left-6 top-6 p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400"
-              >
-                <X size={20} />
-              </button>
-
-              <div className="text-center mb-8 shrink-0">
-                <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-100">
-                  <GraduationCap size={32} />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900 font-display">ربط طالب جديد</h2>
-                <p className="text-slate-500 text-sm mt-1">اختر الطالب الذي تريد ربطه بحساب <span className="text-indigo-600 font-bold">{showLinkModal.name || showLinkModal.email}</span></p>
-              </div>
-
-              <div className="relative mb-6 shrink-0">
-                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="text"
-                  placeholder="ابحث عن الطالب بالاسم..."
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                  className="w-full pr-11 pl-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-sm"
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowEditModal(null)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        {showEditModal && (
+          <form onSubmit={handleUpdateParent} className="flex flex-col flex-1 min-h-0">
+            <div className="sx-app-modal-panel__body space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 pr-1">البريد الإلكتروني (غير قابل للتعديل)</label>
+                <input
+                  type="email"
+                  disabled
+                  value={showEditModal.email}
+                  className="w-full px-5 py-4 bg-slate-100 border border-slate-200 rounded-2xl text-slate-500 font-bold opacity-70 cursor-not-allowed"
                 />
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                {allStudents
-                  .filter(s => s.name?.toLowerCase().includes(studentSearch.toLowerCase()))
-                  .slice(0, 10)
-                  .map(student => {
-                    const isAlreadyLinked = student.parentIds?.includes(showLinkModal.id);
-                    return (
-                      <button
-                        key={student.id}
-                        disabled={isAlreadyLinked || isLinking}
-                        onClick={() => handleLinkStudent(student.id)}
-                        className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-right ${
-                          isAlreadyLinked 
-                            ? 'bg-slate-50 border-slate-100 opacity-60 cursor-not-allowed' 
-                            : 'bg-white border-slate-100 hover:border-emerald-500 hover:shadow-md hover:scale-[1.02]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isAlreadyLinked ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 text-emerald-600'}`}>
-                            <User size={20} />
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900">{student.name}</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">الصف: {student.class || 'غير محدد'}</p>
-                          </div>
-                        </div>
-                        {isAlreadyLinked ? (
-                          <span className="text-[10px] font-bold text-slate-400">مربوط مسبقاً</span>
-                        ) : (
-                          <Plus size={16} className="text-emerald-500" />
-                        )}
-                      </button>
-                    );
-                  })}
-                {allStudents.filter(s => s.name?.toLowerCase().includes(studentSearch.toLowerCase())).length === 0 && (
-                  <div className="py-12 text-center text-slate-400">
-                    <p className="text-sm italic">لا يوجد نتائج للبحث...</p>
-                  </div>
-                )}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 pr-1">اسم ولي الأمر</label>
+                <input
+                  type="text"
+                  required
+                  value={showEditModal.name}
+                  onChange={(e) => setShowEditModal({ ...showEditModal, name: e.target.value })}
+                  className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold"
+                  placeholder="الاسم الكامل"
+                />
               </div>
-            </motion.div>
-          </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 pr-1">رقم الهاتف</label>
+                <input
+                  type="tel"
+                  value={showEditModal.phoneNumber || ""}
+                  onChange={(e) => setShowEditModal({ ...showEditModal, phoneNumber: e.target.value })}
+                  className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold"
+                  placeholder="رقم الهاتف"
+                />
+              </div>
+            </div>
+            <div className="sx-app-modal-panel__footer">
+              <button
+                type="submit"
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold font-display shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 min-h-12"
+              >
+                حفظ التغييرات
+              </button>
+            </div>
+          </form>
         )}
-      </AnimatePresence>
+      </AppModalPortal>
+
+      {/* Link Student Modal */}
+      <AppModalPortal
+        open={Boolean(showLinkModal)}
+        onClose={() => {
+          setShowLinkModal(null);
+          setStudentSearch('');
+        }}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="md"
+        ariaLabel="ربط طالب جديد"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">ربط طالب جديد</h2>
+            <p className="sx-app-modal-panel__subtitle">
+              اختر الطالب الذي تريد ربطه بحساب <span className="text-indigo-600 font-bold">{showLinkModal?.name || showLinkModal?.email}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            className="sx-app-modal-panel__close"
+            onClick={() => {
+              setShowLinkModal(null);
+              setStudentSearch('');
+            }}
+            aria-label="إغلاق"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__body space-y-4">
+          <div className="relative">
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              placeholder="ابحث عن الطالب بالاسم..."
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
+              className="w-full pr-11 pl-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-sm"
+            />
+          </div>
+
+          {allStudents.filter(s => s.name?.toLowerCase().includes(studentSearch.toLowerCase())).length === 0 ? (
+            <div className="py-12 text-center text-slate-400">
+              <p className="text-sm italic">لا يوجد نتائج للبحث...</p>
+            </div>
+          ) : (
+            <div className="sx-selection-panel" role="listbox">
+              {allStudents
+                .filter(s => s.name?.toLowerCase().includes(studentSearch.toLowerCase()))
+                .slice(0, 10)
+                .map(student => {
+                  const isAlreadyLinked = student.parentIds?.includes(showLinkModal?.id);
+                  return (
+                    <button
+                      key={student.id}
+                      type="button"
+                      role="option"
+                      disabled={isAlreadyLinked || isLinking}
+                      onClick={() => handleLinkStudent(student.id)}
+                      className={`sx-selection-panel__option flex items-center justify-between gap-3${isAlreadyLinked ? ' opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isAlreadyLinked ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 text-emerald-600'}`}>
+                          <User size={20} />
+                        </div>
+                        <div className="text-right min-w-0">
+                          <p className="font-bold text-slate-900 truncate">{student.name}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">الصف: {student.class || 'غير محدد'}</p>
+                        </div>
+                      </div>
+                      {isAlreadyLinked ? (
+                        <span className="text-[10px] font-bold text-slate-400 shrink-0">مربوط مسبقاً</span>
+                      ) : (
+                        <Plus size={16} className="text-emerald-500 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      </AppModalPortal>
     </div>
   );
 }

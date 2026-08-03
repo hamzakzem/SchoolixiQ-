@@ -1688,6 +1688,10 @@ html.dark .sx-dock-sheet--light .sx-panel-section-title__desc {
   max-width: 100%;
 }
 
+.sx-app-modal-panel--xl {
+  max-width: 100%;
+}
+
 .sx-app-modal-panel__header {
   flex-shrink: 0;
   display: flex;
@@ -1794,6 +1798,12 @@ html.dark .sx-app-modal-panel__footer {
 
   .sx-app-modal-panel--lg {
     max-width: 42rem;
+  }
+
+  .sx-app-modal-panel--xl {
+    max-width: min(80rem, calc(100vw - 48px));
+    max-height: min(92vh, 920px);
+    width: 100%;
   }
 }
 

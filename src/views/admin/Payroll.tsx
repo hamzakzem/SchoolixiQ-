@@ -4,7 +4,8 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs,
 import { useAuth } from '../../lib/AuthContext';
 import { Wallet, CheckCircle2, Clock, Plus, ReceiptText, X, Printer, Download, Share2, CreditCard, Save } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import { printElement } from '../../lib/printUtils';
 
 enum OperationType {
@@ -472,100 +473,111 @@ export default function Payroll() {
         </table>
       </div>
 
-      <AnimatePresence>
-        {editingDate && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" dir="rtl">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl p-8 border border-slate-200"
-            >
-              <h3 className="text-xl font-bold mb-6 text-slate-900">تعديل تاريخ السجل</h3>
-              
-              <form onSubmit={handleUpdateDate} className="space-y-6">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">اليوم</label>
-                  <input 
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={Number.isNaN(editingDate.day) ? '' : editingDate.day}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setEditingDate({...editingDate, day: val === '' ? 1 : Number(val) || 1});
-                    }}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold"
-                    placeholder="1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">الشهر</label>
-                  <select 
-                    value={editingDate.month}
-                    onChange={e => setEditingDate({...editingDate, month: Number(e.target.value)})}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold"
-                  >
-                    {Array.from({length: 12}, (_, i) => (
-                      <option key={i+1} value={i+1}>شهر {i+1}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">السنة</label>
-                  <input 
-                    type="number"
-                    value={Number.isNaN(editingDate.year) ? '' : editingDate.year}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setEditingDate({...editingDate, year: val === '' ? new Date().getFullYear() : Number(val) || new Date().getFullYear()});
-                    }}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold"
-                    placeholder={new Date().getFullYear().toString()}
-                  />
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                  <button 
-                    type="submit"
-                    className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
-                  >
-                    حفظ التغييرات
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setEditingDate(null)}
-                    className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+      <AppModalPortal
+        open={Boolean(editingDate)}
+        onClose={() => setEditingDate(null)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="تعديل تاريخ السجل"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">تعديل تاريخ السجل</h2>
           </div>
-        )}
-
-        {editingFinancials && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" dir="rtl">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-xl shadow-2xl p-8 border border-slate-200"
-            >
-              <div className="flex items-center gap-4 mb-6 text-emerald-600">
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
-                  <CreditCard size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">تعديل التفاصيل المالية</h3>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">المكافآت، الاستقطاعات والراتب الأساسي</p>
-                </div>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setEditingDate(null)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        {editingDate && (
+          <form onSubmit={handleUpdateDate} className="flex flex-col flex-1 min-h-0">
+            <div className="sx-app-modal-panel__body space-y-6">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">اليوم</label>
+                <input 
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={Number.isNaN(editingDate.day) ? '' : editingDate.day}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setEditingDate({...editingDate, day: val === '' ? 1 : Number(val) || 1});
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold"
+                  placeholder="1"
+                />
               </div>
-              
-              <form onSubmit={handleUpdateFinancials} className="space-y-6">
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">الشهر</label>
+                <select 
+                  value={editingDate.month}
+                  onChange={e => setEditingDate({...editingDate, month: Number(e.target.value)})}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold"
+                >
+                  {Array.from({length: 12}, (_, i) => (
+                    <option key={i+1} value={i+1}>شهر {i+1}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">السنة</label>
+                <input 
+                  type="number"
+                  value={Number.isNaN(editingDate.year) ? '' : editingDate.year}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setEditingDate({...editingDate, year: val === '' ? new Date().getFullYear() : Number(val) || new Date().getFullYear()});
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold"
+                  placeholder={new Date().getFullYear().toString()}
+                />
+              </div>
+            </div>
+
+            <div className="sx-app-modal-panel__footer flex gap-4">
+              <button 
+                type="submit"
+                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
+              >
+                حفظ التغييرات
+              </button>
+              <button 
+                type="button"
+                onClick={() => setEditingDate(null)}
+                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all"
+              >
+                إلغاء
+              </button>
+            </div>
+          </form>
+        )}
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={Boolean(editingFinancials)}
+        onClose={() => setEditingFinancials(null)}
+        dir="rtl"
+        size="lg"
+        ariaLabel="تعديل التفاصيل المالية"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div className="flex items-center gap-4 text-emerald-600">
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
+              <CreditCard size={24} />
+            </div>
+            <div>
+              <h2 className="sx-app-modal-panel__title text-slate-900">تعديل التفاصيل المالية</h2>
+              <p className="sx-app-modal-panel__subtitle">المكافآت، الاستقطاعات والراتب الأساسي</p>
+            </div>
+          </div>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setEditingFinancials(null)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        {editingFinancials && (
+          <form onSubmit={handleUpdateFinancials} className="flex flex-col flex-1 min-h-0">
+            <div className="sx-app-modal-panel__body space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">الراتب الأساسي (د.ع)</label>
@@ -637,202 +649,206 @@ export default function Payroll() {
                   </div>
                 </div>
 
-                <div className="flex gap-4 pt-6">
-                  <button 
-                    type="submit"
-                    className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <Save size={18} />
-                    حفظ ومزامنة الراتب
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setEditingFinancials(null)}
-                    className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
+            </div>
 
-        {showBudgetModal && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md" dir={isRtl ? 'rtl' : 'ltr'}>
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white rounded-[3rem] w-full max-w-sm shadow-2xl p-10 border border-slate-200"
-            >
-              <div className="flex items-center gap-5 mb-8">
-                <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                  <Wallet size={28} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black text-slate-900 font-display">ميزانية الرواتب</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">تخصيص الميزانية الشهرية</p>
+            <div className="sx-app-modal-panel__footer flex gap-4">
+              <button 
+                type="submit"
+                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Save size={18} />
+                حفظ ومزامنة الراتب
+              </button>
+              <button 
+                type="button"
+                onClick={() => setEditingFinancials(null)}
+                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
+              >
+                إلغاء
+              </button>
+            </div>
+          </form>
+        )}
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={showBudgetModal}
+        onClose={() => setShowBudgetModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="sm"
+        ariaLabel="ميزانية الرواتب"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div className="flex items-center gap-5">
+            <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+              <Wallet size={28} />
+            </div>
+            <div>
+              <h2 className="sx-app-modal-panel__title font-display">ميزانية الرواتب</h2>
+              <p className="sx-app-modal-panel__subtitle">تخصيص الميزانية الشهرية</p>
+            </div>
+          </div>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowBudgetModal(false)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <form onSubmit={handleUpdateBudget} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-8">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">الميزانية المستهدفة (د.ع)</label>
+              <div className="relative">
+                <input 
+                  required
+                  type="number"
+                  value={Number.isNaN(budgetInput) ? '' : budgetInput}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setBudgetInput(val === '' ? 0 : Number(val) || 0);
+                  }}
+                  className="w-full px-6 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-indigo-500 outline-none font-black text-3xl text-indigo-600 font-mono tracking-tighter transition-all bg-slate-50/50"
+                  placeholder="0"
+                />
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm pointer-events-none">د.ع</div>
+              </div>
+              <div className="mt-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-2">
+                <div className="flex justify-between text-[10px] font-bold text-indigo-600 italic">
+                  <span>إجمالي الرواتب الحالية:</span>
+                  <span className="font-mono">{payrolls.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()} د.ع</span>
                 </div>
               </div>
-              
-              <form onSubmit={handleUpdateBudget} className="space-y-8">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">الميزانية المستهدفة (د.ع)</label>
-                  <div className="relative">
-                    <input 
-                      required
-                      type="number"
-                      value={Number.isNaN(budgetInput) ? '' : budgetInput}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setBudgetInput(val === '' ? 0 : Number(val) || 0);
-                      }}
-                      className="w-full px-6 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-indigo-500 outline-none font-black text-3xl text-indigo-600 font-mono tracking-tighter transition-all bg-slate-50/50"
-                      placeholder="0"
-                    />
-                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm pointer-events-none">د.ع</div>
-                  </div>
-                  <div className="mt-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-2">
-                    <div className="flex justify-between text-[10px] font-bold text-indigo-600 italic">
-                      <span>إجمالي الرواتب الحالية:</span>
-                      <span className="font-mono">{payrolls.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()} د.ع</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <button 
-                    type="submit"
-                    className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900/10 active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <Save size={20} />
-                    تحديث الميزانية
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setShowBudgetModal(false)}
-                    className="px-6 py-5 bg-slate-100 text-slate-600 rounded-[1.5rem] font-bold hover:bg-slate-200 transition-all active:scale-95"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+            </div>
           </div>
-        )}
 
+          <div className="sx-app-modal-panel__footer flex gap-4">
+            <button 
+              type="submit"
+              className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900/10 active:scale-95 flex items-center justify-center gap-2"
+            >
+              <Save size={20} />
+              تحديث الميزانية
+            </button>
+            <button 
+              type="button"
+              onClick={() => setShowBudgetModal(false)}
+              className="px-6 py-5 bg-slate-100 text-slate-600 rounded-[1.5rem] font-bold hover:bg-slate-200 transition-all active:scale-95"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={Boolean(selectedPayroll)}
+        onClose={() => setSelectedPayroll(null)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="md"
+        ariaLabel="وصل صرف الراتب"
+      >
         {selectedPayroll && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" dir={isRtl ? 'rtl' : 'ltr'}>
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden relative border border-slate-200"
-            >
-              <div ref={printRef}>
-                {/* Receipt Header */}
-                <div className="bg-slate-900 p-8 text-white relative">
-                  <button 
-                    onClick={() => setSelectedPayroll(null)}
-                    className="absolute top-6 left-6 text-white/50 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full no-print"
-                  >
-                  <X size={20} />
-                </button>
-                <div className="flex items-center gap-4 mb-2">
-                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
-                    <ReceiptText size={24} className="text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black font-display tracking-tight">وصل صرف الراتب</h3>
-                    <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">إيصال مالي رسمي</p>
-                  </div>
+          <>
+            <div ref={printRef} className="overflow-hidden">
+              {/* Receipt Header */}
+              <div className="bg-slate-900 p-8 text-white relative">
+                <button 
+                  onClick={() => setSelectedPayroll(null)}
+                  className="absolute top-6 left-6 text-white/50 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full no-print"
+                >
+                <X size={20} />
+              </button>
+              <div className="flex items-center gap-4 mb-2">
+                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                  <ReceiptText size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black font-display tracking-tight">وصل صرف الراتب</h3>
+                  <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">إيصال مالي رسمي</p>
                 </div>
               </div>
+            </div>
 
-              {/* Receipt Body */}
-              <div className="p-8 space-y-8 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px]">
-                <div className="flex justify-between items-start border-b border-slate-100 pb-6 border-dashed">
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">الموظف المستلم</label>
-                    <p className="text-xl font-black text-slate-900 font-display">{selectedPayroll.userName}</p>
-                    <p className="text-xs text-slate-500 font-mono tracking-tighter">ID: {selectedPayroll.userId}</p>
-                  </div>
-                  <div className="text-left">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">التاريخ</label>
-                    <p className="text-sm font-bold text-slate-900">{selectedPayroll.day || 1} / {selectedPayroll.month} / {selectedPayroll.year}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">
-                      {selectedPayroll.createdAt?.seconds ? new Date(selectedPayroll.createdAt.seconds * 1000).toLocaleDateString() : new Date().toLocaleDateString()}
-                    </p>
-                  </div>
+            {/* Receipt Body */}
+            <div className="p-8 space-y-8 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px]">
+              <div className="flex justify-between items-start border-b border-slate-100 pb-6 border-dashed">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">الموظف المستلم</label>
+                  <p className="text-xl font-black text-slate-900 font-display">{selectedPayroll.userName}</p>
+                  <p className="text-xs text-slate-500 font-mono tracking-tighter">ID: {selectedPayroll.userId}</p>
                 </div>
-
-                <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 space-y-4">
-                  <div className="flex justify-between items-center text-sm font-bold text-slate-600">
-                    <span>الراتب الأساسي</span>
-                    <span className="font-mono text-slate-900">{selectedPayroll.amount?.toLocaleString()} د.ع</span>
-                  </div>
-                  {selectedPayroll.bonus > 0 && (
-                    <div className="flex justify-between items-center text-sm font-bold text-indigo-600">
-                      <span>مكافآت {selectedPayroll.bonusReason && `(${selectedPayroll.bonusReason})`}</span>
-                      <span className="font-mono">+{selectedPayroll.bonus.toLocaleString()} د.ع</span>
-                    </div>
-                  )}
-                  {selectedPayroll.deduction > 0 && (
-                    <div className="flex justify-between items-center text-sm font-bold text-rose-600">
-                      <span>استقطاعات {selectedPayroll.deductionReason && `(${selectedPayroll.deductionReason})`}</span>
-                      <span className="font-mono">-{selectedPayroll.deduction.toLocaleString()} د.ع</span>
-                    </div>
-                  )}
-                  <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
-                    <span className="font-black text-slate-900 uppercase tracking-widest text-xs">صافي المبلغ المستلم</span>
-                    <span className="font-black text-2xl text-emerald-600 font-mono tracking-tighter">
-                      {(selectedPayroll.totalAmount || selectedPayroll.amount || 0).toLocaleString()} د.ع
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 justify-center py-4">
-                  <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border-2 ${
-                    selectedPayroll.status === 'paid' 
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                    : 'bg-amber-50 text-amber-600 border-amber-100'
-                  }`}>
-                    {selectedPayroll.status === 'paid' ? 'تم الصرف بنجاح' : 'معلق - بانتظار الصرف'}
-                  </div>
-                </div>
-
-                <div className="text-center pt-8">
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-loose mt-8">
-                    هذا الوصل تم توليده إلكترونياً بواسطة نظام إدارة المدرسة<br/>
-                    ID: {selectedPayroll.id}
+                <div className="text-left">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">التاريخ</label>
+                  <p className="text-sm font-bold text-slate-900">{selectedPayroll.day || 1} / {selectedPayroll.month} / {selectedPayroll.year}</p>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    {selectedPayroll.createdAt?.seconds ? new Date(selectedPayroll.createdAt.seconds * 1000).toLocaleDateString() : new Date().toLocaleDateString()}
                   </p>
                 </div>
               </div>
+
+              <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 space-y-4">
+                <div className="flex justify-between items-center text-sm font-bold text-slate-600">
+                  <span>الراتب الأساسي</span>
+                  <span className="font-mono text-slate-900">{selectedPayroll.amount?.toLocaleString()} د.ع</span>
+                </div>
+                {selectedPayroll.bonus > 0 && (
+                  <div className="flex justify-between items-center text-sm font-bold text-indigo-600">
+                    <span>مكافآت {selectedPayroll.bonusReason && `(${selectedPayroll.bonusReason})`}</span>
+                    <span className="font-mono">+{selectedPayroll.bonus.toLocaleString()} د.ع</span>
+                  </div>
+                )}
+                {selectedPayroll.deduction > 0 && (
+                  <div className="flex justify-between items-center text-sm font-bold text-rose-600">
+                    <span>استقطاعات {selectedPayroll.deductionReason && `(${selectedPayroll.deductionReason})`}</span>
+                    <span className="font-mono">-{selectedPayroll.deduction.toLocaleString()} د.ع</span>
+                  </div>
+                )}
+                <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
+                  <span className="font-black text-slate-900 uppercase tracking-widest text-xs">صافي المبلغ المستلم</span>
+                  <span className="font-black text-2xl text-emerald-600 font-mono tracking-tighter">
+                    {(selectedPayroll.totalAmount || selectedPayroll.amount || 0).toLocaleString()} د.ع
+                  </span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 no-print px-8 pb-8 bg-white">
-                <button 
-                  onClick={handlePrintClick}
-                  className="flex items-center justify-center gap-2 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
-                >
-                  <Printer size={18} />
-                  طباعة
-                </button>
-                <button 
-                  onClick={handlePrintClick}
-                  className="flex items-center justify-center gap-2 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95"
-                >
-                  <Download size={18} />
-                  حفظ PDF
-                </button>
+              <div className="flex items-center gap-2 justify-center py-4">
+                <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border-2 ${
+                  selectedPayroll.status === 'paid' 
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                  : 'bg-amber-50 text-amber-600 border-amber-100'
+                }`}>
+                  {selectedPayroll.status === 'paid' ? 'تم الصرف بنجاح' : 'معلق - بانتظار الصرف'}
+                </div>
               </div>
 
-              <div className="h-2 bg-slate-900 w-full relative z-10"></div>
-            </motion.div>
-          </div>
+              <div className="text-center pt-8">
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-loose mt-8">
+                  هذا الوصل تم توليده إلكترونياً بواسطة نظام إدارة المدرسة<br/>
+                  ID: {selectedPayroll.id}
+                </p>
+              </div>
+            </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 no-print px-8 pb-8 bg-white">
+              <button 
+                onClick={handlePrintClick}
+                className="flex items-center justify-center gap-2 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
+              >
+                <Printer size={18} />
+                طباعة
+              </button>
+              <button 
+                onClick={handlePrintClick}
+                className="flex items-center justify-center gap-2 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95"
+              >
+                <Download size={18} />
+                حفظ PDF
+              </button>
+            </div>
+
+            <div className="h-2 bg-slate-900 w-full relative z-10"></div>
+          </>
         )}
-      </AnimatePresence>
+      </AppModalPortal>
     </div>
   );
 }

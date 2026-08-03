@@ -7,9 +7,9 @@ import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { FileText, Plus, Edit2, Trash2, Send, X, Users, BarChart, Printer, Wallet, BookOpen, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
+import { AppModalPortal } from '../../components/AppModalPortal';
 
 type AdvancedReportsProps = {
   lockedClassId?: string;
@@ -267,17 +267,20 @@ export default function AdvancedReports({
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-4">
             <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-4 px-2">{isRtl ? 'اختر الصف' : 'Select Class'}</h3>
-            <div className="space-y-2 max-h-48 overflow-y-auto pl-2 pr-1 custom-scrollbar">
+            <div className="sx-selection-panel" role="listbox">
               {lockedClassId ? (
-                <div className="w-full text-right px-4 py-3 rounded-xl text-sm font-bold bg-indigo-50 text-indigo-700">
+                <div className="sx-selection-panel__option is-selected">
                   {lockedClassName || lockedClassId}
                 </div>
               ) : (
                 classes.map(cls => (
                   <button
                     key={cls.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedClassId === cls.id}
                     onClick={() => setSelectedClassId(cls.id)}
-                    className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${selectedClassId === cls.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                    className={`sx-selection-panel__option${selectedClassId === cls.id ? ' is-selected' : ''}`}
                   >
                     {cls.name}
                   </button>
@@ -288,19 +291,20 @@ export default function AdvancedReports({
 
           <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-4 flex-1">
              <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-4 px-2">{isRtl ? 'اختر الطالب' : 'Select Student'}</h3>
-             <div className="space-y-2 max-h-[400px] overflow-y-auto pl-2 pr-1 custom-scrollbar">
+             <div className="sx-selection-panel" role="listbox">
                 {students.map(student => (
                   <button
                     key={student.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedStudent?.id === student.id}
                     onClick={() => setSelectedStudent(student)}
-                    className={`w-full text-right px-4 py-3 rounded-xl flex items-center justify-between transition-all ${selectedStudent?.id === student.id ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800/30 border' : 'bg-transparent border border-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'}`}
+                    className={`sx-selection-panel__option${selectedStudent?.id === student.id ? ' is-selected' : ''}`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedStudent?.id === student.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
-                        {student.name[0]}
-                      </div>
-                      <span className="font-bold text-sm truncate">{student.name}</span>
-                    </div>
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${selectedStudent?.id === student.id ? 'bg-white/20 text-inherit' : 'bg-slate-100 text-slate-500'}`}>
+                      {student.name[0]}
+                    </span>
+                    <span className="truncate">{student.name}</span>
                   </button>
                 ))}
              </div>
@@ -458,84 +462,73 @@ export default function AdvancedReports({
         </div>
       </div>
 
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl relative"
-            >
-              <button 
-                onClick={() => setShowAddModal(false)}
-                className="absolute top-6 left-6 p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
-                title={isRtl ? 'إغلاق' : 'Close'}
-              >
-                <X size={20} />
-              </button>
-
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                {editingReport ? (isRtl ? 'تعديل الملاحظة التحليلية' : 'Edit analytic note') : (isRtl ? 'ملاحظة تحليلية إضافية' : 'Optional analytic note')}
-              </h2>
-              <p className="text-slate-500 font-bold mb-2">{selectedStudent?.name}</p>
-              <p className="text-slate-400 text-xs mb-6">
-                {isRtl
-                  ? 'للتعليقات التحليلية التكميلية فقط — البيانات الأساسية تُسجَّل في أقسامها المخصصة'
-                  : 'Supplementary analytic comments only — core data belongs in dedicated sections'}
-              </p>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'عنوان الملاحظة' : 'Note title'}</label>
-                  <input
-                    type="text"
-                    value={reportTitle}
-                    onChange={(e) => setReportTitle(e.target.value)}
-                    dir="auto"
-                    placeholder={isRtl ? 'مثال: ملخص الفصل الدراسي' : 'e.g. term summary'}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'تفاصيل الملاحظة التحليلية' : 'Analytic note details'}</label>
-                  <textarea
-                    value={reportContent}
-                    onChange={(e) => setReportContent(e.target.value)}
-                    dir="auto"
-                    rows={6}
-                    placeholder={isRtl ? 'أدخل التفاصيل...' : 'Enter details...'}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white resize-none"
-                  ></textarea>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowAddModal(false)}
-                    className="px-6 py-3 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    {isRtl ? 'إلغاء' : 'Cancel'}
-                  </button>
-                  <button
-                    onClick={handleSaveReport}
-                    disabled={isSaving || !reportTitle.trim() || !reportContent.trim()}
-                    className="px-6 py-3 rounded-xl font-bold bg-indigo-600 text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                  >
-                    {isSaving ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <Send size={18} />
-                        <span>{isRtl ? 'حفظ وإرسال' : 'Save & Send'}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="md"
+        ariaLabel={editingReport ? (isRtl ? 'تعديل الملاحظة التحليلية' : 'Edit analytic note') : (isRtl ? 'ملاحظة تحليلية إضافية' : 'Optional analytic note')}
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">
+              {editingReport ? (isRtl ? 'تعديل الملاحظة التحليلية' : 'Edit analytic note') : (isRtl ? 'ملاحظة تحليلية إضافية' : 'Optional analytic note')}
+            </h2>
+            <p className="sx-app-modal-panel__subtitle">{selectedStudent?.name}</p>
           </div>
-        )}
-      </AnimatePresence>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowAddModal(false)} aria-label={isRtl ? 'إغلاق' : 'Close'}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__body space-y-5">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'عنوان الملاحظة' : 'Note title'}</label>
+            <input
+              type="text"
+              value={reportTitle}
+              onChange={(e) => setReportTitle(e.target.value)}
+              dir="auto"
+              placeholder={isRtl ? 'مثال: ملخص الفصل الدراسي' : 'e.g. term summary'}
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none transition-all font-medium text-slate-900 dark:text-white min-h-11"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'تفاصيل الملاحظة التحليلية' : 'Analytic note details'}</label>
+            <textarea
+              value={reportContent}
+              onChange={(e) => setReportContent(e.target.value)}
+              dir="auto"
+              rows={6}
+              placeholder={isRtl ? 'أدخل التفاصيل...' : 'Enter details...'}
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none transition-all font-medium text-slate-900 dark:text-white resize-none"
+            />
+          </div>
+        </div>
+        <div className="sx-app-modal-panel__footer flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAddModal(false)}
+            className="px-6 py-3 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors min-h-12"
+          >
+            {isRtl ? 'إلغاء' : 'Cancel'}
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveReport}
+            disabled={isSaving || !reportTitle.trim() || !reportContent.trim()}
+            className="px-6 py-3 rounded-xl font-bold bg-[#0b1f3a] text-white flex items-center justify-center gap-2 hover:bg-[#122a4a] transition-colors disabled:opacity-50 min-h-12"
+          >
+            {isSaving ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <Send size={18} />
+                <span>{isRtl ? 'حفظ وإرسال' : 'Save & Send'}</span>
+              </>
+            )}
+          </button>
+        </div>
+      </AppModalPortal>
     </div>
   );
 }

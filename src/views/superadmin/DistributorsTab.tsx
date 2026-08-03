@@ -20,8 +20,10 @@ import {
   Tag,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { AppModalPortal } from "../../components/AppModalPortal";
 import { db } from "../../lib/firebase";
 import {
   adminApplyDistributorCoupon,
@@ -744,13 +746,29 @@ export function DistributorsTab({
       </div>
 
       {/* Modals */}
-      {showAddDistributor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form
-            onSubmit={handleCreateDistributor}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl"
-          >
-            <h4 className="font-black text-lg">موزع جديد</h4>
+      <AppModalPortal
+        open={showAddDistributor}
+        onClose={() => setShowAddDistributor(false)}
+        size="md"
+        dir="rtl"
+        ariaLabel="موزع جديد"
+      >
+        <form
+          onSubmit={handleCreateDistributor}
+          className="flex flex-col flex-1 min-h-0"
+        >
+          <div className="sx-app-modal-panel__header">
+            <h4 className="sx-app-modal-panel__title">موزع جديد</h4>
+            <button
+              type="button"
+              onClick={() => setShowAddDistributor(false)}
+              className="sx-app-modal-panel__close"
+              aria-label="إغلاق"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="sx-app-modal-panel__body space-y-4">
             <input
               required
               placeholder="اسم الموزع"
@@ -782,29 +800,45 @@ export function DistributorsTab({
               }
               className="w-full px-3 py-2 rounded-lg border dark:border-slate-700 dark:bg-slate-800"
             />
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setShowAddDistributor(false)}
-                className="px-4 py-2 rounded-lg border"
-              >
-                إلغاء
-              </button>
-              <button type="submit" className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold">
-                حفظ
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+          </div>
+          <div className="sx-app-modal-panel__footer flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => setShowAddDistributor(false)}
+              className="px-4 py-2 rounded-lg border"
+            >
+              إلغاء
+            </button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold">
+              حفظ
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
 
-      {showAddCoupon && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form
-            onSubmit={handleCreateCoupon}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl"
-          >
-            <h4 className="font-black text-lg">كوبون جديد</h4>
+      <AppModalPortal
+        open={showAddCoupon}
+        onClose={() => setShowAddCoupon(false)}
+        size="md"
+        dir="rtl"
+        ariaLabel="كوبون جديد"
+      >
+        <form
+          onSubmit={handleCreateCoupon}
+          className="flex flex-col flex-1 min-h-0"
+        >
+          <div className="sx-app-modal-panel__header">
+            <h4 className="sx-app-modal-panel__title">كوبون جديد</h4>
+            <button
+              type="button"
+              onClick={() => setShowAddCoupon(false)}
+              className="sx-app-modal-panel__close"
+              aria-label="إغلاق"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="sx-app-modal-panel__body space-y-4">
             <select
               required
               value={newCoupon.distributorId}
@@ -840,21 +874,21 @@ export function DistributorsTab({
               }
               className="w-full px-3 py-2 rounded-lg border dark:border-slate-700 dark:bg-slate-800"
             />
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setShowAddCoupon(false)}
-                className="px-4 py-2 rounded-lg border"
-              >
-                إلغاء
-              </button>
-              <button type="submit" className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold">
-                إنشاء
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+          </div>
+          <div className="sx-app-modal-panel__footer flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => setShowAddCoupon(false)}
+              className="px-4 py-2 rounded-lg border"
+            >
+              إلغاء
+            </button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold">
+              إنشاء
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
     </div>
   );
 }

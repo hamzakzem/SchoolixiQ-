@@ -4,14 +4,13 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDo
 import { fetchStudentLinkFields } from '../../lib/schoolSync';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { useAuth } from '../../lib/AuthContext';
-import { Calendar, Plus, Search, User, MessageSquare, AlertTriangle, CheckCircle, Trash2 } from 'lucide-react';
+import { Calendar, Plus, Search, User, MessageSquare, AlertTriangle, CheckCircle, Trash2, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
 import { notificationService } from '../../lib/notificationService';
 import { safeFirestoreAdd } from '../../lib/offline/offlineSync';
 import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
-
 import { useLanguage } from '../../lib/LanguageContext';
+import { AppModalPortal } from '../../components/AppModalPortal';
 
 export default function Behavior() {
   const { isRtl } = useLanguage();
@@ -184,24 +183,27 @@ export default function Behavior() {
               </div>
             </div>
 
-            <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar">
+            <div className="sx-selection-panel" role="listbox">
               {filteredStudents.map(student => (
-                <div 
+                <div
                   key={student.id}
-                  className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 transition-all group"
+                  role="option"
+                  className="sx-selection-panel__option flex items-center justify-between gap-3"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-white dark:bg-slate-700 rounded-xl flex items-center justify-center font-bold text-slate-400 border border-slate-100 dark:border-slate-600">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-white dark:bg-slate-700 rounded-xl flex items-center justify-center font-bold text-slate-400 border border-slate-100 dark:border-slate-600 shrink-0">
                       {student.name[0]}
                     </div>
-                    <span className="font-bold text-sm text-slate-700 dark:text-slate-200">{student.name}</span>
+                    <span className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate">{student.name}</span>
                   </div>
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => {
                       setSelectedStudent(student);
                       setShowAddModal(true);
                     }}
-                    className="p-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 transition-all active:scale-95"
+                    className="p-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 transition-all active:scale-95 shrink-0"
+                    aria-label="إضافة حادثة"
                   >
                     <Plus size={18} />
                   </button>
@@ -266,147 +268,151 @@ export default function Behavior() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {reportToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 w-full max-w-sm border border-slate-200 dark:border-slate-800 shadow-2xl text-center"
-            >
-              <div className="w-16 h-16 bg-red-50 dark:bg-red-950/30 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
-                <Trash2 size={32} />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">تأكيد الحذف</h2>
-              <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">هل أنت متأكد من رغبتك في حذف هذا التقرير؟ لا يمكن التراجع عن هذا الإجراء.</p>
-              
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setReportToDelete(null)}
-                  className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all"
-                >
-                  إلغاء
-                </button>
-                <button 
-                  onClick={handleDelete}
-                  disabled={loading}
-                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
-                >
-                  {loading ? 'جاري الحذف...' : 'حذف التقرير'}
-                </button>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={Boolean(reportToDelete)}
+        onClose={() => setReportToDelete(null)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="sm"
+        ariaLabel="تأكيد الحذف"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">تأكيد الحذف</h2>
+            <p className="sx-app-modal-panel__subtitle">حذف حادثة سلوكية</p>
           </div>
-        )}
-      </AnimatePresence>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setReportToDelete(null)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__body">
+          <p className="text-slate-500 text-sm font-bold">هل أنت متأكد من رغبتك في حذف هذا التقرير؟ لا يمكن التراجع عن هذا الإجراء.</p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-3">
+          <button
+            onClick={() => setReportToDelete(null)}
+            className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all min-h-12"
+          >
+            إلغاء
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={loading}
+            className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all disabled:opacity-50 min-h-12"
+          >
+            {loading ? 'جاري الحذف...' : 'حذف التقرير'}
+          </button>
+        </div>
+      </AppModalPortal>
 
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-[3rem] p-10 w-full max-w-xl border border-slate-200 shadow-2xl"
-            >
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">حادثة سلوكية جديدة</h2>
-              <p className="text-slate-500 font-bold text-sm mb-2">تسجيل حادثة لطالب: {selectedStudent?.name}</p>
-              <p className="text-slate-400 text-xs mb-8">حادثة فردية — لا تُستخدم للإعلانات أو التقييمات الدراسية</p>
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">نوع الحادثة</label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setNewReport({...newReport, type: 'positive'})}
-                      className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all border-2 ${newReport.type === 'positive' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-slate-50 border-transparent text-slate-400'}`}
-                    >
-                      <CheckCircle size={18} />
-                      إيجابي
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewReport({...newReport, type: 'warning'})}
-                      className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all border-2 ${newReport.type === 'warning' ? 'bg-red-50 border-red-500 text-red-700' : 'bg-slate-50 border-transparent text-slate-400'}`}
-                    >
-                      <AlertTriangle size={18} />
-                      تنبيه / تحذير
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">درجة الشدة</label>
-                  <select
-                    value={newReport.severity}
-                    onChange={(e) =>
-                      setNewReport({
-                        ...newReport,
-                        severity: e.target.value as 'low' | 'medium' | 'high',
-                      })
-                    }
-                    className="w-full px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 font-bold text-slate-700"
-                  >
-                    <option value="low">منخفضة</option>
-                    <option value="medium">متوسطة</option>
-                    <option value="high">عالية</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">الإجراء المتخذ (اختياري)</label>
-                  <input
-                    type="text"
-                    value={newReport.actionTaken}
-                    onChange={(e) => setNewReport({ ...newReport, actionTaken: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 font-bold text-slate-700"
-                    placeholder="مثال: تنبيه شفهي، استدعاء ولي الأمر..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">ملاحظات الحادثة</label>
-                  <textarea 
-                    required
-                    value={newReport.description}
-                    onChange={e => setNewReport({...newReport, description: e.target.value})}
-                    className="w-full h-32 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 focus:bg-white outline-none focus:ring-4 focus:ring-blue-100 transition-all font-bold text-slate-700"
-                    placeholder="صف ما حدث بوضوح..."
-                  />
-                </div>
-
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newReport.notifyParent}
-                    onChange={(e) => setNewReport({ ...newReport, notifyParent: e.target.checked })}
-                    className="w-4 h-4 rounded border-slate-300"
-                  />
-                  <span className="text-sm font-bold text-slate-600 dark:text-slate-300">إشعار ولي الأمر بهذه الحادثة</span>
-                </label>
-
-                <div className="flex gap-4">
-                  <button 
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200 transition-all"
-                  >
-                    إلغاء
-                  </button>
-                  <button 
-                    disabled={loading || !newReport.description}
-                    className="flex-[2] py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    {loading ? 'جاري الحفظ...' : 'حفظ الحادثة'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+      <AppModalPortal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="md"
+        ariaLabel="حادثة سلوكية جديدة"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">حادثة سلوكية جديدة</h2>
+            <p className="sx-app-modal-panel__subtitle">تسجيل حادثة لطالب: {selectedStudent?.name}</p>
           </div>
-        )}
-      </AnimatePresence>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowAddModal(false)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-2">نوع الحادثة</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setNewReport({ ...newReport, type: 'positive' })}
+                  className={`py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-h-12 ${newReport.type === 'positive' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-400'}`}
+                >
+                  <CheckCircle size={18} />
+                  إيجابي
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewReport({ ...newReport, type: 'warning' })}
+                  className={`py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-h-12 ${newReport.type === 'warning' ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-400'}`}
+                >
+                  <AlertTriangle size={18} />
+                  تنبيه / تحذير
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-2">درجة الشدة</label>
+              <select
+                value={newReport.severity}
+                onChange={(e) =>
+                  setNewReport({
+                    ...newReport,
+                    severity: e.target.value as 'low' | 'medium' | 'high',
+                  })
+                }
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-700 min-h-11"
+              >
+                <option value="low">منخفضة</option>
+                <option value="medium">متوسطة</option>
+                <option value="high">عالية</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-2">الإجراء المتخذ (اختياري)</label>
+              <input
+                type="text"
+                value={newReport.actionTaken}
+                onChange={(e) => setNewReport({ ...newReport, actionTaken: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-700 min-h-11"
+                placeholder="مثال: تنبيه شفهي، استدعاء ولي الأمر..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-2">ملاحظات الحادثة</label>
+              <textarea
+                required
+                value={newReport.description}
+                onChange={(e) => setNewReport({ ...newReport, description: e.target.value })}
+                className="w-full h-28 p-4 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none transition-all font-bold text-slate-700"
+                placeholder="صف ما حدث بوضوح..."
+              />
+            </div>
+
+            <label className="flex items-center gap-3 cursor-pointer min-h-11">
+              <input
+                type="checkbox"
+                checked={newReport.notifyParent}
+                onChange={(e) => setNewReport({ ...newReport, notifyParent: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-300"
+              />
+              <span className="text-sm font-bold text-slate-600">إشعار ولي الأمر بهذه الحادثة</span>
+            </label>
+          </div>
+
+          <div className="sx-app-modal-panel__footer flex gap-3">
+            <button
+              type="button"
+              onClick={() => setShowAddModal(false)}
+              className="flex-1 py-3.5 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200 transition-all min-h-12"
+            >
+              إلغاء
+            </button>
+            <button
+              disabled={loading || !newReport.description}
+              className="flex-[2] py-3.5 bg-[#0b1f3a] text-white rounded-xl font-bold hover:bg-[#122a4a] transition-all disabled:opacity-50 min-h-12"
+            >
+              {loading ? 'جاري الحفظ...' : 'حفظ الحادثة'}
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
     </div>
   );
 }

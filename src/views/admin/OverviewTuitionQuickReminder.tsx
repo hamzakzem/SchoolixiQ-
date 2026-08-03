@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { X, Search, Send, MessageCircle, ExternalLink, ChevronRight, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../lib/AuthContext';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import {
   formatTuitionAmountLabel,
   formatTuitionDueLabel,
@@ -356,39 +356,31 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[250] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+    <AppModalPortal
+      open={open}
+      onClose={onClose}
+      dir="rtl"
+      size="xl"
+      ariaLabel="إرسال تنبيهات الأقساط"
+    >
+      <div className="sx-app-modal-panel__header">
+        <div>
+          <h2 className="sx-app-modal-panel__title">إرسال تنبيهات الأقساط</h2>
+          <p className="sx-app-modal-panel__subtitle">
+            متزامن مع بيانات الأقساط — يعرض القسط الحالي غير المدفوع لكل طالب فقط
+          </p>
+        </div>
+        <button
+          type="button"
+          className="sx-app-modal-panel__close"
           onClick={onClose}
+          aria-label="إغلاق"
         >
-          <motion.div
-            initial={{ scale: 0.96, y: 16 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.96, y: 16 }}
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-slate-900 w-full max-w-6xl max-h-[92vh] rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden"
-            dir="rtl"
-          >
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-4 shrink-0">
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white">إرسال تنبيهات الأقساط</h2>
-                <p className="text-sm text-slate-500 font-bold mt-1">
-                  متزامن مع بيانات الأقساط — يعرض القسط الحالي غير المدفوع لكل طالب فقط
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
-              >
-                <X size={20} />
-              </button>
-            </div>
+          <X size={18} />
+        </button>
+      </div>
 
+      <div className="sx-app-modal-panel__body !p-0 flex flex-col flex-1 min-h-0">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 space-y-4 shrink-0">
               <div className="relative">
                 <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -588,56 +580,55 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-100 dark:border-slate-800 shrink-0 space-y-4">
-              {summary && (
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-200 grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  <span>إرسال لحساب ولي الأمر: {summary.sent}</span>
-                  <span>روابط واتساب جاهزة: {summary.whatsAppPrepared}</span>
-                  <span>تخطي — لا ولي مرتبط: {summary.skippedNoParent}</span>
-                  <span>تخطي — لا هاتف: {summary.skippedNoPhone}</span>
-                  <span>تخطي — مكرر: {summary.skippedDedup}</span>
-                  <span>فشل: {summary.failed}</span>
-                </div>
-              )}
+      </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={whatsAppQueue.length === 0}
-                    onClick={openNextWhatsApp}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 text-emerald-700 font-bold text-sm disabled:opacity-40"
-                  >
-                    <ExternalLink size={16} />
-                    {waQueueIndex >= 0
-                      ? `واتساب (${waQueueIndex + 1}/${whatsAppQueue.length})`
-                      : 'فتح قائمة واتساب'}
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm"
-                  >
-                    إغلاق
-                  </button>
-                  <button
-                    type="button"
-                    disabled={sending || selected.size === 0}
-                    onClick={() => void handleBulkSend()}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl font-black text-sm disabled:opacity-50"
-                  >
-                    <Send size={16} />
-                    {sending ? 'جاري الإرسال...' : 'إرسال المحدد'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+      <div className="sx-app-modal-panel__footer space-y-4">
+        {summary && (
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-200 grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <span>إرسال لحساب ولي الأمر: {summary.sent}</span>
+            <span>روابط واتساب جاهزة: {summary.whatsAppPrepared}</span>
+            <span>تخطي — لا ولي مرتبط: {summary.skippedNoParent}</span>
+            <span>تخطي — لا هاتف: {summary.skippedNoPhone}</span>
+            <span>تخطي — مكرر: {summary.skippedDedup}</span>
+            <span>فشل: {summary.failed}</span>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={whatsAppQueue.length === 0}
+              onClick={openNextWhatsApp}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 text-emerald-700 font-bold text-sm disabled:opacity-40 min-h-11"
+            >
+              <ExternalLink size={16} />
+              {waQueueIndex >= 0
+                ? `واتساب (${waQueueIndex + 1}/${whatsAppQueue.length})`
+                : 'فتح قائمة واتساب'}
+              <ChevronRight size={14} />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm min-h-11"
+            >
+              إغلاق
+            </button>
+            <button
+              type="button"
+              disabled={sending || selected.size === 0}
+              onClick={() => void handleBulkSend()}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl font-black text-sm disabled:opacity-50 min-h-11"
+            >
+              <Send size={16} />
+              {sending ? 'جاري الإرسال...' : 'إرسال المحدد'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </AppModalPortal>
   );
 }

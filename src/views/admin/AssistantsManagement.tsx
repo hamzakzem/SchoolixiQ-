@@ -4,7 +4,7 @@ import { collection, query, where, serverTimestamp, setDoc, doc, updateDoc, getD
 import { useAuth } from '../../lib/AuthContext';
 import { UserPlus, Trash2, Save, X, Search, Lock, CheckSquare, Square, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { UserRole } from '../../types';
@@ -411,43 +411,41 @@ export default function AssistantsManagement() {
         </form>
       </AppModalPortal>
 
-      <AnimatePresence>
-        {confirmDeleteId && (
-          <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" dir="rtl">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl"
-            >
-              <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Trash2 size={32} />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-2 text-center font-display">تأكيد حذف المساعد</h2>
-              <p className="text-slate-500 text-center mb-8">
-                هل أنت متأكد من حذف حساب المساعد؟ سيتم فقدان صلاحية الوصول لهذا الحساب فوراً.
-              </p>
-              
-              <div className="flex gap-4">
-                <button
-                  disabled={isDeleting}
-                  onClick={() => handleDelete(confirmDeleteId)}
-                  className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                >
-                  {isDeleting ? 'جاري الحذف...' : 'نعم، احذف الحساب'}
-                </button>
-                <button
-                  disabled={isDeleting}
-                  onClick={() => setConfirmDeleteId(null)}
-                  className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-                >
-                  تراجع
-                </button>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={Boolean(confirmDeleteId)}
+        onClose={() => setConfirmDeleteId(null)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="تأكيد حذف المساعد"
+      >
+        <div className="sx-app-modal-panel__body text-center space-y-4">
+          <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto">
+            <Trash2 size={32} />
           </div>
-        )}
-      </AnimatePresence>
+          <h2 className="sx-app-modal-panel__title">تأكيد حذف المساعد</h2>
+          <p className="text-slate-500 text-sm font-bold">
+            هل أنت متأكد من حذف حساب المساعد؟ سيتم فقدان صلاحية الوصول لهذا الحساب فوراً.
+          </p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-4">
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+            className="flex-1 py-4 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 min-h-12"
+          >
+            {isDeleting ? 'جاري الحذف...' : 'نعم، احذف الحساب'}
+          </button>
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={() => setConfirmDeleteId(null)}
+            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-95 min-h-12"
+          >
+            تراجع
+          </button>
+        </div>
+      </AppModalPortal>
     </div>
   );
 }

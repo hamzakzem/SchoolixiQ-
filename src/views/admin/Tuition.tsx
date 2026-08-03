@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc, increment, limit, deleteDoc, writeBatch } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { Wallet, Receipt, Plus, Search, Filter, CheckCircle2, AlertCircle, DollarSign, Calendar, MessageSquare, ExternalLink, Trash2, Clock, Edit2, Settings2, Bell } from 'lucide-react';
+import { Wallet, Receipt, Plus, Search, Filter, CheckCircle2, AlertCircle, DollarSign, Calendar, MessageSquare, ExternalLink, Trash2, Clock, Edit2, Settings2, Bell, X } from 'lucide-react';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -892,153 +893,158 @@ export default function Tuition() {
       </div>
 
       {/* Payment Modal */}
-      <AnimatePresence>
-        {showPayModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white dark:bg-slate-900 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-14 w-full max-w-xl border border-slate-200 dark:border-slate-800 shadow-2xl relative"
-              >
-                <div className="text-center mb-6 md:mb-10">
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-4 md:mb-6">
-                    <Wallet size={32} />
-                  </div>
-                  <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">تسجيل عملية دفع</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mt-2">تسجيل القسط الدراسي للطالب: <span className="text-blue-600">{selectedStudent?.name}</span></p>
-                </div>
-
-                <form onSubmit={handleProcessPayment} className="space-y-6 md:space-y-8">
-                  <div className="bg-slate-50 dark:bg-slate-800/80 p-6 md:p-8 rounded-3xl border border-slate-100 dark:border-slate-800">
-                    <label className="block text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4">أدخل المبلغ المدفوع (بالدينار)</label>
-                    <div className="relative group">
-                      <input 
-                        required
-                        autoFocus
-                        type="number"
-                        className="w-full text-center bg-transparent text-3xl md:text-5xl font-black text-slate-900 dark:text-white outline-none font-mono tracking-tighter placeholder:text-slate-200 dark:placeholder:text-slate-800"
-                        placeholder="000,000"
-                        value={paymentAmount}
-                        onChange={(e) => setPaymentAmount(e.target.value)}
-                      />
-                      <div className="text-center mt-2 text-slate-400 font-bold text-sm">دينار عراقي</div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <button 
-                      type="button"
-                      onClick={() => setShowPayModal(false)}
-                      className="flex-1 py-4 md:py-5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all font-display"
-                    >
-                      إلغاء
-                    </button>
-                    <button 
-                      type="submit"
-                      disabled={isProcessingPayment || !paymentAmount}
-                      className="flex-[2] py-4 md:py-5 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/30 active:scale-95 disabled:opacity-50"
-                    >
-                      {isProcessingPayment ? 'جاري المعالجة...' : 'تأكيد العملية'}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
+      <AppModalPortal
+        open={Boolean(showPayModal)}
+        onClose={() => setShowPayModal(false)}
+        dir="rtl"
+        size="md"
+        ariaLabel="تسجيل عملية دفع"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-2xl flex items-center justify-center shrink-0">
+              <Wallet size={24} />
+            </div>
+            <div>
+              <h2 className="sx-app-modal-panel__title">تسجيل عملية دفع</h2>
+              <p className="sx-app-modal-panel__subtitle">
+                تسجيل القسط الدراسي للطالب: <span className="text-blue-600">{selectedStudent?.name}</span>
+              </p>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowPayModal(false)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <form onSubmit={handleProcessPayment} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body">
+            <div className="bg-slate-50 dark:bg-slate-800/80 p-6 md:p-8 rounded-3xl border border-slate-100 dark:border-slate-800">
+              <label className="block text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4">أدخل المبلغ المدفوع (بالدينار)</label>
+              <div className="relative group">
+                <input
+                  required
+                  autoFocus
+                  type="number"
+                  className="w-full text-center bg-transparent text-3xl md:text-5xl font-black text-slate-900 dark:text-white outline-none font-mono tracking-tighter placeholder:text-slate-200 dark:placeholder:text-slate-800"
+                  placeholder="000,000"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                />
+                <div className="text-center mt-2 text-slate-400 font-bold text-sm">دينار عراقي</div>
+              </div>
+            </div>
+          </div>
+          <div className="sx-app-modal-panel__footer flex gap-4">
+            <button
+              type="button"
+              onClick={() => setShowPayModal(false)}
+              className="flex-1 py-4 md:py-5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all font-display"
+            >
+              إلغاء
+            </button>
+            <button
+              type="submit"
+              disabled={isProcessingPayment || !paymentAmount}
+              className="flex-[2] py-4 md:py-5 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/30 active:scale-95 disabled:opacity-50"
+            >
+              {isProcessingPayment ? 'جاري المعالجة...' : 'تأكيد العملية'}
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
 
       {/* Plan Installments Modal */}
-      <AnimatePresence>
-        {showPlanModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-12 w-full max-w-xl border border-slate-200 dark:border-slate-800 shadow-2xl"
-            >
-              <div className="text-center mb-6 md:mb-8">
-                <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4 md:mb-6">
-                  <Calendar size={32} />
-                </div>
-                <h2 className="text-2xl md:text-2xl font-black text-slate-900 dark:text-white">إنشاء نظام أقساط</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mt-2">تحديد الدفعات للطالب {selectedStudent?.name}</p>
-              </div>
-
-              <div className="space-y-4 md:space-y-6">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3">إجمالي القسط السنوي</label>
-                  <input 
-                    type="number"
-                    className="w-full px-5 md:px-6 py-3 md:py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 outline-none font-bold text-slate-900 dark:text-white text-sm md:text-base"
-                    placeholder="مثلاً: 2,000,000"
-                    value={planTotal}
-                    onChange={(e) => setPlanTotal(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3">عدد الدفعات (أشهر)</label>
-                  <div className="flex gap-2">
-                    {['4', '6', '10'].map(num => (
-                      <button 
-                        key={num}
-                        onClick={() => setPlanCount(num)}
-                        className={`flex-1 py-3 rounded-xl font-bold text-xs md:text-sm transition-all ${planCount === num ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                      >
-                        {num}
-                      </button>
-                    ))}
-                    <input 
-                      type="number"
-                      className="w-16 md:w-20 px-2 md:px-3 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 outline-none font-bold text-slate-900 dark:text-white text-center text-xs md:text-sm"
-                      value={planCount}
-                      onChange={(e) => setPlanCount(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 dark:bg-slate-800/80 p-4 md:p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center justify-between text-[10px] md:text-xs font-bold text-slate-500 mb-2">
-                    <span>قيمة الدفعة الواحدة:</span>
-                    <span className="font-mono text-slate-900 dark:text-white">
-                      {Math.round((parseFloat(planTotal) || 0) / (parseInt(planCount) || 1)).toLocaleString()} د.ع
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-4 pt-2 md:pt-4">
-                  <button 
-                    onClick={() => setShowPlanModal(false)}
-                    className="flex-1 py-3 md:py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl font-bold text-sm"
-                  >
-                    إلغاء
-                  </button>
-                  <button 
-                    disabled={loading || !planTotal || !planCount}
-                    onClick={handleGeneratePlan}
-                    className="flex-[2] py-3 md:py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-600/20 text-sm"
-                  >
-                    {loading ? 'جاري الإنشاء...' : 'بدء خطة التقسيط'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={Boolean(showPlanModal)}
+        onClose={() => setShowPlanModal(false)}
+        dir="rtl"
+        size="md"
+        ariaLabel="إنشاء نظام أقساط"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0">
+              <Calendar size={24} />
+            </div>
+            <div>
+              <h2 className="sx-app-modal-panel__title">إنشاء نظام أقساط</h2>
+              <p className="sx-app-modal-panel__subtitle">تحديد الدفعات للطالب {selectedStudent?.name}</p>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowPlanModal(false)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__body space-y-4 md:space-y-6">
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3">إجمالي القسط السنوي</label>
+            <input
+              type="number"
+              className="w-full px-5 md:px-6 py-3 md:py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 outline-none font-bold text-slate-900 dark:text-white text-sm md:text-base"
+              placeholder="مثلاً: 2,000,000"
+              value={planTotal}
+              onChange={(e) => setPlanTotal(e.target.value)}
+            />
+          </div>
 
-      <AnimatePresence>
-        {showTuitionSettings && profile?.schoolId && (
-          <TuitionSettingsModal
-            onClose={() => setShowTuitionSettings(false)}
-            classes={classes}
-            students={students}
-            schoolId={profile.schoolId}
-          />
-        )}
-      </AnimatePresence>
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3">عدد الدفعات (أشهر)</label>
+            <div className="flex gap-2">
+              {['4', '6', '10'].map(num => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => setPlanCount(num)}
+                  className={`flex-1 py-3 rounded-xl font-bold text-xs md:text-sm transition-all ${planCount === num ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                >
+                  {num}
+                </button>
+              ))}
+              <input
+                type="number"
+                className="w-16 md:w-20 px-2 md:px-3 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 outline-none font-bold text-slate-900 dark:text-white text-center text-xs md:text-sm"
+                value={planCount}
+                onChange={(e) => setPlanCount(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="bg-slate-50 dark:bg-slate-800/80 p-4 md:p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between text-[10px] md:text-xs font-bold text-slate-500 mb-2">
+              <span>قيمة الدفعة الواحدة:</span>
+              <span className="font-mono text-slate-900 dark:text-white">
+                {Math.round((parseFloat(planTotal) || 0) / (parseInt(planCount) || 1)).toLocaleString()} د.ع
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-4">
+          <button
+            type="button"
+            onClick={() => setShowPlanModal(false)}
+            className="flex-1 py-3 md:py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl font-bold text-sm"
+          >
+            إلغاء
+          </button>
+          <button
+            type="button"
+            disabled={loading || !planTotal || !planCount}
+            onClick={handleGeneratePlan}
+            className="flex-[2] py-3 md:py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-600/20 text-sm"
+          >
+            {loading ? 'جاري الإنشاء...' : 'بدء خطة التقسيط'}
+          </button>
+        </div>
+      </AppModalPortal>
+
+      {showTuitionSettings && profile?.schoolId && (
+        <TuitionSettingsModal
+          onClose={() => setShowTuitionSettings(false)}
+          classes={classes}
+          students={students}
+          schoolId={profile.schoolId}
+        />
+      )}
     </div>
   );
 }

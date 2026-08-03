@@ -6,8 +6,9 @@ import { logAction } from '../../lib/auditLog';
 import { useAuth } from '../../lib/AuthContext';
 import { Search, Plus, Filter, MoreVertical, LayoutDashboard, Trash2, AlertTriangle, X, Users, Edit2, UserPlus, ArrowRightLeft, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import {
   CACHE_COLLECTION_KEYS,
   cacheSnapshot,
@@ -315,253 +316,259 @@ export default function Classes() {
         )}
       </div>
 
-      <AnimatePresence>
+      <AppModalPortal
+        open={Boolean(selectedClassForStudents)}
+        onClose={() => {
+          setSelectedClassForStudents(null);
+          setShowQuickAdd(false);
+        }}
+        dir="rtl"
+        size="lg"
+        ariaLabel="طلاب الصف"
+      >
         {selectedClassForStudents && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-end backdrop-blur-sm">
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col"
-            >
-               <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-slate-900 text-white rounded-2xl">
-                      <Users size={24} />
+          <>
+            <div className="sx-app-modal-panel__header">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="p-3 bg-slate-900 text-white rounded-2xl shrink-0">
+                  <Users size={24} />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="sx-app-modal-panel__title">طلاب: {selectedClassForStudents.name}</h2>
+                  <p className="sx-app-modal-panel__subtitle">
+                    {students.filter(s => s.classId === selectedClassForStudents.id).length} طالب مقيد
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="sx-app-modal-panel__close"
+                onClick={() => {
+                  setSelectedClassForStudents(null);
+                  setShowQuickAdd(false);
+                }}
+                aria-label="إغلاق"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="sx-app-modal-panel__body">
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="font-bold text-slate-900">قائمة الطلاب</h3>
+                <button
+                  onClick={() => setShowQuickAdd(!showQuickAdd)}
+                  className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all flex items-center gap-2"
+                >
+                  {showQuickAdd ? <X size={16} /> : <UserPlus size={16} />}
+                  {showQuickAdd ? 'إلغاء' : 'إضافة طالب سريع'}
+                </button>
+              </div>
+
+              {showQuickAdd && (
+                <form
+                  onSubmit={handleQuickAddStudent}
+                  className="bg-slate-50 p-6 rounded-3xl border border-slate-100 mb-8"
+                >
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">اسم الطالب</label>
+                      <input
+                        required
+                        type="text"
+                        value={quickNewStudent.name}
+                        onChange={e => setQuickNewStudent({ ...quickNewStudent, name: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all"
+                        placeholder="الاسم الكامل"
+                      />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-slate-900 font-display">طلاب: {selectedClassForStudents.name}</h2>
-                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{students.filter(s => s.classId === selectedClassForStudents.id).length} طالب مقيد</p>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">رقم القيد</label>
+                      <input
+                        required
+                        type="text"
+                        value={quickNewStudent.registrationNumber}
+                        onChange={e => setQuickNewStudent({ ...quickNewStudent, registrationNumber: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all"
+                        placeholder="ID001"
+                      />
                     </div>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setSelectedClassForStudents(null);
-                      setShowQuickAdd(false);
-                    }}
-                    className="p-3 hover:bg-white hover:shadow-lg rounded-2xl transition-all text-slate-400 hover:text-slate-900"
-                  >
-                    <X size={24} />
-                  </button>
-               </div>
-
-               <div className="p-8 flex-1 overflow-y-auto">
-                  <div className="flex items-center justify-between mb-8">
-                    <h3 className="font-bold text-slate-900">قائمة الطلاب</h3>
-                    <button 
-                      onClick={() => setShowQuickAdd(!showQuickAdd)}
-                      className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all flex items-center gap-2"
-                    >
-                      {showQuickAdd ? <X size={16} /> : <UserPlus size={16} />}
-                      {showQuickAdd ? 'إلغاء' : 'إضافة طالب سريع'}
-                    </button>
-                  </div>
-
-                  <AnimatePresence>
-                    {showQuickAdd && (
-                      <motion.form 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        onSubmit={handleQuickAddStudent}
-                        className="bg-slate-50 p-6 rounded-3xl border border-slate-100 mb-8 overflow-hidden"
-                      >
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                           <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">اسم الطالب</label>
-                              <input 
-                                required
-                                type="text"
-                                value={quickNewStudent.name}
-                                onChange={e => setQuickNewStudent({...quickNewStudent, name: e.target.value})}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all"
-                                placeholder="الاسم الكامل"
-                              />
-                           </div>
-                           <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">رقم القيد</label>
-                              <input 
-                                required
-                                type="text"
-                                value={quickNewStudent.registrationNumber}
-                                onChange={e => setQuickNewStudent({...quickNewStudent, registrationNumber: e.target.value})}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all"
-                                placeholder="ID001"
-                              />
-                           </div>
-                        </div>
-                        <button 
-                          disabled={isProcessing}
-                          className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 active:scale-95 disabled:opacity-50"
-                        >
-                          {isProcessing ? 'جاري الحفظ...' : 'إضافة الطالب للصف'}
-                        </button>
-                      </motion.form>
-                    )}
-                  </AnimatePresence>
-
-                  <div className="space-y-4">
-                    {students.filter(s => s.classId === selectedClassForStudents.id).map(student => (
-                      <div key={student.id} className="p-5 bg-white border border-slate-100 rounded-3xl flex items-center justify-between hover:border-slate-300 transition-all group">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                            <User size={20} />
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900">{student.name}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">#{student.registrationNumber}</p>
-                          </div>
-                        </div>
-
-                        <div className="relative">
-                          <ActionMenu
-                            open={movingStudent === student.id}
-                            onOpenChange={(open) => setMovingStudent(open ? student.id : null)}
-                            ariaLabel="نقل لصف آخر"
-                            preferredSide="top"
-                            align="end"
-                            minWidth={200}
-                            maxWidth={280}
-                            header={
-                              <p className="px-3 py-2 text-[11px] font-bold text-slate-400">
-                                اختر الوجهة
-                              </p>
-                            }
-                            items={
-                              classes.filter((c) => c.id !== selectedClassForStudents.id).length === 0
-                                ? [
-                                    {
-                                      id: 'none',
-                                      label: 'لا توجد صفوف أخرى متاحة',
-                                      disabled: true,
-                                      onClick: () => undefined,
-                                    },
-                                  ]
-                                : classes
-                                    .filter((c) => c.id !== selectedClassForStudents.id)
-                                    .map((targetClass) => ({
-                                      id: targetClass.id,
-                                      label: targetClass.name,
-                                      icon: <Plus size={12} />,
-                                      onClick: () => handleMoveStudent(student.id, targetClass.id),
-                                    }))
-                            }
-                            trigger={({ ref, onClick, ...a11y }) => (
-                              <button
-                                ref={ref}
-                                type="button"
-                                onClick={onClick}
-                                {...a11y}
-                                className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 text-slate-500 rounded-xl text-[10px] font-bold hover:bg-slate-900 hover:text-white transition-all shadow-sm min-h-10"
-                              >
-                                <ArrowRightLeft size={14} />
-                                نقل لصف آخر
-                              </button>
-                            )}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    {students.filter(s => s.classId === selectedClassForStudents.id).length === 0 && !showQuickAdd && (
-                      <div className="py-20 text-center bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200">
-                        <Users size={48} className="mx-auto text-slate-200 mb-4" />
-                        <p className="text-slate-400 font-bold">لا يوجد طلاب في هذا الصف حالياً</p>
-                      </div>
-                    )}
-                  </div>
-               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-              className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl relative border border-slate-200"
-            >
-              <h2 className="text-2xl font-bold mb-6 text-slate-900 font-display">
-                {editingClass ? 'تعديل بيانات الصف' : 'إضافة صف دراسي جديد'}
-              </h2>
-              
-              <form onSubmit={handleAddClass} className="space-y-6">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">اسم الصف</label>
-                  <input
-                    required
-                    type="text"
-                    value={newClass.name}
-                    onChange={e => setNewClass({ name: e.target.value })}
-                    className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all font-bold text-slate-900"
-                    placeholder="مثال: الصف الأول أ"
-                    autoFocus
-                  />
-                </div>
-
-                <div className="flex gap-4 pt-4">
                   <button
-                    type="submit"
-                    className="flex-1 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl active:scale-95"
+                    disabled={isProcessing}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 active:scale-95 disabled:opacity-50"
                   >
-                    {editingClass ? 'تحديث البيانات' : 'إضافة الصف'}
+                    {isProcessing ? 'جاري الحفظ...' : 'إضافة الطالب للصف'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-8 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                </form>
+              )}
 
-      <AnimatePresence>
-        {confirmDeleteId && (
-          <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-[2rem] p-8 max-w-sm w-full text-center shadow-2xl"
-              dir="rtl"
-            >
-              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100">
-                <AlertTriangle size={32} />
+              <div className="space-y-4">
+                {students.filter(s => s.classId === selectedClassForStudents.id).map(student => (
+                  <div key={student.id} className="p-5 bg-white border border-slate-100 rounded-3xl flex items-center justify-between hover:border-slate-300 transition-all group">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                        <User size={20} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900">{student.name}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">#{student.registrationNumber}</p>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <ActionMenu
+                        open={movingStudent === student.id}
+                        onOpenChange={(open) => setMovingStudent(open ? student.id : null)}
+                        ariaLabel="نقل لصف آخر"
+                        preferredSide="top"
+                        align="end"
+                        minWidth={200}
+                        maxWidth={280}
+                        header={
+                          <p className="px-3 py-2 text-[11px] font-bold text-slate-400">
+                            اختر الوجهة
+                          </p>
+                        }
+                        items={
+                          classes.filter((c) => c.id !== selectedClassForStudents.id).length === 0
+                            ? [
+                                {
+                                  id: 'none',
+                                  label: 'لا توجد صفوف أخرى متاحة',
+                                  disabled: true,
+                                  onClick: () => undefined,
+                                },
+                              ]
+                            : classes
+                                .filter((c) => c.id !== selectedClassForStudents.id)
+                                .map((targetClass) => ({
+                                  id: targetClass.id,
+                                  label: targetClass.name,
+                                  icon: <Plus size={12} />,
+                                  onClick: () => handleMoveStudent(student.id, targetClass.id),
+                                }))
+                        }
+                        trigger={({ ref, onClick, ...a11y }) => (
+                          <button
+                            ref={ref}
+                            type="button"
+                            onClick={onClick}
+                            {...a11y}
+                            className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 text-slate-500 rounded-xl text-[10px] font-bold hover:bg-slate-900 hover:text-white transition-all shadow-sm min-h-10"
+                          >
+                            <ArrowRightLeft size={14} />
+                            نقل لصف آخر
+                          </button>
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+                {students.filter(s => s.classId === selectedClassForStudents.id).length === 0 && !showQuickAdd && (
+                  <div className="py-20 text-center bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200">
+                    <Users size={48} className="mx-auto text-slate-200 mb-4" />
+                    <p className="text-slate-400 font-bold">لا يوجد طلاب في هذا الصف حالياً</p>
+                  </div>
+                )}
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">تأكيد حذف الصف</h2>
-              <p className="text-slate-500 text-sm mb-8">
-                هل أنت متأكد من رغبتك في حذف هذا الصف؟ سيتم إزالة هذا التصنيف من كافة قوائم المدرسة.
-              </p>
-              
-              <div className="flex gap-3">
-                <button
-                  disabled={isDeleting}
-                  onClick={() => handleDeleteClass(confirmDeleteId)}
-                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
-                >
-                  {isDeleting ? 'جاري الحذف...' : 'نعم، احذف'}
-                </button>
-                <button
-                  disabled={isDeleting}
-                  onClick={() => setConfirmDeleteId(null)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all"
-                >
-                  تراجع
-                </button>
-              </div>
-            </motion.div>
-          </div>
+            </div>
+          </>
         )}
-      </AnimatePresence>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        dir="rtl"
+        size="md"
+        ariaLabel={editingClass ? 'تعديل بيانات الصف' : 'إضافة صف دراسي جديد'}
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">
+              {editingClass ? 'تعديل بيانات الصف' : 'إضافة صف دراسي جديد'}
+            </h2>
+          </div>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setShowAddModal(false)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleAddClass} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">اسم الصف</label>
+              <input
+                required
+                type="text"
+                value={newClass.name}
+                onChange={e => setNewClass({ name: e.target.value })}
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all font-bold text-slate-900"
+                placeholder="مثال: الصف الأول أ"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <div className="sx-app-modal-panel__footer flex gap-4">
+            <button
+              type="submit"
+              className="flex-1 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl active:scale-95 min-h-12"
+            >
+              {editingClass ? 'تحديث البيانات' : 'إضافة الصف'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddModal(false)}
+              className="px-8 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95 min-h-12"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </AppModalPortal>
+
+      <AppModalPortal
+        open={Boolean(confirmDeleteId)}
+        onClose={() => setConfirmDeleteId(null)}
+        dir="rtl"
+        size="sm"
+        ariaLabel="تأكيد حذف الصف"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">تأكيد حذف الصف</h2>
+          </div>
+          <button type="button" className="sx-app-modal-panel__close" onClick={() => setConfirmDeleteId(null)} aria-label="إغلاق">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="sx-app-modal-panel__body text-center">
+          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100">
+            <AlertTriangle size={32} />
+          </div>
+          <p className="text-slate-500 text-sm font-bold">
+            هل أنت متأكد من رغبتك في حذف هذا الصف؟ سيتم إزالة هذا التصنيف من كافة قوائم المدرسة.
+          </p>
+        </div>
+        <div className="sx-app-modal-panel__footer flex gap-3">
+          <button
+            disabled={isDeleting}
+            onClick={() => confirmDeleteId && handleDeleteClass(confirmDeleteId)}
+            className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50 min-h-12"
+          >
+            {isDeleting ? 'جاري الحذف...' : 'نعم، احذف'}
+          </button>
+          <button
+            disabled={isDeleting}
+            onClick={() => setConfirmDeleteId(null)}
+            className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all min-h-12"
+          >
+            تراجع
+          </button>
+        </div>
+      </AppModalPortal>
     </div>
   );
 }

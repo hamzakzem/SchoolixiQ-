@@ -5,8 +5,8 @@ import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { Calendar, Save, Printer, Share2, Plus, Trash2, Clock, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import { printElement } from '../../lib/printUtils';
 
 /** Firestore schedule keys remain Arabic day names — display labels are presentation-only. */
@@ -504,56 +504,60 @@ export default function Schedules() {
       )}
       
       {/* Share Modal */}
-      <AnimatePresence>
-        {showShareModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 print:hidden">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowShareModal(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800"
-            >
-              <div className="p-6 md:p-8">
-                <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-6 transform -rotate-6">
-                  <Share2 size={32} />
-                </div>
-                
-                <h3 className="text-2xl font-black text-center text-slate-900 dark:text-white mb-2">إرسال تعميم للجميع</h3>
-                <p className="text-center text-slate-500 dark:text-slate-400 font-bold leading-relaxed mb-8">
-                  إرسال إشعار إلى جميع المعلمين وأولياء الأمور لإبلاغهم بتحديث الجدول الدراسي الخاص بـ 
-                  <span className="text-emerald-600 dark:text-emerald-400 mx-1">
-                    {classes.find(c => c.id === selectedClassId)?.name}
-                  </span>.
-                </p>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={() => setShowShareModal(false)}
-                    className="flex-1 px-6 py-4 rounded-xl font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    onClick={handleShare}
-                    disabled={isSharing}
-                    className="flex-1 px-6 py-4 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isSharing ? 'جاري الإرسال...' : 'تأكيد الإرسال'}
-                  </button>
-                </div>
+      <AppModalPortal
+        open={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="sm"
+        ariaLabel={isRtl ? 'إرسال تعميم للجميع' : 'Share schedule update'}
+      >
+        <div className="print:hidden">
+          <div className="sx-app-modal-panel__header">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center shrink-0 transform -rotate-6">
+                <Share2 size={24} />
               </div>
-            </motion.div>
+              <div>
+                <h3 className="sx-app-modal-panel__title">إرسال تعميم للجميع</h3>
+                <p className="sx-app-modal-panel__subtitle">
+                  {classes.find(c => c.id === selectedClassId)?.name}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="sx-app-modal-panel__close"
+              onClick={() => setShowShareModal(false)}
+              aria-label={isRtl ? 'إغلاق' : 'Close'}
+            >
+              <X size={18} />
+            </button>
           </div>
-        )}
-      </AnimatePresence>
+          <div className="sx-app-modal-panel__body">
+            <p className="text-slate-500 dark:text-slate-400 font-bold leading-relaxed text-center">
+              إرسال إشعار إلى جميع المعلمين وأولياء الأمور لإبلاغهم بتحديث الجدول الدراسي الخاص بـ{' '}
+              <span className="text-emerald-600 dark:text-emerald-400">
+                {classes.find(c => c.id === selectedClassId)?.name}
+              </span>.
+            </p>
+          </div>
+          <div className="sx-app-modal-panel__footer flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => setShowShareModal(false)}
+              className="flex-1 px-6 py-4 rounded-xl font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={handleShare}
+              disabled={isSharing}
+              className="flex-1 px-6 py-4 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isSharing ? 'جاري الإرسال...' : 'تأكيد الإرسال'}
+            </button>
+          </div>
+        </div>
+      </AppModalPortal>
 
       {/* Print Styles */}
       <style dangerouslySetInnerHTML={{__html: `

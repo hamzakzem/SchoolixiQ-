@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { notificationService } from '../../lib/notificationService';
 import { useLanguage } from '../../lib/LanguageContext';
 import { useSystemConfig } from '../../lib/SystemConfigContext';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import {
   STORE_COLLECTION,
   LEGACY_STORE_COLLECTION,
@@ -462,113 +463,127 @@ export default function Marketplace() {
         </div>
       </div>
 
-      {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-           <div className="bg-white rounded-[2rem] w-full max-w-lg p-10 shadow-2xl relative border border-slate-200">
-             <h2 className="text-2xl font-bold text-slate-900 mb-8 font-display">إضافة منتج للمتجر</h2>
-             <form onSubmit={handleAddItem} className="space-y-6">
-                <div className="space-y-4">
-                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">صورة المنتج</label>
-                   
-                   {/* Upload Area */}
-                   <div className="flex items-center gap-6">
-                      {newItem.imageUrl ? (
-                        <div className="relative w-28 h-28 rounded-2xl overflow-hidden border border-slate-200">
-                          <img src={newItem.imageUrl || undefined} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          <button 
-                            type="button"
-                            onClick={() => setNewItem({...newItem, imageUrl: ''})}
-                            className="absolute top-1.5 left-1.5 p-1.5 bg-white/90 text-red-500 rounded-lg shadow-sm hover:bg-red-50 transition-colors"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="w-28 h-28 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:border-slate-300 hover:text-slate-500 transition-all cursor-pointer bg-slate-50/50 group">
-                          {uploading ? (
-                            <Loader2 className="animate-spin" size={24} />
-                          ) : (
-                            <>
-                              <Camera size={26} className="group-hover:scale-110 transition-transform" />
-                              <span className="text-[10px] mt-2 font-bold">رفع ملف</span>
-                            </>
-                          )}
-                          <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
-                        </label>
-                      )}
-                      
-                      <div className="flex-1 space-y-2">
-                        <p className="text-[10px] text-slate-400 font-medium">ارفع ملفاً من جهازك أو ضع رابط صورة مباشر أدناه:</p>
-                        <div className="relative">
-                          <ImageIcon size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                          <input
-                            type="url"
-                            value={newItem.imageUrl}
-                            onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
-                            placeholder="https://example.com/image.jpg"
-                            className="w-full px-9 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all"
-                          />
-                        </div>
-                      </div>
-                   </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">اسم المنتج</label>
-                  <input
-                    required
-                    type="text"
-                    value={newItem.itemName}
-                    onChange={e => setNewItem({...newItem, itemName: e.target.value})}
-                    className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-900 transition-all"
-                    placeholder={isRtl ? `مثال: حقيبة مدرسية ${config.appName}` : `Example: ${config.appName} Backpack`}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">السعر (دينار عراقي)</label>
-                    <input
-                      required
-                      type="number"
-                      value={Number.isNaN(newItem.price) ? '' : newItem.price}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setNewItem({...newItem, price: val === '' ? 0 : Number(val) || 0});
-                      }}
-                      className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">الكمية المتوفرة</label>
-                    <input
-                      required
-                      type="number"
-                      value={Number.isNaN(newItem.stock) ? '' : newItem.stock}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setNewItem({...newItem, stock: val === '' ? 0 : Number(val) || 0});
-                      }}
-                      className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">وصف المنتج</label>
-                  <textarea
-                    value={newItem.description}
-                    onChange={e => setNewItem({...newItem, description: e.target.value})}
-                    className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 outline-none h-32 focus:border-slate-900 transition-all resize-none"
-                    placeholder="اكتب وصفاً مختصراً للمنتج..."
-                  />
-                </div>
-                <div className="flex gap-4 pt-6">
-                  <button type="submit" disabled={uploading} className="flex-1 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95 disabled:opacity-50">حفظ المنتج</button>
-                  <button type="button" onClick={() => setShowAddModal(false)} className="px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all">إلغاء</button>
-                </div>
-             </form>
-           </div>
+      <AppModalPortal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="md"
+        ariaLabel="إضافة منتج للمتجر"
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">إضافة منتج للمتجر</h2>
+          </div>
+          <button
+            type="button"
+            className="sx-app-modal-panel__close"
+            onClick={() => setShowAddModal(false)}
+            aria-label={isRtl ? 'إغلاق' : 'Close'}
+          >
+            <X size={18} />
+          </button>
         </div>
-      )}
+        <form onSubmit={handleAddItem} className="flex flex-col flex-1 min-h-0">
+          <div className="sx-app-modal-panel__body space-y-5">
+            <div className="space-y-4">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">صورة المنتج</label>
+              <div className="flex items-center gap-6">
+                {newItem.imageUrl ? (
+                  <div className="relative w-28 h-28 rounded-2xl overflow-hidden border border-slate-200">
+                    <img src={newItem.imageUrl || undefined} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <button
+                      type="button"
+                      onClick={() => setNewItem({...newItem, imageUrl: ''})}
+                      className="absolute top-1.5 left-1.5 p-1.5 bg-white/90 text-red-500 rounded-lg shadow-sm hover:bg-red-50 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="w-28 h-28 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:border-slate-300 hover:text-slate-500 transition-all cursor-pointer bg-slate-50/50 group">
+                    {uploading ? (
+                      <Loader2 className="animate-spin" size={24} />
+                    ) : (
+                      <>
+                        <Camera size={26} className="group-hover:scale-110 transition-transform" />
+                        <span className="text-[10px] mt-2 font-bold">رفع ملف</span>
+                      </>
+                    )}
+                    <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+                  </label>
+                )}
+
+                <div className="flex-1 space-y-2">
+                  <p className="text-[10px] text-slate-400 font-medium">ارفع ملفاً من جهازك أو ضع رابط صورة مباشر أدناه:</p>
+                  <div className="relative">
+                    <ImageIcon size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="url"
+                      value={newItem.imageUrl}
+                      onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
+                      placeholder="https://example.com/image.jpg"
+                      className="w-full px-9 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 outline-none focus:border-slate-900 transition-all min-h-11"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">اسم المنتج</label>
+              <input
+                required
+                type="text"
+                value={newItem.itemName}
+                onChange={e => setNewItem({...newItem, itemName: e.target.value})}
+                className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50/50 outline-none transition-all min-h-11"
+                placeholder={isRtl ? `مثال: حقيبة مدرسية ${config.appName}` : `Example: ${config.appName} Backpack`}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">السعر (دينار عراقي)</label>
+                <input
+                  required
+                  type="number"
+                  value={Number.isNaN(newItem.price) ? '' : newItem.price}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNewItem({...newItem, price: val === '' ? 0 : Number(val) || 0});
+                  }}
+                  className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50/50 outline-none transition-all min-h-11"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">الكمية المتوفرة</label>
+                <input
+                  required
+                  type="number"
+                  value={Number.isNaN(newItem.stock) ? '' : newItem.stock}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNewItem({...newItem, stock: val === '' ? 0 : Number(val) || 0});
+                  }}
+                  className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50/50 outline-none transition-all min-h-11"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">وصف المنتج</label>
+              <textarea
+                value={newItem.description}
+                onChange={e => setNewItem({...newItem, description: e.target.value})}
+                className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50/50 outline-none h-32 transition-all resize-none"
+                placeholder="اكتب وصفاً مختصراً للمنتج..."
+              />
+            </div>
+          </div>
+          <div className="sx-app-modal-panel__footer flex gap-4">
+            <button type="submit" disabled={uploading} className="flex-1 px-8 py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95 disabled:opacity-50 min-h-12">حفظ المنتج</button>
+            <button type="button" onClick={() => setShowAddModal(false)} className="px-8 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all min-h-12">إلغاء</button>
+          </div>
+        </form>
+      </AppModalPortal>
     </div>
   );
 }

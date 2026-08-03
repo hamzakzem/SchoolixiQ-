@@ -5,8 +5,8 @@ import { useAuth } from '../../lib/AuthContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { BookOpen, Plus, Calendar, Edit2, Trash2, Send, X, Users, MessageSquare } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+import { AppModalPortal } from '../../components/AppModalPortal';
 import { notificationService } from '../../lib/notificationService';
 import { safeFirestoreAdd, safeFirestoreDelete, safeFirestoreUpdate } from '../../lib/offline/offlineSync';
 import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
@@ -324,93 +324,92 @@ export default function Homework() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl relative"
-            >
-              <button 
-                onClick={() => setShowAddModal(false)}
-                className="absolute top-6 left-6 p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
-                title={isRtl ? 'إغلاق' : 'Close'}
-              >
-                <X size={20} />
-              </button>
-
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                {editingHomework ? (isRtl ? 'تعديل الواجب' : 'Edit Homework') : (isRtl ? 'إضافة واجب جديد' : 'New Homework')}
-              </h2>
-              <p className="text-slate-500 font-bold mb-6">
-                {classes.find(c => c.id === selectedClassId)?.name}
-              </p>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'عنوان الواجب' : 'Title'}</label>
-                  <input
-                    type="text"
-                    required
-                    value={newHomework.title}
-                    onChange={(e) => setNewHomework({...newHomework, title: e.target.value})}
-                    dir="auto"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'تاريخ التسليم' : 'Due Date'}</label>
-                  <input
-                    type="date"
-                    required
-                    value={newHomework.dueDate}
-                    onChange={(e) => setNewHomework({...newHomework, dueDate: e.target.value})}
-                    dir="auto"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'التفاصيل' : 'Details'}</label>
-                  <textarea
-                    value={newHomework.content}
-                    onChange={(e) => setNewHomework({...newHomework, content: e.target.value})}
-                    dir="auto"
-                    rows={4}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white resize-none"
-                  ></textarea>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowAddModal(false)}
-                    className="px-6 py-3 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    {isRtl ? 'إلغاء' : 'Cancel'}
-                  </button>
-                  <button
-                    onClick={handleSaveHomework}
-                    disabled={isSaving || !newHomework.title.trim() || !newHomework.content.trim() || !newHomework.dueDate}
-                    className="px-6 py-3 rounded-xl font-bold bg-indigo-600 text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                  >
-                    {isSaving ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <Send size={18} />
-                        <span>{isRtl ? 'حفظ وإرسال' : 'Save & Send'}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+      <AppModalPortal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        size="md"
+        ariaLabel={editingHomework ? (isRtl ? 'تعديل الواجب' : 'Edit Homework') : (isRtl ? 'إضافة واجب جديد' : 'New Homework')}
+      >
+        <div className="sx-app-modal-panel__header">
+          <div>
+            <h2 className="sx-app-modal-panel__title">
+              {editingHomework ? (isRtl ? 'تعديل الواجب' : 'Edit Homework') : (isRtl ? 'إضافة واجب جديد' : 'New Homework')}
+            </h2>
+            <p className="sx-app-modal-panel__subtitle">
+              {classes.find(c => c.id === selectedClassId)?.name}
+            </p>
           </div>
-        )}
-      </AnimatePresence>
+          <button
+            type="button"
+            className="sx-app-modal-panel__close"
+            onClick={() => setShowAddModal(false)}
+            aria-label={isRtl ? 'إغلاق' : 'Close'}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="sx-app-modal-panel__body space-y-6">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'عنوان الواجب' : 'Title'}</label>
+            <input
+              type="text"
+              required
+              value={newHomework.title}
+              onChange={(e) => setNewHomework({ ...newHomework, title: e.target.value })}
+              dir="auto"
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'تاريخ التسليم' : 'Due Date'}</label>
+            <input
+              type="date"
+              required
+              value={newHomework.dueDate}
+              onChange={(e) => setNewHomework({ ...newHomework, dueDate: e.target.value })}
+              dir="auto"
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{isRtl ? 'التفاصيل' : 'Details'}</label>
+            <textarea
+              value={newHomework.content}
+              onChange={(e) => setNewHomework({ ...newHomework, content: e.target.value })}
+              dir="auto"
+              rows={4}
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-900 dark:text-white resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="sx-app-modal-panel__footer flex justify-end gap-3">
+          <button
+            onClick={() => setShowAddModal(false)}
+            className="px-6 py-3 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors min-h-12"
+          >
+            {isRtl ? 'إلغاء' : 'Cancel'}
+          </button>
+          <button
+            onClick={handleSaveHomework}
+            disabled={isSaving || !newHomework.title.trim() || !newHomework.content.trim() || !newHomework.dueDate}
+            className="px-6 py-3 rounded-xl font-bold bg-indigo-600 text-white flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50 min-h-12"
+          >
+            {isSaving ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <Send size={18} />
+                <span>{isRtl ? 'حفظ وإرسال' : 'Save & Send'}</span>
+              </>
+            )}
+          </button>
+        </div>
+      </AppModalPortal>
     </div>
   );
 }
