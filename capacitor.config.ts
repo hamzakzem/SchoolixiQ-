@@ -8,13 +8,6 @@ const config: CapacitorConfig = {
     url: 'https://schoolixiq.com',
     cleartext: false,
   },
-  plugins: {
-    GoogleAuth: {
-      scopes: ["profile", "email"],
-      clientId: "377979165565-2k1qjeet2clrjob0eahb6kb5ejcvdp99.apps.googleusercontent.com", // Default Web Client ID, can be updated in Google Console
-      forceCodeForRefreshToken: true
-    }
-  }
 };
 
 export default config;
