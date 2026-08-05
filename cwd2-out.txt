@@ -1,0 +1,20 @@
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+Firebase Admin initialized with defaults.
+SERVER_BOOT_START { port: 3462, host: '0.0.0.0', nodeEnv: 'production' }
+STATIC_ROOT_RESOLVED {
+  mode: 'dirname',
+  distPath: 'C:\\Users\\hamza\\schoolixiQ-\\dist',
+  cwd: 'C:\\Users\\hamza\\schoolixiQ-\\dist',
+  dirname: 'C:\\Users\\hamza\\schoolixiQ-\\dist'
+}
+PRODUCTION_STATIC_VERIFY_OK {
+  cwd: 'C:\\Users\\hamza\\schoolixiQ-\\dist',
+  dirname: 'C:\\Users\\hamza\\schoolixiQ-\\dist',
+  distPath: 'C:\\Users\\hamza\\schoolixiQ-\\dist',
+  indexHtml: 'C:\\Users\\hamza\\schoolixiQ-\\dist\\index.html',
+  assets: 'C:\\Users\\hamza\\schoolixiQ-\\dist\\assets'
+}
+PORT_LISTENING { host: '0.0.0.0', port: 3462 }
+SERVER_READY { host: '0.0.0.0', port: 3462 }
+Server running on http://localhost:3462
+[Notifications] PUSH_SEND_START { event: 'fcm_gateway_initialized' }

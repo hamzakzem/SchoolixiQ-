@@ -73,13 +73,20 @@ PRODUCTION_HEALTH_URL=https://schoolixiq.com npm run verify:deploy-health
 
 ## Hostinger settings
 
+Canonical checklist: [`hostinger.webapp.json`](../hostinger.webapp.json) (copy into hPanel; Hostinger does not auto-apply the file).
+
+> **Warning:** Do **not** use Framework / Application type **Vite**. On Hostinger, Vite is **always static** (no entry file, no Node process). That serves `dist/` as files only and **never starts** `dist/server.mjs`, so Express API + SPA fallback break. Use **Express**.
+
 | Field | Value |
 |--------|--------|
-| Framework | Other / Express (not Vite-static-only) |
+| Application type / Framework | **`express`** (not `vite`) |
 | Node.js | **22** |
-| Build command | `npm run build` |
-| Start command / entry | `npm start` → **`dist/server.mjs`** |
+| Root directory | `/` (repo root) |
+| Build script / command | `build` → `npm run build` |
 | Output directory | `dist` |
+| Entry file | **`dist/server.mjs`** (required) |
+| Start command | `npm start` → `node dist/server.mjs` |
+| Package manager | `npm` |
 | Env | `NODE_ENV=production`, Hostinger `PORT`, Firebase Admin + cron secrets as required |
 
 Confirm **Runtime Logs** show `SERVER_READY` / `PORT_LISTENING` after each deploy.

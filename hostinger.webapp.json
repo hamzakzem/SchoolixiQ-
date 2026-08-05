@@ -1,0 +1,26 @@
+{
+  "$schema_comment": "Source of truth for Hostinger Node.js Web App hPanel settings. Hostinger does not auto-apply this file — copy these values into Deploy / Build settings.",
+  "applicationType": "express",
+  "framework": "express",
+  "nodeVersion": "22",
+  "rootDirectory": "/",
+  "packageManager": "npm",
+  "buildScript": "build",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "entryFile": "dist/server.mjs",
+  "startCommand": "npm start",
+  "startEquivalent": "node dist/server.mjs",
+  "warnings": [
+    "Never set application type / framework to vite — Hostinger Vite is static-only and will not start dist/server.mjs.",
+    "Never leave entryFile empty — Express must run so Vite dist is served through Express (API + SPA fallback).",
+    "Confirm Runtime Logs show SERVER_READY and PORT_LISTENING after each deploy."
+  ],
+  "requiredEnv": [
+    "NODE_ENV=production",
+    "PORT (injected by Hostinger)",
+    "Firebase Admin credentials as required by the server",
+    "TUITION_CRON_SECRET or CRON_SECRET",
+    "NOTIFICATION_CRON_SECRET or CRON_SECRET"
+  ]
+}

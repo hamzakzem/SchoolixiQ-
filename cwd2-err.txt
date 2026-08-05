@@ -1,0 +1,2 @@
+[SECURITY] Production requires TUITION_CRON_SECRET or CRON_SECRET (min 32 chars). Tuition cron endpoint will reject all requests.
+[SECURITY] Production requires NOTIFICATION_CRON_SECRET or CRON_SECRET (min 32 chars). Push dispatch cron will reject all requests.

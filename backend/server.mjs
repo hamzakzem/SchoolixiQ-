@@ -2571,6 +2571,64 @@ function resolveCronSecret(...candidates) {
   }
   return null;
 }
+function resolveProductionDistPath() {
+  const fromCwd = path.resolve(process.cwd(), "dist");
+  if (fs.existsSync(path.join(fromCwd, "index.html"))) {
+    return { distPath: fromCwd, mode: "cwd-dist" };
+  }
+  if (fs.existsSync(path.join(__dirname, "index.html"))) {
+    return { distPath: path.resolve(__dirname), mode: "dirname" };
+  }
+  return { distPath: fromCwd, mode: "cwd-dist-fallback" };
+}
+function verifyProductionStaticRoot(distPath) {
+  const requiredFiles = [
+    path.join(distPath, "index.html"),
+    path.join(__dirname, "firebase-applet-config.json")
+  ];
+  const requiredDirs = [path.join(distPath, "assets")];
+  const serverEntryCandidates = [
+    path.join(__dirname, "server.mjs"),
+    path.join(__dirname, path.basename(__filename))
+  ];
+  const missing = [];
+  for (const filePath of requiredFiles) {
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      missing.push(filePath);
+    }
+  }
+  for (const dirPath of requiredDirs) {
+    if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+      missing.push(`${dirPath}/`);
+      continue;
+    }
+    const entries = fs.readdirSync(dirPath);
+    if (entries.length === 0) {
+      missing.push(`${dirPath}/ (empty)`);
+    }
+  }
+  if (!serverEntryCandidates.some((candidate) => fs.existsSync(candidate))) {
+    missing.push(`server entry near ${__dirname} (server.mjs)`);
+  }
+  if (missing.length > 0) {
+    console.error("PRODUCTION_STATIC_VERIFY_FAIL", {
+      cwd: process.cwd(),
+      dirname: __dirname,
+      distPath,
+      missing
+    });
+    throw new Error(
+      `Production static root incomplete. Missing: ${missing.join(", ")}`
+    );
+  }
+  console.log("PRODUCTION_STATIC_VERIFY_OK", {
+    cwd: process.cwd(),
+    dirname: __dirname,
+    distPath,
+    indexHtml: path.join(distPath, "index.html"),
+    assets: path.join(distPath, "assets")
+  });
+}
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3e3;
@@ -4456,7 +4514,14 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    const { distPath, mode } = resolveProductionDistPath();
+    console.log("STATIC_ROOT_RESOLVED", {
+      mode,
+      distPath,
+      cwd: process.cwd(),
+      dirname: __dirname
+    });
+    verifyProductionStaticRoot(distPath);
     app.use("/assets", express.static(path.join(distPath, "assets"), {
       maxAge: "1y",
       immutable: true,
@@ -4512,4 +4577,7 @@ async function startServer() {
     }
   });
 }
-startServer();
+startServer().catch((error) => {
+  console.error("SERVER_BOOT_FATAL", error instanceof Error ? error.message : error);
+  process.exit(1);
+});

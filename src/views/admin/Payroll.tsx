@@ -286,191 +286,409 @@ export default function Payroll() {
     }
   };
 
+  const payAmount = (p: any) => Number(p.totalAmount || p.amount || 0);
+  const totalBase = payrolls.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const totalNet = payrolls.reduce((sum, p) => sum + payAmount(p), 0);
+  const paidNet = payrolls.filter((p) => p.status === 'paid').reduce((sum, p) => sum + payAmount(p), 0);
+  const pendingNet = payrolls.filter((p) => p.status !== 'paid').reduce((sum, p) => sum + payAmount(p), 0);
+  const paidCount = payrolls.filter((p) => p.status === 'paid').length;
+  const pendingCount = payrolls.length - paidCount;
+  const budgetUsageRatio = schoolBudget > 0 ? totalBase / schoolBudget : 0;
+  const budgetUsagePct = Math.round(budgetUsageRatio * 100);
+  const budgetOver = schoolBudget > 0 && budgetUsageRatio > 1;
+
+  const openFinancials = (pay: any) => {
+    setEditingFinancials({
+      id: pay.id,
+      userId: pay.userId,
+      amount: pay.amount || 0,
+      bonus: pay.bonus || 0,
+      deduction: pay.deduction || 0,
+      bonusReason: pay.bonusReason || '',
+      deductionReason: pay.deductionReason || '',
+    });
+  };
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-start md:gap-12 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 font-display">سجلات الرواتب والمالية</h1>
-          <p className="text-slate-500 mt-1">إدارة صرف الرواتب والميزانية التشغيلية</p>
+    <div className="space-y-5 md:space-y-6 lg:space-y-8" dir={isRtl ? 'rtl' : 'ltr'}>
+      {/* Header */}
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">لوحة مالية</p>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 font-display tracking-tight leading-tight">
+            سجلات الرواتب والمالية
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm md:text-base font-bold">
+            إدارة صرف الرواتب والميزانية التشغيلية
+          </p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 no-print" dir={isRtl ? 'rtl' : 'ltr'}>
-            <select 
+
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 no-print w-full xl:w-auto">
+          <div className="flex flex-wrap items-center gap-1 bg-white border border-slate-200 rounded-2xl p-1 shadow-sm">
+            <select
               value={filterDay}
               onChange={(e) => setFilterDay(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="px-4 py-2 rounded-lg bg-transparent text-sm font-bold text-slate-700 outline-none border-l border-slate-100"
+              className="flex-1 min-w-[6.5rem] px-3 py-2.5 rounded-xl bg-transparent text-sm font-bold text-slate-700 outline-none"
             >
               <option value="all">كل الأيام</option>
-              {Array.from({length: 31}, (_, i) => (
-                <option key={i+1} value={i+1}>يوم {i+1}</option>
+              {Array.from({ length: 31 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>يوم {i + 1}</option>
               ))}
             </select>
-            <select 
+            <select
               value={filterMonth}
               onChange={(e) => setFilterMonth(Number(e.target.value))}
-              className="px-4 py-2 rounded-lg bg-transparent text-sm font-bold text-slate-700 outline-none border-l border-slate-100"
+              className="flex-1 min-w-[5.5rem] px-3 py-2.5 rounded-xl bg-transparent text-sm font-bold text-slate-700 outline-none"
             >
-              {Array.from({length: 12}, (_, i) => (
-                <option key={i+1} value={i+1}>شهر {i+1}</option>
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>شهر {i + 1}</option>
               ))}
             </select>
-            <input 
+            <input
               type="number"
               value={Number.isNaN(filterYear) ? '' : filterYear}
               onChange={(e) => {
                 const val = e.target.value;
                 setFilterYear(val === '' ? new Date().getFullYear() : Number(val) || new Date().getFullYear());
               }}
-              className="w-20 px-4 py-2 rounded-lg bg-transparent text-sm font-bold text-slate-700 outline-none focus:bg-slate-50 transition-colors placeholder:text-slate-300"
+              className="w-full sm:w-24 px-3 py-2.5 rounded-xl bg-transparent text-sm font-bold text-slate-700 outline-none focus:bg-slate-50 transition-colors"
               placeholder="السنة"
             />
           </div>
 
-          <button 
-            onClick={generateMonthlyPayroll}
-            disabled={loading}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-sm active:scale-95 disabled:opacity-50"
-          >
-            <ReceiptText size={20} />
-            توليد كشف شهري
-          </button>
-          <div className="flex items-center gap-3">
-            <button 
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <button
+              type="button"
               onClick={() => setShowBudgetModal(true)}
-              className="bg-white border border-slate-200 px-6 py-3 rounded-2xl flex items-center gap-4 shadow-sm hover:border-indigo-300 hover:bg-indigo-50/30 transition-all group"
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:border-indigo-300 hover:bg-indigo-50/40 transition-all shadow-sm text-sm"
             >
-               <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                 <Wallet size={20} />
-               </div>
-               <div className="text-right">
-                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">الميزانية المرصودة</p>
-                 <span className="text-slate-900 font-bold text-lg">
-                   {schoolBudget.toLocaleString()} <span className="text-[10px]">د.ع</span>
-                 </span>
-               </div>
+              <Wallet size={18} className="text-indigo-600" />
+              الميزانية
             </button>
-
-            <div className="bg-emerald-50 px-6 py-3 rounded-2xl border border-emerald-100 flex items-center gap-4 shadow-sm">
-               <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
-                 <ReceiptText size={20} />
-               </div>
-               <div className="text-right">
-                 <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">مجموع المدفوعات الصافي</p>
-                 <span className="text-emerald-900 font-bold text-lg">
-                   {payrolls.reduce((sum, p) => sum + (p.totalAmount || p.amount || 0), 0).toLocaleString()} <span className="text-[10px]">د.ع</span>
-                 </span>
-               </div>
-            </div>
+            <button
+              type="button"
+              onClick={generateMonthlyPayroll}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-sm active:scale-95 disabled:opacity-50 text-sm"
+            >
+              <ReceiptText size={18} />
+              توليد كشف شهري
+            </button>
           </div>
         </div>
       </div>
 
+      {/* KPI dashboard */}
+      <div className="sx-dashboard-grid sx-dashboard-grid--2 sx-dashboard-grid--4">
+        <div className="sx-kpi-card">
+          <div className="flex items-center justify-between gap-2">
+            <span className="sx-kpi-card__label">إجمالي الرواتب</span>
+            <span className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+              <Wallet size={16} />
+            </span>
+          </div>
+          <p className="sx-kpi-card__value font-mono tracking-tighter">
+            {totalBase.toLocaleString()} <span className="text-xs font-sans text-slate-400">د.ع</span>
+          </p>
+          <p className="text-[10px] font-bold text-slate-400">{payrolls.length} سجل لهذا الشهر</p>
+        </div>
+
+        <div className="sx-kpi-card border-emerald-100/80">
+          <div className="flex items-center justify-between gap-2">
+            <span className="sx-kpi-card__label text-emerald-600">المدفوع</span>
+            <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <CheckCircle2 size={16} />
+            </span>
+          </div>
+          <p className="sx-kpi-card__value font-mono tracking-tighter text-emerald-700">
+            {paidNet.toLocaleString()} <span className="text-xs font-sans text-emerald-500/80">د.ع</span>
+          </p>
+          <p className="text-[10px] font-bold text-emerald-600/70">{paidCount} عملية صرف</p>
+        </div>
+
+        <div className="sx-kpi-card border-amber-100/80">
+          <div className="flex items-center justify-between gap-2">
+            <span className="sx-kpi-card__label text-amber-600">المعلق</span>
+            <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+              <Clock size={16} />
+            </span>
+          </div>
+          <p className="sx-kpi-card__value font-mono tracking-tighter text-amber-700">
+            {pendingNet.toLocaleString()} <span className="text-xs font-sans text-amber-500/80">د.ع</span>
+          </p>
+          <p className="text-[10px] font-bold text-amber-600/70">{pendingCount} بانتظار الصرف</p>
+        </div>
+
+        <div className="sx-kpi-card bg-gradient-to-br from-emerald-50/80 to-white border-emerald-100">
+          <div className="flex items-center justify-between gap-2">
+            <span className="sx-kpi-card__label text-emerald-700">صافي الرواتب</span>
+            <span className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
+              <ReceiptText size={16} />
+            </span>
+          </div>
+          <p className="sx-kpi-card__value font-mono tracking-tighter text-emerald-800">
+            {totalNet.toLocaleString()} <span className="text-xs font-sans text-emerald-600/70">د.ع</span>
+          </p>
+          <p className="text-[10px] font-bold text-slate-400">
+            الميزانية: {schoolBudget.toLocaleString()} د.ع
+          </p>
+        </div>
+      </div>
+
       {schoolBudget > 0 && (
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm overflow-hidden relative">
-          <div className="flex items-center justify-between mb-4">
-             <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                <span className="text-xs font-bold text-slate-500">حالة استهلاك الميزانية</span>
-             </div>
-             <span className="text-xs font-black font-mono text-slate-400">
-               {Math.round((payrolls.reduce((sum, p) => sum + (p.amount || 0), 0) / schoolBudget) * 100)}% مستخدم
-             </span>
+        <div className="bg-white p-4 md:p-5 lg:p-6 rounded-2xl lg:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between mb-3 gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
+              <span className="text-xs font-bold text-slate-500 truncate">حالة استهلاك الميزانية</span>
+            </div>
+            <span className="text-xs font-black font-mono text-slate-400 shrink-0">{budgetUsagePct}% مستخدم</span>
           </div>
-          <div className="w-full h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-             <motion.div 
-               initial={{ width: 0 }}
-               animate={{ width: `${Math.min((payrolls.reduce((sum, p) => sum + (p.amount || 0), 0) / schoolBudget) * 100), 100}%` }}
-               className={`h-full transition-all duration-1000 ${
-                 (payrolls.reduce((sum, p) => sum + (p.amount || 0), 0) / schoolBudget) > 1 ? 'bg-rose-500' : 'bg-indigo-500'
-               }`}
-             />
+          <div className="w-full h-2.5 md:h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(budgetUsageRatio * 100, 100)}%` }}
+              className={`h-full transition-all duration-1000 ${budgetOver ? 'bg-rose-500' : 'bg-indigo-500'}`}
+            />
           </div>
-          {(payrolls.reduce((sum, p) => sum + (p.amount || 0), 0) / schoolBudget) > 1 && (
-            <p className="mt-3 text-[10px] text-rose-500 font-bold flex items-center gap-2">
+          {budgetOver && (
+            <p className="mt-3 text-[10px] text-rose-500 font-bold">
               ⚠️ تحذير: مجموع الرواتب الحالي يتجاوز الميزانية المرصودة!
             </p>
           )}
         </div>
       )}
 
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
-        <table className="w-full text-right min-w-[700px]">
-          <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] border-b border-slate-200">
-            <tr>
-              <th className="p-4">اسم الموظف</th>
-              <th className="p-4">الشهر/السنة</th>
-              <th className="p-4">المبلغ</th>
-              <th className="p-4">الحالة</th>
-              <th className="p-4">الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {payrolls.map(pay => (
-              <tr key={pay.id} className="hover:bg-slate-50 transition-colors">
-                <td className="p-4">
-                  <div className="font-bold text-slate-900">{pay.userName || pay.userId}</div>
-                  <div className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">{pay.userId}</div>
-                </td>
-                <td className="p-4">
-                  <button 
-                    onClick={() => setEditingDate({ id: pay.id, day: pay.day || 1, month: pay.month, year: pay.year })}
-                    className="group flex flex-col hover:bg-slate-50 px-3 py-1 rounded-xl transition-all border border-transparent hover:border-slate-200"
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {payrolls.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400 font-medium italic text-sm">
+            لا توجد سجلات رواتب لهذا الشهر
+          </div>
+        ) : (
+          payrolls.map((pay) => (
+            <article
+              key={pay.id}
+              className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3.5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-black text-slate-900 font-display truncate">
+                    {pay.userName || pay.userId}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingDate({
+                        id: pay.id,
+                        day: pay.day || 1,
+                        month: pay.month,
+                        year: pay.year,
+                      })
+                    }
+                    className="mt-1 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors"
                   >
-                    <span className="font-bold text-slate-700 text-sm">{pay.day || 1} / {pay.month} / {pay.year}</span>
-                    <span className="text-[9px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity font-bold">تعديل التاريخ</span>
+                    الشهر: {pay.month} / {pay.year}
+                    {pay.day ? ` · يوم ${pay.day}` : ''}
                   </button>
-                </td>
-                <td className="p-4">
-                  <button 
-                    onClick={() => setEditingFinancials({ 
-                      id: pay.id, 
-                      userId: pay.userId, 
-                      amount: pay.amount || 0,
-                      bonus: pay.bonus || 0,
-                      deduction: pay.deduction || 0,
-                      bonusReason: pay.bonusReason || '',
-                      deductionReason: pay.deductionReason || ''
-                    })}
-                    className="group text-right hover:bg-slate-50 px-3 py-1 rounded-xl transition-all border border-transparent hover:border-emerald-200"
+                </div>
+                {pay.status === 'paid' ? (
+                  <button
+                    type="button"
+                    onClick={() => togglePaymentStatus(pay)}
+                    title="انقر لإلغاء الصرف"
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black border border-emerald-100"
                   >
-                    <div className="font-bold text-emerald-600 font-mono tracking-tighter text-lg">{(pay.totalAmount || pay.amount || 0).toLocaleString()} د.ع</div>
-                    <div className="text-[9px] text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity font-bold">تعديل التفاصيل المالية</div>
+                    <CheckCircle2 size={12} strokeWidth={2.5} /> مدفوع
                   </button>
-                </td>
-                <td className="p-4">
-                   {pay.status === 'paid' ? (
-                     <button 
-                       onClick={() => togglePaymentStatus(pay)}
-                       title="انقر لإلغاء الصرف"
-                       className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                     >
-                        <CheckCircle2 size={12} strokeWidth={2.5} /> مدفوع
-                     </button>
-                   ) : (
-                     <button 
-                       onClick={() => togglePaymentStatus(pay)}
-                       title="انقر لتأكيد الصرف"
-                       className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold border border-amber-100 hover:bg-amber-100 transition-colors"
-                     >
-                        <Clock size={12} strokeWidth={2.5} /> قيد الانتظار
-                     </button>
-                   )}
-                </td>
-                <td className="p-4">
-                  <button 
-                    onClick={() => setSelectedPayroll(pay)}
-                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-widest hover:underline decoration-2 underline-offset-4 transition-all"
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => togglePaymentStatus(pay)}
+                    title="انقر لتأكيد الصرف"
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-[10px] font-black border border-amber-100"
                   >
-                    عرض الوصل
+                    <Clock size={12} strokeWidth={2.5} /> معلق
                   </button>
-                </td>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">الراتب الأساسي</span>
+                  <span className="font-bold font-mono text-slate-800">
+                    {(Number(pay.amount) || 0).toLocaleString()} د.ع
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[10px] font-black text-rose-400 uppercase tracking-wider">الخصومات</span>
+                  <span className="font-bold font-mono text-rose-600">
+                    {(Number(pay.deduction) || 0).toLocaleString()} د.ع
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">الصافي</span>
+                  <button
+                    type="button"
+                    onClick={() => openFinancials(pay)}
+                    className="font-black font-mono text-emerald-700 text-base tracking-tighter"
+                  >
+                    {payAmount(pay).toLocaleString()} د.ع
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPayroll(pay)}
+                  className="w-full py-3 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
+                >
+                  عرض التفاصيل / الوصل
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openFinancials(pay)}
+                  className="w-full py-3 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
+                >
+                  تعديل التفاصيل المالية
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+
+      {/* Tablet + Desktop table */}
+      <div className="hidden md:block bg-white rounded-2xl lg:rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 md:px-5 lg:px-6 py-3.5 md:py-4 border-b border-slate-100 bg-slate-50/90">
+          <div className="min-w-0">
+            <h2 className="text-sm font-black text-slate-800 tracking-wide font-display">كشف الرواتب التفصيلي</h2>
+            <p className="text-[11px] text-slate-400 font-bold mt-0.5">
+              {payrolls.length} سجل · {filterMonth}/{filterYear}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+              مدفوع {paidCount}
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+              معلق {pendingCount}
+            </span>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto overscroll-x-contain">
+          <table className="w-full text-right md:min-w-[720px] lg:min-w-[880px]">
+            <thead className="bg-slate-50/95 text-[10px] font-black text-slate-500 uppercase tracking-[0.14em] border-b border-slate-200 sticky top-0 z-20">
+              <tr>
+                <th className="p-3 md:p-3.5 lg:p-4 sticky right-0 z-30 bg-slate-50 min-w-[11rem] shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.12)]">
+                  اسم الموظف
+                </th>
+                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الشهر/السنة</th>
+                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الأساسي</th>
+                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الخصم</th>
+                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الصافي</th>
+                <th className="p-3 md:p-3.5 lg:p-4 sticky left-0 z-30 bg-slate-50 whitespace-nowrap shadow-[4px_0_8px_-6px_rgba(15,23,42,0.12)]">
+                  الحالة
+                </th>
+                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الإجراءات</th>
               </tr>
-            ))}
-            {payrolls.length === 0 && (
-              <tr><td colSpan={5} className="p-24 text-center text-slate-400 font-medium italic">لا توجد سجلات رواتب لهذا الشهر</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {payrolls.map((pay) => (
+                <tr key={pay.id} className="hover:bg-slate-50/90 transition-colors group/row">
+                  <td className="p-3 md:p-3.5 lg:p-4 sticky right-0 z-10 bg-white group-hover/row:bg-slate-50 min-w-[11rem] shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.08)]">
+                    <div className="font-bold text-slate-900 text-sm truncate max-w-[14rem]">
+                      {pay.userName || pay.userId}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase truncate max-w-[14rem]">
+                      {pay.userId}
+                    </div>
+                  </td>
+                  <td className="p-3 md:p-3.5 lg:p-4">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditingDate({
+                          id: pay.id,
+                          day: pay.day || 1,
+                          month: pay.month,
+                          year: pay.year,
+                        })
+                      }
+                      className="group flex flex-col hover:bg-white px-2 py-1 rounded-xl transition-all border border-transparent hover:border-slate-200"
+                    >
+                      <span className="font-bold text-slate-700 text-sm whitespace-nowrap">
+                        {pay.day || 1} / {pay.month} / {pay.year}
+                      </span>
+                      <span className="text-[9px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity font-bold">
+                        تعديل التاريخ
+                      </span>
+                    </button>
+                  </td>
+                  <td className="p-3 md:p-3.5 lg:p-4 font-mono text-sm font-bold text-slate-700 whitespace-nowrap">
+                    {(Number(pay.amount) || 0).toLocaleString()}
+                  </td>
+                  <td className="p-3 md:p-3.5 lg:p-4 font-mono text-sm font-bold text-rose-600 whitespace-nowrap">
+                    {(Number(pay.deduction) || 0).toLocaleString()}
+                  </td>
+                  <td className="p-3 md:p-3.5 lg:p-4">
+                    <button
+                      type="button"
+                      onClick={() => openFinancials(pay)}
+                      className="group text-right hover:bg-emerald-50/60 px-2 py-1 rounded-xl transition-all border border-transparent hover:border-emerald-200"
+                    >
+                      <div className="font-black text-emerald-600 font-mono tracking-tighter text-sm lg:text-base whitespace-nowrap">
+                        {payAmount(pay).toLocaleString()} د.ع
+                      </div>
+                      <div className="text-[9px] text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity font-bold">
+                        تعديل التفاصيل
+                      </div>
+                    </button>
+                  </td>
+                  <td className="p-3 md:p-3.5 lg:p-4 sticky left-0 z-10 bg-white group-hover/row:bg-slate-50 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.08)]">
+                    {pay.status === 'paid' ? (
+                      <button
+                        type="button"
+                        onClick={() => togglePaymentStatus(pay)}
+                        title="انقر لإلغاء الصرف"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                      >
+                        <CheckCircle2 size={12} strokeWidth={2.5} /> مدفوع
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => togglePaymentStatus(pay)}
+                        title="انقر لتأكيد الصرف"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-[10px] font-black border border-amber-100 hover:bg-amber-100 transition-colors"
+                      >
+                        <Clock size={12} strokeWidth={2.5} /> معلق
+                      </button>
+                    )}
+                  </td>
+                  <td className="p-3 md:p-3.5 lg:p-4">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPayroll(pay)}
+                      className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-widest hover:underline decoration-2 underline-offset-4 transition-all whitespace-nowrap"
+                    >
+                      عرض الوصل
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {payrolls.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-16 lg:p-24 text-center text-slate-400 font-medium italic">
+                    لا توجد سجلات رواتب لهذا الشهر
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <AppModalPortal
@@ -535,17 +753,17 @@ export default function Payroll() {
               </div>
             </div>
 
-            <div className="sx-app-modal-panel__footer flex gap-4">
+            <div className="sx-app-modal-panel__footer flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
               <button 
                 type="submit"
-                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
+                className="flex-1 py-3.5 sm:py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
               >
                 حفظ التغييرات
               </button>
               <button 
                 type="button"
                 onClick={() => setEditingDate(null)}
-                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all"
+                className="flex-1 py-3.5 sm:py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all"
               >
                 إلغاء
               </button>
@@ -651,10 +869,10 @@ export default function Payroll() {
 
             </div>
 
-            <div className="sx-app-modal-panel__footer flex gap-4">
+            <div className="sx-app-modal-panel__footer flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
               <button 
                 type="submit"
-                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 active:scale-95 flex items-center justify-center gap-2"
+                className="flex-1 py-3.5 sm:py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 active:scale-95 flex items-center justify-center gap-2"
               >
                 <Save size={18} />
                 حفظ ومزامنة الراتب
@@ -662,7 +880,7 @@ export default function Payroll() {
               <button 
                 type="button"
                 onClick={() => setEditingFinancials(null)}
-                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
+                className="flex-1 py-3.5 sm:py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
               >
                 إلغاء
               </button>
@@ -719,10 +937,10 @@ export default function Payroll() {
             </div>
           </div>
 
-          <div className="sx-app-modal-panel__footer flex gap-4">
+          <div className="sx-app-modal-panel__footer flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
             <button 
               type="submit"
-              className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900/10 active:scale-95 flex items-center justify-center gap-2"
+              className="flex-1 py-4 sm:py-5 bg-indigo-600 text-white rounded-[1.5rem] font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900/10 active:scale-95 flex items-center justify-center gap-2"
             >
               <Save size={20} />
               تحديث الميزانية
@@ -730,7 +948,7 @@ export default function Payroll() {
             <button 
               type="button"
               onClick={() => setShowBudgetModal(false)}
-              className="px-6 py-5 bg-slate-100 text-slate-600 rounded-[1.5rem] font-bold hover:bg-slate-200 transition-all active:scale-95"
+              className="sm:px-6 py-4 sm:py-5 bg-slate-100 text-slate-600 rounded-[1.5rem] font-bold hover:bg-slate-200 transition-all active:scale-95"
             >
               إلغاء
             </button>
@@ -749,33 +967,33 @@ export default function Payroll() {
           <>
             <div ref={printRef} className="overflow-hidden">
               {/* Receipt Header */}
-              <div className="bg-slate-900 p-8 text-white relative">
+              <div className="bg-slate-900 p-5 sm:p-8 text-white relative">
                 <button 
                   onClick={() => setSelectedPayroll(null)}
-                  className="absolute top-6 left-6 text-white/50 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full no-print"
+                  className="absolute top-4 sm:top-6 left-4 sm:left-6 text-white/50 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full no-print"
                 >
                 <X size={20} />
               </button>
-              <div className="flex items-center gap-4 mb-2">
-                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
-                  <ReceiptText size={24} className="text-white" />
+              <div className="flex items-center gap-3 sm:gap-4 mb-2 pe-10">
+                <div className="w-11 h-11 sm:w-12 sm:h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md shrink-0">
+                  <ReceiptText size={22} className="text-white" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-black font-display tracking-tight">وصل صرف الراتب</h3>
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-xl font-black font-display tracking-tight">وصل صرف الراتب</h3>
                   <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">إيصال مالي رسمي</p>
                 </div>
               </div>
             </div>
 
             {/* Receipt Body */}
-            <div className="p-8 space-y-8 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px]">
-              <div className="flex justify-between items-start border-b border-slate-100 pb-6 border-dashed">
-                <div>
+            <div className="p-5 sm:p-8 space-y-6 sm:space-y-8 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px]">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 border-b border-slate-100 pb-5 sm:pb-6 border-dashed">
+                <div className="min-w-0">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">الموظف المستلم</label>
-                  <p className="text-xl font-black text-slate-900 font-display">{selectedPayroll.userName}</p>
-                  <p className="text-xs text-slate-500 font-mono tracking-tighter">ID: {selectedPayroll.userId}</p>
+                  <p className="text-lg sm:text-xl font-black text-slate-900 font-display truncate">{selectedPayroll.userName}</p>
+                  <p className="text-xs text-slate-500 font-mono tracking-tighter truncate">ID: {selectedPayroll.userId}</p>
                 </div>
-                <div className="text-left">
+                <div className="sm:text-left">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">التاريخ</label>
                   <p className="text-sm font-bold text-slate-900">{selectedPayroll.day || 1} / {selectedPayroll.month} / {selectedPayroll.year}</p>
                   <p className="text-[10px] text-slate-400 font-mono">
@@ -828,17 +1046,17 @@ export default function Payroll() {
             </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 no-print px-8 pb-8 bg-white">
+            <div className="flex flex-col sm:grid sm:grid-cols-2 gap-3 sm:gap-4 no-print px-4 sm:px-8 pb-6 sm:pb-8 bg-white">
               <button 
                 onClick={handlePrintClick}
-                className="flex items-center justify-center gap-2 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
+                className="flex items-center justify-center gap-2 py-3.5 sm:py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
               >
                 <Printer size={18} />
                 طباعة
               </button>
               <button 
                 onClick={handlePrintClick}
-                className="flex items-center justify-center gap-2 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95"
+                className="flex items-center justify-center gap-2 py-3.5 sm:py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95"
               >
                 <Download size={18} />
                 حفظ PDF
