@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
-import { Wallet, CheckCircle2, Clock, Plus, ReceiptText, X, Printer, Download, Share2, CreditCard, Save } from 'lucide-react';
+import { Wallet, CheckCircle2, Clock, ReceiptText, X, Printer, Download, CreditCard, Save, Search } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion } from 'motion/react';
 import { AppModalPortal } from '../../components/AppModalPortal';
@@ -83,6 +83,8 @@ export default function Payroll() {
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [schoolBudget, setSchoolBudget] = useState(0);
   const [budgetInput, setBudgetInput] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending'>('all');
 
   const handleUpdateBudget = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,6 +299,17 @@ export default function Payroll() {
   const budgetUsagePct = Math.round(budgetUsageRatio * 100);
   const budgetOver = schoolBudget > 0 && budgetUsageRatio > 1;
 
+  // UI-only list filter (does not change Firestore queries or financial totals)
+  const visiblePayrolls = payrolls.filter((p) => {
+    if (statusFilter === 'paid' && p.status !== 'paid') return false;
+    if (statusFilter === 'pending' && p.status === 'paid') return false;
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const name = String(p.userName || '').toLowerCase();
+    const uid = String(p.userId || '').toLowerCase();
+    return name.includes(q) || uid.includes(q);
+  });
+
   const openFinancials = (pay: any) => {
     setEditingFinancials({
       id: pay.id,
@@ -309,72 +322,184 @@ export default function Payroll() {
     });
   };
 
+  const renderPayrollCard = (pay: any) => (
+    <article
+      key={pay.id}
+      className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-5 space-y-3.5 h-full flex flex-col min-w-0 overflow-hidden"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="font-black text-slate-900 font-display truncate text-sm md:text-base">
+            {pay.userName || pay.userId}
+          </h3>
+          <button
+            type="button"
+            onClick={() =>
+              setEditingDate({
+                id: pay.id,
+                day: pay.day || 1,
+                month: pay.month,
+                year: pay.year,
+              })
+            }
+            className="mt-1 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors"
+          >
+            الشهر: {pay.month} / {pay.year}
+            {pay.day ? ` · يوم ${pay.day}` : ''}
+          </button>
+        </div>
+        {pay.status === 'paid' ? (
+          <button
+            type="button"
+            onClick={() => togglePaymentStatus(pay)}
+            title="انقر لإلغاء الصرف"
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black border border-emerald-100"
+          >
+            <CheckCircle2 size={12} strokeWidth={2.5} /> مدفوع
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => togglePaymentStatus(pay)}
+            title="انقر لتأكيد الصرف"
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-[10px] font-black border border-amber-100"
+          >
+            <Clock size={12} strokeWidth={2.5} /> معلق
+          </button>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 space-y-2 flex-1">
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">الراتب الأساسي</span>
+          <span className="font-bold font-mono text-slate-800 truncate">
+            {(Number(pay.amount) || 0).toLocaleString()} د.ع
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-[10px] font-black text-rose-400 uppercase tracking-wider shrink-0">الخصم</span>
+          <span className="font-bold font-mono text-rose-600 truncate">
+            {(Number(pay.deduction) || 0).toLocaleString()} د.ع
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200">
+          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider shrink-0">الصافي</span>
+          <button
+            type="button"
+            onClick={() => openFinancials(pay)}
+            className="font-black font-mono text-emerald-700 text-sm md:text-base tracking-tighter truncate"
+          >
+            {payAmount(pay).toLocaleString()} د.ع
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 mt-auto">
+        <button
+          type="button"
+          onClick={() => setSelectedPayroll(pay)}
+          className="w-full py-2.5 md:py-3 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
+        >
+          عرض التفاصيل / الوصل
+        </button>
+        <button
+          type="button"
+          onClick={() => openFinancials(pay)}
+          className="w-full py-2.5 md:py-3 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
+        >
+          تعديل التفاصيل المالية
+        </button>
+      </div>
+    </article>
+  );
+
   return (
-    <div className="space-y-5 md:space-y-6 lg:space-y-8" dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* Header */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">لوحة مالية</p>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 font-display tracking-tight leading-tight">
-            سجلات الرواتب والمالية
-          </h1>
-          <p className="text-slate-500 mt-1 text-sm md:text-base font-bold">
-            إدارة صرف الرواتب والميزانية التشغيلية
-          </p>
+    <div className="space-y-5 md:space-y-6 lg:space-y-8 max-w-full overflow-x-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">لوحة مالية</p>
+        <h1 className="text-2xl md:text-3xl font-black text-slate-900 font-display tracking-tight leading-tight">
+          سجلات الرواتب والمالية
+        </h1>
+        <p className="text-slate-500 mt-1 text-sm md:text-base font-bold">
+          إدارة صرف الرواتب والميزانية التشغيلية
+        </p>
+      </div>
+
+      {/* Filters: vertical on phone/tablet, compact row on desktop */}
+      <div className="no-print bg-white border border-slate-200 rounded-2xl p-3 md:p-4 shadow-sm space-y-3 lg:space-y-0 lg:flex lg:flex-wrap lg:items-center lg:gap-3">
+        <div className="relative w-full lg:flex-1 lg:min-w-[14rem]">
+          <Search size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-slate-400 pointer-events-none" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="بحث باسم الموظف..."
+            className="w-full pe-10 ps-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+          />
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 no-print w-full xl:w-auto">
-          <div className="flex flex-wrap items-center gap-1 bg-white border border-slate-200 rounded-2xl p-1 shadow-sm">
-            <select
-              value={filterDay}
-              onChange={(e) => setFilterDay(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="flex-1 min-w-[6.5rem] px-3 py-2.5 rounded-xl bg-transparent text-sm font-bold text-slate-700 outline-none"
-            >
-              <option value="all">كل الأيام</option>
-              {Array.from({ length: 31 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>يوم {i + 1}</option>
-              ))}
-            </select>
-            <select
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(Number(e.target.value))}
-              className="flex-1 min-w-[5.5rem] px-3 py-2.5 rounded-xl bg-transparent text-sm font-bold text-slate-700 outline-none"
-            >
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>شهر {i + 1}</option>
-              ))}
-            </select>
-            <input
-              type="number"
-              value={Number.isNaN(filterYear) ? '' : filterYear}
-              onChange={(e) => {
-                const val = e.target.value;
-                setFilterYear(val === '' ? new Date().getFullYear() : Number(val) || new Date().getFullYear());
-              }}
-              className="w-full sm:w-24 px-3 py-2.5 rounded-xl bg-transparent text-sm font-bold text-slate-700 outline-none focus:bg-slate-50 transition-colors"
-              placeholder="السنة"
-            />
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 w-full lg:w-auto lg:items-center">
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(Number(e.target.value))}
+            className="w-full lg:w-auto px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 outline-none"
+          >
+            {Array.from({ length: 12 }, (_, i) => (
+              <option key={i + 1} value={i + 1}>شهر {i + 1}</option>
+            ))}
+          </select>
 
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => setShowBudgetModal(true)}
-              className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:border-indigo-300 hover:bg-indigo-50/40 transition-all shadow-sm text-sm"
-            >
-              <Wallet size={18} className="text-indigo-600" />
-              الميزانية
-            </button>
-            <button
-              type="button"
-              onClick={generateMonthlyPayroll}
-              disabled={loading}
-              className="flex items-center justify-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-sm active:scale-95 disabled:opacity-50 text-sm"
-            >
-              <ReceiptText size={18} />
-              توليد كشف شهري
-            </button>
-          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'paid' | 'pending')}
+            className="w-full lg:w-auto px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 outline-none"
+          >
+            <option value="all">كل الحالات</option>
+            <option value="paid">مدفوع</option>
+            <option value="pending">معلق</option>
+          </select>
+
+          <select
+            value={filterDay}
+            onChange={(e) => setFilterDay(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            className="w-full lg:w-auto px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 outline-none"
+          >
+            <option value="all">كل الأيام</option>
+            {Array.from({ length: 31 }, (_, i) => (
+              <option key={i + 1} value={i + 1}>يوم {i + 1}</option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            value={Number.isNaN(filterYear) ? '' : filterYear}
+            onChange={(e) => {
+              const val = e.target.value;
+              setFilterYear(val === '' ? new Date().getFullYear() : Number(val) || new Date().getFullYear());
+            }}
+            className="w-full lg:w-24 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 outline-none focus:border-indigo-400"
+            placeholder="السنة"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex gap-3 w-full lg:w-auto">
+          <button
+            type="button"
+            onClick={() => setShowBudgetModal(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:border-indigo-300 hover:bg-indigo-50/40 transition-all text-sm"
+          >
+            <Wallet size={18} className="text-indigo-600" />
+            الميزانية
+          </button>
+          <button
+            type="button"
+            onClick={generateMonthlyPayroll}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 text-sm"
+          >
+            <ReceiptText size={18} />
+            توليد كشف شهري
+          </button>
         </div>
       </div>
 
@@ -459,113 +584,26 @@ export default function Payroll() {
         </div>
       )}
 
-      {/* Mobile cards */}
-      <div className="md:hidden space-y-3">
-        {payrolls.length === 0 ? (
+      {/* Mobile: 1-col cards | Tablet: 2-col cards */}
+      <div className="lg:hidden">
+        {visiblePayrolls.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400 font-medium italic text-sm">
-            لا توجد سجلات رواتب لهذا الشهر
+            لا توجد سجلات رواتب مطابقة
           </div>
         ) : (
-          payrolls.map((pay) => (
-            <article
-              key={pay.id}
-              className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3.5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="font-black text-slate-900 font-display truncate">
-                    {pay.userName || pay.userId}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEditingDate({
-                        id: pay.id,
-                        day: pay.day || 1,
-                        month: pay.month,
-                        year: pay.year,
-                      })
-                    }
-                    className="mt-1 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors"
-                  >
-                    الشهر: {pay.month} / {pay.year}
-                    {pay.day ? ` · يوم ${pay.day}` : ''}
-                  </button>
-                </div>
-                {pay.status === 'paid' ? (
-                  <button
-                    type="button"
-                    onClick={() => togglePaymentStatus(pay)}
-                    title="انقر لإلغاء الصرف"
-                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black border border-emerald-100"
-                  >
-                    <CheckCircle2 size={12} strokeWidth={2.5} /> مدفوع
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => togglePaymentStatus(pay)}
-                    title="انقر لتأكيد الصرف"
-                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-[10px] font-black border border-amber-100"
-                  >
-                    <Clock size={12} strokeWidth={2.5} /> معلق
-                  </button>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">الراتب الأساسي</span>
-                  <span className="font-bold font-mono text-slate-800">
-                    {(Number(pay.amount) || 0).toLocaleString()} د.ع
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-[10px] font-black text-rose-400 uppercase tracking-wider">الخصومات</span>
-                  <span className="font-bold font-mono text-rose-600">
-                    {(Number(pay.deduction) || 0).toLocaleString()} د.ع
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">الصافي</span>
-                  <button
-                    type="button"
-                    onClick={() => openFinancials(pay)}
-                    className="font-black font-mono text-emerald-700 text-base tracking-tighter"
-                  >
-                    {payAmount(pay).toLocaleString()} د.ع
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedPayroll(pay)}
-                  className="w-full py-3 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
-                >
-                  عرض التفاصيل / الوصل
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openFinancials(pay)}
-                  className="w-full py-3 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
-                >
-                  تعديل التفاصيل المالية
-                </button>
-              </div>
-            </article>
-          ))
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+            {visiblePayrolls.map((pay) => renderPayrollCard(pay))}
+          </div>
         )}
       </div>
 
-      {/* Tablet + Desktop table */}
-      <div className="hidden md:block bg-white rounded-2xl lg:rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 md:px-5 lg:px-6 py-3.5 md:py-4 border-b border-slate-100 bg-slate-50/90">
+      {/* Desktop table only */}
+      <div className="hidden lg:block bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50/90">
           <div className="min-w-0">
             <h2 className="text-sm font-black text-slate-800 tracking-wide font-display">كشف الرواتب التفصيلي</h2>
             <p className="text-[11px] text-slate-400 font-bold mt-0.5">
-              {payrolls.length} سجل · {filterMonth}/{filterYear}
+              {visiblePayrolls.length} من {payrolls.length} سجل · {filterMonth}/{filterYear}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
@@ -578,35 +616,33 @@ export default function Payroll() {
           </div>
         </div>
 
-        <div className="overflow-x-auto overscroll-x-contain">
-          <table className="w-full text-right md:min-w-[720px] lg:min-w-[880px]">
-            <thead className="bg-slate-50/95 text-[10px] font-black text-slate-500 uppercase tracking-[0.14em] border-b border-slate-200 sticky top-0 z-20">
+        <div className="overflow-x-auto">
+          <table className="w-full text-right table-fixed min-w-0">
+            <thead className="bg-slate-50/95 text-[10px] font-black text-slate-500 uppercase tracking-[0.14em] border-b border-slate-200">
               <tr>
-                <th className="p-3 md:p-3.5 lg:p-4 sticky right-0 z-30 bg-slate-50 min-w-[11rem] shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.12)]">
-                  اسم الموظف
+                <th className="p-4 w-[22%] sticky right-0 z-20 bg-slate-50 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.12)]">
+                  الموظف
                 </th>
-                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الشهر/السنة</th>
-                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الأساسي</th>
-                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الخصم</th>
-                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الصافي</th>
-                <th className="p-3 md:p-3.5 lg:p-4 sticky left-0 z-30 bg-slate-50 whitespace-nowrap shadow-[4px_0_8px_-6px_rgba(15,23,42,0.12)]">
-                  الحالة
-                </th>
-                <th className="p-3 md:p-3.5 lg:p-4 whitespace-nowrap">الإجراءات</th>
+                <th className="p-4 w-[12%]">الشهر</th>
+                <th className="p-4 w-[14%]">الراتب الأساسي</th>
+                <th className="p-4 w-[12%]">الخصومات</th>
+                <th className="p-4 w-[14%]">الصافي</th>
+                <th className="p-4 w-[12%]">الحالة</th>
+                <th className="p-4 w-[14%]">الإجراءات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {payrolls.map((pay) => (
+              {visiblePayrolls.map((pay) => (
                 <tr key={pay.id} className="hover:bg-slate-50/90 transition-colors group/row">
-                  <td className="p-3 md:p-3.5 lg:p-4 sticky right-0 z-10 bg-white group-hover/row:bg-slate-50 min-w-[11rem] shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.08)]">
-                    <div className="font-bold text-slate-900 text-sm truncate max-w-[14rem]">
+                  <td className="p-4 sticky right-0 z-10 bg-white group-hover/row:bg-slate-50 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.08)]">
+                    <div className="font-bold text-slate-900 text-sm truncate">
                       {pay.userName || pay.userId}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase truncate max-w-[14rem]">
+                    <div className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase truncate">
                       {pay.userId}
                     </div>
                   </td>
-                  <td className="p-3 md:p-3.5 lg:p-4">
+                  <td className="p-4">
                     <button
                       type="button"
                       onClick={() =>
@@ -620,34 +656,29 @@ export default function Payroll() {
                       className="group flex flex-col hover:bg-white px-2 py-1 rounded-xl transition-all border border-transparent hover:border-slate-200"
                     >
                       <span className="font-bold text-slate-700 text-sm whitespace-nowrap">
-                        {pay.day || 1} / {pay.month} / {pay.year}
+                        {pay.month} / {pay.year}
                       </span>
-                      <span className="text-[9px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity font-bold">
-                        تعديل التاريخ
-                      </span>
+                      <span className="text-[9px] text-slate-400 font-bold">يوم {pay.day || 1}</span>
                     </button>
                   </td>
-                  <td className="p-3 md:p-3.5 lg:p-4 font-mono text-sm font-bold text-slate-700 whitespace-nowrap">
+                  <td className="p-4 font-mono text-sm font-bold text-slate-700 whitespace-nowrap">
                     {(Number(pay.amount) || 0).toLocaleString()}
                   </td>
-                  <td className="p-3 md:p-3.5 lg:p-4 font-mono text-sm font-bold text-rose-600 whitespace-nowrap">
+                  <td className="p-4 font-mono text-sm font-bold text-rose-600 whitespace-nowrap">
                     {(Number(pay.deduction) || 0).toLocaleString()}
                   </td>
-                  <td className="p-3 md:p-3.5 lg:p-4">
+                  <td className="p-4">
                     <button
                       type="button"
                       onClick={() => openFinancials(pay)}
                       className="group text-right hover:bg-emerald-50/60 px-2 py-1 rounded-xl transition-all border border-transparent hover:border-emerald-200"
                     >
-                      <div className="font-black text-emerald-600 font-mono tracking-tighter text-sm lg:text-base whitespace-nowrap">
+                      <div className="font-black text-emerald-600 font-mono tracking-tighter text-base whitespace-nowrap">
                         {payAmount(pay).toLocaleString()} د.ع
-                      </div>
-                      <div className="text-[9px] text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity font-bold">
-                        تعديل التفاصيل
                       </div>
                     </button>
                   </td>
-                  <td className="p-3 md:p-3.5 lg:p-4 sticky left-0 z-10 bg-white group-hover/row:bg-slate-50 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.08)]">
+                  <td className="p-4">
                     {pay.status === 'paid' ? (
                       <button
                         type="button"
@@ -668,21 +699,30 @@ export default function Payroll() {
                       </button>
                     )}
                   </td>
-                  <td className="p-3 md:p-3.5 lg:p-4">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPayroll(pay)}
-                      className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-widest hover:underline decoration-2 underline-offset-4 transition-all whitespace-nowrap"
-                    >
-                      عرض الوصل
-                    </button>
+                  <td className="p-4">
+                    <div className="flex flex-col gap-1.5 items-start">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPayroll(pay)}
+                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-widest hover:underline decoration-2 underline-offset-4 transition-all"
+                      >
+                        عرض الوصل
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openFinancials(pay)}
+                        className="text-[10px] font-bold text-slate-500 hover:text-emerald-600 transition-colors"
+                      >
+                        تعديل مالي
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
-              {payrolls.length === 0 && (
+              {visiblePayrolls.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-16 lg:p-24 text-center text-slate-400 font-medium italic">
-                    لا توجد سجلات رواتب لهذا الشهر
+                  <td colSpan={7} className="p-20 text-center text-slate-400 font-medium italic">
+                    لا توجد سجلات رواتب مطابقة
                   </td>
                 </tr>
               )}
@@ -780,16 +820,16 @@ export default function Payroll() {
         ariaLabel="تعديل التفاصيل المالية"
       >
         <div className="sx-app-modal-panel__header">
-          <div className="flex items-center gap-4 text-emerald-600">
-            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
-              <CreditCard size={24} />
+          <div className="flex items-center gap-3 sm:gap-4 text-emerald-600 min-w-0 pe-2">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shrink-0">
+              <CreditCard size={22} />
             </div>
-            <div>
-              <h2 className="sx-app-modal-panel__title text-slate-900">تعديل التفاصيل المالية</h2>
+            <div className="min-w-0">
+              <h2 className="sx-app-modal-panel__title text-slate-900 truncate">تعديل التفاصيل المالية</h2>
               <p className="sx-app-modal-panel__subtitle">المكافآت، الاستقطاعات والراتب الأساسي</p>
             </div>
           </div>
-          <button type="button" className="sx-app-modal-panel__close" onClick={() => setEditingFinancials(null)} aria-label="إغلاق">
+          <button type="button" className="sx-app-modal-panel__close shrink-0" onClick={() => setEditingFinancials(null)} aria-label="إغلاق">
             <X size={18} />
           </button>
         </div>
@@ -923,10 +963,10 @@ export default function Payroll() {
                     const val = e.target.value;
                     setBudgetInput(val === '' ? 0 : Number(val) || 0);
                   }}
-                  className="w-full px-6 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-indigo-500 outline-none font-black text-3xl text-indigo-600 font-mono tracking-tighter transition-all bg-slate-50/50"
+                  className="w-full px-4 sm:px-6 py-4 sm:py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-indigo-500 outline-none font-black text-2xl sm:text-3xl text-indigo-600 font-mono tracking-tighter transition-all bg-slate-50/50"
                   placeholder="0"
                 />
-                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm pointer-events-none">د.ع</div>
+                <div className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm pointer-events-none">د.ع</div>
               </div>
               <div className="mt-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-2">
                 <div className="flex justify-between text-[10px] font-bold text-indigo-600 italic">
