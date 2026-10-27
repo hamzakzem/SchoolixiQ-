@@ -11,6 +11,7 @@ on:
       - firestore.rules
       - storage.rules
       - firebase.json
+      - scripts/deploy-firebase-rules.mjs
   workflow_dispatch:
 
 concurrency:
@@ -47,14 +48,13 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$RUNNER_TEMP/firebase-sa.json" \
             || { echo "::error::FIREBASE_SERVICE_ACCOUNT is not valid JSON (copy the whole file content)"; exit 1; }
 
+      - name: Install firebase-admin
+        run: npm install --no-save --no-audit --no-fund --legacy-peer-deps firebase-admin@13
+
       - name: Deploy Firestore + Storage rules
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
-        run: |
-          npx --yes firebase-tools@15.34.1 deploy \
-            --only firestore:rules,storage \
-            --project yala-safari-iq \
-            --non-interactive
+        run: node scripts/deploy-firebase-rules.mjs
 
       - name: Remove credentials
         if: always()
