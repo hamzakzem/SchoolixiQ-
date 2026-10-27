@@ -560,7 +560,7 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
             : 'School Store Collection Today'
           : '';
 
-  const formattedToday = new Date().toLocaleDateString(isRtl ? 'ar-IQ' : 'en-US', {
+  const formattedToday = new Date().toLocaleDateString(isRtl ? 'ar-IQ-u-nu-latn' : 'en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
@@ -620,13 +620,14 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
         />
         {hasMarketplace && (
           <SummaryStatCard
-            label={isRtl ? 'المُحصل اليوم' : 'Store Today'}
+            label={isRtl ? 'مبيعات المتجر اليوم' : 'Store sales today'}
             value={loading ? null : stats.collectedToday}
             emptyHint={isRtl ? 'لا مبيعات اليوم' : 'No sales today'}
             icon={Wallet}
             tone="indigo"
             unit={t('iqd')}
             formatNumber
+            className="col-span-2 md:col-span-1"
             onClick={() => setActiveModal('market')}
             isRtl={isRtl}
           />
@@ -640,7 +641,6 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
           unit={t('iqd')}
           formatNumber
           isRtl={isRtl}
-          className="col-span-2 md:col-span-1"
         />
         <SummaryStatCard
           label={isRtl ? 'مخزون منخفض' : 'Low Stock'}
@@ -649,7 +649,6 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
           icon={AlertTriangle}
           tone="orange"
           isRtl={isRtl}
-          className="col-span-2 md:col-span-1"
         />
       </div>
 
@@ -695,7 +694,7 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
             <h3 className="text-sm font-black text-white">
               {isRtl ? 'إجراءات سريعة' : 'Quick Actions'}
             </h3>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
               {isRtl
                 ? 'أرسل تنبيهات الأقساط المتأخرة أو المستحقة لأولياء الأمور'
                 : 'Notify parents about overdue or upcoming installments'}

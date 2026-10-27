@@ -214,7 +214,7 @@ export default function StudentArchive() {
     }
   };
 
-  const currentMonthYear = new Date().toLocaleDateString("ar-IQ", {
+  const currentMonthYear = new Date().toLocaleDateString("ar-IQ-u-nu-latn", {
     year: "numeric",
     month: "long",
   });

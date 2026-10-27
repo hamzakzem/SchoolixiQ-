@@ -194,7 +194,7 @@ function formatNotificationTime(
   if (diffMin < 60) return isArabic ? `منذ ${diffMin} د` : `${diffMin}m ago`;
   const diffHr = Math.floor(diffMin / 60);
   if (diffHr < 24 && isToday) {
-    return date.toLocaleTimeString(isArabic ? 'ar-IQ' : undefined, {
+    return date.toLocaleTimeString(isArabic ? 'ar-IQ-u-nu-latn' : undefined, {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -202,13 +202,13 @@ function formatNotificationTime(
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) {
-    const time = date.toLocaleTimeString(isArabic ? 'ar-IQ' : undefined, {
+    const time = date.toLocaleTimeString(isArabic ? 'ar-IQ-u-nu-latn' : undefined, {
       hour: '2-digit',
       minute: '2-digit',
     });
     return isArabic ? `أمس ${time}` : `Yesterday ${time}`;
   }
-  return date.toLocaleDateString(isArabic ? 'ar-IQ' : undefined, {
+  return date.toLocaleDateString(isArabic ? 'ar-IQ-u-nu-latn' : undefined, {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',

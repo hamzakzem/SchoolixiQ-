@@ -173,7 +173,7 @@ export function getOfflineStatusLabel(snapshotIn?: OfflineStatusSnapshot): strin
 export function formatCacheAge(iso: string | null): string {
   if (!iso) return 'غير متوفر';
   try {
-    return new Date(iso).toLocaleString('ar-IQ');
+    return new Date(iso).toLocaleString('ar-IQ-u-nu-latn');
   } catch {
     return iso;
   }

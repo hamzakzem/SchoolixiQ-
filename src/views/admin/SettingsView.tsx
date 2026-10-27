@@ -486,7 +486,7 @@ export default function SettingsView() {
                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
                       <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">صالح لغاية</p>
                       <p className="text-lg font-bold font-mono">
-                        {schoolData?.subscriptionExpiresAt ? new Date(schoolData.subscriptionExpiresAt).toLocaleDateString('ar-IQ', {
+                        {schoolData?.subscriptionExpiresAt ? new Date(schoolData.subscriptionExpiresAt).toLocaleDateString('ar-IQ-u-nu-latn', {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric'

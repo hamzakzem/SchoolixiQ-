@@ -476,7 +476,7 @@ export default function LandingPage() {
                 const topFeatures = getPackageMarketingFeatures(pkg.permissions as PackagePermissions);
                 const displayFeatures =
                   topFeatures.length > 0 ? topFeatures : (Array.isArray(pkg.features) ? pkg.features : []).slice(0, 5);
-                const maxLabel = pkg.maxStudents > 0 ? `حتى ${pkg.maxStudents.toLocaleString('ar-IQ')} طالب` : 'طلاب غير محدود';
+                const maxLabel = pkg.maxStudents > 0 ? `حتى ${pkg.maxStudents.toLocaleString('ar-IQ-u-nu-latn')} طالب` : 'طلاب غير محدود';
                 const isCenter = popular || (popularIndex === -1 && index === 1);
 
                 return (

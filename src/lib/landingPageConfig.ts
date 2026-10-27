@@ -305,7 +305,7 @@ export function getPackageMarketingFeatures(
 
 export function formatIqdPrice(amount: number): string {
   if (!amount || amount <= 0) return 'حسب الطلب';
-  return `${amount.toLocaleString('ar-IQ')} د.ع`;
+  return `${amount.toLocaleString('ar-IQ-u-nu-latn')} د.ع`;
 }
 
 /** Normalize Iraqi mobile to wa.me digits (964...). */

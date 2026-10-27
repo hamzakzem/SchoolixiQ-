@@ -131,7 +131,7 @@ export function ParentHomeView({
         onGoTuition={() => onNavigate('tuition')}
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
         <SummaryTile
           icon={CalendarCheck}
           label={isRtl ? 'الحضور' : 'Attendance'}
@@ -165,7 +165,7 @@ export function ParentHomeView({
         <SummaryTile
           icon={Wallet}
           label={isRtl ? 'المتبقي' : 'Remaining'}
-          value={remaining > 0 ? remaining.toLocaleString('ar-IQ') : '0'}
+          value={remaining > 0 ? remaining.toLocaleString('ar-IQ-u-nu-latn') : '0'}
           sub={isRtl ? 'د.ع' : 'IQD'}
           accent={hasTuitionIssue ? 'danger' : 'navy'}
           onClick={() => onNavigate('tuition')}
@@ -187,11 +187,6 @@ export function ParentHomeView({
           {[
             { label: isRtl ? 'غائب' : 'Absent', count: attendanceSummary.absent, tone: 'danger' },
             { label: isRtl ? 'متأخر' : 'Late', count: attendanceSummary.late, tone: 'amber' },
-            {
-              label: isRtl ? 'سليم' : 'OK',
-              count: Math.max(0, 30 - attendanceSummary.absent - attendanceSummary.late),
-              tone: 'success',
-            },
           ].map((item) => (
             <div key={item.label} className={`parent-attendance-pill parent-attendance-pill--${item.tone}`}>
               <span className="text-lg font-black tabular-nums">{item.count}</span>
@@ -216,7 +211,7 @@ export function ParentHomeView({
               className="parent-quick-action"
               aria-label={isRtl ? action.label : action.en}
             >
-              <action.icon size={20} className="text-[#D4AF37]" aria-hidden />
+              <action.icon size={20} className="text-[#A8841F]" aria-hidden />
               <span>{isRtl ? action.label : action.en}</span>
             </button>
           ))}
@@ -275,7 +270,7 @@ export function ParentHomeView({
               >
                 <div className="min-w-0">
                   <p className="font-bold text-sm truncate">{hw.title}</p>
-                  <p className="text-[10px] text-[#D4AF37] font-bold mt-0.5">
+                  <p className="text-[10px] text-[#A8841F] font-bold mt-0.5">
                     {getHomeworkSubjectDisplay(hw, undefined, isRtl)}
                   </p>
                   <p className="text-[10px] text-[#0B2345]/45 mt-1">

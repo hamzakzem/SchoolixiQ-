@@ -37,7 +37,7 @@ export function ParentTuitionView({
     return installments.find((i) => i.status !== 'paid') || installments[0];
   }, [installments]);
 
-  const locale = language === 'ar' ? 'ar-IQ' : 'en-US';
+  const locale = language === 'ar' ? 'ar-IQ-u-nu-latn' : 'en-US';
 
   return (
     <div className="parent-tab space-y-6">
@@ -66,17 +66,17 @@ export function ParentTuitionView({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="parent-tuition-stat">
           <span className="parent-tuition-stat__label">{isRtl ? 'المتبقي' : 'Remaining'}</span>
-          <p className="parent-tuition-stat__value text-rose-600">{remaining.toLocaleString('ar-IQ')}</p>
+          <p className="parent-tuition-stat__value text-rose-600">{remaining.toLocaleString('ar-IQ-u-nu-latn')}</p>
           <span className="text-[10px] font-bold opacity-50">{t('iqd')}</span>
         </div>
         <div className="parent-tuition-stat">
           <span className="parent-tuition-stat__label">{isRtl ? 'المدفوع' : 'Paid'}</span>
-          <p className="parent-tuition-stat__value text-emerald-600">{totalPaid.toLocaleString('ar-IQ')}</p>
+          <p className="parent-tuition-stat__value text-emerald-600">{totalPaid.toLocaleString('ar-IQ-u-nu-latn')}</p>
           <span className="text-[10px] font-bold opacity-50">{t('iqd')}</span>
         </div>
         <div className="parent-tuition-stat col-span-2 lg:col-span-1">
           <span className="parent-tuition-stat__label">{isRtl ? 'إجمالي الرسوم' : 'Total fees'}</span>
-          <p className="parent-tuition-stat__value">{(student?.totalTuition || 0).toLocaleString('ar-IQ')}</p>
+          <p className="parent-tuition-stat__value">{(student?.totalTuition || 0).toLocaleString('ar-IQ-u-nu-latn')}</p>
           <span className="text-[10px] font-bold opacity-50">{t('iqd')}</span>
         </div>
         {nearestInstallment && (

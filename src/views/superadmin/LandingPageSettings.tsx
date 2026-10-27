@@ -135,7 +135,7 @@ export default function LandingPageSettings() {
 
       {/* Hero */}
       <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-        <h3 className="font-black text-lg">قسم البطل (Hero)</h3>
+        <h3 className="font-black text-lg">القسم الرئيسي (أعلى الصفحة)</h3>
         {(
           [
             ['heroTitle', 'العنوان الرئيسي'],

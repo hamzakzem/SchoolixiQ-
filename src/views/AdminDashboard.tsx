@@ -650,7 +650,7 @@ export default function AdminDashboard() {
                           <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
                             {plan.price === 0
                               ? "مجاني"
-                              : plan.price.toLocaleString("ar-IQ")}
+                              : plan.price.toLocaleString("ar-IQ-u-nu-latn")}
                           </span>
                           {plan.price > 0 && (
                             <span className="text-xs font-bold text-slate-400">
@@ -674,7 +674,7 @@ export default function AdminDashboard() {
                                 الحد الأقصى للطلاب
                               </p>
                               <p className="text-sm font-black text-slate-700 dark:text-slate-200">
-                                {plan.maxStudents.toLocaleString("ar-IQ")} طالب
+                                {plan.maxStudents.toLocaleString("ar-IQ-u-nu-latn")} طالب
                               </p>
                             </div>
                           </div>
@@ -785,7 +785,7 @@ export default function AdminDashboard() {
                 {isRtl
                   ? `شكراً لاختيارك منصة ${config.appName}. لقد تم إرسال طلب تفعيل`
                   : `Thank you for choosing ${config.appName}. Your activation request has been sent`}{" "}
-                مدرستك إلى الإدارة العليا (Super Admin).
+                مدرستك إلى إدارة المنصة.
                 <br />
                 <span className="text-indigo-600 dark:text-indigo-400">
                   سنقوم بتفعيل حسابك والتواصل معك خلال ساعات قليلة.
@@ -1390,7 +1390,7 @@ export default function AdminDashboard() {
                   </h2>
                   <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
                     عذراً، لقد انتهت صلاحية اشتراك مدرستك. يرجى التواصل مع
-                    الإدارة العامة (Super Admin) لتجديد الاشتراك ومواصلة استخدام
+                    إدارة المنصة لتجديد الاشتراك ومواصلة استخدام
                     الخدمات.
                   </p>
                   <div className="space-y-4">
@@ -1401,7 +1401,7 @@ export default function AdminDashboard() {
                       <span className="text-sm font-bold text-red-600 font-mono">
                         {new Date(
                           schoolData?.subscriptionExpiresAt,
-                        ).toLocaleDateString("ar-IQ")}
+                        ).toLocaleDateString("ar-IQ-u-nu-latn")}
                       </span>
                     </div>
                     <button
@@ -1483,7 +1483,7 @@ function PackageDetailsModal({
                 : (pkg.priceYearly !== undefined
                     ? pkg.priceYearly
                     : pkg.price
-                  ).toLocaleString("ar-IQ")}
+                  ).toLocaleString("ar-IQ-u-nu-latn")}
               {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) >
                 0 && <span className="text-xs font-bold mr-1">د.ع</span>}
             </p>
@@ -1500,7 +1500,7 @@ function PackageDetailsModal({
                 : (pkg.priceMonthly !== undefined
                     ? pkg.priceMonthly
                     : Math.round((pkg.price || 0) / 12)
-                  ).toLocaleString("ar-IQ")}
+                  ).toLocaleString("ar-IQ-u-nu-latn")}
               {(pkg.priceMonthly !== undefined
                 ? pkg.priceMonthly
                 : Math.round((pkg.price || 0) / 12)) > 0 && (
@@ -1513,7 +1513,7 @@ function PackageDetailsModal({
               سعة الطلاب
             </p>
             <p className="text-xl font-black text-indigo-800 dark:text-indigo-300">
-              {pkg.maxStudents.toLocaleString("ar-IQ")} طالب
+              {pkg.maxStudents.toLocaleString("ar-IQ-u-nu-latn")} طالب
             </p>
           </div>
         </div>

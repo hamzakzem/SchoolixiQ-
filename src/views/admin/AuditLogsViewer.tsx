@@ -32,7 +32,7 @@ type AuditRow = {
 function formatWhen(row: AuditRow): string {
   const ts = row.createdAt?.toDate?.() || row.timestamp?.toDate?.();
   if (!ts) return '—';
-  return ts.toLocaleString('ar-IQ', { dateStyle: 'short', timeStyle: 'short' });
+  return ts.toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 type LoginRow = {
@@ -95,7 +95,7 @@ function LoginLogsPanel({
             {row.event || 'login'} · {row.role} · {row.email || row.userId}
           </span>
           <span className="text-slate-400">
-            {row.userAgentSummary} · {row.createdAt?.toDate?.()?.toLocaleString('ar-IQ') || '—'}
+            {row.userAgentSummary} · {row.createdAt?.toDate?.()?.toLocaleString('ar-IQ-u-nu-latn') || '—'}
           </span>
         </div>
       ))}

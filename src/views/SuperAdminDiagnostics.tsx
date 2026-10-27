@@ -159,7 +159,7 @@ export function SuperAdminDiagnostics({
               {logs.map((log, i) => (
                 <tr key={log.id || i} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                   <td className="p-5 text-sm font-bold text-slate-600 dark:text-slate-300 font-mono" dir="ltr">
-                    {log.timestamp?.toDate ? new Date(log.timestamp.toDate()).toLocaleString('ar-IQ') : '—'}
+                    {log.timestamp?.toDate ? new Date(log.timestamp.toDate()).toLocaleString('ar-IQ-u-nu-latn') : '—'}
                   </td>
                   <td className="p-5">
                     <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black shadow-sm ${

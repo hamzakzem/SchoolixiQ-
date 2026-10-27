@@ -796,7 +796,7 @@ const AppContent = () => {
               <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-bold italic">
                 {isRtl
                   ? isManagement
-                    ? "لقد انتهت الفترة الزمنية لاشتراك مدرستكم. يرجى التواصل مع الدعم الفني (Super Admin) لتجديد الاشتراك."
+                    ? "لقد انتهت الفترة الزمنية لاشتراك مدرستكم. يرجى التواصل مع الدعم الفني لمنصة SchoolixiQ لتجديد الاشتراك."
                     : "لقد انتهت الفترة الزمنية المخصصة لاشتراك مدرستكم. يرجى التواصل مع إدارة المدرسة لتجديد الاشتراك واستعادة الصلاحيات."
                   : isManagement
                     ? "Your subscription has expired. Please contact Support to renew."

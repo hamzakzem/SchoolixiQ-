@@ -47,7 +47,8 @@
   --color-amber-300: #FAD97B;
   --color-amber-400: #F6C147;
   --color-amber-500: #D4A64A;
-  --color-amber-600: #D4A64A;
+  /* Deeper brand gold so amber-600 text stays readable on white (4.8:1). */
+  --color-amber-600: #946A1C;
   --color-amber-700: #B58B39;
   --color-amber-800: #916E2B;
   --color-amber-900: #75571F;
@@ -1085,12 +1086,20 @@ html.dark aside.parent-dashboard-menu:not(.sx-drawer-panel) {
   color: #f1f5f9 !important;
 }
 
+/* The parent sidebar brand sits on the dark navy header strip. */
 aside.parent-dashboard-menu .parent-sidebar-heading {
-  color: #0b2345 !important;
+  color: #ffffff !important;
 }
 
 aside.parent-dashboard-menu .parent-sidebar-subheading {
-  color: #64748b !important;
+  color: rgba(212, 175, 55, 0.9) !important;
+}
+
+/* Parent top bar is the dark design-system topbar: keep its icons legible. */
+.parent-app-header.sx-ds-topbar .sx-header-actions,
+.parent-app-header.sx-ds-topbar .sx-header-actions button,
+.parent-app-header.sx-ds-topbar .sx-ds-topbar__title {
+  color: rgba(248, 250, 252, 0.92);
 }
 
 html.dark aside.parent-dashboard-menu .parent-sidebar-heading {
@@ -2481,7 +2490,7 @@ html.dark .parent-feed-card {
 .parent-link-btn {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #d4af37;
+  color: #8c6a12;
   background: none;
   border: none;
   cursor: pointer;

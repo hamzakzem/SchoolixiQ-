@@ -185,7 +185,7 @@ export function SuperAdminSchoolCard({
       className="sx-school-card sx-sa-school-card"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <header className="sx-sa-school-card__head">
+      <div className="sx-sa-school-card__head">
         <div className="sx-sa-school-card__avatar" aria-hidden>
           {school.logoUrl ? (
             <img src={school.logoUrl} alt="" />
@@ -200,7 +200,7 @@ export function SuperAdminSchoolCard({
             {school.governorate ? ` · ${school.governorate}` : ''}
           </p>
         </div>
-      </header>
+      </div>
 
       <div className="sx-sa-school-card__badges">
         <span
@@ -243,7 +243,7 @@ export function SuperAdminSchoolCard({
         <div className="sx-sa-info-cell">
           <p className="sx-sa-info-cell__label">{isRtl ? 'تاريخ التسجيل' : 'Registered'}</p>
           <p className="sx-sa-info-cell__value font-mono">
-            {school.createdAt?.toDate?.()?.toLocaleDateString('ar-IQ') || '—'}
+            {school.createdAt?.toDate?.()?.toLocaleDateString('ar-IQ-u-nu-latn') || '—'}
           </p>
         </div>
         <div className="sx-sa-info-cell">

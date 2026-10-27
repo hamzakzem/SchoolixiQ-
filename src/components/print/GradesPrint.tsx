@@ -79,7 +79,7 @@ const GradesPrint = forwardRef<HTMLDivElement, GradesPrintProps>(
 
               <div className="text-left space-y-2 w-1/3 pl-4 mt-2">
                 <p className="text-[11px] font-bold text-slate-700 flex justify-end gap-2"><span className="text-slate-500">الرقم:</span> <span className="font-mono tabular-nums">{Math.random().toString(36).substring(2, 8).toUpperCase()}</span></p>
-                <p className="text-[11px] font-bold text-slate-700 flex justify-end gap-2"><span className="text-slate-500">التاريخ:</span> <span>{new Date().toLocaleDateString('ar-EG')}</span></p>
+                <p className="text-[11px] font-bold text-slate-700 flex justify-end gap-2"><span className="text-slate-500">التاريخ:</span> <span>{new Date().toLocaleDateString('ar-IQ-u-nu-latn')}</span></p>
                 <p className="text-[11px] font-bold text-slate-700 flex justify-end gap-2"><span className="text-slate-500">العام الدراسي:</span> <span>{selectedYear}</span></p>
                 <p className="text-[11px] font-bold text-slate-700 flex justify-end gap-2"><span className="text-slate-500">الفصل:</span> <span>{selectedTerm}</span></p>
               </div>

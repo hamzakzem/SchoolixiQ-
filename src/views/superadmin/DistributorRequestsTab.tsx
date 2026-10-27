@@ -16,8 +16,8 @@ import type { DistributorRecord } from "../../types/distributor";
 
 function formatDate(value: unknown) {
   const ts = value as { toDate?: () => Date; seconds?: number } | undefined;
-  if (ts?.toDate) return ts.toDate().toLocaleString("ar-IQ");
-  if (ts?.seconds) return new Date(ts.seconds * 1000).toLocaleString("ar-IQ");
+  if (ts?.toDate) return ts.toDate().toLocaleString("ar-IQ-u-nu-latn");
+  if (ts?.seconds) return new Date(ts.seconds * 1000).toLocaleString("ar-IQ-u-nu-latn");
   return "—";
 }
 

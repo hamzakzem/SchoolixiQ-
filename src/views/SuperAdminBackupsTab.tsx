@@ -135,7 +135,7 @@ export function SuperAdminBackupsTab() {
               <div>
                 <div className="text-xs text-slate-400 font-bold mb-1">آخر نسخة يدوية تم تنزيلها</div>
                 <div className="text-sm font-black text-slate-700 dark:text-white">
-                  {lastBackupDate ? lastBackupDate.toLocaleString('ar-IQ') : 'لم يتم تنزيل نسخة بعد'}
+                  {lastBackupDate ? lastBackupDate.toLocaleString('ar-IQ-u-nu-latn') : 'لم يتم تنزيل نسخة بعد'}
                 </div>
               </div>
             </div>

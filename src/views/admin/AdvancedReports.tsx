@@ -414,7 +414,7 @@ export default function AdvancedReports({
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
                                   <span>{report.teacherName}</span>
                                   <span>•</span>
-                                  <span>{report.createdAt?.seconds ? new Date(report.createdAt.seconds * 1000).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : ''}</span>
+                                  <span>{report.createdAt?.seconds ? new Date(report.createdAt.seconds * 1000).toLocaleDateString(language === 'ar' ? 'ar-IQ-u-nu-latn' : 'en-US') : ''}</span>
                                 </div>
                               </div>
                            </div>

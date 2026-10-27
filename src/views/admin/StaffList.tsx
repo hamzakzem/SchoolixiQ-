@@ -1350,7 +1350,7 @@ export default function StaffList() {
         <div ref={reportPrintRef} className="sx-app-modal-panel__body" id="report-content" dir="rtl">
                 <div className="hidden print:block mb-8 text-center border-b-2 border-slate-900 pb-6">
                   <h1 className="text-3xl font-black mb-2">تقرير حضور كادر المدرسة</h1>
-                  <p className="text-xl font-bold text-slate-600 font-mono tracking-tighter">التاريخ: {new Date().toLocaleDateString('ar-IQ')}</p>
+                  <p className="text-xl font-bold text-slate-600 font-mono tracking-tighter">التاريخ: {new Date().toLocaleDateString('ar-IQ-u-nu-latn')}</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">

@@ -54,21 +54,21 @@ const STATUS_CLASS: Record<string, string> = {
 };
 
 function formatIqd(amount: number) {
-  return `${Number(amount || 0).toLocaleString("ar-IQ")} د.ع`;
+  return `${Number(amount || 0).toLocaleString("ar-IQ-u-nu-latn")} د.ع`;
 }
 
 function formatDate(value: unknown) {
   if (!value) return "—";
   if (typeof value === "object" && value !== null && "toDate" in value) {
     try {
-      return (value as { toDate: () => Date }).toDate().toLocaleDateString("ar-IQ");
+      return (value as { toDate: () => Date }).toDate().toLocaleDateString("ar-IQ-u-nu-latn");
     } catch {
       return "—";
     }
   }
   if (typeof value === "string") {
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString("ar-IQ");
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString("ar-IQ-u-nu-latn");
   }
   return "—";
 }

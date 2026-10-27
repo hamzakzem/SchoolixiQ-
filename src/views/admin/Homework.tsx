@@ -273,7 +273,7 @@ export default function Homework() {
                                   <span>•</span>
                                   <span>{getHomeworkSubjectDisplay(hw, hw.teacherId ? teachersById[hw.teacherId] : undefined, isRtl)}</span>
                                   <span>•</span>
-                                  <span>{hw.createdAt?.seconds ? new Date(hw.createdAt.seconds * 1000).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : ''}</span>
+                                  <span>{hw.createdAt?.seconds ? new Date(hw.createdAt.seconds * 1000).toLocaleDateString(language === 'ar' ? 'ar-IQ-u-nu-latn' : 'en-US') : ''}</span>
                                 </div>
                               </div>
                            </div>
