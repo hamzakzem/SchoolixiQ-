@@ -8,6 +8,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   X,
+  MessageCircleQuestion,
 } from 'lucide-react';
 import {
   categoriesForScope,
@@ -311,10 +312,11 @@ export function SmartAssistantWidget({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed z-40 bottom-24 end-4 w-14 h-14 rounded-full bg-[#0B1F3A] text-[#D4AF37] shadow-xl flex items-center justify-center hover:scale-105 transition-transform ring-2 ring-[#D4AF37]/35 animate-pulse"
+          className="fixed z-40 bottom-24 end-4 w-14 h-14 rounded-full bg-[#0B1F3A] text-[#D4AF37] shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform ring-2 ring-[#D4AF37]/35"
           aria-label={displayName}
+          title={displayName}
         >
-          <span className="text-lg font-black">S</span>
+          <MessageCircleQuestion size={24} strokeWidth={1.75} aria-hidden />
         </button>
       ) : null}
 

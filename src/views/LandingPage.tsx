@@ -48,7 +48,6 @@ import { LandingRoleInterfaces } from '../components/landing/LandingRoleInterfac
 import { LandingSafeDismissalShowcase } from '../components/landing/LandingSafeDismissalShowcase';
 import { LandingFooterShell } from '../components/landing/LandingFooterShell';
 import { LandingButton } from '../components/ui/LandingButton';
-import { LandingFeatureSlider } from '../components/landing/LandingFeatureSlider';
 import {
   LandingPartnersSection,
   useLandingPartners,
@@ -311,7 +310,9 @@ export default function LandingPage() {
 
   const pricingPlans = useMemo(() => {
     const source = packages.length ? packages : FALLBACK_PRICING_PACKAGES;
-    return source.slice(0, 3);
+    // Firestore returns packages by document id; show them cheapest → most expensive.
+    const monthlyPrice = (pkg: any) => Number(pkg.priceMonthly || pkg.price || 0);
+    return [...source.slice(0, 3)].sort((a: any, b: any) => monthlyPrice(a) - monthlyPrice(b));
   }, [packages]);
 
   const showcaseFeatures = useMemo(() => {
@@ -418,25 +419,24 @@ export default function LandingPage() {
       {featureStrip.length > 0 && (
         <SectionShell className="landing-feature-strip">
           <div className="lp-container">
-            <LandingFeatureSlider
-              ariaLabel="أبرز مميزات المنصة"
-              slides={featureStrip.map(({ id, title, description }) => {
+            <ul className="landing-feature-strip__grid" aria-label="أبرز مميزات المنصة">
+              {featureStrip.map(({ id, title, description }, i) => {
                 const Icon = FEATURE_STRIP_ICONS[id] || Sparkles;
-                return {
-                  id,
-                  label: title,
-                  content: (
-                    <div className="landing-feature-strip__card lp-card landing-feature-strip__card--slider">
-                      <div className="landing-feature-strip__icon">
-                        <Icon size={20} strokeWidth={1.5} />
-                      </div>
-                      <h3 className="font-black text-sm text-white mb-2">{title}</h3>
-                      <p className="text-xs leading-[1.75] text-[#8b9cb3]">{description}</p>
+                return (
+                  <li
+                    key={id}
+                    className="landing-feature-strip__card lp-card landing-fade-up"
+                    style={{ animationDelay: `${i * 70}ms` }}
+                  >
+                    <div className="landing-feature-strip__icon">
+                      <Icon size={20} strokeWidth={1.5} />
                     </div>
-                  ),
-                };
+                    <h3 className="font-black text-sm text-white mb-2">{title}</h3>
+                    <p className="text-xs leading-[1.75] text-[#8b9cb3]">{description}</p>
+                  </li>
+                );
               })}
-            />
+            </ul>
           </div>
         </SectionShell>
       )}
