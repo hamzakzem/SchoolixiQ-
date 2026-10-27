@@ -329,3 +329,82 @@ export function buildKeywordsFromAnswers(answers: AssistantAnswer[]): AssistantK
   }
   return rows;
 }
+
+export type AssistantSearchIndexEntry = {
+  answer: AssistantAnswer;
+  phrases: string[];
+  titleTokens: string[];
+  bodyTokens: Set<string>;
+};
+
+/** Pre-normalizes answers once per catalog so typing-time search stays cheap. */
+export function buildAssistantSearchIndex(
+  catalog: AssistantCatalog,
+  scope: SmartAssistantScope,
+): AssistantSearchIndexEntry[] {
+  const extra = new Map<string, string[]>();
+  for (const kw of catalog.keywords) {
+    if (!kw.active || !scopeListIncludes(kw.scopes, scope)) continue;
+    const list = extra.get(kw.answerId) || [];
+    list.push(kw.keyword);
+    extra.set(kw.answerId, list);
+  }
+  return catalog.answers
+    .filter((a) => a.active && scopeListIncludes(a.scopes, scope))
+    .map((answer) => {
+      const phrases = [...(answer.keywords || []), ...(extra.get(answer.id) || [])]
+        .map(normalizeAssistantText)
+        .filter(Boolean);
+      const title = normalizeAssistantText(answer.titleAr);
+      return {
+        answer,
+        phrases: [...new Set([title, ...phrases])],
+        titleTokens: title.split(' ').filter((t) => t.length > 1),
+        bodyTokens: new Set(normalizeAssistantText(answer.bodyAr).split(' ').filter((t) => t.length > 2)),
+      };
+    });
+}
+
+/** Strip the Arabic definite article so "الاشتراك" matches "اشتراك". */
+function stem(token: string): string {
+  return token.length > 4 && token.startsWith('ال') ? token.slice(2) : token;
+}
+
+/**
+ * Ranked answer search: whole keyword phrases score highest, then shared
+ * words with the title/keywords (prefix-tolerant), then body words.
+ */
+export function searchAssistantAnswers(
+  query: string,
+  index: AssistantSearchIndexEntry[],
+  limit = 3,
+): KeywordMatch[] {
+  const normalized = normalizeAssistantText(query);
+  if (normalized.length < 2) return [];
+  const tokens = normalized.split(' ').filter((t) => t.length > 1).map(stem);
+
+  const results: KeywordMatch[] = [];
+  for (const entry of index) {
+    let score = 0;
+    let keyword = '';
+    for (const phrase of entry.phrases) {
+      if (phrase && normalized.includes(phrase)) {
+        const s = 40 + phrase.length;
+        if (s > score) {
+          score = s;
+          keyword = phrase;
+        }
+      }
+    }
+    const phraseTokens = entry.phrases.flatMap((p) => p.split(' ')).map(stem);
+    for (const token of tokens) {
+      if (phraseTokens.some((p) => p === token)) score += 12;
+      else if (token.length >= 3 && phraseTokens.some((p) => p.startsWith(token) || (token.startsWith(p) && p.length >= 3))) score += 7;
+      else if (entry.bodyTokens.has(token)) score += 3;
+    }
+    if (score >= 7) {
+      results.push({ answer: entry.answer, score: score + (entry.answer.priority || 0) / 10, keyword: keyword || normalized });
+    }
+  }
+  return results.sort((a, b) => b.score - a.score).slice(0, limit);
+}
