@@ -157,19 +157,19 @@ export default function GuardDashboard() {
         <DismissalWorkflowListShell
           locale="ar"
           title="تحقق التسريح"
-          subtitle="طلبات REQUESTED فقط — طابق البيانات ثم قرّر"
+          subtitle="الطلبات الجديدة فقط — طابق بيانات الطالب وولي الأمر ثم قرّر"
           stats={[
             { label: 'بانتظارك', value: filtered.length },
             { label: 'صفوف', value: Object.keys(groupedByClass).length },
             { label: 'إجمالي اليوم', value: requests.length },
           ]}
           headerExtra={
-            <span className="dw-badge dw-badge--pending">Pending Verification</span>
+            <span className="dw-badge dw-badge--pending">بانتظار التحقق</span>
           }
         >
           <div className="col-span-full mb-2 relative">
             <Search
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dw-slate-muted)]"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dw-slate-muted)] pointer-events-none z-10"
               size={16}
               aria-hidden
             />
@@ -177,7 +177,8 @@ export default function GuardDashboard() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="بحث بالاسم أو الصف..."
-              className="dw-input pr-10"
+              className="dw-input"
+              style={{ paddingInlineStart: '2.5rem' }}
               aria-label="بحث في الطلبات"
             />
           </div>

@@ -4,6 +4,7 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc
 import { AttendanceService } from '../../services/attendance.service';
 import { fetchStudentLinkFields } from '../../lib/schoolSync';
 import { useAuth } from '../../lib/AuthContext';
+import { UserRole } from '../../types';
 import { useLanguage } from '../../lib/LanguageContext';
 import { FileText, Plus, Edit2, Trash2, Send, X, Users, BarChart, Printer, Wallet, BookOpen, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -92,10 +93,17 @@ export default function AdvancedReports({
     if (!profile?.schoolId) return;
     setLoading(true);
 
-    const reportsQ = query(
-      collection(db, 'advanced_reports'),
-      where('schoolId', '==', profile.schoolId)
-    );
+    // Teachers may only read the reports they wrote (see firestore.rules).
+    const reportsQ = profile.role === UserRole.TEACHER
+      ? query(
+          collection(db, 'advanced_reports'),
+          where('schoolId', '==', profile.schoolId),
+          where('teacherId', '==', profile.uid),
+        )
+      : query(
+          collection(db, 'advanced_reports'),
+          where('schoolId', '==', profile.schoolId)
+        );
     const unsubscribe = onSnapshot(reportsQ, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setReports(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
