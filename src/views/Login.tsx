@@ -73,6 +73,7 @@ import SchoolixLogo from "../components/SchoolixLogo";
 import { isCustomAppLogo } from "../lib/brandAssets";
 import { submitDistributorRegistration } from "../lib/distributorRegistration";
 import { DistributorAccessScreen } from "../components/DistributorAccessScreen";
+import { ScrollToTopButton } from "../components/ScrollToTopButton";
 
 export const getLocalizedPackages = (packagesList: any[], isRtl: boolean) => {
   return packagesList.map(pkg => {
@@ -587,12 +588,17 @@ export default function Login() {
     setResetSent(false);
   };
 
-  const fieldClass = `w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 rounded-xl border border-slate-200 bg-slate-50/60 font-bold text-sm sm:text-base text-slate-900 placeholder:text-slate-400 placeholder:font-semibold outline-none transition focus:bg-white focus:border-[#0B2345] focus:ring-4 focus:ring-[#0B2345]/10`;
+  const fieldClass = `w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 rounded-xl border border-white/10 bg-white/[0.04] font-semibold text-sm sm:text-base text-white placeholder:text-slate-500 outline-none transition focus:bg-white/[0.07] focus:border-[#D4AF37]/60 focus:ring-4 focus:ring-[#D4AF37]/10`;
   const selectClass =
-    "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-slate-50/60 font-bold text-sm sm:text-base text-slate-900 outline-none transition focus:bg-white focus:border-[#0B2345] focus:ring-4 focus:ring-[#0B2345]/10";
-  const iconClass = `absolute ${isRtl ? "right-4" : "left-4"} top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none`;
+    "w-full px-4 py-3.5 rounded-xl border border-white/10 bg-white/[0.04] font-semibold text-sm sm:text-base text-white outline-none transition focus:bg-white/[0.07] focus:border-[#D4AF37]/60 focus:ring-4 focus:ring-[#D4AF37]/10";
+  const iconClass = `absolute ${isRtl ? "right-4" : "left-4"} top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none`;
   const primaryButtonClass =
-    "w-full py-4 rounded-xl font-black text-base flex items-center justify-center gap-3 transition-all bg-[#0B2345] text-white hover:bg-[#13315c] shadow-lg shadow-[#0B2345]/20 active:scale-[0.98] disabled:opacity-50";
+    "w-full py-4 rounded-xl font-black text-base flex items-center justify-center gap-3 transition-all bg-gradient-to-b from-[#EDD07F] to-[#C99A2E] text-[#0B2345] hover:brightness-105 shadow-[0_12px_30px_-10px_rgba(212,175,55,0.55)] active:scale-[0.98] disabled:opacity-50";
+  const secondaryLinkClass =
+    "w-full py-3 text-sm font-bold text-slate-400 hover:text-white transition-colors";
+  const spinner = (
+    <div className="w-5 h-5 border-2 border-[#0B2345]/25 border-t-[#0B2345] rounded-full animate-spin" />
+  );
 
   const panelHeading =
     authPanel === "reset"
@@ -643,22 +649,20 @@ export default function Login() {
 
   return (
     <div
-      className="relative isolate overflow-x-hidden min-h-[100dvh] bg-slate-50 font-sans flex flex-col items-center py-5 sm:py-10 px-4 sm:px-6"
+      className="auth-dark relative isolate overflow-x-hidden min-h-[100dvh] bg-[#061429] text-slate-100 [color-scheme:dark] font-sans flex flex-col items-center py-5 sm:py-10 px-4 sm:px-6"
       dir={isRtl ? "rtl" : "ltr"}
     >
-      {/* Navy brand band behind the card — matches the landing page */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[300px] sm:h-[380px] overflow-hidden bg-gradient-to-b from-[#081a33] to-[#0B2345]"
-      >
-        <div className="absolute -top-40 -end-24 w-[520px] h-[520px] rounded-full bg-[#D4A64A]/15 blur-3xl" />
-        <div className="absolute -bottom-48 -start-24 w-[460px] h-[460px] rounded-full bg-sky-400/10 blur-3xl" />
+      {/* Ambient background — same navy/gold language as the landing page */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_45%_at_85%_0%,rgba(212,175,55,0.16),transparent_65%),radial-gradient(ellipse_55%_50%_at_0%_100%,rgba(56,120,220,0.14),transparent_60%),linear-gradient(180deg,#071833_0%,#061429_100%)]" />
+        <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(ellipse_at_center,black_25%,transparent_75%)]" />
       </div>
+
       {/* Kept on the left edge: the language toggle is pinned top-right */}
       <div className={`w-full max-w-lg lg:max-w-5xl mb-4 sm:mb-6 flex ${isRtl ? "justify-end" : "justify-start"}`}>
         <Link
           to="/"
-          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
+          className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold text-slate-300 border border-white/10 bg-white/[0.03] hover:text-white hover:bg-white/10 transition-colors"
         >
           <ArrowRight size={16} className={isRtl ? "" : "rotate-180"} />
           {isRtl ? "العودة للرئيسية" : "Back to home"}
@@ -666,17 +670,19 @@ export default function Login() {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white w-full max-w-lg lg:max-w-5xl lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] rounded-[2rem] shadow-2xl shadow-[#0B2345]/25 ring-1 ring-black/5 overflow-hidden mb-8 sm:mb-12"
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-full max-w-lg lg:max-w-5xl lg:grid lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)] rounded-[2rem] border border-white/10 bg-[#0a1f3f]/75 backdrop-blur-xl shadow-[0_40px_100px_-30px_rgba(0,0,0,0.75)] overflow-hidden mb-8 sm:mb-12"
       >
+        <div aria-hidden="true" className="absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-[#D4AF37]/70 to-transparent" />
         {/* Brand panel — desktop only */}
-        <aside className="hidden lg:flex flex-col justify-between gap-10 relative overflow-hidden bg-[#0B2345] text-white p-10 xl:p-12">
+        <aside className="hidden lg:flex flex-col justify-between gap-10 relative overflow-hidden bg-gradient-to-br from-[#10305c] via-[#0b2448] to-[#081a36] border-e border-white/10 text-white p-10 xl:p-12">
           <div className="absolute -top-24 -end-24 w-72 h-72 rounded-full bg-[#D4A64A]/15 blur-3xl pointer-events-none" />
           <div className="absolute -bottom-28 -start-20 w-80 h-80 rounded-full bg-sky-400/10 blur-3xl pointer-events-none" />
 
           <div className="relative">
-            <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-lg mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-black/30 ring-4 ring-white/5 mb-6">
               {isCustomAppLogo(config.appLogo) ? (
                 <img
                   src={config.appLogo || undefined}
@@ -700,7 +706,7 @@ export default function Login() {
           <ul className="relative space-y-4">
             {brandBenefits.map((benefit) => (
               <li key={benefit} className="flex items-center gap-3 font-bold text-slate-100">
-                <span className="w-7 h-7 shrink-0 rounded-full bg-[#D4A64A]/20 text-[#D4A64A] flex items-center justify-center">
+                <span className="w-7 h-7 shrink-0 rounded-full bg-[#D4AF37]/15 text-[#E8C76E] ring-1 ring-[#D4AF37]/30 flex items-center justify-center">
                   <Check size={15} strokeWidth={3} />
                 </span>
                 <span className="leading-relaxed">{benefit}</span>
@@ -717,31 +723,31 @@ export default function Login() {
         <div className="p-6 sm:p-10">
           {/* Brand header */}
           <div className="flex flex-col items-center mb-6 sm:mb-8 text-center select-none">
-            <div className="lg:hidden mb-3">
+            <div className="lg:hidden mb-3 w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-black/30">
               {isCustomAppLogo(config.appLogo) ? (
                 <img
                   src={config.appLogo || undefined}
                   alt="SchoolixIQ logo"
-                  className="max-h-16 w-auto object-contain"
+                  className="max-h-12 w-auto object-contain"
                   loading="eager"
                 />
               ) : (
-                <SchoolixLogo size={64} />
+                <SchoolixLogo size={44} />
               )}
             </div>
-            <p className="lg:hidden text-2xl font-black tracking-tight text-[#0B2345] mb-4" dir="ltr">
-              Schoolix<span className="text-[#A8841F]">iQ</span>
+            <p className="lg:hidden text-2xl font-black tracking-tight text-white mb-4" dir="ltr">
+              Schoolix<span className="text-[#E8C76E]">iQ</span>
             </p>
-            <h1 className="text-2xl sm:text-[1.7rem] font-black text-slate-900 leading-tight">
+            <h1 className="text-2xl sm:text-[1.75rem] font-black text-white leading-tight">
               {panelHeading.title}
             </h1>
-            <p className="mt-2 text-sm sm:text-base font-semibold text-slate-500 leading-relaxed max-w-sm">
+            <p className="mt-2 text-sm sm:text-base font-medium text-slate-400 leading-relaxed max-w-sm">
               {panelHeading.subtitle}
             </p>
           </div>
 
           {authPanel !== "reset" && (
-            <div role="tablist" className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-2xl mb-6">
+            <div role="tablist" className="grid grid-cols-3 gap-1 bg-white/[0.04] border border-white/10 p-1 rounded-2xl mb-6">
               {([
                 { key: "login", label: t("login"), active: authPanel === "account" && mode === "login", onClick: () => openPanel("account", "login") },
                 { key: "signup", label: t("signup"), active: authPanel === "account" && mode === "signup", onClick: () => openPanel("account", "signup") },
@@ -753,7 +759,7 @@ export default function Login() {
                   role="tab"
                   aria-selected={tab.active}
                   onClick={tab.onClick}
-                  className={`py-2.5 sm:py-3 rounded-xl font-bold text-[13px] sm:text-sm transition-all ${tab.active ? "bg-white text-[#0B2345] shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                  className={`py-2.5 sm:py-3 rounded-xl font-bold text-[13px] sm:text-sm transition-all ${tab.active ? "bg-gradient-to-b from-[#EDD07F] to-[#C99A2E] text-[#0B2345] shadow-md shadow-black/20" : "text-slate-400 hover:text-white hover:bg-white/5"}`}
                 >
                   {tab.label}
                 </button>
@@ -764,14 +770,14 @@ export default function Login() {
           {authPanel === "reset" ? (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               {resetSent ? (
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-center">
-                  <div className="w-12 h-12 rounded-full bg-white text-emerald-600 flex items-center justify-center mx-auto mb-3 shadow-sm">
+                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-5 text-center">
+                  <div className="w-12 h-12 rounded-full bg-emerald-400/15 text-emerald-300 flex items-center justify-center mx-auto mb-3">
                     <Mail size={22} />
                   </div>
-                  <p className="font-black text-emerald-800">
+                  <p className="font-black text-emerald-200">
                     {isRtl ? "تحقق من بريدك الإلكتروني" : "Check your inbox"}
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-emerald-700 leading-relaxed">
+                  <p className="mt-1 text-sm font-medium text-emerald-100/80 leading-relaxed">
                     {isRtl
                       ? `أرسلنا رابط إعادة التعيين إلى ${email}. إذا لم تجده، تحقق من مجلد الرسائل غير المرغوب فيها.`
                       : `We sent a reset link to ${email}. Check your spam folder if you can't find it.`}
@@ -794,7 +800,7 @@ export default function Login() {
                   </div>
                   <button type="submit" disabled={loading} className={primaryButtonClass}>
                     {loading ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      spinner
                     ) : isRtl ? (
                       "إرسال رابط الاستعادة"
                     ) : (
@@ -806,7 +812,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => openPanel("account", "login")}
-                className="w-full py-3 text-sm font-bold text-slate-500 hover:text-[#0B2345] transition-colors"
+                className={secondaryLinkClass}
               >
                 {isRtl ? "العودة لتسجيل الدخول" : "Back to sign in"}
               </button>
@@ -889,8 +895,8 @@ export default function Login() {
               </div>
               <button type="submit" disabled={loading} className={primaryButtonClass}>
                 {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : isRtl ? (
+                      spinner
+                    ) : isRtl ? (
                   "إرسال طلب الموزع"
                 ) : (
                   "Submit distributor application"
@@ -899,7 +905,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => openPanel("account", "login")}
-                className="w-full py-3 text-sm font-bold text-slate-500 hover:text-[#0B2345] transition-colors"
+                className={secondaryLinkClass}
               >
                 {isRtl ? "العودة لتسجيل الدخول" : "Back to sign in"}
               </button>
@@ -916,7 +922,7 @@ export default function Login() {
                   exit={{ opacity: 0, height: 0 }}
                   className="space-y-4 sm:space-y-5 overflow-hidden"
                 >
-                  <label className="block text-xs sm:text-sm font-bold text-slate-500 mb-1 text-center">
+                  <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 text-center">
                     {t("role")}
                   </label>
                   <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
@@ -924,7 +930,7 @@ export default function Login() {
                       type="button"
                       onClick={() => setRole(UserRole.PARENT)}
                       aria-pressed={role === UserRole.PARENT}
-                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all ${role === UserRole.PARENT ? "border-[#0B2345] bg-[#0B2345]/5 text-[#0B2345] shadow-md" : "border-slate-100 text-slate-500 hover:border-slate-200"}`}
+                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all ${role === UserRole.PARENT ? "border-[#D4AF37]/70 bg-[#D4AF37]/10 text-[#F0D58A] shadow-lg shadow-black/20" : "border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-200"}`}
                     >
                       <Users size={24} className="mb-2" />
                       <span className="font-bold text-sm">{t("parent")}</span>
@@ -933,7 +939,7 @@ export default function Login() {
                       type="button"
                       onClick={() => setRole(UserRole.ADMIN)}
                       aria-pressed={role === UserRole.ADMIN}
-                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all ${role === UserRole.ADMIN ? "border-[#0B2345] bg-[#0B2345]/5 text-[#0B2345] shadow-md" : "border-slate-100 text-slate-500 hover:border-slate-200"}`}
+                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all ${role === UserRole.ADMIN ? "border-[#D4AF37]/70 bg-[#D4AF37]/10 text-[#F0D58A] shadow-lg shadow-black/20" : "border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-200"}`}
                     >
                       <Building2 size={24} className="mb-2" />
                       <span className="font-bold text-sm">{t("admin")}</span>
@@ -1135,7 +1141,7 @@ export default function Login() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? (isRtl ? "إخفاء كلمة المرور" : "Hide password") : (isRtl ? "إظهار كلمة المرور" : "Show password")}
-                className={`absolute ${isRtl ? "left-4" : "right-4"} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1`}
+                className={`absolute ${isRtl ? "left-4" : "right-4"} top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors cursor-pointer z-10 flex items-center justify-center p-1`}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -1146,21 +1152,21 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => openPanel("reset")}
-                  className="text-sm font-bold text-[#0B2345]/70 hover:text-[#0B2345] transition-colors"
+                  className="text-sm font-bold text-[#E8C76E]/80 hover:text-[#F0D58A] transition-colors"
                 >
                   {t("forgotPassword")}
                 </button>
               </div>
             )}
 
-            <div className="bg-slate-50 px-4 py-3.5 rounded-xl border border-slate-200">
+            <div className="bg-white/[0.03] px-4 py-3.5 rounded-xl border border-white/10">
               <div className="flex items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="bg-white p-1.5 sm:p-2 rounded-lg border border-slate-200 hidden sm:block">
-                    <ShieldCheck size={20} className="text-[#A8841F]" />
+                  <div className="bg-[#D4AF37]/10 p-1.5 sm:p-2 rounded-lg ring-1 ring-[#D4AF37]/25 hidden sm:block">
+                    <ShieldCheck size={20} className="text-[#E8C76E]" />
                   </div>
                   <div>
-                    <span className="block font-bold text-slate-600 text-xs sm:text-sm">
+                    <span className="block font-bold text-slate-200 text-xs sm:text-sm">
                       {t("checkIfRobot")}
                     </span>
                     <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
@@ -1174,7 +1180,7 @@ export default function Login() {
                   type="number"
                   value={captchaAnswer}
                   onChange={(e) => setCaptchaAnswer(e.target.value)}
-                  className="w-16 sm:w-20 px-2 py-2.5 rounded-lg border border-slate-200 bg-white text-center font-bold outline-none transition focus:border-[#0B2345] focus:ring-4 focus:ring-[#0B2345]/10 text-sm sm:text-base"
+                  className="w-16 sm:w-20 px-2 py-2.5 rounded-lg border border-white/10 bg-white/[0.06] text-white text-center font-bold outline-none transition focus:border-[#D4AF37]/60 focus:ring-4 focus:ring-[#D4AF37]/10 text-sm sm:text-base placeholder:text-slate-500"
                   placeholder="?"
                 />
               </div>
@@ -1185,7 +1191,7 @@ export default function Login() {
               className={primaryButtonClass}
             >
               {loading ? (
-                <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                spinner
               ) : (
                 <>
                   <span>{mode === "login" ? t("login") : t("signup")}</span>
@@ -1194,22 +1200,17 @@ export default function Login() {
               )}
             </button>
 
-            <div className="relative my-6 sm:my-8">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-slate-200"></span>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-white px-4 text-slate-400 font-bold">
-                  {isRtl ? "أو عبر" : "OR VIA"}
-                </span>
-              </div>
+            <div className="flex items-center gap-4 my-6 sm:my-7 text-xs font-bold text-slate-500">
+              <span className="h-px flex-1 bg-gradient-to-l from-white/15 to-transparent" />
+              {isRtl ? "أو" : "OR"}
+              <span className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" />
             </div>
 
             <button
               type="button"
               disabled={loading}
               onClick={handleGoogleAuth}
-              className="w-full py-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all font-bold text-slate-700 flex items-center justify-center gap-3 shadow-sm hover:border-slate-300 active:scale-[0.98] disabled:opacity-50 text-sm sm:text-base"
+              className="w-full py-3.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20 transition-all font-bold text-slate-100 flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50 text-sm sm:text-base"
             >
               <img
                 src="/brand/google-g.svg"
@@ -1227,8 +1228,8 @@ export default function Login() {
           </>
           )}
 
-          <p className="mt-6 sm:mt-8 flex items-center justify-center gap-2 text-center text-slate-400 text-xs sm:text-sm font-medium">
-            <ShieldCheck size={16} className="shrink-0 text-slate-300" />
+          <p className="mt-6 sm:mt-8 flex items-center justify-center gap-2 text-center text-slate-500 text-xs sm:text-sm font-medium">
+            <ShieldCheck size={16} className="shrink-0 text-[#D4AF37]/70" />
             {isRtl
               ? "نظام آمن ومشفر 100% لإدارة تعليمية متميزة"
               : "100% Secure & Encrypted School Management System"}
@@ -1243,16 +1244,16 @@ export default function Login() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white w-full max-w-lg rounded-[2rem] sm:rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden mb-8 sm:mb-12 text-center mx-auto"
+          className="w-full max-w-lg lg:max-w-5xl rounded-[2rem] border border-white/10 bg-white/[0.03] backdrop-blur-xl overflow-hidden mb-8 sm:mb-12 text-center mx-auto"
         >
-          <div className="p-6 sm:p-10 text-right">
-            <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-[#0B2345]/5 text-[#0B2345] mx-auto mb-4">
-              <Smartphone className="w-6 h-6 text-[#0B2345]" />
+          <div className="p-6 sm:p-8 text-right max-w-xl mx-auto">
+            <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-[#D4AF37]/10 ring-1 ring-[#D4AF37]/25 mx-auto mb-4">
+              <Smartphone className="w-6 h-6 text-[#E8C76E]" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 text-center">
-              {isRtl ? "تنزيل وتثبيت تطبيق SchoolixiQ للاندرويد" : "Install SchoolixiQ Android App"}
+            <h2 className="text-xl sm:text-2xl font-black text-white mb-2 text-center">
+              {isRtl ? "تطبيق SchoolixiQ للأندرويد" : "Install SchoolixiQ Android App"}
             </h2>
-            <p className="text-slate-500 font-bold text-xs sm:text-sm max-w-sm mx-auto mb-6 text-center leading-relaxed">
+            <p className="text-slate-400 font-medium text-xs sm:text-sm max-w-sm mx-auto mb-6 text-center leading-relaxed">
               {isRtl
                 ? "احصل على تطبيق الأندرويد الرسمي للمنصة للاستفادة من الوصول الفوري، والسرعة الفائقة مع إشعارات دفع مباشرة وتنبيهات فورية على هاتفك."
                 : "Get the official Android App for instant access, lightning-fast performance, and real-time native push notifications."}
@@ -1264,12 +1265,12 @@ export default function Login() {
                   href={androidApkUrl ?? "#"}
                   download="schoolixiq.apk"
                   onClick={handleAndroidApkDownload}
-                  className="w-full py-4 bg-[#D4A64A] hover:bg-[#0B2345] text-[#0B2345] hover:text-[#D4A64A] border border-[#D4A64A] hover:border-[#0B2345] font-black rounded-2xl text-sm sm:text-base flex items-center justify-center gap-3 transition-all shadow-lg shadow-[#D4A64A]/10 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  className="w-full sm:w-auto sm:min-w-[260px] sm:mx-auto py-3.5 px-6 rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#F0D58A] font-black text-sm sm:text-base flex items-center justify-center gap-3 transition-all active:scale-[0.98] cursor-pointer"
                 >
                   <Download className="w-5 h-5" />
                   <span>{isRtl ? "تحميل تطبيق أندرويد (APK)" : "Download Android App (APK)"}</span>
                 </a>
-                <p className="text-[10px] text-slate-400 mt-2.5 font-bold">
+                <p className="text-[11px] text-slate-500 mt-2.5 font-medium">
                   {isRtl
                     ? "حمّل ملف APK ثم ثبّته من مدير الملفات على هاتف أندرويد"
                     : "Download the APK file, then open it on your Android phone to install"}
@@ -1284,18 +1285,18 @@ export default function Login() {
               </div>
             ) : (
               /* Progress view */
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-right">
+              <div className="bg-white/[0.03] p-6 rounded-2xl border border-white/10 text-right">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-bold text-slate-400">
                     Google Android Package (APK / PWA)
                   </span>
-                  <span className="text-sm font-black text-[#0B2345] font-mono">
+                  <span className="text-sm font-black text-[#E8C76E] font-mono">
                     {installProgress}%
                   </span>
                 </div>
 
                 {/* Progressive status text */}
-                <p className="text-xs font-extrabold text-slate-700 mb-3 min-h-[1.5rem] leading-relaxed">
+                <p className="text-xs font-extrabold text-slate-200 mb-3 min-h-[1.5rem] leading-relaxed">
                   {isRtl ? (
                     installProgress < 30 ? "⚡ جاري فحص ملفات الدعامة والبدء..." :
                     installProgress < 70 ? "📦 جاري تنزيل ملفات التطبيق والمزامنة..." :
@@ -1310,7 +1311,7 @@ export default function Login() {
                 </p>
 
                 {/* Progress bar container */}
-                <div className="w-full h-2.5 bg-slate-200/80 rounded-full overflow-hidden mb-4">
+                <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden mb-4">
                   <motion.div
                     className="h-full bg-gradient-to-r from-[#0B2345] to-[#D4A64A]"
                     initial={{ width: 0 }}
@@ -1324,13 +1325,13 @@ export default function Login() {
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="space-y-4 pt-3 border-t border-slate-200/60"
+                    className="space-y-4 pt-3 border-t border-white/10"
                   >
-                    <div className="text-xs text-slate-600 font-bold leading-relaxed space-y-2">
-                      <p className="text-emerald-600 font-black">
+                    <div className="text-xs text-slate-300 font-bold leading-relaxed space-y-2">
+                      <p className="text-emerald-300 font-black">
                         {isRtl ? "✓ تم تحضير التطبيق للتثبيت" : "✓ Setup components prepared!"}
                       </p>
-                      <p className="font-normal text-slate-500 text-[11px]">
+                      <p className="font-normal text-slate-400 text-[11px]">
                         {isRtl 
                           ? "إذا لم يظهر لك مربع حوار التثبيت التلقائي الصادر من نظام الاندرويد، يرجى النقر على زر 'تثبيت الآن' بالأسفل، أو النقر على الثلاث نقاط الرأسية أعلى المتصفح واختيار 'تثبيت التطبيق' (Install App)."
                           : "If the native install prompt did not trigger automatically, tap 'Install Now' below or click your browser's menu button and select 'Install' or 'Add to Home screen'."}
@@ -1366,7 +1367,7 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => setInstallingPlatform(null)}
-                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-500 font-bold rounded-xl text-xs transition-colors"
+                      className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-slate-400 font-bold rounded-xl text-xs transition-colors"
                     >
                       {isRtl ? "إعادة تهيئة المزامنة" : "Restart & Re-download"}
                     </button>
@@ -1381,27 +1382,27 @@ export default function Login() {
       {/* Subscription Plans Section */}
       <div className="w-full max-w-6xl mt-12 sm:mt-20">
         <div className="text-center mb-8 sm:mb-12">
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 sm:mb-4 font-display">
+          <h2 className="text-3xl sm:text-4xl font-black text-white mb-3 sm:mb-4 font-display">
             {isRtl
               ? `باقات الاشتراك في ${config.appName}`
               : `${config.appName} Subscription Plans`}
           </h2>
-          <p className="text-slate-500 font-bold text-sm sm:text-base mb-8">
+          <p className="text-slate-400 font-medium text-sm sm:text-base mb-8">
             {isRtl
               ? "اختر الباقة المناسبة لمدرستك وابدأ مسار التحول الرقمي اليوم"
               : "Choose the right plan for your school and start your digital transformation today"}
           </p>
 
-          <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full items-center shadow-inner">
+          <div className="inline-flex bg-white/[0.04] border border-white/10 p-1 rounded-full items-center">
             <button
               onClick={() => setBillingCycle("monthly")}
-              className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm font-bold transition-all ${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-md shadow-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}
+              className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm font-bold transition-all ${billingCycle === "monthly" ? "bg-gradient-to-b from-[#EDD07F] to-[#C99A2E] text-[#0B2345] shadow-md" : "text-slate-400 hover:text-white"}`}
             >
               {isRtl ? "شهرياً" : "Monthly"}
             </button>
             <button
               onClick={() => setBillingCycle("annually")}
-              className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm font-bold transition-all ${billingCycle === "annually" ? "bg-white text-slate-900 shadow-md shadow-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}
+              className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm font-bold transition-all ${billingCycle === "annually" ? "bg-gradient-to-b from-[#EDD07F] to-[#C99A2E] text-[#0B2345] shadow-md" : "text-slate-400 hover:text-white"}`}
             >
               {isRtl ? "سنوياً" : "Annually"}
             </button>
@@ -1421,20 +1422,20 @@ export default function Login() {
             return (
               <motion.div
                 key={pkg.id}
-                whileHover={{ y: -8 }}
-                className={`bg-white rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 border-2 transition-all flex flex-col ${pkg.isPopular ? "border-blue-600 shadow-2xl shadow-blue-100 ring-4 ring-blue-50" : "border-slate-100 shadow-xl"}`}
+                whileHover={{ y: -4 }}
+                className={`rounded-[2rem] p-6 sm:p-8 border backdrop-blur-xl transition-all flex flex-col ${pkg.isPopular ? "border-[#D4AF37]/50 bg-gradient-to-b from-[#D4AF37]/[0.12] to-white/[0.02] shadow-[0_30px_80px_-30px_rgba(212,175,55,0.45)]" : "border-white/10 bg-white/[0.03]"}`}
               >
                 {pkg.isPopular && (
-                  <span className="bg-blue-600 text-white px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-6">
+                  <span className="bg-gradient-to-b from-[#EDD07F] to-[#C99A2E] text-[#0B2345] px-4 py-1 rounded-full text-[11px] font-black self-start mb-5">
                     {t("mostPopular")}
                   </span>
                 )}
-                <h3 className="text-2xl font-black text-slate-900 mb-2">
+                <h3 className="text-2xl font-black text-white mb-2">
                   {pkg.name}
                 </h3>
                 <div className="flex items-baseline gap-2 mb-8">
-                  <span className="text-4xl font-black text-slate-900">
-                    {displayPrice?.toLocaleString()}
+                  <span className="text-4xl font-black text-[#F0D58A]">
+                    {displayPrice?.toLocaleString("en-US")}
                   </span>
                   <span className="text-slate-400 font-bold text-sm">
                     {billingCycle === "annually"
@@ -1448,10 +1449,10 @@ export default function Login() {
                 <ul className="space-y-4 mb-10 flex-1">
                   {(pkg.features || []).map((feature: string, idx: number) => (
                     <li key={idx} className="flex items-start gap-3">
-                      <div className="w-5 h-5 bg-emerald-50 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Check size={12} className="text-emerald-600" />
+                      <div className="w-5 h-5 bg-[#D4AF37]/15 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Check size={12} className="text-[#E8C76E]" />
                       </div>
-                      <span className="text-slate-600 text-sm font-medium">
+                      <span className="text-slate-300 text-sm font-medium">
                         {feature}
                       </span>
                     </li>
@@ -1460,7 +1461,7 @@ export default function Login() {
 
                 <button
                   onClick={() => setShowSubscriptionModal(pkg)}
-                  className={`w-full py-4 rounded-2xl font-bold transition-all active:scale-95 ${pkg.isPopular ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}
+                  className={`w-full py-3.5 rounded-xl font-black transition-all active:scale-[0.98] ${pkg.isPopular ? "bg-gradient-to-b from-[#EDD07F] to-[#C99A2E] text-[#0B2345] hover:brightness-105" : "border border-white/15 text-white hover:bg-white/10"}`}
                 >
                   {t("subscribeNow")}
                 </button>
@@ -1470,190 +1471,11 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Marketing Landing Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-100px" }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="w-full mt-24 sm:mt-32 pt-20 pb-12 relative overflow-hidden"
-      >
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-800 to-transparent"></div>
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[500px] bg-blue-500/10 dark:bg-blue-500/5 blur-[120px] rounded-full pointer-events-none"></div>
-
-        <div className="w-full max-w-7xl mx-auto px-4 z-10 relative">
-          <div className="text-center max-w-3xl mx-auto mb-20">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              whileInView={{ scale: 1, opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 rounded-full text-xs font-black tracking-widest mb-6 border border-blue-100/50 dark:border-blue-800/50 shadow-sm"
-            >
-              <Sparkles size={14} className="animate-pulse" />
-              <span>
-                {isRtl ? "لماذا تختار منصتنا؟" : "Why Choose Our Platform?"}
-              </span>
-            </motion.div>
-
-            <motion.h2
-              initial={{ y: 20, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
-              className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-8 font-display leading-[1.1] tracking-tight"
-            >
-              {config.marketingTitle ||
-                (isRtl
-                  ? "منصة الإدارة والتحصيل الذكي المتقدمة لمدارس العراق الأهلية"
-                  : "Smart School Management & Tuition System")}
-            </motion.h2>
-
-            <motion.p
-              initial={{ y: 20, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.4 }}
-              className="text-slate-500 dark:text-slate-400 font-medium text-lg md:text-xl leading-relaxed max-w-2xl mx-auto"
-            >
-              {config.marketingSubtitle ||
-                (isRtl
-                  ? "نظام بيئي متكامل يربط الإدارة والمعلمين وأولياء الأمور لتسهيل جباية الأقساط، تتبع الغيابات ومراقبة النتائج بمرونة تامة ونظام إشعارات ذكي يرتقي بتجربة التعليم."
-                  : "An integrated ecosystem connecting admins, teachers, and parents to streamline fee collection, track attendance, and monitor school progress with intelligent notifications.")}
-            </motion.p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            {(config.marketingFeatures && config.marketingFeatures.length > 0
-              ? config.marketingFeatures
-              : [
-                  {
-                    title: isRtl
-                      ? "متابعة الأقساط الذكية"
-                      : "Smart Fees Tracking",
-                    description: isRtl
-                      ? "لوحة تحكم تفصيلية لمتابعة الأقساط والتحصيل اليومي وجدولة الدفعات تلقائياً."
-                      : "Comprehensive dashboard for following payments and auto-scheduling batches.",
-                  },
-                  {
-                    title: isRtl
-                      ? "ربط متكامل ومباشر"
-                      : "Seamless Parent Connection",
-                    description: isRtl
-                      ? "واجهة مخصصة تتيح لولي الأمر متابعة شاملة للغيابات، النتائج وتواريخ السداد."
-                      : "Dedicated portal for parents to monitor attendance, grades, and schedules.",
-                  },
-                  {
-                    title: isRtl
-                      ? "إنذارات وتذكير فوري"
-                      : "Automated Notifications",
-                    description: isRtl
-                      ? "تذكير فوري ذكي لإعلام أولياء الأمور بالدفعات عبر منصات التواصل والرسائل."
-                      : "Instant, automatic reminders notifying parents of due and overdue fees.",
-                  },
-                  {
-                    title: isRtl ? "إحصائيات تفاعلية" : "Interactive Analytics",
-                    description: isRtl
-                      ? "تقارير ورسوم بيانية ذكية تدعم اتخاذ القرار وتوفر لك رؤية فورية عن الديون والسيولة."
-                      : "Intelligent charts to plan your budget, track debts, and cash flow.",
-                  },
-                  {
-                    title: isRtl
-                      ? "إدارة أكاديمية مبسطة"
-                      : "Simplified Academic Mgmt",
-                    description: isRtl
-                      ? "تنظيم الجداول، توزيع الحصص الدراسية ومتابعة تقييمات الطلاب بسهولة."
-                      : "Organize schedules, distribute classes and track evaluations easily.",
-                  },
-                  {
-                    title: isRtl
-                      ? "تشفير وحماية بيانات"
-                      : "Encrypted Data Security",
-                    description: isRtl
-                      ? "بيانات مدرستك في أمان تام مع أعلى معايير التشفير والنسخ الاحتياطي السحابي."
-                      : "Your school data is secure with the highest encryption and cloud backup standards.",
-                  },
-                  {
-                    title: isRtl
-                      ? "تطبيق للهواتف الذكية"
-                      : "Mobile Application",
-                    description: isRtl
-                      ? "تطبيق مخصص لأولياء الأمور للوصول المباشر وتتبع مستوى الطالب بشكل فوري."
-                      : "Dedicated mobile app for parents to track student progress instantly.",
-                  },
-                  {
-                    title: isRtl
-                      ? "إدارة وتصدير التقارير"
-                      : "Reports Management",
-                    description: isRtl
-                      ? "أرشفة وتصدير تقارير وتقييمات الطلاب بسهولة وبصيغ متعددة بضغطة زر واحدة."
-                      : "Easily archive and export student reports in multiple formats with one click.",
-                  },
-                ]
-            ).map((feat, idx) => {
-              const bgColors = [
-                "from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 text-blue-600 dark:text-blue-400 group-hover:from-blue-500 group-hover:to-indigo-600",
-                "from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 text-emerald-600 dark:text-emerald-400 group-hover:from-emerald-500 group-hover:to-teal-600",
-                "from-orange-500/10 to-amber-500/10 dark:from-orange-500/20 dark:to-amber-500/20 text-orange-600 dark:text-orange-400 group-hover:from-orange-500 group-hover:to-amber-600",
-                "from-purple-500/10 to-fuchsia-500/10 dark:from-purple-500/20 dark:to-fuchsia-500/20 text-purple-600 dark:text-purple-400 group-hover:from-purple-500 group-hover:to-fuchsia-600",
-                "from-pink-500/10 to-rose-500/10 dark:from-pink-500/20 dark:to-rose-500/20 text-pink-600 dark:text-pink-400 group-hover:from-pink-500 group-hover:to-rose-600",
-                "from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 text-cyan-600 dark:text-cyan-400 group-hover:from-cyan-500 group-hover:to-blue-600",
-                "from-yellow-500/10 to-amber-500/10 dark:from-yellow-500/20 dark:to-amber-500/20 text-yellow-600 dark:text-yellow-400 group-hover:from-yellow-500 group-hover:to-amber-600",
-                "from-sky-500/10 to-blue-500/10 dark:from-sky-500/20 dark:to-blue-500/20 text-sky-600 dark:text-sky-400 group-hover:from-sky-500 group-hover:to-blue-600",
-              ];
-              const IconsList = [
-                Coins,
-                Users,
-                Bell,
-                TrendingUp,
-                GraduationCap,
-                ShieldCheck,
-                Smartphone,
-                ClipboardList,
-              ];
-
-              const themeClass = bgColors[idx % bgColors.length];
-              const Icon = IconsList[idx % IconsList.length];
-
-              return (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
-                  transition={{
-                    duration: 0.5,
-                    delay: idx * 0.1,
-                    ease: "easeOut",
-                  }}
-                  whileHover={{ y: -10, scale: 1.02 }}
-                  className="group relative bg-white dark:bg-slate-900 rounded-[2rem] p-8 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 dark:hover:shadow-black/50 hover:border-transparent dark:hover:border-transparent transition-all duration-300 z-10 overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-5 transition-opacity duration-500 from-slate-400 to-slate-900 pointer-events-none"></div>
-
-                  <div
-                    className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${themeClass} flex items-center justify-center shrink-0 mb-8 transition-all duration-300 group-hover:shadow-lg group-hover:text-white`}
-                  >
-                    <Icon size={28} />
-                  </div>
-
-                  <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mb-4 font-display group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-slate-900 group-hover:to-slate-600 dark:group-hover:from-white dark:group-hover:to-slate-300 transition-colors">
-                    {feat.title}
-                  </h3>
-
-                  <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
-                    {feat.description}
-                  </p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </motion.div>
-
-      <div className="-mx-4 sm:-mx-6 -mb-6 sm:-mb-12 mt-20 w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)]">
+      <div className="-mx-4 sm:-mx-6 -mb-6 sm:-mb-12 mt-16 w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)] border-t border-white/10">
         <GlobalFooter compact />
       </div>
+
+      <ScrollToTopButton label={isRtl ? "العودة للأعلى" : "Back to top"} />
 
       <AnimatePresence>
         {successCode && (
