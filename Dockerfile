@@ -11,7 +11,10 @@ RUN npm ci
 COPY server.ts notificationPushDispatch.ts firebase-applet-config.json ./
 
 # Backend-local modules (delete helpers, role hierarchy, messaging cleanup)
-COPY backend/schoolPermanentDelete.mjs backend/userPermanentDelete.mjs backend/schoolMessageCleanup.mjs backend/userConversationPurge.mjs backend/messagingAccess.mjs backend/chatConversationKeys.mjs backend/startConversation.mjs backend/distributorCommissions.mjs backend/distributorApproval.mjs backend/roleHierarchy.ts backend/chatAssignment.mjs backend/chatDirectory.mjs backend/chatEscalationWorker.mjs ./
+COPY backend/schoolPermanentDelete.mjs backend/userPermanentDelete.mjs backend/schoolMessageCleanup.mjs backend/userConversationPurge.mjs backend/messagingAccess.mjs backend/chatConversationKeys.mjs backend/startConversation.mjs backend/distributorCommissions.mjs backend/distributorApproval.mjs backend/roleHierarchy.ts backend/chatAssignment.mjs backend/chatDirectory.mjs backend/chatEscalationWorker.mjs backend/dismissalApi.mjs backend/dismissalStateMachine.mjs backend/dismissalSnapshot.mjs backend/dismissalRecoveryWorker.mjs backend/dismissalCompactionWorker.mjs ./
+
+# Root server.ts imports backend modules via ./backend/*; rewrite for this directory.
+RUN sed -i "s#from './backend/#from './#g" server.ts
 
 RUN npm run build
 

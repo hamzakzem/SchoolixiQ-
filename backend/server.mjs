@@ -8,7 +8,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import dotEnv from "dotenv";
 import fs from "fs";
-import crypto4 from "crypto";
+import crypto5 from "crypto";
 
 // schoolMessageCleanup.mjs
 async function deleteSchoolMessages(db, schoolId, opts = {}) {
@@ -2491,6 +2491,936 @@ async function runChatEscalation(db, opts = {}) {
   return { ok: true, escalated, results, config };
 }
 
+// dismissalStateMachine.mjs
+import crypto4 from "crypto";
+var STATES = {
+  REQUESTED: "REQUESTED",
+  GUARD_REVIEWING: "GUARD_REVIEWING",
+  GUARD_VERIFIED: "GUARD_VERIFIED",
+  MANAGER_REVIEWING: "MANAGER_REVIEWING",
+  APPROVED: "APPROVED",
+  DISMISSED: "DISMISSED",
+  REJECTED: "REJECTED",
+  EXPIRED: "EXPIRED"
+};
+var EVENT_TYPES = {
+  REQUEST_CREATED: "REQUEST_CREATED",
+  GUARD_VERIFIED: "GUARD_VERIFIED",
+  GUARD_REJECTED: "GUARD_REJECTED",
+  MANAGER_APPROVED: "MANAGER_APPROVED",
+  MANAGER_REJECTED: "MANAGER_REJECTED",
+  DISMISSED: "DISMISSED",
+  SYSTEM_RECONCILE: "SYSTEM_RECONCILE"
+};
+var META_EVENT_TYPES = /* @__PURE__ */ new Set([EVENT_TYPES.SYSTEM_RECONCILE]);
+var ACTIVE_STATES = [
+  STATES.REQUESTED,
+  STATES.GUARD_REVIEWING,
+  STATES.GUARD_VERIFIED,
+  STATES.MANAGER_REVIEWING,
+  STATES.APPROVED
+];
+var TERMINAL_STATES = [STATES.DISMISSED, STATES.REJECTED, STATES.EXPIRED];
+var GUARD_QUEUE = [STATES.REQUESTED];
+var MANAGER_QUEUE = [STATES.GUARD_VERIFIED];
+var LEGACY_MAP = {
+  waiting: STATES.REQUESTED,
+  called: STATES.REQUESTED,
+  pending_guard_review: STATES.REQUESTED,
+  ready: STATES.GUARD_VERIFIED,
+  guard_verified: STATES.GUARD_VERIFIED,
+  guard_rejected: STATES.REJECTED,
+  manager_rejected: STATES.REJECTED,
+  cancelled: STATES.REJECTED,
+  manager_approved: STATES.DISMISSED,
+  completed: STATES.DISMISSED,
+  expired: STATES.EXPIRED
+};
+var LOCK_TTL_MS = 2 * 60 * 1e3;
+function deriveState(events, fallback = STATES.REQUESTED) {
+  if (!Array.isArray(events) || !events.length) return fallback;
+  let state = STATES.REQUESTED;
+  for (const ev of events) {
+    if (META_EVENT_TYPES.has(ev?.type)) continue;
+    switch (ev?.type) {
+      case EVENT_TYPES.REQUEST_CREATED:
+        state = STATES.REQUESTED;
+        break;
+      case EVENT_TYPES.GUARD_VERIFIED:
+        state = STATES.GUARD_VERIFIED;
+        break;
+      case EVENT_TYPES.GUARD_REJECTED:
+        state = STATES.REJECTED;
+        break;
+      case EVENT_TYPES.MANAGER_APPROVED:
+      case EVENT_TYPES.DISMISSED:
+        state = STATES.DISMISSED;
+        break;
+      case EVENT_TYPES.MANAGER_REJECTED:
+        state = STATES.REJECTED;
+        break;
+      default:
+        break;
+    }
+  }
+  return state;
+}
+function normalizeState(raw) {
+  const s = String(raw || "");
+  if (LEGACY_MAP[s]) return LEGACY_MAP[s];
+  if (Object.values(STATES).includes(s)) return s;
+  return STATES.REQUESTED;
+}
+function makeEventId(requestId, type, idempotencyKey) {
+  const seed = `${String(requestId)}:${String(type)}:${String(idempotencyKey || "")}`;
+  return crypto4.createHash("sha256").update(seed).digest("hex").slice(0, 20);
+}
+function makeEvent(requestId, type, by, metadata = {}) {
+  const idempotencyKey = metadata.idempotencyKey || metadata.clientIdempotencyKey || `${type}:${Date.now()}`;
+  const eventId = makeEventId(requestId, type, idempotencyKey);
+  const meta = { ...metadata };
+  delete meta.idempotencyKey;
+  delete meta.clientIdempotencyKey;
+  return {
+    eventId,
+    type,
+    by: String(by || ""),
+    byName: metadata.byName ? String(metadata.byName) : void 0,
+    timestamp: /* @__PURE__ */ new Date(),
+    metadata: metadata.note || metadata.reason || Object.keys(meta).length ? { note: metadata.note, reason: metadata.reason, ...meta } : void 0
+  };
+}
+function appendEvents(existing, ...events) {
+  const list = Array.isArray(existing) ? [...existing] : [];
+  for (const ev of events) {
+    if (!ev?.eventId || !list.some((e) => e?.eventId === ev.eventId)) {
+      list.push(ev);
+    }
+  }
+  return list;
+}
+function hasEvent(events, type) {
+  return Array.isArray(events) && events.some((e) => e?.type === type);
+}
+function hasEventId(events, eventId) {
+  return Array.isArray(events) && events.some((e) => e?.eventId === eventId);
+}
+function lockExpired(data) {
+  if (!data?.isProcessing) return true;
+  const started = data.processingStartedAt?.toDate?.() || data.processingStartedAt;
+  if (!started) return true;
+  const ms = started instanceof Date ? started.getTime() : new Date(started).getTime();
+  return Date.now() - ms > LOCK_TTL_MS;
+}
+function assertCanAcquireLock(data, uid) {
+  if (!data?.isProcessing) return;
+  if (data.processingBy === uid) return;
+  if (lockExpired(data)) return;
+  const err = new Error("\u0627\u0644\u0637\u0644\u0628 \u0642\u064A\u062F \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629 \u0645\u0646 \u0645\u0633\u062A\u062E\u062F\u0645 \u0622\u062E\u0631");
+  err.code = "LOCKED";
+  err.status = 409;
+  throw err;
+}
+function assertTransition(from, to, allowedFrom) {
+  const state = normalizeState(from);
+  if (!allowedFrom.includes(state)) {
+    const err = new Error(`\u0627\u0646\u062A\u0642\u0627\u0644 \u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D: ${state} \u2192 ${to}`);
+    err.code = "INVALID_TRANSITION";
+    err.status = 400;
+    throw err;
+  }
+  if (TERMINAL_STATES.includes(state)) {
+    const err = new Error("\u0627\u0644\u0637\u0644\u0628 \u0645\u063A\u0644\u0642 \u0648\u0644\u0627 \u064A\u0645\u0643\u0646 \u062A\u0639\u062F\u064A\u0644\u0647");
+    err.code = "REQUEST_CLOSED";
+    err.status = 400;
+    throw err;
+  }
+}
+function duplicateEventError() {
+  const err = new Error("\u062A\u0645 \u062A\u0646\u0641\u064A\u0630 \u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0645\u0633\u0628\u0642\u0627\u064B");
+  err.code = "DUPLICATE_EVENT";
+  err.status = 409;
+  err.idempotent = true;
+  return err;
+}
+function assertIdempotent(events, eventType, targetState, currentState, eventId) {
+  if (eventId && hasEventId(events, eventId)) {
+    throw duplicateEventError();
+  }
+  if (normalizeState(currentState) === targetState) {
+    const err = new Error("\u0627\u0644\u0637\u0644\u0628 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u062D\u0627\u0644\u0629 \u0628\u0627\u0644\u0641\u0639\u0644");
+    err.code = "ALREADY_IN_STATE";
+    err.status = 409;
+    err.idempotent = true;
+    throw err;
+  }
+  if (hasEvent(events, eventType)) {
+    const err = new Error("\u062A\u0645 \u062A\u0646\u0641\u064A\u0630 \u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0645\u0633\u0628\u0642\u0627\u064B");
+    err.code = "DUPLICATE_EVENT";
+    err.status = 409;
+    err.idempotent = true;
+    throw err;
+  }
+}
+var TRANSITIONS = {
+  guardVerify: {
+    allowedFrom: [STATES.REQUESTED, STATES.GUARD_REVIEWING],
+    reviewState: STATES.GUARD_REVIEWING,
+    targetState: STATES.GUARD_VERIFIED,
+    eventType: EVENT_TYPES.GUARD_VERIFIED
+  },
+  guardReject: {
+    allowedFrom: [STATES.REQUESTED, STATES.GUARD_REVIEWING],
+    reviewState: STATES.GUARD_REVIEWING,
+    targetState: STATES.REJECTED,
+    eventType: EVENT_TYPES.GUARD_REJECTED
+  },
+  managerApprove: {
+    allowedFrom: [STATES.GUARD_VERIFIED, STATES.MANAGER_REVIEWING],
+    reviewState: STATES.MANAGER_REVIEWING,
+    targetState: STATES.DISMISSED,
+    eventType: EVENT_TYPES.MANAGER_APPROVED,
+    alsoEvents: [EVENT_TYPES.DISMISSED]
+  },
+  managerReject: {
+    allowedFrom: [STATES.GUARD_VERIFIED, STATES.MANAGER_REVIEWING],
+    reviewState: STATES.MANAGER_REVIEWING,
+    targetState: STATES.REJECTED,
+    eventType: EVENT_TYPES.MANAGER_REJECTED
+  }
+};
+
+// dismissalSnapshot.mjs
+var SNAPSHOT_COL = "dismissal_snapshots";
+var ARCHIVE_FIELD = "dismissalEventsArchive";
+var COMPACTION_TAIL_EVENTS = 8;
+function lastEventId(events) {
+  if (!Array.isArray(events) || !events.length) return null;
+  return events[events.length - 1]?.eventId || null;
+}
+function buildSnapshot(requestId, events) {
+  const list = Array.isArray(events) ? events : [];
+  const derivedStatus = deriveState(list, STATES.REQUESTED);
+  return {
+    requestId: String(requestId),
+    derivedStatus,
+    lastEventId: lastEventId(list),
+    eventCount: list.length,
+    updatedAt: /* @__PURE__ */ new Date()
+  };
+}
+function resolveEffectiveState(data) {
+  const events = Array.isArray(data?.dismissalEvents) ? data.dismissalEvents : [];
+  const snap = data?.dismissalSnapshot;
+  if (snap?.derivedStatus && snap?.lastEventId && events.length) {
+    const tailId = lastEventId(events);
+    if (tailId && tailId === snap.lastEventId) {
+      return normalizeState(snap.derivedStatus);
+    }
+  }
+  if (snap?.derivedStatus && !events.length) {
+    return normalizeState(snap.derivedStatus);
+  }
+  return deriveState(events, STATES.REQUESTED);
+}
+function detectDrift(data) {
+  const events = Array.isArray(data?.dismissalEvents) ? data.dismissalEvents : [];
+  const derived = deriveState(events, STATES.REQUESTED);
+  const cachedStatus = normalizeState(data?.status);
+  const snapStatus = data?.dismissalSnapshot?.derivedStatus ? normalizeState(data.dismissalSnapshot.derivedStatus) : null;
+  const statusDrift = cachedStatus !== derived;
+  const snapshotDrift = snapStatus !== null && snapStatus !== derived;
+  const snapshotStale = snapStatus !== null && events.length > 0 && data.dismissalSnapshot?.lastEventId !== lastEventId(events);
+  return {
+    derived,
+    cachedStatus,
+    snapStatus,
+    drift: statusDrift || snapshotDrift || snapshotStale,
+    statusDrift,
+    snapshotDrift,
+    snapshotStale
+  };
+}
+function makeReconcileEvent(requestId, derived, wasStored, wasSnap) {
+  return makeEvent(requestId, EVENT_TYPES.SYSTEM_RECONCILE, "system", {
+    byName: "System",
+    idempotencyKey: `reconcile:${derived}:${wasStored}:${Date.now()}`,
+    derived,
+    wasStored,
+    wasSnap
+  });
+}
+function materializeFromEvents(requestId, events, extra = {}) {
+  const derived = deriveState(events, STATES.REQUESTED);
+  const snapshot = buildSnapshot(requestId, events);
+  return {
+    status: derived,
+    dismissalSnapshot: snapshot,
+    dismissalEvents: events,
+    statusDrift: false,
+    ...extra
+  };
+}
+async function writeSnapshotDoc(db, requestId, snapshot, schoolId) {
+  const ref = db.collection(SNAPSHOT_COL).doc(requestId);
+  await ref.set(
+    {
+      ...snapshot,
+      schoolId: schoolId || null
+    },
+    { merge: true }
+  );
+}
+function compactEventLog(events, archiveBeforeDays = 30) {
+  const list = Array.isArray(events) ? [...events] : [];
+  if (list.length <= COMPACTION_TAIL_EVENTS) {
+    return { kept: list, archived: [], didCompact: false };
+  }
+  const cutoff = Date.now() - archiveBeforeDays * 24 * 60 * 60 * 1e3;
+  const isOld = (ev) => {
+    const ts = ev?.timestamp?.toDate?.() || ev?.timestamp;
+    if (!ts) return false;
+    const ms = ts instanceof Date ? ts.getTime() : new Date(ts).getTime();
+    return ms < cutoff;
+  };
+  const terminal = deriveState(list);
+  const isTerminal = ["DISMISSED", "REJECTED", "EXPIRED"].includes(terminal);
+  if (!isTerminal) {
+    return { kept: list, archived: [], didCompact: false };
+  }
+  const oldEvents = list.filter(isOld);
+  if (oldEvents.length === 0) {
+    return { kept: list, archived: [], didCompact: false };
+  }
+  const tail = list.slice(-COMPACTION_TAIL_EVENTS);
+  const archived = list.slice(0, list.length - tail.length);
+  return { kept: tail, archived, didCompact: archived.length > 0 };
+}
+
+// dismissalApi.mjs
+var DISMISSAL_COL = "dismissal_requests";
+var DISMISSAL_LOGS_COL = "dismissal_logs";
+var TOKEN_TTL_MS = 10 * 60 * 1e3;
+var MANAGER_ROLES = /* @__PURE__ */ new Set([
+  "admin",
+  "school_admin",
+  "assistant",
+  "school_assistant",
+  "superadmin",
+  "super_admin"
+]);
+function httpError(message, code, status = 400) {
+  const err = new Error(message);
+  err.code = code;
+  err.status = status;
+  return err;
+}
+function generateToken() {
+  const part = () => Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${part()}-${part()}`;
+}
+async function loadUser(db, uid) {
+  const snap = await db.collection("users").doc(uid).get();
+  if (!snap.exists) throw httpError("\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "USER_NOT_FOUND", 403);
+  return { uid, ...snap.data() };
+}
+function assertRole(user, roles, message) {
+  if (!roles.has(String(user.role || ""))) {
+    throw httpError(message || "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D", "FORBIDDEN_ROLE", 403);
+  }
+}
+function assertSchool(user, schoolId) {
+  const isSuper = ["superadmin", "super_admin"].includes(String(user.role || ""));
+  if (!isSuper && String(user.schoolId || "") !== schoolId) {
+    throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u0627\u0644\u0648\u0635\u0648\u0644 \u0644\u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649", "FORBIDDEN_SCHOOL", 403);
+  }
+}
+async function resolveStudent(db, studentId, parentId, schoolId) {
+  const snap = await db.collection("students").doc(studentId).get();
+  if (!snap.exists) throw httpError("\u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "STUDENT_NOT_FOUND", 404);
+  const data = snap.data() || {};
+  if (String(data.schoolId || "") !== schoolId) {
+    throw httpError("\u0627\u0644\u0637\u0627\u0644\u0628 \u0644\u0627 \u064A\u0646\u062A\u0645\u064A \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062F\u0631\u0633\u0629", "INVALID_SCHOOL", 400);
+  }
+  const parentIds = Array.isArray(data.parentIds) ? data.parentIds.filter(Boolean) : [];
+  if (!parentIds.includes(parentId)) {
+    throw httpError("\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628", "FORBIDDEN_PARENT", 403);
+  }
+  const classId = String(data.classId || "").trim();
+  if (!classId) throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0644\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0631\u062A\u0628\u0637 \u0628\u0635\u0641 \u0635\u062D\u064A\u062D", "NO_CLASS", 400);
+  const classSnap = await db.collection("classes").doc(classId).get();
+  if (!classSnap.exists || String(classSnap.data()?.schoolId || "") !== schoolId) {
+    throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0644\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0631\u062A\u0628\u0637 \u0628\u0635\u0641 \u0635\u062D\u064A\u062D", "NO_CLASS", 400);
+  }
+  const className = String(classSnap.data()?.name || "").trim();
+  if (!className) throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0644\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0631\u062A\u0628\u0637 \u0628\u0635\u0641 \u0635\u062D\u064A\u062D", "NO_CLASS", 400);
+  return {
+    studentId,
+    studentName: String(data.name || "").trim(),
+    classId,
+    className,
+    schoolId,
+    registrationNumber: String(data.registrationNumber || ""),
+    photoUrl: String(data.photoUrl || data.photo || ""),
+    parentIds
+  };
+}
+async function findActiveForStudent(db, studentId, schoolId) {
+  const snap = await db.collection(DISMISSAL_COL).where("schoolId", "==", schoolId).where("studentId", "==", studentId).limit(20).get();
+  return snap.docs.find((d) => {
+    const state = resolveEffectiveState(d.data());
+    return ACTIVE_STATES.includes(state);
+  }) || null;
+}
+async function getRequestOrThrow(db, requestId) {
+  const ref = db.collection(DISMISSAL_COL).doc(requestId);
+  const snap = await ref.get();
+  if (!snap.exists) throw httpError("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
+  return { ref, data: snap.data(), id: snap.id };
+}
+async function verifyStudentMatch(db, data, schoolId) {
+  const studentSnap = await db.collection("students").doc(String(data.studentId)).get();
+  if (!studentSnap.exists) throw httpError("\u062A\u0639\u0630\u0631 \u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0627\u0644\u0628", "STUDENT_NOT_FOUND", 400);
+  const student = studentSnap.data() || {};
+  if (String(student.schoolId || "") !== schoolId) {
+    throw httpError("\u0627\u0644\u0637\u0627\u0644\u0628 \u0644\u0627 \u064A\u0646\u062A\u0645\u064A \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062F\u0631\u0633\u0629", "INVALID_SCHOOL", 400);
+  }
+  if (String(student.classId || "") !== String(data.classId || "")) {
+    throw httpError("\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0635\u0641 \u0644\u0627 \u062A\u0637\u0627\u0628\u0642 \u0633\u062C\u0644 \u0627\u0644\u0637\u0627\u0644\u0628", "CLASS_MISMATCH", 400);
+  }
+}
+function runTransitionTx(tx, ref, requestId, freshData, uid, actorName, config, extra = {}) {
+  const events = Array.isArray(freshData.dismissalEvents) ? freshData.dismissalEvents : [];
+  const current = resolveEffectiveState(freshData);
+  const idempotencyKey = extra.idempotencyKey || `${config.eventType}:${uid}`;
+  const primaryEvent = makeEvent(requestId, config.eventType, uid, {
+    byName: actorName,
+    idempotencyKey,
+    ...extra.metadata
+  });
+  if (hasEventId(events, primaryEvent.eventId)) {
+    throw duplicateEventError();
+  }
+  assertCanAcquireLock(freshData, uid);
+  assertTransition(current, config.targetState, config.allowedFrom);
+  assertIdempotent(events, config.eventType, config.targetState, current, primaryEvent.eventId);
+  const now = /* @__PURE__ */ new Date();
+  let nextEvents = appendEvents(events, primaryEvent);
+  if (config.alsoEvents) {
+    for (const t of config.alsoEvents) {
+      const alsoEv = makeEvent(requestId, t, uid, {
+        byName: actorName,
+        idempotencyKey: `${idempotencyKey}:${t}`,
+        ...extra.metadata
+      });
+      if (hasEventId(nextEvents, alsoEv.eventId)) {
+        throw duplicateEventError();
+      }
+      nextEvents = appendEvents(nextEvents, alsoEv);
+    }
+  }
+  const patch = materializeFromEvents(requestId, nextEvents, {
+    updatedAt: now,
+    isProcessing: false,
+    processingBy: null,
+    processingStartedAt: null,
+    lastTransitionAt: now,
+    lastTransitionType: config.eventType,
+    ...extra.fields
+  });
+  tx.update(ref, patch);
+  return { events: nextEvents, now, status: patch.status, snapshot: patch.dismissalSnapshot };
+}
+function serializeRequest(id, data) {
+  const derived = resolveEffectiveState(data);
+  const { drift, statusDrift, snapshotDrift } = detectDrift(data);
+  return {
+    id,
+    ...data,
+    status: derived,
+    derivedStatus: derived,
+    statusDrift: drift,
+    statusDriftDetail: { statusDrift, snapshotDrift }
+  };
+}
+async function createDismissalRequestApi(db, uid, body) {
+  const user = await loadUser(db, uid);
+  assertRole(user, /* @__PURE__ */ new Set(["parent"]), "\u0641\u0642\u0637 \u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631 \u064A\u0645\u0643\u0646\u0647 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D");
+  const schoolId = String(body.schoolId || user.schoolId || "");
+  const studentId = String(body.studentId || "");
+  if (!schoolId || !studentId) throw httpError("\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0643\u062A\u0645\u0644\u0629", "INVALID_BODY", 400);
+  assertSchool(user, schoolId);
+  const verified = await resolveStudent(db, studentId, uid, schoolId);
+  if (await findActiveForStudent(db, studentId, schoolId)) {
+    throw httpError("\u064A\u0648\u062C\u062F \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0646\u0634\u0637 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628 \u0628\u0627\u0644\u0641\u0639\u0644", "ACTIVE_EXISTS", 409);
+  }
+  const token = generateToken();
+  const now = /* @__PURE__ */ new Date();
+  const parentName = String(body.parentName || user.name || "");
+  const requestedByName = String(body.requestedByName || parentName || "\u0648\u0644\u064A \u0623\u0645\u0631");
+  const docRef = db.collection(DISMISSAL_COL).doc();
+  const createEvent = makeEvent(docRef.id, EVENT_TYPES.REQUEST_CREATED, uid, {
+    byName: requestedByName,
+    idempotencyKey: body.idempotencyKey || `create:${studentId}:${Math.floor(Date.now() / 6e4)}`,
+    studentId: verified.studentId,
+    classId: verified.classId
+  });
+  if (body.idempotencyKey) {
+    const dup = await db.collection(DISMISSAL_COL).where("schoolId", "==", schoolId).where("studentId", "==", studentId).where("parentId", "==", uid).limit(5).get();
+    const existing = dup.docs.find((d) => {
+      const evs = d.data().dismissalEvents || [];
+      return evs.some((e) => e.eventId === createEvent.eventId);
+    });
+    if (existing) throw duplicateEventError();
+  }
+  const events = [createEvent];
+  const snapshot = buildSnapshot(docRef.id, events);
+  const derived = deriveState(events);
+  await docRef.set({
+    schoolId: verified.schoolId,
+    studentId: verified.studentId,
+    studentName: verified.studentName,
+    classId: verified.classId,
+    className: verified.className,
+    registrationNumber: verified.registrationNumber,
+    photoUrl: verified.photoUrl,
+    parentIds: verified.parentIds,
+    parentId: uid,
+    parentName,
+    requestedByName,
+    pickupPersonName: String(body.pickupPersonName || "").trim() || parentName,
+    pickupPersonRelation: String(body.pickupPersonRelation || "").trim() || "\u0648\u0644\u064A \u0623\u0645\u0631",
+    pickupNote: String(body.pickupNote || "").trim(),
+    status: derived,
+    dismissalSnapshot: snapshot,
+    token,
+    tokenExpiresAt: new Date(Date.now() + TOKEN_TTL_MS),
+    isProcessing: false,
+    dismissalEvents: events,
+    statusDrift: false,
+    createdAt: now,
+    updatedAt: now
+  });
+  await writeSnapshotDoc(db, docRef.id, snapshot, verified.schoolId);
+  return { id: docRef.id, token, status: derived, derivedStatus: derived, dismissalSnapshot: snapshot };
+}
+async function runTransitionApi(db, uid, body, cfg, actorName, extraFields = {}) {
+  const requestId = String(body.requestId || "");
+  if (!requestId) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
+  const { ref, data } = await getRequestOrThrow(db, requestId);
+  const schoolId = String(data.schoolId || "");
+  const idempotencyKey = body.idempotencyKey || body.clientIdempotencyKey;
+  let result;
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(ref);
+    if (!fresh.exists) throw httpError("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
+    result = runTransitionTx(tx, ref, requestId, fresh.data(), uid, actorName, cfg, {
+      idempotencyKey,
+      metadata: extraFields.metadata,
+      fields: extraFields.fields
+    });
+  });
+  if (result?.snapshot) {
+    await writeSnapshotDoc(db, requestId, result.snapshot, schoolId);
+  }
+  return { id: requestId, status: result.status, derivedStatus: result.status, dismissalSnapshot: result.snapshot };
+}
+async function guardVerifyDismissalApi(db, uid, body) {
+  const user = await loadUser(db, uid);
+  assertRole(user, /* @__PURE__ */ new Set(["guard"]), "\u0641\u0642\u0637 \u0627\u0644\u062D\u0627\u0631\u0633 \u064A\u0645\u0643\u0646\u0647 \u0627\u0644\u062A\u062D\u0642\u0642");
+  const requestId = String(body.requestId || "");
+  const note = String(body.note || "").trim();
+  if (!requestId) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
+  const { data } = await getRequestOrThrow(db, requestId);
+  const schoolId = String(data.schoolId || "");
+  assertSchool(user, schoolId);
+  await verifyStudentMatch(db, data, schoolId);
+  return runTransitionApi(db, uid, body, TRANSITIONS.guardVerify, String(user.name || "\u062D\u0627\u0631\u0633"), {
+    metadata: { note },
+    fields: {
+      guardVerifiedBy: uid,
+      guardVerifiedByName: String(user.name || "\u062D\u0627\u0631\u0633"),
+      guardVerifiedAt: /* @__PURE__ */ new Date()
+    }
+  });
+}
+async function guardRejectDismissalApi(db, uid, body) {
+  const user = await loadUser(db, uid);
+  assertRole(user, /* @__PURE__ */ new Set(["guard"]), "\u0641\u0642\u0637 \u0627\u0644\u062D\u0627\u0631\u0633 \u064A\u0645\u0643\u0646\u0647 \u0627\u0644\u0631\u0641\u0636");
+  const requestId = String(body.requestId || "");
+  const reason = String(body.reason || body.rejectReason || "").trim();
+  if (!requestId || !reason) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0648\u0633\u0628\u0628 \u0627\u0644\u0631\u0641\u0636 \u0645\u0637\u0644\u0648\u0628\u0627\u0646", "INVALID_BODY", 400);
+  const { data } = await getRequestOrThrow(db, requestId);
+  assertSchool(user, String(data.schoolId || ""));
+  return runTransitionApi(db, uid, body, TRANSITIONS.guardReject, String(user.name || "\u062D\u0627\u0631\u0633"), {
+    metadata: { reason },
+    fields: {
+      rejectReason: reason,
+      rejectedBy: uid,
+      rejectedByName: String(user.name || "\u062D\u0627\u0631\u0633"),
+      rejectedAt: /* @__PURE__ */ new Date()
+    }
+  });
+}
+async function managerApproveDismissalApi(db, uid, body) {
+  const user = await loadUser(db, uid);
+  assertRole(user, MANAGER_ROLES, "\u0641\u0642\u0637 \u0627\u0644\u0625\u062F\u0627\u0631\u0629 \u064A\u0645\u0643\u0646\u0647\u0627 \u0627\u0644\u0627\u0639\u062A\u0645\u0627\u062F");
+  const requestId = String(body.requestId || "");
+  if (!requestId) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
+  const { ref, data } = await getRequestOrThrow(db, requestId);
+  const schoolId = String(data.schoolId || "");
+  assertSchool(user, schoolId);
+  const managerName = String(user.name || "\u0645\u062F\u064A\u0631");
+  const studentId = String(data.studentId || "");
+  const studentRef = db.collection("students").doc(studentId);
+  const cfg = TRANSITIONS.managerApprove;
+  let result;
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(ref);
+    if (!fresh.exists) throw httpError("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
+    const freshData = fresh.data();
+    result = runTransitionTx(tx, ref, requestId, freshData, uid, managerName, cfg, {
+      idempotencyKey: body.idempotencyKey || body.clientIdempotencyKey,
+      fields: {
+        managerVerifiedBy: uid,
+        managerVerifiedByName: managerName,
+        managerVerifiedAt: /* @__PURE__ */ new Date(),
+        dismissedAt: /* @__PURE__ */ new Date()
+      }
+    });
+    tx.update(studentRef, {
+      gateDismissalStatus: "dismissed",
+      gateDismissedAt: /* @__PURE__ */ new Date(),
+      lastDismissalRequestId: requestId,
+      updatedAt: /* @__PURE__ */ new Date()
+    });
+    const logRef = db.collection(DISMISSAL_LOGS_COL).doc();
+    tx.set(logRef, {
+      schoolId,
+      requestId,
+      studentId,
+      studentName: String(data.studentName || ""),
+      classId: String(data.classId || ""),
+      className: String(data.className || ""),
+      parentId: String(data.parentId || ""),
+      action: EVENT_TYPES.DISMISSED,
+      guardVerifiedBy: freshData.guardVerifiedBy || null,
+      managerVerifiedBy: uid,
+      createdAt: /* @__PURE__ */ new Date()
+    });
+  });
+  if (result?.snapshot) {
+    await writeSnapshotDoc(db, requestId, result.snapshot, schoolId);
+  }
+  return {
+    id: requestId,
+    status: result.status,
+    derivedStatus: result.status,
+    dismissalSnapshot: result.snapshot
+  };
+}
+async function managerRejectDismissalApi(db, uid, body) {
+  const user = await loadUser(db, uid);
+  assertRole(user, MANAGER_ROLES, "\u0641\u0642\u0637 \u0627\u0644\u0625\u062F\u0627\u0631\u0629 \u064A\u0645\u0643\u0646\u0647\u0627 \u0627\u0644\u0631\u0641\u0636");
+  const requestId = String(body.requestId || "");
+  const reason = String(body.reason || body.rejectReason || "").trim();
+  if (!requestId || !reason) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0648\u0633\u0628\u0628 \u0627\u0644\u0631\u0641\u0636 \u0645\u0637\u0644\u0648\u0628\u0627\u0646", "INVALID_BODY", 400);
+  const { data } = await getRequestOrThrow(db, requestId);
+  assertSchool(user, String(data.schoolId || ""));
+  return runTransitionApi(db, uid, body, TRANSITIONS.managerReject, String(user.name || "\u0645\u062F\u064A\u0631"), {
+    metadata: { reason },
+    fields: {
+      rejectReason: reason,
+      rejectedBy: uid,
+      rejectedByName: String(user.name || "\u0645\u062F\u064A\u0631"),
+      rejectedAt: /* @__PURE__ */ new Date()
+    }
+  });
+}
+async function listPendingDismissalsApi(db, uid, query = {}) {
+  const user = await loadUser(db, uid);
+  const role = String(user.role || "");
+  const schoolId = String(query.schoolId || user.schoolId || "");
+  if (!schoolId) throw httpError("\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0645\u0637\u0644\u0648\u0628\u0629", "INVALID_BODY", 400);
+  assertSchool(user, schoolId);
+  if (role === "guard") {
+    const snap = await db.collection(DISMISSAL_COL).where("schoolId", "==", schoolId).where("status", "in", GUARD_QUEUE).limit(100).get();
+    return snap.docs.map((d) => serializeRequest(d.id, d.data())).filter((r) => GUARD_QUEUE.includes(r.derivedStatus) && !r.isProcessing);
+  }
+  if (role === "parent") {
+    const snap = await db.collection(DISMISSAL_COL).where("schoolId", "==", schoolId).where("parentId", "==", uid).limit(50).get();
+    return snap.docs.map((d) => serializeRequest(d.id, d.data())).filter((r) => GUARD_QUEUE.includes(r.derivedStatus));
+  }
+  throw httpError("\u063A\u064A\u0631 \u0645\u0635\u0631\u062D", "FORBIDDEN_ROLE", 403);
+}
+async function listVerifiedDismissalsApi(db, uid, query = {}) {
+  const user = await loadUser(db, uid);
+  assertRole(user, MANAGER_ROLES, "\u0641\u0642\u0637 \u0627\u0644\u0625\u062F\u0627\u0631\u0629 \u064A\u0645\u0643\u0646\u0647\u0627 \u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0627\u062A");
+  const schoolId = String(query.schoolId || user.schoolId || "");
+  if (!schoolId) throw httpError("\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0645\u0637\u0644\u0648\u0628\u0629", "INVALID_BODY", 400);
+  assertSchool(user, schoolId);
+  const snap = await db.collection(DISMISSAL_COL).where("schoolId", "==", schoolId).where("status", "in", MANAGER_QUEUE).limit(100).get();
+  return snap.docs.map((d) => serializeRequest(d.id, d.data())).filter((r) => MANAGER_QUEUE.includes(r.derivedStatus) && !r.isProcessing);
+}
+function registerDismissalRoutes(app, { getDb: getDb2, verifyToken, jsonParser }) {
+  const wrap = (fn) => async (req, res) => {
+    try {
+      const result = await fn(getDb2(), req.user.uid, req.body || {});
+      return res.json(result);
+    } catch (e) {
+      return res.status(e.status || 500).json({ error: e.code || "ERROR", message: e.message });
+    }
+  };
+  app.post("/api/dismissal/request", verifyToken, jsonParser, wrap(createDismissalRequestApi));
+  app.post("/api/dismissal/guard-verify", verifyToken, jsonParser, wrap(guardVerifyDismissalApi));
+  app.post("/api/dismissal/guard-reject", verifyToken, jsonParser, wrap(guardRejectDismissalApi));
+  app.post("/api/dismissal/manager-approve", verifyToken, jsonParser, wrap(managerApproveDismissalApi));
+  app.post("/api/dismissal/manager-reject", verifyToken, jsonParser, wrap(managerRejectDismissalApi));
+  app.get("/api/dismissal/pending", verifyToken, async (req, res) => {
+    try {
+      const rows = await listPendingDismissalsApi(getDb2(), req.user.uid, req.query || {});
+      return res.json({ requests: rows });
+    } catch (e) {
+      return res.status(e.status || 500).json({ error: e.code || "ERROR", message: e.message });
+    }
+  });
+  app.get("/api/dismissal/verified", verifyToken, async (req, res) => {
+    try {
+      const rows = await listVerifiedDismissalsApi(getDb2(), req.user.uid, req.query || {});
+      return res.json({ requests: rows });
+    } catch (e) {
+      return res.status(e.status || 500).json({ error: e.code || "ERROR", message: e.message });
+    }
+  });
+}
+
+// dismissalRecoveryWorker.mjs
+var DISMISSAL_COL2 = "dismissal_requests";
+function lockAge(data) {
+  const started = data.processingStartedAt?.toDate?.() || data.processingStartedAt;
+  if (!started) return null;
+  const ms = started instanceof Date ? started.getTime() : new Date(started).getTime();
+  return Date.now() - ms;
+}
+async function repairDrift(db, docRef, data, reason = "drift_detected") {
+  const events = Array.isArray(data.dismissalEvents) ? [...data.dismissalEvents] : [];
+  const { derived, cachedStatus, snapStatus, drift } = detectDrift(data);
+  if (!drift && data.dismissalSnapshot?.lastEventId) {
+    return { action: "noop", derived };
+  }
+  const hasReconcile = events.some((e) => e.type === EVENT_TYPES.SYSTEM_RECONCILE);
+  let nextEvents = events;
+  if (!hasReconcile || cachedStatus !== derived || snapStatus !== derived) {
+    const reconcileEv = makeReconcileEvent(docRef.id, derived, cachedStatus, snapStatus);
+    if (!events.some((e) => e.eventId === reconcileEv.eventId)) {
+      nextEvents = appendEvents(events, reconcileEv);
+    }
+  }
+  const patch = materializeFromEvents(docRef.id, nextEvents, {
+    isProcessing: false,
+    processingBy: null,
+    processingStartedAt: null,
+    stateReconciledAt: /* @__PURE__ */ new Date(),
+    stateDriftFrom: cachedStatus,
+    recoveryReason: reason,
+    updatedAt: /* @__PURE__ */ new Date(),
+    recoveryAt: /* @__PURE__ */ new Date()
+  });
+  await docRef.update(patch);
+  await writeSnapshotDoc(db, docRef.id, patch.dismissalSnapshot, data.schoolId);
+  return {
+    action: "drift_repaired",
+    derived,
+    wasStored: cachedStatus,
+    wasSnap: snapStatus,
+    reconcileAppended: nextEvents.length > events.length
+  };
+}
+async function rebuildSnapshot(db, docRef, data) {
+  const events = Array.isArray(data.dismissalEvents) ? data.dismissalEvents : [];
+  if (!events.length) return { action: "skipped", reason: "no_events" };
+  const snapshot = buildSnapshot(docRef.id, events);
+  const derived = deriveState(events);
+  const patch = {
+    dismissalSnapshot: snapshot,
+    status: derived,
+    statusDrift: false,
+    snapshotRebuiltAt: /* @__PURE__ */ new Date(),
+    updatedAt: /* @__PURE__ */ new Date()
+  };
+  await docRef.update(patch);
+  await writeSnapshotDoc(db, docRef.id, snapshot, data.schoolId);
+  return { action: "snapshot_rebuilt", derived, lastEventId: snapshot.lastEventId };
+}
+async function runDismissalRecovery(db, options = {}) {
+  const limit = Math.min(Number(options.limit) || 50, 200);
+  const schoolId = options.schoolId ? String(options.schoolId) : null;
+  const results = [];
+  let lockQuery = db.collection(DISMISSAL_COL2).where("isProcessing", "==", true).limit(limit);
+  if (schoolId) {
+    lockQuery = db.collection(DISMISSAL_COL2).where("schoolId", "==", schoolId).where("isProcessing", "==", true).limit(limit);
+  }
+  const lockSnap = await lockQuery.get();
+  for (const doc of lockSnap.docs) {
+    const data = doc.data();
+    if (!lockExpired(data)) {
+      results.push({ id: doc.id, action: "lock_skipped", lockAgeMs: lockAge(data) });
+      continue;
+    }
+    const repair = await repairDrift(db, doc.ref, data, "stale_lock_recovery");
+    results.push({
+      id: doc.id,
+      action: "lock_released",
+      lockReleased: true,
+      ...repair
+    });
+  }
+  const snapLimit = Math.min(Number(options.snapshotScanLimit) || 40, 150);
+  let missingQuery = db.collection(DISMISSAL_COL2).orderBy("updatedAt", "desc").limit(snapLimit);
+  if (schoolId) {
+    missingQuery = db.collection(DISMISSAL_COL2).where("schoolId", "==", schoolId).orderBy("updatedAt", "desc").limit(snapLimit);
+  }
+  const recentSnap = await missingQuery.get().catch(() => ({ docs: [] }));
+  for (const doc of recentSnap.docs) {
+    const data = doc.data();
+    if (data.isProcessing) continue;
+    const missingSnap = !data.dismissalSnapshot?.derivedStatus || !data.dismissalSnapshot?.lastEventId;
+    if (missingSnap) {
+      const rebuilt = await rebuildSnapshot(db, doc.ref, data);
+      results.push({ id: doc.id, ...rebuilt });
+      continue;
+    }
+    const { drift } = detectDrift(data);
+    if (drift) {
+      const repaired = await repairDrift(db, doc.ref, data, "auto_drift_repair");
+      results.push({ id: doc.id, ...repaired });
+    }
+  }
+  const retryCleared = results.filter((r) => r.lockReleased || r.action === "drift_repaired").length;
+  return {
+    scannedLocks: lockSnap.size,
+    scannedRecent: recentSnap.docs?.length || 0,
+    lockReleased: results.filter((r) => r.lockReleased).length,
+    driftRepaired: results.filter((r) => r.action === "drift_repaired").length,
+    snapshotsRebuilt: results.filter((r) => r.action === "snapshot_rebuilt").length,
+    retryReady: retryCleared,
+    lockTtlMs: LOCK_TTL_MS,
+    results
+  };
+}
+function registerDismissalRecoveryRoute(app, { getDb: getDb2, resolveCronSecret: resolveCronSecret2 }) {
+  app.post("/api/internal/dismissal-recovery/run", async (req, res) => {
+    const secret = resolveCronSecret2(
+      process.env.DISMISSAL_CRON_SECRET,
+      process.env.CRON_SECRET
+    );
+    if (!secret || req.headers["x-cron-secret"] !== secret) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    try {
+      const report = await runDismissalRecovery(getDb2(), req.body || {});
+      return res.json({ success: true, ...report });
+    } catch (e) {
+      console.error("[DismissalRecovery]", e);
+      return res.status(500).json({ success: false, error: e.message || "Recovery failed" });
+    }
+  });
+}
+
+// dismissalCompactionWorker.mjs
+var DISMISSAL_COL3 = "dismissal_requests";
+var TERMINAL = /* @__PURE__ */ new Set(["DISMISSED", "REJECTED", "EXPIRED"]);
+var DEFAULT_ARCHIVE_DAYS = 30;
+async function runDismissalCompaction(db, options = {}) {
+  const limit = Math.min(Number(options.limit) || 100, 300);
+  const archiveDays = Number(options.archiveDays) || DEFAULT_ARCHIVE_DAYS;
+  const schoolId = options.schoolId ? String(options.schoolId) : null;
+  const cutoffDate = new Date(Date.now() - archiveDays * 24 * 60 * 60 * 1e3);
+  let query = db.collection(DISMISSAL_COL3).where("updatedAt", "<", cutoffDate).orderBy("updatedAt", "asc").limit(limit);
+  if (schoolId) {
+    query = db.collection(DISMISSAL_COL3).where("schoolId", "==", schoolId).where("updatedAt", "<", cutoffDate).orderBy("updatedAt", "asc").limit(limit);
+  }
+  const snap = await query.get().catch(async () => {
+    const fallback = db.collection(DISMISSAL_COL3).limit(limit);
+    return schoolId ? fallback.where("schoolId", "==", schoolId).limit(limit).get() : fallback.get();
+  });
+  const results = [];
+  let compacted = 0;
+  let archivedEvents = 0;
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    const events = Array.isArray(data.dismissalEvents) ? data.dismissalEvents : [];
+    const state = deriveState(events);
+    if (!TERMINAL.has(state)) {
+      results.push({ id: doc.id, action: "skipped", reason: "not_terminal" });
+      continue;
+    }
+    if (data.dismissalSnapshot?.compactedAt) {
+      const compactedAt = data.dismissalSnapshot.compactedAt?.toDate?.() || data.dismissalSnapshot.compactedAt;
+      const ms = compactedAt instanceof Date ? compactedAt.getTime() : new Date(compactedAt).getTime();
+      if (Date.now() - ms < 24 * 60 * 60 * 1e3) {
+        results.push({ id: doc.id, action: "skipped", reason: "recently_compacted" });
+        continue;
+      }
+    }
+    const { kept, archived, didCompact } = compactEventLog(events, archiveDays);
+    if (!didCompact) {
+      results.push({ id: doc.id, action: "skipped", reason: "no_old_events" });
+      continue;
+    }
+    const existingArchive = Array.isArray(data[ARCHIVE_FIELD]) ? data[ARCHIVE_FIELD] : [];
+    const snapshot = {
+      ...buildSnapshot(doc.id, [...existingArchive, ...archived, ...kept]),
+      compactedAt: /* @__PURE__ */ new Date(),
+      archivedCount: existingArchive.length + archived.length
+    };
+    await doc.ref.update({
+      dismissalEvents: kept,
+      [ARCHIVE_FIELD]: [...existingArchive, ...archived],
+      dismissalSnapshot: snapshot,
+      status: snapshot.derivedStatus,
+      statusDrift: false,
+      compactedAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    });
+    await writeSnapshotDoc(db, doc.id, snapshot, data.schoolId);
+    compacted += 1;
+    archivedEvents += archived.length;
+    results.push({
+      id: doc.id,
+      action: "compacted",
+      keptEvents: kept.length,
+      archivedBatch: archived.length,
+      totalArchived: snapshot.archivedCount
+    });
+  }
+  return {
+    scanned: snap.size,
+    compacted,
+    archivedEvents,
+    archiveDays,
+    results
+  };
+}
+function registerDismissalCompactionRoute(app, { getDb: getDb2, resolveCronSecret: resolveCronSecret2 }) {
+  app.post("/api/internal/dismissal-compaction/run", async (req, res) => {
+    const secret = resolveCronSecret2(
+      process.env.DISMISSAL_CRON_SECRET,
+      process.env.CRON_SECRET
+    );
+    if (!secret || req.headers["x-cron-secret"] !== secret) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    try {
+      const report = await runDismissalCompaction(getDb2(), req.body || {});
+      return res.json({ success: true, ...report });
+    } catch (e) {
+      console.error("[DismissalCompaction]", e);
+      return res.status(500).json({ success: false, error: e.message || "Compaction failed" });
+    }
+  });
+}
+
 // server.ts
 dotEnv.config();
 var __filename = fileURLToPath(import.meta.url);
@@ -2663,8 +3593,6 @@ async function startServer() {
       allowedOrigins.push(process.env.APP_URL.replace(/\/$/, "").toLowerCase());
     }
     const allowedPatterns = [
-      /\.run\.app$/,
-      // Matches Cloud Run dev / preview URLs
       /^http:\/\/localhost(:\d+)?$/,
       /^http:\/\/127\.0\.0\.1(:\d+)?$/,
       /^capacitor:\/\/localhost$/,
@@ -2698,6 +3626,28 @@ async function startServer() {
   });
   app.use(compression());
   app.use(express.json({ limit: "10mb" }));
+  app.set("trust proxy", 1);
+  const publicRateHits = /* @__PURE__ */ new Map();
+  const PUBLIC_RATE_WINDOW_MS = 6e4;
+  const PUBLIC_RATE_MAX = 30;
+  app.use("/api/public", (req, res, next) => {
+    const now = Date.now();
+    const key = String(req.ip || req.socket?.remoteAddress || "unknown");
+    const entry = publicRateHits.get(key);
+    if (!entry || entry.resetAt <= now) {
+      if (publicRateHits.size > 1e4) {
+        for (const [k, v] of publicRateHits) if (v.resetAt <= now) publicRateHits.delete(k);
+      }
+      publicRateHits.set(key, { count: 1, resetAt: now + PUBLIC_RATE_WINDOW_MS });
+      return next();
+    }
+    entry.count += 1;
+    if (entry.count > PUBLIC_RATE_MAX) {
+      res.setHeader("Retry-After", String(Math.ceil((entry.resetAt - now) / 1e3)));
+      return res.status(429).json({ error: "RATE_LIMITED", message: "\u0637\u0644\u0628\u0627\u062A \u0643\u062B\u064A\u0631\u0629\u060C \u064A\u0631\u062C\u0649 \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629 \u0628\u0639\u062F \u0642\u0644\u064A\u0644" });
+    }
+    next();
+  });
   const sanitizeForFirestore = (val) => {
     if (val === void 0) return null;
     if (val === null) return null;
@@ -2865,7 +3815,7 @@ async function startServer() {
       next();
     } catch (error) {
       console.error("VerifyAdmin Error:", error.message);
-      res.status(401).json({ error: `Authentication failed: ${error.message}` });
+      res.status(401).json({ error: "Authentication failed" });
     }
   };
   const verifyToken = async (req, res, next) => {
@@ -3039,7 +3989,7 @@ async function startServer() {
       try {
         const bucket = getStorage().bucket();
         const file = bucket.file(storagePath);
-        const token = crypto4.randomUUID();
+        const token = crypto5.randomUUID();
         await file.save(buffer, {
           metadata: {
             contentType,
@@ -3278,7 +4228,7 @@ async function startServer() {
         } else {
           const hasPassword = existingUser.providerData.some((p) => p.providerId === "password");
           if (!hasPassword) {
-            updateParams.password = crypto4.randomBytes(16).toString("hex") + "SecureP1!";
+            updateParams.password = crypto5.randomBytes(16).toString("hex") + "SecureP1!";
             console.log(`Setting dynamic random password for existing Google user: ${redactUid(uid)}`);
           }
         }
@@ -3289,7 +4239,7 @@ async function startServer() {
         }
       } catch (authError) {
         if (authError.code === "auth/user-not-found") {
-          const generatedSecurePass = crypto4.randomBytes(16).toString("hex") + "SecureP1!";
+          const generatedSecurePass = crypto5.randomBytes(16).toString("hex") + "SecureP1!";
           const userRecord = await admin4.auth().createUser({
             email: emailLower,
             password: password || generatedSecurePass,
@@ -4488,6 +5438,13 @@ async function startServer() {
       res.status(500).json({ success: false, error: error.message || "Chat escalation failed" });
     }
   });
+  registerDismissalRoutes(app, {
+    getDb,
+    verifyToken,
+    jsonParser: express.json()
+  });
+  registerDismissalRecoveryRoute(app, { getDb, resolveCronSecret });
+  registerDismissalCompactionRoute(app, { getDb, resolveCronSecret });
   app.all("/api/*", (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.status(404).json({

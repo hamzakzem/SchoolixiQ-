@@ -3,6 +3,14 @@ import { ensureBackendApiBaseUrl, getApiUrl } from './apiUtils';
 
 const pendingKeys = new Map<string, string>();
 
+function newIdempotencyKey(scope: string, requestId: string) {
+  const nonce =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${scope}:${requestId}:${nonce}`;
+}
+
 function stableKey(scope: string, requestId: string) {
   const cacheKey = `${scope}:${requestId}`;
   if (!pendingKeys.has(cacheKey)) {
@@ -49,7 +57,7 @@ export async function apiCreateDismissalRequest(body: Record<string, unknown>) {
     method: 'POST',
     body: JSON.stringify({ ...body, idempotencyKey }),
   });
-  return parseJson(res) as { id: string; token: string; status: string };
+  return (await parseJson(res)) as { id: string; token: string; status: string };
 }
 
 export async function apiGuardVerifyDismissal(requestId: string, note?: string) {

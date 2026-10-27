@@ -21,11 +21,11 @@
             var target = e.target || {};
             var tagName = (target.tagName || '').toUpperCase();
             
-            // Check if it is a script or stylesheet loading error, or chunk load error
-            var isLoadError = tagName === 'SCRIPT' || 
-                              tagName === 'LINK' || 
-                              msg.indexOf('Script error') !== -1 || 
-                              msg.indexOf('Failed to fetch') !== -1 || 
+            // Only our own scripts/stylesheets count: third-party failures (analytics blocked
+            // by an ad blocker, Google Fonts offline) must not purge caches and reload the app.
+            var assetUrl = tagName === 'SCRIPT' ? target.src : (tagName === 'LINK' ? target.href : '');
+            var isOwnAsset = !!assetUrl && assetUrl.indexOf(window.location.origin + '/') === 0;
+            var isLoadError = isOwnAsset ||
                               msg.indexOf('ChunkLoadError') !== -1 ||
                               msg.indexOf('dynamically imported') !== -1 ||
                               msg.indexOf('loading chunk') !== -1;
@@ -63,7 +63,6 @@
             var reason = String((e.reason && e.reason.message) || e.reason || '');
             if (
               reason.indexOf('dynamically imported') !== -1 ||
-              reason.indexOf('Failed to fetch') !== -1 ||
               reason.indexOf('ChunkLoadError') !== -1 ||
               reason.indexOf('Loading chunk') !== -1
             ) {

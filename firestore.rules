@@ -121,6 +121,34 @@ service cloud.firestore {
       ]);
     }
 
+    // Subscription / lifecycle fields — only Super Admin (or server) may change them.
+    function preservesSchoolSubscriptionFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'status',
+        'subscriptionStatus',
+        'paymentStatus',
+        'planId',
+        'packageId',
+        'packageName',
+        'subscriptionExpiresAt',
+        'subscriptionStartedAt',
+        'durationDays',
+        'ownerUid',
+        'adminEmail',
+        'isDeleted',
+        'suspendedAt',
+        'suspendedBy',
+        'suspendedByName',
+        'archivedAt',
+        'archivedBy',
+        'archivedByName',
+        'reactivatedAt',
+        'reactivatedBy',
+        'restoredAt',
+        'restoredBy',
+      ]);
+    }
+
     function schoolCreateWithoutDistributorFields() {
       return !request.resource.data.keys().hasAny([
         'distributorId',
@@ -818,27 +846,43 @@ service cloud.firestore {
       allow create, update, delete: if isSuperAdmin();
     }
 
-    // Schools — public read for login/footer/onboarding; scoped writes.
+    // Schools — signed-in get; list limited to platform staff, the school's
+    // own admin email (login provisioning) and public featured partners (footer).
     match /schools/{schoolId} {
-      allow read, get, list: if true;
+      allow get: if signedIn();
+      allow list: if isSuperAdmin()
+        || isPlatformAssistant()
+        || (resource.data.featured == true && resource.data.status == 'active')
+        || (
+          signedIn()
+          && request.auth.token.email != null
+          && resource.data.adminEmail == request.auth.token.email.lower()
+        );
       allow create: if isSuperAdmin()
         || (
           signedIn()
           && isAdmin()
           && request.resource.data.ownerUid == request.auth.uid
           && schoolCreateWithoutDistributorFields()
+          && request.resource.data.get('status', 'pending_subscription') == 'pending_subscription'
+          && !request.resource.data.keys().hasAny([
+            'subscriptionExpiresAt',
+            'subscriptionStatus',
+            'paymentStatus',
+          ])
         );
       allow update: if isSuperAdmin()
         || (
           signedIn()
           && isSchoolMember(schoolId)
-          && userRole() in ['admin', 'school_admin', 'assistant', 'teacher']
+          && userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant']
           && preservesSchoolDistributorFields()
+          && preservesSchoolSubscriptionFields()
         );
       allow delete: if isSuperAdmin();
 
       match /settings/{settingId} {
-        allow read, get, list: if true;
+        allow read, get, list: if signedIn();
         allow create, update, delete: if isSuperAdmin() || canManageSchool(schoolId);
       }
     }
@@ -858,6 +902,7 @@ service cloud.firestore {
         || canReadStudentByParentEmail()
         || (
           signedIn()
+          && isParent()
           && request.query.limit <= 1
           && resource.data.keys().hasAll(['registrationNumber'])
         );

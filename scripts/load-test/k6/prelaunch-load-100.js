@@ -11,7 +11,7 @@ export const options = {
         { duration: '5m', target: 50 },
         { duration: '5m', target: 100 },
         { duration: '2m', target: 0 },
-      },
+      ],
       gracefulRampDown: '30s',
     },
   },

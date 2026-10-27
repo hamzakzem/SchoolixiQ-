@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { db, auth } from "../lib/firebase";
 import { signOutWithCleanup } from "../lib/authLogout";
+import { isTeacherMenuFeatureEnabled } from "../lib/featureRegistry";
 import {
   collection,
   query,
@@ -611,8 +612,7 @@ export default function TeacherDashboard() {
     const queryName = "TEACHER_HOMEWORK";
 
     const rebuild = () => {
-      const merged = chunkResults
-        .values()
+      const merged = Array.from(chunkResults.values())
         .flat()
         .sort(
           (a: any, b: any) =>
@@ -691,8 +691,7 @@ export default function TeacherDashboard() {
     const queryName = "TEACHER_REPORTS";
 
     const rebuild = () => {
-      const merged = chunkResults
-        .values()
+      const merged = Array.from(chunkResults.values())
         .flat()
         .sort(
           (a: any, b: any) =>

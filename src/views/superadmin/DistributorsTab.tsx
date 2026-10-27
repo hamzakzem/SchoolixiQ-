@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
   doc,
+  getDocs,
+  limit,
+  where,
   onSnapshot,
   orderBy,
   query,
@@ -41,7 +44,6 @@ import { DistributorSupportInbox } from "./DistributorSupportInbox";
 import {
   ensureDistributorSupportConversation,
 } from "../../lib/distributorSupportChat";
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
 
 type SchoolRow = {
   id: string;

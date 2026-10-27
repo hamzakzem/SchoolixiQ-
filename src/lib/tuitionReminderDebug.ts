@@ -264,7 +264,7 @@ export function runTuitionReminderDiagnostics(params: {
   let hiddenNoPhone = 0;
   let hiddenNoParentAccount = 0;
   for (const row of displayableRows) {
-    const phone = resolveParentPhone(row.student, parents[row.parentId || '']);
+    const phone = resolveParentPhone(row.student, parents[String((row.student as { parentIds?: string[] } | undefined)?.parentIds?.[0] || '')]);
     if (!isValidWhatsAppPhone(phone)) hiddenNoPhone++;
   }
   hiddenNoParentAccount = hiddenNoParent;

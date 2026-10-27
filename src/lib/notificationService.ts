@@ -71,7 +71,7 @@ export interface NotificationPayload {
   senderRole?: string;
   recipientId?: string;
   receiverId?: string;
-  audience?: 'school_admin' | 'teacher' | 'parent' | 'all_school';
+  audience?: 'school_admin' | 'teacher' | 'parent' | 'all_school' | 'super_admin';
   metadata?: Record<string, unknown>;
 }
 
@@ -334,7 +334,7 @@ export const notificationService = {
       const batch = writeBatch(db);
       realUserIds.forEach((userId) => {
         const docRef = doc(collection(db, 'notifications'));
-        const notificationDoc = buildNotificationDoc(payload, userId);
+        const notificationDoc = buildNotificationDoc(payload as NotificationPayload, userId);
         assertNoPoolRecipientFields(notificationDoc, 'sendToMultiple/batch.set');
         batch.set(docRef, notificationDoc);
       });
@@ -491,7 +491,7 @@ export const notificationService = {
   ): Promise<number> {
     if (isQuotaWritePaused()) return 0;
     const candidates = notifications
-      .filter((n) => n.read === true && canManuallyDeleteNotification(n, userRole))
+      .filter((n) => n.read === true && canManuallyDeleteNotification(n as Parameters<typeof canManuallyDeleteNotification>[0], userRole))
       .slice(0, batchLimit);
     if (candidates.length === 0) return 0;
 
@@ -531,7 +531,7 @@ export const notificationService = {
     if (isQuotaWritePaused() || notifications.length === 0) return 0;
     const nowMs = Date.now();
     const expired = notifications.filter((n) => {
-      if (isCriticalNotification(n)) return false;
+      if (isCriticalNotification(n as Parameters<typeof isCriticalNotification>[0])) return false;
       const raw = n.deleteAfter as
         | { toMillis?: () => number; seconds?: number }
         | Date

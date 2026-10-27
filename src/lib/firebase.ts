@@ -92,6 +92,8 @@ export const storage = getStorage(
 // Initialize Analytics conditionally
 export const initAnalytics = async () => {
   try {
+    // Without a measurement ID Analytics only loads gtag.js?id=undefined.
+    if (!firebaseConfig.measurementId) return null;
     const supported = await isSupported();
     if (supported) {
       return getAnalytics(app);

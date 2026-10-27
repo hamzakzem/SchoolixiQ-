@@ -29,7 +29,7 @@ export function ParentHomeworkView({ isRtl, t, homework, onDelete }: Props) {
                 <article key={hw.id} className="parent-section-card relative">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <span className="parent-badge">
-                      {getHomeworkSubjectDisplay(hw, undefined, isRtl)}
+                      {getHomeworkSubjectDisplay(hw as { subjectName?: string; subject?: string; teacherId?: string }, undefined, isRtl)}
                     </span>
                     <button
                       type="button"

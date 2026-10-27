@@ -321,7 +321,7 @@ export default function GlobalSearch({
         if (cancelled) return;
 
         const studentRows: SearchResult[] = filterActiveRecords(
-          students.docs.map((d) => ({ id: d.id, ...d.data() })),
+          students.docs.map((d) => ({ id: d.id, ...d.data() }) as Record<string, any>),
         ).map((s) => ({
           id: s.id,
           group: 'students' as const,
@@ -372,7 +372,7 @@ export default function GlobalSearch({
           });
 
         const messageRows: SearchResult[] = filterActiveRecords(
-          announcements.docs.map((d) => ({ id: d.id, ...d.data() })),
+          announcements.docs.map((d) => ({ id: d.id, ...d.data() }) as Record<string, any>),
         ).map((a) => ({
           id: a.id,
           group: 'messages' as const,

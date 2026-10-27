@@ -50,6 +50,9 @@ import {
 } from './chatAssignment.mjs';
 import { loadSafeSchoolDirectory } from './chatDirectory.mjs';
 import { runChatEscalation } from './chatEscalationWorker.mjs';
+import { registerDismissalRoutes } from './backend/dismissalApi.mjs';
+import { registerDismissalRecoveryRoute } from './backend/dismissalRecoveryWorker.mjs';
+import { registerDismissalCompactionRoute } from './backend/dismissalCompactionWorker.mjs';
 
 dotEnv.config();
 
@@ -266,7 +269,6 @@ async function startServer() {
     }
 
     const allowedPatterns = [
-      /\.run\.app$/, // Matches Cloud Run dev / preview URLs
       /^http:\/\/localhost(:\d+)?$/,
       /^http:\/\/127\.0\.0\.1(:\d+)?$/,
       /^capacitor:\/\/localhost$/,
@@ -306,6 +308,30 @@ async function startServer() {
   app.use(compression());
 
   app.use(express.json({ limit: '10mb' }));
+
+  // Basic per-IP rate limit for unauthenticated endpoints (in-memory, per instance).
+  app.set('trust proxy', 1);
+  const publicRateHits = new Map<string, { count: number; resetAt: number }>();
+  const PUBLIC_RATE_WINDOW_MS = 60_000;
+  const PUBLIC_RATE_MAX = 30;
+  app.use('/api/public', (req: any, res: any, next: any) => {
+    const now = Date.now();
+    const key = String(req.ip || req.socket?.remoteAddress || 'unknown');
+    const entry = publicRateHits.get(key);
+    if (!entry || entry.resetAt <= now) {
+      if (publicRateHits.size > 10_000) {
+        for (const [k, v] of publicRateHits) if (v.resetAt <= now) publicRateHits.delete(k);
+      }
+      publicRateHits.set(key, { count: 1, resetAt: now + PUBLIC_RATE_WINDOW_MS });
+      return next();
+    }
+    entry.count += 1;
+    if (entry.count > PUBLIC_RATE_MAX) {
+      res.setHeader('Retry-After', String(Math.ceil((entry.resetAt - now) / 1000)));
+      return res.status(429).json({ error: 'RATE_LIMITED', message: 'طلبات كثيرة، يرجى المحاولة بعد قليل' });
+    }
+    next();
+  });
 
   // Helper to sanitize objects for Firestore (removes/converts undefined values)
   const sanitizeForFirestore = (val: any): any => {
@@ -507,7 +533,7 @@ async function startServer() {
       next();
     } catch (error: any) {
       console.error('VerifyAdmin Error:', error.message);
-      res.status(401).json({ error: `Authentication failed: ${error.message}` });
+      res.status(401).json({ error: 'Authentication failed' });
     }
   };
 
@@ -2406,6 +2432,15 @@ async function startServer() {
       res.status(500).json({ success: false, error: error.message || 'Chat escalation failed' });
     }
   });
+
+  // Safe dismissal workflow (parent request → guard verify → manager approve)
+  registerDismissalRoutes(app, {
+    getDb,
+    verifyToken,
+    jsonParser: express.json(),
+  });
+  registerDismissalRecoveryRoute(app, { getDb, resolveCronSecret });
+  registerDismissalCompactionRoute(app, { getDb, resolveCronSecret });
 
   // Global API 404 handler - MUST be before Vite middleware
   app.all('/api/*', (req, res) => {

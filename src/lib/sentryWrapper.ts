@@ -14,13 +14,14 @@ export function initSentry(dsn: string) {
         dsn: dsn,
         integrations: [
           Sentry.browserTracingIntegration(),
+          // Screens show student names, grades, phones and photos — never record them.
           Sentry.replayIntegration({
-            maskAllText: false,
-            blockAllMedia: false,
+            maskAllText: true,
+            blockAllMedia: true,
           }),
         ],
-        tracesSampleRate: 1.0,
-        tracePropagationTargets: ["localhost", /^https:\/\/yourserver\.io\/api/],
+        tracesSampleRate: 0.1,
+        tracePropagationTargets: ["localhost", /^https:\/\/(www\.|app\.)?schoolixiq\.(com|iq)\/api/],
         replaysSessionSampleRate: 0.1,
         replaysOnErrorSampleRate: 1.0,
       });

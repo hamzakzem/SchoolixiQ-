@@ -48,6 +48,9 @@ export interface UserProfile {
     restoredAt?: unknown;
     restoredBy?: string;
   };
+  /** Firestore user docs carry additional role-specific fields. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
 }
 
 export interface School {
@@ -62,6 +65,9 @@ export interface School {
   showSubscriptionTimer?: boolean;
   notificationsEnabled?: boolean;
   featured?: boolean;
+  adminEmail?: string;
+  adminName?: string;
+  adminPhone?: string;
 }
 
 export interface Student {

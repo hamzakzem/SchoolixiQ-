@@ -75,7 +75,7 @@ export function LandingButton(props: LandingButtonProps) {
   );
 
   if ('to' in props && props.to) {
-    const { to, target, rel, onClick } = props;
+    const { to, target, rel, onClick } = props as AsLink;
     return (
       <Link
         to={to}

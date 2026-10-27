@@ -528,7 +528,7 @@ export default function TeacherChatTab() {
   ].filter(
     (c) =>
       c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.email?.toLowerCase().includes(searchTerm.toLowerCase()),
+      (c as { email?: string }).email?.toLowerCase().includes(searchTerm.toLowerCase()),
   ).sort((a, b) => {
     const timeA = lastInteractionTimes[a.id] || 0;
     const timeB = lastInteractionTimes[b.id] || 0;
@@ -565,7 +565,7 @@ export default function TeacherChatTab() {
     id: c.id,
     name: c.name || (c.type === 'admin' ? adminName : 'ولي أمر'),
     type: c.type,
-    extra: c.extra,
+    extra: (c as { extra?: Record<string, any> }).extra,
     subtitle: c.type === 'admin' ? (isRtl ? 'إدارة المدرسة' : 'School Management') : undefined,
   }));
 

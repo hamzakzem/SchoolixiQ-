@@ -533,9 +533,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             name,
             snap.docs.map((docSnap) => ({
               id: docSnap.id,
-              ...docSnap.data(),
-              createdAt: docSnap.data().createdAt?.toDate
-                ? docSnap.data().createdAt.toDate()
+              ...(docSnap.data() as Record<string, any>),
+              createdAt: (docSnap.data() as Record<string, any>).createdAt?.toDate
+                ? (docSnap.data() as Record<string, any>).createdAt.toDate()
                 : new Date(),
             })),
           );
@@ -1568,7 +1568,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           <header className="sx-notif-header">
             <div className="sx-notif-header__row">
               <div className="sx-notif-header__title-wrap">
-                {mainView !== 'list' && (
+                {(mainView as string) !== 'list' && (
                   <button
                     type="button"
                     className="sx-action-btn sx-action-btn-icon"

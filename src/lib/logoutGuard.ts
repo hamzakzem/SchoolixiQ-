@@ -94,8 +94,18 @@ export function unregisterAllFirestoreListeners(): void {
 type FirestoreSnap = QuerySnapshot<DocumentData> | DocumentSnapshot<DocumentData>;
 
 export function subscribeGuardedFirestore(
+  source: DocumentReference<DocumentData>,
+  onNext: (snap: DocumentSnapshot<DocumentData>) => void,
+  onError?: (error: unknown) => void,
+): () => void;
+export function subscribeGuardedFirestore(
+  source: Query<DocumentData>,
+  onNext: (snap: QuerySnapshot<DocumentData>) => void,
+  onError?: (error: unknown) => void,
+): () => void;
+export function subscribeGuardedFirestore(
   source: Query<DocumentData> | DocumentReference<DocumentData>,
-  onNext: (snap: FirestoreSnap) => void,
+  onNext: (snap: any) => void,
   onError?: (error: unknown) => void,
 ): () => void {
   if (shouldSkipFirestoreListeners()) {
@@ -103,8 +113,8 @@ export function subscribeGuardedFirestore(
   }
 
   const unsub = onSnapshot(
-    source,
-    (snap) => {
+    source as Query<DocumentData>,
+    (snap: FirestoreSnap) => {
       if (shouldSkipFirestoreListeners()) return;
       onNext(snap);
     },
