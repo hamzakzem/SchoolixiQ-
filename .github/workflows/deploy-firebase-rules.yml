@@ -1,0 +1,61 @@
+name: Deploy Firebase Rules
+
+# Publishes firestore.rules and storage.rules to the Firebase project.
+# Requires repository secret FIREBASE_SERVICE_ACCOUNT (service account JSON
+# from Firebase Console → Project settings → Service accounts).
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - firestore.rules
+      - storage.rules
+      - firebase.json
+  workflow_dispatch:
+
+concurrency:
+  group: firebase-rules-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Require FIREBASE_SERVICE_ACCOUNT secret
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error title=Missing FIREBASE_SERVICE_ACCOUNT::Add the Firebase service account JSON as repository secret FIREBASE_SERVICE_ACCOUNT, then re-run this workflow."
+            exit 1
+          fi
+
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+          node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$RUNNER_TEMP/firebase-sa.json" \
+            || { echo "::error::FIREBASE_SERVICE_ACCOUNT is not valid JSON (copy the whole file content)"; exit 1; }
+
+      - name: Deploy Firestore + Storage rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+        run: |
+          npx --yes firebase-tools@15.34.1 deploy \
+            --only firestore:rules,storage \
+            --project yala-safari-iq \
+            --non-interactive
+
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-sa.json"
