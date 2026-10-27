@@ -690,6 +690,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         parentPhone: '',
         parentEmail: '',
         address: '',
+        driverPhone: '',
         parentPassword: '',
         photoUrl: ''
       });
@@ -942,6 +943,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                     parentPhone: student.parentPhone || '',
                                     driverPhone: student.driverPhone || '',
                                     parentEmail: student.parentEmail || '',
+                                    address: student.address || '',
                                     parentPassword: student.parentPassword || '',
                                     photoUrl: student.photoUrl || '',
                                     email: '',

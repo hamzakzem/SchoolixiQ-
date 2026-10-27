@@ -199,7 +199,7 @@ function isPlatformTeamAssistant(user: Record<string, unknown> & { role?: string
 }
 
 export default function SuperAdminDashboard() {
-  const { profile, logout } = useAuth();
+  const { profile } = useAuth();
   const { t, isRtl, setLanguage, language } = useLanguage();
   const { config } = useSystemConfig();
 
@@ -281,7 +281,7 @@ export default function SuperAdminDashboard() {
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const { totalUnread } = useNotificationBadges();
-  useNotificationRouteRedirect(normalizeDashboardRole(undefined, profile?.role), setActiveTab);
+  useNotificationRouteRedirect(normalizeDashboardRole(undefined, profile?.role), setActiveTab as (tab: string) => void);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [activeRequestSource, setActiveRequestSource] = useState<string | null>(
@@ -789,7 +789,7 @@ export default function SuperAdminDashboard() {
         const d = (raw as { toDate?: () => Date }).toDate?.();
         return d?.getTime() ?? 0;
       }
-      const t = new Date(raw as string | number).getTime();
+      const t = new Date(raw as unknown as string | number).getTime();
       return Number.isNaN(t) ? 0 : t;
     };
 
@@ -1547,7 +1547,7 @@ export default function SuperAdminDashboard() {
       await clearMessagingCache(auth.currentUser?.uid || "").catch(() => undefined);
       toast.dismiss(loadingToast);
       toast.success(
-        `تم الحذف: ${result.deleted?.conversations ?? 0} محادثة، ${result.deleted?.system_messages ?? 0} رسالة`,
+        `تم الحذف: ${(result as any).deleted?.conversations ?? 0} محادثة، ${(result as any).deleted?.system_messages ?? 0} رسالة`,
       );
       setPurgeConvTarget(null);
       setPurgeConvConfirm("");
@@ -1851,6 +1851,7 @@ export default function SuperAdminDashboard() {
         setNewSchool({
           name: "",
           address: "",
+          googleMapsUrl: "",
           governorate: "",
           directorate: "",
           stage: "",
@@ -1949,6 +1950,7 @@ export default function SuperAdminDashboard() {
       setNewSchool({
         name: "",
         address: "",
+        googleMapsUrl: "",
         governorate: "",
         directorate: "",
         stage: "",
@@ -2437,7 +2439,7 @@ export default function SuperAdminDashboard() {
                       </button>
                     )}
                     {(profile?.role === "superadmin" ||
-                      profile?.role === "dev_agent") && (
+                      String(profile?.role) === "dev_agent") && (
                       <button
                         onClick={() => {
                           navigateToTab("diagnostics");
@@ -2600,7 +2602,7 @@ export default function SuperAdminDashboard() {
           {showNotifications && (
             <NotificationCenter
               onClose={() => setShowNotifications(false)}
-              activeTabSetter={setActiveTab}
+              activeTabSetter={setActiveTab as (tab: string) => void}
               userRole="super_admin"
             />
           )}
@@ -2738,7 +2740,7 @@ export default function SuperAdminDashboard() {
                       onClick={() => {
                         setActiveTab("parents");
                       }}
-                      isActive={activeTab === "parents"}
+                      isActive={(activeTab as string) === "parents"}
                     />
                   </div>
 
@@ -5021,7 +5023,7 @@ export default function SuperAdminDashboard() {
                 )
               ) : activeTab === "diagnostics" ? (
                 profile?.role === "superadmin" ||
-                profile?.role === "dev_agent" ? (
+                String(profile?.role) === "dev_agent" ? (
                   <SuperAdminDiagnostics
                     totalUsers={users.length}
                     totalSchools={schools.length}
@@ -5635,6 +5637,7 @@ export default function SuperAdminDashboard() {
                     setNewSchool({
                       name: "",
                       address: "",
+                      googleMapsUrl: "",
                       governorate: "",
                       directorate: "",
                       stage: "",
@@ -6024,6 +6027,8 @@ export default function SuperAdminDashboard() {
                     setNewPackage({
                       name: "",
                       price: 0,
+                      priceMonthly: 0,
+                      priceYearly: 0,
                       maxStudents: 500,
                       features: "",
                       durationDays: 365,
@@ -6388,7 +6393,7 @@ export default function SuperAdminDashboard() {
           hasPermission("system_settings") && { id: "settings", label: t('sidebar_settings'), icon: SettingsIcon },
           hasPermission("system_settings") && { id: "footer", label: t('sidebar_footer'), icon: Save },
           hasPermission("view_backups") && { id: "backups", label: t('sidebar_backups') || (isRtl ? "النسخ الاحتياطي" : "Backups"), icon: FileArchive },
-          (profile?.role === "superadmin" || profile?.role === "dev_agent") && { id: "diagnostics", label: t('sidebar_diagnostics') || (isRtl ? "الفحص والتشخيص" : "Diagnostics"), icon: ClipboardCheck }
+          (profile?.role === "superadmin" || String(profile?.role) === "dev_agent") && { id: "diagnostics", label: t('sidebar_diagnostics') || (isRtl ? "الفحص والتشخيص" : "Diagnostics"), icon: ClipboardCheck }
         ].filter(Boolean) as any[]}
         activeTab={activeTab}
         setActiveTab={(tabId) => {

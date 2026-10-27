@@ -235,6 +235,7 @@ export default function AssistantsManagement() {
                     name: assistant.name || '',
                     email: assistant.email || '',
                     password: '',
+                    confirmPassword: '',
                     permissions: assistant.permissions || [],
                     salary: assistant.salary || ''
                   });

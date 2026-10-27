@@ -625,7 +625,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const { _credentialValues: _profileCreds, ...data } = redactionCtx as Record<string, unknown>;
 
           if (data.language && data.language !== languageRef.current) {
-            setLanguage(data.language as string);
+            setLanguage(data.language as 'ar' | 'en');
           } else if (!data.language && languageRef.current && source === 'snapshot') {
             try {
               await updateDoc(docRef, { language: languageRef.current });
@@ -695,7 +695,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             schoolId: normalizedSchoolId || undefined,
             email: authUser.email,
           };
-          setLogoutLogSnapshot(profileSnapshotRef.current);
+          setLogoutLogSnapshot({
+            userId: authUser.uid,
+            role: roleLabel,
+            schoolId: normalizedSchoolId || undefined,
+            email: authUser.email,
+          });
 
           if (loginLoggedRef.current !== authUser.uid) {
             loginLoggedRef.current = authUser.uid;
