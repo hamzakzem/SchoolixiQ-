@@ -1,3 +1,4 @@
+import { resolveTeacherClassIds } from "../lib/teacherClass";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/AuthContext";
 import { db, storage } from "../lib/firebase";
@@ -146,10 +147,12 @@ export default function TeacherChatTab() {
         markChatPerf("contacts_loaded", "TeacherChatTab", { contacts: p.length + 1 });
       });
       const untrackParents = openChatSnapshotListener("TeacherChatTab:parents");
-      // Fetch students for this school
+      // Students of the teacher's assigned classes (teachers cannot list the whole school).
+      const teacherClassIds = resolveTeacherClassIds(profile as Record<string, unknown>).slice(0, 30);
       const qStudents = query(
         collection(db, "students"),
         where("schoolId", "==", profile.schoolId),
+        where("classId", "in", teacherClassIds.length ? teacherClassIds : ["__none__"]),
       );
       const unsubStudents = onSnapshot(qStudents, (snapshot) => {
         const s = snapshot.docs.map((doc) => ({

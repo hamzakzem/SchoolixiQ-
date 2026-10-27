@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { initializeFirestore, connectFirestoreEmulator, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -88,6 +88,15 @@ export const storage = getStorage(
     ? `gs://${firebaseConfig.storageBucket}`
     : undefined,
 );
+
+// Local end-to-end testing only (VITE_USE_FIREBASE_EMULATORS=1 at build time).
+// Never set in production builds, so this block is dropped from the bundle.
+if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === '1') {
+  const host = String(import.meta.env.VITE_FIREBASE_EMULATOR_HOST || '127.0.0.1');
+  connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+  connectFirestoreEmulator(db, host, 8085);
+  connectStorageEmulator(storage, host, 9199);
+}
 
 // Initialize Analytics conditionally
 export const initAnalytics = async () => {

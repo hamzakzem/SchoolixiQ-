@@ -51,6 +51,13 @@ import {
 import { loadSafeSchoolDirectory } from './chatDirectory.mjs';
 import { runChatEscalation } from './chatEscalationWorker.mjs';
 import { registerDismissalRoutes } from './dismissalApi.mjs';
+import {
+  getDistributorDashboardPayload,
+  resolveDistributorContext,
+  loadPackagesMap,
+  fetchDistributorSchools,
+  fetchDistributorCommissions,
+} from './distributorPortal.mjs';
 import { registerDismissalRecoveryRoute } from './dismissalRecoveryWorker.mjs';
 import { registerDismissalCompactionRoute } from './dismissalCompactionWorker.mjs';
 
@@ -117,12 +124,20 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
 }
 
 // Get Firestore instance with database ID if available
+let firestoreSettingsApplied = false;
 const getDb = () => {
   const dbId = (firebaseConfig as any).firestoreDatabaseId;
-  if (admin.apps.length === 0) {
-    return getFirestore();
+  const db = admin.apps.length === 0 ? getFirestore() : getFirestore(admin.app(), dbId || '(default)');
+  if (!firestoreSettingsApplied) {
+    firestoreSettingsApplied = true;
+    try {
+      // Skip optional fields left undefined instead of failing the whole write.
+      db.settings({ ignoreUndefinedProperties: true });
+    } catch {
+      /* settings already applied by an earlier caller */
+    }
   }
-  return getFirestore(admin.app(), dbId || '(default)');
+  return db;
 };
 
 const MIN_CRON_SECRET_LEN = 32;
@@ -2430,6 +2445,50 @@ async function startServer() {
     } catch (error: any) {
       console.error('[ChatEscalation] error', error);
       res.status(500).json({ success: false, error: error.message || 'Chat escalation failed' });
+    }
+  });
+
+  // Distributor portal (each distributor only sees its own schools/commissions)
+  const sendDistributorError = (res: any, error: any) =>
+    res.status(error?.status || 500).json({
+      error: error?.code || 'DISTRIBUTOR_PORTAL_ERROR',
+      message: error?.status ? error.message : 'تعذر تحميل بيانات الموزع',
+    });
+
+  app.get('/api/distributor/dashboard', verifyToken, async (req: any, res: any) => {
+    try {
+      res.json(await getDistributorDashboardPayload(getDb(), req.user.uid));
+    } catch (error: any) {
+      if (!error?.status) console.error('[DistributorPortal] dashboard', error);
+      sendDistributorError(res, error);
+    }
+  });
+
+  app.get('/api/distributor/schools', verifyToken, async (req: any, res: any) => {
+    try {
+      const db = getDb();
+      const ctx = await resolveDistributorContext(db, req.user.uid);
+      const schools = await fetchDistributorSchools(db, ctx.distributorId, await loadPackagesMap(db));
+      res.json({ ok: true, schools });
+    } catch (error: any) {
+      if (!error?.status) console.error('[DistributorPortal] schools', error);
+      sendDistributorError(res, error);
+    }
+  });
+
+  app.get('/api/distributor/commissions', verifyToken, async (req: any, res: any) => {
+    try {
+      const db = getDb();
+      const ctx = await resolveDistributorContext(db, req.user.uid);
+      const commissions = await fetchDistributorCommissions(db, ctx.distributorId, {
+        monthKey: req.query?.monthKey,
+        status: req.query?.status,
+        schoolId: req.query?.schoolId,
+      });
+      res.json({ ok: true, commissions });
+    } catch (error: any) {
+      if (!error?.status) console.error('[DistributorPortal] commissions', error);
+      sendDistributorError(res, error);
     }
   });
 

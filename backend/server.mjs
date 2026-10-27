@@ -2581,14 +2581,19 @@ function makeEvent(requestId, type, by, metadata = {}) {
   const meta = { ...metadata };
   delete meta.idempotencyKey;
   delete meta.clientIdempotencyKey;
-  return {
+  const eventMeta = {};
+  for (const [key, value] of Object.entries({ note: metadata.note, reason: metadata.reason, ...meta })) {
+    if (value !== void 0) eventMeta[key] = value;
+  }
+  const event = {
     eventId,
     type,
     by: String(by || ""),
-    byName: metadata.byName ? String(metadata.byName) : void 0,
-    timestamp: /* @__PURE__ */ new Date(),
-    metadata: metadata.note || metadata.reason || Object.keys(meta).length ? { note: metadata.note, reason: metadata.reason, ...meta } : void 0
+    timestamp: /* @__PURE__ */ new Date()
   };
+  if (metadata.byName) event.byName = String(metadata.byName);
+  if (Object.keys(eventMeta).length) event.metadata = eventMeta;
+  return event;
 }
 function appendEvents(existing, ...events) {
   const list = Array.isArray(existing) ? [...existing] : [];
@@ -3194,6 +3199,183 @@ function registerDismissalRoutes(app, { getDb: getDb2, verifyToken, jsonParser }
   });
 }
 
+// distributorPortal.mjs
+var COMMISSIONS_COL = "distributorMonthlyCommissions";
+var DISTRIBUTORS_COL2 = "distributors";
+var SCHOOLS_COL = "schools";
+var PACKAGES_COL = "packages";
+function currentMonthKey() {
+  const d = /* @__PURE__ */ new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function schoolIsActive(school) {
+  const status = String(school.status || "").toLowerCase();
+  if (["suspended", "inactive", "archived", "rejected"].includes(status)) return false;
+  const sub = String(school.subscriptionStatus || "active").toLowerCase();
+  if (sub !== "active") return false;
+  const pay = String(school.paymentStatus || "paid").toLowerCase();
+  return ["paid", "approved"].includes(pay);
+}
+async function resolveDistributorContext(db, uid) {
+  const userSnap = await db.collection("users").doc(uid).get();
+  if (!userSnap.exists) {
+    const err = new Error("\u0645\u0644\u0641 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+    err.code = "USER_NOT_FOUND";
+    err.status = 403;
+    throw err;
+  }
+  const userData = userSnap.data() || {};
+  if (userData.role !== "distributor") {
+    const err = new Error("\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u2014 \u062D\u0633\u0627\u0628 \u0645\u0648\u0632\u0639 \u0641\u0642\u0637");
+    err.code = "FORBIDDEN";
+    err.status = 403;
+    throw err;
+  }
+  const distributorId = String(userData.distributorId || "").trim();
+  if (!distributorId) {
+    const err = new Error("\u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0648\u0632\u0639 \u063A\u064A\u0631 \u0645\u0631\u0628\u0648\u0637 \u0628\u0633\u062C\u0644 \u0645\u0648\u0632\u0639");
+    err.code = "DISTRIBUTOR_NOT_LINKED";
+    err.status = 403;
+    throw err;
+  }
+  const distSnap = await db.collection(DISTRIBUTORS_COL2).doc(distributorId).get();
+  if (!distSnap.exists) {
+    const err = new Error("\u0633\u062C\u0644 \u0627\u0644\u0645\u0648\u0632\u0639 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+    err.code = "DISTRIBUTOR_NOT_FOUND";
+    err.status = 404;
+    throw err;
+  }
+  const distributor = distSnap.data() || {};
+  const status = String(distributor.status || "").toLowerCase();
+  if (status === "pending") {
+    const err = new Error("\u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0648\u0632\u0639 \u0628\u0627\u0646\u062A\u0638\u0627\u0631 \u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629");
+    err.code = "DISTRIBUTOR_PENDING";
+    err.status = 403;
+    throw err;
+  }
+  if (status === "rejected" || distributor.canLogin === false) {
+    const err = new Error("\u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0648\u0632\u0639 \u063A\u064A\u0631 \u0645\u0641\u0639\u0651\u0644");
+    err.code = "DISTRIBUTOR_INACTIVE";
+    err.status = 403;
+    throw err;
+  }
+  if (status && status !== "active" && distributor.active !== true) {
+    const err = new Error("\u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0648\u0632\u0639 \u063A\u064A\u0631 \u0646\u0634\u0637");
+    err.code = "DISTRIBUTOR_INACTIVE";
+    err.status = 403;
+    throw err;
+  }
+  return {
+    distributorId,
+    userData,
+    distributor: { id: distSnap.id, ...distributor }
+  };
+}
+async function fetchDistributorSchools(db, distributorId, packagesMap) {
+  const snap = await db.collection(SCHOOLS_COL).where("distributorId", "==", distributorId).get();
+  return snap.docs.map((doc) => {
+    const data = doc.data() || {};
+    const planId = data.planId || "basic";
+    return {
+      id: doc.id,
+      name: data.name || doc.id,
+      governorate: data.governorate || data.province || data.city || "",
+      planId,
+      planName: packagesMap.get(planId)?.name || planId,
+      status: data.status || "",
+      subscriptionStatus: data.subscriptionStatus || "",
+      paymentStatus: data.paymentStatus || "",
+      distributorLinkedAt: data.distributorLinkedAt || null,
+      lastPaymentAt: data.lastPaymentAt || data.lastPaidAt || "",
+      distributorCommissionPaused: Boolean(data.distributorCommissionPaused),
+      isActive: schoolIsActive(data)
+    };
+  });
+}
+async function fetchDistributorCommissions(db, distributorId, filters = {}) {
+  let q = db.collection(COMMISSIONS_COL).where("distributorId", "==", distributorId);
+  const snap = await q.get();
+  let rows = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() || {} }));
+  const monthKey = String(filters.monthKey || "").trim();
+  const status = String(filters.status || "").trim();
+  const schoolId = String(filters.schoolId || "").trim();
+  if (monthKey) rows = rows.filter((r) => r.monthKey === monthKey);
+  if (status) rows = rows.filter((r) => r.status === status);
+  if (schoolId) rows = rows.filter((r) => r.schoolId === schoolId);
+  rows.sort((a, b) => String(b.monthKey || "").localeCompare(String(a.monthKey || "")));
+  return rows;
+}
+function buildDistributorStats(commissions, schools, monthKey = currentMonthKey()) {
+  const activeSchools = schools.filter((s) => s.isActive && !s.distributorCommissionPaused).length;
+  let thisMonthCommission = 0;
+  let totalDue = 0;
+  let totalPaid = 0;
+  let pendingCommissions = 0;
+  for (const c of commissions) {
+    const amount = Number(c.commissionAmount || 0);
+    if (c.monthKey === monthKey) thisMonthCommission += amount;
+    if (c.status === "paid") totalPaid += amount;
+    else if (c.status === "earned" || c.status === "pending") {
+      totalDue += amount;
+      if (c.status === "pending") pendingCommissions += 1;
+    }
+  }
+  return {
+    totalSchools: schools.length,
+    activeSchools,
+    thisMonthCommission,
+    totalDue,
+    totalPaid,
+    pendingCommissions
+  };
+}
+function enrichSchoolsWithCommissions(schools, commissions, monthKey = currentMonthKey()) {
+  const bySchool = /* @__PURE__ */ new Map();
+  for (const c of commissions) {
+    const sid = c.schoolId;
+    if (!sid) continue;
+    const entry = bySchool.get(sid) || { currentMonth: 0, total: 0 };
+    if (c.monthKey === monthKey) entry.currentMonth += Number(c.commissionAmount || 0);
+    if (c.status !== "canceled") entry.total += Number(c.commissionAmount || 0);
+    bySchool.set(sid, entry);
+  }
+  return schools.map((s) => ({
+    ...s,
+    currentMonthCommission: bySchool.get(s.id)?.currentMonth || 0,
+    totalCommissionFromSchool: bySchool.get(s.id)?.total || 0
+  }));
+}
+async function loadPackagesMap(db) {
+  const snap = await db.collection(PACKAGES_COL).get();
+  const map = /* @__PURE__ */ new Map();
+  snap.docs.forEach((doc) => map.set(doc.id, { id: doc.id, ...doc.data() || {} }));
+  return map;
+}
+async function getDistributorDashboardPayload(db, uid) {
+  const ctx = await resolveDistributorContext(db, uid);
+  const packagesMap = await loadPackagesMap(db);
+  const schools = await fetchDistributorSchools(db, ctx.distributorId, packagesMap);
+  const commissions = await fetchDistributorCommissions(db, ctx.distributorId);
+  const monthKey = currentMonthKey();
+  const stats = buildDistributorStats(commissions, schools, monthKey);
+  const schoolsEnriched = enrichSchoolsWithCommissions(schools, commissions, monthKey);
+  return {
+    ok: true,
+    distributor: ctx.distributor,
+    profile: {
+      uid,
+      name: ctx.userData.name || ctx.distributor.name,
+      email: ctx.userData.email || ctx.distributor.email || "",
+      phone: ctx.userData.phone || ctx.userData.phoneNumber || ctx.distributor.phone || "",
+      distributorId: ctx.distributorId
+    },
+    stats,
+    schools: schoolsEnriched,
+    commissions,
+    monthKey
+  };
+}
+
 // dismissalRecoveryWorker.mjs
 var DISMISSAL_COL2 = "dismissal_requests";
 function lockAge(data) {
@@ -3468,12 +3650,18 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
     console.warn("Firebase Admin failed to initialize.");
   }
 }
+var firestoreSettingsApplied = false;
 var getDb = () => {
   const dbId = firebaseConfig.firestoreDatabaseId;
-  if (admin4.apps.length === 0) {
-    return getFirestore();
+  const db = admin4.apps.length === 0 ? getFirestore() : getFirestore(admin4.app(), dbId || "(default)");
+  if (!firestoreSettingsApplied) {
+    firestoreSettingsApplied = true;
+    try {
+      db.settings({ ignoreUndefinedProperties: true });
+    } catch {
+    }
   }
-  return getFirestore(admin4.app(), dbId || "(default)");
+  return db;
 };
 var MIN_CRON_SECRET_LEN = 32;
 function isProductionEnv() {
@@ -5436,6 +5624,44 @@ async function startServer() {
     } catch (error) {
       console.error("[ChatEscalation] error", error);
       res.status(500).json({ success: false, error: error.message || "Chat escalation failed" });
+    }
+  });
+  const sendDistributorError = (res, error) => res.status(error?.status || 500).json({
+    error: error?.code || "DISTRIBUTOR_PORTAL_ERROR",
+    message: error?.status ? error.message : "\u062A\u0639\u0630\u0631 \u062A\u062D\u0645\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0645\u0648\u0632\u0639"
+  });
+  app.get("/api/distributor/dashboard", verifyToken, async (req, res) => {
+    try {
+      res.json(await getDistributorDashboardPayload(getDb(), req.user.uid));
+    } catch (error) {
+      if (!error?.status) console.error("[DistributorPortal] dashboard", error);
+      sendDistributorError(res, error);
+    }
+  });
+  app.get("/api/distributor/schools", verifyToken, async (req, res) => {
+    try {
+      const db = getDb();
+      const ctx = await resolveDistributorContext(db, req.user.uid);
+      const schools = await fetchDistributorSchools(db, ctx.distributorId, await loadPackagesMap(db));
+      res.json({ ok: true, schools });
+    } catch (error) {
+      if (!error?.status) console.error("[DistributorPortal] schools", error);
+      sendDistributorError(res, error);
+    }
+  });
+  app.get("/api/distributor/commissions", verifyToken, async (req, res) => {
+    try {
+      const db = getDb();
+      const ctx = await resolveDistributorContext(db, req.user.uid);
+      const commissions = await fetchDistributorCommissions(db, ctx.distributorId, {
+        monthKey: req.query?.monthKey,
+        status: req.query?.status,
+        schoolId: req.query?.schoolId
+      });
+      res.json({ ok: true, commissions });
+    } catch (error) {
+      if (!error?.status) console.error("[DistributorPortal] commissions", error);
+      sendDistributorError(res, error);
     }
   });
   registerDismissalRoutes(app, {

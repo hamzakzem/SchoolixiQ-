@@ -193,7 +193,7 @@ service cloud.firestore {
     }
 
     function isDismissalSchoolStaff() {
-      return userRole() in ['admin', 'school_admin', 'assistant', 'staff'];
+      return userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'staff'];
     }
 
     function isOwner(uid) {
@@ -273,7 +273,7 @@ service cloud.firestore {
     }
 
     function isSchoolManagementReadRole() {
-      return userRole() in ['admin', 'school_admin', 'assistant', 'staff'];
+      return userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'staff'];
     }
 
     // Admin / staff school operations — excludes teacher, parent, guard.
@@ -307,6 +307,8 @@ service cloud.firestore {
     function canReadClassDocument(targetClassId) {
       return canReadSchoolManagement()
         || (signedIn() && isTeacher() && teacherCanAccessClass(targetClassId))
+        // Teachers list the school's classes for schedules / class pickers.
+        || (signedIn() && isTeacher() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId)
         || (signedIn() && isParent() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId);
     }
 
@@ -341,6 +343,7 @@ service cloud.firestore {
 
     function canReadStudentDocument() {
       return isSuperAdmin()
+        || platformAssistantHasAny(['manage_users', 'manage_schools'])
         || canReadStudentManagement()
         || canReadStudentAsTeacher()
         || canReadStudentAsParent()
@@ -388,6 +391,7 @@ service cloud.firestore {
         && resource != null
         && (
           isSuperAdmin()
+          || platformAssistantHasAny(['manage_users', 'manage_schools'])
           || (
             resource.data.keys().hasAll(['email'])
             && effectiveAuthEmail().size() > 0
@@ -402,10 +406,10 @@ service cloud.firestore {
             isParent()
             && hasSchoolId(resource.data)
             && userSchoolId() == resource.data.schoolId
-            && resource.data.role in ['admin', 'assistant', 'teacher', 'staff']
+            && resource.data.role in ['admin', 'assistant', 'school_assistant', 'teacher', 'staff']
           )
           || (
-            userRole() in ['admin', 'school_admin', 'assistant', 'teacher']
+            userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher']
             && userSchoolId().size() > 0
             && canReadPlatformSuperAdminUserDoc()
           )
@@ -616,6 +620,16 @@ service cloud.firestore {
         );
     }
 
+    // Read-only grants for platform assistants, per permission set in the
+    // Super Admin team screen (writes still go through the Admin API).
+    function platformAssistantHasAny(perms) {
+      let u = userDoc();
+      return isPlatformAssistant()
+        && u.keys().hasAll(['permissions'])
+        && u.permissions is list
+        && u.permissions.hasAny(perms);
+    }
+
     function isSuperAdminPrivateMessage() {
       return (
         (resource.data.keys().hasAll(['visibility']) && resource.data.visibility == 'superadmin_private')
@@ -681,47 +695,85 @@ service cloud.firestore {
       return canPlatformAssistantReadWithPrivacy();
     }
 
+    // Evaluated for every message in chat list queries, so the user's role and
+    // school are read once (let) and the cheap participant checks come first —
+    // the previous version exceeded Firestore's 1000-expression limit and every
+    // chat listener failed with permission-denied.
     function canReadSystemMessage() {
-      return isSuperAdmin()
-        || canPlatformAssistantReadMessage()
+      let role = userRole();
+      let schoolId = userSchoolId();
+      let platformAssistant = role == 'platform_assistant'
+        || (role == 'assistant' && (schoolId == '' || schoolId == null));
+      return signedIn() && (
+        role in ['superadmin', 'super_admin']
         || (
-          !isPlatformAssistant()
-          && signedIn()
-          && resource.data.receiverId == request.auth.uid
+          request.auth.token.keys().hasAll(['role'])
+          && request.auth.token.role in ['superadmin', 'super_admin']
         )
         || (
-          !isPlatformAssistant()
-          && signedIn()
-          && resource.data.senderId == request.auth.uid
+          !platformAssistant
+          && (
+            resource.data.receiverId == request.auth.uid
+            || resource.data.senderId == request.auth.uid
+          )
         )
-        || (signedIn() && isAdmin() && resource.data.receiverId == 'admin' && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId)
+        // Thread queries filter by conversationId; school chat ids embed the
+        // participant uid (e.g. <schoolId>_<uid> or <uidA>_<uidB>).
         || (
-          signedIn()
-          && hasSchoolId(resource.data)
-          && userSchoolId() == resource.data.schoolId
-          && isSchoolStaffRole()
-          && !isPlatformAssistant()
-        );
+          !platformAssistant
+          && schoolId is string
+          && schoolId != ''
+          && resource.data.schoolId == schoolId
+          && resource.data.conversationId is string
+          && resource.data.conversationId.matches('(.*[_:])?' + request.auth.uid + '([_:].*)?')
+        )
+        || (
+          !platformAssistant
+          && schoolId is string
+          && schoolId != ''
+          && resource.data.schoolId == schoolId
+          && (
+            role in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher', 'staff']
+            || (role in ['admin', 'school_admin'] && resource.data.receiverId == 'admin')
+          )
+        )
+        || (platformAssistant && canPlatformAssistantReadWithPrivacy())
+      );
     }
 
+    // Same 1000-expression budget as reads: resolve the user once (let).
     function canWriteSystemMessage() {
-      return isSuperAdmin()
+      let role = userRole();
+      let schoolId = userSchoolId();
+      let data = request.resource.data;
+      let platformAssistant = role == 'platform_assistant'
+        || (role == 'assistant' && (schoolId == '' || schoolId == null));
+      let targetSchool = data.keys().hasAll(['schoolId']) && data.schoolId is string ? data.schoolId : '';
+      return signedIn() && (
+        role in ['superadmin', 'super_admin']
         || (
-          isPlatformAssistant()
-          && platformAssistantHasOpsPermission()
-          && hasSchoolId(request.resource.data)
-          && request.resource.data.senderId == request.auth.uid
-          && request.resource.data.keys().hasAll(['conversationPrivacy', 'privacyHash'])
-          && request.resource.data.conversationPrivacy.visibility in ['platform_operations', 'platform_assistant_private']
+          request.auth.token.keys().hasAll(['role'])
+          && request.auth.token.role in ['superadmin', 'super_admin']
         )
-        || (signedIn() && hasSchoolId(request.resource.data) && canWriteSchoolData(request.resource.data.schoolId))
         || (
-          signedIn()
-          && isParent()
-          && hasSchoolId(request.resource.data)
-          && sameSchoolRequest()
-          && isSchoolOperationallyActive(request.resource.data.schoolId)
-        );
+          !platformAssistant
+          && targetSchool != ''
+          && targetSchool == schoolId
+          && (
+            role in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher', 'staff']
+            || (role == 'parent' && data.senderId == request.auth.uid)
+          )
+          && isSchoolOperationallyActive(targetSchool)
+        )
+        || (
+          platformAssistant
+          && platformAssistantHasOpsPermission()
+          && targetSchool != ''
+          && data.senderId == request.auth.uid
+          && data.keys().hasAll(['conversationPrivacy', 'privacyHash'])
+          && data.conversationPrivacy.visibility in ['platform_operations', 'platform_assistant_private']
+        )
+      );
     }
 
     function canSoftDeleteSystemMessage() {
@@ -773,13 +825,14 @@ service cloud.firestore {
     // Distributors & coupons — Super Admin manages status/canLogin; distributors read own record only.
     match /distributors/{distributorId} {
       allow read, get: if isSuperAdmin()
+        || platformAssistantHasAny(['manage_distributors'])
         || (isDistributor() && userDistributorId() == distributorId);
-      allow list: if isSuperAdmin();
+      allow list: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
       allow create, update, delete: if isSuperAdmin();
     }
 
     match /distributorCoupons/{couponId} {
-      allow read, get, list: if isSuperAdmin();
+      allow read, get, list: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
       allow create, update, delete: if isSuperAdmin();
     }
 
@@ -793,8 +846,15 @@ service cloud.firestore {
 
     // Distributor ↔ platform support chat (isolated from school messaging).
     match /distributor_support_conversations/{conversationId} {
+      // The client reads dist_<distributorId> before creating it, so allow by id
+      // (also when the document does not exist yet).
       allow read, get: if isSuperAdmin()
-        || (isDistributor() && resource.data.distributorId == userDistributorId());
+        || (
+          isDistributor()
+          && userDistributorId() != ''
+          && conversationId == 'dist_' + userDistributorId()
+        )
+        || (isDistributor() && resource != null && resource.data.distributorId == userDistributorId());
       allow list: if isSuperAdmin()
         || (isDistributor() && resource.data.distributorId == userDistributorId());
       allow create: if isSuperAdmin()
@@ -813,11 +873,23 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    function canDistributorListSupportMessages() {
+      let u = userDoc();
+      let distributorId = u.keys().hasAll(['distributorId']) && u.distributorId is string
+        ? u.distributorId
+        : '';
+      return signedIn()
+        && u.keys().hasAll(['role'])
+        && u.role == 'distributor'
+        && distributorId != ''
+        && resource.data.conversationId == 'dist_' + distributorId;
+    }
+
     match /distributor_support_messages/{messageId} {
       allow read, get: if isSuperAdmin()
         || (isDistributor() && resource.data.distributorId == userDistributorId());
-      allow list: if isSuperAdmin()
-        || (isDistributor() && resource.data.distributorId == userDistributorId());
+      // The chat subscribes with where('conversationId', '==', 'dist_<id>').
+      allow list: if isSuperAdmin() || canDistributorListSupportMessages();
       allow create: if isSuperAdmin()
         || (
           isDistributor()
@@ -896,6 +968,7 @@ service cloud.firestore {
           && request.auth.token.role in ['superadmin', 'super_admin']
         )
         || isSuperAdmin()
+        || platformAssistantHasAny(['manage_users', 'manage_schools'])
         || canReadStudentManagement()
         || canReadStudentAsTeacher()
         || canReadStudentAsParent()
@@ -918,7 +991,9 @@ service cloud.firestore {
     // Registration / subscription requests — open create; scoped read/update.
     match /registrations/{registrationId} {
       allow create: if true;
-      allow read, get, list: if isSuperAdmin() || canReadOwnRegistration(resource.data);
+      allow read, get, list: if isSuperAdmin()
+        || platformAssistantHasAny(['view_requests', 'manage_subscriptions', 'manage_schools'])
+        || canReadOwnRegistration(resource.data);
       allow update: if isSuperAdmin()
         || (signedIn() && canReadOwnRegistration(resource.data) && resource.data.status == 'pending');
       allow delete: if isSuperAdmin();
@@ -1019,7 +1094,13 @@ service cloud.firestore {
     }
 
     match /advanced_reports/{reportId} {
-      allow read, get, list: if canReadAcademicOrParentLink();
+      allow read, get, list: if canReadAcademicOrParentLink()
+        || (
+          signedIn()
+          && isTeacher()
+          && resource.data.keys().hasAll(['teacherId'])
+          && resource.data.teacherId == request.auth.uid
+        );
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
       allow update: if isSuperAdmin()
@@ -1096,6 +1177,7 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read, get, list: if isSuperAdmin()
+        || platformAssistantHasAny(['view_requests', 'manage_subscriptions', 'manage_schools'])
         || (signedIn() && resource.data.keys().hasAll(['parentId']) && resource.data.parentId == request.auth.uid)
         || (signedIn() && hasSchoolId(resource.data) && canManageSchool(resource.data.schoolId))
         || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && isSchoolStaffRole());
@@ -1116,6 +1198,7 @@ service cloud.firestore {
 
     match /subscriptionRequests/{requestId} {
       allow read, get, list: if isSuperAdmin()
+        || platformAssistantHasAny(['view_requests', 'manage_subscriptions', 'manage_schools'])
         || (signedIn() && hasSchoolId(resource.data) && canManageSchool(resource.data.schoolId));
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isAdmin());
@@ -1124,6 +1207,7 @@ service cloud.firestore {
 
     match /id_cards/{cardId} {
       allow read, get, list: if canReadSchoolManagement()
+        || (signedIn() && isTeacher() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId)
         || (signedIn() && isParentOfStudent(cardId));
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
@@ -1179,7 +1263,7 @@ service cloud.firestore {
       function isSchoolAdminAudienceNotification() {
         return signedIn()
           && request.auth.token.keys().hasAll(['role', 'schoolId'])
-          && request.auth.token.role in ['admin', 'school_admin', 'assistant']
+          && request.auth.token.role in ['admin', 'school_admin', 'assistant', 'school_assistant']
           && resource.data.keys().hasAll(['schoolId', 'audience'])
           && resource.data.schoolId == request.auth.token.schoolId
           && resource.data.audience in ['school_admin', 'all_school'];
@@ -1195,7 +1279,7 @@ service cloud.firestore {
       function isSchoolNotificationAuthor(schoolId) {
         return signedIn()
           && userSchoolId() == schoolId
-          && userRole() in ['admin', 'school_admin', 'assistant', 'teacher'];
+          && userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher'];
       }
 
       function notificationRecipientUserId() {
@@ -1225,7 +1309,7 @@ service cloud.firestore {
       function isSameSchoolStaffRecipient(userId, schoolId) {
         return isSameSchoolRecipient(userId, schoolId)
           && recipientUserData(userId).keys().hasAll(['role'])
-          && recipientUserData(userId).role in ['admin', 'school_admin', 'assistant', 'teacher', 'staff'];
+          && recipientUserData(userId).role in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher', 'staff'];
       }
 
       function notificationStudentId() {
@@ -1321,7 +1405,7 @@ service cloud.firestore {
           && data.schoolId == 'system'
           && sourceSchoolId.size() > 0
           && isSchoolNotificationAuthor(sourceSchoolId)
-          && userRole() in ['admin', 'school_admin', 'assistant', 'teacher']
+          && userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher']
           && recipientId == data.userId
           && isSuperAdminRecipient(recipientId);
       }

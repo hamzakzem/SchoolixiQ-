@@ -119,17 +119,21 @@ export function makeEvent(requestId, type, by, metadata = {}) {
   delete meta.idempotencyKey;
   delete meta.clientIdempotencyKey;
 
-  return {
+  // Firestore rejects `undefined` values, so optional fields are only set
+  // when present (an undefined note made every request creation fail).
+  const eventMeta = {};
+  for (const [key, value] of Object.entries({ note: metadata.note, reason: metadata.reason, ...meta })) {
+    if (value !== undefined) eventMeta[key] = value;
+  }
+  const event = {
     eventId,
     type,
     by: String(by || ''),
-    byName: metadata.byName ? String(metadata.byName) : undefined,
     timestamp: new Date(),
-    metadata:
-      metadata.note || metadata.reason || Object.keys(meta).length
-        ? { note: metadata.note, reason: metadata.reason, ...meta }
-        : undefined,
   };
+  if (metadata.byName) event.byName = String(metadata.byName);
+  if (Object.keys(eventMeta).length) event.metadata = eventMeta;
+  return event;
 }
 
 export function appendEvents(existing, ...events) {
