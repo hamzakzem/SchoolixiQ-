@@ -2528,6 +2528,7 @@ export default function ParentDashboard() {
           logoutLabel={t("logout")}
           onLogout={handleLogout}
           desktopDrawerEnabled={false}
+          onOpenAssistant={activeTab !== "chat" ? () => setAssistantOpen(true) : undefined}
         />
         ) : null}
       </div>

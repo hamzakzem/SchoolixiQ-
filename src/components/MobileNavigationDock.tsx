@@ -53,6 +53,7 @@ import {
   Building2,
   Wallet,
   BarChart3,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -79,6 +80,8 @@ interface MobileNavigationDockProps {
   menuSurface?: "dark" | "light";
   hidden?: boolean;
   desktopDrawerEnabled?: boolean;
+  /** Shows a Smart Assistant row in the More sheet (header buttons are hidden on mobile). */
+  onOpenAssistant?: () => void;
 }
 
 type DockSheet = "none" | "quick" | "more";
@@ -122,6 +125,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
   menuSurface = "dark",
   hidden = false,
   desktopDrawerEnabled = true,
+  onOpenAssistant,
 }) => {
   const { user, profile } = useAuth();
   const { tabBadges, categoryUnread } = useNotificationBadges();
@@ -584,6 +588,31 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                     />
                   </div>
                   <div className="sx-dock-sheet__body sx-dock-more-body">
+                    {onOpenAssistant ? (
+                      <section className="sx-dock-more-section">
+                        <button
+                          type="button"
+                          className="sx-dock-more-row sx-dock-more-row--assistant"
+                          onClick={() => {
+                            closeSheets();
+                            onOpenAssistant();
+                          }}
+                        >
+                          <span className="sx-dock-more-row__icon sx-dock-more-row__icon--assistant" aria-hidden>
+                            <Sparkles size={18} strokeWidth={2} />
+                          </span>
+                          <span className="sx-dock-more-row__text">
+                            <span className="sx-dock-more-row__label">
+                              {isRtl ? "المساعد الذكي" : "Smart assistant"}
+                            </span>
+                            <span className="sx-dock-more-row__hint">
+                              {isRtl ? "إجابات فورية لأسئلتك حول النظام" : "Instant answers about the system"}
+                            </span>
+                          </span>
+                          <ChevronLeft size={16} className="sx-dock-more-row__chevron" aria-hidden />
+                        </button>
+                      </section>
+                    ) : null}
                     <section className="sx-dock-more-section">
                       <PanelSectionTitle
                         icon={User}

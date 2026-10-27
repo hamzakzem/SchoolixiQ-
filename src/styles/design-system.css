@@ -2709,6 +2709,16 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__footer {
   color: #0b2345;
 }
 
+.sx-dock-more-row__icon--assistant {
+  background: linear-gradient(180deg, #edd07f, #c99a2e);
+  color: #0b2345;
+}
+
+.sx-dock-more-row--assistant {
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.06), rgba(212, 175, 55, 0.14));
+}
+
 .sx-dock-more-row__icon--warn {
   background: rgba(245, 158, 11, 0.12);
   color: #b45309;

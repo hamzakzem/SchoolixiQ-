@@ -63,6 +63,7 @@ export function SmartAssistantWidget({
   assistantName,
   introText,
   logoUrl,
+  userName,
 }: {
   isRtl?: boolean;
   scope?: SmartAssistantScope;
@@ -76,6 +77,8 @@ export function SmartAssistantWidget({
   assistantName?: string;
   introText?: string;
   logoUrl?: string;
+  /** Signed-in user's name for a personal greeting (dashboards). */
+  userName?: string | null;
 }) {
   const { isMobile } = useDevice();
   const reduced = prefersReducedMotion();
@@ -98,8 +101,17 @@ export function SmartAssistantWidget({
   const [activeCategory, setActiveCategory] = useState<AssistantCategory | null>(null);
   const [activeFlow, setActiveFlow] = useState<AssistantFlow | null>(null);
   const [activeAnswer, setActiveAnswer] = useState<AssistantAnswer | null>(null);
-  const intro = introText || smartAssistantIntro(isRtl);
-  const [lines, setLines] = useState<ChatLine[]>([{ id: 'intro', kind: 'bot', text: intro }]);
+  const firstName = String(userName || '').trim().split(/\s+/)[0] || '';
+  const introFor = useCallback(() => {
+    const base = introText || smartAssistantIntro(isRtl);
+    if (!firstName) return base;
+    // Drop the generic greeting so it doesn't read "Hi Ali — Welcome!".
+    const rest = base
+      .replace(/^\s*(مرحباً|مرحبا|أهلاً|أهلا|اهلا)( بك)?\s*[!،,.]?\s*(👋)?\s*\n?/, '')
+      .replace(/^\s*(welcome|hello|hi)( back)?\s*[!,.]?\s*(👋)?\s*\n?/i, '');
+    return isRtl ? `أهلاً ${firstName} 👋\n${rest}` : `Hi ${firstName} 👋\n${rest}`;
+  }, [introText, isRtl, firstName]);
+  const [lines, setLines] = useState<ChatLine[]>(() => [{ id: 'intro', kind: 'bot', text: introFor() }]);
   const [query, setQuery] = useState('');
   const [typing, setTyping] = useState(false);
   const [ticketBusy, setTicketBusy] = useState(false);
@@ -130,6 +142,15 @@ export function SmartAssistantWidget({
 
   const cats = useMemo(() => categoriesForScope(catalog, scope), [catalog, scope]);
   const searchIndex = useMemo(() => buildAssistantSearchIndex(catalog, scope), [catalog, scope]);
+  /** Highest-priority top-level questions for this audience. */
+  const popular = useMemo(
+    () =>
+      catalog.answers
+        .filter((a) => a.active && !a.parentAnswerId && (!a.scopes?.length || a.scopes.includes(scope)))
+        .sort((a, b) => (b.priority || 0) - (a.priority || 0) || a.order - b.order)
+        .slice(0, 4),
+    [catalog, scope],
+  );
   const suggestions = useMemo(
     () => (query.trim().length >= 2 ? searchAssistantAnswers(query, searchIndex, 4) : []),
     [query, searchIndex],
@@ -172,8 +193,8 @@ export function SmartAssistantWidget({
     setActiveAnswer(null);
     setFeedbackFor(null);
     setQuery('');
-    setLines([{ id: 'intro', kind: 'bot', text: introText || smartAssistantIntro(isRtl) }]);
-  }, [scope, isRtl, introText]);
+    setLines([{ id: 'intro', kind: 'bot', text: introFor() }]);
+  }, [scope, introFor]);
 
   useEffect(() => {
     resetConversation();
@@ -187,6 +208,13 @@ export function SmartAssistantWidget({
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' });
   }, [lines, typing, mode, reduced]);
+
+  // Desktop: put the cursor in the question box (no auto keyboard on touch).
+  useEffect(() => {
+    if (!open || isMobile) return;
+    const t = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 250);
+    return () => window.clearTimeout(t);
+  }, [open, isMobile]);
 
   // Escape closes; the mobile sheet locks page scroll while open.
   useEffect(() => {
@@ -393,7 +421,7 @@ export function SmartAssistantWidget({
     if (line.kind === 'user') {
       return (
         <motion.div key={line.id} {...msgMotion} className="flex justify-end">
-          <div className="max-w-[82%] rounded-2xl rounded-ee-md bg-gradient-to-b from-[#16345f] to-[#0B1F3A] text-white px-3.5 py-2.5 text-[13px] font-semibold leading-6 shadow-sm">
+          <div className="max-w-[82%] rounded-2xl rounded-ee-md bg-gradient-to-b from-[#16345f] to-[#0B1F3A] dark:from-[#2b4f86] dark:to-[#1d3a66] text-white px-3.5 py-2.5 text-[13px] font-semibold leading-6 shadow-sm">
             {line.text}
           </div>
         </motion.div>
@@ -480,7 +508,8 @@ export function SmartAssistantWidget({
     if (typing) return null;
     if (mode === 'home') {
       return (
-        <div className="grid grid-cols-2 gap-2 pt-1">
+        <div className="space-y-3 pt-1">
+        <div className="grid grid-cols-2 gap-2">
           {cats.map((cat) => (
             <button
               key={cat.id}
@@ -494,6 +523,29 @@ export function SmartAssistantWidget({
               <p className="text-[12.5px] font-black mt-2 text-[#0B1F3A] dark:text-white leading-5">{cat.titleAr}</p>
             </button>
           ))}
+        </div>
+        {popular.length ? (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-bold text-slate-400 px-0.5">{isRtl ? 'أسئلة شائعة' : 'Popular questions'}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {popular.map((ans) => (
+                <button
+                  key={ans.id}
+                  type="button"
+                  onClick={() => {
+                    pushUser(ans.titleAr);
+                    setActiveCategory(catalog.categories.find((c) => c.id === ans.categoryId) || null);
+                    setActiveFlow(catalog.flows.find((f) => f.id === ans.flowId) || null);
+                    showAnswer(ans);
+                  }}
+                  className={chip}
+                >
+                  {ans.titleAr}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         </div>
       );
     }
@@ -650,7 +702,15 @@ export function SmartAssistantWidget({
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={isRtl ? 'اكتب سؤالك هنا…' : 'Type your question…'}
+            placeholder={
+              popular[0]
+                ? isRtl
+                  ? `اكتب سؤالك… مثل: ${popular[0].titleAr}`
+                  : `Ask anything… e.g. ${popular[0].titleAr}`
+                : isRtl
+                  ? 'اكتب سؤالك هنا…'
+                  : 'Type your question…'
+            }
             aria-label={isRtl ? 'اكتب سؤالك' : 'Your question'}
             enterKeyHint="send"
             className="flex-1 min-w-0 h-11 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3.5 text-[14px] text-slate-800 dark:text-white placeholder:text-slate-400 outline-none focus:bg-white dark:focus:bg-white/10 focus:border-[#D4AF37]/70 focus:ring-4 focus:ring-[#D4AF37]/15 transition"
@@ -729,15 +789,20 @@ export function SmartAssistantWidget({
         dir={isRtl ? 'rtl' : 'ltr'}
         onClick={() => setOpen(false)}
       >
-        <div
+        <motion.div
           className="sx-assistant-panel"
+          style={{ animation: 'none' }}
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
           aria-label={displayName}
+          initial={reduced ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
+          animate={reduced ? { opacity: 1 } : { x: 0 }}
+          exit={reduced ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
+          transition={reduced ? { duration: 0.01 } : { type: 'spring', stiffness: 380, damping: 40 }}
         >
           {body}
-        </div>
+        </motion.div>
       </motion.div>
     );
   } else if (open && isSheet) {
