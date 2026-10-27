@@ -630,10 +630,10 @@ async function maybeQueueOrThrow(
   return 'queued';
 }
 
-async function tryOnlineOrQueue<T>(
+async function tryOnlineOrQueue<T, Q = T>(
   onlineFn: () => Promise<T>,
-  queueFn: () => Promise<T>,
-): Promise<T> {
+  queueFn: () => Promise<Q>,
+): Promise<T | Q> {
   if (isQuotaWritePaused()) {
     notifyQuotaExhaustedIfNeeded();
     throw new Error('resource-exhausted');

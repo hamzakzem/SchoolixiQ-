@@ -344,7 +344,7 @@ export default function Grades() {
       for (const studentId of studentIds) {
         const student = students.find(s => s.id === studentId);
         const score = grades[studentId];
-        if (score === undefined || score === null || score === '') continue;
+        if (score === undefined || score === null || (score as unknown) === '') continue;
 
         const numScore = Number(score);
         const percentage = Math.round((numScore / editMaxScore) * 100);
@@ -379,7 +379,7 @@ export default function Grades() {
       await batch.commit();
 
       for (const studentId of studentIds) {
-        if (grades[studentId] === undefined || grades[studentId] === null || grades[studentId] === '') continue;
+        if (grades[studentId] === undefined || grades[studentId] === null || (grades[studentId] as unknown) === '') continue;
         await notificationService.notifyStudentParents(studentId, {
           title: 'رصد درجات جديدة',
           message: `تم رصد درجة الطالب في مادة ${selectedSubject}: ${grades[studentId]} من ${editMaxScore}`,

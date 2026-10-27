@@ -1,4 +1,4 @@
-import type { DistributorRecord } from '../types/distributor';
+import type { DistributorRecord } from '../../types/distributor';
 
 export type DistributorAccessState = 'loading' | 'active' | 'pending' | 'rejected' | 'blocked';
 

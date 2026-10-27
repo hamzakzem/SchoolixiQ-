@@ -85,7 +85,7 @@ export function AssistantSchoolGate({ children }: AssistantSchoolGateProps) {
 
   const isSchoolAssistant =
     profile?.role === UserRole.SCHOOL_ASSISTANT ||
-    profile?.role === 'school_assistant' ||
+    String(profile?.role) === 'school_assistant' ||
     isSchoolAssistantProfile(profile as Record<string, unknown>);
 
   if (!isSchoolAssistant) {

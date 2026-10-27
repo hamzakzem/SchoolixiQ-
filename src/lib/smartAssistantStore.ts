@@ -241,7 +241,7 @@ export async function createAssistantTicket(input: Omit<AssistantTicket, 'id' | 
 
 export async function loadAssistantTickets(): Promise<AssistantTicket[]> {
   const snap = await getDocs(query(collection(db, COL.tickets), orderBy('createdAt', 'desc')));
-  return mapDocs<AssistantTicket>(snap);
+  return mapDocs<AssistantTicket & { id: string }>(snap);
 }
 
 export async function closeAssistantTicket(id: string) {

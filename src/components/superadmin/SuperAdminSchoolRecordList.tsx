@@ -19,6 +19,7 @@ export type SuperAdminSchoolRecord = {
   approximateStudents?: string | number;
   adminName?: string;
   adminEmail?: string;
+  adminPhone?: string;
   planId?: string;
   studentCount?: number;
   featured?: boolean;

@@ -57,7 +57,7 @@ export default function Homework() {
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStudents(all.filter((s) => homeworkMatchesStudent(selectedClassId, s, classes)));
+      setStudents(all.filter((s) => homeworkMatchesStudent(selectedClassId, s as { classId?: string; class?: string }, classes)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'students'));
     return () => unsubscribe();
   }, [profile, selectedClassId, classes]);

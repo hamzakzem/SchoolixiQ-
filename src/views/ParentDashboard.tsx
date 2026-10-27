@@ -1059,7 +1059,7 @@ export default function ParentDashboard() {
       },
       {
         onError: (error) => {
-          logParentFirestoreError(queryName, error, meta);
+          logParentFirestoreError(queryName, error);
           handleFirestoreError(error, OperationType.LIST, "ParentDashboard:market", false);
           setMarketLoading(false);
         },

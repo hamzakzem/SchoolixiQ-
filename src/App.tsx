@@ -266,7 +266,7 @@ const AppContent = () => {
 
   useEffect(() => {
     const isDistributor =
-      profile?.role === UserRole.DISTRIBUTOR || profile?.role === "distributor";
+      profile?.role === UserRole.DISTRIBUTOR || String(profile?.role) === "distributor";
     if (!profile || !isDistributor || !profile.distributorId) {
       setDistributorRecord(null);
       setDistributorAccessLoading(false);
@@ -638,7 +638,7 @@ const AppContent = () => {
     }
 
     const isDistributorRole =
-      profile?.role === UserRole.DISTRIBUTOR || profile?.role === "distributor";
+      profile?.role === UserRole.DISTRIBUTOR || String(profile?.role) === "distributor";
     if (isDistributorRole) {
       if (distributorAccessLoading) {
         return <PageLoadingSkeleton />;
@@ -769,7 +769,7 @@ const AppContent = () => {
       profile?.role &&
       profile.role !== UserRole.SUPERADMIN &&
       profile.role !== UserRole.PLATFORM_ASSISTANT &&
-      profile.role !== "platform_assistant" &&
+      String(profile.role) !== "platform_assistant" &&
       !isPlatformAssistantProfile(profile as Record<string, unknown>) &&
       schoolData?.subscriptionExpiresAt
     ) {
@@ -779,7 +779,7 @@ const AppContent = () => {
           profile.role === UserRole.ADMIN ||
           profile.role === UserRole.STAFF ||
           profile.role === UserRole.SCHOOL_ASSISTANT ||
-          profile.role === "school_assistant" ||
+          String(profile.role) === "school_assistant" ||
           isSchoolAssistantProfile(profile as Record<string, unknown>);
         return (
           <div
@@ -816,7 +816,7 @@ const AppContent = () => {
     }
 
     // Multi-tenant dashboard switching based on role
-    switch (profile?.role) {
+    switch (profile?.role as string | undefined) {
       case UserRole.SUPERADMIN:
         return <SuperAdminDashboard />;
       case UserRole.PLATFORM_ASSISTANT:

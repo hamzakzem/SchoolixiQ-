@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Type check
+        run: npm run lint
+
       - name: Require VITE_FIREBASE_VAPID_KEY secret
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}

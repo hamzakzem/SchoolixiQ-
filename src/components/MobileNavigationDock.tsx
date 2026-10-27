@@ -53,6 +53,7 @@ import {
   Building2,
   Wallet,
   BarChart3,
+  type LucideIcon,
 } from "lucide-react";
 
 interface MenuItem {
@@ -462,7 +463,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
                       groupedQuickAccess.map(({ section, items }) => (
                         <section key={section.id} className="sx-dock-qa-section">
                           <PanelSectionTitle
-                            icon={QUICK_SECTION_ICONS[section.id]}
+                            icon={QUICK_SECTION_ICONS[section.id] as LucideIcon}
                             title={isRtl ? section.labelAr : section.labelEn}
                             description={isRtl ? section.descAr : section.descEn}
                           />

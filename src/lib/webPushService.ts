@@ -358,7 +358,7 @@ function attachForegroundMessageListener() {
 async function saveTokenToFirestore(userId: string, token: string): Promise<void> {
   const gate = canWritePushTokensForUser(userId);
   if (!gate.ok) {
-    logTokenSaveSkipped(userId, gate.reason);
+    logTokenSaveSkipped(userId, (gate as { reason: string }).reason);
     return;
   }
 
@@ -456,7 +456,7 @@ export async function registerWebPushDevice(
 
   const authGate = canWritePushTokensForUser(userId);
   if (!authGate.ok) {
-    logTokenSaveSkipped(userId, authGate.reason);
+    logTokenSaveSkipped(userId, (authGate as { reason: string }).reason);
     return { ok: false, reason: 'no_user', error: 'Not signed in' };
   }
 
@@ -845,7 +845,7 @@ export async function unregisterWebPushToken(userId: string): Promise<void> {
 
   const gate = canWritePushTokensForUser(userId);
   if (!gate.ok) {
-    logTokenRemoveSkipped(userId, gate.reason === 'logging_out' ? 'signed_out' : gate.reason);
+    logTokenRemoveSkipped(userId, (gate as { reason: string }).reason === 'logging_out' ? 'signed_out' : (gate as { reason: string }).reason);
     localStorage.removeItem('schoolix_fcm_token_web');
     currentWebToken = null;
     return;

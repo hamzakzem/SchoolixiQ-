@@ -57,7 +57,7 @@ export async function apiCreateDismissalRequest(body: Record<string, unknown>) {
     method: 'POST',
     body: JSON.stringify({ ...body, idempotencyKey }),
   });
-  return parseJson(res) as { id: string; token: string; status: string };
+  return (await parseJson(res)) as { id: string; token: string; status: string };
 }
 
 export async function apiGuardVerifyDismissal(requestId: string, note?: string) {
