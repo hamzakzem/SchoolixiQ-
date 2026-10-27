@@ -49,7 +49,7 @@ jobs:
             || { echo "::error::FIREBASE_SERVICE_ACCOUNT is not valid JSON (copy the whole file content)"; exit 1; }
 
       - name: Install firebase-admin
-        run: npm install --no-save --no-audit --no-fund --legacy-peer-deps firebase-admin@13
+        run: npm install --no-save --no-audit --no-fund firebase-admin@13
 
       - name: Deploy Firestore + Storage rules
         env:
