@@ -27,12 +27,12 @@ if (existsSync(esbuildBin) && process.env.FORCE_BACKEND_NPM_CI !== '1') {
 }
 
 console.log('Installing backend dependencies (npm ci)...');
-if (run('npm', ['ci', '--prefix', 'backend'])) {
+if (run('npm', ['ci', '--include=dev', '--prefix', 'backend'])) {
   process.exit(0);
 }
 
 console.warn('WARN: npm ci failed — retrying with npm install --prefix backend');
-if (run('npm', ['install', '--prefix', 'backend'])) {
+if (run('npm', ['install', '--include=dev', '--prefix', 'backend'])) {
   process.exit(0);
 }
 
