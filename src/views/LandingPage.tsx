@@ -274,7 +274,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="landing-page min-h-screen antialiased selection:bg-[#D4AF37]/30 overflow-x-hidden" dir="rtl">
+    <div className="landing-page min-h-screen antialiased selection:bg-[#D4AF37]/30 overflow-x-clip" dir="rtl">
       <LandingNavbar
         appName={systemConfig.appName}
         links={navLinks}
