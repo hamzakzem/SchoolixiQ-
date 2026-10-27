@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ArrowLeft,
   BarChart3,
   Bell,
   BookOpen,
@@ -60,7 +59,7 @@ import {
 import { toast } from 'react-hot-toast';
 import type { PackagePermissions } from '../lib/featureRegistry';
 
-const SECTION_PY = 'py-20 lg:py-28';
+const SECTION_PY = 'py-14 sm:py-20 lg:py-28';
 
 const FEATURE_STRIP_ICONS: Record<string, React.ElementType> = {
   reports: BarChart3,
@@ -70,38 +69,6 @@ const FEATURE_STRIP_ICONS: Record<string, React.ElementType> = {
   security: Lock,
 };
 
-const EXPLAINER_SECTIONS = [
-  {
-    id: 'central',
-    icon: LayoutDashboard,
-    title: 'إدارة مركزية',
-    description: 'إدارة الطلاب، الصفوف، الكادر، الحضور، الأقساط، الجداول والملفات من مكان واحد.',
-    mini: 'لوحة موحّدة للإدارة',
-  },
-  {
-    id: 'comms',
-    icon: Bell,
-    title: 'تواصل أسرع',
-    description: 'رسائل وتنبيهات فورية بين الإدارة والمعلمين وأولياء الأمور.',
-    mini: 'تنبيهات لحظية',
-  },
-  {
-    id: 'decisions',
-    icon: BarChart3,
-    title: 'قرارات أدق',
-    description: 'تقارير لحظية تساعد الإدارة على متابعة الأداء المالي والتعليمي.',
-    mini: 'تقارير وإحصائيات',
-  },
-  {
-    id: 'responsive',
-    icon: Smartphone,
-    title: 'جاهز للهاتف والكمبيوتر',
-    description: 'تجربة متجاوبة على الهاتف والتابلت والكمبيوتر.',
-    mini: 'متجاوب بالكامل',
-  },
-] as const;
-
-/** Six flagship features — synced with marketing requirements */
 const SHOWCASE_FEATURE_IDS = [
   'students',
   'tuition',
@@ -118,37 +85,6 @@ const SHOWCASE_FALLBACK: LandingFeatureCard[] = [
   { id: 'announcements', title: 'الإشعارات', description: 'تبليغات وإعلانات موثّقة تصل للمعلمين وأولياء الأمور في الوقت المناسب.' },
   { id: 'parent_app', title: 'تطبيق ولي الأمر', description: 'متابعة الحضور والواجبات والأقساط والتسريح من الهاتف.' },
   { id: 'reports', title: 'التقارير', description: 'لوحات وإحصائيات تدعم قرارات الإدارة اليومية.' },
-];
-
-const AUDIENCE_ROLES = [
-  {
-    id: 'admin',
-    title: 'للمدير',
-    description: 'لوحة شاملة للطلاب، الأقساط، الكادر، التقارير، والإعدادات.',
-    icon: LayoutDashboard,
-    accent: 'from-[#0B2345] to-[#153a6b]',
-  },
-  {
-    id: 'teacher',
-    title: 'للمعلم',
-    description: 'حضور، واجبات، درجات، وتواصل مع الإدارة وأولياء الأمور.',
-    icon: GraduationCap,
-    accent: 'from-[#8a7330] to-[#c9a84c]',
-  },
-  {
-    id: 'parent',
-    title: 'لولي الأمر',
-    description: 'متابعة الأبناء: حضور، أقساط، واجبات، وتبليغات في تطبيق واحد.',
-    icon: Smartphone,
-    accent: 'from-[#0B2345] to-[#1a3a5c]',
-  },
-  {
-    id: 'guard',
-    title: 'للحارس / البوابة الذكية',
-    description: 'تحقق التسريح، مسح الرمز، وسجل خروج آمن ومنظم.',
-    icon: Shield,
-    accent: 'from-[#06182f] to-[#0b2345]',
-  },
 ];
 
 const FEATURE_ICONS: Record<string, React.ElementType> = {
@@ -273,11 +209,9 @@ export default function LandingPage() {
       { href: '#smart-gate', label: 'التسريح الآمن' },
     ];
     if (config.showPricing) links.push({ href: '#pricing', label: 'الباقات' });
-    links.push({ href: '#partners', label: 'الشركاء' });
     if (config.showDistributorSection !== false) {
       links.push({ href: '#distributors', label: 'الموزعين' });
     }
-    links.push({ href: '#about', label: 'عن المنصة' });
     links.push({ href: '#contact', label: 'تواصل معنا' });
     return links;
   }, [config.showPricing, config.showDistributorSection]);
@@ -441,13 +375,6 @@ export default function LandingPage() {
         </SectionShell>
       )}
 
-      <LandingRoleInterfaces />
-
-      <LandingSafeDismissalShowcase
-        title={config.smartGateTitle}
-        subtitle={config.smartGateDescription}
-      />
-
       {/* Features — alternating showcase */}
       <SectionShell id="features" className={`${SECTION_PY} lp-section--deep`}>
         <div className="lp-container">
@@ -458,6 +385,43 @@ export default function LandingPage() {
             subtitle="وحدات متكاملة للإدارة والمعلمين وأولياء الأمور — بدون أدوات متفرقة."
           />
           <LandingFeaturesShowcase features={showcaseFeatures} icons={FEATURE_ICONS} />
+        </div>
+      </SectionShell>
+
+      <LandingRoleInterfaces />
+
+      <LandingSafeDismissalShowcase
+        title={config.smartGateTitle}
+        subtitle={config.smartGateDescription}
+      />
+
+      {/* Problem / Solution */}
+      <SectionShell className={SECTION_PY}>
+        <div className="lp-container">
+          <SectionHeader eyebrow="التحول" title="من الفوضى إلى نظام واحد موثوق" />
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16">
+            <div className="lp-card p-8 lg:p-10">
+              <p className="text-sm font-bold text-[#94a3b8] mb-5">قبل SchoolixIQ</p>
+              <ul className="space-y-4">
+                {config.problemPoints.map((point) => (
+                  <li key={point} className="text-[15px] leading-[1.85] pr-4 border-r-2 border-[rgba(212,175,55,0.2)] text-[#cbd5e1]">
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="lp-card p-8 lg:p-10 border-[#d4af37]/40">
+              <p className="text-sm font-bold mb-5 text-[#f2c866]">بعد SchoolixIQ</p>
+              <ul className="space-y-4">
+                {config.solutionPoints.map((point) => (
+                  <li key={point} className="text-[15px] leading-[1.85] font-medium pr-4 border-r-2 border-[#D4AF37]/50 flex items-start gap-2 text-white">
+                    <Check size={16} className="shrink-0 mt-1 text-[#d4af37]" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
       </SectionShell>
 
@@ -474,8 +438,21 @@ export default function LandingPage() {
               {pricingPlans.map((pkg: any, index: number) => {
                 const popular = pkg.isPopular;
                 const topFeatures = getPackageMarketingFeatures(pkg.permissions as PackagePermissions);
+                const previous = index > 0 ? pricingPlans[index - 1] : null;
+                const previousFeatures = previous
+                  ? new Set(getPackageMarketingFeatures(previous.permissions as PackagePermissions, 100))
+                  : null;
+                const addedFeatures = previousFeatures
+                  ? getPackageMarketingFeatures(pkg.permissions as PackagePermissions, 100)
+                      .filter((f) => !previousFeatures.has(f))
+                      .slice(0, 4)
+                  : [];
                 const displayFeatures =
-                  topFeatures.length > 0 ? topFeatures : (Array.isArray(pkg.features) ? pkg.features : []).slice(0, 5);
+                  addedFeatures.length > 0
+                    ? [`كل مميزات ${previous.name}`, ...addedFeatures]
+                    : topFeatures.length > 0
+                      ? topFeatures
+                      : (Array.isArray(pkg.features) ? pkg.features : []).slice(0, 5);
                 const maxLabel = pkg.maxStudents > 0 ? `حتى ${pkg.maxStudents.toLocaleString('ar-IQ-u-nu-latn')} طالب` : 'طلاب غير محدود';
                 const isCenter = popular || (popularIndex === -1 && index === 1);
 
@@ -545,102 +522,6 @@ export default function LandingPage() {
       />
 
       {config.showTechSection !== false && <LandingTechSection />}
-
-      {/* Explainer sections */}
-      {config.showExplainerSections !== false && (
-        <SectionShell className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)] bg-[#081f3d]`}>
-          <div className="lp-container">
-            <SectionHeader
-              eyebrow="لماذا SchoolixIQ"
-              title="حلول عملية لإدارة يومية أسهل"
-              subtitle="أربعة محاور تغطي احتياجات المدرسة الحديثة."
-            />
-            <div className="grid sm:grid-cols-2 gap-5 lg:gap-6">
-              {EXPLAINER_SECTIONS.map((item, idx) => {
-                const Icon = item.icon;
-                return (
-                  <motion.div
-                    key={item.id}
-                    initial={reduced ? {} : { opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: idx * 0.07, duration: 0.35 }}
-                    className="landing-explainer-card lp-card"
-                  >
-                    <div className="landing-feature-strip__icon !mx-0 mb-4">
-                      <Icon size={20} strokeWidth={1.5} />
-                    </div>
-                    <h3 className="font-black text-lg text-white mb-2">{item.title}</h3>
-                    <p className="text-sm leading-[1.85] text-[#cbd5e1]">{item.description}</p>
-                    <div className="landing-explainer-mini">{item.mini}</div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        </SectionShell>
-      )}
-
-      {/* Audience */}
-      <SectionShell id="audience" className={`${SECTION_PY} border-t border-[rgba(212,175,55,0.2)]`}>
-        <div className="lp-container">
-          <SectionHeader
-            eyebrow="لمن؟"
-            title="منصة واحدة لكل أدوار المدرسة"
-            subtitle="تجربة مخصّصة للمدير والمعلم وولي الأمر والحارس."
-          />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {AUDIENCE_ROLES.map((role) => {
-              const Icon = role.icon;
-              return (
-                <div
-                  key={role.id}
-                  className="lp-card overflow-hidden hover:-translate-y-1 transition-transform"
-                >
-                  <div className={`h-2 bg-gradient-to-l ${role.accent}`} />
-                  <div className="p-6">
-                    <div className="w-10 h-10 rounded-xl bg-[#081f3d] border border-[rgba(212,175,55,0.2)] flex items-center justify-center mb-4">
-                      <Icon size={18} className="text-[#d4af37]" />
-                    </div>
-                    <h3 className="font-black text-base mb-2 text-white">{role.title}</h3>
-                    <p className="text-sm leading-[1.8] text-[#94a3b8]">{role.description}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </SectionShell>
-
-      {/* Problem / Solution */}
-      <SectionShell className={SECTION_PY}>
-        <div className="lp-container">
-          <SectionHeader eyebrow="التحول" title="من الفوضى إلى نظام واحد موثوق" />
-          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16">
-            <div className="lp-card p-8 lg:p-10">
-              <p className="text-sm font-bold text-[#94a3b8] mb-5">قبل SchoolixIQ</p>
-              <ul className="space-y-4">
-                {config.problemPoints.map((point) => (
-                  <li key={point} className="text-[15px] leading-[1.85] pr-4 border-r-2 border-[rgba(212,175,55,0.2)] text-[#cbd5e1]">
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="lp-card p-8 lg:p-10 border-[#d4af37]/40">
-              <p className="text-sm font-bold mb-5 text-[#f2c866]">بعد SchoolixIQ</p>
-              <ul className="space-y-4">
-                {config.solutionPoints.map((point) => (
-                  <li key={point} className="text-[15px] leading-[1.85] font-medium pr-4 border-r-2 border-[#D4AF37]/50 flex items-start gap-2 text-white">
-                    <Check size={16} className="shrink-0 mt-1 text-[#d4af37]" />
-                    <span>{point}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </SectionShell>
 
       {/* Testimonials — real config only */}
       {showTestimonials && (
@@ -764,7 +645,7 @@ export default function LandingPage() {
           email={systemConfig.supportEmails?.[0]}
           location="العراق"
         />
-        <GlobalFooter compact={false} showPartnerSections={showFooterPartners} />
+        <GlobalFooter compact showPartnerSections={showFooterPartners} />
       </footer>
     </div>
   );

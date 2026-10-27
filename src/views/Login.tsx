@@ -643,14 +643,22 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-[100dvh] bg-slate-50 font-sans flex flex-col items-center py-5 sm:py-10 px-4 sm:px-6"
+      className="relative isolate overflow-x-hidden min-h-[100dvh] bg-slate-50 font-sans flex flex-col items-center py-5 sm:py-10 px-4 sm:px-6"
       dir={isRtl ? "rtl" : "ltr"}
     >
+      {/* Navy brand band behind the card — matches the landing page */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[300px] sm:h-[380px] overflow-hidden bg-gradient-to-b from-[#081a33] to-[#0B2345]"
+      >
+        <div className="absolute -top-40 -end-24 w-[520px] h-[520px] rounded-full bg-[#D4A64A]/15 blur-3xl" />
+        <div className="absolute -bottom-48 -start-24 w-[460px] h-[460px] rounded-full bg-sky-400/10 blur-3xl" />
+      </div>
       {/* Kept on the left edge: the language toggle is pinned top-right */}
       <div className={`w-full max-w-lg lg:max-w-5xl mb-4 sm:mb-6 flex ${isRtl ? "justify-end" : "justify-start"}`}>
         <Link
           to="/"
-          className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0B2345] transition-colors"
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
         >
           <ArrowRight size={16} className={isRtl ? "" : "rotate-180"} />
           {isRtl ? "العودة للرئيسية" : "Back to home"}
@@ -660,7 +668,7 @@ export default function Login() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white w-full max-w-lg lg:max-w-5xl lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] rounded-[2rem] shadow-2xl shadow-slate-200/70 border border-slate-100 overflow-hidden mb-8 sm:mb-12"
+        className="bg-white w-full max-w-lg lg:max-w-5xl lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] rounded-[2rem] shadow-2xl shadow-[#0B2345]/25 ring-1 ring-black/5 overflow-hidden mb-8 sm:mb-12"
       >
         {/* Brand panel — desktop only */}
         <aside className="hidden lg:flex flex-col justify-between gap-10 relative overflow-hidden bg-[#0B2345] text-white p-10 xl:p-12">
