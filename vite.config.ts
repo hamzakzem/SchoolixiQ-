@@ -29,6 +29,11 @@ export default defineConfig(({mode}) => {
               if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('html-to-image')) {
                 return 'pdf-vendor';
               }
+              // Sentry is loaded with a dynamic import only when a DSN is configured;
+              // keep it out of the eagerly-loaded vendor chunk.
+              if (id.includes('@sentry')) {
+                return 'sentry-vendor';
+              }
               // Charts libraries can be dynamically split
               if (id.includes('recharts') || id.includes('d3')) {
                 return 'charts-vendor';
