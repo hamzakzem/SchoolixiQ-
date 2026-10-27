@@ -47,6 +47,7 @@ import { LandingRoleInterfaces } from '../components/landing/LandingRoleInterfac
 import { LandingSafeDismissalShowcase } from '../components/landing/LandingSafeDismissalShowcase';
 import { LandingFooterShell } from '../components/landing/LandingFooterShell';
 import { LandingButton } from '../components/ui/LandingButton';
+import { ScrollToTopButton } from '../components/ScrollToTopButton';
 import {
   LandingPartnersSection,
   useLandingPartners,
@@ -634,6 +635,7 @@ export default function LandingPage() {
 
       <LandingWhatsAppFab whatsappNumber={config.whatsappNumber} />
       <SmartAssistantWidget isRtl />
+      <ScrollToTopButton />
 
       {/* Footer */}
       <footer id="contact" className="landing-footer-wrap pb-6">

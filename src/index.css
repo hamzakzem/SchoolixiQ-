@@ -4151,3 +4151,13 @@ html.dark .sx-dist-section { background: #1e293b; border-color: #334155; }
 .sx-dist-inbox__chat { border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; min-height: 320px; }
 .sx-dist-inbox__chat-head { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
 .sx-dist-inbox__messages { max-height: 300px; }
+
+/* Auth page (dark): keep browser autofill from painting fields white/yellow */
+.auth-dark input:-webkit-autofill,
+.auth-dark input:-webkit-autofill:hover,
+.auth-dark input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff;
+  caret-color: #fff;
+  -webkit-box-shadow: 0 0 0 1000px #0f2648 inset;
+  transition: background-color 9999s ease-out 0s;
+}
