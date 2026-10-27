@@ -138,8 +138,9 @@ service firebase.storage {
     }
 
     // 6. Student photos — school-scoped, management staff only, images only
+    // (pages display photos through download URLs, which do not depend on this read rule)
     match /students/{schoolId}/{studentId}/{fileName} {
-      allow read: if isSignedIn();
+      allow read: if isSuperAdmin() || sameSchool(schoolId);
       allow write: if canManageSchoolAssets(schoolId)
         && isStudentPhotoFileName(fileName)
         && isAllowedImageUpload(fileName, 5 * 1024 * 1024);
@@ -147,13 +148,39 @@ service firebase.storage {
 
     // Legacy generic path (superadmin only)
     match /students/{studentId}/{allPaths=**} {
-      allow read: if isSignedIn();
+      allow read: if isSuperAdmin() || sameSchool(studentId);
       allow write: if isSuperAdmin();
     }
 
-    // Chat attachments
+    // Conversation ids embed the participant uid or the school id
+    // (see src/lib/chatConversationKeys.ts and the *ChatTab views).
+    function canAccessChatConversation(convId) {
+      return isSignedIn() && (
+        isSuperAdmin()
+        || userRole() == 'platform_assistant'
+        || convId.matches('.*' + request.auth.uid + '.*')
+        || (
+          userSchoolId() is string
+          && userSchoolId().size() > 0
+          && convId.matches('.*' + userSchoolId() + '.*')
+        )
+      );
+    }
+
+    // Chat file uploads (path used by all chat tabs)
+    match /chat_files/{convId}/{fileName} {
+      allow read: if canAccessChatConversation(convId);
+      allow create: if canAccessChatConversation(convId)
+        && resource == null
+        && request.resource.size > 0
+        && request.resource.size < 50 * 1024 * 1024;
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Legacy chat attachments path (no longer written by the app)
     match /chat_attachments/{messageId}/{allPaths=**} {
-      allow read, write: if isSignedIn();
+      allow read: if isSuperAdmin();
+      allow write: if false;
     }
 
     // Legacy store image path (backward compatibility)
