@@ -27,7 +27,7 @@ export default function LandingPageSettings() {
       const data = await fetchLandingPageConfig();
       setConfig(data);
     } catch (error) {
-      handleFirestoreError(error, OperationType.READ, 'system/landingPage');
+      handleFirestoreError(error, OperationType.GET, 'system/landingPage');
       toast.error('تعذر تحميل إعدادات صفحة الهبوط');
     } finally {
       setLoading(false);

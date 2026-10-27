@@ -1120,7 +1120,7 @@ export default function Login() {
               className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border-2 border-slate-100 bg-white hover:bg-slate-50 transition-all font-bold text-slate-600 flex items-center justify-center gap-3 shadow-sm hover:border-slate-200 active:scale-95 disabled:opacity-50 text-sm sm:text-base"
             >
               <img
-                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                src="/brand/google-g.svg"
                 alt="Google"
                 className="w-4 h-4 sm:w-5 sm:h-5"
               />
@@ -1558,7 +1558,7 @@ export default function Login() {
         </div>
       </motion.div>
 
-      <div className="-mx-6 -mb-12 mt-20 w-[calc(100%+3rem)]">
+      <div className="-mx-4 sm:-mx-6 -mb-6 sm:-mb-12 mt-20 w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)]">
         <GlobalFooter compact={false} />
       </div>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { clsx } from "clsx";
 import { db, auth } from "../lib/firebase";
 import { signOutWithCleanup } from "../lib/authLogout";
+import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 import {
   collection,
   query,
@@ -339,7 +340,7 @@ export default function ParentDashboard() {
       );
     } catch (error: any) {
       console.error("Error updating student/idcard details:", error);
-      handleFirestoreError(error, OperationType.UPDATE, "students_and_id_cards");
+      handleFirestoreError(error, OperationType.UPDATE, "students_and_id_cards", false);
       toast.error(
         isRtl
           ? "عذراً، فشل تحديث البيانات. يرجى مراجعة الصلاحيات."
@@ -400,6 +401,7 @@ export default function ParentDashboard() {
           err,
           OperationType.UPDATE,
           `students_search_and_link:student_doc`,
+          false,
         );
         throw err;
       }
@@ -454,6 +456,7 @@ export default function ParentDashboard() {
           err,
           OperationType.UPDATE,
           `students_search_and_link:user_profile`,
+          false,
         );
       }
     } catch (error) {
@@ -461,6 +464,7 @@ export default function ParentDashboard() {
         error,
         OperationType.UPDATE,
         `students_search_and_link`,
+        false,
       );
       toast.error(t("linkFailed"));
     } finally {
@@ -1056,7 +1060,7 @@ export default function ParentDashboard() {
       {
         onError: (error) => {
           logParentFirestoreError(queryName, error, meta);
-          handleFirestoreError(error, OperationType.LIST, "ParentDashboard:market");
+          handleFirestoreError(error, OperationType.LIST, "ParentDashboard:market", false);
           setMarketLoading(false);
         },
       },
@@ -1528,7 +1532,7 @@ export default function ParentDashboard() {
       }
     } catch (error) {
       console.error("Delete error:", error);
-      handleFirestoreError(error, OperationType.DELETE, collectionName);
+      handleFirestoreError(error, OperationType.DELETE, collectionName, false);
       toast.error(isRtl ? "فشل عملية الحذف" : "Failed to delete record");
     }
   };
