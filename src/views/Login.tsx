@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { db } from "../lib/firebase";
 import {
   doc,
@@ -170,7 +170,7 @@ export default function Login() {
   const [mode, setMode] = useState<"login" | "signup">(
     searchParams.get("mode") === "signup" ? "signup" : "login",
   );
-  const [authPanel, setAuthPanel] = useState<"account" | "distributor" | "distributor_success">(
+  const [authPanel, setAuthPanel] = useState<"account" | "distributor" | "distributor_success" | "reset">(
     searchParams.get("panel") === "distributor" ? "distributor" : "account",
   );
   const [distributorForm, setDistributorForm] = useState({
@@ -557,13 +557,18 @@ export default function Login() {
     }
   };
 
-  const handleForgotPassword = async () => {
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleForgotPassword = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!email) {
       toast.error(isRtl ? "يرجى إدخال البريد الإلكتروني أولاً" : "Enter your email first");
       return;
     }
+    setLoading(true);
     try {
       await resetPassword(email);
+      setResetSent(true);
       toast.success(
         isRtl
           ? "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني"
@@ -571,8 +576,66 @@ export default function Login() {
       );
     } catch (error) {
       toast.error(getEmailAuthErrorMessage(error, t, isRtl));
+    } finally {
+      setLoading(false);
     }
   };
+
+  const openPanel = (panel: "account" | "distributor" | "reset", nextMode?: "login" | "signup") => {
+    setAuthPanel(panel);
+    if (nextMode) setMode(nextMode);
+    setResetSent(false);
+  };
+
+  const fieldClass = `w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 rounded-xl border border-slate-200 bg-slate-50/60 font-bold text-sm sm:text-base text-slate-900 placeholder:text-slate-400 placeholder:font-semibold outline-none transition focus:bg-white focus:border-[#0B2345] focus:ring-4 focus:ring-[#0B2345]/10`;
+  const selectClass =
+    "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-slate-50/60 font-bold text-sm sm:text-base text-slate-900 outline-none transition focus:bg-white focus:border-[#0B2345] focus:ring-4 focus:ring-[#0B2345]/10";
+  const iconClass = `absolute ${isRtl ? "right-4" : "left-4"} top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none`;
+  const primaryButtonClass =
+    "w-full py-4 rounded-xl font-black text-base flex items-center justify-center gap-3 transition-all bg-[#0B2345] text-white hover:bg-[#13315c] shadow-lg shadow-[#0B2345]/20 active:scale-[0.98] disabled:opacity-50";
+
+  const panelHeading =
+    authPanel === "reset"
+      ? {
+          title: isRtl ? "استعادة كلمة المرور" : "Reset your password",
+          subtitle: isRtl
+            ? "أدخل بريدك وسنرسل لك رابطاً لتعيين كلمة مرور جديدة"
+            : "Enter your email and we'll send you a reset link",
+        }
+      : authPanel === "distributor"
+        ? {
+            title: isRtl ? "انضم كموزع معتمد" : "Become a distributor",
+            subtitle: isRtl
+              ? "أرسل طلبك وستتم مراجعته من الإدارة قبل تفعيل الحساب"
+              : "Your account will be activated after admin approval",
+          }
+        : mode === "signup"
+          ? {
+              title: isRtl ? "أنشئ حسابك" : "Create your account",
+              subtitle: isRtl
+                ? "اختر نوع الحساب وأكمل بياناتك خلال دقيقة"
+                : "Pick an account type and finish in a minute",
+            }
+          : {
+              title: isRtl ? "مرحباً بعودتك" : "Welcome back",
+              subtitle: isRtl
+                ? "سجّل الدخول لمتابعة مدرستك وأبنائك"
+                : "Sign in to continue to your dashboard",
+            };
+
+  const brandBenefits = isRtl
+    ? [
+        "حضور وغياب ودرجات لحظية لأولياء الأمور",
+        "إدارة مالية وأقساط وتقارير دقيقة",
+        "تواصل مباشر بين المدرسة والأهل",
+        "انصراف آمن للطلاب عبر رمز QR",
+      ]
+    : [
+        "Live attendance and grades for parents",
+        "Fees, finance and accurate reports",
+        "Direct school-to-parent messaging",
+        "Safe QR-based student dismissal",
+      ];
 
   if (authPanel === "distributor_success") {
     return <DistributorAccessScreen variant="submitted" isRtl={isRtl} />;
@@ -580,193 +643,261 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-[100dvh] bg-slate-50 font-sans flex flex-col items-center py-6 sm:py-12 px-4 sm:px-6"
+      className="min-h-[100dvh] bg-slate-50 font-sans flex flex-col items-center py-5 sm:py-10 px-4 sm:px-6"
       dir={isRtl ? "rtl" : "ltr"}
     >
+      {/* Kept on the left edge: the language toggle is pinned top-right */}
+      <div className={`w-full max-w-lg lg:max-w-5xl mb-4 sm:mb-6 flex ${isRtl ? "justify-end" : "justify-start"}`}>
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0B2345] transition-colors"
+        >
+          <ArrowRight size={16} className={isRtl ? "" : "rotate-180"} />
+          {isRtl ? "العودة للرئيسية" : "Back to home"}
+        </Link>
+      </div>
+
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white w-full max-w-lg rounded-[2rem] sm:rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden mb-8 sm:mb-12"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white w-full max-w-lg lg:max-w-5xl lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] rounded-[2rem] shadow-2xl shadow-slate-200/70 border border-slate-100 overflow-hidden mb-8 sm:mb-12"
       >
-        <div className="p-6 sm:p-10">
-          {/* Enforced Brand: schoolixiQ */}
-          <div className="flex flex-col items-center mb-6 sm:mb-10 text-center select-none">
-            {/* Elegant Technical Logo Container - Fixed Height to prevent any layout shifts */}
-            <div className="h-24 sm:h-28 w-full flex items-center justify-center mb-2 relative group">
+        {/* Brand panel — desktop only */}
+        <aside className="hidden lg:flex flex-col justify-between gap-10 relative overflow-hidden bg-[#0B2345] text-white p-10 xl:p-12">
+          <div className="absolute -top-24 -end-24 w-72 h-72 rounded-full bg-[#D4A64A]/15 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-28 -start-20 w-80 h-80 rounded-full bg-sky-400/10 blur-3xl pointer-events-none" />
+
+          <div className="relative">
+            <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-lg mb-6">
               {isCustomAppLogo(config.appLogo) ? (
-                <div className="relative">
-                  {/* Tech Aura Backlight */}
-                  <div className="absolute -inset-2 bg-gradient-to-r from-[#0B2345] to-[#D4A64A] rounded-full blur-xl opacity-10 group-hover:opacity-25 transition duration-500"></div>
-                  <img
-                    src={config.appLogo || undefined}
-                    alt="SchoolixIQ logo"
-                    className="max-h-20 sm:max-h-24 w-auto object-contain drop-shadow-sm transition-all duration-500 hover:scale-[1.01] relative z-10"
-                    loading="eager"
-                  />
-                </div>
+                <img
+                  src={config.appLogo || undefined}
+                  alt="SchoolixIQ logo"
+                  className="max-h-12 w-auto object-contain"
+                />
               ) : (
-                <div className="relative">
-                  {/* Tech Aura Backlight */}
-                  <div className="absolute -inset-4 bg-gradient-to-r from-[#0B2345] to-[#D4A64A] rounded-full blur-2xl opacity-15 group-hover:opacity-30 transition duration-500"></div>
-                  <SchoolixLogo size={90} className="relative z-10" />
-                </div>
+                <SchoolixLogo size={44} />
               )}
             </div>
+            <p className="text-3xl font-black tracking-tight" dir="ltr">
+              Schoolix<span className="text-[#D4A64A]">iQ</span>
+            </p>
+            <p className="mt-3 text-slate-300 font-semibold leading-relaxed max-w-sm">
+              {isRtl
+                ? "منصة متكاملة تجمع الإدارة والمعلمين وأولياء الأمور في مكان واحد."
+                : "One platform for school management, teachers and parents."}
+            </p>
+          </div>
 
-            {/* Platform Brand Title styled geometrically/technically */}
-            <div className="relative flex flex-col items-center">
-              {/* Elegant Geometric Accents around the main brand */}
-              <div className="flex items-center gap-3">
-                <span className="h-[2px] w-8 bg-gradient-to-r from-transparent to-slate-200 rounded-full"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                <span className="h-[2px] w-8 bg-gradient-to-l from-transparent to-slate-200 rounded-full"></span>
-              </div>
-
-              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 mt-2 font-sans select-none">
-                <span className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 bg-clip-text text-transparent">
-                  schoolix
+          <ul className="relative space-y-4">
+            {brandBenefits.map((benefit) => (
+              <li key={benefit} className="flex items-center gap-3 font-bold text-slate-100">
+                <span className="w-7 h-7 shrink-0 rounded-full bg-[#D4A64A]/20 text-[#D4A64A] flex items-center justify-center">
+                  <Check size={15} strokeWidth={3} />
                 </span>
-                <span className="text-indigo-600 font-extrabold relative">
-                  iQ
-                  <span className="absolute -top-0.5 -right-2.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                </span>
-              </h1>
+                <span className="leading-relaxed">{benefit}</span>
+              </li>
+            ))}
+          </ul>
 
-              {/* Tagline or subheading */}
-              <p className="text-slate-400 mt-2 font-medium tracking-wide text-xs sm:text-sm uppercase font-mono max-w-xs leading-relaxed">
-                {t("appTagline")}
-              </p>
+          <p className="relative flex items-center gap-2 text-xs font-semibold text-slate-400">
+            <ShieldCheck size={16} className="text-[#D4A64A]" />
+            {isRtl ? "اتصال آمن ومشفّر بالكامل" : "Fully secure, encrypted connection"}
+          </p>
+        </aside>
+
+        <div className="p-6 sm:p-10">
+          {/* Brand header */}
+          <div className="flex flex-col items-center mb-6 sm:mb-8 text-center select-none">
+            <div className="lg:hidden mb-3">
+              {isCustomAppLogo(config.appLogo) ? (
+                <img
+                  src={config.appLogo || undefined}
+                  alt="SchoolixIQ logo"
+                  className="max-h-16 w-auto object-contain"
+                  loading="eager"
+                />
+              ) : (
+                <SchoolixLogo size={64} />
+              )}
             </div>
+            <p className="lg:hidden text-2xl font-black tracking-tight text-[#0B2345] mb-4" dir="ltr">
+              Schoolix<span className="text-[#A8841F]">iQ</span>
+            </p>
+            <h1 className="text-2xl sm:text-[1.7rem] font-black text-slate-900 leading-tight">
+              {panelHeading.title}
+            </h1>
+            <p className="mt-2 text-sm sm:text-base font-semibold text-slate-500 leading-relaxed max-w-sm">
+              {panelHeading.subtitle}
+            </p>
           </div>
 
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthPanel("account");
-                setMode("login");
-              }}
-              className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${authPanel === "account" && mode === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-            >
-              {t("login")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAuthPanel("account");
-                setMode("signup");
-              }}
-              className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${authPanel === "account" && mode === "signup" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-            >
-              {t("signup")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuthPanel("distributor")}
-              className={`flex-1 py-2 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all ${authPanel === "distributor" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-            >
-              {isRtl ? "تسجيل موزع" : "Distributor"}
-            </button>
-          </div>
+          {authPanel !== "reset" && (
+            <div role="tablist" className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-2xl mb-6">
+              {([
+                { key: "login", label: t("login"), active: authPanel === "account" && mode === "login", onClick: () => openPanel("account", "login") },
+                { key: "signup", label: t("signup"), active: authPanel === "account" && mode === "signup", onClick: () => openPanel("account", "signup") },
+                { key: "distributor", label: isRtl ? "تسجيل موزع" : "Distributor", active: authPanel === "distributor", onClick: () => openPanel("distributor") },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab.active}
+                  onClick={tab.onClick}
+                  className={`py-2.5 sm:py-3 rounded-xl font-bold text-[13px] sm:text-sm transition-all ${tab.active ? "bg-white text-[#0B2345] shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
 
-          {authPanel === "distributor" ? (
-            <form onSubmit={handleDistributorRegister} className="space-y-4 sm:space-y-5">
-              <p className="text-center text-sm text-slate-500 font-bold">
-                {isRtl
-                  ? "أرسل طلبك كموزع — سيتم مراجعته من الإدارة قبل تفعيل الحساب"
-                  : "Apply as a distributor — your account will be activated after admin approval"}
-              </p>
-              <input
-                required
-                type="text"
-                placeholder={isRtl ? "الاسم الكامل" : "Full name"}
-                value={distributorForm.name}
-                onChange={(e) => setDistributorForm({ ...distributorForm, name: e.target.value })}
-                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/30"
-              />
-              <input
-                required
-                type="tel"
-                placeholder={isRtl ? "رقم الهاتف" : "Phone number"}
-                value={distributorForm.phone}
-                onChange={(e) => setDistributorForm({ ...distributorForm, phone: e.target.value })}
-                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/30"
-              />
-              <input
-                required
-                type="text"
-                placeholder={isRtl ? "العنوان" : "Address"}
-                value={distributorForm.address}
-                onChange={(e) => setDistributorForm({ ...distributorForm, address: e.target.value })}
-                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/30"
-              />
+          {authPanel === "reset" ? (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              {resetSent ? (
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-center">
+                  <div className="w-12 h-12 rounded-full bg-white text-emerald-600 flex items-center justify-center mx-auto mb-3 shadow-sm">
+                    <Mail size={22} />
+                  </div>
+                  <p className="font-black text-emerald-800">
+                    {isRtl ? "تحقق من بريدك الإلكتروني" : "Check your inbox"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-emerald-700 leading-relaxed">
+                    {isRtl
+                      ? `أرسلنا رابط إعادة التعيين إلى ${email}. إذا لم تجده، تحقق من مجلد الرسائل غير المرغوب فيها.`
+                      : `We sent a reset link to ${email}. Check your spam folder if you can't find it.`}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Mail className={iconClass} size={18} />
+                    <input
+                      required
+                      autoFocus
+                      type="email"
+                      autoComplete="email"
+                      placeholder={t("email")}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={fieldClass}
+                    />
+                  </div>
+                  <button type="submit" disabled={loading} className={primaryButtonClass}>
+                    {loading ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : isRtl ? (
+                      "إرسال رابط الاستعادة"
+                    ) : (
+                      "Send reset link"
+                    )}
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => openPanel("account", "login")}
+                className="w-full py-3 text-sm font-bold text-slate-500 hover:text-[#0B2345] transition-colors"
+              >
+                {isRtl ? "العودة لتسجيل الدخول" : "Back to sign in"}
+              </button>
+            </form>
+          ) : authPanel === "distributor" ? (
+            <form onSubmit={handleDistributorRegister} className="space-y-4">
+              <div className="relative">
+                <Users className={iconClass} size={18} />
+                <input
+                  required
+                  type="text"
+                  autoComplete="name"
+                  placeholder={isRtl ? "الاسم الكامل" : "Full name"}
+                  value={distributorForm.name}
+                  onChange={(e) => setDistributorForm({ ...distributorForm, name: e.target.value })}
+                  className={fieldClass}
+                />
+              </div>
+              <div className="relative">
+                <Phone className={iconClass} size={18} />
+                <input
+                  required
+                  type="tel"
+                  autoComplete="tel"
+                  placeholder={isRtl ? "رقم الهاتف" : "Phone number"}
+                  value={distributorForm.phone}
+                  onChange={(e) => setDistributorForm({ ...distributorForm, phone: e.target.value })}
+                  className={fieldClass}
+                />
+              </div>
+              <div className="relative">
+                <MapPin className={iconClass} size={18} />
+                <input
+                  required
+                  type="text"
+                  autoComplete="street-address"
+                  placeholder={isRtl ? "العنوان" : "Address"}
+                  value={distributorForm.address}
+                  onChange={(e) => setDistributorForm({ ...distributorForm, address: e.target.value })}
+                  className={fieldClass}
+                />
+              </div>
               <select
                 required
                 value={distributorForm.governorate}
                 onChange={(e) => setDistributorForm({ ...distributorForm, governorate: e.target.value })}
-                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/50"
+                className={selectClass}
               >
                 <option value="">{isRtl ? "اختر المحافظة..." : "Select governorate..."}</option>
-                <option value="بغداد">بغداد</option>
-                <option value="البصرة">البصرة</option>
-                <option value="نينوى">نينوى</option>
-                <option value="أربيل">أربيل</option>
-                <option value="النجف">النجف</option>
-                <option value="ذي قار">ذي قار</option>
-                <option value="كركوك">كركوك</option>
-                <option value="الأنبار">الأنبار</option>
-                <option value="ديالى">ديالى</option>
-                <option value="المثنى">المثنى</option>
-                <option value="القادسية">القادسية</option>
-                <option value="ميسان">ميسان</option>
-                <option value="واسط">واسط</option>
-                <option value="صلاح الدين">صلاح الدين</option>
-                <option value="دهوك">دهوك</option>
-                <option value="السليمانية">السليمانية</option>
-                <option value="بابل">بابل</option>
-                <option value="كربلاء">كربلاء</option>
-                <option value="حلبجة">حلبجة</option>
+                  <option value="بغداد">بغداد</option>
+                  <option value="البصرة">البصرة</option>
+                  <option value="نينوى">نينوى</option>
+                  <option value="أربيل">أربيل</option>
+                  <option value="النجف">النجف</option>
+                  <option value="ذي قار">ذي قار</option>
+                  <option value="كركوك">كركوك</option>
+                  <option value="الأنبار">الأنبار</option>
+                  <option value="ديالى">ديالى</option>
+                  <option value="المثنى">المثنى</option>
+                  <option value="القادسية">القادسية</option>
+                  <option value="ميسان">ميسان</option>
+                  <option value="واسط">واسط</option>
+                  <option value="صلاح الدين">صلاح الدين</option>
+                  <option value="دهوك">دهوك</option>
+                  <option value="السليمانية">السليمانية</option>
+                  <option value="بابل">بابل</option>
+                  <option value="كربلاء">كربلاء</option>
+                  <option value="حلبجة">حلبجة</option>
               </select>
-              <input
-                type="email"
-                placeholder={isRtl ? "البريد الإلكتروني (اختياري)" : "Email (optional)"}
-                value={distributorForm.email}
-                onChange={(e) => setDistributorForm({ ...distributorForm, email: e.target.value })}
-                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 font-bold bg-slate-50/30"
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 rounded-xl bg-indigo-600 text-white font-bold disabled:opacity-50"
-              >
-                {loading ? "..." : isRtl ? "إرسال طلب الموزع" : "Submit distributor application"}
+              <div className="relative">
+                <Mail className={iconClass} size={18} />
+                <input
+                  type="email"
+                  autoComplete="email"
+                  placeholder={isRtl ? "البريد الإلكتروني (اختياري)" : "Email (optional)"}
+                  value={distributorForm.email}
+                  onChange={(e) => setDistributorForm({ ...distributorForm, email: e.target.value })}
+                  className={fieldClass}
+                />
+              </div>
+              <button type="submit" disabled={loading} className={primaryButtonClass}>
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : isRtl ? (
+                  "إرسال طلب الموزع"
+                ) : (
+                  "Submit distributor application"
+                )}
               </button>
               <button
                 type="button"
-                onClick={() => setAuthPanel("account")}
-                className="w-full py-3 text-sm font-bold text-slate-500"
+                onClick={() => openPanel("account", "login")}
+                className="w-full py-3 text-sm font-bold text-slate-500 hover:text-[#0B2345] transition-colors"
               >
                 {isRtl ? "العودة لتسجيل الدخول" : "Back to sign in"}
               </button>
             </form>
           ) : (
           <>
-
-          {/* Android APK download — direct browser download */}
-          <div className="mb-6 text-center">
-            <a
-              href={androidApkUrl ?? "#"}
-              download="schoolixiq.apk"
-              onClick={handleAndroidApkDownload}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-[#D4A64A]/40 bg-gradient-to-r from-[#0B2345]/5 to-[#D4A64A]/5 hover:from-[#0B2345]/15 hover:to-[#D4A64A]/15 text-[#0B2345] dark:text-[#D4A64A] font-black text-xs sm:text-sm transition-all hover:border-[#D4A64A] hover:scale-[1.02] active:scale-[0.98] shadow-sm select-none"
-            >
-              <Smartphone size={16} className="text-[#0B2345] dark:text-[#D4A64A] animate-pulse shrink-0" />
-              <span>
-                {isRtl ? "تحميل تطبيق أندرويد 📱" : "Download Android App 📱"}
-              </span>
-            </a>
-          </div>
-
           <form onSubmit={handleAuth} className="space-y-4 sm:space-y-5">
             <AnimatePresence mode="wait">
               {mode === "signup" && (
@@ -777,22 +908,24 @@ export default function Login() {
                   exit={{ opacity: 0, height: 0 }}
                   className="space-y-4 sm:space-y-5 overflow-hidden"
                 >
-                  <label className="block text-[10px] sm:text-xs font-bold text-slate-400 mb-1 sm:mb-2 uppercase tracking-widest text-center">
+                  <label className="block text-xs sm:text-sm font-bold text-slate-500 mb-1 text-center">
                     {t("role")}
                   </label>
                   <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
                     <button
                       type="button"
                       onClick={() => setRole(UserRole.PARENT)}
-                      className={`flex flex-col items-center p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all ${role === UserRole.PARENT ? "border-blue-600 bg-blue-50 text-blue-700 shadow-lg shadow-blue-100" : "border-slate-100 text-slate-400 hover:border-slate-200"}`}
+                      aria-pressed={role === UserRole.PARENT}
+                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all ${role === UserRole.PARENT ? "border-[#0B2345] bg-[#0B2345]/5 text-[#0B2345] shadow-md" : "border-slate-100 text-slate-500 hover:border-slate-200"}`}
                     >
-                      <Users size={20} className="mb-1 sm:mb-2 sm:w-6 sm:h-6" />
+                      <Users size={24} className="mb-2" />
                       <span className="font-bold text-sm">{t("parent")}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setRole(UserRole.ADMIN)}
-                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all ${role === UserRole.ADMIN ? "border-slate-900 bg-slate-50 text-slate-900 shadow-lg shadow-slate-100" : "border-slate-100 text-slate-400 hover:border-slate-200"}`}
+                      aria-pressed={role === UserRole.ADMIN}
+                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all ${role === UserRole.ADMIN ? "border-[#0B2345] bg-[#0B2345]/5 text-[#0B2345] shadow-md" : "border-slate-100 text-slate-500 hover:border-slate-200"}`}
                     >
                       <Building2 size={24} className="mb-2" />
                       <span className="font-bold text-sm">{t("admin")}</span>
@@ -800,24 +933,14 @@ export default function Login() {
                   </div>
 
                   <div className="relative">
-                    {isRtl ? (
-                      <Users
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                        size={18}
-                      />
-                    ) : (
-                      <Users
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                        size={18}
-                      />
-                    )}
+                    <Users className={iconClass} size={18} />
                     <input
                       required
                       type="text"
                       placeholder={t("name")}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base`}
+                      className={fieldClass}
                     />
                   </div>
 
@@ -828,46 +951,26 @@ export default function Login() {
                       className="space-y-4 sm:space-y-5"
                     >
                       <div className="relative">
-                        {isRtl ? (
-                          <Phone
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={18}
-                          />
-                        ) : (
-                          <Phone
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={18}
-                          />
-                        )}
+                        <Phone className={iconClass} size={18} />
                         <input
                           required
                           type="tel"
                           placeholder={t("phone")}
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base`}
+                          className={fieldClass}
                         />
                       </div>
 
                       <div className="relative">
-                        {isRtl ? (
-                          <MapPin
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={18}
-                          />
-                        ) : (
-                          <MapPin
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={18}
-                          />
-                        )}
+                        <MapPin className={iconClass} size={18} />
                         <input
                           required
                           type="text"
                           placeholder={isRtl ? "العنوان التفصيلي للمدرسة" : "School Detailed Address"}
                           value={schoolAddress}
                           onChange={(e) => setSchoolAddress(e.target.value)}
-                          className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base`}
+                          className={fieldClass}
                         />
                       </div>
 
@@ -877,7 +980,7 @@ export default function Login() {
                             required
                             value={schoolGovernorate}
                             onChange={(e) => setSchoolGovernorate(e.target.value)}
-                            className="w-full px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 bg-slate-50/50 outline-none font-bold text-sm sm:text-base dark:text-slate-900 focus:bg-white"
+                            className={selectClass}
                           >
                             <option value="" disabled>
                               {isRtl ? "اختر المحافظة..." : "Select Governorate..."}
@@ -909,7 +1012,7 @@ export default function Login() {
                             required
                             value={schoolDirectorate}
                             onChange={(e) => setSchoolDirectorate(e.target.value)}
-                            className="w-full px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 bg-slate-50/50 outline-none font-bold text-sm sm:text-base dark:text-slate-900 focus:bg-white"
+                            className={selectClass}
                           >
                             <option value="" disabled>
                               {isRtl ? "اختر المديرية..." : "Select Directorate..."}
@@ -931,7 +1034,7 @@ export default function Login() {
                             required
                             value={schoolEducationLevel}
                             onChange={(e) => setSchoolEducationLevel(e.target.value)}
-                            className="w-full px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 bg-slate-50/50 outline-none font-bold text-sm sm:text-base dark:text-slate-900 focus:bg-white"
+                            className={selectClass}
                           >
                             <option value="" disabled>
                               {isRtl ? "المرحلة الدراسية..." : "Education Level..."}
@@ -949,7 +1052,7 @@ export default function Login() {
                             required
                             value={schoolWorkingHours}
                             onChange={(e) => setSchoolWorkingHours(e.target.value)}
-                            className="w-full px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 bg-slate-50/50 outline-none font-bold text-sm sm:text-base dark:text-slate-900 focus:bg-white"
+                            className={selectClass}
                           >
                             <option value="" disabled>
                               {isRtl ? "وقت الدوام..." : "Working Hours..."}
@@ -967,7 +1070,7 @@ export default function Login() {
                             required
                             value={schoolStudyType}
                             onChange={(e) => setSchoolStudyType(e.target.value)}
-                            className="w-full px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 bg-slate-50/50 outline-none font-bold text-sm sm:text-base dark:text-slate-900 focus:bg-white"
+                            className={selectClass}
                           >
                             <option value="" disabled>
                               {isRtl ? "نوع الدراسة..." : "Study Type..."}
@@ -986,7 +1089,7 @@ export default function Login() {
                             placeholder={isRtl ? "عدد الطلاب المقدر" : "Estimated Students"}
                             value={schoolEstimatedStudents}
                             onChange={(e) => setSchoolEstimatedStudents(e.target.value)}
-                            className="w-full px-4 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 text-sm sm:text-base dark:text-slate-900 focus:bg-white"
+                            className={selectClass}
                           />
                         </div>
                       </div>
@@ -997,17 +1100,7 @@ export default function Login() {
             </AnimatePresence>
 
             <div className="relative">
-              {isRtl ? (
-                <Mail
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  size={18}
-                />
-              ) : (
-                <Mail
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  size={18}
-                />
-              )}
+              <Mail className={iconClass} size={18} />
               <input
                 required
                 type="email"
@@ -1015,45 +1108,48 @@ export default function Login() {
                 placeholder={t("email")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`w-full ${isRtl ? "pr-12 pl-4 text-right" : "pl-12 pr-4 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 shadow-inner text-sm sm:text-base`}
+                className={fieldClass}
               />
             </div>
 
             <div className="relative">
-              {isRtl ? (
-                <Lock
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  size={18}
-                />
-              ) : (
-                <Lock
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  size={18}
-                />
-              )}
+              <Lock className={iconClass} size={18} />
               <input
                 required
                 type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
                 placeholder={t("password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={`w-full ${isRtl ? "pr-12 pl-12 text-right" : "pl-12 pr-12 text-left"} py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 focus:border-slate-900 outline-none font-bold bg-slate-50/30 shadow-inner text-sm sm:text-base`}
+                className={`${fieldClass} ${isRtl ? "pl-12" : "pr-12"}`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? (isRtl ? "إخفاء كلمة المرور" : "Hide password") : (isRtl ? "إظهار كلمة المرور" : "Show password")}
                 className={`absolute ${isRtl ? "left-4" : "right-4"} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10 flex items-center justify-center p-1`}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
 
-            <div className="bg-slate-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-100 shadow-inner">
+            {mode === "login" && (
+              <div className="flex justify-end -mt-1">
+                <button
+                  type="button"
+                  onClick={() => openPanel("reset")}
+                  className="text-sm font-bold text-[#0B2345]/70 hover:text-[#0B2345] transition-colors"
+                >
+                  {t("forgotPassword")}
+                </button>
+              </div>
+            )}
+
+            <div className="bg-slate-50 px-4 py-3.5 rounded-xl border border-slate-200">
               <div className="flex items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="bg-white p-1.5 sm:p-2 rounded-lg border border-slate-200 hidden sm:block">
-                    <ShieldCheck size={20} className="text-blue-600" />
+                    <ShieldCheck size={20} className="text-[#A8841F]" />
                   </div>
                   <div>
                     <span className="block font-bold text-slate-600 text-xs sm:text-sm">
@@ -1070,7 +1166,7 @@ export default function Login() {
                   type="number"
                   value={captchaAnswer}
                   onChange={(e) => setCaptchaAnswer(e.target.value)}
-                  className="w-16 sm:w-20 px-2 sm:px-3 py-2 sm:py-3 rounded-lg sm:rounded-xl border border-slate-200 text-center font-bold focus:border-blue-500 outline-none shadow-sm text-sm sm:text-base"
+                  className="w-16 sm:w-20 px-2 py-2.5 rounded-lg border border-slate-200 bg-white text-center font-bold outline-none transition focus:border-[#0B2345] focus:ring-4 focus:ring-[#0B2345]/10 text-sm sm:text-base"
                   placeholder="?"
                 />
               </div>
@@ -1078,7 +1174,7 @@ export default function Login() {
 
             <button
               disabled={loading}
-              className={`w-full py-4 sm:py-5 rounded-xl sm:rounded-[1.5rem] font-bold text-base sm:text-lg flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 disabled:opacity-50 ${mode === "signup" ? "bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200" : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100"}`}
+              className={primaryButtonClass}
             >
               {loading ? (
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -1090,24 +1186,12 @@ export default function Login() {
               )}
             </button>
 
-            {mode === "login" && (
-              <div className="text-center mt-3 sm:mt-4">
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className="text-slate-400 hover:text-slate-900 font-bold transition-all text-xs sm:text-sm"
-                >
-                  {t("forgotPassword")}
-                </button>
-              </div>
-            )}
-
             <div className="relative my-6 sm:my-8">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-slate-200"></span>
               </div>
-              <div className="relative flex justify-center text-[10px] sm:text-xs uppercase">
-                <span className="bg-white px-4 text-slate-400 font-bold tracking-widest">
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-white px-4 text-slate-400 font-bold">
                   {isRtl ? "أو عبر" : "OR VIA"}
                 </span>
               </div>
@@ -1117,7 +1201,7 @@ export default function Login() {
               type="button"
               disabled={loading}
               onClick={handleGoogleAuth}
-              className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl border-2 border-slate-100 bg-white hover:bg-slate-50 transition-all font-bold text-slate-600 flex items-center justify-center gap-3 shadow-sm hover:border-slate-200 active:scale-95 disabled:opacity-50 text-sm sm:text-base"
+              className="w-full py-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all font-bold text-slate-700 flex items-center justify-center gap-3 shadow-sm hover:border-slate-300 active:scale-[0.98] disabled:opacity-50 text-sm sm:text-base"
             >
               <img
                 src="/brand/google-g.svg"
@@ -1135,7 +1219,8 @@ export default function Login() {
           </>
           )}
 
-          <p className="mt-6 sm:mt-8 text-center text-slate-400 text-xs sm:text-sm font-medium">
+          <p className="mt-6 sm:mt-8 flex items-center justify-center gap-2 text-center text-slate-400 text-xs sm:text-sm font-medium">
+            <ShieldCheck size={16} className="shrink-0 text-slate-300" />
             {isRtl
               ? "نظام آمن ومشفر 100% لإدارة تعليمية متميزة"
               : "100% Secure & Encrypted School Management System"}
@@ -1174,7 +1259,7 @@ export default function Login() {
                   className="w-full py-4 bg-[#D4A64A] hover:bg-[#0B2345] text-[#0B2345] hover:text-[#D4A64A] border border-[#D4A64A] hover:border-[#0B2345] font-black rounded-2xl text-sm sm:text-base flex items-center justify-center gap-3 transition-all shadow-lg shadow-[#D4A64A]/10 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                 >
                   <Download className="w-5 h-5" />
-                  <span>{isRtl ? "تحميل تطبيق أندرويد (APK) 📱" : "Download Android App (APK) 📱"}</span>
+                  <span>{isRtl ? "تحميل تطبيق أندرويد (APK)" : "Download Android App (APK)"}</span>
                 </a>
                 <p className="text-[10px] text-slate-400 mt-2.5 font-bold">
                   {isRtl
@@ -1559,7 +1644,7 @@ export default function Login() {
       </motion.div>
 
       <div className="-mx-4 sm:-mx-6 -mb-6 sm:-mb-12 mt-20 w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)]">
-        <GlobalFooter compact={false} />
+        <GlobalFooter compact />
       </div>
 
       <AnimatePresence>
