@@ -157,7 +157,7 @@ export function buildTuitionWhatsAppMessage(params: {
 }): string {
   const amountStr =
     typeof params.amount === 'number'
-      ? params.amount.toLocaleString('ar-IQ')
+      ? params.amount.toLocaleString('ar-IQ-u-nu-latn')
       : params.amount;
   return [
     `\u062a\u0646\u0628\u064a\u0647 \u0645\u0646 \u0645\u062f\u0631\u0633\u0629 ${params.schoolName}`,

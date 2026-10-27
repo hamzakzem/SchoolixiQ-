@@ -60,7 +60,7 @@ export function ParentTuitionWarning({
               </p>
               <div className="flex flex-wrap gap-3 mt-2 text-xs font-bold text-[#0B2345]/60">
                 {escalation.amount != null && (
-                  <span>المبلغ: {Number(escalation.amount).toLocaleString('ar-IQ')} د.ع</span>
+                  <span>المبلغ: {Number(escalation.amount).toLocaleString('ar-IQ-u-nu-latn')} د.ع</span>
                 )}
                 {escalation.dueDate && <span>الاستحقاق: {String(escalation.dueDate)}</span>}
               </div>

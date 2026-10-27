@@ -701,11 +701,11 @@ export function enrichTuitionReminderDisplayRows(
 
 export function formatTuitionDueLabel(dueDate: unknown): string {
   if (!dueDate) return 'غير محدد';
-  return parseTuitionDueDate(dueDate).toLocaleDateString('ar-IQ');
+  return parseTuitionDueDate(dueDate).toLocaleDateString('ar-IQ-u-nu-latn');
 }
 
 export function formatTuitionAmountLabel(amount?: number): string {
-  return (amount ?? 0).toLocaleString('ar-IQ');
+  return (amount ?? 0).toLocaleString('ar-IQ-u-nu-latn');
 }
 
 export function buildTuitionReminderPayload(

@@ -193,7 +193,7 @@ export function OfflineOperationsPanel({ open, onClose }: Props) {
                   </div>
                   <div className="font-semibold text-slate-800 dark:text-slate-100">{op.collection}</div>
                   <div className="mt-1 text-xs text-slate-500">
-                    {new Date(op.updatedAt).toLocaleString('ar-IQ')} · محاولات {op.retryCount}
+                    {new Date(op.updatedAt).toLocaleString('ar-IQ-u-nu-latn')} · محاولات {op.retryCount}
                   </div>
                   {op.errorMessage && (
                     <div className="mt-1 text-xs text-red-600 dark:text-red-300">{op.errorMessage}</div>

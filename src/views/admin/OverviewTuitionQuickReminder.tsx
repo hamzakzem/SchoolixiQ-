@@ -542,7 +542,7 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
                           </td>
                           <td className="px-3 py-3 text-xs text-slate-500">
                             {row.lastReminderAt
-                              ? row.lastReminderAt.toLocaleDateString('ar-IQ')
+                              ? row.lastReminderAt.toLocaleDateString('ar-IQ-u-nu-latn')
                               : '—'}
                           </td>
                           <td className="px-3 py-3 text-xs font-bold">

@@ -1255,7 +1255,7 @@ export default function TeacherDashboard() {
     },
     {
       id: "homework",
-      label: isRtl ? "الالواحب اليومي" : "Daily Homework",
+      label: isRtl ? "الواجبات اليومية" : "Daily Homework",
       icon: BookOpen,
       permission: "homework_and_tasks",
     },
@@ -1435,17 +1435,17 @@ export default function TeacherDashboard() {
                     )
                   ) : (
                   <>
-                  <div className="sx-card-grid sx-dashboard-grid--4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="sx-dashboard-grid--4 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                     {[
                       {
-                        label: isRtl ? "طلاب الصف المعيّن" : "Assigned class students",
+                        label: isRtl ? "طلاب صفوفي" : "My students",
                         value: students.length,
                         icon: Users,
                         color: "indigo",
                       },
                       {
-                        label: isRtl ? "الصفوف المعيّنة" : "Assigned classes",
-                        value: assignedClassName || 1,
+                        label: isRtl ? "صفوفي" : "My classes",
+                        value: Math.max(1, assignedClassIds.length),
                         icon: LayoutDashboard,
                         color: "orange",
                       },
@@ -1464,17 +1464,17 @@ export default function TeacherDashboard() {
                     ].map((stat, i) => (
                       <div
                         key={i}
-                        className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm"
+                        className="bg-white p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-slate-200 shadow-sm"
                       >
                         <div
-                          className={`w-12 h-12 rounded-2xl bg-${stat.color}-50 text-${stat.color}-600 flex items-center justify-center mb-4`}
+                          className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-${stat.color}-50 text-${stat.color}-600 flex items-center justify-center mb-3 md:mb-4`}
                         >
-                          <stat.icon size={24} />
+                          <stat.icon size={20} />
                         </div>
-                        <p className="text-xs font-bold text-slate-400 mb-1">
+                        <p className="text-xs font-bold text-slate-500 mb-1">
                           {stat.label}
                         </p>
-                        <p className="text-3xl font-black text-slate-900 font-display">
+                        <p className="text-2xl md:text-3xl font-black text-slate-900 font-display tabular-nums">
                           {stat.value}
                         </p>
                       </div>
@@ -1484,7 +1484,7 @@ export default function TeacherDashboard() {
                   <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                     <div className="mb-8">
                       <h3 className="text-xl font-bold text-slate-900 mb-1 font-display">
-                        {isRtl ? "الصف المعيّن" : "Assigned class"}
+                        {isRtl ? (assignedClassIds.length > 1 ? "صفوفي" : "صفّي") : "My classes"}
                       </h3>
                       <p className="text-xs text-slate-400 font-bold">
                         {assignedClassName}

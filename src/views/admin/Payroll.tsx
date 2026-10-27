@@ -862,7 +862,7 @@ export default function Payroll() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
                   <div className="space-y-4">
                     <div className="bg-indigo-50/30 p-4 rounded-2xl border border-indigo-100/50">
-                      <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2 px-1">المكافأة (Bonus)</label>
+                      <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2 px-1">المكافأة</label>
                       <input 
                         type="number"
                         value={Number.isNaN(editingFinancials.bonus) ? '' : editingFinancials.bonus}
@@ -885,7 +885,7 @@ export default function Payroll() {
 
                   <div className="space-y-4">
                     <div className="bg-rose-50/30 p-4 rounded-2xl border border-rose-100/50">
-                      <label className="block text-[10px] font-black text-rose-600 uppercase tracking-widest mb-2 px-1">الاستقطاع (Deduction)</label>
+                      <label className="block text-[10px] font-black text-rose-600 uppercase tracking-widest mb-2 px-1">الاستقطاع</label>
                       <input 
                         type="number"
                         value={Number.isNaN(editingFinancials.deduction) ? '' : editingFinancials.deduction}

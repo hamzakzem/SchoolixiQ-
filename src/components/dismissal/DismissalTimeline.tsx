@@ -33,7 +33,7 @@ const EVENT_ICONS: Record<string, React.ElementType> = {
 function eventTime(ev: { timestamp?: { seconds?: number } | null }) {
   const s = ev.timestamp?.seconds;
   if (!s) return null;
-  return new Date(s * 1000).toLocaleString('ar-IQ', {
+  return new Date(s * 1000).toLocaleString('ar-IQ-u-nu-latn', {
     hour: '2-digit',
     minute: '2-digit',
     day: 'numeric',

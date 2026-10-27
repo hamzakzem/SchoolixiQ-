@@ -2007,16 +2007,16 @@ export default function SuperAdminDashboard() {
                   <SchoolixLogo size={isSidebarCollapsed ? 38 : 44} surface="dark" />
                 )}
                 {!isSidebarCollapsed && (
-                  <motion.h1
+                  <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="text-lg md:text-xl font-bold font-display tracking-tight leading-none min-w-0"
+                    className="text-[15px] font-bold font-display tracking-tight leading-snug min-w-0 text-white"
                   >
-                    <span className="truncate block w-full">
+                    <span className="block w-full line-clamp-2">
                       {t('sidebar_platform_title').replace('{appName}', config.appName)}
                     </span>
-                  </motion.h1>
+                  </motion.p>
                 )}
               </div>
               <nav className="flex-1 overflow-x-hidden overflow-y-auto px-3 md:px-4 py-4 space-y-1.5 custom-scrollbar">
@@ -2707,7 +2707,7 @@ export default function SuperAdminDashboard() {
                       {t('add_new_school')}
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
                     <AdminStatCard
                       title={t('stat_total_schools')}
                       value={stats.total}
@@ -2940,7 +2940,7 @@ export default function SuperAdminDashboard() {
                           <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-xl text-orange-600">
                             <Users size={24} />
                           </div>
-                          تسجيلات مدرسية بانتظار المراجعة (New Nodes)
+                          تسجيلات مدارس جديدة بانتظار المراجعة
                         </h4>
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-bold mt-1 opacity-80 pr-12">
                           حسابات تم إنشاؤها عبر بوابات الويب ولم يتم تعيينها
@@ -3301,7 +3301,7 @@ export default function SuperAdminDashboard() {
                                   className="text-amber-500"
                                 />
                                 <span className="font-bold text-amber-600 dark:text-amber-400">
-                                  {request.price.toLocaleString("ar-IQ")} د.ع
+                                  {request.price.toLocaleString("ar-IQ-u-nu-latn")} د.ع
                                 </span>
                               </div>
                             )}
@@ -3346,7 +3346,7 @@ export default function SuperAdminDashboard() {
                             تاريخ الطلب:{" "}
                             {request.createdAt
                               ?.toDate?.()
-                              ?.toLocaleString("ar-IQ") || "جاري التحميل..."}
+                              ?.toLocaleString("ar-IQ-u-nu-latn") || "جاري التحميل..."}
                           </div>
                         </div>
 
@@ -3484,9 +3484,9 @@ export default function SuperAdminDashboard() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
                     <AdminStatCard
-                      title="المدراء الخارقين"
+                      title="مدراء النظام"
                       value={
                         users.filter((u) => u.role === "superadmin").length
                       }
@@ -3541,7 +3541,7 @@ export default function SuperAdminDashboard() {
                                       {user.createdAt
                                         ? new Date(
                                             user.createdAt.seconds * 1000,
-                                          ).toLocaleDateString("ar-IQ")
+                                          ).toLocaleDateString("ar-IQ-u-nu-latn")
                                         : "---"}
                                     </span>
                                   </div>
@@ -6178,7 +6178,7 @@ export default function SuperAdminDashboard() {
                     <option value="school_assistant">مساعد مدرسة</option>
                     <option value="admin">مدير مدرسة</option>
                     {isMasterAdmin && (
-                      <option value="superadmin">مدير نظام (Super)</option>
+                      <option value="superadmin">مدير نظام</option>
                     )}
                   </select>
                 </div>
@@ -6468,7 +6468,7 @@ function PackageDetailsModal({
                   : (pkg.priceYearly !== undefined
                       ? pkg.priceYearly
                       : pkg.price
-                    ).toLocaleString("ar-IQ")}
+                    ).toLocaleString("ar-IQ-u-nu-latn")}
                 {(pkg.priceYearly !== undefined ? pkg.priceYearly : pkg.price) >
                   0 && <span className="text-xs font-bold mr-1">د.ع</span>}
               </p>
@@ -6485,7 +6485,7 @@ function PackageDetailsModal({
                   : (pkg.priceMonthly !== undefined
                       ? pkg.priceMonthly
                       : Math.round((pkg.price || 0) / 12)
-                    ).toLocaleString("ar-IQ")}
+                    ).toLocaleString("ar-IQ-u-nu-latn")}
                 {(pkg.priceMonthly !== undefined
                   ? pkg.priceMonthly
                   : Math.round((pkg.price || 0) / 12)) > 0 && (
@@ -6498,7 +6498,7 @@ function PackageDetailsModal({
                 سعة الطلاب
               </p>
               <p className="text-xl font-black text-blue-800 dark:text-blue-300 transition-colors">
-                {pkg.maxStudents.toLocaleString("ar-IQ")} طالب
+                {pkg.maxStudents.toLocaleString("ar-IQ-u-nu-latn")} طالب
               </p>
             </div>
           </div>

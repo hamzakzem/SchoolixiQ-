@@ -14,12 +14,12 @@ function formatListTime(ms: number | undefined, isRtl: boolean): string {
     date.getMonth() === now.getMonth() &&
     date.getFullYear() === now.getFullYear();
   if (isToday) {
-    return date.toLocaleTimeString(isRtl ? 'ar-SA' : 'en-US', {
+    return date.toLocaleTimeString(isRtl ? 'ar-IQ-u-nu-latn' : 'en-US', {
       hour: '2-digit',
       minute: '2-digit',
     });
   }
-  return date.toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', {
+  return date.toLocaleDateString(isRtl ? 'ar-IQ-u-nu-latn' : 'en-US', {
     month: 'short',
     day: 'numeric',
   });

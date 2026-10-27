@@ -67,7 +67,7 @@ function currentMonthKey() {
 }
 
 function formatIqd(amount: number) {
-  return `${Number(amount || 0).toLocaleString("ar-IQ")} د.ع`;
+  return `${Number(amount || 0).toLocaleString("ar-IQ-u-nu-latn")} د.ع`;
 }
 
 const STATUS_LABELS: Record<string, string> = {

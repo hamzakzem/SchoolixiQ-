@@ -262,7 +262,7 @@ export default function Announcements() {
                         {ann.target === 'all' ? 'للجميع' : ann.target === 'parents' ? 'لأولياء الأمور' : ann.target === 'staff' ? 'للكادر التعليمي' : `فردي: ${ann.targetStudentName}`}
                       </span>
                       <span className="text-[10px] text-slate-400 font-bold">
-                        {ann.createdAt?.seconds ? new Date(ann.createdAt.seconds * 1000).toLocaleString('ar-IQ') : 'جاري النشر...'}
+                        {ann.createdAt?.seconds ? new Date(ann.createdAt.seconds * 1000).toLocaleString('ar-IQ-u-nu-latn') : 'جاري النشر...'}
                       </span>
                     </div>
                     <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">{ann.title}</h3>

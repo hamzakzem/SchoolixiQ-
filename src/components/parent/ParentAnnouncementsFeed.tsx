@@ -57,7 +57,7 @@ export function ParentAnnouncementsFeed({ isRtl, t, announcements, mode = 'all' 
                   </div>
                   <time className="text-[10px] font-semibold text-[#0B2345]/40 tabular-nums">
                     {ann.createdAt?.seconds
-                      ? new Date(ann.createdAt.seconds * 1000).toLocaleDateString(isRtl ? 'ar-IQ' : 'en-US')
+                      ? new Date(ann.createdAt.seconds * 1000).toLocaleDateString(isRtl ? 'ar-IQ-u-nu-latn' : 'en-US')
                       : t('now')}
                   </time>
                 </div>

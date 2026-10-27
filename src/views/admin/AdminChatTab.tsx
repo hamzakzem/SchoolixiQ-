@@ -342,7 +342,7 @@ export default function AdminChatTab() {
     if (!timestamp) return '';
     if (typeof timestamp.toDate === 'function') {
       const date = timestamp.toDate();
-      return date.toLocaleTimeString(isRtl ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString(isRtl ? 'ar-IQ-u-nu-latn' : 'en-US', { hour: '2-digit', minute: '2-digit' });
     }
     return '';
   };
@@ -365,7 +365,7 @@ export default function AdminChatTab() {
       const today = new Date();
       const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
       if (!isToday) {
-        dateStr = date.toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        dateStr = date.toLocaleDateString(isRtl ? 'ar-IQ-u-nu-latn' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric' });
       }
     }
     if (!acc[dateStr]) acc[dateStr] = [];

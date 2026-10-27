@@ -838,7 +838,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         <div className="min-w-0">
                           <span className="font-bold text-slate-900 block font-display leading-none truncate">{student.name}</span>
                           <div className="flex flex-wrap items-center gap-2 mt-1">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block whitespace-nowrap">سجل: {new Date(student.createdAt?.seconds * 1000).toLocaleDateString('ar-IQ')}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block whitespace-nowrap">سجل: {new Date(student.createdAt?.seconds * 1000).toLocaleDateString('ar-IQ-u-nu-latn')}</span>
                             {student.parentIds?.length > 0 && (
                               <button 
                                 onClick={() => setShowLinkedParentsModal(student)}
@@ -1274,7 +1274,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           </div>
           <h3 className="sx-app-modal-panel__title mb-2">حذف الحساب نهائياً؟</h3>
           <p className="text-slate-500 text-sm mb-2 leading-relaxed px-4">
-            سيتم حذف حساب <span className="font-bold text-slate-900">{parentToDelete?.name}</span> نهائياً من النظام (Auth & Firestore).
+            سيتم حذف حساب <span className="font-bold text-slate-900">{parentToDelete?.name}</span> نهائياً من النظام، مع بيانات الدخول الخاصة به.
           </p>
           <p className="text-red-500 text-[11px] font-bold mb-8 px-4 py-2 bg-red-50 rounded-lg inline-block border border-red-100 mx-4">
             تحذير: سيتم إلغاء ربط الولي من جميع الطلاب المرتبطين به في هذه المدرسة.

@@ -524,7 +524,7 @@ export default function TuitionReminderDashboard() {
                   <td className="px-4 py-3 font-bold">{row.studentName}</td>
                   <td className="px-4 py-3">{row.parentName}</td>
                   <td className="px-4 py-3 font-mono text-xs" dir="ltr">{row.parentPhone || '—'}</td>
-                  <td className="px-4 py-3">{row.amount.toLocaleString('ar-IQ')} د.ع</td>
+                  <td className="px-4 py-3">{row.amount.toLocaleString('ar-IQ-u-nu-latn')} د.ع</td>
                   <td className="px-4 py-3 text-xs">{formatTuitionDueLabel(row.dueDate)}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${row.delayDays > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -532,7 +532,7 @@ export default function TuitionReminderDashboard() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-500">
-                    {row.lastReminderAt ? row.lastReminderAt.toLocaleString('ar-IQ') : '—'}
+                    {row.lastReminderAt ? row.lastReminderAt.toLocaleString('ar-IQ-u-nu-latn') : '—'}
                   </td>
                   <td className="px-4 py-3 font-bold">{row.reminderCount}</td>
                   <td className="px-4 py-3">
