@@ -54,7 +54,9 @@ function buildClassName(
     .join(' ');
 }
 
-export function LandingButton(props: LandingButtonProps) {
+export function LandingButton(allProps: LandingButtonProps) {
+  // Pull styling props out so they are never spread onto the DOM element
+  // (a spread `className` would otherwise replace the computed classes).
   const {
     variant = 'primary',
     size = 'md',
@@ -64,7 +66,8 @@ export function LandingButton(props: LandingButtonProps) {
     icon,
     disabled,
     'aria-label': ariaLabel,
-  } = props;
+    ...props
+  } = allProps;
 
   const classes = buildClassName(variant, size, fullWidth, className);
   const content = (
@@ -74,8 +77,8 @@ export function LandingButton(props: LandingButtonProps) {
     </>
   );
 
-  if ('to' in props && props.to) {
-    const { to, target, rel, onClick } = props as AsLink;
+  if ('to' in allProps && allProps.to) {
+    const { to, target, rel, onClick } = props as Omit<AsLink, keyof CommonProps>;
     return (
       <Link
         to={to}
@@ -90,8 +93,8 @@ export function LandingButton(props: LandingButtonProps) {
     );
   }
 
-  if ('href' in props && props.href) {
-    const { href, target, rel, onClick, ...rest } = props as AsAnchor;
+  if ('href' in allProps && allProps.href) {
+    const { href, target, rel, onClick, ...rest } = props as Omit<AsAnchor, keyof CommonProps>;
     return (
       <a
         href={href}
@@ -107,7 +110,7 @@ export function LandingButton(props: LandingButtonProps) {
     );
   }
 
-  const { type = 'button', onClick, ...buttonRest } = props as AsButton;
+  const { type = 'button', onClick, ...buttonRest } = props as Omit<AsButton, keyof CommonProps>;
   return (
     <button
       type={type}
