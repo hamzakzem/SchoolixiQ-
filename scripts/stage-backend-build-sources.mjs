@@ -26,7 +26,7 @@ for (const [srcName, destName] of pairs) {
   if (srcName === 'server.ts') {
     // Root server.ts imports backend modules via ./backend/*; rewrite for backend/ runtime.
     const raw = fs.readFileSync(src, 'utf8');
-    const rewritten = raw.replaceAll("from './backend/roleHierarchy.ts'", "from './roleHierarchy.ts'");
+    const rewritten = raw.replaceAll("from './backend/", "from './");
     fs.writeFileSync(dest, rewritten);
   } else {
     fs.copyFileSync(src, dest);

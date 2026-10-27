@@ -3,6 +3,14 @@ import { ensureBackendApiBaseUrl, getApiUrl } from './apiUtils';
 
 const pendingKeys = new Map<string, string>();
 
+function newIdempotencyKey(scope: string, requestId: string) {
+  const nonce =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${scope}:${requestId}:${nonce}`;
+}
+
 function stableKey(scope: string, requestId: string) {
   const cacheKey = `${scope}:${requestId}`;
   if (!pendingKeys.has(cacheKey)) {
