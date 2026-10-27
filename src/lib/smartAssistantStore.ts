@@ -68,6 +68,65 @@ export async function loadAssistantCatalog(): Promise<AssistantCatalog> {
   }
 }
 
+const CATALOG_CACHE_KEY = 'sx_assistant_catalog_v1';
+const CATALOG_TTL_MS = 10 * 60 * 1000;
+let catalogMemo: { at: number; catalog: AssistantCatalog } | null = null;
+let catalogInflight: Promise<AssistantCatalog> | null = null;
+
+function readStoredCatalog(): { at: number; catalog: AssistantCatalog } | null {
+  try {
+    const raw = window.localStorage.getItem(CATALOG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.catalog?.answers ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Drop cached content so widgets in this browser pick up admin edits immediately. */
+export function invalidateAssistantCatalogCache(): void {
+  catalogMemo = null;
+  try {
+    window.localStorage.removeItem(CATALOG_CACHE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Last known catalog (memory, then localStorage) — instant, no network. */
+export function peekCachedAssistantCatalog(): AssistantCatalog | null {
+  if (!catalogMemo && typeof window !== 'undefined') catalogMemo = readStoredCatalog();
+  return catalogMemo?.catalog || null;
+}
+
+/**
+ * One shared, cached catalog fetch for every assistant widget (one-shot reads
+ * instead of four realtime listeners per mounted widget). Revalidates after TTL.
+ */
+export function getCachedAssistantCatalog(): Promise<AssistantCatalog> {
+  peekCachedAssistantCatalog();
+  if (catalogMemo && Date.now() - catalogMemo.at < CATALOG_TTL_MS) {
+    return Promise.resolve(catalogMemo.catalog);
+  }
+  if (!catalogInflight) {
+    catalogInflight = loadAssistantCatalog()
+      .then((catalog) => {
+        catalogMemo = { at: Date.now(), catalog };
+        try {
+          window.localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify(catalogMemo));
+        } catch {
+          /* storage full or blocked — memory cache still works */
+        }
+        return catalog;
+      })
+      .finally(() => {
+        catalogInflight = null;
+      });
+  }
+  return catalogInflight;
+}
+
 export function subscribeAssistantCatalog(onData: (c: AssistantCatalog) => void): Unsubscribe {
   let categories: AssistantCategory[] = [];
   let flows: AssistantFlow[] = [];
@@ -139,6 +198,7 @@ export function subscribeAssistantCatalog(onData: (c: AssistantCatalog) => void)
 }
 
 export async function seedAssistantCatalogIfEmpty(): Promise<{ seeded: boolean }> {
+  invalidateAssistantCatalogCache();
   const existing = await getDocs(collection(db, COL.categories));
   if (!existing.empty) return { seeded: false };
   const seed = getSeedCatalog();
@@ -152,12 +212,15 @@ export async function seedAssistantCatalogIfEmpty(): Promise<{ seeded: boolean }
 }
 
 export async function upsertCategory(data: AssistantCategory) {
+  invalidateAssistantCatalogCache();
   await setDoc(doc(db, COL.categories, data.id), data, { merge: true });
 }
 export async function upsertFlow(data: AssistantFlow) {
+  invalidateAssistantCatalogCache();
   await setDoc(doc(db, COL.flows, data.id), data, { merge: true });
 }
 export async function upsertAnswer(data: AssistantAnswer) {
+  invalidateAssistantCatalogCache();
   await setDoc(doc(db, COL.answers, data.id), data, { merge: true });
   for (const keyword of data.keywords || []) {
     const id = `kw_${data.id}_${keyword}`.replace(/\s+/g, '_').slice(0, 120);
@@ -175,12 +238,15 @@ export async function upsertAnswer(data: AssistantAnswer) {
   }
 }
 export async function deleteCategory(id: string) {
+  invalidateAssistantCatalogCache();
   await deleteDoc(doc(db, COL.categories, id));
 }
 export async function deleteFlow(id: string) {
+  invalidateAssistantCatalogCache();
   await deleteDoc(doc(db, COL.flows, id));
 }
 export async function deleteAnswer(id: string) {
+  invalidateAssistantCatalogCache();
   await deleteDoc(doc(db, COL.answers, id));
 }
 
@@ -346,9 +412,11 @@ export async function saveAssistantSettings(data: AssistantUiSettings): Promise<
 }
 
 export async function upsertKeyword(data: AssistantKeyword): Promise<void> {
+  invalidateAssistantCatalogCache();
   await setDoc(doc(db, COL.keywords, data.id), data, { merge: true });
 }
 
 export async function deleteKeyword(id: string): Promise<void> {
+  invalidateAssistantCatalogCache();
   await deleteDoc(doc(db, COL.keywords, id));
 }
