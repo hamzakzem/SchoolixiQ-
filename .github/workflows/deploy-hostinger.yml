@@ -29,6 +29,8 @@ jobs:
       - name: Install dependencies
         # Same install as Hostinger (no --legacy-peer-deps): a lockfile that only
         # resolves with that flag makes Hostinger keep serving the old release.
+        env:
+          SKIP_POSTINSTALL_BUILD: "1"
         run: npm ci
 
       - name: Type check

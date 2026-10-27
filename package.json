@@ -17,7 +17,8 @@
     "predeploy:check": "npm run verify:production && npm run verify:server-start",
     "build:server": "node scripts/stage-backend-build-sources.mjs && node scripts/ensure-backend-deps.mjs && npm run build --prefix backend && node scripts/stage-server-dist.mjs",
     "preview": "vite preview",
-    "start": "node dist/server.mjs",
+    "start": "node server.js",
+    "postinstall": "node scripts/postinstall-build.mjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
