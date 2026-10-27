@@ -219,6 +219,7 @@ export function DashboardShell({
             onLogout={onLogout}
             hidden={hideMobileDock}
             desktopDrawerEnabled={false}
+            onOpenAssistant={!assistantHidden ? () => setAssistantOpen(true) : undefined}
           />
         ) : null}
       </div>

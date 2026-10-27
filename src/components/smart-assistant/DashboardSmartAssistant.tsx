@@ -95,6 +95,7 @@ export function DashboardSmartAssistant({
       assistantName={isRtl ? settings.nameAr : settings.nameEn}
       introText={isRtl ? settings.introAr : settings.introEn}
       logoUrl={settings.logoUrl || undefined}
+      userName={profile.name}
     />
   );
 }
@@ -135,6 +136,7 @@ export function DashboardSmartAssistantHost({
         assistantName={isRtl ? settings.nameAr : settings.nameEn}
         introText={isRtl ? settings.introAr : settings.introEn}
         logoUrl={settings.logoUrl || undefined}
+        userName={profile.name}
       />
     </>
   );

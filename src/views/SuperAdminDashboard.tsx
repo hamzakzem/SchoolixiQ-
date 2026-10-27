@@ -6409,6 +6409,7 @@ export default function SuperAdminDashboard() {
         onLogout={() => signOutWithCleanup()}
         hidden={activeTab === "chat"}
         desktopDrawerEnabled={false}
+        onOpenAssistant={() => setAssistantOpen(true)}
       />
       ) : null}
       <DashboardSmartAssistant
