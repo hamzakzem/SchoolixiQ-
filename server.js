@@ -28,4 +28,10 @@ if (!fs.existsSync(entry) || !fs.existsSync(indexHtml)) {
 }
 
 process.env.NODE_ENV ||= 'production';
-await import('./dist/server.mjs');
+
+// No top-level await: Hostinger (LiteSpeed lsnode) loads this file with
+// require(), which rejects ES modules that use top-level await.
+import('./dist/server.mjs').catch((error) => {
+  console.error('FAIL: could not start dist/server.mjs', error);
+  process.exit(1);
+});
