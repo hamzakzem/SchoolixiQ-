@@ -449,6 +449,9 @@ export function GlobalFooter({
             &copy; {new Date().getFullYear()} {config.appName}. جميع الحقوق
             محفوظة.
           </div>
+          <div className="mt-1 text-[10px] text-slate-500/70 dark:text-slate-600" dir="ltr">
+            build {__APP_BUILD_TIME__}
+          </div>
         </div>
       </div>
     </footer>

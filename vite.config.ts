@@ -8,6 +8,8 @@ export default defineConfig(({mode}) => {
   return {
     define: {
       'process.env.APP_URL': JSON.stringify(env.APP_URL || env.VITE_APP_URL || ''),
+      // Shown in the footer so a deployed release can be identified at a glance.
+      __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
     },
     plugins: [react(), tailwindcss()],
     resolve: {
