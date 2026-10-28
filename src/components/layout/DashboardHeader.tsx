@@ -6,14 +6,13 @@ import {
   MessageSquare,
   PanelLeft,
   Settings,
-  UserRound,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import SchoolixLogo from '../SchoolixLogo';
 import { isCustomSchoolLogo } from '../../lib/brandAssets';
 import { useAuth } from '../../lib/AuthContext';
 import { LanguageToggle } from '../LanguageToggle';
-import { ThemeToggle } from '../ThemeToggle';
+import { LanguageSegment, ThemeSegment } from '../PreferenceSegments';
 import { FloatingMenu } from '../ui/FloatingMenu';
 
 export type BreadcrumbItem = {
@@ -240,7 +239,7 @@ export function DashboardHeader({
                     {displayImage ? (
                       <img src={displayImage} alt="" className="sx-nav__avatar-img" />
                     ) : (
-                      <UserRound size={18} strokeWidth={1.75} />
+                      <span className="text-base font-extrabold">{initial}</span>
                     )}
                   </span>
                   <div className="sx-nav__profile-menu-copy">
@@ -256,11 +255,11 @@ export function DashboardHeader({
                 <div className="sx-nav__menu-prefs">
                   <div className="sx-nav__menu-pref">
                     <span>{isRtl ? 'المظهر' : 'Appearance'}</span>
-                    <ThemeToggle />
+                    <ThemeSegment />
                   </div>
                   <div className="sx-nav__menu-pref">
                     <span>{isRtl ? 'اللغة' : 'Language'}</span>
-                    <LanguageToggle variant="icon" />
+                    <LanguageSegment />
                   </div>
                   <div className="sx-nav__profile-menu-divider" aria-hidden />
                 </div>

@@ -3,8 +3,40 @@ import { Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { prefersReducedMotion } from '../lib/motion';
 
+const THEME_EVENT = 'sx-theme-change';
+
+/** Apply + persist the theme and tell every toggle on the page. */
+export function applyTheme(dark: boolean) {
+  document.documentElement.classList.toggle('dark', dark);
+  try {
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  } catch {
+    /* storage blocked (private mode) — the class still applies */
+  }
+  window.dispatchEvent(new CustomEvent(THEME_EVENT, { detail: dark }));
+}
+
+/** Current theme, kept in sync with every other toggle. */
+export function useIsDarkTheme(): boolean {
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'),
+  );
+  useEffect(() => {
+    const onChange = (e: Event) => setIsDark(Boolean((e as CustomEvent<boolean>).detail));
+    window.addEventListener(THEME_EVENT, onChange);
+    return () => window.removeEventListener(THEME_EVENT, onChange);
+  }, []);
+  return isDark;
+}
+
 export const ThemeToggle = () => {
   const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const onChange = (e: Event) => setIsDark(Boolean((e as CustomEvent<boolean>).detail));
+    window.addEventListener(THEME_EVENT, onChange);
+    return () => window.removeEventListener(THEME_EVENT, onChange);
+  }, []);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -20,13 +52,7 @@ export const ThemeToggle = () => {
   const toggleTheme = () => {
     const newIsDark = !isDark;
     setIsDark(newIsDark);
-    if (newIsDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
+    applyTheme(newIsDark);
   };
 
   return (

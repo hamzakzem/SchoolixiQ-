@@ -636,6 +636,8 @@ export function filterTuitionReminderRows(
 
   const q = search.trim().toLowerCase();
   if (!q) return list;
+  // Only digit queries match phones: ''.includes('') would match every row
+  const qDigits = q.replace(/\D/g, '');
 
   return list.filter((row) => {
     const student = row.student;
@@ -657,7 +659,7 @@ export function filterTuitionReminderRows(
       className.includes(q) ||
       parentName.includes(q) ||
       parentEmail.includes(q) ||
-      parentPhone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
+      (qDigits.length > 0 && parentPhone.replace(/\D/g, '').includes(qDigits)) ||
       amountStr.includes(q) ||
       statusLabel.includes(q) ||
       row.bucket.includes(q)

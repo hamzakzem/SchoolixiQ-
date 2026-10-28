@@ -19,7 +19,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { notificationService } from './notificationService';
-import { resolveStudentParentIds } from './schoolSync';
+import { getSchoolParentDoc, resolveStudentParentIds } from './schoolSync';
 import {
   buildTuitionReminderPayload,
   computeInstallmentDelayDays,
@@ -302,8 +302,7 @@ export async function applyParentEscalation(
   settings: TuitionReminderSettings,
 ): Promise<void> {
   const userRef = doc(db, 'users', parentId);
-  const snap = await getDoc(userRef);
-  if (!snap.exists() || snap.data()?.schoolId !== schoolId) return;
+  if (!(await getSchoolParentDoc(parentId, schoolId))) return;
 
   const restrictions: Record<string, unknown> = {
     tuitionEscalationLevel: level,
@@ -335,8 +334,7 @@ export async function restoreParentPrivileges(
   restoredBy: string,
 ): Promise<void> {
   const userRef = doc(db, 'users', parentId);
-  const snap = await getDoc(userRef);
-  if (!snap.exists() || snap.data()?.schoolId !== schoolId) {
+  if (!(await getSchoolParentDoc(parentId, schoolId))) {
     throw new Error('Parent not found in this school');
   }
 

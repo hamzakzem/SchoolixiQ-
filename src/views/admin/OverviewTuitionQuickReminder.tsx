@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { X, Search, Send, MessageCircle, ExternalLink, ChevronRight, AlertTriangle } from 'lucide-react';
+import { X, Search, Send, MessageCircle, ChevronDown, AlertTriangle, Inbox, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../lib/AuthContext';
 import { AppModalPortal } from '../../components/AppModalPortal';
 import {
   formatTuitionAmountLabel,
-  formatTuitionDueLabel,
   tuitionParentsQuery,
   type TuitionReminderDisplayRow,
   type TuitionReminderFilterKey,
@@ -26,6 +25,11 @@ import {
   type TuitionReminderSettings,
 } from '../../lib/tuitionReminderService';
 import { TuitionReminderDiagnosticPanel } from '../../components/admin/tuition/TuitionReminderDiagnosticPanel';
+import {
+  ReminderCheck,
+  ReminderFilterChips,
+  TuitionReminderCard,
+} from '../../components/admin/tuition/TuitionReminderCard';
 import {
   logTuitionListenerError,
   logTuitionListenerSnapshot,
@@ -77,6 +81,7 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
 
   const [senderName, setSenderName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
+  const [senderOpen, setSenderOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -87,6 +92,7 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
     setSenderEmail(profile?.email || '');
     setSummary(null);
     setWaQueueIndex(-1);
+    setSenderOpen(false);
   }, [open, profile?.displayName, profile?.name, profile?.email]);
 
   useEffect(() => {
@@ -355,6 +361,13 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
     }
   };
 
+  const allSelected = filteredRows.length > 0 && selected.size === filteredRows.length;
+  const sendCount = Math.min(selected.size, sendLimit);
+  const selectedTotal = useMemo(
+    () => selectedRows.reduce((sum, r) => sum + (r.amount || 0), 0),
+    [selectedRows],
+  );
+
   return (
     <AppModalPortal
       open={open}
@@ -367,7 +380,7 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
         <div>
           <h2 className="sx-app-modal-panel__title">إرسال تنبيهات الأقساط</h2>
           <p className="sx-app-modal-panel__subtitle">
-            متزامن مع بيانات الأقساط — يعرض القسط الحالي غير المدفوع لكل طالب فقط
+            القسط الحالي غير المدفوع لكل طالب — حدّد من تريد تذكيره
           </p>
         </div>
         <button
@@ -380,253 +393,205 @@ export function OverviewTuitionQuickReminder({ open, onClose }: Props) {
         </button>
       </div>
 
-      <div className="sx-app-modal-panel__body !p-0 flex flex-col flex-1 min-h-0">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 space-y-4 shrink-0">
-              <div className="relative">
-                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="بحث: اسم الطالب، الصف، ولي الأمر، البريد، الهاتف، المبلغ، الحالة..."
-                  className="w-full h-11 pr-11 pl-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
-              </div>
+      <div className="sx-app-modal-panel__body sx-trm sx-trm-modal-body flex flex-col">
+        <div className="sx-trm-modal-tools">
+          <div className="sx-trm-search">
+            <Search size={17} aria-hidden />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث باسم الطالب، الصف، ولي الأمر أو الهاتف"
+              aria-label="بحث في الأقساط"
+            />
+          </div>
 
-              <div className="flex flex-wrap gap-2">
-                {FILTER_TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setFilter(tab.key)}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
-                      filter === tab.key
-                        ? 'bg-[#0B2345] text-white border-[#0B2345]'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                    }`}
-                  >
-                    {tab.label} ({filterCounts[tab.key as keyof typeof filterCounts] ?? 0})
-                  </button>
-                ))}
-              </div>
+          <ReminderFilterChips
+            tabs={FILTER_TABS}
+            value={filter}
+            counts={filterCounts}
+            onChange={setFilter}
+          />
 
-              <div className="grid sm:grid-cols-3 gap-3">
-                <label className="text-xs font-bold text-slate-500">
+          <div className={`sx-trm-sender${senderOpen ? ' is-open' : ''}`}>
+            <button
+              type="button"
+              className="sx-trm-sender__toggle"
+              onClick={() => setSenderOpen((v) => !v)}
+              aria-expanded={senderOpen}
+            >
+              <span className="sx-trm-sender__icon" aria-hidden>
+                <SlidersHorizontal size={16} />
+              </span>
+              <span className="sx-trm-sender__copy">
+                <span className="sx-trm-sender__title">إعدادات الإرسال</span>
+                <span className="sx-trm-sender__summary">
+                  {senderName || 'بدون اسم مرسل'} · حتى {sendLimit} حساب في المرة
+                </span>
+              </span>
+              <ChevronDown size={18} className="sx-trm-sender__chev" aria-hidden />
+            </button>
+            {senderOpen ? (
+              <div className="sx-trm-sender__fields">
+                <label className="sx-trm-field">
                   اسم المرسل
-                  <input
-                    type="text"
-                    value={senderName}
-                    onChange={(e) => setSenderName(e.target.value)}
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold bg-white dark:bg-slate-800"
-                  />
+                  <input type="text" value={senderName} onChange={(e) => setSenderName(e.target.value)} />
                 </label>
-                <label className="text-xs font-bold text-slate-500">
+                <label className="sx-trm-field">
                   بريد المرسل
                   <input
                     type="email"
+                    dir="ltr"
                     value={senderEmail}
                     onChange={(e) => setSenderEmail(e.target.value)}
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold bg-white dark:bg-slate-800"
                   />
                 </label>
-                <label className="text-xs font-bold text-slate-500">
-                  عدد الحسابات المراد إرسال التنبيه لها
+                <label className="sx-trm-field">
+                  الحد الأقصى للإرسال
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={1}
                     max={500}
                     value={sendLimit}
                     onChange={(e) => setSendLimit(Math.max(1, Number(e.target.value) || 1))}
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold bg-white dark:bg-slate-800"
                   />
                 </label>
               </div>
+            ) : null}
+          </div>
+        </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={filteredRows.length > 0 && selected.size === filteredRows.length}
-                    onChange={toggleAllVisible}
-                    className="rounded border-slate-300"
-                  />
+        <div className="sx-trm-modal-list">
+          {parentsCount === 0 && eligibleRows.length > 0 && (
+            <div className="sx-trm-notice mb-3">
+              <AlertTriangle size={16} aria-hidden />
+              <span>{TUITION_REMINDER_EMPTY_MESSAGES.noParentsWarning}</span>
+            </div>
+          )}
+
+          {IS_DEV && (
+            <TuitionReminderDiagnosticPanel
+              diagnostics={diagnostics}
+              debugMode={debugMode}
+              onDebugModeChange={setDebugMode}
+            />
+          )}
+
+          {loading ? (
+            <div className="sx-trm-list" aria-busy="true">
+              {[0, 1, 2].map((k) => (
+                <div key={k} className="sx-trm-skeleton" />
+              ))}
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div className="sx-trm-empty">
+              <span className="sx-trm-empty__icon" aria-hidden>
+                <Inbox size={26} />
+              </span>
+              <p className="m-0">{emptyMessage}</p>
+            </div>
+          ) : (
+            <>
+              <div className="sx-trm-selectbar">
+                <button
+                  type="button"
+                  className="sx-trm-selectbar__all"
+                  onClick={toggleAllVisible}
+                  aria-pressed={allSelected}
+                >
+                  <ReminderCheck checked={allSelected} mixed={selected.size > 0 && !allSelected} />
                   تحديد الكل ({filteredRows.length})
-                </label>
-                <span className="text-xs font-bold text-slate-400">
-                  محدد: {selected.size} — سيُرسل لـ {Math.min(selected.size, sendLimit)} كحد أقصى
+                </button>
+                <span className="sx-trm-selectbar__info">
+                  {selected.size > 0 ? (
+                    <>
+                      <strong>{selected.size}</strong> محدد · <strong>{formatTuitionAmountLabel(selectedTotal)}</strong> د.ع
+                    </>
+                  ) : (
+                    'اضغط على البطاقة لتحديدها'
+                  )}
                 </span>
               </div>
-            </div>
 
-            <div className="flex-1 overflow-auto px-6 py-4">
-              {parentsCount === 0 && eligibleRows.length > 0 && (
-                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-                  {TUITION_REMINDER_EMPTY_MESSAGES.noParentsWarning}
-                </div>
-              )}
-
-              {IS_DEV && (
-                <TuitionReminderDiagnosticPanel
-                  diagnostics={diagnostics}
-                  debugMode={debugMode}
-                  onDebugModeChange={setDebugMode}
-                />
-              )}
-
-              {loading ? (
-                <p className="text-center text-slate-500 font-bold py-12">جاري تحميل الأقساط...</p>
-              ) : filteredRows.length === 0 ? (
-                <div className="text-center py-16">
-                  <AlertTriangle className="mx-auto text-slate-300 mb-3" size={32} />
-                  <p className="font-bold text-slate-500">{emptyMessage}</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[960px]">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 text-[10px] font-bold uppercase">
-                        <th className="px-2 py-3 text-right w-10" />
-                        <th className="px-3 py-3 text-right">الطالب / الصف</th>
-                        <th className="px-3 py-3 text-right">ولي الأمر</th>
-                        <th className="px-3 py-3 text-right">الهاتف</th>
-                        <th className="px-3 py-3 text-right">المبلغ</th>
-                        <th className="px-3 py-3 text-right">الاستحقاق</th>
-                        <th className="px-3 py-3 text-right">حالة القسط</th>
-                        <th className="px-3 py-3 text-right">آخر تذكير</th>
-                        <th className="px-3 py-3 text-right">الإرسال</th>
-                        <th className="px-3 py-3 text-right">واتساب</th>
-                        <th className="px-3 py-3 text-right">إجراء</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRows.map((row) => (
-                        <tr
-                          key={row.installmentId}
-                          className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+              <div className="sx-trm-list">
+                {filteredRows.map((row) => (
+                  <TuitionReminderCard
+                    key={row.installmentId}
+                    row={row}
+                    selectable
+                    selected={selected.has(row.installmentId)}
+                    onToggle={() => toggleRow(row.installmentId)}
+                    actions={
+                      row.hasWhatsApp ? (
+                        <button
+                          type="button"
+                          className="sx-trm-action sx-trm-action--wa"
+                          onClick={() => void handleWhatsApp(row)}
                         >
-                          <td className="px-2 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selected.has(row.installmentId)}
-                              onChange={() => toggleRow(row.installmentId)}
-                              className="rounded border-slate-300"
-                            />
-                          </td>
-                          <td className="px-3 py-3">
-                            <p className="font-black text-slate-900 dark:text-white">{row.studentName}</p>
-                            <p className="text-xs text-slate-500">{row.className}</p>
-                          </td>
-                          <td className="px-3 py-3">
-                            <p className="font-bold text-slate-700 dark:text-slate-200">{row.parentName}</p>
-                            {row.parentEmail && (
-                              <p className="text-xs text-slate-500 truncate max-w-[140px]">{row.parentEmail}</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 font-mono text-xs">{row.parentPhone || '—'}</td>
-                          <td className="px-3 py-3 font-black text-slate-900 dark:text-white">
-                            {formatTuitionAmountLabel(row.amount)} د.ع
-                          </td>
-                          <td className="px-3 py-3 text-xs font-bold">{formatTuitionDueLabel(row.dueDate)}</td>
-                          <td className="px-3 py-3">
-                            <span
-                              className={`text-[10px] font-black px-2 py-1 rounded-full ${
-                                row.bucket === 'overdue'
-                                  ? 'bg-rose-100 text-rose-700'
-                                  : row.bucket === 'today'
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : 'bg-blue-100 text-blue-700'
-                              }`}
-                            >
-                              {row.paymentStatusLabel}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-xs text-slate-500">
-                            {row.lastReminderAt
-                              ? row.lastReminderAt.toLocaleDateString('ar-IQ-u-nu-latn')
-                              : '—'}
-                          </td>
-                          <td className="px-3 py-3 text-xs font-bold">
-                            <span className={row.hasLinkedParent ? 'text-emerald-600' : 'text-rose-600'}>
-                              {row.sendStatusLabel}
-                            </span>
-                            {row.actionHint && (
-                              <span className="block text-[10px] text-amber-700 mt-0.5">{row.actionHint}</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-xs font-bold">
-                            <span className={row.hasWhatsApp ? 'text-emerald-600' : 'text-slate-400'}>
-                              {row.hasWhatsApp ? 'واتساب: يتطلب فتح الرابط يدوياً' : 'لا يوجد رقم واتساب'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            {row.hasWhatsApp ? (
-                              <button
-                                type="button"
-                                onClick={() => void handleWhatsApp(row)}
-                                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100"
-                              >
-                                <MessageCircle size={14} />
-                                واتساب
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 font-bold">لا يوجد رقم واتساب</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
+                          <MessageCircle size={15} aria-hidden />
+                          واتساب
+                        </button>
+                      ) : null
+                    }
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="sx-app-modal-panel__footer space-y-4">
+      <div className="sx-app-modal-panel__footer sx-trm sx-trm-modal-foot">
         {summary && (
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-200 grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            <span>إرسال لحساب ولي الأمر: {summary.sent}</span>
-            <span>روابط واتساب جاهزة: {summary.whatsAppPrepared}</span>
-            <span>تخطي — لا ولي مرتبط: {summary.skippedNoParent}</span>
-            <span>تخطي — لا هاتف: {summary.skippedNoPhone}</span>
-            <span>تخطي — مكرر: {summary.skippedDedup}</span>
-            <span>فشل: {summary.failed}</span>
+          <div className="sx-trm-result" role="status">
+            <div className="sx-trm-result__item sx-trm-result__item--ok">
+              <b>{summary.sent}</b>
+              <span>أُرسل لحساب ولي الأمر</span>
+            </div>
+            <div className="sx-trm-result__item">
+              <b>{summary.whatsAppPrepared}</b>
+              <span>روابط واتساب جاهزة</span>
+            </div>
+            <div className="sx-trm-result__item">
+              <b>{summary.skippedNoParent + summary.skippedDedup}</b>
+              <span>تم تخطيه</span>
+            </div>
+            {summary.failed > 0 ? (
+              <div className="sx-trm-result__item sx-trm-result__item--bad">
+                <b>{summary.failed}</b>
+                <span>فشل</span>
+              </div>
+            ) : null}
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={whatsAppQueue.length === 0}
-              onClick={openNextWhatsApp}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 text-emerald-700 font-bold text-sm disabled:opacity-40 min-h-11"
-            >
-              <ExternalLink size={16} />
-              {waQueueIndex >= 0
-                ? `واتساب (${waQueueIndex + 1}/${whatsAppQueue.length})`
-                : 'فتح قائمة واتساب'}
-              <ChevronRight size={14} />
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm min-h-11"
-            >
-              إغلاق
-            </button>
-            <button
-              type="button"
-              disabled={sending || selected.size === 0}
-              onClick={() => void handleBulkSend()}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl font-black text-sm disabled:opacity-50 min-h-11"
-            >
-              <Send size={16} />
-              {sending ? 'جاري الإرسال...' : 'إرسال المحدد'}
-            </button>
-          </div>
+        <div className="sx-trm-modal-foot__row">
+          <button
+            type="button"
+            disabled={sending || selected.size === 0}
+            onClick={() => void handleBulkSend()}
+            className="sx-trm-cta sx-trm-cta--primary"
+          >
+            <Send size={17} aria-hidden />
+            {sending
+              ? 'جاري الإرسال…'
+              : selected.size > 0
+                ? `إرسال التنبيه (${sendCount})`
+                : 'حدّد طلاباً للإرسال'}
+          </button>
+          <button
+            type="button"
+            disabled={whatsAppQueue.length === 0}
+            onClick={openNextWhatsApp}
+            className="sx-trm-cta sx-trm-cta--wa"
+            title="يفتح محادثة واتساب لكل ولي أمر محدد واحداً تلو الآخر"
+          >
+            <MessageCircle size={17} aria-hidden />
+            {waQueueIndex >= 0
+              ? `التالي ${waQueueIndex + 1}/${whatsAppQueue.length}`
+              : `واتساب${whatsAppQueue.length ? ` (${whatsAppQueue.length})` : ''}`}
+          </button>
         </div>
       </div>
     </AppModalPortal>

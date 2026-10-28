@@ -130,9 +130,12 @@ export function FloatingMenu({
 
     const t = autoFocus
       ? window.setTimeout(() => {
-          const first = menuRef.current?.querySelector<HTMLElement>(
-            '[role="menuitem"]:not([disabled]), [role="option"]:not([disabled]), button:not([disabled])',
-          );
+          // Prefer a real item: a selector list matches in DOM order, which
+          // would land on inline controls (e.g. theme switch) placed first.
+          const root = menuRef.current;
+          const first =
+            root?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]), [role="option"]:not([disabled])') ||
+            root?.querySelector<HTMLElement>('button:not([disabled])');
           first?.focus();
         }, 20)
       : null;
