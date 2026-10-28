@@ -8,7 +8,7 @@ import { motion } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { UserRole } from '../../types';
-import { getStaffPermissionOptions } from '../../lib/featureRegistry';
+import { getPermissionLabel, getStaffPermissionOptions } from '../../lib/featureRegistry';
 import { canAssignStaffPermission } from '../../lib/staffPermissions';
 import { AppModalPortal } from '../../components/AppModalPortal';
 
@@ -217,7 +217,7 @@ export default function AssistantsManagement() {
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {assistant.permissions?.map((pId: string) => (
                     <span key={pId} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-md border border-indigo-100">
-                      {permissionOptions.find((opt) => opt.id === pId)?.label || pId}
+                      {permissionOptions.find((opt) => opt.id === pId)?.label || getPermissionLabel(pId)}
                     </span>
                   ))}
                   {(!assistant.permissions || assistant.permissions.length === 0) && (

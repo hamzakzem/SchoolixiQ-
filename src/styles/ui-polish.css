@@ -1,0 +1,224 @@
+/*
+ * SchoolixIQ — cross-dashboard UI polish (loaded last).
+ * Interaction states only: consistent hover/press/focus, menus, inputs,
+ * tables and Arabic typography. Layout and colours stay with each view.
+ */
+
+/* ─── Arabic typography: letter-spacing breaks cursive joining ─── */
+[dir='rtl'] :is(.tracking-wide, .tracking-wider, .tracking-widest, .tracking-\[0\.2em\], .tracking-\[0\.3em\]),
+[dir='rtl'] .sx-ds-sidebar__section {
+  letter-spacing: 0 !important;
+}
+
+/* ─── Sidebar navigation (all dashboards) ─── */
+.sx-ds-sidebar__section {
+  font-size: 0.6875rem;
+  color: rgba(232, 201, 122, 0.55) !important;
+  padding-top: 0.25rem;
+}
+
+:is(.sx-ds-nav-item, .sx-ds-sidebar .parent-nav-item, .sx-ds-sidebar .sx-nav-item, .sx-ds-sidebar .sx-dist-nav-item) {
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease !important;
+}
+
+:is(.sx-ds-nav-item, .sx-ds-sidebar .parent-nav-item, .sx-ds-sidebar .sx-nav-item, .sx-ds-sidebar .sx-dist-nav-item) svg {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), color 180ms ease;
+}
+
+:is(.sx-ds-nav-item, .sx-ds-sidebar .parent-nav-item, .sx-ds-sidebar .sx-nav-item, .sx-ds-sidebar .sx-dist-nav-item):hover svg {
+  transform: scale(1.08);
+  color: var(--sx-ds-gold, #d4af37) !important;
+  stroke: var(--sx-ds-gold, #d4af37) !important;
+}
+
+:is(
+    .sx-ds-nav-item.is-active,
+    .sx-ds-sidebar .parent-nav-item--active,
+    .sx-ds-sidebar .sx-nav-item--active,
+    .sx-ds-sidebar .sx-dist-nav-item.is-active
+  ) {
+  background: linear-gradient(270deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.06)) !important;
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.18) !important;
+  font-weight: 700 !important;
+}
+
+[dir='ltr'] :is(
+    .sx-ds-nav-item.is-active,
+    .sx-ds-sidebar .parent-nav-item--active,
+    .sx-ds-sidebar .sx-nav-item--active,
+    .sx-ds-sidebar .sx-dist-nav-item.is-active
+  ) {
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.06)) !important;
+}
+
+:is(.sx-ds-nav-item, .sx-ds-sidebar .parent-nav-item, .sx-ds-sidebar .sx-nav-item, .sx-ds-sidebar .sx-dist-nav-item, .sx-ds-logout, .sx-ds-sidebar .parent-nav-logout):focus-visible {
+  outline: 2px solid rgba(232, 201, 122, 0.8) !important;
+  outline-offset: 1px !important;
+}
+
+:is(.sx-ds-logout, .sx-ds-sidebar .parent-nav-logout, .sx-ds-sidebar .sx-dist-sidebar__logout) {
+  transition: background-color 180ms ease, color 180ms ease !important;
+}
+
+:is(.sx-ds-logout, .sx-ds-sidebar .parent-nav-logout, .sx-ds-sidebar .sx-dist-sidebar__logout):hover {
+  background: rgba(248, 113, 113, 0.12) !important;
+  color: #fecaca !important;
+}
+
+/* Sidebar scroll area: thin, unobtrusive scrollbar */
+:is(.sx-ds-sidebar__nav, .sx-ds-sidebar nav) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+:is(.sx-ds-sidebar__nav, .sx-ds-sidebar nav)::-webkit-scrollbar {
+  width: 6px;
+}
+
+:is(.sx-ds-sidebar__nav, .sx-ds-sidebar nav)::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+
+/* ─── Top bar icon buttons ─── */
+.sx-ds-icon-btn {
+  transition: background-color 180ms ease, color 180ms ease, transform 150ms ease !important;
+}
+
+.sx-ds-icon-btn:active {
+  transform: scale(0.94) !important;
+}
+
+.sx-ds-icon-btn:focus-visible,
+.sx-ds-assistant-btn:focus-visible {
+  outline: 2px solid rgba(232, 201, 122, 0.8) !important;
+  outline-offset: 2px !important;
+}
+
+/* ─── Buttons inside dashboards ─── */
+.sx-dashboard-context :is(button, [role='button'], a):focus-visible {
+  outline: 2px solid var(--sx-gold, #d4af37);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.sx-dashboard-context :is(button, [role='button']):disabled {
+  cursor: not-allowed;
+}
+
+.sx-btn {
+  letter-spacing: 0;
+}
+
+.sx-btn svg {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sx-btn:hover:not(:disabled) svg {
+  transform: translateX(-2px);
+}
+
+[dir='ltr'] .sx-btn:hover:not(:disabled) svg {
+  transform: translateX(2px);
+}
+
+.sx-btn-primary:active:not(:disabled) {
+  box-shadow: 0 3px 10px -6px rgba(212, 175, 55, 0.6);
+}
+
+.sx-btn-danger:focus-visible {
+  outline-color: #f87171;
+}
+
+/* ─── Form fields inside dashboards: one focus language ─── */
+.sx-dashboard-context
+  :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']), select, textarea) {
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.sx-dashboard-context
+  :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']), select, textarea):focus-visible {
+  outline: none !important;
+  border-color: rgba(212, 175, 55, 0.75) !important;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.15) !important;
+}
+
+.sx-dashboard-context :is(input, textarea)::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.sx-dashboard-context :is(input[type='checkbox'], input[type='radio']) {
+  accent-color: #c99a2e;
+}
+
+/* ─── Tables: readable rows ─── */
+.sx-dashboard-context table tbody tr {
+  transition: background-color 150ms ease;
+}
+
+.sx-dashboard-context table tbody tr:hover {
+  background-color: rgba(212, 175, 55, 0.05);
+}
+
+html.dark .sx-dashboard-context table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.sx-dashboard-context table thead th {
+  font-weight: 700;
+}
+
+/* ─── Content scroll areas ─── */
+.sx-dashboard-context .custom-scrollbar,
+.sx-shell-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+}
+
+/* ─── Mobile dock + sheets: tactile feedback ─── */
+:is(.sx-dock-v2 button, .sx-dock-more-row, .sx-dock-qa-item) {
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 160ms ease, transform 140ms ease, color 160ms ease;
+}
+
+:is(.sx-dock-v2 button, .sx-dock-more-row:not(.sx-dock-more-row--static), .sx-dock-qa-item):active {
+  transform: scale(0.97);
+}
+
+:is(.sx-dock-v2 button, .sx-dock-more-row, .sx-dock-qa-item):focus-visible {
+  outline: 2px solid rgba(212, 175, 55, 0.75);
+  outline-offset: 2px;
+}
+
+/* ─── Motion preferences ─── */
+@media (prefers-reduced-motion: reduce) {
+  :is(.sx-ds-nav-item, .sx-ds-sidebar .parent-nav-item, .sx-ds-sidebar .sx-nav-item, .sx-btn) svg,
+  :is(.sx-ds-nav-item, .sx-ds-sidebar .parent-nav-item, .sx-ds-sidebar .sx-nav-item, .sx-btn):hover svg {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ─── Distributor portal: align with the other dashboards ─── */
+.sx-dist-bottom-nav {
+  background: #0b2345 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 -10px 30px -18px rgba(0, 0, 0, 0.6) !important;
+}
+
+.sx-dist-bottom-nav__item {
+  color: rgba(226, 232, 240, 0.65) !important;
+}
+
+.sx-dist-bottom-nav__item.is-active {
+  color: #f0d58a !important;
+  background: rgba(212, 175, 55, 0.14) !important;
+}
+
+.sx-dist-bottom-nav__item.is-active svg {
+  color: #e8c97a !important;
+}

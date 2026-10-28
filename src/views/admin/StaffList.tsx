@@ -26,7 +26,7 @@ import {
   resolveTeacherClassIds,
   type SchoolClassOption,
 } from '../../lib/teacherClass';
-import { getStaffPermissionOptions } from '../../lib/featureRegistry';
+import { getPermissionLabel, getStaffPermissionOptions } from '../../lib/featureRegistry';
 import { canAssignStaffPermission } from '../../lib/staffPermissions';
 import { AppModalPortal } from '../../components/AppModalPortal';
 
@@ -696,7 +696,7 @@ export default function StaffList() {
                         key={pId}
                         className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full border border-indigo-100"
                       >
-                        {permissionOptions.find((opt) => opt.id === pId)?.label || pId}
+                        {permissionOptions.find((opt) => opt.id === pId)?.label || getPermissionLabel(pId)}
                       </span>
                     ))
                   )}
@@ -716,28 +716,22 @@ export default function StaffList() {
 
                 {/* Quick Status & Actions Row */}
                 <div className="flex items-center justify-between mt-4 p-2 bg-slate-50/50 rounded-xl border border-slate-100 no-print">
-                   <div className="flex items-center gap-1.5 p-1 bg-white rounded-lg border border-slate-100 shadow-sm">
-                      <button 
-                        onClick={() => handleUpdateStatusQuick(member.id, 'active')}
-                        className={`w-5 h-5 rounded-md border transition-all flex items-center justify-center ${member.status === 'active' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 hover:border-emerald-200'}`}
-                        title="نشط"
-                      >
-                        {member.status === 'active' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                      </button>
-                      <button 
-                        onClick={() => handleUpdateStatusQuick(member.id, 'on_leave')}
-                        className={`w-5 h-5 rounded-md border transition-all flex items-center justify-center ${member.status === 'on_leave' ? 'bg-amber-500 border-amber-500 text-white' : 'border-slate-200 hover:border-amber-200'}`}
-                        title="إجازة"
-                      >
-                        {member.status === 'on_leave' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                      </button>
-                      <button 
-                        onClick={() => handleUpdateStatusQuick(member.id, 'absent')}
-                        className={`w-5 h-5 rounded-md border transition-all flex items-center justify-center ${member.status === 'absent' ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-200 hover:border-rose-200'}`}
-                        title="غائب"
-                      >
-                        {member.status === 'absent' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                      </button>
+                   <div className="flex items-center gap-0.5 p-0.5 bg-white rounded-lg border border-slate-200 shadow-sm" role="group" aria-label="حالة الموظف">
+                      {([
+                        { id: 'active', label: 'نشط', on: 'bg-emerald-500 text-white shadow-sm', off: 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50' },
+                        { id: 'on_leave', label: 'مجاز', on: 'bg-amber-500 text-white shadow-sm', off: 'text-slate-500 hover:text-amber-600 hover:bg-amber-50' },
+                        { id: 'absent', label: 'غائب', on: 'bg-rose-500 text-white shadow-sm', off: 'text-slate-500 hover:text-rose-600 hover:bg-rose-50' },
+                      ] as const).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => handleUpdateStatusQuick(member.id, opt.id)}
+                          aria-pressed={member.status === opt.id}
+                          className={`h-7 px-2.5 rounded-md text-[11px] font-bold transition-colors ${member.status === opt.id ? opt.on : opt.off}`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
                    </div>
 
                    <div className="flex items-center gap-1.5">

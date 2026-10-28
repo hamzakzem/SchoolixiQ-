@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useLanguage } from '../lib/LanguageContext';
 
 interface SubscriptionTimerProps {
   expiryDate: any;
@@ -8,6 +9,8 @@ interface SubscriptionTimerProps {
 }
 
 export function SubscriptionTimer({ expiryDate, variant = 'banner' }: SubscriptionTimerProps) {
+  // Desktop: park the floating pill beside the content, away from the sidebar.
+  const { isRtl } = useLanguage();
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number; isWarning: boolean } | null>(null);
 
   useEffect(() => {
@@ -66,7 +69,7 @@ export function SubscriptionTimer({ expiryDate, variant = 'banner' }: Subscripti
       <motion.div 
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+5.25rem)] lg:bottom-4 left-1/2 -translate-x-1/2 z-[100] max-w-fit px-4 pointer-events-none [&>*]:pointer-events-auto"
+        className={`${timeLeft.isWarning ? '' : 'hidden lg:block'} fixed bottom-[calc(env(safe-area-inset-bottom,0px)+5.25rem)] lg:bottom-4 left-1/2 -translate-x-1/2 ${isRtl ? 'lg:left-6' : 'lg:left-auto lg:right-6'} lg:translate-x-0 z-[100] max-w-fit px-4 pointer-events-none [&>*]:pointer-events-auto`}
         dir="rtl"
       >
         <div className={`relative overflow-hidden backdrop-blur-xl rounded-full border shadow-lg transition-all duration-500 ${timeLeft.isWarning ? 'bg-red-50/90 dark:bg-red-900/90 border-red-200 dark:border-red-800 shadow-red-500/10' : 'bg-white/90 dark:bg-slate-900/90 border-slate-200 dark:border-slate-700 shadow-slate-500/10'}`}>

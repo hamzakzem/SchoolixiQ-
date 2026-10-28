@@ -512,6 +512,19 @@ export function getFeatureLabel(
   return isRtl ? feature.labelAr : feature.labelEn;
 }
 
+/** Human label for any stored permission id (staff picker id, feature key, legacy key or menu id). */
+export function getPermissionLabel(id: string, isRtl = true): string {
+  const staff = STAFF_PERMISSION_LABELS[id];
+  if (staff) return isRtl ? staff.labelAr : staff.labelEn;
+  const feature =
+    featureByKey.get(id) ||
+    SCHOOL_FEATURES.find(
+      (f) => f.staffPermissionIds?.includes(id) || f.legacyKeys?.includes(id) || f.menuIds.includes(id),
+    );
+  if (feature) return isRtl ? feature.labelAr : feature.labelEn;
+  return id.replace(/_/g, ' ');
+}
+
 export function isSchoolSubjectsEnabled(perms: PackagePermissions | undefined): boolean {
   return isPackageFeatureEnabled('school_subjects', perms);
 }
