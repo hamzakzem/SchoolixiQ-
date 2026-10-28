@@ -2561,12 +2561,27 @@ export default function SuperAdminDashboard() {
               </motion.button>
             )}
             <div className="sx-ds-topbar__title-block min-w-0">
-              <p className="sx-ds-topbar__eyebrow">{isRtl ? 'منصة' : 'Platform'}</p>
+              <p className="sx-ds-topbar__eyebrow">{isRtl ? 'منصة SchoolixIQ' : 'SchoolixIQ platform'}</p>
               <h2
                 id="super-admin-header"
-                className="sx-ds-topbar__title truncate max-w-[140px] xs:max-w-[200px] sm:max-w-none"
+                className="sx-ds-topbar__title truncate max-w-[180px] xs:max-w-[220px] sm:max-w-none"
               >
-                {t('system_management')}
+                {({
+                  schools: t('sidebar_schools'),
+                  accounts: t('sidebar_accounts'),
+                  team: t('sidebar_team'),
+                  packages: t('sidebar_packages'),
+                  distributors: isRtl ? 'الموزعون والكوبونات' : 'Distributors',
+                  distributor_requests: isRtl ? 'طلبات الموزعين' : 'Distributor requests',
+                  requests: t('sidebar_requests'),
+                  chat: t('sidebar_chat'),
+                  users: t('sidebar_users'),
+                  parents: t('sidebar_parents'),
+                  settings: t('sidebar_settings'),
+                  footer: t('sidebar_footer'),
+                  backups: t('sidebar_backups'),
+                  diagnostics: t('sidebar_diagnostics'),
+                } as Record<string, string>)[activeTab] || t('system_management')}
               </h2>
             </div>
           </div>

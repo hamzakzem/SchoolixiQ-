@@ -119,8 +119,8 @@ export default function GuardDashboard() {
             <SchoolixLogo size={26} surface="light" />
           </div>
           <div className="sx-ds-topbar__title-block min-w-0">
-            <h1 className="sx-ds-topbar__title">بوابة التسريح — الحارس</h1>
-            <p className="sx-ds-topbar__subtitle">{schoolData?.name}</p>
+            {schoolData?.name ? <p className="sx-ds-topbar__eyebrow">{schoolData.name}</p> : null}
+            <h1 className="sx-ds-topbar__title truncate">بوابة الحارس</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">

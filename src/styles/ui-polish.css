@@ -140,7 +140,7 @@
 }
 
 .sx-dashboard-context
-  :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']), select, textarea):focus-visible {
+  :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not(.sx-gs__input):not(.sx-gs__sheet-input), select, textarea):focus-visible {
   outline: none !important;
   border-color: rgba(212, 175, 55, 0.75) !important;
   box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.15) !important;
@@ -672,4 +672,342 @@ html.dark .parent-home :is([class*='text-[#0B2345]/'], [class*='text-[#0b2345]/'
 
 html.dark .parent-home :is([class~='text-[#0B2345]'], [class~='text-[#0b2345]']) {
   color: #f1f5f9 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Top bar refresh — all dashboards (shared .sx-ds-topbar / .sx-nav)
+   ═══════════════════════════════════════════════════════════════════ */
+html .sx-ds-topbar,
+html .sx-nav.sx-ds-topbar {
+  background: linear-gradient(180deg, #0e2648 0%, #0a1d39 100%) !important;
+  box-shadow:
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 28px -18px rgba(0, 0, 0, 0.65) !important;
+}
+
+/* Page title block (replaces the brand copy that repeated the sidebar) */
+html .sx-nav .sx-nav__brand {
+  gap: 0.7rem;
+}
+
+html .sx-nav .sx-nav__logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06) !important;
+}
+
+@media (min-width: 1024px) {
+  /* The sidebar already shows the logo right next to it */
+  html .sx-nav .sx-nav__logo {
+    display: none;
+  }
+}
+
+.sx-nav__page-title {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+
+.sx-nav__page-meta {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(232, 201, 122, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+
+@media (max-width: 767px) {
+  .sx-nav__page-title {
+    font-size: 0.9375rem;
+    max-width: 11rem;
+  }
+
+  .sx-nav__page-meta {
+    max-width: 11rem;
+  }
+
+  /* Language + chat live in the dock "More" sheet / Messages tab on phones */
+  .sx-nav__hide-mobile {
+    display: none !important;
+  }
+}
+
+.sx-nav__hide-mobile {
+  display: inline-flex;
+}
+
+/* Action buttons: one quiet glass style */
+html .sx-ds-topbar.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-nav__btn, .sx-ds-icon-btn, .sx-ds-assistant-btn, .sx-lang-toggle--icon, .sx-gs__mobile-trigger, .sx-nav__chat-btn, .sx-header-action-btn):not(.sx-nav__btn--menu):not(.sx-nav__btn--back) {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  border-radius: 11px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07) !important;
+  color: rgba(241, 245, 249, 0.9) !important;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 140ms ease !important;
+}
+
+html .sx-ds-topbar .sx-nav__chat-btn {
+  max-width: 38px !important;
+  padding-inline: 0 !important;
+}
+
+html .sx-ds-topbar .sx-nav__chat-btn__label {
+  display: none !important;
+}
+
+/* Phones: show where you are next to the logo */
+@media (max-width: 767px) {
+  html .sx-nav .sx-nav__brand-copy {
+    display: flex !important;
+  }
+}
+
+html .sx-ds-topbar.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-nav__btn, .sx-ds-icon-btn, .sx-ds-assistant-btn, .sx-lang-toggle--icon, .sx-gs__mobile-trigger, .sx-nav__chat-btn, .sx-header-action-btn):hover {
+  background: rgba(255, 255, 255, 0.11) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+}
+
+html .sx-ds-topbar.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-nav__btn, .sx-ds-icon-btn, .sx-ds-assistant-btn, .sx-gs__mobile-trigger, .sx-nav__chat-btn):active {
+  transform: scale(0.94) !important;
+}
+
+html .sx-ds-topbar.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-nav__btn--menu, .sx-nav__btn--back) {
+  background: transparent !important;
+  color: rgba(241, 245, 249, 0.75) !important;
+}
+
+html .sx-ds-topbar .sx-ds-icon-btn.is-active {
+  background: rgba(212, 175, 55, 0.16) !important;
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.35) !important;
+  color: #f0d58a !important;
+}
+
+/* Notification badge ring matches the new bar colour */
+html .sx-ds-topbar .sx-ds-icon-btn > span:is(.absolute, [class*='rounded-full']) {
+  box-shadow: 0 0 0 2px #0c2141 !important;
+  inset-block-start: 3px !important;
+  inset-inline-end: 3px !important;
+}
+
+.sx-nav__divider {
+  width: 1px;
+  height: 24px;
+  margin-inline: 0.25rem;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .sx-nav__divider {
+    display: none;
+  }
+}
+
+/* Search field */
+html .sx-ds-topbar .sx-gs__field {
+  height: 42px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+html .sx-ds-topbar .sx-gs__field:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+html .sx-ds-topbar .sx-gs__field:focus-within {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 0 0 1px rgba(212, 175, 55, 0.55),
+    0 0 0 4px rgba(212, 175, 55, 0.12) !important;
+}
+
+/* Profile chip: avatar + name/role on wide screens */
+html .sx-ds-topbar .sx-nav__actions button.sx-nav__profile-chip {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.55rem;
+  width: auto !important;
+  max-width: 15rem !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 3px !important;
+  padding-inline-end: 3px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  color: #f1f5f9 !important;
+  cursor: pointer;
+  transition: background-color 160ms ease, box-shadow 160ms ease !important;
+}
+
+html .sx-ds-topbar .sx-nav__actions button.sx-nav__profile-chip:hover,
+html .sx-ds-topbar .sx-nav__actions button.sx-nav__profile-chip[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.4) !important;
+}
+
+.sx-nav__chip-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #edd07f, #c99a2e);
+  color: #0b2345 !important;
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+
+.sx-nav__chip-copy,
+.sx-nav__chip-caret {
+  display: none !important;
+}
+
+@media (min-width: 1536px) {
+  html .sx-ds-topbar .sx-nav__actions button.sx-nav__profile-chip {
+    padding-inline-end: 0.75rem !important;
+  }
+
+  .sx-nav__chip-copy {
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    text-align: start;
+    line-height: 1.15;
+  }
+
+  .sx-nav__chip-caret {
+    display: inline-block !important;
+    color: rgba(241, 245, 249, 0.55) !important;
+  }
+}
+
+.sx-nav__chip-name {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #ffffff;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sx-nav__chip-role {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: rgba(232, 201, 122, 0.85);
+}
+
+/* Legacy topbars (super admin, parent): show their title again, styled */
+html .sx-ds-topbar .sx-ds-topbar__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+html .sx-ds-topbar .sx-ds-topbar__title-block .sx-ds-topbar__title {
+  display: block !important;
+  margin: 0 !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  color: #ffffff !important;
+}
+
+html .sx-ds-topbar .sx-ds-topbar__title-block .sx-ds-topbar__eyebrow {
+  margin: 0 !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  color: rgba(232, 201, 122, 0.8) !important;
+  border: none !important;
+}
+
+/* Logo tile on legacy topbars (guard) */
+html .sx-ds-topbar .sx-ds-topbar__logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Full language pill + theme button used by legacy topbars: same glass look */
+html .sx-ds-topbar.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-lang-toggle--default, .sx-btn.w-11) {
+  height: 38px !important;
+  min-height: 38px !important;
+  border-radius: 11px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: none !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07) !important;
+  color: rgba(241, 245, 249, 0.9) !important;
+  transform: none !important;
+}
+
+html .sx-ds-topbar .sx-btn.w-11 {
+  width: 38px !important;
+  min-width: 38px !important;
+  padding: 0 !important;
+}
+
+html .sx-ds-topbar.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-lang-toggle--default, .sx-btn.w-11):hover {
+  background: rgba(255, 255, 255, 0.11) !important;
+}
+
+html .sx-ds-topbar.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-lang-toggle--default, .sx-btn.w-11) svg {
+  color: #e8c97a !important;
+}
+
+/* Distributor header title */
+.sx-dist-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.sx-dist-header .sx-dist-header__eyebrow {
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  color: rgba(232, 201, 122, 0.8) !important;
+}
+
+/* Theme toggle carries id="theme-toggle" (ID-level rules in app-chrome) */
+html .sx-ds-topbar #theme-toggle.sx-btn {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  border-radius: 11px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07) !important;
+}
+
+html .sx-ds-topbar #theme-toggle.sx-btn:hover {
+  background: rgba(255, 255, 255, 0.11) !important;
+}
+
+html .sx-ds-topbar #theme-toggle.sx-btn svg {
+  color: #e8c97a !important;
 }
