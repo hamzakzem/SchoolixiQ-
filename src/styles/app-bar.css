@@ -1,0 +1,770 @@
+/*
+ * SchoolixIQ — app bar for phones and tablets, global search sheet and chat list.
+ * Loaded after ui-polish.css. Legacy navbar rules use long :not() chains and
+ * !important, so selectors here repeat .sx-ds-topbar to outrank them.
+ */
+
+/* ─── Height includes the notch instead of being eaten by it ─── */
+@media (max-width: 767px) {
+  :root {
+    --sx-ds-topbar-h: calc(64px + env(safe-area-inset-top, 0px));
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --sx-ds-topbar-h: calc(68px + env(safe-area-inset-top, 0px));
+  }
+}
+
+/* The shell scrolls internally; never let the document itself scroll
+   (iOS rubber-banding pulled the sticky bar half off-screen). */
+html:has(.sx-shell-layout),
+html:has(.sx-shell-layout) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* ═══════════ Phone app bar (< 768px) ═══════════ */
+@media (max-width: 767px) {
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    padding: env(safe-area-inset-top, 0px) 14px 0 !important;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__start {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-nav__center, .sx-nav__search) {
+    flex: 0 0 auto;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__end {
+    flex: 0 0 auto;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-nav__actions, .sx-header-actions) {
+    gap: 8px !important;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__brand {
+    gap: 10px;
+    min-width: 0;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__logo {
+    display: inline-flex !important;
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 13px !important;
+    background: #ffffff !important;
+    box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.25) !important;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__brand-copy {
+    display: flex !important;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .sx-nav__page-title {
+    font-size: 1.0625rem !important;
+    font-weight: 800 !important;
+    max-width: 100% !important;
+  }
+
+  .sx-nav__page-meta {
+    font-size: 0.71875rem !important;
+    max-width: 100% !important;
+  }
+
+  /* Back chevron replaces the logo when a page can go back */
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__btn--back {
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 40px !important;
+    margin-inline-end: -4px;
+    border-radius: 12px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #f0d58a !important;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__btn--back + .sx-nav__brand .sx-nav__logo {
+    display: none !important;
+  }
+
+  /* 42px circular actions */
+  html .sx-ds-topbar.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-ds-assistant-btn, .sx-gs__mobile-trigger, .sx-ds-icon-btn) {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    max-width: 42px !important;
+    max-height: 42px !important;
+    border-radius: 14px !important;
+  }
+
+  html .sx-ds-topbar.sx-ds-topbar .sx-nav__actions button.sx-nav__profile-chip {
+    width: 42px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0 !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    box-shadow: 0 0 0 2px rgba(232, 201, 122, 0.55) !important;
+  }
+
+  .sx-nav__chip-avatar {
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 1rem !important;
+  }
+
+  html .sx-nav.sx-ds-topbar .sx-nav__divider {
+    display: none !important;
+  }
+}
+
+/* ═══════════ Tablet app bar (768–1023px) ═══════════ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar {
+    display: flex !important;
+    align-items: center;
+    gap: 14px;
+    padding: env(safe-area-inset-top, 0px) 18px 0 !important;
+  }
+
+  /* Title never yields to the search field */
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__start {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__center {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 420px !important;
+    margin-inline: auto;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__search {
+    width: 100% !important;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__end {
+    flex: 0 0 auto;
+  }
+
+  /* The collapsed sidebar already shows the logo */
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__logo {
+    display: none !important;
+  }
+
+  html .sx-nav.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar .sx-nav__brand-copy {
+    display: flex !important;
+  }
+
+  .sx-nav__page-title {
+    font-size: 1.0625rem !important;
+    max-width: 13rem !important;
+  }
+
+  html .sx-ds-topbar.sx-ds-topbar.sx-ds-topbar.sx-ds-topbar :is(.sx-ds-assistant-btn, .sx-ds-icon-btn, #theme-toggle.sx-btn) {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    border-radius: 12px !important;
+  }
+
+  html .sx-ds-topbar .sx-gs__field {
+    height: 42px !important;
+  }
+}
+
+/* Phones + tablets: language/theme/chat live in the profile menu (DashboardHeader only) */
+@media (max-width: 1023px) {
+  .sx-nav__hide-compact {
+    display: none !important;
+  }
+
+  html .sx-nav.sx-ds-topbar .sx-nav__actions :is(#theme-toggle, .sx-lang-toggle--default) {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sx-nav__menu-prefs {
+    display: none;
+  }
+}
+
+/* Profile menu preference rows */
+.sx-nav__menu-prefs {
+  padding: 2px 0;
+}
+
+.sx-nav__menu-pref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 10px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #0b2345;
+}
+
+html.dark .sx-nav__menu-pref {
+  color: #e2e8f0;
+}
+
+.sx-nav__menu-pref :is(#theme-toggle, .sx-lang-toggle__btn, .sx-lang-toggle) {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  border-radius: 11px !important;
+  background: rgba(11, 35, 69, 0.06) !important;
+  border: 1px solid rgba(11, 35, 69, 0.1) !important;
+  box-shadow: none !important;
+  color: #8c6a12 !important;
+  transform: none !important;
+}
+
+html.dark .sx-nav__menu-pref :is(#theme-toggle, .sx-lang-toggle__btn, .sx-lang-toggle) {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #e8c97a !important;
+}
+
+.sx-nav__menu-pref svg {
+  color: inherit !important;
+  width: 17px !important;
+  height: 17px !important;
+}
+
+/* ═══════════ Global search — mobile sheet (light + dark) ═══════════ */
+.sx-gs__sheet-root {
+  --gs-bg: #ffffff;
+  --gs-field: #f1f5f9;
+  --gs-field-border: #e2e8f0;
+  --gs-text: #0b2345;
+  --gs-muted: #64748b;
+  --gs-row-hover: #f1f5f9;
+  --gs-tile: #f8fafc;
+  --gs-tile-border: #e8edf3;
+  --gs-icon-bg: rgba(11, 35, 69, 0.06);
+  --gs-icon: #0b2345;
+}
+
+html.dark .sx-gs__sheet-root {
+  --gs-bg: #0d1b33;
+  --gs-field: rgba(255, 255, 255, 0.06);
+  --gs-field-border: rgba(255, 255, 255, 0.1);
+  --gs-text: #f1f5f9;
+  --gs-muted: #94a3b8;
+  --gs-row-hover: rgba(255, 255, 255, 0.06);
+  --gs-tile: rgba(255, 255, 255, 0.045);
+  --gs-tile-border: rgba(255, 255, 255, 0.07);
+  --gs-icon-bg: rgba(212, 175, 55, 0.12);
+  --gs-icon: #e8c97a;
+}
+
+.sx-gs__sheet-root .sx-gs__sheet-backdrop {
+  background: rgba(3, 10, 20, 0.6) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.sx-gs__sheet-root .sx-gs__sheet {
+  background: var(--gs-bg) !important;
+  border-radius: 0 0 24px 24px !important;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.55) !important;
+  max-height: min(88dvh, 720px) !important;
+}
+
+html.dark .sx-gs__sheet-root .sx-gs__sheet {
+  box-shadow: 0 1px 0 rgba(212, 175, 55, 0.2), 0 24px 60px -20px rgba(0, 0, 0, 0.7) !important;
+}
+
+.sx-gs__sheet-root .sx-gs__sheet-head {
+  background: transparent !important;
+  padding: 14px 14px 12px !important;
+  gap: 10px !important;
+  border-bottom: 1px solid var(--gs-tile-border);
+}
+
+.sx-gs__sheet-root .sx-gs__sheet-field {
+  height: 48px !important;
+  border-radius: 15px !important;
+  background: var(--gs-field) !important;
+  box-shadow: inset 0 0 0 1px var(--gs-field-border) !important;
+  transition: box-shadow 160ms ease;
+}
+
+.sx-gs__sheet-root .sx-gs__sheet-field:focus-within {
+  box-shadow: inset 0 0 0 1.5px rgba(212, 175, 55, 0.7), 0 0 0 4px rgba(212, 175, 55, 0.12) !important;
+}
+
+.sx-gs__sheet-root .sx-gs__sheet-icon {
+  color: var(--gs-muted) !important;
+}
+
+.sx-gs__sheet-root .sx-gs__sheet-field:focus-within .sx-gs__sheet-icon {
+  color: #c99a2e !important;
+}
+
+/* Dashboard-wide dark input rules painted this input a solid dark block */
+html .sx-gs__sheet-root input.sx-gs__sheet-input.sx-gs__sheet-input {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--gs-text) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+.sx-gs__sheet-root .sx-gs__sheet-input::placeholder {
+  color: var(--gs-muted) !important;
+  font-weight: 500;
+}
+
+.sx-gs__sheet-root .sx-gs__sheet-close {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 14px !important;
+  background: var(--gs-field) !important;
+  color: var(--gs-text) !important;
+}
+
+.sx-gs__sheet-root .sx-gs__sheet-body {
+  padding: 10px 14px 18px !important;
+}
+
+.sx-gs__sheet-root .sx-gs__group-label {
+  color: var(--gs-muted) !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  padding: 10px 4px 8px !important;
+}
+
+.sx-gs__sheet-root .sx-gs__quick {
+  gap: 10px !important;
+  padding: 0 0 6px !important;
+}
+
+.sx-gs__sheet-root .sx-gs__quick-btn {
+  min-height: 56px !important;
+  padding: 10px 12px !important;
+  gap: 10px !important;
+  border-radius: 16px !important;
+  background: var(--gs-tile) !important;
+  box-shadow: inset 0 0 0 1px var(--gs-tile-border) !important;
+  color: var(--gs-text) !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+}
+
+.sx-gs__sheet-root .sx-gs__quick-btn svg {
+  box-sizing: content-box;
+  width: 18px !important;
+  height: 18px !important;
+  padding: 9px;
+  border-radius: 11px;
+  background: var(--gs-icon-bg);
+  color: var(--gs-icon) !important;
+  flex-shrink: 0;
+}
+
+.sx-gs__sheet-root .sx-gs__quick-btn:active {
+  transform: scale(0.98);
+}
+
+.sx-gs__sheet-root .sx-gs__row {
+  border-radius: 14px !important;
+  min-height: 52px !important;
+  color: var(--gs-text) !important;
+}
+
+.sx-gs__sheet-root .sx-gs__row:hover,
+.sx-gs__sheet-root .sx-gs__row.is-active {
+  background: var(--gs-row-hover) !important;
+}
+
+.sx-gs__sheet-root .sx-gs__row-icon {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 11px !important;
+  background: var(--gs-icon-bg) !important;
+  color: var(--gs-icon) !important;
+}
+
+.sx-gs__sheet-root .sx-gs__row-title {
+  color: var(--gs-text) !important;
+  font-weight: 700 !important;
+}
+
+.sx-gs__sheet-root :is(.sx-gs__row-meta, .sx-gs__empty) {
+  color: var(--gs-muted) !important;
+}
+
+/* Desktop / tablet field: same dark-input bleed as the sheet */
+html .sx-ds-topbar input.sx-gs__input.sx-gs__input {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+}
+
+/* ─── Desktop / tablet results panel in dark mode ─── */
+html.dark .sx-gs__panel {
+  background: #0f1d36 !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 20px 50px -16px rgba(0, 0, 0, 0.7) !important;
+}
+
+html.dark .sx-gs__panel :is(.sx-gs__row, .sx-gs__row-title) {
+  color: #f1f5f9 !important;
+}
+
+html.dark .sx-gs__panel .sx-gs__row:hover,
+html.dark .sx-gs__panel .sx-gs__row.is-active {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark .sx-gs__panel .sx-gs__row-icon {
+  background: rgba(212, 175, 55, 0.12) !important;
+  color: #e8c97a !important;
+}
+
+/* ═══════════ Chat conversation list ═══════════ */
+/* Phones show list OR thread, never side by side: use the full width */
+@media (max-width: 767px) {
+  .sx-enterprise-chat-sidebar.sx-chat-list {
+    max-width: none !important;
+    border-inline-end: none !important;
+    box-shadow: none !important;
+  }
+}
+
+.sx-enterprise-chat-sidebar .sx-enterprise-convo-card {
+  width: calc(100% - 1rem);
+  margin-inline: 0.5rem;
+}
+
+.sx-enterprise-convo-card__time {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(11, 35, 69, 0.45);
+}
+
+html.dark .sx-enterprise-convo-card__time {
+  color: #94a3b8;
+}
+
+html.dark .sx-enterprise-convo-card__snippet {
+  color: #94a3b8;
+}
+
+.sx-chat-search__icon {
+  color: rgba(11, 35, 69, 0.4);
+}
+
+html.dark .sx-chat-search__icon {
+  color: #94a3b8;
+}
+
+html.dark input.sx-chat-search {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .sx-enterprise-chat-sidebar__header {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: transparent;
+}
+
+html.dark .sx-enterprise-convo-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html.dark .sx-enterprise-convo-card--active {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(212, 175, 55, 0.12) 100%);
+}
+
+/* ═══════════ Platform status badge (super admin, desktop only) ═══════════ */
+.sx-nav__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+}
+.sx-nav__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+@media (max-width: 1279px) {
+  .sx-nav__status { display: none; }
+}
+
+/* ═══════════ Parent: app bar + children switcher ═══════════ */
+/* The strip continues the navy bar so both read as one surface.
+   z-index lives here: a Tailwind z-[var(--sx-z-header)] class would match
+   the legacy [class*="header"] rules and repaint every child gold. */
+.parent-app-bar {
+  z-index: var(--sx-z-header);
+  background: linear-gradient(180deg, #0b2345 0%, #0d2a52 100%);
+  box-shadow: 0 10px 24px -18px rgba(2, 8, 23, 0.8);
+}
+html.dark .parent-app-bar {
+  background: linear-gradient(180deg, #0a1730 0%, #0c1b36 100%);
+}
+.parent-app-bar > .sx-ds-topbar {
+  position: relative;
+  top: auto;
+  box-shadow: none;
+  border-bottom-color: transparent;
+}
+.parent-child-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.25rem 14px 0.75rem;
+  scroll-snap-type: x proximity;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+@media (min-width: 768px) {
+  .parent-child-strip { padding-inline: 1.25rem; }
+}
+html .parent-app-bar .parent-child-pill.parent-child-pill {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  gap: 0.5rem;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0 0.875rem 0 0.3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: none;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+html[dir="rtl"] .parent-app-bar .parent-child-pill.parent-child-pill,
+.parent-app-bar [dir="rtl"] .parent-child-pill.parent-child-pill {
+  padding: 0 0.3rem 0 0.875rem;
+}
+html .parent-app-bar .parent-child-pill.parent-child-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+html .parent-app-bar .parent-child-pill.parent-child-pill--active {
+  background: linear-gradient(135deg, #f5d77a 0%, #d4af37 100%);
+  border-color: transparent;
+  color: #0b2345;
+  box-shadow: 0 6px 16px -8px rgba(212, 175, 55, 0.7);
+}
+.parent-child-pill__avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+.parent-child-pill--active .parent-child-pill__avatar {
+  background: #0b2345;
+  color: #f5d77a;
+}
+html .parent-app-bar .parent-child-pill.parent-child-pill--add {
+  padding-inline: 0.875rem;
+  border-style: dashed;
+  border-color: rgba(212, 175, 55, 0.55);
+  background: transparent;
+  color: #f5d77a;
+}
+
+/* ═══════════ Email verification notice ═══════════ */
+.sx-verify-banner {
+  --vb-bg: linear-gradient(135deg, #fffaf0 0%, #fff4dc 100%);
+  --vb-border: rgba(212, 175, 55, 0.35);
+  --vb-title: #0b2345;
+  --vb-text: #6b5a2e;
+  --vb-icon-bg: linear-gradient(135deg, #f5d77a 0%, #d4af37 100%);
+  --vb-icon: #0b2345;
+  --vb-btn-bg: #ffffff;
+  --vb-btn-border: rgba(11, 35, 69, 0.12);
+  --vb-btn-text: #0b2345;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  padding-inline-end: 2.75rem;
+  border-radius: 1.125rem;
+  background: var(--vb-bg);
+  border: 1px solid var(--vb-border);
+  box-shadow: 0 10px 28px -22px rgba(146, 108, 20, 0.55);
+  flex-shrink: 0;
+}
+html.dark .sx-verify-banner {
+  --vb-bg: linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.05) 100%);
+  --vb-border: rgba(212, 175, 55, 0.26);
+  --vb-title: #f8fafc;
+  --vb-text: rgba(245, 215, 122, 0.78);
+  --vb-btn-bg: rgba(255, 255, 255, 0.06);
+  --vb-btn-border: rgba(255, 255, 255, 0.12);
+  --vb-btn-text: #f1f5f9;
+  box-shadow: none;
+}
+.sx-verify-banner__icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.875rem;
+  background: var(--vb-icon-bg);
+  color: var(--vb-icon);
+  box-shadow: 0 6px 14px -8px rgba(212, 175, 55, 0.8);
+}
+.sx-verify-banner__copy {
+  flex: 1;
+  min-width: 0;
+}
+.sx-verify-banner__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--vb-title);
+}
+.sx-verify-banner__desc {
+  margin: 0.15rem 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--vb-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sx-verify-banner__email {
+  font-weight: 700;
+}
+.sx-verify-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+html .sx-verify-banner .sx-verify-banner__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2.375rem;
+  padding: 0 0.9rem;
+  border-radius: 0.75rem;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--vb-btn-bg);
+  color: var(--vb-btn-text);
+  border: 1px solid var(--vb-btn-border);
+  transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+html .sx-verify-banner .sx-verify-banner__btn:active { transform: scale(0.97); }
+html .sx-verify-banner .sx-verify-banner__btn--primary {
+  background: #0b2345;
+  color: #f5d77a;
+  border-color: transparent;
+}
+html.dark .sx-verify-banner .sx-verify-banner__btn--primary {
+  background: linear-gradient(135deg, #f5d77a 0%, #d4af37 100%);
+  color: #0b2345;
+}
+html .sx-verify-banner .sx-verify-banner__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+html .sx-verify-banner .sx-verify-banner__close {
+  position: absolute;
+  top: 0.625rem;
+  inset-inline-end: 0.625rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--vb-text);
+  background: transparent;
+  border: 0;
+}
+html .sx-verify-banner .sx-verify-banner__close:hover {
+  background: rgba(11, 35, 69, 0.06);
+}
+/* Phones: copy on top, two full-width actions underneath */
+@media (max-width: 639px) {
+  .sx-verify-banner {
+    flex-wrap: wrap;
+    padding: 0.875rem;
+    padding-inline-end: 2.5rem;
+  }
+  .sx-verify-banner__desc { white-space: normal; }
+  .sx-verify-banner__actions {
+    flex-basis: 100%;
+    margin-inline-end: -1.625rem;
+  }
+  html .sx-verify-banner .sx-verify-banner__btn { flex: 1; }
+}
+
+/* Phone profile menu opens as a bottom sheet: give it the full width */
+.sx-floating-menu.sx-floating-menu--sheet.sx-nav__profile-menu-portal {
+  width: 100%;
+  max-width: none;
+  padding: 0.25rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}

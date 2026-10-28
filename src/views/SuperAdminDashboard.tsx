@@ -81,6 +81,7 @@ import {
 } from "lucide-react";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { toast } from "react-hot-toast";
+import { EmailVerificationBanner } from "../components/EmailVerificationBanner";
 import { motion, AnimatePresence } from "motion/react";
 import { pageTransitionProps } from "../lib/motion";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
@@ -96,6 +97,7 @@ import {
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import SchoolixLogo from "../components/SchoolixLogo";
+import { DashboardHeader } from "../components/layout/DashboardHeader";
 import { isCustomAppLogo } from "../lib/brandAssets";
 import SuperAdminChatTab from "./admin/SuperAdminChatTab";
 import {
@@ -2524,49 +2526,9 @@ export default function SuperAdminDashboard() {
       ) : null}
 
       <main className="sx-dashboard-content sx-shell-content flex-1 flex flex-col h-[100dvh] overflow-hidden bg-transparent transition-all duration-300 print:overflow-visible print:h-auto print:block">
-        <header className="sx-ds-topbar sx-ds-topbar--flex px-4 sm:px-5 shrink-0 relative z-[var(--sx-z-header)] print:hidden">
-          <div className="flex items-center gap-2.5 min-w-0">
-            {!isMobile ? (
-            <button
-              type="button"
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="sx-ds-icon-btn hidden md:inline-flex shrink-0"
-              aria-label={isRtl ? 'القائمة' : 'Menu'}
-            >
-              <Menu
-                size={18}
-                strokeWidth={1.75}
-                className={
-                  isSidebarCollapsed
-                    ? `${isRtl ? "-rotate-90" : "rotate-90"} transition-transform`
-                    : "transition-transform"
-                }
-              />
-            </button>
-            ) : null}
-            {activeTab !== "schools" && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                onClick={handleBack}
-                className="sx-ds-icon-btn shrink-0"
-                aria-label={isRtl ? 'رجوع' : 'Back'}
-              >
-                <ArrowRight
-                  size={16}
-                  strokeWidth={1.75}
-                  className="transition-transform"
-                />
-                <span className="hidden sm:inline text-xs font-semibold ms-1">{t('back')}</span>
-              </motion.button>
-            )}
-            <div className="sx-ds-topbar__title-block min-w-0">
-              <p className="sx-ds-topbar__eyebrow">{isRtl ? 'منصة SchoolixIQ' : 'SchoolixIQ platform'}</p>
-              <h2
-                id="super-admin-header"
-                className="sx-ds-topbar__title truncate max-w-[180px] xs:max-w-[220px] sm:max-w-none"
-              >
-                {({
+        <DashboardHeader
+          isRtl={isRtl}
+          title={({
                   schools: t('sidebar_schools'),
                   accounts: t('sidebar_accounts'),
                   team: t('sidebar_team'),
@@ -2581,99 +2543,71 @@ export default function SuperAdminDashboard() {
                   footer: t('sidebar_footer'),
                   backups: t('sidebar_backups'),
                   diagnostics: t('sidebar_diagnostics'),
-                } as Record<string, string>)[activeTab] || t('system_management')}
-              </h2>
-            </div>
-          </div>
-          <div className="sx-header-actions sx-dock-duplicate-hide lg:flex">
-            <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
-            <LanguageToggle />
-            <ThemeToggle />
-            {activeTab !== "chat" ? (
-              <SmartAssistantNavButton isRtl={isRtl} onClick={() => setAssistantOpen(true)} />
-            ) : null}
-
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className={`sx-ds-icon-btn relative active:scale-95 ${
-                showNotifications ? "is-active" : ""
-              }`}
-            >
-              <Bell size={18} strokeWidth={1.75} />
-              {totalUnread > 0 && (
-                <span className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 bg-red-500 border-2 border-white rounded-full text-[9px] font-bold text-white flex items-center justify-center">
-                  {totalUnread > 9 ? '9+' : totalUnread}
-                </span>
-              )}
-            </button>
-            <div className="hidden md:flex items-center gap-2 me-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden />
-              <span className="text-[11px] font-semibold text-white/55">
+                          } as Record<string, string>)[activeTab] || t('system_management')}
+          brandTitle={isRtl ? 'منصة SchoolixIQ' : 'SchoolixIQ platform'}
+          showBack={activeTab !== "schools"}
+          onBack={handleBack}
+          onMenuToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          menuCollapsed={isSidebarCollapsed}
+          showMenuToggle={!isMobile}
+          onLogout={() => signOutWithCleanup()}
+          onOpenChat={() => setActiveTab("chat")}
+          onOpenSettings={() => setActiveTab("settings")}
+          trailing={
+            <>
+              <span className="sx-nav__status sx-nav__hide-compact">
+                <span className="sx-nav__status-dot" aria-hidden />
                 {t('system_status_ok')}
               </span>
-            </div>
-          </div>
-
-          {showNotifications && (
-            <NotificationCenter
-              onClose={() => setShowNotifications(false)}
-              activeTabSetter={setActiveTab as (tab: string) => void}
-              userRole="super_admin"
-            />
-          )}
-        </header>
+              {!isMobile ? <OfflineQueueTrigger variant="header" className="inline-flex" /> : null}
+              {activeTab !== "chat" ? (
+                <SmartAssistantNavButton isRtl={isRtl} onClick={() => setAssistantOpen(true)} />
+              ) : null}
+              {/* Phones reach notifications from the bottom dock */}
+              {!isMobile ? (
+              <button
+                type="button"
+                onClick={() => setShowNotifications(!showNotifications)}
+                className={`sx-ds-icon-btn relative active:scale-95 shrink-0 ${
+                  showNotifications ? "is-active" : ""
+                }`}
+                aria-label={isRtl ? "الإشعارات" : "Notifications"}
+              >
+                <Bell size={18} strokeWidth={1.75} />
+                {totalUnread > 0 && (
+                  <span className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 bg-red-500 border-2 border-white rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                    {totalUnread > 9 ? '9+' : totalUnread}
+                  </span>
+                )}
+              </button>
+              ) : null}
+              {showNotifications && (
+                <NotificationCenter
+                  onClose={() => setShowNotifications(false)}
+                  activeTabSetter={setActiveTab as (tab: string) => void}
+                  userRole="super_admin"
+                />
+              )}
+            </>
+          }
+        />
 
         {!auth.currentUser?.emailVerified && !hideVerificationBanner && (
-          <div className="mx-4 md:mx-8 mt-4 md:mt-6 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 p-3 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm shrink-0 relative">
-            <button
-              onClick={handleHideVerification}
-              className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-700 p-1 rounded-full shadow-sm hover:scale-110 active:scale-95 transition-all z-10"
-              title="إخفاء مؤقتاً"
-            >
-              <X size={14} />
-            </button>
-            <div className="flex items-center gap-3 text-right w-full">
-              <div className="w-8 h-8 shrink-0 bg-amber-100 dark:bg-amber-900/50 text-amber-600 rounded-xl flex items-center justify-center">
-                <ShieldCheck size={18} />
-              </div>
-              <div className="flex-1">
-                <h4 className="text-xs md:text-sm font-bold text-amber-900 dark:text-amber-400 leading-tight">
-                  تأكيد البريد الإلكتروني (Super Admin)
-                </h4>
-                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 truncate max-w-[220px] md:max-w-[400px]">
-                  يرجى تفعيل بريدك ({auth.currentUser?.email})
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <button
-                onClick={async () => {
-                  if (auth.currentUser) {
-                    await auth.currentUser.reload();
-                    if (auth.currentUser.emailVerified) {
-                      toast.success("تم تأكيد البريد بنجاح");
-                    } else {
-                      toast.error("لم يتم التأكيد بعد");
-                    }
-                  }
-                }}
-                className="flex-1 md:flex-none px-4 py-2 bg-white/50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-[10px] hover:bg-white dark:hover:bg-slate-700 transition-all active:scale-95 border border-slate-200 dark:border-slate-700 whitespace-nowrap"
-              >
-                تحديث
-              </button>
-              <button
-                onClick={handleResendVerification}
-                disabled={isSendingVerification || verificationCooldown > 0}
-                className="flex-1 md:flex-none px-4 py-2 bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-400 rounded-lg font-bold text-[10px] hover:bg-amber-300 dark:hover:bg-amber-800 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap overflow-hidden text-ellipsis"
-              >
-                {isSendingVerification
-                  ? "جاري..."
-                  : verificationCooldown > 0
-                    ? `انتظر ${verificationCooldown} ثانية`
-                    : "إعادة إرسال"}
-              </button>
-            </div>
-          </div>
+          <EmailVerificationBanner
+            className="mx-4 md:mx-8 mt-4 md:mt-6"
+            isRtl={isRtl}
+            email={auth.currentUser?.email}
+            sending={isSendingVerification}
+            cooldown={verificationCooldown}
+            onResend={handleResendVerification}
+            onDismiss={handleHideVerification}
+            onRefresh={async () => {
+              if (!auth.currentUser) return;
+              await auth.currentUser.reload();
+              if (auth.currentUser.emailVerified) toast.success(isRtl ? "تم تأكيد البريد بنجاح" : "Email confirmed");
+              else toast.error(isRtl ? "لم يتم التأكيد بعد، راجع بريدك" : "Not confirmed yet — check your inbox");
+            }}
+          />
         )}
 
         <div

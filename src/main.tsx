@@ -4,6 +4,7 @@ import App from './App.tsx';
 import './index.css';
 import './styles/chat-ui.css';
 import './styles/ui-polish.css';
+import './styles/app-bar.css';
 import { initSentry } from './lib/sentryWrapper';
 
 if (import.meta.env.VITE_SENTRY_DSN) {

@@ -75,8 +75,10 @@ export function ConversationList({
       ? 'ستظهر هنا المحادثات المخصصة لهذا الحساب'
       : 'Conversations assigned to this account will appear here');
 
+  // <section>, not <aside>: index.css paints every <aside> navy with forced
+  // white text, which overrode this list's own light/dark theme.
   return (
-    <aside
+    <section
       className="sx-enterprise-chat-sidebar sx-chat-list flex flex-col min-h-0"
       aria-label={isRtl ? 'قائمة المحادثات' : 'Conversation list'}
     >
@@ -88,7 +90,7 @@ export function ConversationList({
         <div className="relative">
           <Search
             size={16}
-            className={`absolute top-1/2 -translate-y-1/2 text-[#0B2345]/40 pointer-events-none ${
+            className={`sx-chat-search__icon absolute top-1/2 -translate-y-1/2 pointer-events-none ${
               isRtl ? 'right-3.5' : 'left-3.5'
             }`}
             aria-hidden
@@ -148,7 +150,7 @@ export function ConversationList({
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="sx-enterprise-convo-card__name">{contact.name}</h3>
                     {timeLabel ? (
-                      <span className="text-[10px] font-semibold text-[#0B2345]/45 shrink-0 tabular-nums">
+                      <span className="sx-enterprise-convo-card__time shrink-0 tabular-nums">
                         {timeLabel}
                       </span>
                     ) : null}
@@ -177,6 +179,6 @@ export function ConversationList({
           })
         )}
       </div>
-    </aside>
+    </section>
   );
 }
