@@ -43,6 +43,43 @@ export async function fetchStudentLinkFields(
   };
 }
 
+const PARENT_LIST_TTL_MS = 60_000;
+type ParentDocs = Map<string, Record<string, unknown>>;
+const parentListCache = new Map<string, { at: number; docs: Promise<ParentDocs> }>();
+
+/** Parent user docs of a school (cached briefly so bulk sends query once). */
+function listSchoolParents(schoolId: string): Promise<ParentDocs> {
+  const hit = parentListCache.get(schoolId);
+  if (hit && Date.now() - hit.at < PARENT_LIST_TTL_MS) return hit.docs;
+  const docs = getDocs(
+    query(collection(db, 'users'), where('schoolId', '==', schoolId), where('role', '==', 'parent')),
+  ).then((snap) => new Map(snap.docs.map((d) => [d.id, d.data()])));
+  docs.catch(() => parentListCache.delete(schoolId));
+  parentListCache.set(schoolId, { at: Date.now(), docs });
+  return docs;
+}
+
+/**
+ * A parent's user doc, only if it belongs to `schoolId`; null otherwise.
+ * School staff are refused a direct get on users/{id} (the rule runs past
+ * Firestore's 1000-expression limit), but the school-scoped parents list
+ * is allowed, so fall back to it.
+ */
+export async function getSchoolParentDoc(
+  parentId: string,
+  schoolId: string,
+): Promise<Record<string, unknown> | null> {
+  if (!parentId || !schoolId) return null;
+  try {
+    const snap = await getDoc(doc(db, 'users', parentId));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return data.schoolId === schoolId && String(data.role || '').toLowerCase() === 'parent' ? data : null;
+  } catch {
+    return (await listSchoolParents(schoolId)).get(parentId) ?? null;
+  }
+}
+
 /** Parent UIDs linked to a student, verified for the expected school only. */
 export async function resolveStudentParentIds(
   studentId: string,
@@ -53,20 +90,14 @@ export async function resolveStudentParentIds(
     return [];
   }
 
-  const verified: string[] = [];
-  for (const parentId of link.parentIds) {
-    const userSnap = await getDoc(doc(db, 'users', parentId));
-    if (!userSnap.exists()) continue;
-    const userData = userSnap.data();
-    if (
-      userData.schoolId === expectedSchoolId &&
-      String(userData.role || '').toLowerCase() === 'parent'
-    ) {
-      verified.push(parentId);
-    }
-  }
+  const ids = [...new Set(link.parentIds.filter(Boolean))];
+  if (ids.length === 0) return [];
 
-  return [...new Set(verified)];
+  const verified: string[] = [];
+  for (const parentId of ids) {
+    if (await getSchoolParentDoc(parentId, expectedSchoolId)) verified.push(parentId);
+  }
+  return verified;
 }
 
 /** Union of parent UIDs linked to students (for parent-scoped homework writes). */

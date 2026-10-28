@@ -1440,7 +1440,18 @@ service cloud.firestore {
     }
 
     match /tuition_reminder_tracking/{trackingId} {
-      allow read, get, list: if isSuperAdmin()
+      // A first reminder reads a tracking doc that does not exist yet;
+      // resource is null then, so allow that get (it reveals nothing).
+      allow get: if isSuperAdmin()
+        || (
+          signedIn()
+          && isSchoolManagementRole()
+          && (
+            resource == null
+            || (hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId)
+          )
+        );
+      allow list: if isSuperAdmin()
         || (
           signedIn()
           && hasSchoolId(resource.data)

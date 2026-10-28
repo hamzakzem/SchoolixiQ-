@@ -5,7 +5,6 @@ import { useAuth } from '../../lib/AuthContext';
 import {
   Bell,
   MessageCircle,
-  ExternalLink,
   ShieldOff,
   ShieldCheck,
   Send,
@@ -14,10 +13,13 @@ import {
   Clock,
   Calendar,
   Search,
+  Wallet,
+  Inbox,
+  History,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import {
-  formatTuitionDueLabel,
+  formatTuitionAmountLabel,
   tuitionParentsQuery,
   type TuitionReminderDisplayRow,
   type TuitionReminderFilterKey,
@@ -48,8 +50,29 @@ import {
   logTuitionListenerSnapshot,
 } from '../../lib/tuitionQueryDebug';
 import { TuitionReminderDiagnosticPanel } from '../../components/admin/tuition/TuitionReminderDiagnosticPanel';
+import {
+  ReminderCheck,
+  ReminderFilterChips,
+  TuitionReminderCard,
+} from '../../components/admin/tuition/TuitionReminderCard';
 
 const IS_DEV = import.meta.env.DEV;
+
+const LOG_RESULT_LABELS: Record<string, string> = {
+  sent: 'تم الإرسال',
+  skipped_dedup: 'تخطي (مكرر)',
+  no_parent: 'لا يوجد ولي أمر',
+  failed: 'فشل',
+  restored: 'استعادة الصلاحيات',
+  skipped_auto: 'تخطي تلقائي',
+};
+
+const LOG_CHANNEL_LABELS: Record<string, string> = {
+  notification: 'إشعار حساب',
+  whatsapp_link: 'واتساب',
+  bulk: 'جماعي',
+  automatic: 'تلقائي',
+};
 
 const FILTER_TABS: { key: TuitionReminderFilterKey; label: string }[] = [
   { key: 'due_now', label: 'مستحق الآن' },
@@ -218,6 +241,8 @@ export default function TuitionReminderDashboard() {
       else if (result === 'no_parent') toast.error('لا يوجد ولي أمر مرتبط');
       else toast.error('فشل الإرسال');
       fetchReminderLogs(schoolId, 30).then(setLogs);
+    } catch {
+      toast.error('تعذر إرسال التذكير، حاول مرة أخرى');
     } finally {
       setBusyId(null);
     }
@@ -295,6 +320,8 @@ export default function TuitionReminderDashboard() {
       }
       toast.success(`تم إرسال ${sent} تذكير`);
       fetchReminderLogs(schoolId, 30).then(setLogs);
+    } catch {
+      toast.error(sent > 0 ? `أُرسل ${sent} تذكير ثم توقف الإرسال` : 'تعذر الإرسال الجماعي');
     } finally {
       setBulkBusy(false);
     }
@@ -318,114 +345,127 @@ export default function TuitionReminderDashboard() {
     setShowSettings(false);
   };
 
+  const totalDue = useMemo(
+    () => eligibleRows.reduce((sum, r) => sum + (r.amount || 0), 0),
+    [eligibleRows],
+  );
+  const bulkCount = useMemo(
+    () =>
+      displayRows.filter(
+        (r) =>
+          r.hasLinkedParent &&
+          (r.bucket === 'overdue' || r.bucket === 'today' || r.bucket === 'soon' || r.autoReminderEligible),
+      ).length,
+    [displayRows],
+  );
+  const studentNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    students.forEach((st) => {
+      map[st.id] = st.name || '';
+    });
+    return map;
+  }, [students]);
+
+  const stats: {
+    key: TuitionReminderFilterKey;
+    label: string;
+    count: number;
+    icon: typeof Bell;
+    tone: string;
+  }[] = [
+    { key: 'all', label: 'إجمالي غير المدفوع', count: dashboardCounts.total, icon: Wallet, tone: 'all' },
+    { key: 'due_now', label: 'مستحق الآن', count: dashboardCounts.dueNow, icon: AlertTriangle, tone: 'due' },
+    { key: 'soon', label: 'قريباً', count: dashboardCounts.soon, icon: Clock, tone: 'soon' },
+    { key: 'later', label: 'لاحقاً', count: dashboardCounts.later, icon: Calendar, tone: 'later' },
+    { key: 'no_parent', label: 'بدون ولي أمر', count: dashboardCounts.noParent, icon: ShieldOff, tone: 'noparent' },
+  ];
+
   return (
-    <div className="space-y-6" dir="rtl">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900">لوحة تذكير الأقساط</h2>
-          <p className="text-sm text-slate-500 font-bold mt-1">
-            متزامنة مع Overview — قسط واحد حالي غير مدفوع لكل طالب
-          </p>
+    <div className="sx-trm sx-trm-page" dir="rtl">
+      <section className="sx-trm-hero">
+        <div className="sx-trm-hero__copy">
+          <p className="sx-trm-hero__eyebrow">الأقساط والرسوم</p>
+          <h2 className="sx-trm-hero__title">تذكير الأقساط</h2>
+          <p className="sx-trm-hero__desc">القسط الحالي غير المدفوع لكل طالب، مع قنوات التواصل المتاحة لولي أمره</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="sx-trm-hero__total">
+          <b>
+            {formatTuitionAmountLabel(totalDue)} <small className="text-sm">د.ع</small>
+          </b>
+          <span>إجمالي المستحق</span>
+        </div>
+        <div className="sx-trm-hero__actions">
           <button
             type="button"
             onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-sm"
+            className="sx-trm-cta sx-trm-cta--ghost"
+            aria-expanded={showSettings}
           >
-            <Settings2 size={16} /> الإعدادات
+            <Settings2 size={17} aria-hidden /> الإعدادات
           </button>
           <button
             type="button"
-            disabled={bulkBusy}
+            disabled={bulkBusy || bulkCount === 0}
             onClick={handleBulk}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#0B2345] text-white rounded-xl font-bold text-sm disabled:opacity-50"
+            className="sx-trm-cta sx-trm-cta--primary"
           >
-            <Send size={16} /> {bulkBusy ? 'جاري الإرسال...' : 'تذكير جماعي'}
+            <Send size={17} aria-hidden />
+            {bulkBusy ? 'جاري الإرسال…' : `تذكير جماعي${bulkCount ? ` (${bulkCount})` : ''}`}
           </button>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {[
-          { label: 'إجمالي غير المدفوع', count: dashboardCounts.total, icon: AlertTriangle, color: 'text-slate-700 bg-slate-100', filterKey: 'all' as TuitionReminderFilterKey },
-          { label: 'مستحق الآن', count: dashboardCounts.dueNow, icon: Calendar, color: 'text-rose-600 bg-rose-50', filterKey: 'due_now' as TuitionReminderFilterKey },
-          { label: 'قريباً', count: dashboardCounts.soon, icon: Clock, color: 'text-blue-600 bg-blue-50', filterKey: 'soon' as TuitionReminderFilterKey },
-          { label: 'لاحقاً', count: dashboardCounts.later, icon: Clock, color: 'text-indigo-600 bg-indigo-50', filterKey: 'later' as TuitionReminderFilterKey },
-          { label: 'بدون ولي أمر', count: dashboardCounts.noParent, icon: ShieldOff, color: 'text-amber-700 bg-amber-50', filterKey: 'no_parent' as TuitionReminderFilterKey },
-        ].map((s) => (
+      <div className="sx-trm-stats">
+        {stats.map((st) => (
           <button
-            key={s.label}
+            key={st.key}
             type="button"
-            onClick={() => setFilter(s.filterKey)}
-            className={`p-5 rounded-2xl border text-right transition-all ${filter === s.filterKey ? 'border-[#0B2345] shadow-md' : 'border-slate-200 bg-white'}`}
+            onClick={() => setFilter(st.key)}
+            className={`sx-trm-stat${filter === st.key ? ' is-active' : ''}`}
+            aria-pressed={filter === st.key}
           >
-            <div className={`inline-flex p-2 rounded-xl ${s.color} mb-2`}>
-              <s.icon size={20} />
-            </div>
-            <p className="text-2xl font-black text-slate-900">{s.count}</p>
-            <p className="text-xs font-bold text-slate-500">{s.label}</p>
-          </button>
-        ))}
-      </div>
-
-      <div className="relative">
-        <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="بحث: الطالب، ولي الأمر، الصف، المبلغ، الحالة..."
-          className="w-full h-11 pr-11 pl-4 rounded-xl border border-slate-200 bg-white text-sm font-bold"
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {FILTER_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setFilter(tab.key)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
-              filter === tab.key
-                ? 'bg-[#0B2345] text-white border-[#0B2345]'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            {tab.label}
-            {(filterCounts[tab.key as keyof typeof filterCounts] ?? 0) > 0 && (
-              <span className="mr-1.5 opacity-80">
-                ({filterCounts[tab.key as keyof typeof filterCounts]})
-              </span>
-            )}
+            <span className={`sx-trm-stat__icon sx-trm-stat__icon--${st.tone}`} aria-hidden>
+              <st.icon size={18} />
+            </span>
+            <b>{st.count}</b>
+            <span>{st.label}</span>
           </button>
         ))}
       </div>
 
       {showSettings && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-          <h3 className="font-black text-lg">إعدادات التذكير والتصعيد</h3>
-          <label className="flex items-center gap-3 font-bold text-sm">
-            <input
-              type="checkbox"
-              checked={settings.enabled}
-              onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
-            />
-            تفعيل التذكير اليدوي
-          </label>
-          <label className="flex items-center gap-3 font-bold text-sm">
-            <input
-              type="checkbox"
-              checked={settings.autoRemindersEnabled}
-              onChange={(e) => setSettings({ ...settings, autoRemindersEnabled: e.target.checked })}
-            />
-            تفعيل التذكير التلقائي لحساب ولي الأمر (يتطلب Cloud Scheduler)
-          </label>
-          <p className="text-xs text-slate-500 font-bold leading-relaxed pr-6">
-            إشعار حساب ولي الأمر: يمكن أن يُرسل تلقائياً عند تفعيل الجدولة.
-            واتساب: يتطلب فتح الرابط يدوياً — لا يُرسل تلقائياً بدون WhatsApp Business API.
-          </p>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section className="sx-trm-panel">
+          <h3 className="sx-trm-panel__title">
+            <Settings2 size={18} aria-hidden /> إعدادات التذكير والتصعيد
+          </h3>
+          <div className="grid gap-2 mb-4">
+            <label className="sx-trm-switch">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={settings.enabled}
+                onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
+              />
+              <ReminderCheck checked={settings.enabled} />
+              <span>تفعيل التذكير اليدوي</span>
+            </label>
+            <label className="sx-trm-switch">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={settings.autoRemindersEnabled}
+                onChange={(e) => setSettings({ ...settings, autoRemindersEnabled: e.target.checked })}
+              />
+              <ReminderCheck checked={settings.autoRemindersEnabled} />
+              <span>
+                التذكير التلقائي لحساب ولي الأمر
+                <small>
+                  يُرسل إشعار الحساب تلقائياً عند تفعيل الجدولة (Cloud Scheduler). رسائل واتساب تُفتح يدوياً دائماً.
+                </small>
+              </span>
+            </label>
+          </div>
+          <div className="sx-trm-settings-grid">
             {[
               { key: 'reminderStartAfterDays', label: 'بدء التذكير بعد (يوم)', min: 1 },
               { key: 'reminderRepeatEveryDays', label: 'تكرار كل (يوم)', min: 1 },
@@ -434,12 +474,12 @@ export default function TuitionReminderDashboard() {
               { key: 'redWarningDurationDays', label: 'مدة التحذير الأحمر (يوم)', min: 1 },
               { key: 'upcomingDays', label: 'نافذة «قريباً» (يوم)', min: 1 },
             ].map((field) => (
-              <label key={field.key} className="text-sm font-bold">
+              <label key={field.key} className="sx-trm-field">
                 {field.label}
                 <input
                   type="number"
+                  inputMode="numeric"
                   min={field.min}
-                  className="mt-1 w-full border rounded-xl px-3 py-2"
                   value={(settings as any)[field.key]}
                   onChange={(e) =>
                     setSettings({ ...settings, [field.key]: Number(e.target.value) || field.min })
@@ -448,182 +488,174 @@ export default function TuitionReminderDashboard() {
               </label>
             ))}
           </div>
-          <button type="button" onClick={saveSettings} className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-bold">
-            حفظ
-          </button>
-        </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button type="button" onClick={() => setShowSettings(false)} className="sx-trm-cta sx-trm-cta--ghost">
+              إلغاء
+            </button>
+            <button type="button" onClick={saveSettings} className="sx-trm-cta sx-trm-cta--navy">
+              حفظ الإعدادات
+            </button>
+          </div>
+        </section>
       )}
 
       {restrictedParents.length > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6">
-          <h3 className="font-black text-lg text-rose-800 mb-3">حسابات أولياء الأمور المقيّدة</h3>
-          <div className="space-y-2">
-            {restrictedParents.map((p) => (
-              <div key={p.parentId} className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-xl p-3 border border-rose-100">
-                <div>
-                  <p className="font-bold text-slate-800">{p.name}</p>
-                  {p.email && <p className="text-xs text-slate-500">{p.email}</p>}
-                  {p.escalationLevel && (
-                    <p className="text-xs text-rose-600 font-bold">مستوى التصعيد: {p.escalationLevel}</p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRestore(p.parentId)}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold"
-                >
-                  <ShieldCheck size={14} /> استعادة الوصول
-                </button>
+        <section className="sx-trm-panel sx-trm-panel--danger">
+          <h3 className="sx-trm-panel__title">
+            <ShieldOff size={18} aria-hidden /> حسابات أولياء أمور مقيّدة ({restrictedParents.length})
+          </h3>
+          {restrictedParents.map((p) => (
+            <div key={p.parentId} className="sx-trm-restricted">
+              <div className="min-w-0">
+                <b>{p.name}</b>
+                {p.email && <small>{p.email}</small>}
+                {p.escalationLevel && <small>مستوى التصعيد: {p.escalationLevel}</small>}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {parentsCount === 0 && eligibleRows.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-          {TUITION_REMINDER_EMPTY_MESSAGES.noParentsWarning}
-        </div>
-      )}
-
-      {allLaterRows && displayRows.length > 0 && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-900">
-          {TUITION_REMINDER_EMPTY_MESSAGES.allLaterDashboard}
-        </div>
-      )}
-
-      {IS_DEV && (
-        <TuitionReminderDiagnosticPanel
-          diagnostics={diagnostics}
-          debugMode={debugMode}
-          onDebugModeChange={setDebugMode}
-        />
-      )}
-
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase">
-                <th className="px-4 py-3 text-right">الطالب</th>
-                <th className="px-4 py-3 text-right">ولي الأمر</th>
-                <th className="px-4 py-3 text-right">الهاتف</th>
-                <th className="px-4 py-3 text-right">المبلغ</th>
-                <th className="px-4 py-3 text-right">الاستحقاق</th>
-                <th className="px-4 py-3 text-right">التأخير</th>
-                <th className="px-4 py-3 text-right">آخر تذكير</th>
-                <th className="px-4 py-3 text-right">العدد</th>
-                <th className="px-4 py-3 text-right">حالة القسط</th>
-                <th className="px-4 py-3 text-right">الإرسال</th>
-                <th className="px-4 py-3 text-center">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {displayRows.map((row) => (
-                <tr key={row.installmentId} className="hover:bg-slate-50/50">
-                  <td className="px-4 py-3 font-bold">{row.studentName}</td>
-                  <td className="px-4 py-3">{row.parentName}</td>
-                  <td className="px-4 py-3 font-mono text-xs" dir="ltr">{row.parentPhone || '—'}</td>
-                  <td className="px-4 py-3">{row.amount.toLocaleString('ar-IQ-u-nu-latn')} د.ع</td>
-                  <td className="px-4 py-3 text-xs">{formatTuitionDueLabel(row.dueDate)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${row.delayDays > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                      {row.delayDays > 0 ? `${row.delayDays} يوم` : '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">
-                    {row.lastReminderAt ? row.lastReminderAt.toLocaleString('ar-IQ-u-nu-latn') : '—'}
-                  </td>
-                  <td className="px-4 py-3 font-bold">{row.reminderCount}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-lg text-xs font-bold block w-fit ${
-                      row.bucket === 'overdue' ? 'bg-rose-100 text-rose-700' :
-                      row.bucket === 'today' ? 'bg-amber-100 text-amber-700' :
-                      row.bucket === 'soon' ? 'bg-blue-100 text-blue-700' :
-                      row.bucket === 'later' ? 'bg-indigo-100 text-indigo-700' :
-                      'bg-slate-100 text-slate-600'
-                    }`}>
-                      {row.paymentStatusLabel}
-                    </span>
-                    {row.autoReminderNote && (
-                      <span className="text-[10px] text-slate-500 font-bold block mt-1">{row.autoReminderNote}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-bold block ${row.hasLinkedParent ? 'text-emerald-700' : 'text-slate-500'}`}>
-                      {row.sendStatusLabel}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-bold block mt-0.5">{row.linkedParentLabel}</span>
-                    {row.actionHint && (
-                      <span className="text-[10px] text-amber-700 font-bold block mt-0.5">{row.actionHint}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1 flex-wrap">
-                      {row.hasLinkedParent && row.parentId ? (
-                        <button
-                          type="button"
-                          title="إرسال إشعار لحساب ولي الأمر"
-                          disabled={busyId === row.installmentId}
-                          onClick={() => handleSend(row)}
-                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50"
-                        >
-                          <Bell size={16} />
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-bold px-1 whitespace-nowrap max-w-[100px] text-center leading-tight">
-                          {row.actionHint || 'لا يمكن إرسال إشعار حساب'}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        title={row.whatsAppLabel}
-                        disabled={!row.hasWhatsApp}
-                        onClick={() => void handleWhatsApp(row)}
-                        className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-40"
-                      >
-                        <MessageCircle size={16} />
-                      </button>
-                      {row.parentId && row.isRestricted && (
-                        <button
-                          type="button"
-                          title="استعادة"
-                          onClick={() => handleRestore(row.parentId!)}
-                          className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        >
-                          <ShieldCheck size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {displayRows.length === 0 && (
-          <p className="text-center py-12 text-slate-500 font-bold">{emptyMessage}</p>
-        )}
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl p-6">
-        <h3 className="font-black text-lg mb-4 flex items-center gap-2">
-          <ExternalLink size={18} /> سجل التدقيق
-        </h3>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {logs.map((log) => (
-            <div key={log.id} className="flex flex-wrap gap-2 text-xs border-b border-slate-100 pb-2">
-              <span className="font-bold">{log.deliveryResult}</span>
-              <span className="text-slate-500">{log.channel}</span>
-              {log.source && <span className="text-slate-400">{log.source}</span>}
-              <span>طالب: {log.studentId?.slice(0, 8)}</span>
-              {log.escalationLevel && <span>L{log.escalationLevel}</span>}
-              {log.skippedReason && <span className="text-amber-600">{log.skippedReason}</span>}
+              <button type="button" onClick={() => handleRestore(p.parentId)} className="sx-trm-action">
+                <ShieldCheck size={15} aria-hidden /> استعادة الوصول
+              </button>
             </div>
           ))}
-          {logs.length === 0 && <p className="text-slate-400 font-bold">لا سجلات بعد</p>}
+        </section>
+      )}
+
+      <section className="sx-trm-panel">
+        <div className="flex flex-col gap-3 mb-3">
+          <div className="sx-trm-search">
+            <Search size={17} aria-hidden />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث باسم الطالب، ولي الأمر، الصف أو المبلغ"
+              aria-label="بحث في الأقساط"
+            />
+          </div>
+          <ReminderFilterChips tabs={FILTER_TABS} value={filter} counts={filterCounts} onChange={setFilter} />
         </div>
-      </div>
+
+        {parentsCount === 0 && eligibleRows.length > 0 && (
+          <div className="sx-trm-notice mb-3">
+            <AlertTriangle size={16} aria-hidden />
+            <span>{TUITION_REMINDER_EMPTY_MESSAGES.noParentsWarning}</span>
+          </div>
+        )}
+
+        {allLaterRows && displayRows.length > 0 && (
+          <div className="sx-trm-notice sx-trm-notice--info mb-3">
+            <Clock size={16} aria-hidden />
+            <span>{TUITION_REMINDER_EMPTY_MESSAGES.allLaterDashboard}</span>
+          </div>
+        )}
+
+        {IS_DEV && (
+          <TuitionReminderDiagnosticPanel
+            diagnostics={diagnostics}
+            debugMode={debugMode}
+            onDebugModeChange={setDebugMode}
+          />
+        )}
+
+        {displayRows.length === 0 ? (
+          <div className="sx-trm-empty">
+            <span className="sx-trm-empty__icon" aria-hidden>
+              <Inbox size={26} />
+            </span>
+            <p className="m-0">{emptyMessage || 'لا توجد أقساط في هذا التصنيف'}</p>
+          </div>
+        ) : (
+          <div className="sx-trm-list sx-trm-list--wide">
+            {displayRows.map((row) => (
+              <TuitionReminderCard
+                key={row.installmentId}
+                row={row}
+                extraMeta={
+                  row.reminderCount > 0 ? (
+                    <span className="sx-trm-meta">
+                      <Bell size={14} aria-hidden />
+                      {row.reminderCount} تذكير
+                    </span>
+                  ) : null
+                }
+                actions={
+                  <>
+                    {row.parentId && row.isRestricted ? (
+                      <button
+                        type="button"
+                        title="استعادة صلاحيات ولي الأمر"
+                        onClick={() => handleRestore(row.parentId!)}
+                        className="sx-trm-action"
+                      >
+                        <ShieldCheck size={15} aria-hidden /> استعادة
+                      </button>
+                    ) : null}
+                    {row.hasWhatsApp ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleWhatsApp(row)}
+                        className="sx-trm-action sx-trm-action--wa"
+                      >
+                        <MessageCircle size={15} aria-hidden /> واتساب
+                      </button>
+                    ) : null}
+                    {row.hasLinkedParent && row.parentId ? (
+                      <button
+                        type="button"
+                        disabled={busyId === row.installmentId}
+                        onClick={() => handleSend(row)}
+                        className="sx-trm-action sx-trm-action--send"
+                      >
+                        <Bell size={15} aria-hidden />
+                        {busyId === row.installmentId ? 'جاري…' : 'تذكير'}
+                      </button>
+                    ) : null}
+                  </>
+                }
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="sx-trm-panel">
+        <h3 className="sx-trm-panel__title">
+          <History size={18} aria-hidden /> سجل التذكيرات
+        </h3>
+        {logs.length === 0 ? (
+          <p className="m-0 text-sm font-bold" style={{ color: 'var(--trm-muted)' }}>
+            لم يُرسل أي تذكير بعد
+          </p>
+        ) : (
+          <div className="sx-trm-log">
+            {logs.map((log) => {
+              const seconds = (log.createdAt as { seconds?: number } | undefined)?.seconds;
+              const tone =
+                log.deliveryResult === 'sent' || log.deliveryResult === 'restored'
+                  ? 'ok'
+                  : log.deliveryResult === 'failed'
+                    ? 'bad'
+                    : 'skip';
+              return (
+                <div key={log.id} className="sx-trm-log__row">
+                  <span className={`sx-trm-log__dot sx-trm-log__dot--${tone}`} aria-hidden />
+                  <span className="sx-trm-log__main">
+                    {studentNames[log.studentId] || 'طالب'} · {LOG_RESULT_LABELS[log.deliveryResult] || log.deliveryResult}
+                  </span>
+                  <span>{LOG_CHANNEL_LABELS[log.channel] || log.channel}</span>
+                  {seconds ? (
+                    <span className="sx-trm-log__time">
+                      {new Date(seconds * 1000).toLocaleDateString('ar-IQ-u-nu-latn', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
