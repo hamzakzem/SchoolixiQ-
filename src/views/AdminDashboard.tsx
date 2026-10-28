@@ -49,6 +49,7 @@ import {
   limit,
 } from "firebase/firestore";
 import { toast } from "react-hot-toast";
+import { EmailVerificationBanner } from "../components/EmailVerificationBanner";
 import { School } from "../types";
 import { SubscriptionTimer } from "../components/SubscriptionTimer";
 import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
@@ -1295,64 +1296,21 @@ export default function AdminDashboard() {
         setShowNotifications={setShowNotifications}
       >
         {!auth.currentUser?.emailVerified && !hideVerificationBanner && (
-          <div className="mb-4 md:mb-6 shrink-0" dir={isRtl ? "rtl" : "ltr"}>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 px-3 py-2.5 rounded-xl border border-amber-200/70 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/15 border-s-4 border-s-amber-400 dark:border-s-amber-500">
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-7 h-7 shrink-0 bg-amber-100/80 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-lg flex items-center justify-center">
-                  <ShieldCheck size={15} />
-                </div>
-                <div className="min-w-0 text-right">
-                  <p className="text-xs font-bold text-amber-900 dark:text-amber-300 leading-tight">
-                    {isRtl ? "تأكيد البريد الإلكتروني مطلوب" : "Email verification required"}
-                  </p>
-                  <p className="text-[10px] text-amber-700/80 dark:text-amber-500 font-medium truncate">
-                    {auth.currentUser?.email}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0 ps-0 sm:ps-2">
-                <button
-                  onClick={async () => {
-                    if (auth.currentUser) {
-                      await auth.currentUser.reload();
-                      if (auth.currentUser.emailVerified) {
-                        toast.success("تم تأكيد البريد بنجاح");
-                      } else {
-                        toast.error("لم يتم التأكيد بعد، يرجى مراجعة بريدك");
-                      }
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg font-bold text-[10px] hover:bg-amber-50 dark:hover:bg-slate-700 transition-all border border-amber-200/80 dark:border-slate-700 whitespace-nowrap"
-                >
-                  {isRtl ? "تحديث" : "Refresh"}
-                </button>
-                <button
-                  onClick={handleResendVerification}
-                  disabled={isSendingVerification || verificationCooldown > 0}
-                  className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 rounded-lg font-bold text-[10px] transition-all disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isSendingVerification
-                    ? isRtl
-                      ? "جاري..."
-                      : "Sending..."
-                    : verificationCooldown > 0
-                      ? isRtl
-                        ? `انتظر ${verificationCooldown}ث`
-                        : `Wait ${verificationCooldown}s`
-                      : isRtl
-                        ? "إعادة الإرسال"
-                        : "Resend"}
-                </button>
-                <button
-                  onClick={handleHideVerification}
-                  className="p-1.5 text-amber-700/70 hover:text-amber-900 dark:text-amber-500 dark:hover:text-amber-300 rounded-lg transition-colors"
-                  aria-label={isRtl ? "إخفاء مؤقتاً" : "Dismiss temporarily"}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
+          <EmailVerificationBanner
+            className="mb-4 md:mb-6"
+            isRtl={isRtl}
+            email={auth.currentUser?.email}
+            sending={isSendingVerification}
+            cooldown={verificationCooldown}
+            onResend={handleResendVerification}
+            onDismiss={handleHideVerification}
+            onRefresh={async () => {
+              if (!auth.currentUser) return;
+              await auth.currentUser.reload();
+              if (auth.currentUser.emailVerified) toast.success(isRtl ? "تم تأكيد البريد بنجاح" : "Email confirmed");
+              else toast.error(isRtl ? "لم يتم التأكيد بعد، راجع بريدك" : "Not confirmed yet — check your inbox");
+            }}
+          />
         )}
 
         <div className="relative flex-1 flex flex-col min-h-0 min-w-0">

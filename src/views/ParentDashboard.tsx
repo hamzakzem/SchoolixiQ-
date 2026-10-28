@@ -103,6 +103,7 @@ import { Phone, Mail, MapPin, Save, Sparkles, ShieldAlert, ExternalLink } from "
 import { useLanguage } from "../lib/LanguageContext";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import SchoolixLogo from "../components/SchoolixLogo";
+import { DashboardHeader } from "../components/layout/DashboardHeader";
 import { isCustomAppLogo } from "../lib/brandAssets";
 
 function isParentDashboardRole(role?: string) {
@@ -1702,84 +1703,54 @@ export default function ParentDashboard() {
         ) : null}
 
         <div className="sx-dashboard-content sx-shell-content flex-1 flex flex-col min-h-[100dvh] bg-transparent print:overflow-visible print:h-auto print:block">
-        <header className="sx-ds-topbar sx-ds-topbar--stack parent-app-header sticky top-0 z-[var(--sx-z-header)] transition-colors print:hidden shrink-0">
-          <div className="sx-ds-topbar__inner px-4">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2 min-w-0">
+        <div className="parent-app-bar sticky top-0 print:hidden shrink-0">
+          <DashboardHeader
+            isRtl={isRtl}
+            title={activeTab === "home" ? (profile?.name || t("parentWelcome")) : (allItems.find((m) => m.id === activeTab)?.label || profile?.name || "")}
+            brandTitle={activeTab === "home" ? t("parentWelcome") : (profile?.name || t("parentWelcome"))}
+            showBack={activeTab !== "home"}
+            onBack={handleBack}
+            onMenuToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            menuCollapsed={isSidebarCollapsed}
+            showMenuToggle={!isMobile}
+            profileRole={isRtl ? "ولي أمر" : "Parent"}
+            onLogout={handleLogout}
+            onOpenChat={() => setActiveTab("chat")}
+            onOpenSettings={() => setActiveTab("settings")}
+            trailing={
+              <>
+                {!isMobile ? <OfflineQueueTrigger variant="header" className="inline-flex" /> : null}
+                {activeTab !== "chat" ? (
+                  <SmartAssistantNavButton isRtl={isRtl} onClick={() => setAssistantOpen(true)} />
+                ) : null}
+                {/* Phones reach notifications from the bottom dock */}
                 {!isMobile ? (
                 <button
                   type="button"
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="sx-ds-icon-btn hidden md:inline-flex shrink-0"
-                  aria-label={isRtl ? "القائمة" : "Menu"}
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className={`sx-ds-icon-btn relative active:scale-95 shrink-0 ${showNotifications ? "is-active" : ""}`}
+                  aria-label={isRtl ? "الإشعارات" : "Notifications"}
                 >
-                  <Menu size={18} strokeWidth={1.75} className={isSidebarCollapsed ? (isRtl ? "-rotate-90" : "rotate-90") : ""} />
+                  <Bell size={18} strokeWidth={1.75} />
+                  {notifications.filter((n) => !n.read).length > 0 && (
+                    <span className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 bg-rose-500 border-2 border-white text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                      {notifications.filter((n) => !n.read).length > 9 ? "9+" : notifications.filter((n) => !n.read).length}
+                    </span>
+                  )}
                 </button>
                 ) : null}
-                {activeTab !== "home" && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    onClick={handleBack}
-                    className="sx-ds-icon-btn shrink-0"
-                    aria-label={isRtl ? "رجوع" : "Back"}
-                  >
-                    <ArrowRight
-                      size={18}
-                      strokeWidth={1.75}
-                      className={isRtl ? "" : "rotate-180"}
-                    />
-                  </motion.button>
+                {showNotifications && (
+                  <NotificationCenter
+                    onClose={() => setShowNotifications(false)}
+                    activeTabSetter={setActiveTab}
+                    userRole="parent"
+                  />
                 )}
-                <div className="sx-ds-topbar__title-block min-w-0">
-                  <p className="sx-ds-topbar__eyebrow">
-                    {t("parentWelcome")}
-                  </p>
-                  <p className="sx-ds-topbar__title truncate max-w-[140px] sm:max-w-xs">
-                    {profile?.name}
-                  </p>
-                </div>
-              </div>
-              <div className="sx-header-actions sx-dock-duplicate-hide lg:flex">
-                  <OfflineQueueTrigger variant="header" className="hidden lg:inline-flex" />
-                  <LanguageToggle />
-                  <ThemeToggle />
-                  {activeTab !== "chat" ? (
-                    <SmartAssistantNavButton isRtl={isRtl} onClick={() => setAssistantOpen(true)} />
-                  ) : null}
-                <button
-                  onClick={handleLogout}
-                  className="parent-icon-btn text-rose-500"
-                  aria-label={t("logout")}
-                >
-                  <LogOut size={18} />
-                </button>
-                <div className="relative shrink-0">
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className={`parent-icon-btn ${showNotifications ? "bg-[#D4AF37] text-[#0B2345]" : "bg-[#0B2345] text-[#D4AF37]"}`}
-                    aria-label={isRtl ? "الإشعارات" : "Notifications"}
-                  >
-                    <Bell size={18} />
-                    {notifications.filter((n) => !n.read).length > 0 && (
-                      <span className="absolute -top-1 -end-1 min-w-[1.1rem] h-[1.1rem] px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
-                        {notifications.filter((n) => !n.read).length > 9 ? "9+" : notifications.filter((n) => !n.read).length}
-                      </span>
-                    )}
-                  </button>
-              </div>
-            </div>
-            {showNotifications && (
-              <NotificationCenter
-                onClose={() => setShowNotifications(false)}
-                activeTabSetter={setActiveTab}
-                userRole="parent"
-              />
-            )}
-          </div>
-          </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto pb-3 px-4 hide-scrollbar">
+              </>
+            }
+          />
+          {activeTab !== "chat" ? (
+          <div className="parent-child-strip hide-scrollbar" role="tablist" aria-label={isRtl ? "الأبناء" : "Children"}>
             {students.map((s) => (
               <button
                 key={s.id}
@@ -1788,11 +1759,11 @@ export default function ParentDashboard() {
                 aria-label={s.name}
                 aria-current={selectedStudent?.id === s.id ? "true" : undefined}
               >
-                <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 bg-white/20 flex items-center justify-center">
+                <div className="parent-child-pill__avatar">
                   {s.photoUrl ? (
                     <img src={s.photoUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
-                    <span className="text-[10px] font-black">{s.name[0]}</span>
+                    <span>{s.name[0]}</span>
                   )}
                 </div>
                 <span className="truncate max-w-[5rem]">{s.name}</span>
@@ -1800,14 +1771,15 @@ export default function ParentDashboard() {
             ))}
             <button
               onClick={() => setShowAddStudentModal(true)}
-              className="parent-child-pill border-dashed border-[#D4AF37]/50 text-[#0B2345]"
+              className="parent-child-pill parent-child-pill--add"
               aria-label={t("linkStudent")}
             >
               <Users size={14} />
               {t("linkStudent")}
             </button>
           </div>
-        </header>
+          ) : null}
+        </div>
 
         <div className={`sx-shell-scroll flex-1 flex flex-col print:overflow-visible min-h-0 ${activeTab === 'chat' ? 'overflow-hidden h-full pb-0 lg:pb-0 sx-shell-main--chat' : 'pb-28 lg:pb-10'}`}>
           <AnimatePresence mode="wait">

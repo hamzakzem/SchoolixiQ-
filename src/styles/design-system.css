@@ -2846,7 +2846,8 @@ html.dark .sx-dock-sheet--light .sx-dock-sheet__footer {
   outline-offset: 2px;
 }
 
-@media (max-width: 1023px) {
+/* Only phones have the bottom dock (useDevice isMobile < 768); tablets keep these header actions. */
+@media (max-width: 767px) {
   .sx-dock-duplicate-hide {
     display: none !important;
   }

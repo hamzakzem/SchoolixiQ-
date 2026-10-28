@@ -13,6 +13,7 @@ import SchoolixLogo from '../SchoolixLogo';
 import { isCustomSchoolLogo } from '../../lib/brandAssets';
 import { useAuth } from '../../lib/AuthContext';
 import { LanguageToggle } from '../LanguageToggle';
+import { ThemeToggle } from '../ThemeToggle';
 import { FloatingMenu } from '../ui/FloatingMenu';
 
 export type BreadcrumbItem = {
@@ -157,7 +158,7 @@ export function DashboardHeader({
               {isCustomSchoolLogo(schoolLogoUrl) ? (
                 <img src={schoolLogoUrl} alt="" className="sx-nav__logo-img" />
               ) : (
-                <SchoolixLogo size={22} surface="light" />
+                <SchoolixLogo size={28} surface="light" />
               )}
             </div>
             {/* Where am I: current page, with the school / portal as context */}
@@ -177,14 +178,15 @@ export function DashboardHeader({
         <div className="sx-nav__actions sx-header-actions">
           {trailing}
 
-          <span className="sx-nav__hide-mobile">
+          {/* Phones + tablets: language lives in the profile menu */}
+          <span className="sx-nav__hide-compact">
             <LanguageToggle variant="icon" />
           </span>
 
           {showChatButton && onOpenChat ? (
             <button
               type="button"
-              className="sx-nav__chat-btn sx-nav__hide-mobile"
+              className="sx-nav__chat-btn sx-nav__hide-compact"
               onClick={onOpenChat}
               aria-label={chatLabel}
               title={chatLabel}
@@ -250,6 +252,18 @@ export function DashboardHeader({
                   </div>
                 </div>
                 <div className="sx-nav__profile-menu-divider" aria-hidden />
+                {/* Phones + tablets: preferences moved here from the bar */}
+                <div className="sx-nav__menu-prefs">
+                  <div className="sx-nav__menu-pref">
+                    <span>{isRtl ? 'المظهر' : 'Appearance'}</span>
+                    <ThemeToggle />
+                  </div>
+                  <div className="sx-nav__menu-pref">
+                    <span>{isRtl ? 'اللغة' : 'Language'}</span>
+                    <LanguageToggle variant="icon" />
+                  </div>
+                  <div className="sx-nav__profile-menu-divider" aria-hidden />
+                </div>
                 {onOpenSettings ? (
                   <button
                     type="button"
