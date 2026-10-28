@@ -1,5 +1,6 @@
 import React, { useId, useRef, useState } from 'react';
 import {
+  ChevronDown,
   ChevronRight,
   LogOut,
   MessageSquare,
@@ -159,12 +160,11 @@ export function DashboardHeader({
                 <SchoolixLogo size={22} surface="light" />
               )}
             </div>
-            {(brandTitle || brandSubtitle) ? (
-              <div className="sx-nav__brand-copy">
-                {brandTitle ? <span className="sx-nav__brand-name">{brandTitle}</span> : null}
-                {brandSubtitle ? <span className="sx-nav__brand-meta">{brandSubtitle}</span> : null}
-              </div>
-            ) : null}
+            {/* Where am I: current page, with the school / portal as context */}
+            <div className="sx-nav__brand-copy">
+              {brandTitle && title ? <span className="sx-nav__page-meta">{brandTitle}</span> : null}
+              <span className="sx-nav__page-title">{title || brandTitle}</span>
+            </div>
           </div>
         ) : null}
       </div>
@@ -177,12 +177,14 @@ export function DashboardHeader({
         <div className="sx-nav__actions sx-header-actions">
           {trailing}
 
-          <LanguageToggle variant="icon" />
+          <span className="sx-nav__hide-mobile">
+            <LanguageToggle variant="icon" />
+          </span>
 
           {showChatButton && onOpenChat ? (
             <button
               type="button"
-              className="sx-nav__chat-btn"
+              className="sx-nav__chat-btn sx-nav__hide-mobile"
               onClick={onOpenChat}
               aria-label={chatLabel}
               title={chatLabel}
@@ -192,25 +194,32 @@ export function DashboardHeader({
             </button>
           ) : null}
 
+          {showProfileMenu && displayName ? <span className="sx-nav__divider" aria-hidden /> : null}
+
           {showProfileMenu && displayName ? (
             <div className="sx-nav__profile">
               <button
                 ref={profileBtnRef}
                 type="button"
-                className="sx-nav__btn sx-nav__btn--profile"
+                className="sx-nav__profile-chip"
                 aria-haspopup="menu"
                 aria-expanded={profileOpen}
                 aria-controls={menuId}
                 aria-label={displayName}
                 onClick={() => setProfileOpen((v) => !v)}
               >
-                <span className="sx-nav__avatar sx-ds-avatar sx-nav-profile__avatar">
+                <span className="sx-nav__chip-avatar">
                   {displayImage ? (
                     <img src={displayImage} alt="" className="sx-nav__avatar-img" />
                   ) : (
                     initial
                   )}
                 </span>
+                <span className="sx-nav__chip-copy">
+                  <span className="sx-nav__chip-name">{displayName}</span>
+                  <span className="sx-nav__chip-role">{displayRole}</span>
+                </span>
+                <ChevronDown size={14} strokeWidth={2} className="sx-nav__chip-caret" aria-hidden />
               </button>
 
               <FloatingMenu
