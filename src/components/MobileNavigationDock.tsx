@@ -307,7 +307,9 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
             aria-label={isRtl ? "الرئيسية" : "Home"}
             aria-current={activeTab === overviewItem?.id ? "page" : undefined}
           >
-            <LayoutDashboard size={24} strokeWidth={2.1} aria-hidden />
+            <span className="sx-dock-v2__icon-wrap">
+              <LayoutDashboard size={24} strokeWidth={2.1} aria-hidden />
+            </span>
             <span>{isRtl ? "الرئيسية" : "Home"}</span>
           </button>
 
@@ -317,6 +319,7 @@ export const MobileNavigationDock: React.FC<MobileNavigationDockProps> = ({
               className={dockBtnClass(activeTab === chatItem.id)}
               onClick={() => handleTabClick(chatItem.id)}
               aria-label={isRtl ? "الرسائل" : "Messages"}
+              aria-current={activeTab === chatItem.id ? "page" : undefined}
             >
               <span className="sx-dock-v2__icon-wrap">
                 <MessageSquare size={24} strokeWidth={2.1} aria-hidden />
