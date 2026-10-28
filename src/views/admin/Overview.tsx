@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, getCount
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { useAuth } from '../../lib/AuthContext';
 import { Users, UserRound, BookOpen, Wallet, ShoppingBag, Trash2, Settings2, MapPin, ExternalLink, Edit2, Building2, GraduationCap, Clock, Map, X } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, Cell } from 'recharts';
 import { AppModalPortal } from '../../components/AppModalPortal';
 import { AnimatedCounter } from '../../components/ui/AnimatedCounter';
 import { toast } from 'react-hot-toast';
@@ -82,17 +82,122 @@ const translateSchoolValue = (value: string, isRtl: boolean): string => {
   return value;
 };
 
+type WeekAttendanceDay = {
+  name: string;
+  date: string;
+  isToday: boolean;
+  present: number;
+  counted: number;
+  attendance: number | null;
+};
+
+const SCHOOL_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu'] as const;
+
+/** Two-line X tick: weekday, then the date in a lighter tone. */
+function AttendanceDayTick({ x, y, payload }: { x?: number; y?: number; payload?: { value?: string } }) {
+  const [day, date] = String(payload?.value ?? '').split('|');
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      <text textAnchor="middle" dy={12} fontSize={11} fontWeight={800} fill="var(--chart-text)">
+        {day}
+      </text>
+      <text textAnchor="middle" dy={27} fontSize={10} fontWeight={600} fill="var(--chart-text)" opacity={0.65}>
+        {date}
+      </text>
+    </g>
+  );
+}
+
+/** Last five Sunday–Thursday dates up to today, oldest first. */
+function buildSchoolDays(t: (key: string) => string): WeekAttendanceDay[] {
+  const out: WeekAttendanceDay[] = [];
+  const today = new Date().toISOString().split('T')[0];
+  for (let i = 0; out.length < 5 && i < 14; i++) {
+    const date = new Date(Date.now() - i * 86_400_000).toISOString().split('T')[0];
+    const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+    if (dow > 4) continue;
+    const [, m, d] = date.split('-');
+    out.unshift({
+      // "day|d/m" — split onto two lines by AttendanceDayTick.
+      name: `${t(SCHOOL_DAY_KEYS[dow])}|${Number(d)}/${Number(m)}`,
+      date,
+      isToday: date === today,
+      present: 0,
+      counted: 0,
+      attendance: null,
+    });
+  }
+  return out;
+}
+
 export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string) => void }) {
   const { profile } = useAuth();
   const { t, isRtl } = useLanguage();
 
-  const chartData = [
-    { name: t('sun'), attendance: 95 },
-    { name: t('mon'), attendance: 88 },
-    { name: t('tue'), attendance: 92 },
-    { name: t('wed'), attendance: 90 },
-    { name: t('thu'), attendance: 85 },
-  ];
+  // Real attendance for the last five school days (Sun–Thu), from the
+  // attendance docs (date = UTC YYYY-MM-DD, same as getTodayDateStr()).
+  const [chartData, setChartData] = useState<WeekAttendanceDay[]>(() => buildSchoolDays(t));
+  const [chartLoading, setChartLoading] = useState(true);
+
+  useEffect(() => {
+    const schoolId = profile?.schoolId;
+    const days = buildSchoolDays(t);
+    if (!schoolId) {
+      setChartData(days);
+      setChartLoading(false);
+      return;
+    }
+    const applyDocs = (docs: Array<{ data: () => unknown }>) => {
+      // `Map` is the lucide icon import in this file.
+      const byDate = new globalThis.Map(days.map((d) => [d.date, { ...d }]));
+      docs.forEach((docSnap) => {
+        const data = docSnap.data() as { date?: string; records?: Record<string, string> };
+        const day = data.date ? byDate.get(data.date) : undefined;
+        if (!day) return;
+        Object.values(data.records || {}).forEach((status) => {
+          if (status === 'present' || status === 'late') {
+            day.present += 1;
+            day.counted += 1;
+          } else if (status === 'absent') {
+            day.counted += 1;
+          }
+        });
+      });
+      setChartData(
+        days.map((d) => {
+          const day = byDate.get(d.date)!;
+          return { ...day, attendance: day.counted ? Math.round((day.present / day.counted) * 100) : null };
+        }),
+      );
+      setChartLoading(false);
+    };
+
+    const unsub = onSnapshot(
+      query(
+        collection(db, 'attendance'),
+        where('schoolId', '==', schoolId),
+        where('date', 'in', days.map((d) => d.date)),
+      ),
+      (snap) => applyDocs(snap.docs),
+      () => {
+        // Fallback: one equality query per day (the shape DailySummary uses).
+        Promise.all(
+          days.map((d) =>
+            getDocs(query(collection(db, 'attendance'), where('schoolId', '==', schoolId), where('date', '==', d.date))),
+          ),
+        )
+          .then((snaps) => applyDocs(snaps.flatMap((sn) => sn.docs)))
+          .catch(() => {
+            setChartData(days);
+            setChartLoading(false);
+          });
+      },
+    );
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.schoolId, isRtl]);
+
+  const chartHasData = chartData.some((d) => d.attendance !== null);
 
   const [stats, setStats] = useState({
     students: 0,
@@ -765,39 +870,110 @@ export default function Overview({ setActiveTab }: { setActiveTab?: (tab: string
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <div className="bg-white dark:bg-slate-900 p-5 md:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors">
-          <h3 className="text-lg font-black text-slate-800 dark:text-white mb-6 font-display">{t('attendanceStats')}</h3>
-          <div className="h-[300px] w-full min-h-[250px]" style={{ minWidth: 0 }}>
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div>
+              <h3 className="text-lg font-black text-slate-800 dark:text-white font-display">{t('attendanceStats')}</h3>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+                {isRtl ? 'نسبة حضور الطلاب لآخر خمسة أيام دراسية' : 'Student attendance rate, last five school days'}
+              </p>
+            </div>
+            {chartHasData ? (
+              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#D4AF37]/12 border border-[#D4AF37]/30 px-3 py-1 text-xs font-black text-[#8C6A12] dark:text-[#E8C97A]">
+                {isRtl ? 'المعدل' : 'Avg'}{' '}
+                {Math.round(
+                  chartData.filter((d) => d.attendance !== null).reduce((sum, d) => sum + (d.attendance || 0), 0) /
+                    Math.max(1, chartData.filter((d) => d.attendance !== null).length),
+                )}
+                %
+              </span>
+            ) : null}
+          </div>
+          <div className="relative h-[280px] w-full min-h-[250px]" style={{ minWidth: 0, direction: 'ltr' }}>
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={250}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 11, fill: 'var(--chart-text)', fontWeight: 600 }} 
+              <BarChart data={chartData} margin={{ top: 24, right: 4, left: 4, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="sxAttendanceBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#EDD07F" />
+                    <stop offset="100%" stopColor="#B8892B" />
+                  </linearGradient>
+                  <linearGradient id="sxAttendanceBarToday" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2b5b9e" />
+                    <stop offset="100%" stopColor="#0B2345" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                  reversed={isRtl}
+                  height={40}
+                  tick={<AttendanceDayTick />}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 11, fill: 'var(--chart-text)' }} 
+                <YAxis
+                  domain={[0, 100]}
+                  ticks={[0, 25, 50, 75, 100]}
+                  axisLine={false}
+                  tickLine={false}
+                  width={40}
+                  orientation={isRtl ? 'right' : 'left'}
+                  tickFormatter={(v: number) => `${v}%`}
+                  tick={{ fontSize: 11, fill: 'var(--chart-text)' }}
                 />
-                <Tooltip 
-                   contentStyle={{ 
-                     borderRadius: '20px', 
-                     border: '1px solid var(--chart-tooltip-border)', 
-                     backgroundColor: 'var(--chart-tooltip-bg)',
-                     color: 'var(--chart-tooltip-text)',
-                     boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.15)', 
-                     direction: isRtl ? 'rtl' : 'ltr', 
-                     padding: '12px' 
-                   }}
-                   itemStyle={{ color: 'var(--chart-tooltip-text)' }}
-                   labelStyle={{ color: 'var(--chart-text)', fontWeight: 'bold' }}
-                   cursor={{ fill: 'var(--chart-cursor)' }}
+                <Tooltip
+                  formatter={(_value: unknown, _name: unknown, item: { payload?: WeekAttendanceDay }) => {
+                    const d = item?.payload;
+                    if (!d || d.attendance === null) return [isRtl ? 'لم يُسجَّل' : 'Not recorded', isRtl ? 'الحضور' : 'Attendance'];
+                    return [
+                      `${d.attendance}% (${d.present} ${isRtl ? 'من' : 'of'} ${d.counted})`,
+                      isRtl ? 'الحضور' : 'Attendance',
+                    ];
+                  }}
+                  contentStyle={{
+                    borderRadius: '14px',
+                    border: '1px solid var(--chart-tooltip-border)',
+                    backgroundColor: 'var(--chart-tooltip-bg)',
+                    color: 'var(--chart-tooltip-text)',
+                    boxShadow: '0 16px 30px -12px rgb(0 0 0 / 0.25)',
+                    direction: isRtl ? 'rtl' : 'ltr',
+                    padding: '10px 12px',
+                    fontWeight: 700,
+                  }}
+                  itemStyle={{ color: 'var(--chart-tooltip-text)' }}
+                  labelStyle={{ color: 'var(--chart-text)', fontWeight: 800 }}
+                  labelFormatter={(label: unknown) => String(label ?? '').replace('|', ' ')}
+                  cursor={{ fill: 'var(--chart-cursor)', radius: 10 }}
                 />
-                <Bar dataKey="attendance" fill="#3b82f6" radius={[12, 12, 0, 0]} barSize={40} />
+                <Bar dataKey="attendance" radius={[10, 10, 4, 4]} maxBarSize={44} isAnimationActive>
+                  {chartData.map((d) => (
+                    <Cell key={d.date} fill={d.isToday ? 'url(#sxAttendanceBarToday)' : 'url(#sxAttendanceBar)'} />
+                  ))}
+                  <LabelList
+                    dataKey="attendance"
+                    position="top"
+                    formatter={(v: unknown) => (typeof v === 'number' ? `${v}%` : '')}
+                    style={{ fontSize: 11, fontWeight: 800, fill: 'var(--chart-text)' }}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
+            {!chartLoading && !chartHasData ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center gap-3 px-6" dir={isRtl ? 'rtl' : 'ltr'}>
+                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+                  {isRtl ? 'لم يُسجَّل حضور خلال آخر خمسة أيام دراسية' : 'No attendance recorded in the last five school days'}
+                </p>
+                {setActiveTab ? (
+                  <button type="button" onClick={() => setActiveTab('attendance')} className="sx-btn sx-btn-primary !h-10 !min-h-10 !px-4 !text-xs">
+                    {isRtl ? 'تسجيل الحضور' : 'Take attendance'}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="mt-3 flex items-center justify-center gap-4 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-b from-[#EDD07F] to-[#B8892B]" />{isRtl ? 'أيام سابقة' : 'Previous days'}</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-b from-[#2b5b9e] to-[#0B2345]" />{isRtl ? 'اليوم' : 'Today'}</span>
           </div>
         </div>
 
