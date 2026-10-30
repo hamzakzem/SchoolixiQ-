@@ -24,6 +24,7 @@ import { DismissalStepper } from '../../components/dismissal/DismissalStepper';
 import { DismissalTimeline } from '../../components/dismissal/DismissalTimeline';
 import { DismissalWorkflowDebug } from '../../components/dismissal/DismissalWorkflowDebug';
 import '../../styles/dismissal-workflow.css';
+import { userFacingError } from '../../lib/userFacingError';
 
 type SchoolClass = { id: string; name: string };
 
@@ -107,7 +108,7 @@ export default function DismissalMonitor() {
       toast.success('تم اعتماد التسريح النهائي');
       setConfirmId(null);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'فشل الاعتماد');
+      toast.error(userFacingError(e, 'فشل الاعتماد'));
     } finally {
       setBusyId(null);
     }
@@ -127,7 +128,7 @@ export default function DismissalMonitor() {
       toast.success('تم رفض الطلب');
       setRejectReason('');
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'فشل الرفض');
+      toast.error(userFacingError(e, 'فشل الرفض'));
     } finally {
       setBusyId(null);
     }
@@ -138,7 +139,7 @@ export default function DismissalMonitor() {
       <DismissalWorkflowListShell
         locale="ar"
         title="مراقبة التسريح الآمن"
-        subtitle="اعتماد نهائي للطلبات التي تحققها الحارس (GUARD_VERIFIED)"
+        subtitle="اعتماد نهائي للطلبات التي تحقق منها الحارس"
         stats={[
           { label: 'نشطة', value: stats.active },
           { label: 'مكتملة اليوم', value: stats.completedToday },
@@ -198,7 +199,7 @@ export default function DismissalMonitor() {
                       <p className="text-xs text-[var(--dw-slate-muted)]">{r.className}</p>
                     </div>
                   </div>
-                  <span className="dw-badge dw-badge--pending">GUARD_VERIFIED</span>
+                  <span className="dw-badge dw-badge--pending">{DISMISSAL_STATUS_LABELS.GUARD_VERIFIED.ar}</span>
                 </div>
 
                 <DismissalStepper request={r} locale="ar" mode="full" />

@@ -10,7 +10,6 @@ import {
   limit,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { notificationService } from './notificationService';
 import {
   ACTIVE_DISMISSAL_STATUSES,
   GUARD_PENDING_STATUSES,
@@ -117,48 +116,6 @@ export function normalizeDismissalDoc(
   return req;
 }
 
-async function notifySchoolGuards(
-  schoolId: string,
-  payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId' | 'type'>,
-) {
-  const q = query(
-    collection(db, 'users'),
-    where('schoolId', '==', schoolId),
-    where('role', '==', 'guard'),
-    limit(50),
-  );
-  const snap = await getDocs(q);
-  const ids = snap.docs.map((d) => d.id);
-  if (!ids.length) return;
-  await notificationService.sendToMultiple(ids, {
-    ...payload,
-    schoolId,
-    type: 'smart_gate',
-    metadata: { ...(payload.metadata || {}), routeTarget: 'smart_gate' },
-  });
-}
-
-async function notifySchoolManagers(
-  schoolId: string,
-  payload: Omit<Parameters<typeof notificationService.sendToMultiple>[1], 'schoolId' | 'type'>,
-) {
-  const q = query(
-    collection(db, 'users'),
-    where('schoolId', '==', schoolId),
-    where('role', 'in', ['admin', 'school_admin', 'assistant']),
-    limit(50),
-  );
-  const snap = await getDocs(q);
-  const ids = snap.docs.map((d) => d.id);
-  if (!ids.length) return;
-  await notificationService.sendToMultiple(ids, {
-    ...payload,
-    schoolId,
-    type: 'smart_gate',
-    metadata: { ...(payload.metadata || {}), routeTarget: 'dismissal_gate' },
-  });
-}
-
 export async function findActiveDismissalForStudent(
   studentId: string,
   schoolId: string,
@@ -187,9 +144,9 @@ export async function createDismissalRequest(input: {
   pickupNote?: string;
 }): Promise<{ id: string; token: string }> {
   await resolveVerifiedStudentForDismissal(input.studentId, input.parentId, input.schoolId);
-  const existing = await findActiveDismissalForStudent(input.studentId, input.schoolId);
-  if (existing) throw new Error('يوجد طلب تسريح نشط لهذا الطالب بالفعل');
-
+  // The server refuses a second active request (409) and notifies the
+  // guards and the parents; a client-side duplicate check was refused by
+  // the rules for parents and aborted the request.
   const result = await apiCreateDismissalRequest({
     schoolId: input.schoolId,
     studentId: input.studentId,
@@ -199,124 +156,39 @@ export async function createDismissalRequest(input: {
     pickupPersonRelation: input.pickupPersonRelation,
     pickupNote: input.pickupNote,
   });
-
-  const verified = await resolveVerifiedStudentForDismissal(
-    input.studentId,
-    input.parentId,
-    input.schoolId,
-  );
-  const title = 'طلب تسريح جديد';
-  const message = `${verified.studentName} — بانتظار مراجعة الحارس`;
-  const meta = {
-    sourceId: result.id,
-    dismissalId: result.id,
-    studentId: verified.studentId,
-    classId: verified.classId,
-  };
-
-  await Promise.all([
-    notifySchoolGuards(input.schoolId, { title, message, metadata: meta }),
-    notificationService.notifyStudentParents(verified.studentId, {
-      title: 'تم استلام طلب التسريح',
-      message: 'طلبك قيد مراجعة الحارس',
-      schoolId: input.schoolId,
-      type: 'smart_gate',
-      metadata: { ...meta, routeTarget: 'dismissal' },
-    }),
-  ]);
-
   return { id: result.id, token: result.token };
 }
 
+/** Notifications for every step are written by the server (dismissalApi). */
 export async function guardVerifyDismissal(
   requestId: string,
-  guard: { uid: string; name: string },
+  _guard: { uid: string; name: string },
   note?: string,
 ) {
   await apiGuardVerifyDismissal(requestId, note);
-
-  const snap = await getDoc(doc(db, DISMISSAL_COLLECTION, requestId));
-  const data = snap.data() as Record<string, unknown> | undefined;
-  if (!data) return;
-
-  const schoolId = String(data.schoolId || '');
-  const studentName = String(data.studentName || '');
-  const title = 'طلب جاهز لاعتماد الإدارة';
-  const message = `${studentName} — تحقق الحارس (${guard.name})`;
-
-  await Promise.all([
-    notifySchoolManagers(schoolId, {
-      title,
-      message,
-      metadata: { sourceId: requestId, dismissalId: requestId },
-    }),
-    notificationService.notifyStudentParents(String(data.studentId || ''), {
-      title: 'تحقق الحارس',
-      message: 'طلب التسريح بانتظار اعتماد الإدارة',
-      schoolId,
-      type: 'smart_gate',
-      metadata: { sourceId: requestId, dismissalId: requestId, routeTarget: 'dismissal' },
-    }),
-  ]);
 }
 
 export async function guardRejectDismissal(
   requestId: string,
   reason: string,
-  guard: { uid: string; name: string },
+  _guard: { uid: string; name: string },
 ) {
   await apiGuardRejectDismissal(requestId, reason);
-
-  const snap = await getDoc(doc(db, DISMISSAL_COLLECTION, requestId));
-  const data = snap.data();
-  if (!data) return;
-
-  await notificationService.notifyStudentParents(String(data.studentId || ''), {
-    title: 'رفض طلب التسريح',
-    message: reason || 'تم رفض الطلب من الحارس',
-    schoolId: String(data.schoolId || ''),
-    type: 'smart_gate',
-    metadata: { sourceId: requestId, dismissalId: requestId, routeTarget: 'dismissal' },
-  });
 }
 
 export async function managerApproveDismissal(
   requestId: string,
-  manager: { uid: string; name: string },
+  _manager: { uid: string; name: string },
 ) {
   await apiManagerApproveDismissal(requestId);
-
-  const snap = await getDoc(doc(db, DISMISSAL_COLLECTION, requestId));
-  const data = snap.data();
-  if (!data) return;
-
-  await notificationService.notifyStudentParents(String(data.studentId || ''), {
-    title: 'تم التسريح',
-    message: `تم اعتماد تسريح ${data.studentName} — يمكنك استلام الطالب`,
-    schoolId: String(data.schoolId || ''),
-    type: 'system',
-    metadata: { sourceId: requestId, dismissalId: requestId, routeTarget: 'dismissal' },
-  });
 }
 
 export async function managerRejectDismissal(
   requestId: string,
   reason: string,
-  manager: { uid: string; name: string },
+  _manager: { uid: string; name: string },
 ) {
   await apiManagerRejectDismissal(requestId, reason);
-
-  const snap = await getDoc(doc(db, DISMISSAL_COLLECTION, requestId));
-  const data = snap.data();
-  if (!data) return;
-
-  await notificationService.notifyStudentParents(String(data.studentId || ''), {
-    title: 'رفض التسريح من الإدارة',
-    message: reason || 'تم رفض الطلب من الإدارة',
-    schoolId: String(data.schoolId || ''),
-    type: 'smart_gate',
-    metadata: { sourceId: requestId, dismissalId: requestId, routeTarget: 'dismissal' },
-  });
 }
 
 export function groupDismissalsByClass(

@@ -11,6 +11,7 @@ import {
 } from '../../lib/dismissalTypes';
 import { DismissalWorkflow } from '../../components/dismissal/DismissalWorkflow';
 import '../../styles/dismissal-workflow.css';
+import { userFacingError } from '../../lib/userFacingError';
 
 type StudentOption = {
   id: string;
@@ -79,7 +80,7 @@ export default function ParentDismissalTab({
       });
       toast.success('تم إرسال طلب التسريح');
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'فشل إرسال الطلب');
+      toast.error(userFacingError(e, 'فشل إرسال الطلب'));
     } finally {
       setSubmitting(false);
     }

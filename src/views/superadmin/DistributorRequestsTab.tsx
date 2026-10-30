@@ -5,9 +5,10 @@ import {
   query,
   where,
 } from "firebase/firestore";
+import { sendPasswordResetEmail } from "firebase/auth";
 import { CheckCircle, Loader2, Phone, XCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { db } from "../../lib/firebase";
+import { auth, db } from "../../lib/firebase";
 import {
   adminApproveDistributor,
   adminRejectDistributor,
@@ -54,7 +55,15 @@ export function DistributorRequestsTab() {
       if (result.needsEmailForLogin) {
         toast.success("تم القبول — أضف بريداً إلكترونياً لتمكين تسجيل الدخول");
       } else if (result.userCreated) {
-        toast.success("تم قبول الموزع وإنشاء حساب الدخول");
+        // The account gets a random password; email the distributor a link to set their own.
+        const sent = row.email
+          ? await sendPasswordResetEmail(auth, row.email).then(() => true, () => false)
+          : false;
+        toast.success(
+          sent
+            ? `تم قبول الموزع وإرسال رابط تعيين كلمة المرور إلى ${row.email}`
+            : "تم قبول الموزع وإنشاء حساب الدخول — يمكنه استخدام «نسيت كلمة المرور» لتعيين كلمته",
+        );
       } else {
         toast.success("تم قبول الموزع");
       }

@@ -481,21 +481,112 @@ export async function listVerifiedDismissalsApi(db, uid, query = {}) {
     .filter((r) => MANAGER_QUEUE.includes(r.derivedStatus) && !r.isProcessing);
 }
 
+// ─── Notifications for each step (Admin SDK) ───
+// Done here rather than in the browser: a parent may not list the school's
+// guards and a guard may not list or notify managers under the rules, so the
+// client-side notifications silently failed (or aborted the request).
+const NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function writeDismissalNotifications(db, schoolId, userIds, payload) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  if (!schoolId || ids.length === 0) return;
+  const now = new Date();
+  const batch = db.batch();
+  for (const userId of ids) {
+    const metadata = { ...(payload.metadata || {}), routeTarget: payload.routeTarget, category: 'smart_gate' };
+    batch.set(db.collection('notifications').doc(), {
+      title: payload.title,
+      message: payload.message,
+      type: payload.type || 'smart_gate',
+      schoolId,
+      userId,
+      recipientId: userId,
+      receiverId: userId,
+      read: false,
+      category: 'smart_gate',
+      routeTarget: payload.routeTarget,
+      metadata,
+      pushDelivery: { status: 'pending' },
+      createdAt: now,
+      expiresAt: new Date(now.getTime() + NOTIFICATION_TTL_MS),
+    });
+  }
+  await batch.commit();
+}
+
+async function schoolUserIds(db, schoolId, roles) {
+  const snap = await db
+    .collection('users')
+    .where('schoolId', '==', schoolId)
+    .where('role', 'in', roles)
+    .limit(50)
+    .get();
+  return snap.docs.map((d) => d.id);
+}
+
+async function notifyAfterDismissalStep(db, step, requestId) {
+  const snap = await db.collection(DISMISSAL_COL).doc(requestId).get();
+  if (!snap.exists) return;
+  const d = snap.data();
+  const schoolId = String(d.schoolId || '');
+  const studentName = String(d.studentName || '');
+  const parents = Array.isArray(d.parentIds) && d.parentIds.length ? d.parentIds : [d.parentId];
+  const meta = { sourceId: requestId, dismissalId: requestId, studentId: d.studentId, classId: d.classId };
+  const toParents = (title, message, type = 'smart_gate') =>
+    writeDismissalNotifications(db, schoolId, parents, { title, message, type, routeTarget: 'dismissal', metadata: meta });
+
+  if (step === 'request') {
+    await writeDismissalNotifications(db, schoolId, await schoolUserIds(db, schoolId, ['guard']), {
+      title: 'طلب تسريح جديد',
+      message: `${studentName} — بانتظار مراجعة الحارس`,
+      routeTarget: 'smart_gate',
+      metadata: meta,
+    });
+    await toParents('تم استلام طلب التسريح', 'طلبك قيد مراجعة الحارس');
+  } else if (step === 'guard-verify') {
+    await writeDismissalNotifications(
+      db,
+      schoolId,
+      await schoolUserIds(db, schoolId, ['admin', 'school_admin', 'assistant', 'school_assistant']),
+      {
+        title: 'طلب جاهز لاعتماد الإدارة',
+        message: `${studentName} — تحقق الحارس (${String(d.guardVerifiedByName || 'الحارس')})`,
+        routeTarget: 'dismissal_gate',
+        metadata: meta,
+      },
+    );
+    await toParents('تحقق الحارس', 'طلب التسريح بانتظار اعتماد الإدارة');
+  } else if (step === 'guard-reject') {
+    await toParents('رفض طلب التسريح', String(d.rejectReason || 'تم رفض الطلب من الحارس'));
+  } else if (step === 'manager-approve') {
+    await toParents('تم التسريح', `تم اعتماد تسريح ${studentName} — يمكنك استلام الطالب`, 'system');
+  } else if (step === 'manager-reject') {
+    await toParents('رفض التسريح من الإدارة', String(d.rejectReason || 'تم رفض الطلب من الإدارة'));
+  }
+}
+
 export function registerDismissalRoutes(app, { getDb, verifyToken, jsonParser }) {
-  const wrap = (fn) => async (req, res) => {
+  const wrap = (fn, step) => async (req, res) => {
     try {
-      const result = await fn(getDb(), req.user.uid, req.body || {});
+      const db = getDb();
+      const result = await fn(db, req.user.uid, req.body || {});
+      if (step && result?.id) {
+        // A failed notification must not fail the transition itself
+        await notifyAfterDismissalStep(db, step, result.id).catch((e) =>
+          console.error('[dismissal] notify failed', step, e?.message || e),
+        );
+      }
       return res.json(result);
     } catch (e) {
       return res.status(e.status || 500).json({ error: e.code || 'ERROR', message: e.message });
     }
   };
 
-  app.post('/api/dismissal/request', verifyToken, jsonParser, wrap(createDismissalRequestApi));
-  app.post('/api/dismissal/guard-verify', verifyToken, jsonParser, wrap(guardVerifyDismissalApi));
-  app.post('/api/dismissal/guard-reject', verifyToken, jsonParser, wrap(guardRejectDismissalApi));
-  app.post('/api/dismissal/manager-approve', verifyToken, jsonParser, wrap(managerApproveDismissalApi));
-  app.post('/api/dismissal/manager-reject', verifyToken, jsonParser, wrap(managerRejectDismissalApi));
+  app.post('/api/dismissal/request', verifyToken, jsonParser, wrap(createDismissalRequestApi, 'request'));
+  app.post('/api/dismissal/guard-verify', verifyToken, jsonParser, wrap(guardVerifyDismissalApi, 'guard-verify'));
+  app.post('/api/dismissal/guard-reject', verifyToken, jsonParser, wrap(guardRejectDismissalApi, 'guard-reject'));
+  app.post('/api/dismissal/manager-approve', verifyToken, jsonParser, wrap(managerApproveDismissalApi, 'manager-approve'));
+  app.post('/api/dismissal/manager-reject', verifyToken, jsonParser, wrap(managerRejectDismissalApi, 'manager-reject'));
 
   app.get('/api/dismissal/pending', verifyToken, async (req, res) => {
     try {

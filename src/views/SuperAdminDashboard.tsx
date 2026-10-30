@@ -874,9 +874,27 @@ export default function SuperAdminDashboard() {
     currentExpiry: string,
   ) => {
     const path = `schools/${schoolId}`;
+    // Stored as an ISO string or a Firestore Timestamp; a lapsed subscription
+    // is extended from today, not from its old expiry date.
+    const raw = currentExpiry as unknown as { toDate?: () => Date; seconds?: number } | string | null;
+    const parsed =
+      raw && typeof raw === 'object'
+        ? typeof raw.toDate === 'function'
+          ? raw.toDate()
+          : new Date((raw.seconds || 0) * 1000)
+        : new Date(String(raw || ''));
+    const base = Number.isNaN(parsed.getTime()) || parsed < new Date() ? new Date() : parsed;
+    const newExpiry = new Date(base);
+    newExpiry.setFullYear(newExpiry.getFullYear() + 1);
+    const schoolName = schools.find((sc: any) => sc.id === schoolId)?.name || '';
+    if (
+      !window.confirm(
+        `تمديد اشتراك ${schoolName || 'المدرسة'} سنة كاملة حتى ${newExpiry.toLocaleDateString('ar-IQ-u-nu-latn')}؟`,
+      )
+    ) {
+      return;
+    }
     try {
-      const newExpiry = new Date(currentExpiry);
-      newExpiry.setFullYear(newExpiry.getFullYear() + 1);
 
       await setDoc(
         doc(db, "schools", schoolId),
@@ -955,8 +973,8 @@ export default function SuperAdminDashboard() {
   useEffect(() => {
     if (shouldSkipFirestoreListeners() || !auth.currentUser) return;
 
-    const needsSchools = ["schools", "accounts", "requests"].includes(activeTab);
-    const needsPackages = ["schools", "packages", "requests"].includes(activeTab);
+    const needsSchools = ["schools", "accounts", "requests", "distributors"].includes(activeTab);
+    const needsPackages = ["schools", "packages", "requests", "distributors"].includes(activeTab);
     const needsUsers = ["schools", "users", "parents", "team", "accounts"].includes(
       activeTab,
     );
@@ -2306,6 +2324,8 @@ export default function SuperAdminDashboard() {
                         </div>
                       )}
                     </button>
+                    {profile?.role === "superadmin" && (
+                    <>
                     <button
                       onClick={() => {
                         navigateToTab("landing_page");
@@ -2381,6 +2401,8 @@ export default function SuperAdminDashboard() {
                         </div>
                       )}
                     </button>
+                    </>
+                    )}
                     <button
                       onClick={() => {
                         navigateToTab("footer");
@@ -6340,9 +6362,13 @@ export default function SuperAdminDashboard() {
           hasPermission("manage_users") && { id: "users", label: t('sidebar_users'), icon: Users },
           hasPermission("manage_users") && { id: "parents", label: t('sidebar_parents'), icon: Users },
           hasPermission("system_settings") && { id: "settings", label: t('sidebar_settings'), icon: SettingsIcon },
+          profile?.role === "superadmin" && { id: "landing_page", label: "صفحة الهبوط", icon: LayoutDashboard },
+          profile?.role === "superadmin" && { id: "smart_assistant", label: "المساعد الذكي", icon: Bot },
+          profile?.role === "superadmin" && { id: "notification_management", label: isRtl ? "إدارة الإشعارات" : "Notifications", icon: Bell },
           hasPermission("system_settings") && { id: "footer", label: t('sidebar_footer'), icon: Save },
           hasPermission("view_backups") && { id: "backups", label: t('sidebar_backups') || (isRtl ? "النسخ الاحتياطي" : "Backups"), icon: FileArchive },
-          (profile?.role === "superadmin" || String(profile?.role) === "dev_agent") && { id: "diagnostics", label: t('sidebar_diagnostics') || (isRtl ? "الفحص والتشخيص" : "Diagnostics"), icon: ClipboardCheck }
+          (profile?.role === "superadmin" || String(profile?.role) === "dev_agent") && { id: "diagnostics", label: t('sidebar_diagnostics') || (isRtl ? "الفحص والتشخيص" : "Diagnostics"), icon: ClipboardCheck },
+          profile?.role === "superadmin" && { id: "audit_logs", label: isRtl ? "سجل التدقيق" : "Audit Logs", icon: ShieldCheck }
         ].filter(Boolean) as any[]}
         activeTab={activeTab}
         setActiveTab={(tabId) => {

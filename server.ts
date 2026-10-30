@@ -1250,8 +1250,17 @@ async function startServer() {
   });
 
   // --- PLAN MANAGEMENT (SUPERADMIN ONLY) ---
+  // Super admin, or a platform assistant the super admin granted this permission
+  async function actorHasPlatformPermission(req: any, permission: string): Promise<boolean> {
+    if (isSuperAdminRole(req.user.role)) return true;
+    if (req.user.role !== 'platform_assistant') return false;
+    const snap = await getDb().collection('users').doc(req.user.uid).get();
+    const perms = snap.data()?.permissions;
+    return Array.isArray(perms) && perms.includes(permission);
+  }
+
   app.post('/api/admin/plans', verifyAdmin, async (req: any, res: any) => {
-    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
+    if (!(await actorHasPlatformPermission(req, 'manage_packages'))) return res.status(403).json({ error: 'SuperAdmin access required' });
     try {
       const db = getDb();
       const plan = req.body;
@@ -1267,7 +1276,7 @@ async function startServer() {
   });
 
   app.put('/api/admin/plans/:id', verifyAdmin, async (req: any, res: any) => {
-    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
+    if (!(await actorHasPlatformPermission(req, 'manage_packages'))) return res.status(403).json({ error: 'SuperAdmin access required' });
     try {
       const db = getDb();
       const { id } = req.params;
@@ -1284,7 +1293,7 @@ async function startServer() {
   });
 
   app.delete('/api/admin/plans/:id', verifyAdmin, async (req: any, res: any) => {
-    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'SuperAdmin access required' });
+    if (!(await actorHasPlatformPermission(req, 'manage_packages'))) return res.status(403).json({ error: 'SuperAdmin access required' });
     try {
       const db = getDb();
       const { id } = req.params;
@@ -1846,7 +1855,7 @@ async function startServer() {
 
   app.get('/api/admin/distributors/pending', verifyAdmin, async (req: any, res: any) => {
     try {
-      if (!isSuperAdminRole(req.user.role)) {
+      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
       }
       const items = await listPendingDistributors(getDb());
@@ -1865,7 +1874,7 @@ async function startServer() {
     }
 
     try {
-      if (!isSuperAdminRole(req.user.role)) {
+      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
       }
 
@@ -1898,7 +1907,7 @@ async function startServer() {
     }
 
     try {
-      if (!isSuperAdminRole(req.user.role)) {
+      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
       }
 
@@ -1934,7 +1943,7 @@ async function startServer() {
     }
 
     try {
-      if (!isSuperAdminRole(req.user.role)) {
+      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'ربط كوبون الموزع مخصص لمدير النظام فقط',
@@ -1973,7 +1982,7 @@ async function startServer() {
     }
 
     try {
-      if (!isSuperAdminRole(req.user.role)) {
+      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'توليد العمولات الشهرية مخصص لمدير النظام فقط',
@@ -2004,7 +2013,7 @@ async function startServer() {
     const notes = req.body?.notes;
 
     try {
-      if (!isSuperAdminRole(req.user.role)) {
+      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'تعليم العمولة كمدفوعة مخصص لمدير النظام فقط',
@@ -2045,7 +2054,7 @@ async function startServer() {
     }
 
     try {
-      if (!isSuperAdminRole(req.user.role)) {
+      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'تعليم عمولات الموزع كمدفوعة مخصص لمدير النظام فقط',
@@ -2079,7 +2088,7 @@ async function startServer() {
     const paused = req.body?.paused === true;
 
     try {
-      if (!isSuperAdminRole(req.user.role)) {
+      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'إيقاف عمولة الموزع مخصص لمدير النظام فقط',

@@ -24,6 +24,7 @@ import { motion } from 'motion/react';
 import { pageTransitionProps } from '../lib/motion';
 import { DashboardSmartAssistantHost } from '../components/smart-assistant/DashboardSmartAssistant';
 import '../styles/dismissal-workflow.css';
+import { userFacingError } from '../lib/userFacingError';
 
 export default function GuardDashboard() {
   const { profile, schoolData } = useAuth();
@@ -72,7 +73,7 @@ export default function GuardDashboard() {
       toast.success('تم التحقق — أُرسل للإدارة');
       setExpandedId(null);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'فشل التحقق');
+      toast.error(userFacingError(e, 'فشل التحقق'));
     } finally {
       setBusy(false);
     }
@@ -93,7 +94,7 @@ export default function GuardDashboard() {
       setExpandedId(null);
       setRejectReason('');
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'فشل الرفض');
+      toast.error(userFacingError(e, 'فشل الرفض'));
     } finally {
       setBusy(false);
     }
