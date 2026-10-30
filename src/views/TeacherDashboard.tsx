@@ -303,11 +303,15 @@ export default function TeacherDashboard() {
     description: "",
   });
 
+  // Homework needs the class students too: publishing notifies their
+  // parents and stores parentIds (both were empty without this).
   const needsStudents =
     activeTab === "home" ||
     activeTab === "grades" ||
     activeTab === "behavior" ||
     activeTab === "reports" ||
+    activeTab === "homework" ||
+    showAddHomework ||
     showAddReport ||
     showAddBehavior;
   const needsHomework = activeTab === "home" || activeTab === "homework";
@@ -1143,9 +1147,12 @@ export default function TeacherDashboard() {
         );
 
         // Find if an entry already exists for this specific student/subject/term
+        // classId lets the rules confirm the teacher teaches this class
+        // (without it the query is refused and no grade is saved)
         const existingQ = query(
           collection(db, "grades"),
           where("schoolId", "==", profile.schoolId),
+          where("classId", "==", selectedClassId),
           where("studentId", "==", studentId),
           where("subject", "==", selectedSubject),
           where("term", "==", term),
@@ -1506,7 +1513,7 @@ export default function TeacherDashboard() {
                           <div className="flex items-center gap-1.5 mt-2">
                             <Users size={12} className="text-indigo-300" />
                             <p className="text-[10px] font-bold text-indigo-200">
-                              {students.length} {t("student")}
+                              {students.filter((st) => homeworkMatchesStudent(c.id, st, classes)).length} {t("student")}
                             </p>
                           </div>
                         </div>
@@ -2694,7 +2701,8 @@ export default function TeacherDashboard() {
                     <option value="">{t("selectStudentPlaceholder")}</option>
                     {students.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} ({assignedClassName || s.classId})
+                        {/* The student's own class, not the teacher's joined list */}
+                        {s.name} ({classes.find((c) => c.id === s.classId)?.name || s.className || s.class || assignedClassName || s.classId})
                       </option>
                     ))}
                   </select>

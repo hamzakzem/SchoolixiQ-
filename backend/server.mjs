@@ -1492,6 +1492,13 @@ async function approveDistributor({
     try {
       const existing = await authAdmin.getUserByEmail(email);
       uid = existing.uid;
+      const existingProfile = await db.collection("users").doc(uid).get();
+      const existingRole = existingProfile.exists ? String(existingProfile.data()?.role || "") : "";
+      if (existingRole && existingRole !== "distributor") {
+        const err = new Error("\u0647\u0630\u0627 \u0627\u0644\u0628\u0631\u064A\u062F \u0645\u0633\u062A\u062E\u062F\u0645 \u0644\u062D\u0633\u0627\u0628 \u0622\u062E\u0631 \u0641\u064A \u0627\u0644\u0645\u0646\u0635\u0629 \u2014 \u0644\u0627 \u064A\u0645\u0643\u0646 \u062A\u062D\u0648\u064A\u0644\u0647 \u0625\u0644\u0649 \u062D\u0633\u0627\u0628 \u0645\u0648\u0632\u0639");
+        err.code = "EMAIL_IN_USE_BY_OTHER_ACCOUNT";
+        throw err;
+      }
       const updateParams = { emailVerified: true, displayName };
       if (password) {
         updateParams.password = password;
@@ -3181,20 +3188,95 @@ async function listVerifiedDismissalsApi(db, uid, query = {}) {
   const snap = await db.collection(DISMISSAL_COL).where("schoolId", "==", schoolId).where("status", "in", MANAGER_QUEUE).limit(100).get();
   return snap.docs.map((d) => serializeRequest(d.id, d.data())).filter((r) => MANAGER_QUEUE.includes(r.derivedStatus) && !r.isProcessing);
 }
+var NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
+async function writeDismissalNotifications(db, schoolId, userIds, payload) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  if (!schoolId || ids.length === 0) return;
+  const now = /* @__PURE__ */ new Date();
+  const batch = db.batch();
+  for (const userId of ids) {
+    const metadata = { ...payload.metadata || {}, routeTarget: payload.routeTarget, category: "smart_gate" };
+    batch.set(db.collection("notifications").doc(), {
+      title: payload.title,
+      message: payload.message,
+      type: payload.type || "smart_gate",
+      schoolId,
+      userId,
+      recipientId: userId,
+      receiverId: userId,
+      read: false,
+      category: "smart_gate",
+      routeTarget: payload.routeTarget,
+      metadata,
+      pushDelivery: { status: "pending" },
+      createdAt: now,
+      expiresAt: new Date(now.getTime() + NOTIFICATION_TTL_MS)
+    });
+  }
+  await batch.commit();
+}
+async function schoolUserIds(db, schoolId, roles) {
+  const snap = await db.collection("users").where("schoolId", "==", schoolId).where("role", "in", roles).limit(50).get();
+  return snap.docs.map((d) => d.id);
+}
+async function notifyAfterDismissalStep(db, step, requestId) {
+  const snap = await db.collection(DISMISSAL_COL).doc(requestId).get();
+  if (!snap.exists) return;
+  const d = snap.data();
+  const schoolId = String(d.schoolId || "");
+  const studentName = String(d.studentName || "");
+  const parents = Array.isArray(d.parentIds) && d.parentIds.length ? d.parentIds : [d.parentId];
+  const meta = { sourceId: requestId, dismissalId: requestId, studentId: d.studentId, classId: d.classId };
+  const toParents = (title, message, type = "smart_gate") => writeDismissalNotifications(db, schoolId, parents, { title, message, type, routeTarget: "dismissal", metadata: meta });
+  if (step === "request") {
+    await writeDismissalNotifications(db, schoolId, await schoolUserIds(db, schoolId, ["guard"]), {
+      title: "\u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u062C\u062F\u064A\u062F",
+      message: `${studentName} \u2014 \u0628\u0627\u0646\u062A\u0638\u0627\u0631 \u0645\u0631\u0627\u062C\u0639\u0629 \u0627\u0644\u062D\u0627\u0631\u0633`,
+      routeTarget: "smart_gate",
+      metadata: meta
+    });
+    await toParents("\u062A\u0645 \u0627\u0633\u062A\u0644\u0627\u0645 \u0637\u0644\u0628 \u0627\u0644\u062A\u0633\u0631\u064A\u062D", "\u0637\u0644\u0628\u0643 \u0642\u064A\u062F \u0645\u0631\u0627\u062C\u0639\u0629 \u0627\u0644\u062D\u0627\u0631\u0633");
+  } else if (step === "guard-verify") {
+    await writeDismissalNotifications(
+      db,
+      schoolId,
+      await schoolUserIds(db, schoolId, ["admin", "school_admin", "assistant", "school_assistant"]),
+      {
+        title: "\u0637\u0644\u0628 \u062C\u0627\u0647\u0632 \u0644\u0627\u0639\u062A\u0645\u0627\u062F \u0627\u0644\u0625\u062F\u0627\u0631\u0629",
+        message: `${studentName} \u2014 \u062A\u062D\u0642\u0642 \u0627\u0644\u062D\u0627\u0631\u0633 (${String(d.guardVerifiedByName || "\u0627\u0644\u062D\u0627\u0631\u0633")})`,
+        routeTarget: "dismissal_gate",
+        metadata: meta
+      }
+    );
+    await toParents("\u062A\u062D\u0642\u0642 \u0627\u0644\u062D\u0627\u0631\u0633", "\u0637\u0644\u0628 \u0627\u0644\u062A\u0633\u0631\u064A\u062D \u0628\u0627\u0646\u062A\u0638\u0627\u0631 \u0627\u0639\u062A\u0645\u0627\u062F \u0627\u0644\u0625\u062F\u0627\u0631\u0629");
+  } else if (step === "guard-reject") {
+    await toParents("\u0631\u0641\u0636 \u0637\u0644\u0628 \u0627\u0644\u062A\u0633\u0631\u064A\u062D", String(d.rejectReason || "\u062A\u0645 \u0631\u0641\u0636 \u0627\u0644\u0637\u0644\u0628 \u0645\u0646 \u0627\u0644\u062D\u0627\u0631\u0633"));
+  } else if (step === "manager-approve") {
+    await toParents("\u062A\u0645 \u0627\u0644\u062A\u0633\u0631\u064A\u062D", `\u062A\u0645 \u0627\u0639\u062A\u0645\u0627\u062F \u062A\u0633\u0631\u064A\u062D ${studentName} \u2014 \u064A\u0645\u0643\u0646\u0643 \u0627\u0633\u062A\u0644\u0627\u0645 \u0627\u0644\u0637\u0627\u0644\u0628`, "system");
+  } else if (step === "manager-reject") {
+    await toParents("\u0631\u0641\u0636 \u0627\u0644\u062A\u0633\u0631\u064A\u062D \u0645\u0646 \u0627\u0644\u0625\u062F\u0627\u0631\u0629", String(d.rejectReason || "\u062A\u0645 \u0631\u0641\u0636 \u0627\u0644\u0637\u0644\u0628 \u0645\u0646 \u0627\u0644\u0625\u062F\u0627\u0631\u0629"));
+  }
+}
 function registerDismissalRoutes(app, { getDb: getDb2, verifyToken, jsonParser }) {
-  const wrap = (fn) => async (req, res) => {
+  const wrap = (fn, step) => async (req, res) => {
     try {
-      const result = await fn(getDb2(), req.user.uid, req.body || {});
+      const db = getDb2();
+      const result = await fn(db, req.user.uid, req.body || {});
+      if (step && result?.id) {
+        await notifyAfterDismissalStep(db, step, result.id).catch(
+          (e) => console.error("[dismissal] notify failed", step, e?.message || e)
+        );
+      }
       return res.json(result);
     } catch (e) {
       return res.status(e.status || 500).json({ error: e.code || "ERROR", message: e.message });
     }
   };
-  app.post("/api/dismissal/request", verifyToken, jsonParser, wrap(createDismissalRequestApi));
-  app.post("/api/dismissal/guard-verify", verifyToken, jsonParser, wrap(guardVerifyDismissalApi));
-  app.post("/api/dismissal/guard-reject", verifyToken, jsonParser, wrap(guardRejectDismissalApi));
-  app.post("/api/dismissal/manager-approve", verifyToken, jsonParser, wrap(managerApproveDismissalApi));
-  app.post("/api/dismissal/manager-reject", verifyToken, jsonParser, wrap(managerRejectDismissalApi));
+  app.post("/api/dismissal/request", verifyToken, jsonParser, wrap(createDismissalRequestApi, "request"));
+  app.post("/api/dismissal/guard-verify", verifyToken, jsonParser, wrap(guardVerifyDismissalApi, "guard-verify"));
+  app.post("/api/dismissal/guard-reject", verifyToken, jsonParser, wrap(guardRejectDismissalApi, "guard-reject"));
+  app.post("/api/dismissal/manager-approve", verifyToken, jsonParser, wrap(managerApproveDismissalApi, "manager-approve"));
+  app.post("/api/dismissal/manager-reject", verifyToken, jsonParser, wrap(managerRejectDismissalApi, "manager-reject"));
   app.get("/api/dismissal/pending", verifyToken, async (req, res) => {
     try {
       const rows = await listPendingDismissalsApi(getDb2(), req.user.uid, req.query || {});
@@ -4575,8 +4657,15 @@ async function startServer() {
       res.status(500).json({ error: error.message });
     }
   });
+  async function actorHasPlatformPermission(req, permission) {
+    if (isSuperAdminRole3(req.user.role)) return true;
+    if (req.user.role !== "platform_assistant") return false;
+    const snap = await getDb().collection("users").doc(req.user.uid).get();
+    const perms = snap.data()?.permissions;
+    return Array.isArray(perms) && perms.includes(permission);
+  }
   app.post("/api/admin/plans", verifyAdmin, async (req, res) => {
-    if (req.user.role !== "superadmin") return res.status(403).json({ error: "SuperAdmin access required" });
+    if (!await actorHasPlatformPermission(req, "manage_packages")) return res.status(403).json({ error: "SuperAdmin access required" });
     try {
       const db = getDb();
       const plan = req.body;
@@ -4591,7 +4680,7 @@ async function startServer() {
     }
   });
   app.put("/api/admin/plans/:id", verifyAdmin, async (req, res) => {
-    if (req.user.role !== "superadmin") return res.status(403).json({ error: "SuperAdmin access required" });
+    if (!await actorHasPlatformPermission(req, "manage_packages")) return res.status(403).json({ error: "SuperAdmin access required" });
     try {
       const db = getDb();
       const { id } = req.params;
@@ -4607,7 +4696,7 @@ async function startServer() {
     }
   });
   app.delete("/api/admin/plans/:id", verifyAdmin, async (req, res) => {
-    if (req.user.role !== "superadmin") return res.status(403).json({ error: "SuperAdmin access required" });
+    if (!await actorHasPlatformPermission(req, "manage_packages")) return res.status(403).json({ error: "SuperAdmin access required" });
     try {
       const db = getDb();
       const { id } = req.params;
@@ -5119,7 +5208,7 @@ async function startServer() {
   });
   app.get("/api/admin/distributors/pending", verifyAdmin, async (req, res) => {
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
+      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
       }
       const items = await listPendingDistributors(getDb());
@@ -5135,7 +5224,7 @@ async function startServer() {
       return res.status(400).json({ error: "DISTRIBUTOR_ID_REQUIRED", message: "distributorId \u0645\u0637\u0644\u0648\u0628" });
     }
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
+      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
       }
       const result = await approveDistributor({
@@ -5163,7 +5252,7 @@ async function startServer() {
       return res.status(400).json({ error: "DISTRIBUTOR_ID_REQUIRED", message: "distributorId \u0645\u0637\u0644\u0648\u0628" });
     }
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
+      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
       }
       const result = await rejectDistributor({
@@ -5193,7 +5282,7 @@ async function startServer() {
       });
     }
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
+      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u0631\u0628\u0637 \u0643\u0648\u0628\u0648\u0646 \u0627\u0644\u0645\u0648\u0632\u0639 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
@@ -5227,7 +5316,7 @@ async function startServer() {
       });
     }
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
+      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u062A\u0648\u0644\u064A\u062F \u0627\u0644\u0639\u0645\u0648\u0644\u0627\u062A \u0627\u0644\u0634\u0647\u0631\u064A\u0629 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
@@ -5253,7 +5342,7 @@ async function startServer() {
     const { commissionId } = req.params;
     const notes = req.body?.notes;
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
+      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u062A\u0639\u0644\u064A\u0645 \u0627\u0644\u0639\u0645\u0648\u0644\u0629 \u0643\u0645\u062F\u0641\u0648\u0639\u0629 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
@@ -5288,7 +5377,7 @@ async function startServer() {
       });
     }
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
+      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u062A\u0639\u0644\u064A\u0645 \u0639\u0645\u0648\u0644\u0627\u062A \u0627\u0644\u0645\u0648\u0632\u0639 \u0643\u0645\u062F\u0641\u0648\u0639\u0629 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
@@ -5317,7 +5406,7 @@ async function startServer() {
     const { schoolId } = req.params;
     const paused = req.body?.paused === true;
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
+      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u0625\u064A\u0642\u0627\u0641 \u0639\u0645\u0648\u0644\u0629 \u0627\u0644\u0645\u0648\u0632\u0639 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"

@@ -133,6 +133,14 @@ export async function approveDistributor({
     try {
       const existing = await authAdmin.getUserByEmail(email);
       uid = existing.uid;
+      // Never convert another platform account (school admin, parent…) into a distributor.
+      const existingProfile = await db.collection('users').doc(uid).get();
+      const existingRole = existingProfile.exists ? String(existingProfile.data()?.role || '') : '';
+      if (existingRole && existingRole !== 'distributor') {
+        const err = new Error('هذا البريد مستخدم لحساب آخر في المنصة — لا يمكن تحويله إلى حساب موزع');
+        err.code = 'EMAIL_IN_USE_BY_OTHER_ACCOUNT';
+        throw err;
+      }
       const updateParams = { emailVerified: true, displayName };
       if (password) {
         updateParams.password = password;

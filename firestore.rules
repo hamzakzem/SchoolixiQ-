@@ -279,6 +279,20 @@ service cloud.firestore {
       return userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'staff'];
     }
 
+    // Staff act only inside the sections the admin granted them
+    // (users/{uid}.permissions, ids from Staff Management, e.g. 'homework').
+    function staffCan(permission) {
+      return signedIn() && userRole() == 'staff' && permission in userDoc().get('permissions', []);
+    }
+
+    function staffCanCreate(permission) {
+      return staffCan(permission) && sameSchoolRequest();
+    }
+
+    function staffCanChange(permission) {
+      return staffCan(permission) && sameSchool(resource);
+    }
+
     // Admin / staff school operations — excludes teacher, parent, guard.
     function canReadSchoolManagement() {
       return isSuperAdmin()
@@ -822,7 +836,7 @@ service cloud.firestore {
     // Subscription plans — public catalog; only Super Admin may mutate.
     match /packages/{packageId} {
       allow read, get, list: if true;
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin() || platformAssistantHasAny(['manage_packages']);
     }
 
     // Distributors & coupons — Super Admin manages status/canLogin; distributors read own record only.
@@ -831,18 +845,22 @@ service cloud.firestore {
         || platformAssistantHasAny(['manage_distributors'])
         || (isDistributor() && userDistributorId() == distributorId);
       allow list: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
     }
 
     match /distributorCoupons/{couponId} {
       allow read, get, list: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
+    }
+
+    function canManageDistributors() {
+      return isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
     }
 
     match /distributorMonthlyCommissions/{commissionId} {
-      allow read, get: if isSuperAdmin()
+      allow read, get: if canManageDistributors()
         || (isDistributor() && resource.data.distributorId == userDistributorId());
-      allow list: if isSuperAdmin()
+      allow list: if canManageDistributors()
         || (isDistributor() && resource.data.distributorId == userDistributorId());
       allow create, update, delete: if false;
     }
@@ -851,23 +869,23 @@ service cloud.firestore {
     match /distributor_support_conversations/{conversationId} {
       // The client reads dist_<distributorId> before creating it, so allow by id
       // (also when the document does not exist yet).
-      allow read, get: if isSuperAdmin()
+      allow read, get: if canManageDistributors()
         || (
           isDistributor()
           && userDistributorId() != ''
           && conversationId == 'dist_' + userDistributorId()
         )
         || (isDistributor() && resource != null && resource.data.distributorId == userDistributorId());
-      allow list: if isSuperAdmin()
+      allow list: if canManageDistributors()
         || (isDistributor() && resource.data.distributorId == userDistributorId());
-      allow create: if isSuperAdmin()
+      allow create: if canManageDistributors()
         || (
           isDistributor()
           && request.resource.data.conversationType == 'distributor_support'
           && request.resource.data.distributorId == userDistributorId()
           && request.auth.uid in request.resource.data.participants
         );
-      allow update: if isSuperAdmin()
+      allow update: if canManageDistributors()
         || (
           isDistributor()
           && resource.data.distributorId == userDistributorId()
@@ -889,11 +907,11 @@ service cloud.firestore {
     }
 
     match /distributor_support_messages/{messageId} {
-      allow read, get: if isSuperAdmin()
+      allow read, get: if canManageDistributors()
         || (isDistributor() && resource.data.distributorId == userDistributorId());
       // The chat subscribes with where('conversationId', '==', 'dist_<id>').
-      allow list: if isSuperAdmin() || canDistributorListSupportMessages();
-      allow create: if isSuperAdmin()
+      allow list: if canManageDistributors() || canDistributorListSupportMessages();
+      allow create: if canManageDistributors()
         || (
           isDistributor()
           && request.resource.data.conversationType == 'distributor_support'
@@ -901,7 +919,7 @@ service cloud.firestore {
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.senderRole == 'distributor'
         );
-      allow update: if isSuperAdmin()
+      allow update: if canManageDistributors()
         || (
           isDistributor()
           && resource.data.distributorId == userDistributorId()
@@ -953,12 +971,25 @@ service cloud.firestore {
           && userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant']
           && preservesSchoolDistributorFields()
           && preservesSchoolSubscriptionFields()
+        )
+        || (
+          isSchoolMember(schoolId)
+          && staffCan('students')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentCount'])
+        )
+        || (
+          isSchoolMember(schoolId)
+          && staffCan('settings')
+          && preservesSchoolDistributorFields()
+          && preservesSchoolSubscriptionFields()
         );
       allow delete: if isSuperAdmin();
 
       match /settings/{settingId} {
         allow read, get, list: if signedIn();
-        allow create, update, delete: if isSuperAdmin() || canManageSchool(schoolId);
+        allow create, update, delete: if isSuperAdmin()
+          || canManageSchool(schoolId)
+          || (userSchoolId() == schoolId && staffCan('settings'));
       }
     }
 
@@ -983,9 +1014,11 @@ service cloud.firestore {
           && resource.data.keys().hasAll(['registrationNumber'])
         );
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('students');
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('students')
         || canParentUpdateStudent();
       allow delete: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && isAdmin());
@@ -1035,9 +1068,18 @@ service cloud.firestore {
     match /classes/{classId} {
       allow read, get, list: if canReadClassDocument(classId);
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('classes');
+      allow update: if isSuperAdmin()
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('classes')
+        || (
+          staffCanChange('schedules')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['schedule', 'updatedAt'])
+        );
+      allow delete: if isSuperAdmin()
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('classes');
     }
 
     match /attendance/{attendanceId} {
@@ -1046,7 +1088,8 @@ service cloud.firestore {
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId))
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
       allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('attendance');
     }
 
     match /homework/{homeworkId} {
@@ -1061,6 +1104,7 @@ service cloud.firestore {
         );
       allow delete: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('homework')
         || (
           signedIn() && sameSchool(resource) && isTeacher()
           && resource.data.keys().hasAll(['teacherId'])
@@ -1075,7 +1119,8 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
       allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('grades');
     }
 
     match /subjects/{subjectId} {
@@ -1109,7 +1154,8 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
       allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('advanced_reports');
     }
 
     match /behavior_reports/{reportId} {
@@ -1119,7 +1165,8 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
       allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('behavior');
     }
 
     match /announcements/{announcementId} {
@@ -1133,49 +1180,61 @@ service cloud.firestore {
     match /payments/{paymentId} {
       allow read, get, list: if canReadAcademicOrParentLink();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('tuition');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('tuition');
     }
 
     match /installments/{installmentId} {
       allow read, get, list: if canReadAcademicOrParentLink();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('tuition');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('tuition');
     }
 
     match /payroll/{payrollId} {
       allow read, get, list: if canReadSchoolManagement();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('payroll');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('payroll');
     }
 
     match /inventory/{itemId} {
       allow read, get, list: if canReadSchoolManagement();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('inventory');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('inventory');
     }
 
     match /market/{itemId} {
       allow read, get, list: if canReadSchoolAcademicWide();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('market');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('market');
     }
 
     match /marketplace/{itemId} {
       allow read, get, list: if canReadSchoolAcademicWide();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('market');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('market');
     }
 
     match /orders/{orderId} {
@@ -1196,7 +1255,8 @@ service cloud.firestore {
           && canManageSchool(request.resource.data.schoolId)
         );
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && hasSchoolId(resource.data) && canManageSchool(resource.data.schoolId));
+        || (signedIn() && hasSchoolId(resource.data) && canManageSchool(resource.data.schoolId))
+        || staffCanChange('market');
     }
 
     match /subscriptionRequests/{requestId} {
@@ -1213,24 +1273,29 @@ service cloud.firestore {
         || (signedIn() && isTeacher() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId)
         || (signedIn() && isParentOfStudent(cardId));
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('id_cards');
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('id_cards')
         || (
           signedIn() && isParentOfStudent(cardId)
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['parentEmail', 'residenceAddress', 'updatedAt'])
         );
       allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('id_cards');
     }
 
     match /student_archives/{archiveId} {
       allow read, get, list: if canReadSchoolManagement();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
+        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || staffCanCreate('student_archive');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
+        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || staffCanChange('student_archive');
     }
 
     // -------------------------------------------------------------------------
@@ -1282,7 +1347,7 @@ service cloud.firestore {
       function isSchoolNotificationAuthor(schoolId) {
         return signedIn()
           && userSchoolId() == schoolId
-          && userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher'];
+          && userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher', 'staff'];
       }
 
       function notificationRecipientUserId() {
@@ -1413,10 +1478,25 @@ service cloud.firestore {
           && isSuperAdminRecipient(recipientId);
       }
 
+      // A parent alerting school staff about a chat message they just sent
+      function canCreateParentChatNotification() {
+        let data = request.resource.data;
+        return signedIn()
+          && isParent()
+          && hasSchoolId(data)
+          && userSchoolId() == data.schoolId
+          && data.keys().hasAll(['userId', 'metadata'])
+          && data.metadata is map
+          && data.metadata.get('routeTarget', '') == 'chat'
+          && data.metadata.get('senderId', '') == request.auth.uid
+          && isSameSchoolStaffRecipient(data.userId, data.schoolId);
+      }
+
       function canCreateSchoolNotification() {
         return canCreateParentSchoolNotification()
           || canCreateStaffSchoolNotification()
-          || canCreateSuperAdminRecipientNotification();
+          || canCreateSuperAdminRecipientNotification()
+          || canCreateParentChatNotification();
       }
 
       // createdBy = uid of whoever wrote the notification; lets the author

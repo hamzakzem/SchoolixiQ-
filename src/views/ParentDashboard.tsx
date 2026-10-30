@@ -2451,6 +2451,10 @@ export default function ParentDashboard() {
                                 </div>
 
                                 <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={Boolean(prefs[item.id])}
+                                  aria-label={`${item.label} — ${student.name}`}
                                   disabled={isSavingPrefs === student.id}
                                   onClick={() =>
                                     togglePreference(student.id, item.id)

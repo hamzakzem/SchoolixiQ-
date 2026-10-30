@@ -4003,7 +4003,11 @@ html.dark .sx-dist-section { background: #1e293b; border-color: #334155; }
 .sx-dist-bottom-nav__item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 44px; border: none; background: transparent; color: #64748b; font-size: 10px; font-weight: 800; cursor: pointer; }
 .sx-dist-bottom-nav__item.is-active { color: #0b2345; }
 /* lg:hidden loses to the display:grid above (same specificity, later rule) */
-@media (min-width: 1024px) { .sx-dist-bottom-nav { display: none; } }
+@media (min-width: 1024px) {
+  .sx-dist-bottom-nav { display: none; }
+  /* Desktop shows the tables; the card lists are the phone/tablet layout. */
+  .sx-dist-school-list, .sx-dist-commission-list { display: none; }
+}
 .sx-dist-bottom-nav { box-shadow: 0 -8px 24px -16px rgba(11, 35, 69, 0.35); }
 .sx-dist-bottom-nav__item { position: relative; border-radius: 12px; transition: color 160ms ease, background-color 160ms ease, transform 140ms ease; -webkit-tap-highlight-color: transparent; }
 .sx-dist-bottom-nav__item:active { transform: scale(0.95); }

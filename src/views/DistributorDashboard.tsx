@@ -53,6 +53,22 @@ const STATUS_CLASS: Record<string, string> = {
   canceled: "sx-dist-badge--canceled",
 };
 
+const SCHOOL_STATUS_LABELS: Record<string, string> = {
+  active: "نشطة",
+  trial: "تجريبية",
+  pending: "قيد المراجعة",
+  expired: "منتهية",
+  suspended: "معطّلة",
+  inactive: "غير نشطة",
+  archived: "مؤرشفة",
+  rejected: "مرفوضة",
+};
+
+function statusLabel(value?: string) {
+  if (!value) return "—";
+  return SCHOOL_STATUS_LABELS[value.toLowerCase()] || value;
+}
+
 function formatIqd(amount: number) {
   return `${Number(amount || 0).toLocaleString("ar-IQ-u-nu-latn")} د.ع`;
 }
@@ -69,6 +85,12 @@ function formatDate(value: unknown) {
   if (typeof value === "string") {
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString("ar-IQ-u-nu-latn");
+  }
+  // Timestamps serialized by the API arrive as { _seconds } / { seconds }.
+  if (typeof value === "object" && value !== null) {
+    const ts = value as { _seconds?: number; seconds?: number };
+    const secs = ts._seconds ?? ts.seconds;
+    if (typeof secs === "number") return new Date(secs * 1000).toLocaleDateString("ar-IQ-u-nu-latn");
   }
   return "—";
 }
@@ -230,7 +252,7 @@ export default function DistributorDashboard() {
         <h2>{isRtl ? "مدارسي" : "My schools"}</h2>
         <p>{isRtl ? "المدارس المرتبطة بحسابك فقط" : "Schools linked to your account only"}</p>
       </div>
-      <div className="sx-dist-school-list">
+      <div className="sx-dist-school-list lg:hidden">
         {schools.length === 0 ? (
           <p className="sx-dist-empty">{isRtl ? "لا توجد مدارس مرتبطة بعد" : "No linked schools yet"}</p>
         ) : (
@@ -253,7 +275,7 @@ export default function DistributorDashboard() {
                     </p>
                   </div>
                   <span className={`sx-dist-badge ${school.isActive ? "sx-dist-badge--paid" : "sx-dist-badge--pending"}`}>
-                    {school.subscriptionStatus || school.status || "—"}
+                    {statusLabel(school.subscriptionStatus || school.status)}
                   </span>
                   {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
@@ -270,7 +292,7 @@ export default function DistributorDashboard() {
           })
         )}
       </div>
-      <div className="sx-dist-table-wrap hidden lg:block">
+      <div className={`sx-dist-table-wrap hidden ${schools.length ? "lg:block" : ""}`}>
         <table className="sx-dist-table">
           <thead>
             <tr>
@@ -289,7 +311,7 @@ export default function DistributorDashboard() {
                 <td>{school.name}</td>
                 <td>{school.governorate || "—"}</td>
                 <td>{school.planName || school.planId}</td>
-                <td>{school.subscriptionStatus || school.status}</td>
+                <td>{statusLabel(school.subscriptionStatus || school.status)}</td>
                 <td>{formatDate(school.distributorLinkedAt)}</td>
                 <td>{formatIqd(school.currentMonthCommission || 0)}</td>
                 <td>{formatIqd(school.totalCommissionFromSchool || 0)}</td>
@@ -327,6 +349,13 @@ export default function DistributorDashboard() {
           ))}
         </select>
       </div>
+      {filteredCommissions.length === 0 ? (
+        <p className="sx-dist-empty">
+          {commissions.length === 0
+            ? (isRtl ? "لا توجد عمولات بعد — تظهر هنا بعد اشتراك مدارسك وتوليد عمولات الشهر" : "No commissions yet")
+            : (isRtl ? "لا توجد عمولات تطابق الفلاتر المختارة" : "No commissions match the filters")}
+        </p>
+      ) : null}
       <div className="sx-dist-commission-list lg:hidden">
         {filteredCommissions.map((c) => (
           <article key={c.id} className="sx-dist-commission-card">
@@ -342,7 +371,7 @@ export default function DistributorDashboard() {
           </article>
         ))}
       </div>
-      <div className="sx-dist-table-wrap hidden lg:block">
+      <div className={`sx-dist-table-wrap hidden ${filteredCommissions.length ? "lg:block" : ""}`}>
         <table className="sx-dist-table">
           <thead>
             <tr>
@@ -424,7 +453,7 @@ export default function DistributorDashboard() {
         <div className="sx-dist-kv"><span>المنطقة</span><strong>{distributor?.region || "—"}</strong></div>
         <div className="sx-dist-kv"><span>نوع الموزع</span><strong>{distributor?.distributorType || "—"}</strong></div>
         <div className="sx-dist-kv"><span>يتبع إلى</span><strong>{distributor?.parentDistributorName || "—"}</strong></div>
-        <div className="sx-dist-kv"><span>الحالة</span><strong>{distributor?.status || (distributor?.active === false ? "غير نشط" : "نشط")}</strong></div>
+        <div className="sx-dist-kv"><span>الحالة</span><strong>{distributor?.active === false || (distributor?.status && distributor.status !== "active") ? "غير نشط" : "نشط"}</strong></div>
       </div>
     </section>
   );
