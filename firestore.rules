@@ -976,12 +976,20 @@ service cloud.firestore {
           isSchoolMember(schoolId)
           && staffCan('students')
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentCount'])
+        )
+        || (
+          isSchoolMember(schoolId)
+          && staffCan('settings')
+          && preservesSchoolDistributorFields()
+          && preservesSchoolSubscriptionFields()
         );
       allow delete: if isSuperAdmin();
 
       match /settings/{settingId} {
         allow read, get, list: if signedIn();
-        allow create, update, delete: if isSuperAdmin() || canManageSchool(schoolId);
+        allow create, update, delete: if isSuperAdmin()
+          || canManageSchool(schoolId)
+          || (userSchoolId() == schoolId && staffCan('settings'));
       }
     }
 
