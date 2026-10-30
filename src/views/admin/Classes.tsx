@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, getDocs, limit, runTransaction, increment } from 'firebase/firestore';
 import { filterActiveRecords, softDeleteDocument } from '../../lib/softDelete';
 import { logAction } from '../../lib/auditLog';
 import { useAuth } from '../../lib/AuthContext';
@@ -175,21 +175,39 @@ export default function Classes() {
     
     setIsProcessing(true);
     try {
-      await addDoc(collection(db, 'students'), {
-        name: quickNewStudent.name,
-        registrationNumber: quickNewStudent.registrationNumber,
-        classId: selectedClassForStudents.id,
-        schoolId: profile.schoolId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        linkedParents: []
+      // Same shape and checks as the main "add student" form: package limit,
+      // school student count, and parentIds (not the unused linkedParents).
+      const schoolId = profile.schoolId;
+      const studentRef = doc(collection(db, 'students'));
+      await runTransaction(db, async (transaction) => {
+        const schoolRef = doc(db, 'schools', schoolId);
+        const schoolSnap = await transaction.get(schoolRef);
+        if (!schoolSnap.exists()) throw new Error('المدرسة غير موجودة');
+        const schoolData = schoolSnap.data();
+        const planSnap = await transaction.get(doc(db, 'packages', schoolData.planId || 'basic'));
+        const maxStudents = planSnap.exists() ? planSnap.data().maxStudents || 500 : 500;
+        if ((schoolData.studentCount || 0) >= maxStudents) {
+          throw new Error(`لقد وصلت للحد الأقصى للطلاب في باقتك الحالية (${maxStudents} طالب).`);
+        }
+        transaction.set(studentRef, {
+          id: studentRef.id,
+          name: quickNewStudent.name,
+          registrationNumber: quickNewStudent.registrationNumber,
+          classId: selectedClassForStudents.id,
+          schoolId,
+          tuitionBalance: 0,
+          parentIds: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        transaction.update(schoolRef, { studentCount: increment(1) });
       });
       toast.success('تمت إضافة الطالب بنجاح');
       setQuickNewStudent({ name: '', registrationNumber: '' });
       setShowQuickAdd(false);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'students');
-      toast.error('حدث خطأ أثناء إضافة الطالب');
+      toast.error(error instanceof Error && /الحد الأقصى/.test(error.message) ? error.message : 'حدث خطأ أثناء إضافة الطالب');
     } finally {
       setIsProcessing(false);
     }
@@ -246,7 +264,9 @@ export default function Classes() {
                 <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg transform group-hover:rotate-6 transition-transform">
                   <LayoutDashboard size={28} />
                 </div>
-                <div className="relative">
+                {/* The menu renders in a portal, but React still bubbles its clicks
+                    to the card, which would also open the students window. */}
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
                   <ActionMenu
                     open={activeMenu === cls.id}
                     onOpenChange={(open) => setActiveMenu(open ? cls.id : null)}

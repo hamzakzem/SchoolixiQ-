@@ -1672,6 +1672,20 @@ function canActorCreateRole(actorRole, targetRole, actorSchoolId) {
   }
   return false;
 }
+function canActorDeleteUser(actorRole, targetRole, actorSchoolId) {
+  const actor = normalizeEffectiveRole(actorRole, actorSchoolId);
+  const target = normalizeRole(targetRole);
+  if (!target) return false;
+  if (actor === "platform_assistant") return false;
+  if (isSuperAdminRole(actor)) {
+    if (isSuperAdminRole(target)) return false;
+    return true;
+  }
+  if (isSchoolAdminRole(actor)) {
+    return roleRank(target) < roleRank("admin");
+  }
+  return false;
+}
 function canActorSyncClaims(actorRole, targetRole, actorSchoolId) {
   const actor = normalizeEffectiveRole(actorRole, actorSchoolId);
   const target = normalizeRole(targetRole);
@@ -4398,6 +4412,16 @@ async function startServer() {
                 message: "\u0647\u0630\u0627 \u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0645\u0633\u062C\u0644 \u0628\u062D\u0633\u0627\u0628 \u0645\u0648\u0638\u0641 \u0623\u0648 \u0645\u0639\u0644\u0645. \u064A\u0631\u062C\u0649 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0628\u0631\u064A\u062F \u0645\u062E\u062A\u0644\u0641 \u0644\u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631."
               });
             }
+            if (req.user.role !== "superadmin" && existingUserData?.schoolId && existingUserData.schoolId !== effectiveSchoolId) {
+              await logAudit(req, "LINK_EXISTING_PARENT_OTHER_SCHOOL", {
+                after: { email: emailLower, role: targetRole, schoolId: effectiveSchoolId }
+              });
+              return res.json({
+                success: true,
+                message: "\u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631 \u0644\u062F\u064A\u0647 \u062D\u0633\u0627\u0628 \u0645\u0633\u0628\u0642\u061B \u062A\u0645 \u0627\u0633\u062A\u062E\u062F\u0627\u0645\u0647 \u062F\u0648\u0646 \u062A\u063A\u064A\u064A\u0631 \u0628\u064A\u0627\u0646\u0627\u062A\u0647",
+                data: { uid, existingAccount: true }
+              });
+            }
           } else {
             if (existingUserData?.schoolId && existingUserData.schoolId !== effectiveSchoolId && req.user.role !== "superadmin") {
               return res.status(400).json({
@@ -4407,11 +4431,13 @@ async function startServer() {
             }
           }
         }
+        const canResetCredentials = req.user.role === "superadmin" || isExistingUser && String(existingUserData?.schoolId || "") === effectiveSchoolId;
         const updateParams = {
           emailVerified: true
           // Set to true since admin is creating/linking
         };
-        if (password) {
+        if (!canResetCredentials) {
+        } else if (password) {
           updateParams.password = password;
         } else {
           const hasPassword = existingUser.providerData.some((p) => p.providerId === "password");
@@ -4420,7 +4446,7 @@ async function startServer() {
             console.log(`Setting dynamic random password for existing Google user: ${redactUid(uid)}`);
           }
         }
-        if (displayName) updateParams.displayName = displayName;
+        if (displayName && canResetCredentials) updateParams.displayName = displayName;
         if (Object.keys(updateParams).length > 1 || updateParams.emailVerified) {
           await admin4.auth().updateUser(uid, updateParams);
           console.log(`Updated existing Auth user: ${redactUid(uid)}, verified: true, hasPasswordUpd: ${!!updateParams.password}`);
@@ -4484,10 +4510,11 @@ async function startServer() {
         await syncUserClaims(uid, targetRole, effectiveSchoolId, additionalData?.permissions || null);
       } else {
         await syncUserClaims(uid, targetRole, effectiveSchoolId, additionalData?.permissions || null);
+        const keepExistingName = targetRole === "parent" && isExistingUser && String(existingUserData?.name || "").trim() && (!displayName || displayName === "\u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631");
         await db.collection("users").doc(uid).set({
           uid,
           email: emailLower,
-          name: displayName,
+          name: keepExistingName ? existingUserData.name : displayName,
           role: targetRole,
           schoolId: effectiveSchoolId,
           ...safeAdditionalData,
@@ -4601,16 +4628,20 @@ async function startServer() {
       return res.status(400).json({ error: "USER_ID_REQUIRED", message: "userId \u0645\u0637\u0644\u0648\u0628" });
     }
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
-        return res.status(403).json({
-          error: "FORBIDDEN",
-          message: "\u062D\u0630\u0641 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645\u064A\u0646 \u0645\u0646 \u0644\u0648\u062D\u0629 \u0627\u0644\u0633\u0648\u0628\u0631 \u0623\u062F\u0645\u0646 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
-        });
-      }
       const db = getDb();
       const userDoc = await db.collection("users").doc(userId).get();
       const beforeData = userDoc.exists ? userDoc.data() || {} : {};
       const targetRole = beforeData.role;
+      if (!isSuperAdminRole3(req.user.role)) {
+        const actorSchoolId = String(req.user.schoolId || "").trim();
+        const sameSchool = userDoc.exists && actorSchoolId.length > 0 && String(beforeData.schoolId || "") === actorSchoolId;
+        if (!sameSchool || !canActorDeleteUser(req.user.role, targetRole, actorSchoolId)) {
+          return res.status(403).json({
+            error: "FORBIDDEN",
+            message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645"
+          });
+        }
+      }
       let authExists = false;
       try {
         await admin4.auth().getUser(userId);

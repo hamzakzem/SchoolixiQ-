@@ -1031,6 +1031,23 @@ async function startServer() {
                 message: 'هذا البريد الإلكتروني مسجل بحساب موظف أو معلم. يرجى استخدام بريد مختلف لولي الأمر.'
               });
             }
+            // A parent registered with another school: return the uid so the
+            // student can be linked, but never touch that account's password,
+            // profile or school (that would hand the account to this admin).
+            if (
+              req.user.role !== 'superadmin' &&
+              existingUserData?.schoolId &&
+              existingUserData.schoolId !== effectiveSchoolId
+            ) {
+              await logAudit(req, 'LINK_EXISTING_PARENT_OTHER_SCHOOL', {
+                after: { email: emailLower, role: targetRole, schoolId: effectiveSchoolId },
+              });
+              return res.json({
+                success: true,
+                message: 'ولي الأمر لديه حساب مسبق؛ تم استخدامه دون تغيير بياناته',
+                data: { uid, existingAccount: true },
+              });
+            }
           } else {
             // For non-parent roles, enforce school exclusivity
             if (existingUserData?.schoolId && existingUserData.schoolId !== effectiveSchoolId && req.user.role !== 'superadmin') {
@@ -1042,13 +1059,22 @@ async function startServer() {
           }
         }
         
+        // Credentials of an existing account may only be reset by the super
+        // admin or for an account that already belongs to this school — not
+        // for an Auth account with no profile (someone else's sign-up).
+        const canResetCredentials =
+          req.user.role === 'superadmin' ||
+          (isExistingUser && String(existingUserData?.schoolId || '') === effectiveSchoolId);
+
         // Update user properties if needed
         const updateParams: any = {
           emailVerified: true // Set to true since admin is creating/linking
         };
         
         // Use provided password, or if none provided and they don't have one, set dynamic random secure one
-        if (password) {
+        if (!canResetCredentials) {
+          // keep the owner's password
+        } else if (password) {
           updateParams.password = password;
         } else {
           // Check if they have a password
@@ -1059,7 +1085,7 @@ async function startServer() {
           }
         }
         
-        if (displayName) updateParams.displayName = displayName;
+        if (displayName && canResetCredentials) updateParams.displayName = displayName;
         
         if (Object.keys(updateParams).length > 1 || updateParams.emailVerified) {
           await admin.auth().updateUser(uid, updateParams);
@@ -1137,10 +1163,15 @@ async function startServer() {
       } else {
         await syncUserClaims(uid, targetRole, effectiveSchoolId, additionalData?.permissions || null);
 
+        // Re-linking an existing parent must not replace their real name with
+        // the generic "ولي الأمر" the student form sends.
+        const keepExistingName =
+          targetRole === 'parent' && isExistingUser && String(existingUserData?.name || '').trim() &&
+          (!displayName || displayName === 'ولي الأمر');
         await db.collection('users').doc(uid).set({
           uid,
           email: emailLower,
-          name: displayName,
+          name: keepExistingName ? existingUserData.name : displayName,
           role: targetRole,
           schoolId: effectiveSchoolId,
           ...safeAdditionalData,
@@ -1277,17 +1308,25 @@ async function startServer() {
     }
 
     try {
-      if (!isSuperAdminRole(req.user.role)) {
-        return res.status(403).json({
-          error: 'FORBIDDEN',
-          message: 'حذف المستخدمين من لوحة السوبر أدمن مخصص لمدير النظام فقط',
-        });
-      }
-
       const db = getDb();
       const userDoc = await db.collection('users').doc(userId).get();
       const beforeData = userDoc.exists ? userDoc.data() || {} : {};
       const targetRole = beforeData.role;
+
+      // Super admin: anyone. School admin: lower-ranked users (teacher, staff,
+      // assistant, parent, guard) of their own school only — the staff,
+      // parents and assistants pages delete accounts through this endpoint.
+      if (!isSuperAdminRole(req.user.role)) {
+        const actorSchoolId = String(req.user.schoolId || '').trim();
+        const sameSchool =
+          userDoc.exists && actorSchoolId.length > 0 && String(beforeData.schoolId || '') === actorSchoolId;
+        if (!sameSchool || !canActorDeleteUser(req.user.role, targetRole, actorSchoolId)) {
+          return res.status(403).json({
+            error: 'FORBIDDEN',
+            message: 'غير مسموح لك بحذف هذا المستخدم',
+          });
+        }
+      }
 
       let authExists = false;
       try {

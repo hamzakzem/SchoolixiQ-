@@ -160,6 +160,11 @@ export function parseTuitionDueDate(value: unknown): Date {
   return parseDueDate(value);
 }
 
+/** What is still owed on an installment (partial payments reduce it). */
+export function installmentOutstanding(installment: Pick<TuitionInstallment, 'amount' | 'paidAmount'>): number {
+  return Math.max(0, (Number(installment.amount) || 0) - (Number(installment.paidAmount) || 0));
+}
+
 /** Tuition.tsx unpaid filter: status !== 'paid' (includes pending, undefined, overdue labels) */
 export function isUnpaidInstallment(installment: Pick<TuitionInstallment, 'status'>): boolean {
   const status = String(installment.status || '').toLowerCase();
@@ -314,7 +319,7 @@ export function buildReminderDashboardRows(
         installmentId: installment.id,
         studentId: installment.studentId,
         studentName: student?.name || 'طالب',
-        amount: installment.amount || 0,
+        amount: installmentOutstanding(installment),
         dueDate,
         delayDays,
         bucket,
@@ -532,7 +537,7 @@ export function getEligibleTuitionReminderRows(params: {
       installmentId: installment.id,
       studentId: installment.studentId,
       studentName: student.name || 'طالب',
-      amount: installment.amount || 0,
+      amount: installmentOutstanding(installment),
       dueDate,
       delayDays,
       bucket,

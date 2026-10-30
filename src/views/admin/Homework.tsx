@@ -317,7 +317,7 @@ export default function Homework() {
              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-12rem)] min-h-[600px] flex items-center justify-center">
                <div className="text-center text-slate-400 space-y-4 max-w-sm px-6">
                  <Users size={64} className="mx-auto opacity-20" />
-                 <h3 className="text-xl font-bold text-slate-600 dark:text-slate-300">{isRtl ? 'اختر صفاً دراسياً לעرض الواجبات' : 'Select a class to view homeworks'}</h3>
+                 <h3 className="text-xl font-bold text-slate-600 dark:text-slate-300">{isRtl ? 'اختر صفاً دراسياً لعرض الواجبات' : 'Select a class to view homeworks'}</h3>
                </div>
              </div>
            )}

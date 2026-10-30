@@ -181,7 +181,7 @@ export default function Grades() {
         createdAt: serverTimestamp()
       });
       setSubjects(prev => [...prev, subjectName]);
-      toast.success(`تمت إضافة مادة ${subjectName} لصف ${selectedClass.name}`);
+      toast.success(`تمت إضافة مادة ${subjectName} إلى ${selectedClass.name}`);
       setNewSubject('');
       setShowAddSubject(false);
     } catch (error) {
@@ -435,7 +435,9 @@ export default function Grades() {
                     <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-colors">
                       <ChevronRight size={24} className="rotate-180" />
                     </div>
-                    <span className="text-lg font-bold text-slate-700">الصف {cls.name}</span>
+                    <span className="text-lg font-bold text-slate-700">
+                      {/^\s*(الصف|صف)/.test(cls.name || '') ? cls.name : `الصف ${cls.name}`}
+                    </span>
                  </button>
                ))}
             </div>

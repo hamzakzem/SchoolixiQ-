@@ -6,6 +6,28 @@ import {
   Wallet,
 } from 'lucide-react';
 import { tuitionRemaining } from './parentUiHelpers';
+import {
+  installmentOutstanding,
+  isOverdueInstallment,
+  parseTuitionDueDate,
+} from '../../lib/tuitionModel';
+
+type InstallmentState = 'paid' | 'late' | 'partial' | 'pending';
+
+/** Display state: overdue is computed from the due date, not only a stored "late". */
+function installmentState(inst: any): InstallmentState {
+  if (inst.status === 'paid') return 'paid';
+  if (inst.status === 'late' || isOverdueInstallment(inst)) return 'late';
+  if (inst.status === 'partial' || Number(inst.paidAmount) > 0) return 'partial';
+  return 'pending';
+}
+
+const STATE_LABEL: Record<InstallmentState, string> = {
+  paid: 'تم الدفع',
+  late: 'متأخر',
+  partial: 'مدفوع جزئياً',
+  pending: 'منتظر',
+};
 
 type Props = {
   isRtl: boolean;
@@ -33,11 +55,23 @@ export function ParentTuitionView({
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const remaining = tuitionRemaining(student);
 
+  // Due dates are ISO strings (admin plans) or Timestamps (older data)
+  const sortedInstallments = useMemo(
+    () =>
+      [...installments].sort(
+        (a, b) => parseTuitionDueDate(a.dueDate).getTime() - parseTuitionDueDate(b.dueDate).getTime(),
+      ),
+    [installments],
+  );
   const nearestInstallment = useMemo(() => {
-    return installments.find((i) => i.status !== 'paid') || installments[0];
-  }, [installments]);
+    return sortedInstallments.find((i) => i.status !== 'paid') || sortedInstallments[0];
+  }, [sortedInstallments]);
 
   const locale = language === 'ar' ? 'ar-IQ-u-nu-latn' : 'en-US';
+  const formatDue = (value: unknown, opts?: Intl.DateTimeFormatOptions) => {
+    const d = parseTuitionDueDate(value);
+    return d.getTime() > 0 ? d.toLocaleDateString(locale, opts) : '—';
+  };
 
   return (
     <div className="parent-tab space-y-6">
@@ -83,29 +117,18 @@ export function ParentTuitionView({
           <div className="parent-tuition-stat col-span-2 lg:col-span-1">
             <span className="parent-tuition-stat__label">{isRtl ? 'أقرب قسط' : 'Next installment'}</span>
             <p className="parent-tuition-stat__value text-base">
-              {nearestInstallment.dueDate?.seconds
-                ? new Date(nearestInstallment.dueDate.seconds * 1000).toLocaleDateString(locale, {
-                    month: 'short',
-                    day: 'numeric',
-                  })
-                : '—'}
+              {formatDue(nearestInstallment.dueDate, { month: 'short', day: 'numeric' })}
             </p>
             <span
               className={`parent-badge mt-1 ${
-                nearestInstallment.status === 'late'
+                installmentState(nearestInstallment) === 'late'
                   ? 'parent-badge--danger'
-                  : nearestInstallment.status === 'paid'
+                  : installmentState(nearestInstallment) === 'paid'
                     ? 'parent-badge--success'
                     : ''
               }`}
             >
-              {nearestInstallment.status === 'paid'
-                ? 'تم الدفع'
-                : nearestInstallment.status === 'late'
-                  ? 'متأخر'
-                  : isRtl
-                    ? 'منتظر'
-                    : 'Pending'}
+              {STATE_LABEL[installmentState(nearestInstallment)]}
             </span>
           </div>
         )}
@@ -114,21 +137,23 @@ export function ParentTuitionView({
       {installments.length > 0 ? (
         <section className="space-y-3">
           <h3 className="parent-group-label">{t('upcomingInstallments')}</h3>
-          {installments.map((inst) => (
+          {sortedInstallments.map((inst) => {
+            const state = installmentState(inst);
+            return (
             <div key={inst.id} className="parent-section-card flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div
                   className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    inst.status === 'paid'
+                    state === 'paid'
                       ? 'bg-emerald-100 text-emerald-700'
-                      : inst.status === 'late'
+                      : state === 'late'
                         ? 'bg-rose-100 text-rose-700'
                         : 'bg-amber-100 text-amber-700'
                   }`}
                 >
-                  {inst.status === 'paid' ? (
+                  {state === 'paid' ? (
                     <CheckCircle size={18} />
-                  ) : inst.status === 'late' ? (
+                  ) : state === 'late' ? (
                     <AlertTriangle size={18} />
                   ) : (
                     <Calendar size={18} />
@@ -136,29 +161,33 @@ export function ParentTuitionView({
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-sm truncate">{t('installmentFor')}</p>
-                  <p className="text-[10px] text-[#0B2345]/45">
-                    {inst.dueDate?.seconds
-                      ? new Date(inst.dueDate.seconds * 1000).toLocaleDateString(locale)
-                      : ''}
-                  </p>
+                  <p className="text-[10px] text-[#0B2345]/45">{formatDue(inst.dueDate)}</p>
                 </div>
               </div>
               <div className="text-end shrink-0">
-                <p className="font-black text-sm tabular-nums">{inst.amount?.toLocaleString()} د.ع</p>
+                <p className="font-black text-sm tabular-nums">
+                  {(state === 'paid' ? Number(inst.amount) || 0 : installmentOutstanding(inst)).toLocaleString()} د.ع
+                </p>
+                {Number(inst.paidAmount) > 0 && state !== 'paid' ? (
+                  <p className="text-[9px] font-bold text-emerald-700">
+                    مدفوع {Number(inst.paidAmount).toLocaleString()} من {(Number(inst.amount) || 0).toLocaleString()}
+                  </p>
+                ) : null}
                 <span
                   className={`text-[9px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 ${
-                    inst.status === 'paid'
+                    state === 'paid'
                       ? 'bg-emerald-100 text-emerald-700'
-                      : inst.status === 'late'
+                      : state === 'late'
                         ? 'bg-rose-100 text-rose-700'
                         : 'bg-amber-100 text-amber-700'
                   }`}
                 >
-                  {inst.status === 'paid' ? 'تم الدفع' : inst.status === 'late' ? 'متأخر' : 'منتظر'}
+                  {STATE_LABEL[state]}
                 </span>
               </div>
             </div>
-          ))}
+            );
+          })}
         </section>
       ) : (
         <div className="parent-empty-state">

@@ -22,16 +22,20 @@ service cloud.firestore {
       return userExists() ? get(userPath()).data : {};
     }
 
+    // map.get(key, default) gives the same result as the old
+    // "userExists() && keys().hasAll([key]) ? field : ''" at a fraction of the
+    // evaluation cost; the old form pushed reads of other users' docs past
+    // Firestore's 1000-expression limit.
     function userRole() {
-      return userExists() && userDoc().keys().hasAll(['role']) ? userDoc().role : '';
+      return userDoc().get('role', '');
     }
 
     function userSchoolId() {
-      return userExists() && userDoc().keys().hasAll(['schoolId']) ? userDoc().schoolId : '';
+      return userDoc().get('schoolId', '');
     }
 
     function userEmail() {
-      return userExists() && userDoc().keys().hasAll(['email']) ? userDoc().email : '';
+      return userDoc().get('email', '');
     }
 
     function isSuperAdmin() {
@@ -49,7 +53,7 @@ service cloud.firestore {
         userRole() == 'platform_assistant'
         || (
           userRole() == 'assistant'
-          && (!userDoc().keys().hasAll(['schoolId']) || userDoc().schoolId == '' || userDoc().schoolId == null)
+          && (userSchoolId() == '' || userSchoolId() == null)
         )
       );
     }
@@ -58,9 +62,8 @@ service cloud.firestore {
       return userRole() in ['school_assistant']
         || (
           userRole() == 'assistant'
-          && userDoc().keys().hasAll(['schoolId'])
-          && userDoc().schoolId is string
-          && userDoc().schoolId.size() > 0
+          && userSchoolId() is string
+          && userSchoolId().size() > 0
         );
     }
 
@@ -1416,18 +1419,34 @@ service cloud.firestore {
           || canCreateSuperAdminRecipientNotification();
       }
 
-      allow get: if canReadNotification();
-      allow list: if canReadNotification();
-      allow create: if isSuperAdmin()
+      // createdBy = uid of whoever wrote the notification; lets the author
+      // clean up what they sent (e.g. after deleting a homework).
+      function isNotificationCreator() {
+        return signedIn() && resource.data.get('createdBy', '') == request.auth.uid;
+      }
+
+      function createdByIsCaller() {
+        return request.resource.data.get('createdBy', request.auth.uid) == request.auth.uid;
+      }
+
+      allow get: if canReadNotification() || isNotificationCreator();
+      allow list: if canReadNotification() || isNotificationCreator();
+      allow create: if createdByIsCaller() && (
+        isSuperAdmin()
         || (
           signedIn()
           && request.resource.data.userId == 'super_admin'
           && request.resource.data.schoolId == 'system'
         )
-        || canCreateSchoolNotification();
-      allow update, delete: if isSuperAdmin()
+        || canCreateSchoolNotification()
+      );
+      allow update: if isSuperAdmin()
         || (isNotificationRecipient() && notificationSchoolMatchesViewer())
         || isSuperAdminInboxNotification();
+      allow delete: if isSuperAdmin()
+        || (isNotificationRecipient() && notificationSchoolMatchesViewer())
+        || isSuperAdminInboxNotification()
+        || isNotificationCreator();
     }
 
     match /notification_preferences/{prefId} {

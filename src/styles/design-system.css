@@ -230,6 +230,12 @@ html.dark .sx-type-h2 {
   color: #f8fafc;
 }
 
+/* Headings on dark cards that ask for white text keep it (the rules above
+   outrank Tailwind's .text-white and painted them navy on navy). */
+.sx-dashboard-context :is(h1, h2, h3, h4).text-white {
+  color: #ffffff;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sx-btn,
   .sx-nav-item,
