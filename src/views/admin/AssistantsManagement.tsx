@@ -18,6 +18,8 @@ export default function AssistantsManagement() {
     () => getStaffPermissionOptions(schoolData?.packagePermissions, true),
     [schoolData?.packagePermissions],
   );
+  // Bumped after create / edit / delete so the list (a one-time read) refreshes
+  const [reloadKey, setReloadKey] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [assistants, setAssistants] = useState<any[]>([]);
@@ -59,7 +61,7 @@ export default function AssistantsManagement() {
     
     fetchAssistants();
     return () => { isMounted = false; };
-  }, [profile]);
+  }, [profile, reloadKey]);
 
   const togglePermission = (permId: string) => {
     setFormData((prev) => {
@@ -123,6 +125,7 @@ export default function AssistantsManagement() {
       setShowModal(false);
       setEditingAssistant(null);
       resetForm();
+      setReloadKey((k) => k + 1);
     } catch (error: any) {
       console.error('Error saving assistant:', error);
       toast.error(error.message || 'حدث خطأ أثناء حفظ البيانات');
@@ -137,6 +140,7 @@ export default function AssistantsManagement() {
       await adminDeleteUser(id);
       toast.success('تم حذف المساعد');
       setConfirmDeleteId(null);
+      setAssistants((prev) => prev.filter((a) => a.id !== id));
     } catch (error: any) {
       console.error('Delete assistant error:', error);
       toast.error(error.message || 'فشل في حذف المساعد');
@@ -246,7 +250,10 @@ export default function AssistantsManagement() {
                 تعديل الصلاحيات
               </button>
               <button 
+                type="button"
                 onClick={() => setConfirmDeleteId(assistant.id)}
+                aria-label="حذف المساعد"
+                title="حذف المساعد"
                 className="p-3 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all active:scale-95 border border-rose-100"
               >
                 <Trash2 size={18} />

@@ -1,4 +1,4 @@
-import { db } from './firebase';
+import { auth, db } from './firebase';
 import {
   collection,
   addDoc,
@@ -163,6 +163,9 @@ function buildNotificationDoc(
     ...retentionField('notifications'),
   };
 
+  // Author of the write (enforced by rules); lets them delete it later
+  const creatorUid = auth.currentUser?.uid;
+  if (creatorUid) doc.createdBy = creatorUid;
   if (senderId) doc.senderId = senderId;
   if (payload.senderName) doc.senderName = payload.senderName;
   if (payload.senderRole) doc.senderRole = payload.senderRole;
@@ -578,12 +581,21 @@ export const notificationService = {
         console.warn('deleteBySourceId skipped: schoolId is required for scoped deletion');
         return false;
       }
-      const q = query(
-        collection(db, 'notifications'),
+      const scoped = [
         where('schoolId', '==', schoolId),
-        where('metadata.sourceId', '==', sourceId)
-      );
-      const snap = await getDocs(q);
+        where('metadata.sourceId', '==', sourceId),
+      ];
+      let snap;
+      try {
+        snap = await getDocs(query(collection(db, 'notifications'), ...scoped));
+      } catch {
+        // Not allowed to see everyone's copies: remove the ones this user sent
+        const uid = auth.currentUser?.uid;
+        if (!uid) return false;
+        snap = await getDocs(
+          query(collection(db, 'notifications'), ...scoped, where('createdBy', '==', uid)),
+        );
+      }
       const batch = writeBatch(db);
       snap.docs.forEach(d => {
         batch.delete(d.ref);

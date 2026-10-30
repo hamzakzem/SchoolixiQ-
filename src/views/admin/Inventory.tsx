@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { useAuth } from '../../lib/AuthContext';
 import { Package, AlertCircle, Plus, Trash2, Edit2, X } from 'lucide-react';
@@ -21,23 +21,21 @@ export default function Inventory() {
     let isMounted = true;
     if (!profile?.schoolId || !auth.currentUser) return;
 
-    const fetchInventory = async () => {
-      try {
-        const q = query(
-          collection(db, 'inventory'), 
-          where('schoolId', '==', profile.schoolId),
-          limit(200)
-        );
-        const snap = await getDocs(q);
+    // Live list so items appear / change / disappear right after saving
+    const q = query(
+      collection(db, 'inventory'),
+      where('schoolId', '==', profile.schoolId),
+      limit(200)
+    );
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
         if (!isMounted) return;
         setItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'inventory');
-      }
-    };
-
-    fetchInventory();
-    return () => { isMounted = false; };
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, 'inventory'),
+    );
+    return () => { isMounted = false; unsubscribe(); };
   }, [profile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -185,7 +183,7 @@ export default function Inventory() {
               <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mb-8 backdrop-blur-sm group-hover:scale-110 transition-transform">
                 <Package size={32} strokeWidth={1.5} className="text-slate-300" />
               </div>
-              <h2 className="text-3xl font-bold mb-4 font-display leading-tight">إحصائيات المخزن</h2>
+              <h2 className="text-3xl font-bold mb-4 font-display leading-tight text-white">إحصائيات المخزن</h2>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400 text-sm">إجمالي المواد</span>

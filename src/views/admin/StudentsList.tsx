@@ -326,13 +326,22 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     const loadingToast = toast.loading('جاري حذف سجل الطالب...');
     try {
       const studentRef = doc(db, 'students', id);
+      const userRef = doc(db, 'users', id);
+
+      // Legacy: some students had a login doc with the same id. Most don't,
+      // and rules refuse reading a missing users doc, which would fail the
+      // whole transaction — so check it outside and treat a refusal as none.
+      let linkedUserSchoolId: string | null = null;
+      try {
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) linkedUserSchoolId = String(userSnap.data()?.schoolId || '');
+      } catch {
+        linkedUserSchoolId = null;
+      }
 
       await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, 'users', id);
-
         // All reads before any writes (Firestore transaction requirement).
         const studentSnap = await transaction.get(studentRef);
-        const userSnap = await transaction.get(userRef);
 
         if (!studentSnap.exists()) {
           throw new Error('سجل الطالب غير موجود');
@@ -354,9 +363,8 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         }
 
         const shouldDeleteLinkedUser =
-          userSnap.exists() &&
-          (isSuperAdmin ||
-            (userSnap.data() || {}).schoolId === profile.schoolId);
+          linkedUserSchoolId !== null &&
+          (isSuperAdmin || linkedUserSchoolId === profile.schoolId);
 
         transaction.delete(studentRef);
         if (shouldDeleteLinkedUser) {
@@ -628,7 +636,17 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           ),
         );
         toast.success('تم تحديث بيانات الطالب بنجاح');
-        scheduleBackgroundParentLink(editingStudent.id, profile.schoolId, parentSnapshot);
+        // Only (re)link when the parent login actually changed or none is
+        // linked yet: resending the stored password would reset a password
+        // the parent may have changed since.
+        const parentLoginChanged =
+          (parentSnapshot.parentEmail || '').trim().toLowerCase() !==
+            String(editingStudent.parentEmail || '').trim().toLowerCase() ||
+          (parentSnapshot.parentPassword || '') !== String(editingStudent.parentPassword || '');
+        const hasLinkedParent = Array.isArray(editingStudent.parentIds) && editingStudent.parentIds.length > 0;
+        if (parentLoginChanged || !hasLinkedParent) {
+          scheduleBackgroundParentLink(editingStudent.id, profile.schoolId, parentSnapshot);
+        }
       } else {
         const studentId = pendingStudentId || doc(collection(db, 'students')).id;
         

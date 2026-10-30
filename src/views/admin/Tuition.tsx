@@ -132,11 +132,36 @@ export default function Tuition() {
     setIsProcessingPayment(true);
 
     try {
+      // Allocate the payment over open installments, earliest due first: an
+      // installment is "paid" only once fully covered, otherwise "partial"
+      // with the amount received so far; any excess rolls to the next one.
       const pendingInstallments = getPendingInstallmentsForStudent(installments, selectedStudent.id);
-      const installmentToPay = pendingInstallments[0];
-      const installmentLabel = installmentToPay
-        ? `الدفعة رقم ${installments.filter(i => i.studentId === selectedStudent.id).indexOf(installmentToPay) + 1}`
-        : 'دفعة إضافية';
+      const studentInstallmentsByDue = [...installments.filter((i) => i.studentId === selectedStudent.id)].sort(
+        (a, b) => parseTuitionDueDate(a.dueDate).getTime() - parseTuitionDueDate(b.dueDate).getTime(),
+      );
+      const allocations: { id: string; number: number; paidAmount: number; status: 'paid' | 'partial' }[] = [];
+      let left = amountNum;
+      for (const inst of pendingInstallments) {
+        if (left <= 0) break;
+        const already = Number(inst.paidAmount) || 0;
+        const due = Math.max(0, (Number(inst.amount) || 0) - already);
+        if (due <= 0 || !inst.id) continue;
+        const applied = Math.min(due, left);
+        left -= applied;
+        allocations.push({
+          id: inst.id,
+          number: studentInstallmentsByDue.findIndex((i) => i.id === inst.id) + 1,
+          paidAmount: already + applied,
+          status: applied >= due ? 'paid' : 'partial',
+        });
+      }
+      const installmentToPay = allocations[0] ? { id: allocations[0].id } : undefined;
+      const installmentLabel =
+        allocations.length === 0
+          ? 'دفعة إضافية'
+          : allocations.length === 1
+            ? `الدفعة رقم ${allocations[0].number}${allocations[0].status === 'partial' ? ' (جزئية)' : ''}`
+            : `الدفعات ${allocations[0].number}–${allocations[allocations.length - 1].number}`;
 
       const clientMutationId = createClientMutationId();
       const paymentId = `pay_${clientMutationId}`;
@@ -149,6 +174,7 @@ export default function Tuition() {
         type: 'tuition',
         note: installmentLabel,
         installmentId: installmentToPay?.id ?? null,
+        installmentIds: allocations.map((a) => a.id),
         collectorId: profile.uid,
         createdAt: serverTimestamp(),
         authorId: profile.uid,
@@ -168,18 +194,16 @@ export default function Tuition() {
           operation: 'update' as const,
           data: { __increment: { tuitionBalance: amountNum } },
         },
-        ...(installmentToPay?.id
-          ? [{
-              collection: 'installments',
-              docId: installmentToPay.id,
-              operation: 'update' as const,
-              data: {
-                status: 'paid',
-                paidAt: serverTimestamp(),
-                paidAmount: amountNum,
-              },
-            }]
-          : []),
+        ...allocations.map((a) => ({
+          collection: 'installments',
+          docId: a.id,
+          operation: 'update' as const,
+          data: {
+            status: a.status,
+            paidAmount: a.paidAmount,
+            ...(a.status === 'paid' ? { paidAt: serverTimestamp() } : {}),
+          },
+        })),
       ];
 
       const syncMode = await tryOnlinePaymentBatch(
@@ -190,11 +214,11 @@ export default function Tuition() {
           batch.update(doc(db, 'students', selectedStudent.id), {
             tuitionBalance: increment(amountNum),
           });
-          if (installmentToPay?.id) {
-            batch.update(doc(db, 'installments', installmentToPay.id), {
-              status: 'paid',
-              paidAt: serverTimestamp(),
-              paidAmount: amountNum,
+          for (const a of allocations) {
+            batch.update(doc(db, 'installments', a.id), {
+              status: a.status,
+              paidAmount: a.paidAmount,
+              ...(a.status === 'paid' ? { paidAt: serverTimestamp() } : {}),
             });
           }
           await batch.commit();
@@ -744,17 +768,26 @@ export default function Tuition() {
                     جدول الأقساط
                   </h4>
                   <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                    {installments.filter(i => i.studentId === selectedStudent.id).map((inst, idx) => (
+                    {installments
+                      .filter(i => i.studentId === selectedStudent.id)
+                      .sort((a, b) => parseTuitionDueDate(a.dueDate).getTime() - parseTuitionDueDate(b.dueDate).getTime())
+                      .map((inst, idx) => (
                       <div key={inst.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 group">
                         <div className="flex items-center gap-3">
                           <button 
                             onClick={() => toggleInstallmentStatus(inst)}
-                            title={inst.status === 'paid' ? "إلغاء التسديد" : "تحديد كمرفوع"}
-                            className={`w-3 h-3 rounded-full transition-all hover:scale-125 ${inst.status === 'paid' ? 'bg-emerald-500' : isOverdueInstallment(inst) ? 'bg-rose-500' : 'bg-slate-300'}`}
+                            title={inst.status === 'paid' ? "إلغاء التسديد" : "تحديد كمدفوع"}
+                            aria-label={inst.status === 'paid' ? "إلغاء التسديد" : "تحديد كمدفوع"}
+                            className={`w-3 h-3 rounded-full transition-all hover:scale-125 ${inst.status === 'paid' ? 'bg-emerald-500' : isOverdueInstallment(inst) ? 'bg-rose-500' : inst.status === 'partial' ? 'bg-amber-400' : 'bg-slate-300'}`}
                           ></button>
                           <div>
                             <p className="font-bold text-[10px] text-slate-900 dark:text-white">قسط #{idx + 1}</p>
                             <p className="text-[9px] text-slate-400 font-bold">{parseTuitionDueDate(inst.dueDate).toLocaleDateString()}</p>
+                            {inst.status === 'partial' && (
+                              <p className="text-[9px] text-amber-600 font-bold">
+                                مدفوع جزئياً: {(Number(inst.paidAmount) || 0).toLocaleString()} د.ع
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
