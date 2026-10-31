@@ -15,10 +15,10 @@ export function ParentHomeworkView({ isRtl, t, homework, onDelete }: Props) {
 
   return (
     <div className="parent-tab space-y-6">
-      <header>
+      <div className="parent-page-head">
         <h2 className="parent-page-title">{t('homeworkList')}</h2>
         <p className="parent-page-subtitle">{isRtl ? 'واجبات ابنك/ابنتك مرتّبة حسب الموعد' : 'Homework sorted by due date'}</p>
-      </header>
+      </div>
 
       {groups.length > 0 ? (
         groups.map(([label, items]) => (

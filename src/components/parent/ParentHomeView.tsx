@@ -223,7 +223,7 @@ export function ParentHomeView({
         <div className="flex items-center justify-between mb-3">
           <h3 className="parent-section-title mb-0">{t('latestAnnouncements')}</h3>
           <button type="button" onClick={() => onNavigate('inbox')} className="parent-link-btn text-xs">
-            {t('seeAll')}
+            {t('viewAll')}
           </button>
         </div>
         {announcements.length > 0 ? (
@@ -251,9 +251,9 @@ export function ParentHomeView({
       {/* Homework preview */}
       <section className="parent-section-card">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="parent-section-title mb-0">{t('recentHomework')}</h3>
+          <h3 className="parent-section-title mb-0">{t('recentHomeworks')}</h3>
           <button type="button" onClick={() => onNavigate('homework')} className="parent-link-btn text-xs flex items-center gap-1">
-            {t('seeAll')}
+            {t('viewAll')}
             <ArrowRight size={12} className={isRtl ? 'rotate-180' : ''} />
           </button>
         </div>

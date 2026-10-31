@@ -75,12 +75,12 @@ export function ParentTuitionView({
 
   return (
     <div className="parent-tab space-y-6">
-      <header>
+      <div className="parent-page-head">
         <h2 className="parent-page-title">
           {t('tuition')} — {student?.name}
         </h2>
         <p className="parent-page-subtitle">{isRtl ? 'ملخص الأقساط والمدفوعات' : 'Installments and payment summary'}</p>
-      </header>
+      </div>
 
       {escalation && (
         <div

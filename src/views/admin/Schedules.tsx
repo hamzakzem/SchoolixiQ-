@@ -194,7 +194,7 @@ export default function Schedules() {
             <Calendar size={32} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-white tracking-tight drop-shadow-md pb-1">الجداول الاسبوعية</h1>
+            <h1 className="text-3xl font-black text-white tracking-tight drop-shadow-md pb-1">الجداول الأسبوعية</h1>
             <p className="text-sm font-bold text-blue-100 mt-1 max-w-sm leading-relaxed">إدارة وتخصيص الجداول الدراسية. يمكنك إضافة حصص جديدة، تعديل المواد، ومشاركة الجدول مع الجميع.</p>
           </div>
         </div>

@@ -27,12 +27,12 @@ export function ParentAnnouncementsFeed({ isRtl, t, announcements, mode = 'all' 
 
   return (
     <div className="parent-tab space-y-6">
-      <header>
+      <div className="parent-page-head">
         <h2 className="parent-page-title">{mode === 'inbox' ? t('messageCenter') : t('latestAnnouncements')}</h2>
         <p className="parent-page-subtitle">
           {isRtl ? 'آخر الإعلانات والرسائل المدرسية' : 'Latest school announcements and messages'}
         </p>
-      </header>
+      </div>
 
       {list.length > 0 ? (
         <div className="space-y-4">
