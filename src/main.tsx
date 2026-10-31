@@ -5,6 +5,8 @@ import './index.css';
 import './styles/chat-ui.css';
 import './styles/ui-polish.css';
 import './styles/app-bar.css';
+// Last: one visual language for every dashboard page (overrides per-page variations)
+import './styles/academic-theme.css';
 import { initSentry } from './lib/sentryWrapper';
 
 if (import.meta.env.VITE_SENTRY_DSN) {

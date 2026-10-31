@@ -189,7 +189,6 @@ export default function Schedules() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-gradient-to-r from-blue-600 to-indigo-600 p-8 rounded-[2rem] border border-blue-500 shadow-xl shadow-blue-500/20 print:hidden text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
         <div className="flex items-center gap-4 z-10">
           <div className="w-16 h-16 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center text-white border border-white/30 shadow-inner">
             <Calendar size={32} />
@@ -231,7 +230,7 @@ export default function Schedules() {
             <button
               onClick={() => setShowShareModal(true)}
               disabled={!selectedClassId}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-500 text-white px-6 py-3.5 rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50 font-black shadow-lg shadow-emerald-500/30 hover:scale-[1.02] active:scale-95"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gradient-to-b from-[#F0D58A] to-[#D4A64A] text-[#0B2345] px-6 py-3.5 rounded-xl hover:brightness-105 transition-all disabled:opacity-50 font-black shadow-lg shadow-[#D4A64A]/30 active:scale-95"
               title="مشاركة وإرسال الجدول"
             >
               <Share2 size={18} />
