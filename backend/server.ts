@@ -26,6 +26,7 @@ import {
   listPendingDistributors,
   registerDistributorApplication,
   rejectDistributor,
+  deleteDistributorRecords,
 } from './distributorApproval.mjs';
 import {
   canActorUseAdminApi,
@@ -51,6 +52,7 @@ import {
 import { loadSafeSchoolDirectory } from './chatDirectory.mjs';
 import { runChatEscalation } from './chatEscalationWorker.mjs';
 import { registerDismissalRoutes } from './dismissalApi.mjs';
+import { scheduleCredentialScrub } from './credentialScrub.mjs';
 import {
   getDistributorDashboardPayload,
   resolveDistributorContext,
@@ -670,6 +672,21 @@ async function startServer() {
       return { role, schoolId };
     }
 
+    const idCardMatch = storagePath.match(/^schools\/([^/]+)\/idcards\/([^/]+)$/);
+    if (idCardMatch) {
+      const pathSchoolId = idCardMatch[1];
+      const fileName = idCardMatch[2];
+      if (!SCHOOL_IMAGE_UPLOAD_ROLES.includes(role)) {
+        throw Object.assign(new Error('FORBIDDEN_ROLE'), { status: 403 });
+      }
+      assertSchoolScope(role, schoolId, pathSchoolId);
+      if (!/^watermark_\d+\.(jpg|jpeg|png|webp)$/i.test(fileName)) {
+        throw Object.assign(new Error('INVALID_UPLOAD_PATH'), { status: 400 });
+      }
+      assertImageExtension(fileName);
+      return { role, schoolId };
+    }
+
     const studentMatch = storagePath.match(/^students\/([^/]+)\/([^/]+)\/([^/]+)$/);
     if (studentMatch) {
       const pathSchoolId = studentMatch[1];
@@ -1009,6 +1026,7 @@ async function startServer() {
       
       const db = getDb();
       let uid = '';
+      let createdAccount = false;
       let isExistingUser = false;
       let existingUserData: any = null;
 
@@ -1103,6 +1121,7 @@ async function startServer() {
             emailVerified: true,
           });
           uid = userRecord.uid;
+          createdAccount = true;
           console.log(`Created new Auth user: ${redactUid(uid)}, email: ${redactEmail(emailLower)}`);
         } else {
           throw authError; // Rethrow other Auth errors
@@ -1183,7 +1202,8 @@ async function startServer() {
       res.json({
         success: true,
         message: 'تم إنشاء المستخدم بنجاح',
-        data: { uid }
+        // createdAccount without a password: the caller should send a set-password email
+        data: { uid, createdAccount, needsPasswordSetup: createdAccount && !password }
       });
     } catch (error: any) {
       console.error('Create User Error:', error);
@@ -1374,6 +1394,20 @@ async function startServer() {
         adminSdk: admin,
         userId,
       });
+
+      // A deleted distributor login must not leave its distributor record looking loggable.
+      const distributorId = String(beforeData.distributorId || '').trim();
+      if (beforeData.role === 'distributor' && distributorId) {
+        const distRef = db.collection('distributors').doc(distributorId);
+        const distSnap = await distRef.get();
+        if (distSnap.exists && distSnap.data()?.userId === userId) {
+          await distRef.update({
+            canLogin: false,
+            userId: admin.firestore.FieldValue.delete(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
 
       await logAudit(req, 'DELETE_USER', {
         before: userDoc.exists ? beforeData : null,
@@ -1855,7 +1889,7 @@ async function startServer() {
 
   app.get('/api/admin/distributors/pending', verifyAdmin, async (req: any, res: any) => {
     try {
-      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
+      if (!isSuperAdminRole(req.user.role)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
       }
       const items = await listPendingDistributors(getDb());
@@ -1874,10 +1908,11 @@ async function startServer() {
     }
 
     try {
-      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
+      if (!isSuperAdminRole(req.user.role)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
       }
 
+      const body = req.body || {};
       const result = await approveDistributor({
         db: getDb(),
         authAdmin: admin.auth(),
@@ -1886,6 +1921,15 @@ async function startServer() {
         actorUid: req.user.uid,
         password,
         syncClaims: syncUserClaims,
+        // Commission %, customer discount % and the distributor's own coupon code
+        terms: body.couponCode !== undefined || body.commissionPercent !== undefined
+          ? {
+              commissionPercent: body.commissionPercent,
+              discountPercent: body.discountPercent,
+              couponCode: body.couponCode,
+              email: body.email,
+            }
+          : undefined,
       });
 
       await logAudit(req, 'DISTRIBUTOR_APPROVE', { metadata: { distributorId, result } });
@@ -1898,6 +1942,41 @@ async function startServer() {
     }
   });
 
+  // Super admin: delete a distributor, its coupons and its login account(s).
+  app.post('/api/admin/distributors/:distributorId/delete', verifyAdmin, async (req: any, res: any) => {
+    const distributorId = String(req.params.distributorId || '').trim();
+    try {
+      if (!isSuperAdminRole(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'حذف الموزعين مخصص لمدير النظام فقط' });
+      }
+      const db = getDb();
+      const snap = await db.collection('distributors').doc(distributorId).get();
+      if (!snap.exists) {
+        return res.status(404).json({ error: 'DISTRIBUTOR_NOT_FOUND', message: 'الموزع غير موجود' });
+      }
+      const userIds = new Set<string>();
+      const linkedUid = String(snap.data()?.userId || '').trim();
+      if (linkedUid) userIds.add(linkedUid);
+      const linkedUsers = await db.collection('users').where('distributorId', '==', distributorId).get();
+      linkedUsers.docs.forEach((d) => userIds.add(d.id));
+      let usersDeleted = 0;
+      for (const uid of userIds) {
+        try {
+          await runUserPermanentDelete({ db, authAdmin: admin.auth(), adminSdk: admin, userId: uid });
+          usersDeleted += 1;
+        } catch (e: any) {
+          if (e?.status !== 404) throw e;
+        }
+      }
+      const result = await deleteDistributorRecords({ db, adminSdk: admin, distributorId, actorUid: req.user.uid });
+      await logAudit(req, 'DISTRIBUTOR_DELETE', { before: snap.data(), metadata: { distributorId, usersDeleted, ...result } });
+      res.json({ ok: true, distributorId, usersDeleted, ...result });
+    } catch (error: any) {
+      console.error('Delete distributor error:', error);
+      res.status(500).json({ error: error.code || 'DELETE_FAILED', message: error.message || 'فشل حذف الموزع' });
+    }
+  });
+
   app.post('/api/admin/distributors/reject', verifyAdmin, async (req: any, res: any) => {
     const distributorId = String(req.body?.distributorId || '').trim();
     const reason = req.body?.reason;
@@ -1907,7 +1986,7 @@ async function startServer() {
     }
 
     try {
-      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
+      if (!isSuperAdminRole(req.user.role)) {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح' });
       }
 
@@ -1943,7 +2022,7 @@ async function startServer() {
     }
 
     try {
-      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
+      if (!isSuperAdminRole(req.user.role)) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'ربط كوبون الموزع مخصص لمدير النظام فقط',
@@ -1982,7 +2061,7 @@ async function startServer() {
     }
 
     try {
-      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
+      if (!isSuperAdminRole(req.user.role)) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'توليد العمولات الشهرية مخصص لمدير النظام فقط',
@@ -2013,7 +2092,7 @@ async function startServer() {
     const notes = req.body?.notes;
 
     try {
-      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
+      if (!isSuperAdminRole(req.user.role)) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'تعليم العمولة كمدفوعة مخصص لمدير النظام فقط',
@@ -2054,7 +2133,7 @@ async function startServer() {
     }
 
     try {
-      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
+      if (!isSuperAdminRole(req.user.role)) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'تعليم عمولات الموزع كمدفوعة مخصص لمدير النظام فقط',
@@ -2088,7 +2167,7 @@ async function startServer() {
     const paused = req.body?.paused === true;
 
     try {
-      if (!(await actorHasPlatformPermission(req, 'manage_distributors'))) {
+      if (!isSuperAdminRole(req.user.role)) {
         return res.status(403).json({
           error: 'FORBIDDEN',
           message: 'إيقاف عمولة الموزع مخصص لمدير النظام فقط',
@@ -2600,7 +2679,12 @@ async function startServer() {
     app.use(express.static(distPath, {
       maxAge: '1d',
       setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.html')) {
+        if (filePath.endsWith('.apk')) {
+          // Android app download: right type, always a download, never a stale cached copy
+          res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+          res.setHeader('Content-Disposition', 'attachment; filename="schoolixiq.apk"');
+          res.setHeader('Cache-Control', 'no-cache');
+        } else if (filePath.endsWith('.html')) {
           res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
           // Never cache index.html so users always get the latest version immediately
           res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -2629,6 +2713,9 @@ async function startServer() {
     } catch (e: any) {
       console.error('[Notifications] PUSH_SEND_ERROR gateway init:', e.message);
     }
+
+    // Delete passwords older app versions stored as readable text in Firestore
+    scheduleCredentialScrub(getDb, admin);
 
     // Save APP_URL dynamically to Firestore system config so all clients (including Mobile Apps) have access to the actual server URL
     // CRITICAL: We ONLY save in production, and only if it's not a development/dev environment.

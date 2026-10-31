@@ -1,12 +1,12 @@
 /**
- * SchoolixIQ production Service Worker (v17)
+ * SchoolixIQ production Service Worker (v18)
  * - Never cache hashed Vite /assets/*.js|css (prevents white-screen after deploy)
  * - Purge ALL stale caches on install + activate so old customers migrate automatically
  * - skipWaiting + clients.claim for immediate activation
  * - Network-only for application chunks; shell-only precache
  * - Chunk 404 / network errors trigger client recovery reload
  */
-const SW_VERSION = 'v17';
+const SW_VERSION = 'v18';
 const SHELL_CACHE = `schoolix-shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `schoolix-runtime-${SW_VERSION}`;
 const PRECACHE_FALLBACK = [
@@ -165,7 +165,8 @@ async function cachePut(cacheName, request, response) {
 async function navigationFallback(request) {
   try {
     const response = await fetch(request, { cache: 'no-store' });
-    if (response.ok) {
+    const isHtml = (response.headers.get('content-type') || '').includes('text/html');
+    if (response.ok && isHtml) {
       const shellCache = await caches.open(SHELL_CACHE);
       await shellCache.put(new Request('/index.html'), response.clone());
     }
@@ -195,6 +196,9 @@ async function hashedBundleStrategy(request) {
 self.addEventListener('fetch', (event) => {
   if (!event.request.url.startsWith(self.location.origin)) return;
   if (event.request.method !== 'GET' || event.request.url.includes('/api/')) return;
+  // File downloads (the Android APK) go straight to the network: a download
+  // link is a navigation, and must never be answered with or cached as the shell.
+  if (new URL(event.request.url).pathname.startsWith('/downloads/')) return;
 
   if (isServiceWorkerScript(event.request)) {
     event.respondWith(fetch(event.request, { cache: 'no-store' }));
@@ -293,6 +297,7 @@ self.addEventListener('notificationclick', (event) => {
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const client of list) {
         if ('focus' in client) {
+          // The open app switches tabs from this message — no full page reload.
           client.postMessage({
             type: 'NOTIFICATION_CLICK',
             route,
@@ -300,13 +305,6 @@ self.addEventListener('notificationclick', (event) => {
             url: targetUrl,
             notificationId: event.notification.data?.notificationId,
           });
-          if (typeof client.navigate === 'function' && targetUrl) {
-            try {
-              client.navigate(targetUrl);
-            } catch {
-              /* ignore */
-            }
-          }
           return client.focus();
         }
       }

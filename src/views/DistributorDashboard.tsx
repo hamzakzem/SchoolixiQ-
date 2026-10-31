@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Bell,
   Building2,
   ChevronDown,
   ChevronUp,
@@ -19,6 +20,9 @@ import { useLanguage } from "../lib/LanguageContext";
 import { signOutWithCleanup } from "../lib/authLogout";
 import { fetchDistributorDashboard } from "../lib/distributorApi";
 import { DashboardSmartAssistantHost } from "../components/smart-assistant/DashboardSmartAssistant";
+import { NotificationCenter } from "../components/NotificationCenter";
+import { useNotificationBadges } from "../lib/NotificationBadgeContext";
+import { useNotificationRouteRedirect } from "../lib/useNotificationRouteRedirect";
 import type {
   DistributorDashboardStats,
   DistributorMonthlyCommission,
@@ -129,6 +133,11 @@ export default function DistributorDashboard() {
   const [chatMessages, setChatMessages] = useState<DistributorSupportMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { totalUnread } = useNotificationBadges();
+  const openTab = useCallback((tab: string) => setActiveTab(tab as TabId), []);
+  // Opening a notification (bell or push) jumps to its tab: chat or earnings
+  useNotificationRouteRedirect("distributor", openTab);
 
   const distributorId = profile?.distributorId || "";
 
@@ -562,8 +571,28 @@ export default function DistributorDashboard() {
               <ThemeToggle />
             </div>
             <DashboardSmartAssistantHost hidden={activeTab === "chat"} isRtl={isRtl} />
+            <button
+              type="button"
+              onClick={() => setShowNotifications(true)}
+              className="sx-ds-icon-btn relative"
+              aria-label={isRtl ? "الإشعارات" : "Notifications"}
+            >
+              <Bell size={18} strokeWidth={1.75} />
+              {totalUnread > 0 && (
+                <span className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
+                  {totalUnread > 9 ? "9+" : totalUnread}
+                </span>
+              )}
+            </button>
           </div>
         </header>
+        {showNotifications && (
+          <NotificationCenter
+            onClose={() => setShowNotifications(false)}
+            activeTabSetter={openTab}
+            userRole="distributor"
+          />
+        )}
         <main className="sx-dist-content">{renderContent()}</main>
       </div>
 

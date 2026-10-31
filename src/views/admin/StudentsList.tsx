@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../../lib/firebase';
+import { auth, db } from '../../lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, deleteDoc, setDoc, runTransaction, increment, arrayUnion, arrayRemove, getDoc, limit, startAfter, orderBy } from 'firebase/firestore';
 import { useAuth } from '../../lib/AuthContext';
 import { Search, Plus, UserPlus, Filter, MoreVertical, GraduationCap, Copy, Check, Trash2, AlertTriangle, X, Users, ArrowRightLeft, Upload, Edit2, User, Hash, Phone, Mail, Key, MapPin } from 'lucide-react';
@@ -248,7 +249,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
       schoolId,
       additionalData: {
         phone: parentFields.parentPhone || '',
-        password: passwordRaw,
         updatedAt: new Date().toISOString(),
       },
     };
@@ -475,7 +475,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         schoolId: profile.schoolId,
         additionalData: {
           phone: parentPhone || '',
-          password: parentPassword || '', // Save readable password for reference as requested
           updatedAt: new Date().toISOString()
         }
       });
@@ -493,7 +492,15 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
         });
       }
 
-      toast.success('تم ربط ولي الأمر وتحديث البيانات بنجاح');
+      if (result.data?.needsPasswordSetup) {
+        // New account created without a password: let the parent set their own.
+        const sent = await sendPasswordResetEmail(auth, emailLower).then(() => true, () => false);
+        toast.success(sent
+          ? `تم إنشاء حساب ولي الأمر وإرسال رابط تعيين كلمة السر إلى ${emailLower}`
+          : 'تم إنشاء حساب ولي الأمر — يمكنه استخدام «نسيت كلمة المرور» لتعيين كلمة السر');
+      } else {
+        toast.success('تم ربط ولي الأمر وتحديث البيانات بنجاح');
+      }
       setShowLinkParentModal(null);
       setParentEmail('');
       setParentName('');
@@ -611,7 +618,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             driverPhone: newStudent.driverPhone || '',
             parentEmail: newStudent.parentEmail?.toLowerCase() || '',
             address: newStudent.address || '',
-            parentPassword: newStudent.parentPassword || '',
             photoUrl: newStudent.photoUrl || '',
             updatedAt: serverTimestamp(),
           },
@@ -636,13 +642,12 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           ),
         );
         toast.success('تم تحديث بيانات الطالب بنجاح');
-        // Only (re)link when the parent login actually changed or none is
-        // linked yet: resending the stored password would reset a password
-        // the parent may have changed since.
+        // Only (re)link when the parent login actually changed (new email or a
+        // newly typed password) or none is linked yet.
         const parentLoginChanged =
           (parentSnapshot.parentEmail || '').trim().toLowerCase() !==
             String(editingStudent.parentEmail || '').trim().toLowerCase() ||
-          (parentSnapshot.parentPassword || '') !== String(editingStudent.parentPassword || '');
+          Boolean(parentSnapshot.parentPassword.trim());
         const hasLinkedParent = Array.isArray(editingStudent.parentIds) && editingStudent.parentIds.length > 0;
         if (parentLoginChanged || !hasLinkedParent) {
           scheduleBackgroundParentLink(editingStudent.id, profile.schoolId, parentSnapshot);
@@ -681,7 +686,6 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
             driverPhone: newStudent.driverPhone || '',
             parentEmail: newStudent.parentEmail?.toLowerCase() || '',
             address: newStudent.address || '',
-            parentPassword: newStudent.parentPassword || '',
             photoUrl: newStudent.photoUrl || '',
             schoolId: profile.schoolId,
             tuitionBalance: 0,
@@ -902,7 +906,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                setParentEmail(student.parentEmail || '');
                                setParentName(student.parentName || '');
                                setParentPhone(student.parentPhone || '');
-                               setParentPassword(student.parentPassword || '');
+                               setParentPassword('');
                              }}
                              className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
                              title="ربط بولي أمر"
@@ -933,7 +937,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                   setParentEmail(student.parentEmail || '');
                                   setParentName(student.parentName || '');
                                   setParentPhone(student.parentPhone || '');
-                                  setParentPassword(student.parentPassword || '');
+                                  setParentPassword('');
                                 },
                               },
                               {
@@ -962,7 +966,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                                     driverPhone: student.driverPhone || '',
                                     parentEmail: student.parentEmail || '',
                                     address: student.address || '',
-                                    parentPassword: student.parentPassword || '',
+                                    parentPassword: '',
                                     photoUrl: student.photoUrl || '',
                                     email: '',
                                     password: '',
@@ -1037,7 +1041,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                             setParentEmail(student.parentEmail || '');
                             setParentName(student.parentName || '');
                             setParentPhone(student.parentPhone || '');
-                            setParentPassword(student.parentPassword || '');
+                            setParentPassword('');
                           },
                         },
                         {
@@ -1056,7 +1060,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                               driverPhone: student.driverPhone || '',
                               parentEmail: student.parentEmail || '',
                               address: student.address || '',
-                              parentPassword: student.parentPassword || '',
+                              parentPassword: '',
                               photoUrl: student.photoUrl || '',
                               email: '',
                               password: '',
@@ -1517,17 +1521,21 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                         </div>
                       </div>
                       <div className="space-y-1.5 text-right">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">كلمة السر لولي الأمر</label>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">
+                          {editingStudent ? 'كلمة سر جديدة لولي الأمر (اختياري)' : 'كلمة السر لولي الأمر'}
+                        </label>
                         <div className="relative">
                           <Key className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <input
-                            type="text"
+                            type="password"
+                            autoComplete="new-password"
                             value={newStudent.parentPassword || ''}
                             onChange={e => setNewStudent({...newStudent, parentPassword: e.target.value})}
                             className="w-full pr-11 pl-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#0B2345]/10 dark:focus:ring-[#D4A64A]/10 focus:border-[#0B2345] dark:focus:border-[#D4A64A] outline-none transition-all font-mono text-slate-900 dark:text-white"
-                            placeholder="P@ssw0rd123"
+                            placeholder={editingStudent ? 'اتركها فارغة للإبقاء على الحالية' : '6 أحرف على الأقل'}
                           />
                         </div>
+                        <p className="text-[11px] text-slate-400">لا تُحفظ كلمة السر في سجل الطالب لحماية الحساب.</p>
                       </div>
                     </div>
 
@@ -1645,14 +1653,14 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">كلمة السر</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">كلمة السر (لحساب جديد)</label>
                 <input
-                  required
-                  type="text"
+                  type="password"
+                  autoComplete="new-password"
                   value={parentPassword}
                   onChange={e => setParentPassword(e.target.value)}
                   className="w-full px-5 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-slate-100 focus:border-slate-900 outline-none transition-all font-mono"
-                  placeholder="كلمة السر..."
+                  placeholder="اتركها فارغة إذا كان لولي الأمر حساب مسبق"
                 />
               </div>
             </div>

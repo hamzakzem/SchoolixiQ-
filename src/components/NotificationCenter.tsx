@@ -495,7 +495,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         name: 'inbox_super_admin',
         q: query(collection(db, 'notifications'), where('userId', '==', 'super_admin')),
       });
-    } else if (schoolId) {
+    } else {
+      // Everyone else also gets platform notifications (schoolId 'system'); for users
+      // without a school (platform assistant, distributor) this is their whole inbox.
       queries.push({
         name: 'inbox_system',
         q: query(

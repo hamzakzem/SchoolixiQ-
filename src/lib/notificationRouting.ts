@@ -11,6 +11,7 @@ export type NotificationRouteRole =
   | 'superadmin'
   | 'super_admin'
   | 'guard'
+  | 'distributor'
   | '';
 
 /** Shared notification metadata contract (stored under `metadata` + mirrored top-level fields). */
@@ -155,6 +156,17 @@ export function resolveNotificationTab(
     case 'chat':
       return 'chat';
 
+    // Distributor ↔ platform support chat and commission updates
+    case 'distributor_chat':
+      if (role === 'distributor') return 'chat';
+      return role === 'superadmin' || role === 'platform_assistant' ? 'distributors' : null;
+
+    case 'distributor_earnings':
+      return role === 'distributor' ? 'earnings' : null;
+
+    case 'distributors':
+      return role === 'superadmin' || role === 'platform_assistant' ? 'distributors' : null;
+
     case 'attendance':
       if (isSchoolAdmin) return 'attendance';
       if (role === 'parent' || role === 'teacher') return 'home';
@@ -184,6 +196,15 @@ export function resolveNotificationTab(
       if (role === 'parent') return 'dismissal';
       return null;
 
+    case 'distributor':
+    case 'distributor_requests':
+      return role === 'superadmin' || role === 'platform_assistant' ? 'distributor_requests' : null;
+
+    case 'requests':
+    case 'subscription_request':
+    case 'subscription_requests':
+      return role === 'superadmin' || role === 'platform_assistant' ? 'requests' : null;
+
     case 'system':
       if (role === 'superadmin') return 'settings';
       return null;
@@ -197,10 +218,9 @@ export function storePendingNotificationRoute(routeTarget: string, role?: string
   if (typeof window === 'undefined' || !routeTarget) return;
   localStorage.setItem(PENDING_ROUTE_KEY, routeTarget);
   if (role) localStorage.setItem(PENDING_ROUTE_ROLE_KEY, role);
+  // Only the tab-redirect event: re-dispatching 'schoolix-notification-route' here
+  // fed the listener below, which called this function again (infinite recursion).
   window.dispatchEvent(new CustomEvent('schoolix_tab_redirect'));
-  window.dispatchEvent(
-    new CustomEvent('schoolix-notification-route', { detail: { route: routeTarget } }),
-  );
   console.info('[Notifications] PUSH_CLICK_ROUTE', { routeTarget, role: role || '(any)' });
 }
 
@@ -254,6 +274,19 @@ export function setupGlobalNotificationClickRouting(): () => void {
 
   navigator.serviceWorker?.addEventListener('message', onSwMessage);
   window.addEventListener('schoolix-notification-route', onNativeRoute);
+
+  // Opened from a push while the app was closed: the service worker opens /?tab=<route>.
+  try {
+    const url = new URL(window.location.href);
+    const tab = url.searchParams.get('tab');
+    if (tab && tab.trim()) {
+      storePendingNotificationRoute(tab.trim().toLowerCase());
+      url.searchParams.delete('tab');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  } catch {
+    /* ignore malformed URLs */
+  }
 
   return () => {
     navigator.serviceWorker?.removeEventListener('message', onSwMessage);

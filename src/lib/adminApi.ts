@@ -290,10 +290,20 @@ export async function adminSetSchoolDistributorCommissionPaused(
   return json;
 }
 
-export async function adminApproveDistributor(distributorId: string, password?: string) {
+export type DistributorApprovalTerms = {
+  commissionPercent: number;
+  discountPercent: number;
+  couponCode: string;
+  email?: string;
+};
+
+export async function adminApproveDistributor(
+  distributorId: string,
+  terms?: DistributorApprovalTerms,
+) {
   const json = await adminApiPost('/api/admin/distributors/approve', {
     distributorId,
-    ...(password ? { password } : {}),
+    ...(terms || {}),
   });
   return json as {
     ok?: boolean;
@@ -303,6 +313,14 @@ export async function adminApproveDistributor(distributorId: string, password?: 
     needsEmailForLogin?: boolean;
     alreadyActive?: boolean;
   };
+}
+
+export async function adminDeleteDistributor(distributorId: string) {
+  const json = await adminApiPost(
+    `/api/admin/distributors/${encodeURIComponent(distributorId)}/delete`,
+    {},
+  );
+  return json as { ok?: boolean; usersDeleted?: number; couponsDeleted?: number; schoolsPaused?: number };
 }
 
 export async function adminRejectDistributor(distributorId: string, reason?: string) {

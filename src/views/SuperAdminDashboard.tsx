@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { clsx } from "clsx";
 import { db, auth, storage } from "../lib/firebase";
-import { sendEmailVerification } from "firebase/auth";
+import { sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import { signOutWithCleanup } from "../lib/authLogout";
 import { adminCreateUser, adminDeleteUser, adminAccrueCommissionOnPaymentConfirmed, adminFinalizeSchoolTracking, adminValidateDistributorCoupon, adminPurgeUserConversations } from "../lib/adminApi";
 import { clearMessagingCache } from "../lib/offline/offlineDataCache";
@@ -190,7 +190,22 @@ const DEFAULT_PACKAGES = [
   },
 ];
 
-const GUARDIAN_ACCOUNT_ROLES = new Set(["parent", "guard"]);
+const USER_ROLE_LABELS: Record<string, string> = {
+  superadmin: "مدير النظام",
+  super_admin: "مدير النظام",
+  admin: "مدير مدرسة",
+  teacher: "معلّم",
+  parent: "ولي أمر",
+  staff: "موظف",
+  guard: "حارس البوابة",
+  distributor: "موزّع",
+  platform_assistant: "مساعد المنصة",
+  school_assistant: "مساعد مدرسة",
+  assistant: "مساعد",
+};
+
+// Parents only: "guard" is the school gate guard, not a guardian.
+const GUARDIAN_ACCOUNT_ROLES = new Set(["parent"]);
 
 function isGuardianAccountRole(role?: string | null): boolean {
   return GUARDIAN_ACCOUNT_ROLES.has(String(role || ""));
@@ -1389,13 +1404,17 @@ export default function SuperAdminDashboard() {
           try {
             const userResult = await adminCreateUser({
               email,
-              password: password || "123456",
+              ...(password ? { password } : {}),
               displayName: adminName,
               role: "admin",
               schoolId: result.schoolId,
             });
             if (userResult?.uid) {
               result.adminUid = userResult.uid;
+            }
+            if (userResult?.data?.needsPasswordSetup) {
+              // No password in the request: the admin sets their own from the emailed link.
+              await sendPasswordResetEmail(auth, email).catch(() => undefined);
             }
           } catch (e) {
             console.warn("Failed to create fallback auth user", e);
@@ -1923,7 +1942,6 @@ export default function SuperAdminDashboard() {
         subscriptionExpiresAt: expiresAt.toISOString(),
         showSubscriptionTimer: newSchool.showSubscriptionTimer,
         adminEmail: email,
-        adminPassword: newSchool.adminPassword,
         adminPhone: newSchool.adminPhone,
         createdAt: serverTimestamp(),
       });
@@ -3739,15 +3757,7 @@ export default function SuperAdminDashboard() {
                                 <td>
                                   <div className="flex flex-col gap-2 items-start">
                                     <span className={`sx-admin-role-badge ${roleBadgeClass}`}>
-                                      {user.role === "superadmin"
-                                        ? "Super Admin"
-                                        : user.role === "admin"
-                                          ? "مدير مدرسة"
-                                          : user.role === "teacher"
-                                            ? "معلّم"
-                                            : user.role === "parent"
-                                              ? "ولي أمر"
-                                              : user.role}
+                                      {USER_ROLE_LABELS[String(user.role)] || user.role}
                                     </span>
                                     {userSchool ? (
                                       <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
@@ -6521,7 +6531,7 @@ function SecureCredentialCell({ hasCredential }: { hasCredential?: boolean }) {
   return (
     <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
       <Lock size={12} className="text-emerald-500" />
-      محفوظة في النظام
+      محمية
     </span>
   );
 }

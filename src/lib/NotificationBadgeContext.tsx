@@ -78,10 +78,9 @@ export function NotificationBadgeProvider({ children }: { children: React.ReactN
     const schoolId = profile?.schoolId;
     const isSuperAdmin = isSuperAdminRole(role);
 
-    if (!isSuperAdmin && !schoolId) {
-      setLoading(true);
-      return;
-    }
+    // Platform assistants and distributors have no school: their notifications are
+    // written with schoolId 'system' (previously they stayed "loading" with no badge).
+    const hasNoSchool = !isSuperAdmin && !schoolId;
 
     type BadgeQuery = { queryName: string; q: ReturnType<typeof query> };
     const queries: BadgeQuery[] = [];
@@ -99,6 +98,15 @@ export function NotificationBadgeProvider({ children }: { children: React.ReactN
         q: query(
           collection(db, 'notifications'),
           where('userId', '==', 'super_admin'),
+        ),
+      });
+    } else if (hasNoSchool) {
+      queries.push({
+        queryName: 'NOTIFICATION_BADGE_SYSTEM',
+        q: query(
+          collection(db, 'notifications'),
+          where('userId', '==', user.uid),
+          where('schoolId', '==', 'system'),
         ),
       });
     } else if (schoolId) {

@@ -1,6 +1,67 @@
 import crypto from 'crypto';
+import { findCouponByCode, normalizeCouponCode, notifyDistributorUser } from './distributorCommissions.mjs';
 
 const DISTRIBUTORS_COL = 'distributors';
+const COUPONS_COL = 'distributorCoupons';
+const COUPON_CODE_PATTERN = /^[A-Z0-9-]{3,24}$/;
+
+function badRequest(message, code) {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+}
+
+function percentOrNull(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+/**
+ * Validates the terms the super admin sets when approving a distributor.
+ * @returns {{ commissionPercent: number, discountPercent: number, couponCode: string } | null}
+ */
+function readApprovalTerms(terms) {
+  if (!terms) return null;
+  const commission = percentOrNull(terms.commissionPercent);
+  const discount = percentOrNull(terms.discountPercent) ?? 0;
+  const couponCode = normalizeCouponCode(terms.couponCode);
+  if (commission === null || Number.isNaN(commission) || commission < 0 || commission > 100) {
+    throw badRequest('نسبة عمولة الموزع يجب أن تكون بين 0 و 100', 'INVALID_COMMISSION');
+  }
+  if (Number.isNaN(discount) || discount < 0 || discount > 100) {
+    throw badRequest('نسبة خصم الكوبون يجب أن تكون بين 0 و 100', 'INVALID_DISCOUNT');
+  }
+  if (!COUPON_CODE_PATTERN.test(couponCode)) {
+    throw badRequest('كود الكوبون: 3–24 حرفاً إنجليزياً أو رقماً أو شرطة', 'INVALID_COUPON_CODE');
+  }
+  return { commissionPercent: commission, discountPercent: discount, couponCode };
+}
+
+async function notifySuperAdmins(db, adminSdk, { title, message, routeTarget, metadata }) {
+  const admins = await db.collection('users').where('role', '==', 'superadmin').limit(20).get();
+  if (admins.empty) return;
+  const now = new Date();
+  const batch = db.batch();
+  for (const u of admins.docs) {
+    batch.set(db.collection('notifications').doc(), {
+      title,
+      message,
+      type: 'system',
+      category: 'distributor',
+      userId: u.id,
+      recipientId: u.id,
+      receiverId: u.id,
+      read: false,
+      routeTarget,
+      metadata: { ...metadata, routeTarget },
+      pushDelivery: { status: 'pending' },
+      createdAt: now,
+      expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+    });
+  }
+  await batch.commit();
+}
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -70,6 +131,14 @@ export async function registerDistributorApplication(db, adminSdk, input) {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
+  // Let the super admins know a request is waiting (a failed notification never fails the application)
+  await notifySuperAdmins(db, adminSdk, {
+    title: 'طلب موزع جديد',
+    message: `${name} — ${governorate} — بانتظار الموافقة وتحديد النسبة والكوبون`,
+    routeTarget: 'distributor_requests',
+    metadata: { distributorId: ref.id },
+  }).catch((e) => console.error('[distributors] notify super admins failed', e?.message || e));
+
   return { id: ref.id, status: 'pending' };
 }
 
@@ -91,7 +160,7 @@ export async function listPendingDistributors(db) {
 }
 
 /**
- * @param {{ db: import('firebase-admin').firestore.Firestore, authAdmin: import('firebase-admin/auth').Auth, adminSdk: typeof import('firebase-admin'), distributorId: string, actorUid: string, password?: string, syncClaims: (uid: string, role: string, schoolId?: string) => Promise<void> }}
+ * @param {{ db: import('firebase-admin').firestore.Firestore, authAdmin: import('firebase-admin/auth').Auth, adminSdk: typeof import('firebase-admin'), distributorId: string, actorUid: string, password?: string, syncClaims: (uid: string, role: string, schoolId?: string) => Promise<void>, terms?: { commissionPercent?: unknown, discountPercent?: unknown, couponCode?: unknown, email?: unknown } }}
  */
 export async function approveDistributor({
   db,
@@ -101,7 +170,9 @@ export async function approveDistributor({
   actorUid,
   password,
   syncClaims,
+  terms,
 }) {
+  const approvalTerms = readApprovalTerms(terms);
   const ref = db.collection(DISTRIBUTORS_COL).doc(distributorId);
   const snap = await ref.get();
   if (!snap.exists) {
@@ -122,8 +193,16 @@ export async function approveDistributor({
 
   const FieldValue = adminSdk.firestore.FieldValue;
   let userId = String(data.userId || '').trim();
-  const email = normalizeEmail(data.email);
+  // The super admin may add the login email when the application came without one.
+  const email = normalizeEmail(data.email) || normalizeEmail(terms?.email);
   const displayName = String(data.name || 'موزع');
+
+  if (approvalTerms) {
+    const existingCoupon = await findCouponByCode(db, approvalTerms.couponCode);
+    if (existingCoupon && existingCoupon.distributorId !== distributorId) {
+      throw badRequest('كود الكوبون مستخدم لموزع آخر — اختر كوداً مختلفاً', 'COUPON_CODE_TAKEN');
+    }
+  }
 
   if (!userId && email) {
     let uid = '';
@@ -183,15 +262,56 @@ export async function approveDistributor({
     userId = uid;
   }
 
-  await ref.update({
+  const batch = db.batch();
+  batch.update(ref, {
     status: 'active',
     canLogin: true,
     active: true,
+    ...(email && !data.email ? { email } : {}),
     ...(userId ? { userId } : {}),
+    ...(approvalTerms
+      ? {
+          commissionPercent: approvalTerms.commissionPercent,
+          discountPercent: approvalTerms.discountPercent,
+          couponCode: approvalTerms.couponCode,
+        }
+      : {}),
     approvedAt: FieldValue.serverTimestamp(),
     approvedBy: actorUid,
     updatedAt: FieldValue.serverTimestamp(),
   });
+  if (approvalTerms) {
+    const existingCoupon = await findCouponByCode(db, approvalTerms.couponCode);
+    const couponRef = existingCoupon
+      ? db.collection(COUPONS_COL).doc(existingCoupon.id)
+      : db.collection(COUPONS_COL).doc();
+    batch.set(
+      couponRef,
+      {
+        code: approvalTerms.couponCode,
+        distributorId,
+        distributorName: displayName,
+        discountPercent: approvalTerms.discountPercent,
+        commissionPercent: approvalTerms.commissionPercent,
+        active: true,
+        ...(existingCoupon ? {} : { redemptionCount: 0, createdAt: FieldValue.serverTimestamp() }),
+        createdBy: actorUid,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+  await batch.commit();
+
+  if (userId) {
+    await notifyDistributorUser(db, distributorId, {
+      title: 'مرحباً بك في SchoolixIQ',
+      message: approvalTerms
+        ? `تم قبولك كموزع — كوبونك ${approvalTerms.couponCode} وعمولتك ${approvalTerms.commissionPercent}% من كل اشتراك`
+        : 'تم قبولك كموزع في المنصة',
+      routeTarget: 'distributor_earnings',
+    }).catch((e) => console.error('[distributors] welcome notification failed', e?.message || e));
+  }
 
   return {
     alreadyActive: false,
@@ -226,4 +346,40 @@ export async function rejectDistributor({ db, adminSdk, distributorId, actorUid,
   });
 
   return { distributorId, status: 'rejected' };
+}
+
+/**
+ * Removes a distributor record and its coupons. Linked schools keep their history
+ * but stop accruing commission. The caller deletes the login account(s).
+ * @param {{ db: import('firebase-admin').firestore.Firestore, adminSdk: typeof import('firebase-admin'), distributorId: string, actorUid: string }}
+ */
+export async function deleteDistributorRecords({ db, adminSdk, distributorId, actorUid }) {
+  const ref = db.collection(DISTRIBUTORS_COL).doc(distributorId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw badRequest('DISTRIBUTOR_NOT_FOUND', 'DISTRIBUTOR_NOT_FOUND');
+  }
+  const FieldValue = adminSdk.firestore.FieldValue;
+  const [coupons, schools] = await Promise.all([
+    db.collection(COUPONS_COL).where('distributorId', '==', distributorId).get(),
+    db.collection('schools').where('distributorId', '==', distributorId).get(),
+  ]);
+  const writes = [
+    ...coupons.docs.map((d) => (b) => b.delete(d.ref)),
+    ...schools.docs.map((d) => (b) =>
+      b.update(d.ref, {
+        distributorCommissionPaused: true,
+        distributorDeleted: true,
+        distributorDeletedAt: FieldValue.serverTimestamp(),
+        distributorDeletedBy: actorUid,
+      }),
+    ),
+    (b) => b.delete(ref),
+  ];
+  for (let i = 0; i < writes.length; i += 400) {
+    const batch = db.batch();
+    writes.slice(i, i + 400).forEach((w) => w(batch));
+    await batch.commit();
+  }
+  return { couponsDeleted: coupons.size, schoolsPaused: schools.size };
 }
