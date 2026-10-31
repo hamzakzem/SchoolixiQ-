@@ -120,6 +120,46 @@ export async function sendDistributorSupportMessage(params: {
       ...patch,
     }, { merge: true });
   });
+
+  // Tell the other side (bell + push). A failed notification never fails the message.
+  await notifySupportRecipient(params, trimmed).catch((err) =>
+    console.warn('[distributor-chat] notification failed', err),
+  );
+}
+
+async function notifySupportRecipient(
+  params: { conversationId: string; distributorId: string; senderId: string; senderRole: 'distributor' | 'superadmin'; senderName?: string },
+  text: string,
+) {
+  const preview = text.length > 140 ? `${text.slice(0, 140)}…` : text;
+  let recipientId = 'super_admin';
+  let title = `رسالة من الموزع ${params.senderName || ''}`.trim();
+  if (params.senderRole !== 'distributor') {
+    const conv = await getDoc(doc(db, DISTRIBUTOR_SUPPORT_CONVERSATIONS, params.conversationId));
+    recipientId = String(conv.data()?.distributorUserId || '');
+    title = 'رد جديد من إدارة المنصة';
+    if (!recipientId) return;
+  }
+  await addDoc(collection(db, 'notifications'), {
+    userId: recipientId,
+    recipientId,
+    schoolId: 'system',
+    title,
+    message: preview,
+    type: 'message',
+    category: 'messages',
+    routeTarget: 'distributor_chat',
+    metadata: {
+      routeTarget: 'distributor_chat',
+      conversationId: params.conversationId,
+      distributorId: params.distributorId,
+      senderId: params.senderId,
+    },
+    read: false,
+    createdBy: params.senderId,
+    createdAt: serverTimestamp(),
+    pushDelivery: { status: 'pending' },
+  });
 }
 
 export function subscribeDistributorSupportMessages(

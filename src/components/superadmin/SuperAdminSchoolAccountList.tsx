@@ -98,7 +98,7 @@ function AccountCard({
   hasCredential,
   presence,
 }: {
-  school: SuperAdminSchoolRecord & { adminPassword?: string };
+  school: SuperAdminSchoolRecord;
   isRtl: boolean;
   hasCredential: boolean;
   presence?: SchoolPresenceRecord | null;
@@ -134,10 +134,10 @@ function AccountCard({
               : undefined
           }
         />
-        <span className="sx-school-chip" title={hasCredential ? 'كلمة مرور محفوظة' : 'لا توجد كلمة مرور'}>
+        <span className="sx-school-chip" title={hasCredential ? 'حساب مدير المدرسة مرتبط' : 'لا يوجد حساب مدير مرتبط'}>
           <span className="sx-school-chip__label">المصادقة</span>
           <span className="sx-school-chip__value">
-            {hasCredential ? 'محمية' : 'غير محددة'}
+            {hasCredential ? 'مرتبط' : 'غير مرتبط'}
           </span>
         </span>
       </div>
@@ -172,7 +172,7 @@ function AccountCard({
 }
 
 type SuperAdminSchoolAccountListProps = {
-  schools: (SuperAdminSchoolRecord & { adminPassword?: string })[];
+  schools: (SuperAdminSchoolRecord)[];
   presenceMap: Record<string, SchoolPresenceRecord | undefined>;
   isRtl: boolean;
   emptyMessage: string;
@@ -198,7 +198,7 @@ export function SuperAdminSchoolAccountList({
             key={school.id}
             school={school}
             isRtl={isRtl}
-            hasCredential={!!school.adminPassword}
+            hasCredential={!!school.adminEmail}
             presence={presenceMap[school.id]}
           />
         ))}
@@ -242,7 +242,7 @@ export function SuperAdminSchoolAccountList({
                   </div>
                 </td>
                 <td className="sx-school-table__cell">
-                  {renderCredential(!!school.adminPassword)}
+                  {renderCredential(!!school.adminEmail)}
                 </td>
                 <td className="sx-school-table__cell">
                   <AccountStatusRow

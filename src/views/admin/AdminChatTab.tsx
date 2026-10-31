@@ -129,8 +129,12 @@ export default function AdminChatTab() {
         where("participants", "array-contains", "admin"),
         orderBy("updatedAt", "desc")
       );
-      
-      const unsubConversations = onSnapshot(qConversations, (snapshot) => {
+
+      // The shared "school administration" inbox is readable by the school admin only
+      // (rules: isConversationParticipant); staff and assistants skip it instead of
+      // opening a listener that is always refused.
+      const canReadAdminInbox = ['admin', 'school_admin'].includes(String(profile.role || ''));
+      const unsubConversations = !canReadAdminInbox ? () => {} : onSnapshot(qConversations, (snapshot) => {
         setLastInteractionTimes(prev => {
           const next = { ...prev };
           let changed = false;

@@ -1,40 +1,40 @@
 import { Capacitor } from '@capacitor/core';
-import { savePdf } from './pdfUtils';
+import { saveElementAsPdf } from './pdfUtils';
 
-export function printElement(element: HTMLElement | null, title: string = 'طباعة') {
-  if (!element) return false;
+/**
+ * Opens the print window synchronously inside a tap/click handler. Safari (iPhone/iPad)
+ * blocks window.open() that runs later (after a timeout or await), so callers that need
+ * to re-render before printing open the window first and pass it to printElement.
+ */
+export function openPrintWindow(): Window | null {
+  if (Capacitor.isNativePlatform()) return null;
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write('<html dir="rtl"><body style="font-family:system-ui;padding:40px;color:#0b2345">جاري تجهيز الصفحة للطباعة…</body></html>');
+  }
+  return win;
+}
 
-  if (Capacitor.isNativePlatform()) {
-     // Run async PDF generation in background for native
-     (async () => {
-       try {
-         const { toPng } = await import('html-to-image');
-         const { default: jsPDF } = await import('jspdf');
-         
-         const dataUrl = await toPng(element, {
-            cacheBust: true,
-            style: { background: "white" },
-            pixelRatio: 2,
-         });
-         
-         const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-         const imgProps = pdf.getImageProperties(dataUrl);
-         const pdfWidth = pdf.internal.pageSize.getWidth();
-         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-         
-         pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
-         const dataUriString = pdf.output('datauristring');
-         
-         const safeTitle = title.replace(/[^a-zA-Z0-9\u0600-\u06FF]/gi, '_');
-         await savePdf(dataUriString, `${safeTitle}.pdf`);
-       } catch (err) {
-         console.error('Native print/pdf failure:', err);
-       }
-     })();
-     return true;
+export function printElement(
+  element: HTMLElement | null,
+  title: string = 'طباعة',
+  targetWindow?: Window | null,
+) {
+  if (!element) {
+    targetWindow?.close();
+    return false;
   }
 
-  const printWindow = window.open('', '_blank');
+  if (Capacitor.isNativePlatform()) {
+    // The app's WebView cannot print: save a (multi-page) PDF instead
+    const safeTitle = title.replace(/[^a-zA-Z0-9\u0600-\u06FF]/gi, '_');
+    void saveElementAsPdf(element, `${safeTitle}.pdf`).catch((err) =>
+      console.error('Native print/pdf failure:', err),
+    );
+    return true;
+  }
+
+  const printWindow = targetWindow && !targetWindow.closed ? targetWindow : window.open('', '_blank');
   if (!printWindow) {
     // If we're able to show a toast, that's great, but we can't import toast here nicely without risking circular deps, 
     // so we just return false and let the caller show a toast.
@@ -68,19 +68,40 @@ export function printElement(element: HTMLElement | null, title: string = 'طب�
              background: white; 
              font-family: 'Inter', system-ui, sans-serif; 
           }
+          /* The app stylesheet hides #print-mount on screen (it is the in-page print
+             fallback); in this window it is the page itself, so show it as a preview. */
+          #print-mount { display: block !important; }
+          @media (max-width: 700px) { body { padding: 56px 8px 8px; } }
         </style>
       </head>
       <body>
         <div id="print-mount">
           ${contentHtml}
         </div>
+        <div class="sx-print-toolbar">
+          <button type="button" onclick="window.print()">طباعة / حفظ PDF</button>
+          <button type="button" onclick="window.close()">إغلاق</button>
+        </div>
+        <style>
+          .sx-print-toolbar { position: fixed; top: 12px; inset-inline-start: 12px; display: flex; gap: 8px; z-index: 10; }
+          .sx-print-toolbar button { font: 700 14px system-ui, sans-serif; padding: 10px 16px; border-radius: 12px; border: 1px solid #cbd5e1; background: #fff; color: #0b2345; }
+          .sx-print-toolbar button:first-child { background: #0b2345; color: #fff; border-color: #0b2345; }
+          @media print { .sx-print-toolbar { display: none !important; } }
+        </style>
         <script>
-          window.onload = () => {
-            setTimeout(() => {
-              window.print();
-              window.close();
-            }, 300);
+          // Wait for fonts and images, then open the print dialog. Phones (iOS/Android)
+          // return from print() before the user acts, so the window is closed only after
+          // printing on desktop; on phones the toolbar stays for a second try or to close.
+          var isTouch = matchMedia('(pointer: coarse)').matches;
+          window.onload = function () {
+            var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+            ready.then(function () {
+              setTimeout(function () { window.focus(); window.print(); }, 350);
+            });
           };
+          if (!isTouch) {
+            window.onafterprint = function () { setTimeout(function () { window.close(); }, 200); };
+          }
         </script>
       </body>
     </html>

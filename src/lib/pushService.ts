@@ -183,6 +183,20 @@ async function runNativeRegistration(userId: string): Promise<void> {
     return;
   }
 
+  if (Capacitor.getPlatform() === 'android') {
+    // The server sends Android pushes on this channel; without it Android files them
+    // under a generic low-importance channel (no heads-up banner). Idempotent.
+    await PushNotifications.createChannel({
+      id: 'schoolix_default',
+      name: 'إشعارات SchoolixIQ',
+      description: 'الحضور، الواجبات، الدرجات، الأقساط، المحادثات والتسريح',
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+      lights: true,
+    }).catch((error: unknown) => console.warn('[NativePush] CHANNEL_CREATE_FAILED', error));
+  }
+
   console.info('[NativePush] REGISTER_CALLED', {
     userId,
     platform: Capacitor.getPlatform(),

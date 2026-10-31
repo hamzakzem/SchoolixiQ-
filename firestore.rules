@@ -104,6 +104,27 @@ service cloud.firestore {
       return userRole() == 'parent';
     }
 
+    // A new student must be written together with schools/{id}.studentCount + 1,
+    // and the new count may not exceed the school's package limit (default 500,
+    // the same default the app uses when the package has no maxStudents).
+    function addsOneStudentWithinPlan(schoolId) {
+      let schoolPath = /databases/$(database)/documents/schools/$(schoolId);
+      let before = get(schoolPath).data;
+      let after = getAfter(schoolPath).data;
+      let packagePath = /databases/$(database)/documents/packages/$(before.get('planId', 'basic'));
+      let maxStudents = exists(packagePath) ? get(packagePath).data.get('maxStudents', 500) : 500;
+      return after.get('studentCount', 0) == before.get('studentCount', 0) + 1
+        && after.get('studentCount', 0) <= maxStudents;
+    }
+
+    // studentCount only moves one step at a time (add or delete one student) and never below zero.
+    function studentCountStepOk() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys().hasAny(['studentCount']);
+      let before = resource.data.get('studentCount', 0);
+      let after = request.resource.data.get('studentCount', 0);
+      return !changed || (after >= 0 && (after == before + 1 || after == before - 1));
+    }
+
     function preservesSchoolDistributorFields() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
         'distributorId',
@@ -845,12 +866,13 @@ service cloud.firestore {
         || platformAssistantHasAny(['manage_distributors'])
         || (isDistributor() && userDistributorId() == distributorId);
       allow list: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
-      allow create, update, delete: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
+      // Approval, commission % and coupons are decided by the super admin only.
+      allow create, update, delete: if isSuperAdmin();
     }
 
     match /distributorCoupons/{couponId} {
       allow read, get, list: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
-      allow create, update, delete: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
+      allow create, update, delete: if isSuperAdmin();
     }
 
     function canManageDistributors() {
@@ -971,17 +993,20 @@ service cloud.firestore {
           && userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant']
           && preservesSchoolDistributorFields()
           && preservesSchoolSubscriptionFields()
+          && studentCountStepOk()
         )
         || (
           isSchoolMember(schoolId)
           && staffCan('students')
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentCount'])
+          && studentCountStepOk()
         )
         || (
           isSchoolMember(schoolId)
           && staffCan('settings')
           && preservesSchoolDistributorFields()
           && preservesSchoolSubscriptionFields()
+          && studentCountStepOk()
         );
       allow delete: if isSuperAdmin();
 
@@ -1014,8 +1039,10 @@ service cloud.firestore {
           && resource.data.keys().hasAll(['registrationNumber'])
         );
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
-        || staffCanCreate('students');
+        || (
+          ((signedIn() && sameSchoolRequest() && isSchoolManagementRole()) || staffCanCreate('students'))
+          && addsOneStudentWithinPlan(request.resource.data.schoolId)
+        );
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
         || staffCanChange('students')

@@ -80,7 +80,7 @@ service firebase.storage {
     function canManageSchoolAssets(schoolId) {
       return isSuperAdmin()
         || (
-          userRole() in ['admin', 'school_admin', 'assistant', 'staff']
+          userRole() in ['admin', 'school_admin', 'assistant', 'school_assistant', 'staff']
           && sameSchool(schoolId)
         );
     }
@@ -129,6 +129,14 @@ service firebase.storage {
       allow write: if canManageSchoolAssets(schoolId)
         && isAllowedImageUpload(fileName, 2 * 1024 * 1024)
         && isSchoolLogoFileName(fileName);
+    }
+
+    // 4b. ID card watermark / background images
+    match /schools/{schoolId}/idcards/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if canManageSchoolAssets(schoolId)
+        && isAllowedImageUpload(fileName, 5 * 1024 * 1024)
+        && fileName.matches('watermark_[0-9]+\\.(jpg|jpeg|png|webp)');
     }
 
     // 5. Other school assets — read only; writes use explicit logo / store paths above

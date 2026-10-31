@@ -25,7 +25,7 @@ import IdCardFontSettings from "../../components/admin/idcards/FontSettings";
 import StudentCard from "../../components/admin/idcards/StudentCard";
 import { IdCardTemplate } from "../../types/idCardTemplate";
 import {
-  uploadImageToServer,
+  uploadImageViaStorageOrServer,
   compressImageToBase64,
 } from "../../lib/imageUtils";
 
@@ -555,10 +555,13 @@ export default function IdCardSettings() {
                             const file = e.target.files?.[0];
                             if (file) {
                               try {
-                                // Using generic profile.schoolId as path segment
-                                const url = await uploadImageToServer(
+                                if (!profile?.schoolId) throw new Error("NO_SCHOOL");
+                                // School-scoped path allowed by storage.rules and /api/upload
+                                const url = await uploadImageViaStorageOrServer(
                                   file,
-                                  `watermarks/${profile?.schoolId || "default"}`,
+                                  `schools/${profile.schoolId}/idcards/watermark_${Date.now()}.jpg`,
+                                  1200,
+                                  1200,
                                 );
                                 setTemplate((p) => ({
                                   ...p,

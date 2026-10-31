@@ -305,35 +305,11 @@ export default function StudentArchive() {
       // 2. Download as PDF (wrapped in try-catch to not break if import fails)
       try {
         if (printRef.current) {
-          const { toPng } = await import("html-to-image");
-          const { default: jsPDF } = await import("jspdf");
-
-          const dataUrl = await toPng(printRef.current, {
-            cacheBust: true,
-            style: { background: "white" },
-            pixelRatio: 2,
-          });
-
-          const pdf = new jsPDF({
-            orientation: "p",
-            unit: "mm",
-            format: "a4",
-          });
-
-          const imgProps = pdf.getImageProperties(dataUrl);
-          const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-          const { savePdf } = await import("../../lib/pdfUtils");
-          pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
-          const pdfFileName = `أرشيف_${selectedStudent.name}_${currentMonthYear}.pdf`;
-          
-          if (Capacitor.isNativePlatform()) {
-             const dataUriString = pdf.output('datauristring');
-             await savePdf(dataUriString, pdfFileName);
-          } else {
-             pdf.save(pdfFileName);
-          }
+          const { saveElementAsPdf } = await import("../../lib/pdfUtils");
+          await saveElementAsPdf(
+            printRef.current,
+            `أرشيف_${selectedStudent.name}_${currentMonthYear}.pdf`,
+          );
         }
       } catch (pdfError) {
         console.error("PDF Generation failed:", pdfError);
@@ -491,43 +467,20 @@ export default function StudentArchive() {
                       id: "pdf-toast",
                     });
                     try {
-                      const { toPng } = await import("html-to-image");
-                      const { default: jsPDF } = await import("jspdf");
-
-                      const dataUrl = await toPng(printRef.current, {
-                        cacheBust: true,
-                        style: { background: "white" },
-                        pixelRatio: 2,
-                      });
-
-                      const pdf = new jsPDF({
-                        orientation: "p",
-                        unit: "mm",
-                        format: "a4",
-                      });
-
-                      const imgProps = pdf.getImageProperties(dataUrl);
-                      const pdfWidth = pdf.internal.pageSize.getWidth();
-                      const pdfHeight =
-                        (imgProps.height * pdfWidth) / imgProps.width;
-
-                      const { savePdf } = await import("../../lib/pdfUtils");
-                      pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
-                      const pdfFileName = `أرشيف_${selectedStudent?.name || "طالب"}.pdf`;
-
-                      if (Capacitor.isNativePlatform()) {
-                        const dataUriString = pdf.output('datauristring');
-                        const ok = await savePdf(dataUriString, pdfFileName);
-                        if (ok) {
-                          toast.success("تم تنزيل وتخزين ملف الـ PDF بنجاح في المستندات", {
-                            id: "pdf-toast",
-                          });
-                        }
+                      const { saveElementAsPdf } = await import("../../lib/pdfUtils");
+                      const ok = await saveElementAsPdf(
+                        printRef.current,
+                        `أرشيف_${selectedStudent?.name || "طالب"}.pdf`,
+                      );
+                      if (ok) {
+                        toast.success(
+                          Capacitor.isNativePlatform()
+                            ? "تم حفظ ملف الـ PDF في المستندات"
+                            : "تم تنزيل ملف الـ PDF بنجاح",
+                          { id: "pdf-toast" },
+                        );
                       } else {
-                        pdf.save(pdfFileName);
-                        toast.success("تم تنزيل ملف الـ PDF بنجاح", {
-                          id: "pdf-toast",
-                        });
+                        toast.dismiss("pdf-toast");
                       }
                     } catch (e) {
                       console.error("PDF generation error: ", e);

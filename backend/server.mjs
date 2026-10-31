@@ -1300,12 +1300,42 @@ async function generateMonthlyCommissions({ db, adminSdk, monthKey }) {
   }
   return counts;
 }
+function formatIqd(amount) {
+  return `${Number(amount || 0).toLocaleString("en-US")} \u062F.\u0639`;
+}
+async function notifyDistributorUser(db, distributorId, { title, message, routeTarget }) {
+  const distSnap = await db.collection(DISTRIBUTORS_COLLECTION).doc(String(distributorId)).get();
+  let userId = String(distSnap.data()?.userId || "").trim();
+  if (!userId) {
+    const users = await db.collection("users").where("distributorId", "==", String(distributorId)).limit(1).get();
+    userId = users.empty ? "" : users.docs[0].id;
+  }
+  if (!userId) return false;
+  const now = /* @__PURE__ */ new Date();
+  await db.collection("notifications").add({
+    userId,
+    recipientId: userId,
+    schoolId: "system",
+    title,
+    message,
+    type: "system",
+    category: "system",
+    routeTarget,
+    metadata: { routeTarget, distributorId: String(distributorId) },
+    read: false,
+    pushDelivery: { status: "pending" },
+    createdAt: now,
+    expiresAt: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1e3)
+  });
+  return true;
+}
 async function markCommissionPaid({
   db,
   adminSdk,
   commissionId,
   paidBy,
-  notes
+  notes,
+  notify = true
 }) {
   const ref = db.collection(COMMISSION_COLLECTION).doc(commissionId);
   const snap = await ref.get();
@@ -1330,6 +1360,13 @@ async function markCommissionPaid({
     paidBy,
     ...notes ? { notes: String(notes) } : {}
   });
+  if (notify && data.distributorId) {
+    await notifyDistributorUser(db, data.distributorId, {
+      title: "\u062A\u0645 \u0635\u0631\u0641 \u0639\u0645\u0648\u0644\u062A\u0643",
+      message: `${formatIqd(data.commissionAmount)} \u2014 ${data.schoolName || "\u0645\u062F\u0631\u0633\u0629"} (${data.monthKey || ""})`,
+      routeTarget: "distributor_earnings"
+    }).catch((e) => console.error("[distributors] paid notification failed", e?.message || e));
+  }
   return { updated: true, alreadyPaid: false, id: commissionId };
 }
 async function markDistributorMonthCommissionsPaid({
@@ -1344,6 +1381,7 @@ async function markDistributorMonthCommissionsPaid({
   const snap = await db.collection(COMMISSION_COLLECTION).where("distributorId", "==", distributorId).where("monthKey", "==", normalizedMonth).get();
   let updated = 0;
   let skipped = 0;
+  let total = 0;
   for (const docSnap of snap.docs) {
     const status = docSnap.data()?.status;
     if (status === "paid" || status === "canceled") {
@@ -1355,9 +1393,18 @@ async function markDistributorMonthCommissionsPaid({
       adminSdk,
       commissionId: docSnap.id,
       paidBy,
-      notes
+      notes,
+      notify: false
     });
     updated += 1;
+    total += Number(docSnap.data()?.commissionAmount || 0);
+  }
+  if (updated > 0) {
+    await notifyDistributorUser(db, distributorId, {
+      title: "\u062A\u0645 \u0635\u0631\u0641 \u0639\u0645\u0648\u0644\u0627\u062A \u0627\u0644\u0634\u0647\u0631",
+      message: `${formatIqd(total)} \u0639\u0646 ${updated} \u0645\u062F\u0631\u0633\u0629 \u2014 ${normalizedMonth}`,
+      routeTarget: "distributor_earnings"
+    }).catch((e) => console.error("[distributors] month paid notification failed", e?.message || e));
   }
   return { updated, skipped, distributorId, monthKey: normalizedMonth };
 }
@@ -1400,6 +1447,58 @@ async function setSchoolDistributorCommissionPaused({
 // distributorApproval.mjs
 import crypto3 from "crypto";
 var DISTRIBUTORS_COL = "distributors";
+var COUPONS_COL = "distributorCoupons";
+var COUPON_CODE_PATTERN = /^[A-Z0-9-]{3,24}$/;
+function badRequest(message, code) {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+}
+function percentOrNull(value) {
+  if (value === void 0 || value === null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : NaN;
+}
+function readApprovalTerms(terms) {
+  if (!terms) return null;
+  const commission = percentOrNull(terms.commissionPercent);
+  const discount = percentOrNull(terms.discountPercent) ?? 0;
+  const couponCode = normalizeCouponCode(terms.couponCode);
+  if (commission === null || Number.isNaN(commission) || commission < 0 || commission > 100) {
+    throw badRequest("\u0646\u0633\u0628\u0629 \u0639\u0645\u0648\u0644\u0629 \u0627\u0644\u0645\u0648\u0632\u0639 \u064A\u062C\u0628 \u0623\u0646 \u062A\u0643\u0648\u0646 \u0628\u064A\u0646 0 \u0648 100", "INVALID_COMMISSION");
+  }
+  if (Number.isNaN(discount) || discount < 0 || discount > 100) {
+    throw badRequest("\u0646\u0633\u0628\u0629 \u062E\u0635\u0645 \u0627\u0644\u0643\u0648\u0628\u0648\u0646 \u064A\u062C\u0628 \u0623\u0646 \u062A\u0643\u0648\u0646 \u0628\u064A\u0646 0 \u0648 100", "INVALID_DISCOUNT");
+  }
+  if (!COUPON_CODE_PATTERN.test(couponCode)) {
+    throw badRequest("\u0643\u0648\u062F \u0627\u0644\u0643\u0648\u0628\u0648\u0646: 3\u201324 \u062D\u0631\u0641\u0627\u064B \u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0627\u064B \u0623\u0648 \u0631\u0642\u0645\u0627\u064B \u0623\u0648 \u0634\u0631\u0637\u0629", "INVALID_COUPON_CODE");
+  }
+  return { commissionPercent: commission, discountPercent: discount, couponCode };
+}
+async function notifySuperAdmins(db, adminSdk, { title, message, routeTarget, metadata }) {
+  const admins = await db.collection("users").where("role", "==", "superadmin").limit(20).get();
+  if (admins.empty) return;
+  const now = /* @__PURE__ */ new Date();
+  const batch = db.batch();
+  for (const u of admins.docs) {
+    batch.set(db.collection("notifications").doc(), {
+      title,
+      message,
+      type: "system",
+      category: "distributor",
+      userId: u.id,
+      recipientId: u.id,
+      receiverId: u.id,
+      read: false,
+      routeTarget,
+      metadata: { ...metadata, routeTarget },
+      pushDelivery: { status: "pending" },
+      createdAt: now,
+      expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1e3)
+    });
+  }
+  await batch.commit();
+}
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
@@ -1447,6 +1546,12 @@ async function registerDistributorApplication(db, adminSdk, input) {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp()
   });
+  await notifySuperAdmins(db, adminSdk, {
+    title: "\u0637\u0644\u0628 \u0645\u0648\u0632\u0639 \u062C\u062F\u064A\u062F",
+    message: `${name} \u2014 ${governorate} \u2014 \u0628\u0627\u0646\u062A\u0638\u0627\u0631 \u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629 \u0648\u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0646\u0633\u0628\u0629 \u0648\u0627\u0644\u0643\u0648\u0628\u0648\u0646`,
+    routeTarget: "distributor_requests",
+    metadata: { distributorId: ref.id }
+  }).catch((e) => console.error("[distributors] notify super admins failed", e?.message || e));
   return { id: ref.id, status: "pending" };
 }
 async function listPendingDistributors(db) {
@@ -1464,8 +1569,10 @@ async function approveDistributor({
   distributorId,
   actorUid,
   password,
-  syncClaims
+  syncClaims,
+  terms
 }) {
+  const approvalTerms = readApprovalTerms(terms);
   const ref = db.collection(DISTRIBUTORS_COL).doc(distributorId);
   const snap = await ref.get();
   if (!snap.exists) {
@@ -1484,8 +1591,14 @@ async function approveDistributor({
   }
   const FieldValue = adminSdk.firestore.FieldValue;
   let userId = String(data.userId || "").trim();
-  const email = normalizeEmail(data.email);
+  const email = normalizeEmail(data.email) || normalizeEmail(terms?.email);
   const displayName = String(data.name || "\u0645\u0648\u0632\u0639");
+  if (approvalTerms) {
+    const existingCoupon = await findCouponByCode(db, approvalTerms.couponCode);
+    if (existingCoupon && existingCoupon.distributorId !== distributorId) {
+      throw badRequest("\u0643\u0648\u062F \u0627\u0644\u0643\u0648\u0628\u0648\u0646 \u0645\u0633\u062A\u062E\u062F\u0645 \u0644\u0645\u0648\u0632\u0639 \u0622\u062E\u0631 \u2014 \u0627\u062E\u062A\u0631 \u0643\u0648\u062F\u0627\u064B \u0645\u062E\u062A\u0644\u0641\u0627\u064B", "COUPON_CODE_TAKEN");
+    }
+  }
   if (!userId && email) {
     let uid = "";
     const securePass = String(password || "").trim() || `${crypto3.randomBytes(16).toString("hex")}SecureP1!`;
@@ -1538,15 +1651,49 @@ async function approveDistributor({
     await syncClaims(uid, "distributor", "");
     userId = uid;
   }
-  await ref.update({
+  const batch = db.batch();
+  batch.update(ref, {
     status: "active",
     canLogin: true,
     active: true,
+    ...email && !data.email ? { email } : {},
     ...userId ? { userId } : {},
+    ...approvalTerms ? {
+      commissionPercent: approvalTerms.commissionPercent,
+      discountPercent: approvalTerms.discountPercent,
+      couponCode: approvalTerms.couponCode
+    } : {},
     approvedAt: FieldValue.serverTimestamp(),
     approvedBy: actorUid,
     updatedAt: FieldValue.serverTimestamp()
   });
+  if (approvalTerms) {
+    const existingCoupon = await findCouponByCode(db, approvalTerms.couponCode);
+    const couponRef = existingCoupon ? db.collection(COUPONS_COL).doc(existingCoupon.id) : db.collection(COUPONS_COL).doc();
+    batch.set(
+      couponRef,
+      {
+        code: approvalTerms.couponCode,
+        distributorId,
+        distributorName: displayName,
+        discountPercent: approvalTerms.discountPercent,
+        commissionPercent: approvalTerms.commissionPercent,
+        active: true,
+        ...existingCoupon ? {} : { redemptionCount: 0, createdAt: FieldValue.serverTimestamp() },
+        createdBy: actorUid,
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+  }
+  await batch.commit();
+  if (userId) {
+    await notifyDistributorUser(db, distributorId, {
+      title: "\u0645\u0631\u062D\u0628\u0627\u064B \u0628\u0643 \u0641\u064A SchoolixIQ",
+      message: approvalTerms ? `\u062A\u0645 \u0642\u0628\u0648\u0644\u0643 \u0643\u0645\u0648\u0632\u0639 \u2014 \u0643\u0648\u0628\u0648\u0646\u0643 ${approvalTerms.couponCode} \u0648\u0639\u0645\u0648\u0644\u062A\u0643 ${approvalTerms.commissionPercent}% \u0645\u0646 \u0643\u0644 \u0627\u0634\u062A\u0631\u0627\u0643` : "\u062A\u0645 \u0642\u0628\u0648\u0644\u0643 \u0643\u0645\u0648\u0632\u0639 \u0641\u064A \u0627\u0644\u0645\u0646\u0635\u0629",
+      routeTarget: "distributor_earnings"
+    }).catch((e) => console.error("[distributors] welcome notification failed", e?.message || e));
+  }
   return {
     alreadyActive: false,
     distributorId,
@@ -1574,6 +1721,36 @@ async function rejectDistributor({ db, adminSdk, distributorId, actorUid, reason
     updatedAt: FieldValue.serverTimestamp()
   });
   return { distributorId, status: "rejected" };
+}
+async function deleteDistributorRecords({ db, adminSdk, distributorId, actorUid }) {
+  const ref = db.collection(DISTRIBUTORS_COL).doc(distributorId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw badRequest("DISTRIBUTOR_NOT_FOUND", "DISTRIBUTOR_NOT_FOUND");
+  }
+  const FieldValue = adminSdk.firestore.FieldValue;
+  const [coupons, schools] = await Promise.all([
+    db.collection(COUPONS_COL).where("distributorId", "==", distributorId).get(),
+    db.collection("schools").where("distributorId", "==", distributorId).get()
+  ]);
+  const writes = [
+    ...coupons.docs.map((d) => (b) => b.delete(d.ref)),
+    ...schools.docs.map(
+      (d) => (b) => b.update(d.ref, {
+        distributorCommissionPaused: true,
+        distributorDeleted: true,
+        distributorDeletedAt: FieldValue.serverTimestamp(),
+        distributorDeletedBy: actorUid
+      })
+    ),
+    (b) => b.delete(ref)
+  ];
+  for (let i = 0; i < writes.length; i += 400) {
+    const batch = db.batch();
+    writes.slice(i, i + 400).forEach((w) => w(batch));
+    await batch.commit();
+  }
+  return { couponsDeleted: coupons.size, schoolsPaused: schools.size };
 }
 
 // roleHierarchy.ts
@@ -3295,6 +3472,65 @@ function registerDismissalRoutes(app, { getDb: getDb2, verifyToken, jsonParser }
   });
 }
 
+// credentialScrub.mjs
+var BATCH_LIMIT = 400;
+var TARGETS = [
+  { collection: "schools", fields: ["adminPassword"] },
+  { collection: "students", fields: ["parentPassword"] },
+  { collection: "users", fields: ["password", "plainPassword", "parentPassword"] },
+  {
+    collection: "registrations",
+    fields: ["password", "adminPassword", "customerInfo.password"],
+    // The super admin still needs the requested password to activate a pending request.
+    keep: (data) => String(data.status || "pending") === "pending"
+  }
+];
+async function scrubField(db, FieldValue, { collection, fields, keep }, field) {
+  let removed = 0;
+  for (let pass = 0; pass < 25; pass += 1) {
+    const snap = await db.collection(collection).where(field, ">", "").limit(BATCH_LIMIT).get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    let ops = 0;
+    for (const docSnap of snap.docs) {
+      if (keep && keep(docSnap.data() || {})) continue;
+      const patch = {};
+      for (const f of fields) patch[f] = FieldValue.delete();
+      batch.update(docSnap.ref, patch);
+      ops += 1;
+    }
+    if (!ops) break;
+    await batch.commit();
+    removed += ops;
+    if (snap.size < BATCH_LIMIT) break;
+  }
+  return removed;
+}
+async function scrubStoredPasswords(db, adminSdk) {
+  const FieldValue = adminSdk.firestore.FieldValue;
+  const summary = {};
+  for (const target of TARGETS) {
+    for (const field of target.fields) {
+      try {
+        const n = await scrubField(db, FieldValue, target, field);
+        if (n) summary[`${target.collection}.${field}`] = n;
+      } catch (e) {
+        console.error("[credential-scrub] failed", target.collection, field, e?.message || e);
+      }
+    }
+  }
+  if (Object.keys(summary).length) console.log("[credential-scrub] removed stored passwords", summary);
+  return summary;
+}
+function scheduleCredentialScrub(getDb2, adminSdk, { intervalMs = 6 * 60 * 60 * 1e3 } = {}) {
+  const run = () => scrubStoredPasswords(getDb2(), adminSdk).catch(
+    (e) => console.error("[credential-scrub] run failed", e?.message || e)
+  );
+  setTimeout(run, 15e3);
+  const timer = setInterval(run, intervalMs);
+  timer.unref?.();
+}
+
 // distributorPortal.mjs
 var COMMISSIONS_COL = "distributorMonthlyCommissions";
 var DISTRIBUTORS_COL2 = "distributors";
@@ -4193,6 +4429,20 @@ async function startServer() {
       assertImageExtension(fileName);
       return { role, schoolId };
     }
+    const idCardMatch = storagePath.match(/^schools\/([^/]+)\/idcards\/([^/]+)$/);
+    if (idCardMatch) {
+      const pathSchoolId = idCardMatch[1];
+      const fileName = idCardMatch[2];
+      if (!SCHOOL_IMAGE_UPLOAD_ROLES.includes(role)) {
+        throw Object.assign(new Error("FORBIDDEN_ROLE"), { status: 403 });
+      }
+      assertSchoolScope(role, schoolId, pathSchoolId);
+      if (!/^watermark_\d+\.(jpg|jpeg|png|webp)$/i.test(fileName)) {
+        throw Object.assign(new Error("INVALID_UPLOAD_PATH"), { status: 400 });
+      }
+      assertImageExtension(fileName);
+      return { role, schoolId };
+    }
     const studentMatch = storagePath.match(/^students\/([^/]+)\/([^/]+)\/([^/]+)$/);
     if (studentMatch) {
       const pathSchoolId = studentMatch[1];
@@ -4477,6 +4727,7 @@ async function startServer() {
       console.log(`Creating user: ${redactEmail(emailLower)}, role: ${role}`);
       const db = getDb();
       let uid = "";
+      let createdAccount = false;
       let isExistingUser = false;
       let existingUserData = null;
       try {
@@ -4544,6 +4795,7 @@ async function startServer() {
             emailVerified: true
           });
           uid = userRecord.uid;
+          createdAccount = true;
           console.log(`Created new Auth user: ${redactUid(uid)}, email: ${redactEmail(emailLower)}`);
         } else {
           throw authError;
@@ -4607,7 +4859,8 @@ async function startServer() {
       res.json({
         success: true,
         message: "\u062A\u0645 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0628\u0646\u062C\u0627\u062D",
-        data: { uid }
+        // createdAccount without a password: the caller should send a set-password email
+        data: { uid, createdAccount, needsPasswordSetup: createdAccount && !password }
       });
     } catch (error) {
       console.error("Create User Error:", error);
@@ -4764,6 +5017,18 @@ async function startServer() {
         adminSdk: admin4,
         userId
       });
+      const distributorId = String(beforeData.distributorId || "").trim();
+      if (beforeData.role === "distributor" && distributorId) {
+        const distRef = db.collection("distributors").doc(distributorId);
+        const distSnap = await distRef.get();
+        if (distSnap.exists && distSnap.data()?.userId === userId) {
+          await distRef.update({
+            canLogin: false,
+            userId: admin4.firestore.FieldValue.delete(),
+            updatedAt: admin4.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }
       await logAudit(req, "DELETE_USER", {
         before: userDoc.exists ? beforeData : null,
         metadata: { targetUid: userId, result }
@@ -5208,7 +5473,7 @@ async function startServer() {
   });
   app.get("/api/admin/distributors/pending", verifyAdmin, async (req, res) => {
     try {
-      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
+      if (!isSuperAdminRole3(req.user.role)) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
       }
       const items = await listPendingDistributors(getDb());
@@ -5224,9 +5489,10 @@ async function startServer() {
       return res.status(400).json({ error: "DISTRIBUTOR_ID_REQUIRED", message: "distributorId \u0645\u0637\u0644\u0648\u0628" });
     }
     try {
-      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
+      if (!isSuperAdminRole3(req.user.role)) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
       }
+      const body = req.body || {};
       const result = await approveDistributor({
         db: getDb(),
         authAdmin: admin4.auth(),
@@ -5234,7 +5500,14 @@ async function startServer() {
         distributorId,
         actorUid: req.user.uid,
         password,
-        syncClaims: syncUserClaims
+        syncClaims: syncUserClaims,
+        // Commission %, customer discount % and the distributor's own coupon code
+        terms: body.couponCode !== void 0 || body.commissionPercent !== void 0 ? {
+          commissionPercent: body.commissionPercent,
+          discountPercent: body.discountPercent,
+          couponCode: body.couponCode,
+          email: body.email
+        } : void 0
       });
       await logAudit(req, "DISTRIBUTOR_APPROVE", { metadata: { distributorId, result } });
       res.json({ ok: true, ...result });
@@ -5245,6 +5518,39 @@ async function startServer() {
       });
     }
   });
+  app.post("/api/admin/distributors/:distributorId/delete", verifyAdmin, async (req, res) => {
+    const distributorId = String(req.params.distributorId || "").trim();
+    try {
+      if (!isSuperAdminRole3(req.user.role)) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "\u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0632\u0639\u064A\u0646 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637" });
+      }
+      const db = getDb();
+      const snap = await db.collection("distributors").doc(distributorId).get();
+      if (!snap.exists) {
+        return res.status(404).json({ error: "DISTRIBUTOR_NOT_FOUND", message: "\u0627\u0644\u0645\u0648\u0632\u0639 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F" });
+      }
+      const userIds = /* @__PURE__ */ new Set();
+      const linkedUid = String(snap.data()?.userId || "").trim();
+      if (linkedUid) userIds.add(linkedUid);
+      const linkedUsers = await db.collection("users").where("distributorId", "==", distributorId).get();
+      linkedUsers.docs.forEach((d) => userIds.add(d.id));
+      let usersDeleted = 0;
+      for (const uid of userIds) {
+        try {
+          await runUserPermanentDelete({ db, authAdmin: admin4.auth(), adminSdk: admin4, userId: uid });
+          usersDeleted += 1;
+        } catch (e) {
+          if (e?.status !== 404) throw e;
+        }
+      }
+      const result = await deleteDistributorRecords({ db, adminSdk: admin4, distributorId, actorUid: req.user.uid });
+      await logAudit(req, "DISTRIBUTOR_DELETE", { before: snap.data(), metadata: { distributorId, usersDeleted, ...result } });
+      res.json({ ok: true, distributorId, usersDeleted, ...result });
+    } catch (error) {
+      console.error("Delete distributor error:", error);
+      res.status(500).json({ error: error.code || "DELETE_FAILED", message: error.message || "\u0641\u0634\u0644 \u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0632\u0639" });
+    }
+  });
   app.post("/api/admin/distributors/reject", verifyAdmin, async (req, res) => {
     const distributorId = String(req.body?.distributorId || "").trim();
     const reason = req.body?.reason;
@@ -5252,7 +5558,7 @@ async function startServer() {
       return res.status(400).json({ error: "DISTRIBUTOR_ID_REQUIRED", message: "distributorId \u0645\u0637\u0644\u0648\u0628" });
     }
     try {
-      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
+      if (!isSuperAdminRole3(req.user.role)) {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D" });
       }
       const result = await rejectDistributor({
@@ -5282,7 +5588,7 @@ async function startServer() {
       });
     }
     try {
-      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
+      if (!isSuperAdminRole3(req.user.role)) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u0631\u0628\u0637 \u0643\u0648\u0628\u0648\u0646 \u0627\u0644\u0645\u0648\u0632\u0639 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
@@ -5316,7 +5622,7 @@ async function startServer() {
       });
     }
     try {
-      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
+      if (!isSuperAdminRole3(req.user.role)) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u062A\u0648\u0644\u064A\u062F \u0627\u0644\u0639\u0645\u0648\u0644\u0627\u062A \u0627\u0644\u0634\u0647\u0631\u064A\u0629 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
@@ -5342,7 +5648,7 @@ async function startServer() {
     const { commissionId } = req.params;
     const notes = req.body?.notes;
     try {
-      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
+      if (!isSuperAdminRole3(req.user.role)) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u062A\u0639\u0644\u064A\u0645 \u0627\u0644\u0639\u0645\u0648\u0644\u0629 \u0643\u0645\u062F\u0641\u0648\u0639\u0629 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
@@ -5377,7 +5683,7 @@ async function startServer() {
       });
     }
     try {
-      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
+      if (!isSuperAdminRole3(req.user.role)) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u062A\u0639\u0644\u064A\u0645 \u0639\u0645\u0648\u0644\u0627\u062A \u0627\u0644\u0645\u0648\u0632\u0639 \u0643\u0645\u062F\u0641\u0648\u0639\u0629 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
@@ -5406,7 +5712,7 @@ async function startServer() {
     const { schoolId } = req.params;
     const paused = req.body?.paused === true;
     try {
-      if (!await actorHasPlatformPermission(req, "manage_distributors")) {
+      if (!isSuperAdminRole3(req.user.role)) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "\u0625\u064A\u0642\u0627\u0641 \u0639\u0645\u0648\u0644\u0629 \u0627\u0644\u0645\u0648\u0632\u0639 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
@@ -5833,7 +6139,11 @@ async function startServer() {
     app.use(express.static(distPath, {
       maxAge: "1d",
       setHeaders: (res, filePath) => {
-        if (filePath.endsWith(".html")) {
+        if (filePath.endsWith(".apk")) {
+          res.setHeader("Content-Type", "application/vnd.android.package-archive");
+          res.setHeader("Content-Disposition", 'attachment; filename="schoolixiq.apk"');
+          res.setHeader("Cache-Control", "no-cache");
+        } else if (filePath.endsWith(".html")) {
           res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         } else if (filePath.match(/\.(js|css|woff2?|ico|png|jpe?g|gif|svg)$/)) {
@@ -5856,6 +6166,7 @@ async function startServer() {
     } catch (e) {
       console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
     }
+    scheduleCredentialScrub(getDb, admin4);
     const isProductionEnv2 = process.env.NODE_ENV === "production";
     const isDevUrl = process.env.APP_URL && (process.env.APP_URL.includes("-dev-") || process.env.APP_URL.includes("localhost") || process.env.APP_URL.includes("127.0.0.1"));
     if (process.env.APP_URL) {

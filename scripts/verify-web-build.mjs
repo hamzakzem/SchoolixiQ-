@@ -142,11 +142,11 @@ try {
   if (!sw.includes('schoolix-shell-v16') && !sw.includes("schoolix-shell-${SW_VERSION}") && !sw.includes('v16')) {
     // Template uses SW_VERSION = 'v16' → schoolix-shell-v16 at runtime string
   }
-  if (!sw.includes("const SW_VERSION = 'v17'") && !sw.includes('schoolix-shell-v17')) {
-    console.error('FAIL sw.js: expected SW_VERSION v17');
+  if (!sw.includes("const SW_VERSION = 'v18'") && !sw.includes('schoolix-shell-v18')) {
+    console.error('FAIL sw.js: expected SW_VERSION v18');
     failed = true;
   } else {
-    console.log('OK: sw.js version v17');
+    console.log('OK: sw.js version v18');
   }
   if (!sw.includes('never persist hashed') && !sw.includes('Hard guard: never persist hashed')) {
     console.error('FAIL sw.js: missing hashed-asset cache guard');

@@ -647,12 +647,45 @@ export async function generateMonthlyCommissions({ db, adminSdk, monthKey }) {
 /**
  * @param {{ db: import('firebase-admin').firestore.Firestore, adminSdk: typeof import('firebase-admin'), commissionId: string, paidBy: string, notes?: string }}
  */
+function formatIqd(amount) {
+  return `${Number(amount || 0).toLocaleString("en-US")} د.ع`;
+}
+
+/** Bell + push notification for a distributor's login account (no-op when it has none). */
+export async function notifyDistributorUser(db, distributorId, { title, message, routeTarget }) {
+  const distSnap = await db.collection(DISTRIBUTORS_COLLECTION).doc(String(distributorId)).get();
+  let userId = String(distSnap.data()?.userId || "").trim();
+  if (!userId) {
+    const users = await db.collection("users").where("distributorId", "==", String(distributorId)).limit(1).get();
+    userId = users.empty ? "" : users.docs[0].id;
+  }
+  if (!userId) return false;
+  const now = new Date();
+  await db.collection("notifications").add({
+    userId,
+    recipientId: userId,
+    schoolId: "system",
+    title,
+    message,
+    type: "system",
+    category: "system",
+    routeTarget,
+    metadata: { routeTarget, distributorId: String(distributorId) },
+    read: false,
+    pushDelivery: { status: "pending" },
+    createdAt: now,
+    expiresAt: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+  });
+  return true;
+}
+
 export async function markCommissionPaid({
   db,
   adminSdk,
   commissionId,
   paidBy,
   notes,
+  notify = true,
 }) {
   const ref = db.collection(COMMISSION_COLLECTION).doc(commissionId);
   const snap = await ref.get();
@@ -679,6 +712,14 @@ export async function markCommissionPaid({
     ...(notes ? { notes: String(notes) } : {}),
   });
 
+  if (notify && data.distributorId) {
+    await notifyDistributorUser(db, data.distributorId, {
+      title: "تم صرف عمولتك",
+      message: `${formatIqd(data.commissionAmount)} — ${data.schoolName || "مدرسة"} (${data.monthKey || ""})`,
+      routeTarget: "distributor_earnings",
+    }).catch((e) => console.error("[distributors] paid notification failed", e?.message || e));
+  }
+
   return { updated: true, alreadyPaid: false, id: commissionId };
 }
 
@@ -702,6 +743,7 @@ export async function markDistributorMonthCommissionsPaid({
 
   let updated = 0;
   let skipped = 0;
+  let total = 0;
   for (const docSnap of snap.docs) {
     const status = docSnap.data()?.status;
     if (status === "paid" || status === "canceled") {
@@ -714,8 +756,19 @@ export async function markDistributorMonthCommissionsPaid({
       commissionId: docSnap.id,
       paidBy,
       notes,
+      notify: false,
     });
     updated += 1;
+    total += Number(docSnap.data()?.commissionAmount || 0);
+  }
+
+  // One summary notification for the whole month
+  if (updated > 0) {
+    await notifyDistributorUser(db, distributorId, {
+      title: "تم صرف عمولات الشهر",
+      message: `${formatIqd(total)} عن ${updated} مدرسة — ${normalizedMonth}`,
+      routeTarget: "distributor_earnings",
+    }).catch((e) => console.error("[distributors] month paid notification failed", e?.message || e));
   }
 
   return { updated, skipped, distributorId, monthKey: normalizedMonth };

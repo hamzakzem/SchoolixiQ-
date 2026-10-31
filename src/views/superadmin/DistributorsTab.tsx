@@ -18,9 +18,11 @@ import {
   Loader2,
   MessageSquare,
   PauseCircle,
+  Pencil,
   PlayCircle,
   Plus,
   Tag,
+  Trash2,
   Users,
   Wallet,
   X,
@@ -28,8 +30,10 @@ import {
 import { toast } from "react-hot-toast";
 import { AppModalPortal } from "../../components/AppModalPortal";
 import { db } from "../../lib/firebase";
+import { useAuth } from "../../lib/AuthContext";
 import {
   adminApplyDistributorCoupon,
+  adminDeleteDistributor,
   adminGenerateMonthlyCommissions,
   adminMarkCommissionPaid,
   adminMarkDistributorMonthPaid,
@@ -93,7 +97,12 @@ export function DistributorsTab({
   schools: SchoolRow[];
   packages: PackageRow[];
 }) {
+  const { profile } = useAuth();
+  // Approvals, commission % and coupons are the super admin's decisions; others only view.
+  const isSuperAdmin = profile?.role === "superadmin";
   const [distributors, setDistributors] = useState<DistributorRecord[]>([]);
+  const [editingCommission, setEditingCommission] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [coupons, setCoupons] = useState<DistributorCouponRecord[]>([]);
   const [commissions, setCommissions] = useState<DistributorMonthlyCommission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,7 +221,67 @@ export function DistributorsTab({
     return map;
   }, [distributors, linkedSchools, commissions, monthKey]);
 
+  // Pending and rejected applications live in "طلبات الموزعين", not in the active list.
+  const activeDistributors = useMemo(
+    () => distributors.filter((d) => !["pending", "rejected"].includes(String(d.status || ""))),
+    [distributors],
+  );
+  const couponsByDistributor = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const c of coupons) {
+      if (!c.distributorId || c.active === false) continue;
+      map.set(c.distributorId, [...(map.get(c.distributorId) || []), String(c.code || "")]);
+    }
+    return map;
+  }, [coupons]);
+
   const selectedDistributor = distributors.find((d) => d.id === selectedDistributorId);
+
+  const handleSaveCommission = async (distributor: DistributorRecord) => {
+    const value = Number(editingCommission);
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      toast.error("النسبة يجب أن تكون بين 0 و 100");
+      return;
+    }
+    try {
+      await updateDoc(doc(db, "distributors", distributor.id), {
+        commissionPercent: value,
+        updatedAt: serverTimestamp(),
+      });
+      // Keep the distributor's coupons in step so new schools get the new rate.
+      await Promise.all(
+        coupons
+          .filter((c) => c.distributorId === distributor.id)
+          .map((c) => updateDoc(doc(db, "distributorCoupons", c.id), { commissionPercent: value })),
+      );
+      toast.success(`تم تحديث نسبة ${distributor.name} إلى ${value}% — تُطبّق على المدارس الجديدة`);
+      setEditingCommission(null);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "فشل تحديث النسبة");
+    }
+  };
+
+  const handleDeleteDistributor = async (distributor: DistributorRecord) => {
+    if (
+      !window.confirm(
+        `حذف الموزع "${distributor.name}" نهائياً؟\nسيُحذف حساب دخوله وكوبوناته، وتتوقف عمولات مدارسه (يبقى سجلها).`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(distributor.id);
+    try {
+      const r = await adminDeleteDistributor(distributor.id);
+      toast.success(
+        `تم حذف الموزع — ${r.couponsDeleted ?? 0} كوبون، ${r.schoolsPaused ?? 0} مدرسة أوقفت عمولتها`,
+      );
+      setSelectedDistributorId(null);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "فشل حذف الموزع");
+    } finally {
+      setDeletingId(null);
+    }
+  };
   const selectedSchools = linkedSchools.filter((s) => s.distributorId === selectedDistributorId);
   const selectedCommissions = commissions.filter((c) => c.distributorId === selectedDistributorId);
 
@@ -249,6 +318,10 @@ export function DistributorsTab({
     const code = newCoupon.code.trim().toUpperCase();
     if (!code || !newCoupon.distributorId) {
       toast.error("الكود والموزع مطلوبان");
+      return;
+    }
+    if (coupons.some((c) => String(c.code || "").toUpperCase() === code)) {
+      toast.error("كود الكوبون مستخدم مسبقاً — اختر كوداً مختلفاً");
       return;
     }
     const dist = distributors.find((d) => d.id === newCoupon.distributorId);
@@ -357,6 +430,7 @@ export function DistributorsTab({
             عمولة شهرية مستمرة لكل مدرسة مرتبطة بموزع
           </p>
         </div>
+        {isSuperAdmin && (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -375,11 +449,13 @@ export function DistributorsTab({
             كوبون جديد
           </button>
         </div>
+        )}
       </div>
 
       <DistributorSupportInbox distributors={distributors} />
 
       {/* Generate monthly */}
+      {isSuperAdmin && (
       <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
         <h4 className="text-lg font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
           <Calendar size={18} />
@@ -408,8 +484,10 @@ export function DistributorsTab({
           يمكن ربط هذا الإجراء لاحقاً بمهمة مجدولة شهرية — حالياً تشغيل يدوي للسوبر أدمن فقط.
         </p>
       </div>
+      )}
 
       {/* Apply coupon */}
+      {isSuperAdmin && (
       <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
         <h4 className="text-lg font-black text-slate-900 dark:text-white mb-4">ربط مدرسة بكوبون موزع</h4>
         <div className="flex flex-wrap gap-3 items-end">
@@ -448,6 +526,7 @@ export function DistributorsTab({
           </button>
         </div>
       </div>
+      )}
 
       {/* Distributor cards */}
       <div>
@@ -456,8 +535,9 @@ export function DistributorsTab({
           الموزعون
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {distributors.map((d) => {
+          {activeDistributors.map((d) => {
             const stats = distributorStats.get(d.id);
+            const codes = couponsByDistributor.get(d.id) || [];
             return (
               <button
                 key={d.id}
@@ -471,7 +551,14 @@ export function DistributorsTab({
               >
                 <div className="font-black text-slate-900 dark:text-white text-lg">{d.name}</div>
                 <div className="text-xs text-slate-500 mt-1">
-                  نسبة العمولة الافتراضية: {d.commissionPercent}%
+                  نسبة العمولة: {d.commissionPercent ?? 0}%
+                  {codes.length ? (
+                    <span className="font-mono font-bold text-indigo-600 dark:text-indigo-300 ms-2" dir="ltr">
+                      {codes.join(" · ")}
+                    </span>
+                  ) : (
+                    <span className="ms-2 text-amber-600">بدون كوبون</span>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4 text-xs">
                   <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-2">
@@ -501,7 +588,7 @@ export function DistributorsTab({
             );
           })}
         </div>
-        {distributors.length === 0 && (
+        {activeDistributors.length === 0 && (
           <p className="text-slate-500 text-sm">لا يوجد موزعون بعد. أضف موزعاً وكوبوناً للبدء.</p>
         )}
       </div>
@@ -522,6 +609,56 @@ export function DistributorsTab({
                 {selectedDistributor.name} — المدارس التابعة
               </h4>
             </div>
+            {isSuperAdmin && (
+              <div className="flex flex-wrap items-center gap-2">
+                {editingCommission !== null ? (
+                  <>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.5"
+                      value={editingCommission}
+                      onChange={(e) => setEditingCommission(e.target.value)}
+                      className="w-24 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold"
+                      aria-label="نسبة العمولة الجديدة"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveCommission(selectedDistributor)}
+                      className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold"
+                    >
+                      حفظ النسبة
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingCommission(null)}
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold"
+                    >
+                      إلغاء
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingCommission(String(selectedDistributor.commissionPercent ?? 0))}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold"
+                  >
+                    <Pencil size={15} />
+                    تعديل النسبة ({selectedDistributor.commissionPercent ?? 0}%)
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={deletingId === selectedDistributor.id}
+                  onClick={() => void handleDeleteDistributor(selectedDistributor)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-50"
+                >
+                  {deletingId === selectedDistributor.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                  حذف الموزع
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => void openDistributorChat(selectedDistributor)}
@@ -530,6 +667,7 @@ export function DistributorsTab({
               <MessageSquare size={16} />
               فتح محادثة
             </button>
+            {isSuperAdmin && (
             <button
               type="button"
               onClick={async () => {
@@ -548,6 +686,7 @@ export function DistributorsTab({
               <Wallet size={16} />
               تعليم كل عمولات {monthKey} كمدفوعة
             </button>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -599,6 +738,7 @@ export function DistributorsTab({
                         )}
                       </td>
                       <td className="py-3 px-2">
+                        {isSuperAdmin && (
                         <button
                           type="button"
                           title={paused ? "إعادة تفعيل العمولة" : "إيقاف العمولة"}
@@ -623,6 +763,7 @@ export function DistributorsTab({
                             <PauseCircle size={18} className="text-amber-600" />
                           )}
                         </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -686,7 +827,7 @@ export function DistributorsTab({
                   <td className="py-2 px-2 font-bold">{formatIqd(c.commissionAmount)}</td>
                   <td className="py-2 px-2">{STATUS_LABELS[c.status] || c.status}</td>
                   <td className="py-2 px-2">
-                    {c.status !== "paid" && c.status !== "canceled" && (
+                    {isSuperAdmin && c.status !== "paid" && c.status !== "canceled" && (
                       <button
                         type="button"
                         onClick={async () => {
@@ -850,7 +991,7 @@ export function DistributorsTab({
               className="w-full px-3 py-2 rounded-lg border dark:border-slate-700 dark:bg-slate-800"
             >
               <option value="">اختر الموزع</option>
-              {distributors.map((d) => (
+              {activeDistributors.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>

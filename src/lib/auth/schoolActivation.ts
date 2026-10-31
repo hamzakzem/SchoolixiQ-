@@ -201,7 +201,6 @@ function buildSchoolPayload(
       subscriptionExpiresAt: expiresAt.toISOString(),
       showSubscriptionTimer: true,
       adminEmail: email,
-      adminPassword: password,
       adminPhone: phone,
       adminName,
       ownerUid: adminUid,

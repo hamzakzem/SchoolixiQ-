@@ -7,7 +7,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator, signInWithEmailAndPassword } from 'firebase/auth';
 import {
   getFirestore, connectFirestoreEmulator, collection, doc, addDoc, setDoc, getDoc, getDocs,
-  updateDoc, query, where, serverTimestamp,
+  updateDoc, query, where, serverTimestamp, runTransaction, increment,
 } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, ref, uploadString } from 'firebase/storage';
 import fs from 'fs';
@@ -66,12 +66,27 @@ await test('admin: add class', async () => {
   const r = await addDoc(collection(db, 'classes'), { name: 'صف اختبار', schoolId: 'S1', createdAt: serverTimestamp() });
   return r.id;
 });
-await test('admin: add student', async () => {
+await test('admin: add student (with school studentCount + 1, as the app does)', async () => {
   const { db } = await admin();
-  await setDoc(doc(db, 'students', 'ST_NEW'), {
-    name: 'طالب جديد', schoolId: 'S1', classId: 'C1', registrationNumber: '2001', parentIds: [],
-    tuitionBalance: 0, createdAt: serverTimestamp(),
+  await runTransaction(db, async (t) => {
+    t.set(doc(db, 'students', 'ST_NEW'), {
+      name: 'طالب جديد', schoolId: 'S1', classId: 'C1', registrationNumber: '2001', parentIds: [],
+      tuitionBalance: 0, createdAt: serverTimestamp(),
+    });
+    t.update(doc(db, 'schools', 'S1'), { studentCount: increment(1) });
   });
+});
+await test('admin: student without raising the count is refused (package limit)', async () => {
+  const { db } = await admin();
+  try {
+    await setDoc(doc(db, 'students', 'ST_BYPASS'), {
+      name: 'تجاوز', schoolId: 'S1', classId: 'C1', registrationNumber: '2002', parentIds: [],
+    });
+  } catch (e) {
+    if (String(e.code || e.message).includes('permission')) return 'denied';
+    throw e;
+  }
+  throw new Error('write was allowed');
 });
 await test('admin: edit student keeps other fields', async () => {
   const { db } = await admin();
