@@ -986,7 +986,8 @@ html.dark .sx-ds-shell {
 }
 
 /* Force trailing nested action groups to same geometry */
-.sx-nav__actions button:not(.sx-nav__profile-item):not(.sx-nav__chat-btn):not(.sx-lang-toggle__item),
+/* (the profile chip sizes itself: avatar only, or avatar + name on wide screens) */
+.sx-nav__actions button:not(.sx-nav__profile-item):not(.sx-nav__chat-btn):not(.sx-lang-toggle__item):not(.sx-nav__profile-chip),
 .sx-nav__actions .sx-ds-icon-btn,
 .sx-nav__actions .sx-header-action-btn {
   width: 40px !important;
