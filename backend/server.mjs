@@ -3531,6 +3531,89 @@ function scheduleCredentialScrub(getDb2, adminSdk, { intervalMs = 6 * 60 * 60 * 
   timer.unref?.();
 }
 
+// chatThreadMigration.mjs
+var LEGACY = /^superadmin:([^:]+):school:(.+)$/;
+var PAGE = 400;
+var sharedKey = (schoolId) => `superadmin_${schoolId}`;
+var millis = (v) => v && typeof v.toMillis === "function" ? v.toMillis() : 0;
+async function moveMessages(db) {
+  let moved = 0;
+  let cursor = null;
+  for (let pass = 0; pass < 50; pass += 1) {
+    let q = db.collection("system_messages").where("conversationId", ">=", "superadmin:").where("conversationId", "<", "superadmin;").orderBy("conversationId").limit(PAGE);
+    if (cursor) q = q.startAfter(cursor);
+    const snap = await q.get();
+    if (snap.empty) break;
+    cursor = snap.docs[snap.docs.length - 1];
+    const batch = db.batch();
+    let ops = 0;
+    for (const docSnap of snap.docs) {
+      const legacyId = String(docSnap.get("conversationId") || "");
+      const m = LEGACY.exec(legacyId);
+      if (!m) continue;
+      const target = sharedKey(m[2]);
+      batch.update(docSnap.ref, { conversationId: target, conversationKey: target, legacyConversationId: legacyId });
+      ops += 1;
+    }
+    if (ops) {
+      await batch.commit();
+      moved += ops;
+    }
+    if (snap.size < PAGE) break;
+  }
+  return moved;
+}
+async function mergeConversations(db, FieldValue) {
+  const snap = await db.collection("conversations").where("conversationId", ">=", "superadmin:").where("conversationId", "<", "superadmin;").get();
+  let merged = 0;
+  for (const legacyDoc of snap.docs) {
+    const m = LEGACY.exec(String(legacyDoc.get("conversationId") || legacyDoc.id));
+    if (!m) continue;
+    const schoolId = m[2];
+    const key = sharedKey(schoolId);
+    const targetRef = db.collection("conversations").doc(key);
+    await db.runTransaction(async (tx) => {
+      const target = await tx.get(targetRef);
+      const legacy = legacyDoc.data() || {};
+      const ids = { conversationId: key, conversationKey: key, schoolId, contactType: "school", contactId: schoolId };
+      let patch;
+      if (!target.exists) {
+        patch = { ...legacy, ...ids, participants: ["admin", "super_admin"] };
+      } else {
+        const cur = target.data() || {};
+        patch = { ...ids, participants: FieldValue.arrayUnion("admin", "super_admin") };
+        if (millis(legacy.updatedAt) > millis(cur.updatedAt)) {
+          if (legacy.lastMessage !== void 0) patch.lastMessage = legacy.lastMessage;
+          if (legacy.updatedAt) patch.updatedAt = legacy.updatedAt;
+        }
+        if (!cur.conversationAssignment && legacy.conversationAssignment) {
+          patch.conversationAssignment = legacy.conversationAssignment;
+        }
+      }
+      tx.set(targetRef, patch, { merge: true });
+      tx.delete(legacyDoc.ref);
+    });
+    merged += 1;
+  }
+  return merged;
+}
+async function migrateSchoolPlatformThreads(db, adminSdk) {
+  const messages = await moveMessages(db);
+  const conversations = await mergeConversations(db, adminSdk.firestore.FieldValue);
+  if (messages || conversations) {
+    console.log("[chat-thread-migration] moved into shared school threads", { messages, conversations });
+  }
+  return { messages, conversations };
+}
+function scheduleChatThreadMigration(getDb2, adminSdk, { intervalMs = 6 * 60 * 60 * 1e3, delayMs = 2e4 } = {}) {
+  const run = () => migrateSchoolPlatformThreads(getDb2(), adminSdk).catch(
+    (e) => console.error("[chat-thread-migration] run failed", e?.message || e)
+  );
+  setTimeout(run, delayMs);
+  const timer = setInterval(run, intervalMs);
+  timer.unref?.();
+}
+
 // distributorPortal.mjs
 var COMMISSIONS_COL = "distributorMonthlyCommissions";
 var DISTRIBUTORS_COL2 = "distributors";
@@ -6167,6 +6250,7 @@ async function startServer() {
       console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
     }
     scheduleCredentialScrub(getDb, admin4);
+    scheduleChatThreadMigration(getDb, admin4);
     const isProductionEnv2 = process.env.NODE_ENV === "production";
     const isDevUrl = process.env.APP_URL && (process.env.APP_URL.includes("-dev-") || process.env.APP_URL.includes("localhost") || process.env.APP_URL.includes("127.0.0.1"));
     if (process.env.APP_URL) {

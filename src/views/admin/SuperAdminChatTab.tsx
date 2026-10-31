@@ -23,14 +23,15 @@ import {
   buildAssistantOwnedThreadMessagesQuery,
   buildAssistantPrivateConversationsQuery,
   buildAssistantPrivateThreadMessagesQuery,
-  buildThreadMessagesQuery,
+  buildThreadMessagesQueryForKeys,
   shouldMarkThreadUnread,
   unreadIdsForReceiver,
 } from '../../lib/chatThreadMessages';
 import {
   assistantSchoolConversationKey,
   resolveConversationIdForContact,
-  superAdminSchoolConversationKey,
+  schoolPlatformConversationKey,
+  superAdminSchoolThreadKeys,
 } from '../../lib/chatConversationKeys';
 import {
   loadAssistantContactDirectory,
@@ -276,30 +277,35 @@ export default function SuperAdminChatTab() {
         opsContactsRef.list = contacts;
         flushAssistantContacts();
 
+        const latestBySchool: Record<string, number> = {};
+        allowed.forEach((data) => {
+          const schoolId = String(data.schoolId ?? '');
+          const updatedAt = data.updatedAt as { toMillis?: () => number } | undefined;
+          if (updatedAt?.toMillis && schoolId) {
+            latestBySchool[schoolId] = Math.max(latestBySchool[schoolId] ?? 0, updatedAt.toMillis());
+          }
+        });
         setLastInteractionTimes((prev) => {
           const next = { ...prev };
           let changed = false;
-          allowed.forEach((data) => {
-            const schoolId = String(data.schoolId ?? '');
-            const updatedAt = data.updatedAt as { toMillis?: () => number } | undefined;
-            if (updatedAt?.toMillis && schoolId) {
-              const time = updatedAt.toMillis();
-              if (next[schoolId] !== time) {
-                next[schoolId] = time;
-                changed = true;
-              }
+          for (const [schoolId, time] of Object.entries(latestBySchool)) {
+            if (next[schoolId] !== time) {
+              next[schoolId] = time;
+              changed = true;
             }
-          });
+          }
           return changed ? next : prev;
         });
 
         setLastMessageSnippets((prev) => {
           const next = { ...prev };
           let changed = false;
+          const seen = new Set<string>();
           allowed.forEach((data) => {
             const schoolId = String(data.schoolId ?? '');
             const lastMessage = data.lastMessage;
-            if (!lastMessage || !schoolId) return;
+            if (!lastMessage || !schoolId || seen.has(schoolId)) return;
+            seen.add(schoolId); // newest conversation first
             if (next[schoolId] !== lastMessage) {
               next[schoolId] = String(lastMessage);
               changed = true;
@@ -445,29 +451,34 @@ export default function SuperAdminChatTab() {
           profileRecord,
         );
 
+        const latestBySchool: Record<string, number> = {};
+        allowed.forEach((data) => {
+          const schoolId = String(data.schoolId ?? '');
+          const updatedAt = data.updatedAt as { toMillis?: () => number } | undefined;
+          if (updatedAt?.toMillis && schoolId) {
+            latestBySchool[schoolId] = Math.max(latestBySchool[schoolId] ?? 0, updatedAt.toMillis());
+          }
+        });
         setLastInteractionTimes((prev) => {
           const next = { ...prev };
           let changed = false;
-          allowed.forEach((data) => {
-            const schoolId = String(data.schoolId ?? '');
-            const updatedAt = data.updatedAt as { toMillis?: () => number } | undefined;
-            if (updatedAt?.toMillis && schoolId) {
-              const time = updatedAt.toMillis();
-              if (next[schoolId] !== time) {
-                next[schoolId] = time;
-                changed = true;
-              }
+          for (const [schoolId, time] of Object.entries(latestBySchool)) {
+            if (next[schoolId] !== time) {
+              next[schoolId] = time;
+              changed = true;
             }
-          });
+          }
           return changed ? next : prev;
         });
         setLastMessageSnippets((prev) => {
           const next = { ...prev };
           let changed = false;
+          const seen = new Set<string>();
           allowed.forEach((data) => {
             const schoolId = String(data.schoolId ?? '');
             const lastMessage = data.lastMessage;
-            if (!lastMessage || !schoolId) return;
+            if (!lastMessage || !schoolId || seen.has(schoolId)) return;
+            seen.add(schoolId); // newest conversation first
             if (next[schoolId] !== lastMessage) {
               next[schoolId] = String(lastMessage);
               changed = true;
@@ -507,17 +518,20 @@ export default function SuperAdminChatTab() {
     unreadKeyRef.current = '';
     messagesFirstSnapshotRef.current = false;
 
-    const convId = isPlatformAssistantView
-      ? resolveConversationIdForContact({
-          contactType: activeContact.type,
-          contactId: String(activeContact.extra?.contactId || activeContact.id),
-          assistantUid: profile.uid,
-          conversationId: activeContact.extra?.conversationId as string | undefined,
-        })
-      : String(
-          activeContact.extra?.conversationId
-            ?? superAdminSchoolConversationKey(profile.uid, activeContact.id),
-        );
+    const threadKeys = isPlatformAssistantView
+      ? [
+          resolveConversationIdForContact({
+            contactType: activeContact.type,
+            contactId: String(activeContact.extra?.contactId || activeContact.id),
+            assistantUid: profile.uid,
+            conversationId: activeContact.extra?.conversationId as string | undefined,
+          }),
+        ]
+      : activeContact.extra?.conversationId
+        ? [String(activeContact.extra.conversationId)]
+        // The school writes to the shared thread; older super-admin replies sit under the per-admin key.
+        : superAdminSchoolThreadKeys(profile.uid, activeContact.id);
+    const convId = threadKeys[0];
     const untrackMessages = openChatSnapshotListener('SuperAdminChatTab:messages');
 
     const mergeAndApply = (docs: Record<string, unknown>[]) => {
@@ -577,7 +591,7 @@ export default function SuperAdminChatTab() {
       };
     }
 
-    const q = buildThreadMessagesQuery(activeContact.id, convId);
+    const q = buildThreadMessagesQueryForKeys(activeContact.id, threadKeys);
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map((docSnap) => ({
         id: docSnap.id,
@@ -629,7 +643,7 @@ export default function SuperAdminChatTab() {
           (school as { extra?: { conversationId?: string } }).extra?.conversationId
             ?? assistantSchoolConversationKey(profile.uid, school.id),
         )
-      : superAdminSchoolConversationKey(profile.uid, school.id);
+      : schoolPlatformConversationKey(school.id);
     const attachmentLabel = isRtl ? 'ملف مرفق' : 'Attachment';
     const visibility = isPlatformAssistantView
       ? 'platform_operations'
@@ -752,7 +766,7 @@ export default function SuperAdminChatTab() {
             })
           : String(
               activeContact.extra?.conversationId
-                ?? superAdminSchoolConversationKey(profile.uid, activeContact.id),
+                ?? schoolPlatformConversationKey(activeContact.id),
             );
         const fileExt = selectedFile.name.split('.').pop();
         const path = `chat_files/${convId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -808,6 +822,11 @@ export default function SuperAdminChatTab() {
     if (timeA !== timeB) return timeB - timeA;
     return (a.name || '').localeCompare(b.name || '');
   });
+
+  const schoolNames = useMemo(
+    () => Object.fromEntries(schools.map((s) => [String(s.id), String(s.name || s.id)])),
+    [schools],
+  );
 
   const groupedMessages = useMemo(() => messages.reduce((acc, msg) => {
     let dateStr = isRtl ? 'اليوم' : 'Today';
@@ -1147,7 +1166,7 @@ export default function SuperAdminChatTab() {
       </div>
       {isSuperAdminChatView && !isPlatformAssistantView ? (
         <div className="hidden xl:flex w-[min(22rem,32vw)] shrink-0 min-h-0 border-s border-[#0B2345]/10">
-          <ChatControlCenter isRtl={isRtl} isSuperAdmin={isSuperAdminChatView} />
+          <ChatControlCenter isRtl={isRtl} isSuperAdmin={isSuperAdminChatView} contactNames={schoolNames} />
         </div>
       ) : null}
       <ChatSettingsPanel

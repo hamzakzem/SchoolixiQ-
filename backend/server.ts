@@ -53,6 +53,7 @@ import { loadSafeSchoolDirectory } from './chatDirectory.mjs';
 import { runChatEscalation } from './chatEscalationWorker.mjs';
 import { registerDismissalRoutes } from './dismissalApi.mjs';
 import { scheduleCredentialScrub } from './credentialScrub.mjs';
+import { scheduleChatThreadMigration } from './chatThreadMigration.mjs';
 import {
   getDistributorDashboardPayload,
   resolveDistributorContext,
@@ -2716,6 +2717,9 @@ async function startServer() {
 
     // Delete passwords older app versions stored as readable text in Firestore
     scheduleCredentialScrub(getDb, admin);
+
+    // Move super-admin replies stored under the old per-admin thread id into the thread schools read
+    scheduleChatThreadMigration(getDb, admin);
 
     // Save APP_URL dynamically to Firestore system config so all clients (including Mobile Apps) have access to the actual server URL
     // CRITICAL: We ONLY save in production, and only if it's not a development/dev environment.

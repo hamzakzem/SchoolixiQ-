@@ -17,6 +17,7 @@ import {
   type DocumentSnapshot,
 } from 'firebase/firestore';
 import { UserProfile } from '../types';
+import { stableEqual } from './stableEqual';
 import {
   resolveProfileSchoolId,
   roleRequiresSchoolBootstrap,
@@ -206,7 +207,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             ? 'school'
             : (data as UserProfile).assistantType,
     } as UserProfile;
-    setProfile(nextProfile);
+    setProfile((prev) => (prev && stableEqual(prev, nextProfile) ? prev : nextProfile));
     setProfileFromCache(true);
     setProfileLoaded(true);
     profileLoadedRef.current = true;
@@ -684,7 +685,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             permissions: resolvedPermissions as UserProfile['permissions'],
           } as UserProfile;
 
-          setProfile(nextProfile);
+          // Keep the same object when nothing changed: every screen keys its Firestore
+          // listeners on the profile, and re-creating it made them all unsubscribe and
+          // immediately re-listen to the same queries (which can trip a Firestore SDK
+          // internal assertion, "Unexpected state ca9").
+          setProfile((prev) => (prev && stableEqual(prev, nextProfile) ? prev : nextProfile));
           setProfileLoaded(true);
           profileLoadedRef.current = true;
           persistProfileCache(authUser.uid, { ...data, schoolId: normalizedSchoolId });

@@ -21,7 +21,7 @@ type Props = {
 export function ParentGradesView({ isRtl, t, studentName, grades, loading }: Props) {
   return (
     <div className="parent-tab space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <div className="parent-page-head flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="parent-page-title">
             {t('resultsFor')} {studentName}
@@ -29,7 +29,7 @@ export function ParentGradesView({ isRtl, t, studentName, grades, loading }: Pro
           <p className="parent-page-subtitle">{isRtl ? 'درجات حسب المادة والفصل' : 'Grades by subject and term'}</p>
         </div>
         <span className="parent-badge parent-badge--gold">{t('firstSemester')}</span>
-      </header>
+      </div>
 
       {loading ? (
         <div className="space-y-3">

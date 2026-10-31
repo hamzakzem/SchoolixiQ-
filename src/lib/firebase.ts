@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { initializeFirestore, connectFirestoreEmulator, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -40,38 +40,13 @@ if (typeof window !== 'undefined') {
 
 const app = initializeApp(firebaseConfig);
 
-// Avoid persistentMultipleTabManager in iframes to prevent BroadcastChannel/lock assertion errors
-const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
-
-// Resilient Local Cache Factory
-const getResilientCache = () => {
-  if (typeof window === 'undefined') {
-    return memoryLocalCache();
-  }
-
-  try {
-    const hasIndexedDB = 'indexedDB' in window && window.indexedDB !== null;
-    if (!hasIndexedDB) {
-      console.warn("IndexedDB is not supported on this browser. Falling back to in-memory cache.");
-      return memoryLocalCache();
-    }
-
-    // Inside iframes (like the AI Studio sandbox), persistent tab managers can conflict with parent frame locks,
-    // causing frequent database disconnects. We prioritize super-stable memory cache in nested frames.
-    if (isInIframe) {
-      console.log("Running inside iframe/preview: Using memoryLocalCache for absolute stability and zero IndexedDB locking issues.");
-      return memoryLocalCache();
-    }
-
-    // For standalone production builds (e.g. mobile apps / main tabs), single-tab persistent cache works great
-    return persistentLocalCache({
-      tabManager: persistentSingleTabManager({})
-    });
-  } catch (error) {
-    console.warn("IndexedDB access threw an error. Falling back to in-memory cache:", error);
-    return memoryLocalCache();
-  }
-};
+// Firestore keeps its local cache in memory. The persistent (IndexedDB) cache reuses
+// the same internal target id when a query is listened to again, and a quick
+// unlisten → re-listen then trips an SDK assertion ("INTERNAL ASSERTION FAILED:
+// Unexpected state", ids ca9/b815) that kills Firestore until the page reloads —
+// seen on iPhone in the school messaging screen. Offline support does not depend on
+// it: the app keeps its own IndexedDB queue and data cache (src/lib/offline).
+const getResilientCache = () => memoryLocalCache();
 
 const firestoreDatabaseId = (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId;
 const useDefaultFirestore =

@@ -239,3 +239,10 @@ html.dark .sx-shell-content-inner :is(input, select, textarea):focus {
   border-radius: 999px;
   background: linear-gradient(180deg, #f0d58a 0%, #d4a64a 100%);
 }
+
+/* Arabic descenders (the dots under ي/ج/ق…) were clipped wherever a one-line
+   truncated label also had line-height 1 — e.g. "الموسوي" rendered as "الموسوى ،". */
+html[lang="ar"] .truncate:is(.leading-none, .leading-tight, [class*="leading-["]) {
+  line-height: 1.5 !important;
+  padding-block: 1px;
+}
