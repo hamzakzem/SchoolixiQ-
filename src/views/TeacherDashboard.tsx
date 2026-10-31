@@ -1388,6 +1388,8 @@ export default function TeacherDashboard() {
               className={`sx-ds-icon-btn relative active:scale-95 shrink-0 ${
                 showNotifications ? "is-active" : ""
               }`}
+              aria-label="الإشعارات"
+              title="الإشعارات"
             >
               <Bell size={18} strokeWidth={1.75} />
               {notifications.filter((n) => !n.read).length > 0 && (

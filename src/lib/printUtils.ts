@@ -1,8 +1,29 @@
 import { Capacitor } from '@capacitor/core';
 import { saveElementAsPdf } from './pdfUtils';
 
-export function printElement(element: HTMLElement | null, title: string = 'طباعة') {
-  if (!element) return false;
+/**
+ * Opens the print window synchronously inside a tap/click handler. Safari (iPhone/iPad)
+ * blocks window.open() that runs later (after a timeout or await), so callers that need
+ * to re-render before printing open the window first and pass it to printElement.
+ */
+export function openPrintWindow(): Window | null {
+  if (Capacitor.isNativePlatform()) return null;
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write('<html dir="rtl"><body style="font-family:system-ui;padding:40px;color:#0b2345">جاري تجهيز الصفحة للطباعة…</body></html>');
+  }
+  return win;
+}
+
+export function printElement(
+  element: HTMLElement | null,
+  title: string = 'طباعة',
+  targetWindow?: Window | null,
+) {
+  if (!element) {
+    targetWindow?.close();
+    return false;
+  }
 
   if (Capacitor.isNativePlatform()) {
     // The app's WebView cannot print: save a (multi-page) PDF instead
@@ -13,7 +34,7 @@ export function printElement(element: HTMLElement | null, title: string = 'طب�
     return true;
   }
 
-  const printWindow = window.open('', '_blank');
+  const printWindow = targetWindow && !targetWindow.closed ? targetWindow : window.open('', '_blank');
   if (!printWindow) {
     // If we're able to show a toast, that's great, but we can't import toast here nicely without risking circular deps, 
     // so we just return false and let the caller show a toast.
@@ -47,6 +68,10 @@ export function printElement(element: HTMLElement | null, title: string = 'طب�
              background: white; 
              font-family: 'Inter', system-ui, sans-serif; 
           }
+          /* The app stylesheet hides #print-mount on screen (it is the in-page print
+             fallback); in this window it is the page itself, so show it as a preview. */
+          #print-mount { display: block !important; }
+          @media (max-width: 700px) { body { padding: 56px 8px 8px; } }
         </style>
       </head>
       <body>

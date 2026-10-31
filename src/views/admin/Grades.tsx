@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { printElement } from '../../lib/printUtils';
+import { openPrintWindow, printElement } from '../../lib/printUtils';
 import { printService } from '../../lib/printService';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, updateDoc, doc, limit } from 'firebase/firestore';
@@ -70,34 +70,39 @@ export default function Grades() {
   const gradeColumns = activeColumns.map((k: string) => colDefs[k]).filter(Boolean);
 
   const printContentRef = useRef<HTMLDivElement>(null);
-  const handlePrintClick = () => {
+  const handlePrintClick = (targetWindow?: Window | null, forStudent = false) => {
     if (!printContentRef.current) {
+      targetWindow?.close();
       toast.error('لا توجد بيانات للطباعة');
       return;
     }
-    const title = printTarget ? 'وثيقة درجات الطالب' : 'سجل نتائج الطلاب الموحد';
-    const success = printElement(printContentRef.current, title);
+    const title = forStudent ? 'وثيقة درجات الطالب' : 'سجل نتائج الطلاب الموحد';
+    const success = printElement(printContentRef.current, title, targetWindow);
     if (!success) {
       toast.error('يرجى السماح بالنوافذ المنبثقة (Pop-ups) للطباعة');
     }
     toast.dismiss('print-toast');
   };
 
+  // The window is opened right away (inside the tap) so Safari does not block it,
+  // then filled once the print layout has re-rendered.
   const handlePrint = (mode: 'table' | 'cards') => {
+    const win = openPrintWindow();
     setPrintTarget(null);
     setPrintMode(mode);
     toast.loading('جاري تحضير الكشف للطباعة...', { id: 'print-toast', duration: 2000 });
     setTimeout(() => {
-      handlePrintClick();
+      handlePrintClick(win, false);
     }, 500);
   };
 
   const handlePrintIndividual = (student: any) => {
+    const win = openPrintWindow();
     setPrintTarget(student);
     setPrintMode('table');
     toast.loading('جاري تحضير الشهادة...', { id: 'print-toast', duration: 2000 });
     setTimeout(() => {
-      handlePrintClick();
+      handlePrintClick(win, true);
     }, 500);
   };
 

@@ -2625,7 +2625,7 @@ export default function SuperAdminDashboard() {
                 <NotificationCenter
                   onClose={() => setShowNotifications(false)}
                   activeTabSetter={setActiveTab as (tab: string) => void}
-                  userRole="super_admin"
+                  userRole={profile?.role === "superadmin" ? "super_admin" : profile?.role}
                 />
               )}
             </>

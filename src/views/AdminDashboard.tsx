@@ -1265,6 +1265,8 @@ export default function AdminDashboard() {
               className={`sx-ds-icon-btn relative active:scale-95 shrink-0 ${
                 showNotifications ? "is-active" : ""
               }`}
+              aria-label="الإشعارات"
+              title="الإشعارات"
             >
               <Bell size={18} strokeWidth={1.75} />
               {totalUnread > 0 && (

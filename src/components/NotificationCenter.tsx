@@ -443,6 +443,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   useEffect(() => {
     if (!profile?.schoolId) return;
+    // Teacher names only dress up homework titles; roles that cannot list school
+    // users (gate guard) or never get homework notifications skip the listener.
+    if (!['parent', 'teacher', 'admin', 'school_admin', 'staff', 'assistant', 'school_assistant'].includes(String(profile.role || ''))) return;
     const teachersQ = query(
       collection(db, "users"),
       where("schoolId", "==", profile.schoolId),
@@ -458,9 +461,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           }) || { id: teacherDoc.id, ...teacherDoc.data() };
       });
       setTeachersById(map);
-    });
+    }, (err) => console.warn('[Notifications] teacher names unavailable', err?.code || err));
     return () => unsub();
-  }, [profile?.schoolId]);
+  }, [profile?.schoolId, profile?.role]);
 
   const getNotificationTitle = (n: any) => {
     if (n.type !== "homework") return n.title;

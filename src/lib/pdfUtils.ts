@@ -53,14 +53,16 @@ const IMAGE_PLACEHOLDER =
  * and saves it (download on the web, Documents folder in the Android/iOS app).
  */
 export async function saveElementAsPdf(element: HTMLElement, filename: string): Promise<boolean> {
-  const { toPng } = await import('html-to-image');
+  const { toJpeg } = await import('html-to-image');
   const { default: jsPDF } = await import('jspdf');
 
-  const dataUrl = await toPng(element, {
+  // JPEG keeps a full-page report around 1 MB instead of ~10 MB as PNG (phones, slow links)
+  const dataUrl = await toJpeg(element, {
     cacheBust: true,
     style: { background: 'white' },
     backgroundColor: '#ffffff',
     pixelRatio: 2,
+    quality: 0.9,
     imagePlaceholder: IMAGE_PLACEHOLDER,
   });
 
@@ -72,11 +74,11 @@ export async function saveElementAsPdf(element: HTMLElement, filename: string): 
 
   // Same image on every page, shifted up by one page height each time.
   let offset = 0;
-  pdf.addImage(dataUrl, 'PNG', 0, 0, pageWidth, imgHeight);
+  pdf.addImage(dataUrl, 'JPEG', 0, 0, pageWidth, imgHeight);
   while (imgHeight - offset > pageHeight + 1) {
     offset += pageHeight;
     pdf.addPage();
-    pdf.addImage(dataUrl, 'PNG', 0, -offset, pageWidth, imgHeight);
+    pdf.addImage(dataUrl, 'JPEG', 0, -offset, pageWidth, imgHeight);
   }
 
   const name = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;

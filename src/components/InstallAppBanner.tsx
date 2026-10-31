@@ -3,7 +3,13 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Capacitor } from '@capacitor/core';
 import { BellRing, Download, ShieldCheck, X, Zap } from 'lucide-react';
 import { useSystemConfig } from '../lib/SystemConfigContext';
-import { ANDROID_APK_FILENAME, resolveAndroidApkUrl } from '../lib/androidApk';
+import {
+  ANDROID_APK_FILENAME,
+  DEFAULT_ANDROID_APK_ABSOLUTE_URL,
+  DEFAULT_ANDROID_APK_PATH,
+  normalizeAndroidApkUrl,
+  resolveAndroidApkUrl,
+} from '../lib/androidApk';
 import SchoolixLogo from './SchoolixLogo';
 
 const DISMISSED_KEY = 'sx_android_apk_banner_dismissed_at';
@@ -41,7 +47,14 @@ function isAndroidPhoneBrowser(): boolean {
  */
 export default function InstallAppBanner() {
   const { config } = useSystemConfig();
-  const apkUrl = useMemo(() => resolveAndroidApkUrl(config?.androidApkUrl), [config?.androidApkUrl]);
+  const apkUrl = useMemo(() => {
+    const resolved = resolveAndroidApkUrl(config?.androidApkUrl);
+    // The APK ships with the site under /downloads: use this origin (www or not) so the
+    // browser treats it as a same-site download.
+    return resolved === DEFAULT_ANDROID_APK_ABSOLUTE_URL
+      ? normalizeAndroidApkUrl(DEFAULT_ANDROID_APK_PATH)
+      : resolved;
+  }, [config?.androidApkUrl]);
   const [visible, setVisible] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
 

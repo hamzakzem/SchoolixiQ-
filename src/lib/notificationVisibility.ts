@@ -77,8 +77,10 @@ export function isNotificationVisibleToUser(
   }
 
   if (recipients.includes(uid)) {
+    // Platform-level notifications (schoolId 'system') addressed directly to this
+    // user: distributors, platform assistants, or a school user hearing from the platform.
     if (notificationSchoolId === 'system') {
-      return role === 'superadmin';
+      return true;
     }
     return schoolIdsMatch(notificationSchoolId, viewer.schoolId);
   }
