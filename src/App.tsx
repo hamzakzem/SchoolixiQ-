@@ -1633,11 +1633,66 @@ class SafeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
   }
 }
 
+/** Firestore SDK internal assertions leave the client unusable until a reload. */
+function isFirestoreInternalError(error?: Error | null): boolean {
+  return /FIRESTORE \([^)]*\) INTERNAL ASSERTION FAILED/.test(String(error?.message || ''));
+}
+
+const FIRESTORE_RECOVERY_KEY = 'schoolix_firestore_recover_at';
+
+/** Reload once (at most every 2 minutes) instead of showing a technical error page. */
+function FirestoreRecovery() {
+  const [stopped] = useState(() => {
+    try {
+      const last = Number(sessionStorage.getItem(FIRESTORE_RECOVERY_KEY) || 0);
+      return Date.now() - last < 120_000;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (stopped) return;
+    try {
+      sessionStorage.setItem(FIRESTORE_RECOVERY_KEY, String(Date.now()));
+    } catch {
+      /* ignore */
+    }
+    const t = window.setTimeout(() => window.location.reload(), 400);
+    return () => window.clearTimeout(t);
+  }, [stopped]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-6 text-center" dir="rtl">
+      <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-lg border border-slate-100">
+        <RefreshCw className={`h-8 w-8 text-[#0B2345] mx-auto mb-4 ${stopped ? '' : 'animate-spin'}`} />
+        <h1 className="text-xl font-bold text-[#0B2345] mb-2">جاري إعادة الاتصال…</h1>
+        <p className="text-slate-500 mb-6">
+          {stopped ? 'تعذّر إعادة الاتصال تلقائياً. اضغط الزر لإعادة المحاولة.' : 'لحظات ونعيدك إلى الصفحة.'}
+        </p>
+        {stopped && (
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="w-full bg-[#0B2345] text-white font-bold py-3 rounded-xl cursor-pointer"
+          >
+            إعادة المحاولة
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FallbackComponent({ error }: { error?: Error | null }) {
   const [showDetails, setShowDetails] = useState(false);
 
   if (shouldUseChunkRecovery(error)) {
     return <ChunkLoadRecovery error={error} />;
+  }
+
+  if (isFirestoreInternalError(error)) {
+    return <FirestoreRecovery />;
   }
 
   return (

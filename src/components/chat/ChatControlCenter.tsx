@@ -19,9 +19,11 @@ type ControlTab =
 export type ChatControlCenterProps = {
   isRtl: boolean;
   isSuperAdmin: boolean;
+  /** schoolId/contactId → display name, so rows show «مدرسة …» instead of raw ids */
+  contactNames?: Record<string, string>;
 };
 
-export function ChatControlCenter({ isRtl, isSuperAdmin }: ChatControlCenterProps) {
+export function ChatControlCenter({ isRtl, isSuperAdmin, contactNames = {} }: ChatControlCenterProps) {
   const [tab, setTab] = useState<ControlTab>('all');
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [assistants, setAssistants] = useState<Array<{ id: string; name: string }>>([]);
@@ -86,6 +88,10 @@ export function ChatControlCenter({ isRtl, isSuperAdmin }: ChatControlCenterProp
   ];
 
   const selected = filtered.find((r) => String(r.id) === selectedId);
+  const rowLabel = (row: Record<string, unknown>) => {
+    const key = String(row.schoolId || row.contactId || '');
+    return String(contactNames[key] || row.contactName || row.contactId || row.schoolId || row.id);
+  };
 
   return (
     <div className="flex flex-col h-full min-h-0 border-s border-[#0B2345]/10 bg-white/80 dark:bg-[#0d1528]/80">
@@ -114,7 +120,7 @@ export function ChatControlCenter({ isRtl, isSuperAdmin }: ChatControlCenterProp
           const id = String(row.id);
           const assignment = extractConversationAssignment(row);
           const privacy = (row.conversationPrivacy as { visibility?: string } | undefined)?.visibility;
-          const label = String(row.contactId || row.schoolId || id);
+          const label = rowLabel(row);
           return (
             <button
               key={id}
@@ -150,7 +156,7 @@ export function ChatControlCenter({ isRtl, isSuperAdmin }: ChatControlCenterProp
           <ChatAssignmentPanel
             isRtl={isRtl}
             conversationId={String(selected.id)}
-            conversationLabel={String(selected.contactId || selected.schoolId || selected.id)}
+            conversationLabel={rowLabel(selected)}
             assistants={assistants}
             currentAssigneeId={extractConversationAssignment(selected)?.assignedToUserId}
           />

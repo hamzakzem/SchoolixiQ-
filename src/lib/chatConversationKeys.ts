@@ -41,6 +41,22 @@ export function legacySuperAdminSchoolConversationKey(schoolId: string): string 
   return `superadmin_${schoolId}`;
 }
 
+/**
+ * The one thread a school shares with the platform administration ("الدعم" on the
+ * school side, the school's row in مراسلة المدارس). Both sides read and write it.
+ * The school side has always used `superadmin_<schoolId>`; super-admin replies were
+ * briefly written under the per-admin key, which the school never read — the server
+ * moves those into this thread (backend/chatThreadMigration.mjs).
+ */
+export function schoolPlatformConversationKey(schoolId: string): string {
+  return legacySuperAdminSchoolConversationKey(schoolId);
+}
+
+/** Every thread id that may hold a school ↔ super admin conversation (shared key first). */
+export function superAdminSchoolThreadKeys(superAdminUid: string, schoolId: string): string[] {
+  return [schoolPlatformConversationKey(schoolId), superAdminSchoolConversationKey(superAdminUid, schoolId)];
+}
+
 export function resolveConversationIdForContact(params: {
   contactType: string;
   contactId: string;
@@ -65,10 +81,7 @@ export function resolveConversationIdForContact(params: {
     if (params.assistantUid) {
       return assistantSchoolConversationKey(params.assistantUid, id);
     }
-    if (params.superAdminUid) {
-      return superAdminSchoolConversationKey(params.superAdminUid, id);
-    }
-    return legacySuperAdminSchoolConversationKey(id);
+    return schoolPlatformConversationKey(id);
   }
   return id;
 }

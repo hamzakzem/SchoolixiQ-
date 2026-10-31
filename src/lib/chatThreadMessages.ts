@@ -35,6 +35,22 @@ export function buildThreadMessagesQuery(
 }
 
 /** Platform Assistant — owned thread messages (school / distributor / private). */
+/** Same thread query over several conversation ids (≤ 10), e.g. a thread plus its legacy id. */
+export function buildThreadMessagesQueryForKeys(
+  schoolId: string,
+  conversationIds: string[],
+): Query {
+  const ids = [...new Set(conversationIds.filter(Boolean))].slice(0, 10);
+  if (ids.length <= 1) return buildThreadMessagesQuery(schoolId, ids[0] || '');
+  return query(
+    collection(db, 'system_messages'),
+    where('schoolId', '==', schoolId),
+    where('conversationId', 'in', ids),
+    orderBy('createdAt', 'desc'),
+    limit(CHAT_MESSAGES_LIMIT),
+  );
+}
+
 export function buildAssistantOwnedThreadMessagesQuery(
   conversationId: string,
   assistantUid: string,
