@@ -11,6 +11,37 @@ import { auth } from './firebase';
 let logoutInProgress = false;
 const firestoreUnsubs = new Set<() => void>();
 
+/**
+ * True only while a user-initiated sign-out is running (the app shows a
+ * "signing out" screen so dashboards unmount and close their listeners before
+ * the session ends). Unlike logoutInProgress, it is not set while signed out.
+ */
+let signingOut = false;
+const signingOutListeners = new Set<() => void>();
+
+export function setSigningOut(value: boolean): void {
+  if (signingOut === value) return;
+  signingOut = value;
+  signingOutListeners.forEach((fn) => {
+    try {
+      fn();
+    } catch {
+      /* noop */
+    }
+  });
+}
+
+export function isSigningOut(): boolean {
+  return signingOut;
+}
+
+export function subscribeSigningOut(fn: () => void): () => void {
+  signingOutListeners.add(fn);
+  return () => {
+    signingOutListeners.delete(fn);
+  };
+}
+
 export type LogoutLogSnapshot = {
   userId: string;
   role: string;

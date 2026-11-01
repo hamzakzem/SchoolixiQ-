@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { auth, db } from "./lib/firebase";
 import { signOutWithCleanup } from "./lib/authLogout";
+import { isSigningOut, subscribeSigningOut } from "./lib/logoutGuard";
 import {
   setDoc,
   doc,
@@ -51,7 +52,7 @@ import {
   onSnapshot,
   deleteDoc,
 } from "firebase/firestore";
-import { useState, useEffect, Suspense, Component, ReactNode, ErrorInfo } from "react";
+import { useState, useEffect, useSyncExternalStore, Suspense, Component, ReactNode, ErrorInfo } from "react";
 import { motion } from "motion/react";
 import { captureException } from "./lib/sentryWrapper";
 import { DistributorAccessScreen } from "./components/DistributorAccessScreen";
@@ -1757,6 +1758,24 @@ function FallbackComponent({ error }: { error?: Error | null }) {
   );
 }
 
+/** Shown while a sign-out runs; unmounting the dashboards closes their Firestore listeners first. */
+function SigningOutScreen() {
+  const { isRtl } = useLanguage();
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-6 text-center" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-10 h-10 border-[3px] border-[#0B2345]/15 border-t-[#D4A64A] rounded-full animate-spin" />
+        <p className="text-[#0B2345] font-bold">{isRtl ? 'جارٍ تسجيل الخروج…' : 'Signing out…'}</p>
+      </div>
+    </div>
+  );
+}
+
+function AppContentGate() {
+  const signingOut = useSyncExternalStore(subscribeSigningOut, isSigningOut, isSigningOut);
+  return signingOut ? <SigningOutScreen /> : <AppContent />;
+}
+
 /** Anonymous/authenticated home: landing page or legacy login-at-root. */
 function PublicHome() {
   const { user, loading } = useAuth();
@@ -1766,7 +1785,7 @@ function PublicHome() {
     return <PageLoadingSkeleton />;
   }
   if (user) {
-    return <AppContent />;
+    return <AppContentGate />;
   }
   if (isPwaStandalone() || isPwaLaunchQuery()) {
     return (
@@ -1799,7 +1818,7 @@ function PublicLogin() {
     return <PageLoadingSkeleton />;
   }
   if (user) {
-    return <AppContent />;
+    return <AppContentGate />;
   }
   return (
     <>
@@ -1829,7 +1848,7 @@ export default function App() {
                   />
                   <Route path="/login" element={<PublicLogin />} />
                   <Route path="/" element={<PublicHome />} />
-                  <Route path="*" element={<AppContent />} />
+                  <Route path="*" element={<AppContentGate />} />
                 </Routes>
               </Suspense>
               <Toaster

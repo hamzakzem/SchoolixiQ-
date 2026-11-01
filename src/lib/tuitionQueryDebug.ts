@@ -1,3 +1,4 @@
+import { shouldIgnoreFirestoreListenerError } from './logoutGuard';
 /**
  * Temporary investigation logs for Tuition Reminder Dashboard Firestore listeners.
  * Remove after root cause is confirmed.
@@ -19,6 +20,7 @@ export function logTuitionListenerDebug(
 }
 
 export function logTuitionListenerError(queryName: string, error: unknown): void {
+  if (shouldIgnoreFirestoreListenerError(error)) return;
   const err = error as { code?: string; message?: string; name?: string };
   console.error('[TuitionReminderFirestore] LISTENER_ERROR', {
     QUERY_NAME: queryName,

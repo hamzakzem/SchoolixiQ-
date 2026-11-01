@@ -11,7 +11,27 @@ export default defineConfig(({mode}) => {
       // Shown in the footer so a deployed release can be identified at a glance.
       __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
     },
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        // App code imports firebase/firestore through src/lib/firestoreListenShim.ts
+        // (onSnapshot with a short release grace period — see that file).
+        name: 'firestore-listen-shim',
+        enforce: 'pre',
+        resolveId(source, importer) {
+          if (
+            source === 'firebase/firestore' &&
+            importer &&
+            !importer.includes('node_modules') &&
+            !importer.replace(/\\/g, '/').endsWith('src/lib/firestoreListenShim.ts')
+          ) {
+            return path.resolve(__dirname, 'src/lib/firestoreListenShim.ts');
+          }
+          return null;
+        },
+      },
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

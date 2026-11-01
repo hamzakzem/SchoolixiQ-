@@ -7,6 +7,7 @@ import {
   type DocumentData,
   type QuerySnapshot,
 } from "firebase/firestore";
+import { buildAssistantOwnedOpsUnreadMessagesQuery } from '../lib/chatThreadMessages';
 import { useAuth } from "../lib/AuthContext";
 import { SCHOOLIXIQ_LOGO_SRC } from '../lib/brandAssets';
 import {
@@ -233,9 +234,15 @@ export const AudioNotificationManager: React.FC = () => {
       );
     }
 
+    // Platform assistants may only read messages of conversations they own (privacy-stamped);
+    // the plain receiverId query is always refused for them by the rules.
+    const isPlatformAssistant =
+      normalizeEffectiveRole(profile as Record<string, unknown>) === 'platform_assistant';
     unsubs.push(
       subscribeNotifications(
-        query(collection(db, "system_messages"), where("receiverId", "==", user.uid)),
+        isPlatformAssistant
+          ? buildAssistantOwnedOpsUnreadMessagesQuery(user.uid)
+          : query(collection(db, "system_messages"), where("receiverId", "==", user.uid)),
         `messages:${user.uid}`,
         (_id, data) => {
               const effectiveRole = normalizeEffectiveRole(profile as Record<string, unknown>);

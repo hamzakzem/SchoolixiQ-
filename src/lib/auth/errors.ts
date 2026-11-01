@@ -12,6 +12,7 @@ export type AuthErrorKind =
   | 'in-app-browser'
   | 'iframe-blocked'
   | 'cancelled'
+  | 'network'
   | 'unknown';
 
 export function classifyAuthError(error: unknown): AuthErrorKind {
@@ -56,6 +57,15 @@ export function classifyAuthError(error: unknown): AuthErrorKind {
   if (code === 'auth/weak-password') return 'weak-password';
   if (code === 'auth/too-many-requests') return 'too-many-requests';
   if (code === 'auth/user-disabled') return 'user-disabled';
+  if (
+    code === 'auth/network-request-failed' ||
+    code === 'auth/internal-error' ||
+    code === 'auth/timeout' ||
+    msg.includes('network-request-failed') ||
+    msg.includes('internal-error')
+  ) {
+    return 'network';
+  }
 
   return 'unknown';
 }
@@ -102,10 +112,18 @@ export function getAuthErrorMessage(
         : 'Open the app in a full browser tab (not an embedded preview) to use Google sign-in.';
     case 'cancelled':
       return isRtl ? 'تم إلغاء تسجيل الدخول.' : 'Sign-in was cancelled.';
-    default:
-      return isAppError(error)
-        ? error.message
-        : normalizeError(error).message || t('authFailed');
+    case 'network':
+      return isRtl
+        ? 'تعذّر الاتصال بخدمة تسجيل الدخول. تحقق من الإنترنت ثم أعد المحاولة.'
+        : 'Could not reach the sign-in service. Check your connection and try again.';
+    default: {
+      // Never show raw SDK text ("Firebase: Error (auth/…)") to users.
+      const message = isAppError(error) ? error.message : normalizeError(error).message;
+      if (!message || /firebase|auth\//i.test(message)) {
+        return isRtl ? 'تعذّر تسجيل الدخول. حاول مرة أخرى.' : t('authFailed');
+      }
+      return message;
+    }
   }
 }
 
@@ -129,6 +147,8 @@ export function getEmailAuthErrorMessage(
       'auth/email-already-in-use': 'هذا البريد مستخدم مسبقاً',
       'auth/weak-password': 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
       'auth/invalid-email': 'البريد الإلكتروني غير صالح',
+      'auth/missing-email': 'يرجى إدخال البريد الإلكتروني',
+      'auth/missing-password': 'يرجى إدخال كلمة المرور',
       'auth/operation-not-allowed':
         'تسجيل الدخول بالبريد وكلمة المرور غير مفعل',
     };
