@@ -836,14 +836,23 @@ export async function registerWebPushNotifications(userId: string): Promise<stri
   return result.ok && result.token ? result.token : null;
 }
 
-export async function unregisterWebPushToken(userId: string): Promise<void> {
+export async function unregisterWebPushToken(
+  userId: string,
+  options: { duringLogout?: boolean } = {},
+): Promise<void> {
   if (!userId || !currentWebToken) {
     const stored = localStorage.getItem('schoolix_fcm_token_web');
     if (stored) currentWebToken = stored;
   }
   if (!userId || !currentWebToken) return;
 
-  const gate = canWritePushTokensForUser(userId);
+  // Sign-out marks "logging out" before it removes the token; that removal must
+  // still go through (while the session is valid), or this browser keeps
+  // receiving the signed-out account's notifications.
+  const gate =
+    options.duringLogout && auth.currentUser?.uid === userId
+      ? ({ ok: true } as const)
+      : canWritePushTokensForUser(userId);
   if (!gate.ok) {
     logTokenRemoveSkipped(userId, (gate as { reason: string }).reason === 'logging_out' ? 'signed_out' : (gate as { reason: string }).reason);
     localStorage.removeItem('schoolix_fcm_token_web');

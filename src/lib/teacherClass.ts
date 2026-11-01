@@ -41,19 +41,20 @@ export function resolveTeacherClassId(profile?: Record<string, unknown> | null):
   return ids[0] || '';
 }
 
-export function resolveTeacherClassName(
-  profile?: Record<string, unknown> | null,
-  classes?: SchoolClassOption[],
-): string {
-  const names = resolveTeacherClassNames(profile, classes);
-  if (names.length) return names.join('، ');
-  if (!profile) return '';
+function readStoredClassName(profile: Record<string, unknown>): string {
   const stored =
     (typeof profile.assignedClassName === 'string' && profile.assignedClassName) ||
     (typeof profile.primaryClassName === 'string' && profile.primaryClassName) ||
     (typeof profile.className === 'string' && profile.className) ||
     '';
-  return stored;
+  return stored.trim();
+}
+
+export function resolveTeacherClassName(
+  profile?: Record<string, unknown> | null,
+  classes?: SchoolClassOption[],
+): string {
+  return resolveTeacherClassNames(profile, classes).join('، ');
 }
 
 export function resolveTeacherClassNames(
@@ -72,7 +73,9 @@ export function resolveTeacherClassNames(
       .map((s) => s.trim())
       .filter(Boolean);
   }
-  const single = resolveTeacherClassName(profile, classes);
+  // Stored single name (never call resolveTeacherClassName here: it calls back into this
+  // function, which recursed forever for a teacher with no class yet).
+  const single = profile ? readStoredClassName(profile) : '';
   return single ? [single] : [];
 }
 

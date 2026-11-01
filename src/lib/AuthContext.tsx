@@ -18,6 +18,8 @@ import {
 } from 'firebase/firestore';
 import { UserProfile } from '../types';
 import { stableEqual } from './stableEqual';
+import { toast } from 'react-hot-toast';
+import { signOutWithCleanup } from './authLogout';
 import {
   resolveProfileSchoolId,
   roleRequiresSchoolBootstrap,
@@ -112,6 +114,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const boundSchoolIdRef = useRef<string | null>(null);
   const schoolReadyRef = useRef(false);
   const profileLoadedRef = useRef(false);
+  /** This session already saw the user's profile (so a later "missing" means it was deleted). */
+  const hadProfileRef = useRef(false);
   const schoolFetchGenRef = useRef(0);
   const schoolContextTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -385,6 +389,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (authUser) {
+        hadProfileRef.current = false;
         setLoading(true);
         setProfileLoaded(false);
         resetSchoolContext();
@@ -620,6 +625,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         ) => {
           if (shouldSkipFirestoreListeners()) return;
           if (!docSnap.exists()) return;
+          hadProfileRef.current = true;
 
           const rawProfile = docSnap.data() as Record<string, unknown>;
           const redactionCtx = buildTeacherRedactionContext(rawProfile) || rawProfile;
@@ -817,8 +823,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         unsubscribeProfile = subscribeGuardedFirestore(docRef, async (docSnap) => {
           if (shouldSkipFirestoreListeners()) return;
+          const fromCacheOnly = docSnap.metadata.fromCache;
           if (docSnap.exists()) {
             await processExistingUserProfile(docSnap, 'snapshot');
+          } else if (fromCacheOnly) {
+            // "Missing" from the local cache is not an answer — wait for the server.
+            // Treating it as final made the fallback below rewrite a real profile.
+            return;
           } else {
             // Check claims first - if server already set them, we can trust them
             let claims: any = {};
@@ -830,6 +841,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
             
             console.log(`[AUTH DIAG] Profile not found in Firestore for UID ${authUser.uid}. Claims:`, claims);
+
+            // The profile existed earlier in this session and is gone now: the account was
+            // deleted (e.g. by the school or the platform). Sign out instead of offering to
+            // set up a new profile on a removed account.
+            if (hadProfileRef.current) {
+              toast.error(
+                languageRef.current === 'en'
+                  ? 'This account was removed. Please contact your school.'
+                  : 'تم حذف هذا الحساب أو إيقافه. يرجى التواصل مع الإدارة.',
+              );
+              void signOutWithCleanup().catch(() => undefined);
+              return;
+            }
             
             if (claims && claims.role) {
               const fallbackRole = claims.role;
@@ -843,16 +867,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               });
 
               try {
+                // Create only: never overwrite a profile that does exist (a stale read must
+                // not wipe the account's school link).
+                const serverSnap = await getDocFromServer(doc(db, 'users', authUser.uid)).catch(() => null);
+                if (!serverSnap || serverSnap.exists()) return;
                 await setDoc(doc(db, 'users', authUser.uid), {
                   uid: authUser.uid,
                   email: fallbackEmail,
                   name: fallbackName,
                   role: fallbackRole,
-                  schoolId: '',
+                  schoolId: typeof claims.schoolId === 'string' ? claims.schoolId : '',
                   createdAt: serverTimestamp(),
                   updatedAt: serverTimestamp(),
                   autoProv: true,
-                }, { merge: true });
+                });
                 
                 // Return immediately, the onSnapshot listener will be reactively updated and correctly fetch it in the next cycle
                 return;
@@ -861,10 +889,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               }
             }
 
+            // No profile document (sign-up interrupted, profile removed, …): finish loading
+            // so the app can show its onboarding screen — which has a sign-out button —
+            // instead of an endless skeleton (authReady waits for profileLoaded).
+            const markProfileMissing = () => {
+              setProfile(null);
+              profileLoadedRef.current = true;
+              setProfileLoaded(true);
+              applySchoolContext('unlinked');
+              setLoading(false);
+            };
+
             // Profile doesn't exist for this UID, check if it was pre-registered by email
             if (!authUser.email) {
-              if (!claims.role) setProfile(null);
-              setLoading(false);
+              markProfileMissing();
               return;
             }
 
@@ -909,16 +947,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   // 3. Delete the provisioned doc
                   await deleteDoc(doc(db, 'users', oldId));
                 } else {
-                  setLoading(false);
+                  markProfileMissing();
                 }
               } else {
-                setProfile(null);
-                setLoading(false);
+                markProfileMissing();
               }
             } catch (error) {
               console.error("Error claiming profile:", error);
-              setProfile(null);
-              setLoading(false);
+              markProfileMissing();
             }
           }
         }, async (error) => {

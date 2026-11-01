@@ -3234,15 +3234,15 @@ export default function SuperAdminDashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         key={request.id}
-                        className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8 transition-all hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 group relative"
+                        className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-6 2xl:gap-8 transition-all hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 group relative"
                       >
-                        <div className="flex items-center gap-8 flex-1">
-                          <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors duration-500">
+                        <div className="flex items-start gap-4 md:gap-6 flex-1 min-w-0">
+                          <div className="hidden sm:flex w-16 h-16 md:w-20 md:h-20 shrink-0 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors duration-500">
                             <Building size={32} />
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-3">
-                              <h4 className="text-xl font-black text-slate-900 dark:text-white">
+                          <div className="space-y-2 flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="text-lg md:text-xl font-black text-slate-900 dark:text-white break-words">
                                 {request.customerInfo?.name ||
                                   request.schoolName ||
                                   request.adminName}
@@ -3267,8 +3267,8 @@ export default function SuperAdminDashboard() {
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                              <Phone size={14} className="text-slate-400" />
+                            <div className="flex items-center gap-2 px-3 py-1 w-fit max-w-full bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                              <Phone size={14} className="text-slate-400 shrink-0" />
                               <span className="select-all">
                                 {request.customerInfo?.phone ||
                                   request.adminPhone ||
@@ -3276,8 +3276,8 @@ export default function SuperAdminDashboard() {
                               </span>
                             </div>
                             <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                              <Mail size={14} className="text-slate-400" />
-                              <span className="lowercase select-all">
+                              <Mail size={14} className="text-slate-400 shrink-0" />
+                              <span className="lowercase select-all break-all">
                                 {request.customerInfo?.email ||
                                   request.adminEmail ||
                                   request.email}
@@ -3330,16 +3330,16 @@ export default function SuperAdminDashboard() {
                               <Plus size={12} />
                               تحديد/عرض تفاصيل الباقة المطلوبة
                             </button>
-                          </div>
-                          <div className="text-[10px] text-slate-300 font-mono italic">
-                            تاريخ الطلب:{" "}
-                            {request.createdAt
-                              ?.toDate?.()
-                              ?.toLocaleString("ar-IQ-u-nu-latn") || "جاري التحميل..."}
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              تاريخ الطلب:{" "}
+                              {request.createdAt
+                                ?.toDate?.()
+                                ?.toLocaleString("ar-IQ-u-nu-latn") || "جاري التحميل..."}
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex flex-col items-center md:items-end gap-1 px-8 md:border-r border-slate-100 dark:border-slate-800 h-full justify-center">
+                        <div className="flex flex-col items-center 2xl:items-end gap-1 px-4 2xl:px-8 2xl:border-r border-slate-100 dark:border-slate-800 2xl:self-stretch justify-center shrink-0">
                           <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">
                             نوع الطلب
                           </span>
@@ -3352,7 +3352,7 @@ export default function SuperAdminDashboard() {
                           </span>
                         </div>
 
-                        <div className="flex gap-4 items-center">
+                        <div className="flex flex-wrap gap-3 items-center justify-center 2xl:justify-end shrink-0">
                           {deleteConfirmId === request.id ? (
                             <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-2xl border border-red-100 dark:border-red-900/30 animate-in fade-in zoom-in duration-300">
                               <button

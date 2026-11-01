@@ -10,6 +10,7 @@ import {
   Timestamp,
   getDocs,
 } from 'firebase/firestore';
+import { shouldIgnoreFirestoreListenerError } from '../../lib/logoutGuard';
 import { useAuth } from '../../lib/AuthContext';
 import {
   CACHE_COLLECTION_KEYS,
@@ -339,7 +340,8 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
             where('createdAt', '<=', Timestamp.fromDate(endOfDay)),
           ),
           (snap) => setMarketOrders(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-          () => {
+          (error) => {
+            if (shouldIgnoreFirestoreListenerError(error)) return;
             getDocs(
               query(collection(db, 'orders'), where('schoolId', '==', schoolId)),
             ).then((fallback) => {
@@ -350,7 +352,7 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
                   return created >= startOfDay && created <= endOfDay;
                 });
               setMarketOrders(filtered);
-            });
+            }).catch(() => setMarketOrders([]));
           },
         ),
       );

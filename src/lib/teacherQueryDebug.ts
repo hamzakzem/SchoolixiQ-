@@ -1,3 +1,4 @@
+import { shouldIgnoreFirestoreListenerError } from './logoutGuard';
 /**
  * Temporary investigation logs for Teacher Dashboard Firestore listeners.
  */
@@ -23,6 +24,7 @@ export function logTeacherFirestoreError(
   queryName: string,
   error: unknown,
 ): void {
+  if (shouldIgnoreFirestoreListenerError(error)) return;
   const err = error as { code?: string; message?: string };
   console.error('[TeacherFirestore] LISTENER_ERROR', {
     QUERY_NAME: queryName,

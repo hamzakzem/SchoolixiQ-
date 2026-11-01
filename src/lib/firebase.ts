@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { initializeFirestore, connectFirestoreEmulator, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator, memoryLocalCache, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -70,6 +70,8 @@ if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === '1') {
   const host = String(import.meta.env.VITE_FIREBASE_EMULATOR_HOST || '127.0.0.1');
   connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
   connectFirestoreEmulator(db, host, 8085);
+  // Emulator builds only: localStorage.fs_debug = '1' turns on the SDK's watch-stream log.
+  if (typeof localStorage !== 'undefined' && localStorage.getItem('fs_debug') === '1') setLogLevel('debug');
   connectStorageEmulator(storage, host, 9199);
 }
 

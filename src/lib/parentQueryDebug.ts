@@ -1,3 +1,4 @@
+import { shouldIgnoreFirestoreListenerError } from './logoutGuard';
 /**
  * Temporary investigation logs for Parent Dashboard Firestore listeners.
  * Remove after audit is confirmed stable.
@@ -24,6 +25,7 @@ export function logParentFirestoreError(
   queryName: string,
   error: unknown,
 ): void {
+  if (shouldIgnoreFirestoreListenerError(error)) return;
   const err = error as { code?: string; message?: string };
   console.error('[ParentFirestore] LISTENER_ERROR', {
     QUERY_NAME: queryName,

@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { shouldIgnoreFirestoreListenerError } from './logoutGuard';
 import { captureException } from './sentryWrapper';
 import {
   handleResourceExhausted,
@@ -33,6 +34,8 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null, shouldThrow = true) {
+  // Listeners still open while the session ends get "permission denied" — expected, not an error.
+  if (shouldIgnoreFirestoreListenerError(error)) return;
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {

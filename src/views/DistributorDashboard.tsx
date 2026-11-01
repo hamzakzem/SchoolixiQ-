@@ -18,6 +18,7 @@ import { toast } from "react-hot-toast";
 import { useAuth } from "../lib/AuthContext";
 import { useLanguage } from "../lib/LanguageContext";
 import { signOutWithCleanup } from "../lib/authLogout";
+import { shouldIgnoreFirestoreListenerError } from "../lib/logoutGuard";
 import { fetchDistributorDashboard } from "../lib/distributorApi";
 import { DashboardSmartAssistantHost } from "../components/smart-assistant/DashboardSmartAssistant";
 import { NotificationCenter } from "../components/NotificationCenter";
@@ -180,7 +181,9 @@ export default function DistributorDashboard() {
           readerRole: "distributor",
         });
       },
-      (err) => console.error("[distributor-chat]", err),
+      (err) => {
+        if (!shouldIgnoreFirestoreListenerError(err)) console.error("[distributor-chat]", err);
+      },
     );
     return () => unsub();
   }, [distributorId, profile?.uid, profile?.name, distributor?.name]);
