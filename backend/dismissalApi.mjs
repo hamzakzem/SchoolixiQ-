@@ -44,6 +44,26 @@ function httpError(message, code, status = 400) {
   return err;
 }
 
+function tokenExpiryMs(data) {
+  const t = data?.tokenExpiresAt;
+  if (!t) return 0;
+  if (typeof t.toMillis === 'function') return t.toMillis();
+  if (typeof t._seconds === 'number') return t._seconds * 1000;
+  const ms = new Date(t).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+/** Server-clock check; the client clock is never consulted. */
+function assertTokenUsable(data) {
+  if (data?.tokenConsumedAt) {
+    throw httpError('تم استخدام هذا الرمز مسبقاً', 'TOKEN_CONSUMED', 409);
+  }
+  const exp = tokenExpiryMs(data);
+  if (exp > 0 && Date.now() > exp) {
+    throw httpError('انتهت صلاحية رمز ولي الأمر. اطلب منه تجديد الرمز من التطبيق ثم أعد المحاولة', 'TOKEN_EXPIRED', 410);
+  }
+}
+
 function generateToken() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const part = () => Array.from({ length: 4 }, () => alphabet[randomInt(alphabet.length)]).join('');
@@ -301,6 +321,43 @@ async function runTransitionApi(db, uid, body, cfg, actorName, extraFields = {})
   return { id: requestId, status: result.status, derivedStatus: result.status, dismissalSnapshot: result.snapshot };
 }
 
+export async function refreshDismissalTokenApi(db, uid, body) {
+  const user = await loadUser(db, uid);
+  assertRole(user, new Set(['parent']), 'فقط ولي الأمر يمكنه تجديد الرمز');
+  const requestId = String(body.requestId || '');
+  if (!requestId) throw httpError('معرّف الطلب مطلوب', 'INVALID_BODY', 400);
+  const { ref } = await getRequestOrThrow(db, requestId);
+
+  let out;
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(ref);
+    if (!fresh.exists) throw httpError('الطلب غير موجود', 'NOT_FOUND', 404);
+    const data = fresh.data();
+    assertSchool(user, String(data.schoolId || ''));
+    const owners = Array.isArray(data.parentIds) ? data.parentIds : [];
+    if (String(data.parentId || '') !== uid && !owners.includes(uid)) {
+      throw httpError('لا يمكنك تجديد رمز هذا الطلب', 'FORBIDDEN_PARENT', 403);
+    }
+    // Only a request still waiting for the guard can get a new code; never one that was
+    // verified/decided (that would re-open a completed step).
+    if (resolveEffectiveState(data) !== STATES.REQUESTED) {
+      throw httpError('لا يمكن تجديد الرمز بعد بدء المعالجة', 'INVALID_STATE', 409);
+    }
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
+    tx.update(ref, {
+      token,
+      tokenExpiresAt: expiresAt,
+      tokenConsumedAt: null,
+      tokenRenewedAt: new Date(),
+      tokenRenewals: (Number(data.tokenRenewals) || 0) + 1,
+      updatedAt: new Date(),
+    });
+    out = { id: requestId, token, tokenExpiresAtMs: expiresAt.getTime() };
+  });
+  return out;
+}
+
 export async function guardVerifyDismissalApi(db, uid, body) {
   const user = await loadUser(db, uid);
   assertRole(user, new Set(['guard']), 'فقط الحارس يمكنه التحقق');
@@ -312,6 +369,9 @@ export async function guardVerifyDismissalApi(db, uid, body) {
   const schoolId = String(data.schoolId || '');
   assertSchool(user, schoolId);
   await verifyStudentMatch(db, data, schoolId);
+
+  // The code must be unexpired (server clock) and unused, whether or not the guard typed it.
+  assertTokenUsable(data);
 
   // When the guard typed the parent's code, it must match this request's code.
   const typed = String(body.token || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -328,6 +388,7 @@ export async function guardVerifyDismissalApi(db, uid, body) {
       guardVerifiedBy: uid,
       guardVerifiedByName: String(user.name || 'حارس'),
       guardVerifiedAt: new Date(),
+      tokenConsumedAt: new Date(),
     },
   });
 }
@@ -349,6 +410,7 @@ export async function guardRejectDismissalApi(db, uid, body) {
       rejectedBy: uid,
       rejectedByName: String(user.name || 'حارس'),
       rejectedAt: new Date(),
+      tokenConsumedAt: new Date(),
     },
   });
 }
@@ -595,6 +657,7 @@ export function registerDismissalRoutes(app, { getDb, verifyToken, jsonParser })
   };
 
   app.post('/api/dismissal/request', verifyToken, jsonParser, wrap(createDismissalRequestApi, 'request'));
+  app.post('/api/dismissal/refresh-token', verifyToken, jsonParser, wrap(refreshDismissalTokenApi, 'refresh-token'));
   app.post('/api/dismissal/guard-verify', verifyToken, jsonParser, wrap(guardVerifyDismissalApi, 'guard-verify'));
   app.post('/api/dismissal/guard-reject', verifyToken, jsonParser, wrap(guardRejectDismissalApi, 'guard-reject'));
   app.post('/api/dismissal/manager-approve', verifyToken, jsonParser, wrap(managerApproveDismissalApi, 'manager-approve'));

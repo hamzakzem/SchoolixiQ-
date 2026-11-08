@@ -74,6 +74,14 @@ export async function apiCreateDismissalRequest(body: Record<string, unknown>) {
   return (await parseJson(res)) as { id: string; token: string; status: string };
 }
 
+export async function apiRefreshDismissalToken(requestId: string) {
+  const res = await dismissalFetch('/api/dismissal/refresh-token', {
+    method: 'POST',
+    body: JSON.stringify({ requestId }),
+  });
+  return (await parseJson(res)) as { id: string; token: string; tokenExpiresAtMs: number };
+}
+
 export async function apiGuardVerifyDismissal(requestId: string, note?: string, token?: string) {
   const idempotencyKey = stableKey('guard-verify', requestId);
   const res = await dismissalFetch('/api/dismissal/guard-verify', {

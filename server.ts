@@ -1,3 +1,4 @@
+import { cronSecretMatches } from './backend/cronSecret.mjs';
 import express from 'express';
 import compression from 'compression';
 import path from 'path';
@@ -868,6 +869,30 @@ async function startServer() {
     } catch (error: any) {
       console.error('Public verify student error:', error);
       return res.status(500).json({ error: 'SERVER_ERROR', message: 'Unable to verify student' });
+    }
+  });
+
+  // Featured schools for the landing page / footer: only public marketing fields, never the school document.
+  app.get('/api/public/featured-schools', async (_req: any, res: any) => {
+    try {
+      const snap = await getDb().collection('schools')
+        .where('featured', '==', true).where('status', '==', 'active').limit(12).get();
+      const schools = snap.docs.map((d: any) => {
+        const x = d.data() || {};
+        return {
+          id: d.id,
+          name: String(x.name || ''),
+          logoUrl: typeof x.logoUrl === 'string' ? x.logoUrl : '',
+          googleMapsUrl: typeof x.googleMapsUrl === 'string' ? x.googleMapsUrl : '',
+          featured: true,
+          status: 'active',
+        };
+      });
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      return res.json({ schools });
+    } catch (error: any) {
+      console.error('Public featured schools error:', error?.message);
+      return res.status(500).json({ error: 'SERVER_ERROR', schools: [] });
     }
   });
 
@@ -2414,7 +2439,7 @@ async function startServer() {
   // Full eligibility logic lives in src/lib/tuitionReminderService.ts (runAutomaticTuitionRemindersForSchool).
   app.post('/api/internal/tuition-reminders/run', express.json(), async (req: any, res: any) => {
     const secret = resolveCronSecret(process.env.TUITION_CRON_SECRET, process.env.CRON_SECRET);
-    if (!secret || req.headers['x-cron-secret'] !== secret) {
+    if (!cronSecretMatches(req.headers['x-cron-secret'], secret)) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     try {
@@ -2624,7 +2649,7 @@ async function startServer() {
   // Fallback when Firebase Cloud Function trigger is not deployed (e.g. static Hostinger hosting).
   app.post('/api/internal/notifications/push-dispatch', express.json(), async (req: any, res: any) => {
     const secret = resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET);
-    if (!secret || req.headers['x-cron-secret'] !== secret) {
+    if (!cronSecretMatches(req.headers['x-cron-secret'], secret)) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     try {
@@ -2647,7 +2672,7 @@ async function startServer() {
   // Cloud Scheduler: POST /api/internal/chat-escalation/run with header X-Cron-Secret
   app.post('/api/internal/chat-escalation/run', express.json(), async (req: any, res: any) => {
     const secret = resolveCronSecret(process.env.CHAT_CRON_SECRET, process.env.CRON_SECRET);
-    if (!secret || req.headers['x-cron-secret'] !== secret) {
+    if (!cronSecretMatches(req.headers['x-cron-secret'], secret)) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     try {

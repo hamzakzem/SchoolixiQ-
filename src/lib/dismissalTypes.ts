@@ -89,6 +89,8 @@ export type DismissalRequest = {
   updatedAt?: { seconds: number; nanoseconds?: number };
   token: string;
   tokenExpiresAt: { seconds: number; nanoseconds?: number };
+  /** UI-only hint computed from the device clock; the server decides. */
+  tokenExpiredHint?: boolean;
   pickupPersonName?: string;
   pickupPersonRelation?: string;
   pickupNote?: string;

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { motion } from 'motion/react';
-import { db } from '../../lib/firebase';
+import { fetchPublicFeaturedSchools } from '../../lib/publicFeaturedSchools';
 import {
   excludePartnersByLogo,
   isHttpLogoUrl,
@@ -84,19 +83,9 @@ export function LandingPartnersSection({
     let cancelled = false;
     (async () => {
       try {
-        const schoolsQ = query(
-          collection(db, 'schools'),
-          where('featured', '==', true),
-          where('status', '==', 'active'),
-          limit(12),
-        );
-        const snap = await getDocs(schoolsQ);
+        const rows = await fetchPublicFeaturedSchools();
         if (cancelled) return;
-        setFeaturedSchoolPartners(
-          normalizeFeaturedSchoolPartners(
-            snap.docs.map((d) => ({ id: d.id, ...(d.data() as object) })),
-          ),
-        );
+        setFeaturedSchoolPartners(normalizeFeaturedSchoolPartners(rows));
       } catch {
         /* ignore */
       }
