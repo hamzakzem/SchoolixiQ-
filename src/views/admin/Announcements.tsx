@@ -259,7 +259,7 @@ export default function Announcements() {
                         ann.target === 'staff' ? 'bg-orange-100 text-orange-700' :
                         'bg-emerald-100 text-emerald-700'
                       }`}>
-                        {ann.target === 'all' ? 'للجميع' : ann.target === 'parents' ? 'لأولياء الأمور' : ann.target === 'staff' ? 'للكادر التعليمي' : `فردي: ${ann.targetStudentName}`}
+                        {ann.target === 'individual' ? `فردي: ${ann.targetStudentName || ''}` : ann.target === 'parents' ? 'لأولياء الأمور' : ann.target === 'staff' ? 'للكادر التعليمي' : 'للجميع'}
                       </span>
                       <span className="text-[10px] text-slate-400 font-bold">
                         {ann.createdAt?.seconds ? new Date(ann.createdAt.seconds * 1000).toLocaleString('ar-IQ-u-nu-latn') : 'جاري النشر...'}
