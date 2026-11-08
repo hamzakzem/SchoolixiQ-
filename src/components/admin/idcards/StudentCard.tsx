@@ -2,6 +2,7 @@ import React from "react";
 import { IdCardTemplate } from "../../../types/idCardTemplate";
 import { resolveStudentPhotoUrl } from "../../../lib/studentPhoto";
 import { PremiumLayouts } from "./PremiumLayouts";
+import { DEFAULT_ID_CARD_TEMPLATE } from "../../../lib/idCardDefaults";
 
 interface StudentCardProps {
   student: any;
@@ -14,8 +15,10 @@ export default function StudentCard({
   student,
   cardData,
   isRtl,
-  template,
+  template: templateProp,
 }: StudentCardProps) {
+  // A school that has not saved a template yet still gets a complete card.
+  const template = templateProp ?? DEFAULT_ID_CARD_TEMPLATE;
   // If card is not issued/created, cardData could be null
   if (!cardData) {
     return (
@@ -119,7 +122,7 @@ export default function StudentCard({
         student={student}
         cardData={displayCardData}
         isRtl={!!isRtl}
-        template={template!}
+        template={template}
       />
     </div>
     </>

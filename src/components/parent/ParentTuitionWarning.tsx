@@ -25,6 +25,15 @@ type Props = {
   onGoTuition?: () => void;
 };
 
+/** Due dates arrive as ISO strings ("2026-10-19T11:13:13.227Z") or Firestore timestamps; show 2026/10/19. */
+function formatDueDate(value: unknown): string {
+  const v = value as { toDate?: () => Date };
+  const d = typeof v?.toDate === 'function' ? v.toDate() : new Date(String(value));
+  if (Number.isNaN(d.getTime())) return String(value).slice(0, 10).replace(/-/g, '/');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+}
+
 export function ParentTuitionWarning({
   escalation,
   banners = [],
@@ -62,7 +71,7 @@ export function ParentTuitionWarning({
                 {escalation.amount != null && (
                   <span>المبلغ: {Number(escalation.amount).toLocaleString('ar-IQ-u-nu-latn')} د.ع</span>
                 )}
-                {escalation.dueDate && <span>الاستحقاق: {String(escalation.dueDate)}</span>}
+                {escalation.dueDate && <span>الاستحقاق: {formatDueDate(escalation.dueDate)}</span>}
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {onGoTuition && (
