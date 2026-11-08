@@ -5,10 +5,23 @@ import {
   doc,
   getDoc,
   serverTimestamp,
-  setDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { AppError } from '../AppError';
+
+/** How long the user may wait for the server to confirm the request before we say so. */
+export const REGISTRATION_CONFIRM_TIMEOUT_MS = 15000;
+
+function withTimeout<T>(task: Promise<T>, ms: number, code: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new AppError('timeout', { code, source: 'auth' })), ms);
+    task.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
 
 export type AdminRegistrationCustomerInfo = {
   /** School name */
@@ -147,7 +160,11 @@ export async function submitPendingAdminSubscription(
   billingCycle: 'monthly' | 'annually',
   customerInfo: AdminRegistrationCustomerInfo,
 ): Promise<{ registrationId: string }> {
-  const existingSnap = await getDoc(doc(db, 'users', user.uid));
+  const existingSnap = await withTimeout(
+    getDoc(doc(db, 'users', user.uid)),
+    8000,
+    'registration/timeout',
+  );
   if (existingSnap.exists()) {
     const existing = existingSnap.data();
     const isActiveAdmin =
@@ -191,9 +208,31 @@ export async function submitPendingAdminSubscription(
 
   const isMonthly = billingCycle === 'monthly';
   const actualPrice = computePackagePrice(pkg, billingCycle);
-  const subscriberCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-  const regRef = await addDoc(collection(db, 'registrations'), {
+  // Idempotent: one pending request per account. A retry (slow network, double tap, reload)
+  // updates the same document instead of creating a duplicate. A previous request that was
+  // already decided (rejected/approved) never gets overwritten — a new one is created.
+  let regId = `reg_${user.uid}`;
+  let subscriberCode = Math.floor(100000 + Math.random() * 900000).toString();
+  let isUpdate = false;
+  try {
+    const prev = await withTimeout(getDoc(doc(db, 'registrations', regId)), 6000, 'registration/timeout');
+    if (prev.exists()) {
+      if (prev.data().status === 'pending') {
+        isUpdate = true;
+        subscriberCode = prev.data().subscriberCode || subscriberCode;
+      } else {
+        regId = `reg_${user.uid}_${Date.now().toString(36)}`;
+      }
+    }
+  } catch (e: any) {
+    // Not found / not readable → first request. A timeout here is surfaced by the commit below.
+    if (e?.code === 'registration/timeout') throw e;
+  }
+
+  const regRef = doc(db, 'registrations', regId);
+  const batch = writeBatch(db);
+  batch.set(regRef, {
     type: 'subscription_request',
     status: 'pending',
     authProvider: resolveAuthProvider(user),
@@ -212,10 +251,9 @@ export async function submitPendingAdminSubscription(
     genderType,
     approximateStudents,
     subscriberCode,
-    createdAt: serverTimestamp(),
-  });
-
-  await setDoc(
+    ...(isUpdate ? { updatedAt: serverTimestamp() } : { createdAt: serverTimestamp() }),
+  }, { merge: true });
+  batch.set(
     doc(db, 'users', user.uid),
     {
       uid: user.uid,
@@ -233,6 +271,9 @@ export async function submitPendingAdminSubscription(
     },
     { merge: true },
   );
+  // Both writes are atomic. If the server does not confirm in time we tell the user to retry
+  // (safe: same document ids) instead of leaving the screen loading forever.
+  await withTimeout(batch.commit(), REGISTRATION_CONFIRM_TIMEOUT_MS, 'registration/timeout');
 
   return { registrationId: regRef.id };
 }

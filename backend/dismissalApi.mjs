@@ -22,6 +22,8 @@ import {
   writeSnapshotDoc,
 } from './dismissalSnapshot.mjs';
 
+import { randomInt } from 'node:crypto';
+
 const DISMISSAL_COL = 'dismissal_requests';
 const DISMISSAL_LOGS_COL = 'dismissal_logs';
 const TOKEN_TTL_MS = 10 * 60 * 1000;
@@ -43,7 +45,8 @@ function httpError(message, code, status = 400) {
 }
 
 function generateToken() {
-  const part = () => Math.random().toString(36).slice(2, 6).toUpperCase();
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const part = () => Array.from({ length: 4 }, () => alphabet[randomInt(alphabet.length)]).join('');
   return `${part()}-${part()}`;
 }
 
@@ -309,6 +312,15 @@ export async function guardVerifyDismissalApi(db, uid, body) {
   const schoolId = String(data.schoolId || '');
   assertSchool(user, schoolId);
   await verifyStudentMatch(db, data, schoolId);
+
+  // When the guard typed the parent's code, it must match this request's code.
+  const typed = String(body.token || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (typed) {
+    const real = String(data.token || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!real || typed !== real) {
+      throw httpError('الرمز المدخل لا يطابق رمز هذا الطلب', 'TOKEN_MISMATCH', 400);
+    }
+  }
 
   return runTransitionApi(db, uid, body, TRANSITIONS.guardVerify, String(user.name || 'حارس'), {
     metadata: { note },

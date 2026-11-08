@@ -164,8 +164,9 @@ export async function guardVerifyDismissal(
   requestId: string,
   _guard: { uid: string; name: string },
   note?: string,
+  token?: string,
 ) {
-  await apiGuardVerifyDismissal(requestId, note);
+  await apiGuardVerifyDismissal(requestId, note, token);
 }
 
 export async function guardRejectDismissal(
