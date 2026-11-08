@@ -162,15 +162,26 @@ const TYPE_ICON_CLASS: Record<string, string> = {
 };
 
 function resolveTypeIcon(notification: Record<string, unknown>): LucideIcon {
-  const rawType = String(notification.type ?? '').toLowerCase();
-  if (TYPE_ICON_MAP[rawType]) return TYPE_ICON_MAP[rawType];
+  const rawType = effectiveIconType(notification);
+  if (rawType !== 'system' && TYPE_ICON_MAP[rawType]) return TYPE_ICON_MAP[rawType];
   const catId = resolveNotificationCategoryId(notification);
   return CATEGORY_ICON_MAP[catId] ?? Bell;
 }
 
-function resolveTypeIconClass(notification: Record<string, unknown>): string {
+/** "system" is a generic type (messages, gate, installments are all sent as system): use the category. */
+function effectiveIconType(notification: Record<string, unknown>): string {
   const rawType = String(notification.type ?? '').toLowerCase();
-  return TYPE_ICON_CLASS[rawType] ?? 'sx-notif-icon--default';
+  if (rawType && rawType !== 'system') return rawType;
+  const cat = String(resolveNotificationCategoryId(notification) || '');
+  const byCategory: Record<string, string> = {
+    messages: 'chat', chat: 'chat', tuition: 'tuition', homework: 'homework', grades: 'homework',
+    attendance: 'attendance', behavior: 'behavior', smart_gate: 'security', security: 'security',
+  };
+  return byCategory[cat] ?? rawType;
+}
+
+function resolveTypeIconClass(notification: Record<string, unknown>): string {
+  return TYPE_ICON_CLASS[effectiveIconType(notification)] ?? 'sx-notif-icon--default';
 }
 
 function formatNotificationTime(

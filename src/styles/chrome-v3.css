@@ -1,0 +1,431 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   SchoolixIQ — Mobile chrome v3 (all roles): bottom dock, notification center.
+   Loaded last; restyles existing components without changing their behaviour.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ═══ Bottom dock ═══════════════════════════════════════════════════════════ */
+.sx-dock-v2 {
+  background: linear-gradient(180deg, #0e2142 0%, #0a1830 100%) !important;
+  border-top: 1px solid rgba(240, 213, 138, 0.14) !important;
+  border-radius: 22px 22px 0 0 !important;
+  box-shadow: 0 -18px 40px -22px rgba(3, 10, 24, 0.85) !important;
+  padding: 8px 8px calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+.sx-dock-v2__inner {
+  gap: 4px !important;
+  align-items: stretch;
+}
+
+.sx-dock-v2__btn,
+.sx-dock-v2__btn--active,
+.sx-dock-v2__btn--active-quick {
+  position: relative;
+  gap: 4px !important;
+  min-height: 56px !important;
+  padding: 6px 2px 4px !important;
+  border-radius: 16px !important;
+  color: #9fb0c8 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.sx-dock-v2__icon-wrap {
+  position: relative;
+  width: 48px;
+  height: 30px;
+  border-radius: 12px;
+}
+
+.sx-dock-v2__icon-wrap svg {
+  width: 22px !important;
+  height: 22px !important;
+  stroke-width: 2 !important;
+}
+
+/* Active: gold label, soft gold tile and a short indicator line above the icon */
+.sx-dock-v2__btn--active,
+.sx-dock-v2__btn--active-quick {
+  color: #f3d98f !important;
+  background: rgba(240, 213, 138, 0.06) !important;
+}
+
+.sx-dock-v2__btn--active::before,
+.sx-dock-v2__btn--active-quick::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  inset-inline: 32%;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(90deg, #f0d58a, #d4a64a);
+  box-shadow: 0 2px 10px rgba(212, 166, 74, 0.55);
+}
+
+.sx-dock-v2__btn--active .sx-dock-v2__icon-wrap,
+.sx-dock-v2__btn--active-quick .sx-dock-v2__icon-wrap {
+  background: rgba(212, 166, 74, 0.16);
+}
+
+/* Count badge: a readable pill on the icon corner */
+.sx-dock-v2__badge {
+  top: -6px !important;
+  inset-inline-end: 0 !important;
+  min-width: 19px !important;
+  height: 19px !important;
+  padding: 0 5px !important;
+  border-radius: 999px !important;
+  border: 2px solid #0c1c38 !important;
+  background: #e5484d !important;
+  color: #fff !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 15px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.sx-dock-v2__dot {
+  top: -2px !important;
+  inset-inline-end: 6px !important;
+  width: 9px !important;
+  height: 9px !important;
+  background: #f0d58a !important;
+  border: 2px solid #0c1c38 !important;
+}
+
+/* ═══ Notification center ═══════════════════════════════════════════════════ */
+.sx-notif-header {
+  padding-bottom: 6px;
+}
+
+.sx-notif-header__title {
+  font-size: 1.15rem !important;
+  font-weight: 900 !important;
+  color: #0b2345;
+}
+
+html.dark .sx-notif-header__title {
+  color: #fff;
+}
+
+.sx-notif-header-actions {
+  gap: 6px !important;
+}
+
+.sx-notif-header-actions .sx-action-btn-icon,
+.sx-notif-header-actions button {
+  width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  border-radius: 12px !important;
+  background: #f1f4f9 !important;
+  border: 1px solid #e3e8f0 !important;
+  color: #334155 !important;
+  box-shadow: none !important;
+}
+
+html.dark .sx-notif-header-actions .sx-action-btn-icon,
+html.dark .sx-notif-header-actions button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #e2e8f0 !important;
+}
+
+/* Filter chips: one scrolling row, nothing cut off */
+.sx-notif-tabs-wrap {
+  padding-inline: 0 !important;
+}
+
+.sx-notif-tabs.sx-notif-tabs--chips {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding: 2px 16px 8px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  scroll-padding-inline: 16px;
+}
+
+.sx-notif-tabs.sx-notif-tabs--chips::-webkit-scrollbar {
+  display: none;
+}
+
+.sx-notif-tabs--chips .sx-notif-tab {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  border: 1px solid #e3e8f0 !important;
+  background: #fff !important;
+  color: #475569 !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  white-space: nowrap;
+  box-shadow: none !important;
+}
+
+.sx-notif-tabs--chips .sx-notif-tab--active {
+  background: #0b2345 !important;
+  border-color: #0b2345 !important;
+  color: #fff !important;
+  box-shadow: 0 6px 16px -10px rgba(11, 35, 69, 0.8) !important;
+}
+
+html.dark .sx-notif-tabs--chips .sx-notif-tab {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark .sx-notif-tabs--chips .sx-notif-tab--active {
+  background: #d4a64a !important;
+  border-color: #d4a64a !important;
+  color: #0b2345 !important;
+}
+
+.sx-notif-filter-chip__badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e5484d !important;
+  color: #fff !important;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Cards: icon tile · content, compact meta, light action */
+.sx-notif-card {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-areas:
+    "icon top"
+    "icon title"
+    "icon message"
+    "icon footer";
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: start;
+  padding: 14px 14px 10px !important;
+  border-radius: 18px !important;
+  border: 1px solid #e6ebf2 !important;
+  background: #fff !important;
+  box-shadow: 0 1px 2px rgba(11, 35, 69, 0.04) !important;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.sx-notif-card--unread {
+  background: linear-gradient(180deg, #fffdf7 0%, #ffffff 100%) !important;
+  border-color: rgba(212, 166, 74, 0.45) !important;
+}
+
+html.dark .sx-notif-card {
+  background: #10284a !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+html.dark .sx-notif-card--unread {
+  background: #132f56 !important;
+  border-color: rgba(212, 166, 74, 0.45) !important;
+}
+
+.sx-notif-card__dot {
+  position: absolute !important;
+  top: 14px !important;
+  inset-inline-end: 14px !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 999px !important;
+  background: #d4a64a !important;
+  box-shadow: 0 0 0 3px rgba(212, 166, 74, 0.18);
+}
+
+.sx-notif-card__icon {
+  grid-area: icon;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 14px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: #eef2f8 !important;
+  color: #334155;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.sx-notif-card__icon svg {
+  width: 20px !important;
+  height: 20px !important;
+  color: currentColor !important;
+  stroke: currentColor !important;
+}
+
+.sx-notif-card__icon.sx-notif-icon--chat { background: #e8f0fe !important; color: #2563eb; }
+.sx-notif-card__icon.sx-notif-icon--tuition,
+.sx-notif-card__icon.sx-notif-icon--payment { background: #fdf3e1 !important; color: #b7791f; }
+.sx-notif-card__icon.sx-notif-icon--homework { background: #f1ecfe !important; color: #7c3aed; }
+.sx-notif-card__icon.sx-notif-icon--attendance { background: #e7f7ef !important; color: #059669; }
+.sx-notif-card__icon.sx-notif-icon--behavior { background: #fdecef !important; color: #db2777; }
+.sx-notif-card__icon.sx-notif-icon--security { background: #fdeceb !important; color: #dc2626; }
+.sx-notif-card__icon.sx-notif-icon--system,
+.sx-notif-card__icon.sx-notif-icon--default { background: #eef2f8 !important; color: #475569; }
+
+html.dark .sx-notif-card__icon { background: rgba(255, 255, 255, 0.07) !important; }
+
+.sx-notif-card__top {
+  grid-area: top;
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  padding-inline-end: 18px;
+  min-width: 0;
+}
+
+.sx-notif-card__category {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #64748b !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.sx-notif-card__time {
+  margin-inline-start: auto;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #94a3b8 !important;
+  white-space: nowrap;
+}
+
+.sx-notif-card__title {
+  grid-area: title;
+  margin: 2px 0 0 !important;
+  font-size: 14.5px !important;
+  font-weight: 800 !important;
+  line-height: 1.55 !important;
+  color: #0b2345 !important;
+}
+
+html.dark .sx-notif-card__title { color: #f1f5f9 !important; }
+
+.sx-notif-card__message {
+  grid-area: message;
+  margin: 0 !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  color: #64748b !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sx-notif-card__footer {
+  grid-area: footer;
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px !important;
+}
+
+/* "View" becomes a light gold link-button instead of a heavy dark block */
+.sx-notif-card__action {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  background: rgba(212, 166, 74, 0.12) !important;
+  border: 1px solid rgba(212, 166, 74, 0.35) !important;
+  color: #8a6418 !important;
+  font-size: 12.5px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.sx-notif-card__action .sx-action-icon {
+  width: 15px !important;
+  height: 15px !important;
+  color: currentColor !important;
+}
+
+html.dark .sx-notif-card__action { color: #f0d58a !important; }
+
+.sx-notif-card__hint {
+  font-size: 11.5px !important;
+  color: #94a3b8 !important;
+}
+
+.sx-notif-card__menu-btn {
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  border: 0 !important;
+  color: #94a3b8 !important;
+  box-shadow: none !important;
+}
+
+/* Footer: two balanced, lighter buttons */
+.sx-notif-footer {
+  padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+  border-top: 1px solid #eef2f7 !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+}
+
+html.dark .sx-notif-footer {
+  background: rgba(14, 33, 66, 0.96) !important;
+  border-top-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.sx-notif-footer-btn {
+  min-height: 44px !important;
+  border-radius: 14px !important;
+  font-size: 13.5px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.sx-notif-footer-btn--primary {
+  background: #0b2345 !important;
+  color: #fff !important;
+  border: 0 !important;
+}
+
+.sx-notif-footer-btn--primary:disabled {
+  background: #cbd5e1 !important;
+  color: #fff !important;
+  opacity: 1 !important;
+}
+
+.sx-notif-footer-btn--ghost {
+  background: #fff !important;
+  border: 1px solid #e3e8f0 !important;
+  color: #475569 !important;
+}
+
+html.dark .sx-notif-footer-btn--ghost {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #e2e8f0 !important;
+}
