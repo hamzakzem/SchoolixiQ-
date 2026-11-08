@@ -1,3 +1,15 @@
+// cronSecret.mjs
+import { createHash, timingSafeEqual } from "node:crypto";
+var MAX_SECRET_LEN = 512;
+function cronSecretMatches(provided, secret) {
+  const given = Array.isArray(provided) ? provided[0] : provided;
+  if (typeof secret !== "string" || secret.length === 0 || secret.length > MAX_SECRET_LEN) return false;
+  if (typeof given !== "string" || given.length === 0 || given.length > MAX_SECRET_LEN) return false;
+  const a = createHash("sha256").update(given, "utf8").digest();
+  const b = createHash("sha256").update(secret, "utf8").digest();
+  return timingSafeEqual(a, b);
+}
+
 // server.ts
 import express from "express";
 import compression from "compression";
@@ -3019,6 +3031,23 @@ function httpError(message, code, status = 400) {
   err.status = status;
   return err;
 }
+function tokenExpiryMs(data) {
+  const t = data?.tokenExpiresAt;
+  if (!t) return 0;
+  if (typeof t.toMillis === "function") return t.toMillis();
+  if (typeof t._seconds === "number") return t._seconds * 1e3;
+  const ms = new Date(t).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+function assertTokenUsable(data) {
+  if (data?.tokenConsumedAt) {
+    throw httpError("\u062A\u0645 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0647\u0630\u0627 \u0627\u0644\u0631\u0645\u0632 \u0645\u0633\u0628\u0642\u0627\u064B", "TOKEN_CONSUMED", 409);
+  }
+  const exp = tokenExpiryMs(data);
+  if (exp > 0 && Date.now() > exp) {
+    throw httpError("\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0631\u0645\u0632 \u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631. \u0627\u0637\u0644\u0628 \u0645\u0646\u0647 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0631\u0645\u0632 \u0645\u0646 \u0627\u0644\u062A\u0637\u0628\u064A\u0642 \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629", "TOKEN_EXPIRED", 410);
+  }
+}
 function generateToken() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const part = () => Array.from({ length: 4 }, () => alphabet[randomInt(alphabet.length)]).join("");
@@ -3230,6 +3259,39 @@ async function runTransitionApi(db, uid, body, cfg, actorName, extraFields = {})
   }
   return { id: requestId, status: result.status, derivedStatus: result.status, dismissalSnapshot: result.snapshot };
 }
+async function refreshDismissalTokenApi(db, uid, body) {
+  const user = await loadUser(db, uid);
+  assertRole(user, /* @__PURE__ */ new Set(["parent"]), "\u0641\u0642\u0637 \u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631 \u064A\u0645\u0643\u0646\u0647 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0631\u0645\u0632");
+  const requestId = String(body.requestId || "");
+  if (!requestId) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
+  const { ref } = await getRequestOrThrow(db, requestId);
+  let out;
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(ref);
+    if (!fresh.exists) throw httpError("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
+    const data = fresh.data();
+    assertSchool(user, String(data.schoolId || ""));
+    const owners = Array.isArray(data.parentIds) ? data.parentIds : [];
+    if (String(data.parentId || "") !== uid && !owners.includes(uid)) {
+      throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062A\u062C\u062F\u064A\u062F \u0631\u0645\u0632 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628", "FORBIDDEN_PARENT", 403);
+    }
+    if (resolveEffectiveState(data) !== STATES.REQUESTED) {
+      throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0631\u0645\u0632 \u0628\u0639\u062F \u0628\u062F\u0621 \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629", "INVALID_STATE", 409);
+    }
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
+    tx.update(ref, {
+      token,
+      tokenExpiresAt: expiresAt,
+      tokenConsumedAt: null,
+      tokenRenewedAt: /* @__PURE__ */ new Date(),
+      tokenRenewals: (Number(data.tokenRenewals) || 0) + 1,
+      updatedAt: /* @__PURE__ */ new Date()
+    });
+    out = { id: requestId, token, tokenExpiresAtMs: expiresAt.getTime() };
+  });
+  return out;
+}
 async function guardVerifyDismissalApi(db, uid, body) {
   const user = await loadUser(db, uid);
   assertRole(user, /* @__PURE__ */ new Set(["guard"]), "\u0641\u0642\u0637 \u0627\u0644\u062D\u0627\u0631\u0633 \u064A\u0645\u0643\u0646\u0647 \u0627\u0644\u062A\u062D\u0642\u0642");
@@ -3240,6 +3302,7 @@ async function guardVerifyDismissalApi(db, uid, body) {
   const schoolId = String(data.schoolId || "");
   assertSchool(user, schoolId);
   await verifyStudentMatch(db, data, schoolId);
+  assertTokenUsable(data);
   const typed = String(body.token || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (typed) {
     const real = String(data.token || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -3252,7 +3315,8 @@ async function guardVerifyDismissalApi(db, uid, body) {
     fields: {
       guardVerifiedBy: uid,
       guardVerifiedByName: String(user.name || "\u062D\u0627\u0631\u0633"),
-      guardVerifiedAt: /* @__PURE__ */ new Date()
+      guardVerifiedAt: /* @__PURE__ */ new Date(),
+      tokenConsumedAt: /* @__PURE__ */ new Date()
     }
   });
 }
@@ -3270,7 +3334,8 @@ async function guardRejectDismissalApi(db, uid, body) {
       rejectReason: reason,
       rejectedBy: uid,
       rejectedByName: String(user.name || "\u062D\u0627\u0631\u0633"),
-      rejectedAt: /* @__PURE__ */ new Date()
+      rejectedAt: /* @__PURE__ */ new Date(),
+      tokenConsumedAt: /* @__PURE__ */ new Date()
     }
   });
 }
@@ -3459,6 +3524,7 @@ function registerDismissalRoutes(app, { getDb: getDb2, verifyToken, jsonParser }
     }
   };
   app.post("/api/dismissal/request", verifyToken, jsonParser, wrap(createDismissalRequestApi, "request"));
+  app.post("/api/dismissal/refresh-token", verifyToken, jsonParser, wrap(refreshDismissalTokenApi, "refresh-token"));
   app.post("/api/dismissal/guard-verify", verifyToken, jsonParser, wrap(guardVerifyDismissalApi, "guard-verify"));
   app.post("/api/dismissal/guard-reject", verifyToken, jsonParser, wrap(guardRejectDismissalApi, "guard-reject"));
   app.post("/api/dismissal/manager-approve", verifyToken, jsonParser, wrap(managerApproveDismissalApi, "manager-approve"));
@@ -3920,7 +3986,7 @@ function registerDismissalRecoveryRoute(app, { getDb: getDb2, resolveCronSecret:
       process.env.DISMISSAL_CRON_SECRET,
       process.env.CRON_SECRET
     );
-    if (!secret || req.headers["x-cron-secret"] !== secret) {
+    if (!cronSecretMatches(req.headers["x-cron-secret"], secret)) {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
     try {
@@ -4014,7 +4080,7 @@ function registerDismissalCompactionRoute(app, { getDb: getDb2, resolveCronSecre
       process.env.DISMISSAL_CRON_SECRET,
       process.env.CRON_SECRET
     );
-    if (!secret || req.headers["x-cron-secret"] !== secret) {
+    if (!cronSecretMatches(req.headers["x-cron-secret"], secret)) {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
     try {
@@ -4680,6 +4746,27 @@ async function startServer() {
     } catch (error) {
       console.error("Public verify student error:", error);
       return res.status(500).json({ error: "SERVER_ERROR", message: "Unable to verify student" });
+    }
+  });
+  app.get("/api/public/featured-schools", async (_req, res) => {
+    try {
+      const snap = await getDb().collection("schools").where("featured", "==", true).where("status", "==", "active").limit(12).get();
+      const schools = snap.docs.map((d) => {
+        const x = d.data() || {};
+        return {
+          id: d.id,
+          name: String(x.name || ""),
+          logoUrl: typeof x.logoUrl === "string" ? x.logoUrl : "",
+          googleMapsUrl: typeof x.googleMapsUrl === "string" ? x.googleMapsUrl : "",
+          featured: true,
+          status: "active"
+        };
+      });
+      res.setHeader("Cache-Control", "public, max-age=300");
+      return res.json({ schools });
+    } catch (error) {
+      console.error("Public featured schools error:", error?.message);
+      return res.status(500).json({ error: "SERVER_ERROR", schools: [] });
     }
   });
   app.get("/api/download/schoolixiq.mobileconfig", (req, res) => {
@@ -6006,7 +6093,7 @@ async function startServer() {
   });
   app.post("/api/internal/tuition-reminders/run", express.json(), async (req, res) => {
     const secret = resolveCronSecret(process.env.TUITION_CRON_SECRET, process.env.CRON_SECRET);
-    if (!secret || req.headers["x-cron-secret"] !== secret) {
+    if (!cronSecretMatches(req.headers["x-cron-secret"], secret)) {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
     try {
@@ -6185,7 +6272,7 @@ async function startServer() {
   });
   app.post("/api/internal/notifications/push-dispatch", express.json(), async (req, res) => {
     const secret = resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET);
-    if (!secret || req.headers["x-cron-secret"] !== secret) {
+    if (!cronSecretMatches(req.headers["x-cron-secret"], secret)) {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
     try {
@@ -6205,7 +6292,7 @@ async function startServer() {
   });
   app.post("/api/internal/chat-escalation/run", express.json(), async (req, res) => {
     const secret = resolveCronSecret(process.env.CHAT_CRON_SECRET, process.env.CRON_SECRET);
-    if (!secret || req.headers["x-cron-secret"] !== secret) {
+    if (!cronSecretMatches(req.headers["x-cron-secret"], secret)) {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
     try {

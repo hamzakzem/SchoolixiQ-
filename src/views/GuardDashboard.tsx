@@ -11,6 +11,7 @@ import {
   guardVerifyDismissal,
   guardRejectDismissal,
   filterPendingForGuard,
+  isDismissalTokenExpired,
   groupDismissalsByClass,
 } from '../lib/dismissalService';
 import { type DismissalRequest } from '../lib/dismissalTypes';
@@ -42,6 +43,11 @@ export default function GuardDashboard() {
   const [search, setSearch] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 20000);
+    return () => clearInterval(t);
+  }, []);
   const [busyId, setBusyId] = useState<string | null>(null);
   const busy = busyId !== null;
   const [showNotifications, setShowNotifications] = useState(false);
@@ -326,6 +332,11 @@ export default function GuardDashboard() {
                       <p className="flex items-center gap-2 text-xs text-[var(--dw-gold-400)] font-mono">
                         <KeyRound size={12} aria-hidden />
                         رمز: {r.token}
+                        {isDismissalTokenExpired(r) && (
+                          <span className="dw-badge dw-badge--pending" style={{ marginInlineStart: 8 }}>
+                            منتهي — اطلب من ولي الأمر تجديده
+                          </span>
+                        )}
                       </p>
                     </div>
 

@@ -23,6 +23,7 @@ import {
 import {
   apiCreateDismissalRequest,
   apiGuardVerifyDismissal,
+  apiRefreshDismissalToken,
   apiGuardRejectDismissal,
   apiManagerApproveDismissal,
   apiManagerRejectDismissal,
@@ -94,10 +95,16 @@ function toMillis(ts?: { seconds: number; nanoseconds?: number } | null): number
   return ts.seconds * 1000;
 }
 
+/**
+ * DISPLAY HINT ONLY. The server is the authority on expiry (it uses its own clock and refuses
+ * an expired code at guard verification). The hint only applies while the request still waits
+ * for the guard — once verified/decided the code is irrelevant and must never hide the request.
+ */
 export function isDismissalTokenExpired(
   request: Pick<DismissalRequest, 'tokenExpiresAt' | 'status'>,
 ): boolean {
   if (request.status === 'EXPIRED') return true;
+  if (request.status !== 'REQUESTED') return false;
   const expiresAt = toMillis(request.tokenExpiresAt);
   return expiresAt > 0 && Date.now() > expiresAt;
 }
@@ -110,8 +117,8 @@ export function normalizeDismissalDoc(
   let req = reconcileDismissalRequest(raw);
   const resolved = resolveDismissalStatus(req);
   req = { ...req, status: resolved, derivedStatus: resolved };
-  if (isDismissalTokenExpired(req) && ACTIVE_DISMISSAL_STATUSES.includes(resolved)) {
-    req = { ...req, status: 'EXPIRED', derivedStatus: 'EXPIRED' };
+  if (isDismissalTokenExpired(req)) {
+    req = { ...req, tokenExpiredHint: true };
   }
   return req;
 }
@@ -157,6 +164,11 @@ export async function createDismissalRequest(input: {
     pickupNote: input.pickupNote,
   });
   return { id: result.id, token: result.token };
+}
+
+/** Parent asks the server for a fresh pickup code (server-side clock, only while awaiting the guard). */
+export async function refreshDismissalToken(requestId: string) {
+  return apiRefreshDismissalToken(requestId);
 }
 
 /** Notifications for every step are written by the server (dismissalApi). */

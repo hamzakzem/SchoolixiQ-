@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { toast } from 'react-hot-toast';
 import { QrCode, User } from 'lucide-react';
-import { createDismissalRequest, subscribeParentDismissals } from '../../lib/dismissalService';
+import { createDismissalRequest, isDismissalTokenExpired, refreshDismissalToken, subscribeParentDismissals } from '../../lib/dismissalService';
 import {
   ACTIVE_DISMISSAL_STATUSES,
   resolveDismissalStatus,
@@ -41,6 +41,12 @@ export default function ParentDismissalTab({
   const [pickupRelation, setPickupRelation] = useState('');
   const [pickupNote, setPickupNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [renewing, setRenewing] = useState(false);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 20000);
+    return () => clearInterval(t);
+  }, []);
   const [pickedStudentId, setPickedStudentId] = useState('');
 
   useEffect(() => {
@@ -193,10 +199,33 @@ export default function ParentDismissalTab({
                       </p>
                       <p className="dw-token-box__code">{activeForStudent.token}</p>
                       <p className="text-[10px] text-[var(--dw-slate-muted)] mt-1">
-                        {isRtl ? 'صالح 10 دقائق' : 'Valid 10 min'}
+                        {isDismissalTokenExpired(activeForStudent)
+                          ? isRtl ? 'انتهت صلاحية الرمز — جدّده ليتمكن الحارس من التحقق' : 'Code expired — renew it so the guard can verify'
+                          : isRtl ? 'صالح 10 دقائق' : 'Valid 10 min'}
                       </p>
                     </div>
                   </div>
+                  {isDismissalTokenExpired(activeForStudent) && resolveDismissalStatus(activeForStudent) === 'REQUESTED' && (
+                    <button
+                      type="button"
+                      disabled={renewing}
+                      aria-busy={renewing}
+                      className="dw-btn dw-btn--gold w-full"
+                      onClick={async () => {
+                        setRenewing(true);
+                        try {
+                          await refreshDismissalToken(activeForStudent.id);
+                          toast.success(isRtl ? 'تم إصدار رمز جديد' : 'New code issued');
+                        } catch (e) {
+                          toast.error(userFacingError(e, isRtl ? 'تعذّر تجديد الرمز' : 'Could not renew the code'));
+                        } finally {
+                          setRenewing(false);
+                        }
+                      }}
+                    >
+                      {isRtl ? 'تجديد الرمز' : 'Renew code'}
+                    </button>
+                  )}
                   <p className="text-xs text-[var(--dw-slate-muted)]" aria-live="polite">
                     {DISMISSAL_STATUS_LABELS[resolveDismissalStatus(activeForStudent)]?.[locale]}
                   </p>

@@ -972,10 +972,20 @@ service cloud.firestore {
     // Schools — signed-in get; list limited to platform staff, the school's
     // own admin email (login provisioning) and public featured partners (footer).
     match /schools/{schoolId} {
-      allow get: if signedIn();
+      // Least privilege: only super admin / platform assistant, members of THIS school, or the
+      // owner/admin-email of a school being activated may read it. Featured-school marketing
+      // fields are served by GET /api/public/featured-schools (never by direct reads).
+      allow get: if signedIn() && (
+          isSchoolMember(schoolId)
+          || isPlatformAssistant()
+          || (
+            request.auth.token.email != null
+            && resource.data.get('adminEmail', '') == request.auth.token.email.lower()
+          )
+          || resource.data.get('ownerUid', '') == request.auth.uid
+        );
       allow list: if isSuperAdmin()
         || isPlatformAssistant()
-        || (resource.data.featured == true && resource.data.status == 'active')
         || (
           signedIn()
           && request.auth.token.email != null
@@ -1019,7 +1029,7 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
 
       match /settings/{settingId} {
-        allow read, get, list: if signedIn();
+        allow read, get, list: if signedIn() && (isSchoolMember(schoolId) || isPlatformAssistant());
         allow create, update, delete: if isSuperAdmin()
           || canManageSchool(schoolId)
           || (userSchoolId() == schoolId && staffCan('settings'));

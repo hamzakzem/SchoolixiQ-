@@ -420,10 +420,19 @@ async function pollPendingNotificationPushes(ctx, limit = POLL_DEFAULT_LIMIT) {
   return results;
 }
 
+// Constant-time comparison of the cron secret (inputs are hashed to equal length first).
+function cronSecretMatches(provided, secret) {
+  const given = Array.isArray(provided) ? provided[0] : provided;
+  if (typeof secret !== 'string' || !secret || secret.length > 512) return false;
+  if (typeof given !== 'string' || !given || given.length > 512) return false;
+  const { createHash, timingSafeEqual } = require('crypto');
+  return timingSafeEqual(createHash('sha256').update(given).digest(), createHash('sha256').update(secret).digest());
+}
+
 function verifyCronSecret(req) {
   const secret = process.env.NOTIFICATION_CRON_SECRET || process.env.CRON_SECRET;
   if (!secret) return { ok: false, error: 'NOTIFICATION_CRON_SECRET not configured' };
-  if (req.headers['x-cron-secret'] !== secret) return { ok: false, error: 'Unauthorized' };
+  if (!cronSecretMatches(req.headers['x-cron-secret'], secret)) return { ok: false, error: 'Unauthorized' };
   return { ok: true };
 }
 

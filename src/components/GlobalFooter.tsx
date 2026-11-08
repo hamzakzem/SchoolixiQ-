@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { fetchPublicFeaturedSchools } from "../lib/publicFeaturedSchools";
 import { useSystemConfig } from "../lib/SystemConfigContext";
 import { resolveAppLogoSrc } from "../lib/brandAssets";
 import {
@@ -235,27 +234,10 @@ export function GlobalFooter({
 
     (async () => {
       try {
-        const schoolsQ = query(
-          collection(db, "schools"),
-          where("featured", "==", true),
-          where("status", "==", "active"),
-          limit(12),
-        );
-        const schoolsSnap = await getDocs(schoolsQ);
+        const rows = await fetchPublicFeaturedSchools();
         if (cancelled) return;
 
-        const partners = normalizeFeaturedSchoolPartners(
-          schoolsSnap.docs.map((docSnap) => ({
-            id: docSnap.id,
-            ...(docSnap.data() as {
-              name?: string;
-              logoUrl?: string;
-              googleMapsUrl?: string;
-              featured?: boolean;
-              status?: string;
-            }),
-          })),
-        );
+        const partners = normalizeFeaturedSchoolPartners(rows);
 
         setFeaturedSchoolPartners(partners);
 

@@ -3,6 +3,7 @@
  * POST /api/internal/dismissal-recovery/run
  */
 
+import { cronSecretMatches } from './cronSecret.mjs';
 import {
   deriveState,
   lockExpired,
@@ -174,7 +175,7 @@ export function registerDismissalRecoveryRoute(app, { getDb, resolveCronSecret }
       process.env.DISMISSAL_CRON_SECRET,
       process.env.CRON_SECRET,
     );
-    if (!secret || req.headers['x-cron-secret'] !== secret) {
+    if (!cronSecretMatches(req.headers['x-cron-secret'], secret)) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     try {
