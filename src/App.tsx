@@ -93,6 +93,16 @@ import SchoolPresenceTracker from "./components/SchoolPresenceTracker";
 import { isPwaLaunchQuery, isPwaStandalone } from "./lib/pwaUtils";
 import { setupGlobalNotificationClickRouting } from "./lib/notificationRouting";
 
+/** A confirm-timeout is not a failure: the write is queued and may already be on the server. */
+function notifyRegistrationFailure(err: unknown) {
+  const msg = registrationErrorMessage(err);
+  if (String((err as { code?: string })?.code || "") === "registration/timeout") {
+    toast(msg, { icon: "⏳", duration: 9000 });
+  } else {
+    toast.error(msg);
+  }
+}
+
 function registrationErrorMessage(err: unknown): string {
   const code = String((err as { code?: string })?.code || "");
   if (code === "registration/timeout")
@@ -1159,7 +1169,7 @@ const AppContent = () => {
                                 setOnboardingState("waiting_approval");
                               } catch (err) {
                                 console.error("Package subscription failed:", err);
-                                toast.error(registrationErrorMessage(err));
+                                notifyRegistrationFailure(err);
                               } finally {
                                 setIsCreatingProfile(false);
                               }
@@ -1232,7 +1242,7 @@ const AppContent = () => {
                       setOnboardingState("waiting_approval");
                     } catch (err) {
                       console.error("School registration failed:", err);
-                      toast.error(registrationErrorMessage(err));
+                      notifyRegistrationFailure(err);
                     } finally {
                       setIsCreatingProfile(false);
                     }
