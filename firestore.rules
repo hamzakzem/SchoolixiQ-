@@ -306,6 +306,14 @@ service cloud.firestore {
       return signedIn() && userRole() == 'staff' && permission in userDoc().get('permissions', []);
     }
 
+    // Staff / assistants carry a custom permissions array. When it is a list, writes to the
+    // matching module require one of its ids (menu id or feature key). Admin/teacher unaffected.
+    function customPermOk(ids) {
+      return !(userRole() in ['staff', 'school_assistant', 'assistant'])
+        || !(userDoc().get('permissions', null) is list)
+        || userDoc().get('permissions', []).hasAny(ids);
+    }
+
     function staffCanCreate(permission) {
       return staffCan(permission) && sameSchoolRequest();
     }
@@ -1112,25 +1120,25 @@ service cloud.firestore {
     match /attendance/{attendanceId} {
       allow read, get, list: if canReadAcademicOrParentLink();
       allow create, update: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId))
-        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
+        || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId) && customPermOk(['attendance', 'attendance_track']))
+        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId) && customPermOk(['attendance', 'attendance_track']));
       allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['attendance', 'attendance_track'])))
         || staffCanChange('attendance');
     }
 
     match /homework/{homeworkId} {
       allow read, get, list: if canReadAcademicOrParentLink();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
+        || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId) && customPermOk(['homework', 'homework_and_tasks']));
       allow update: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId))
+        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId) && customPermOk(['homework', 'homework_and_tasks']))
         || (
           signedIn() && isParent() && sameSchool(resource)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenFor'])
         );
       allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['homework', 'homework_and_tasks'])))
         || staffCanChange('homework')
         || (
           signedIn() && sameSchool(resource) && isTeacher()
@@ -1142,11 +1150,11 @@ service cloud.firestore {
     match /grades/{gradeId} {
       allow read, get, list: if canReadAcademicOrParentLink();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
+        || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId) && customPermOk(['grades', 'exams_and_results']));
       allow update: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
+        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId) && customPermOk(['grades', 'exams_and_results']));
       allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['grades', 'exams_and_results'])))
         || staffCanChange('grades');
     }
 
@@ -1217,30 +1225,30 @@ service cloud.firestore {
     match /installments/{installmentId} {
       allow read, get, list: if canReadAcademicOrParentLink();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || (signedIn() && sameSchoolRequest() && (isSchoolManagementRole() && customPermOk(['tuition', 'tuition_fees'])))
         || staffCanCreate('tuition');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['tuition', 'tuition_fees'])))
         || staffCanChange('tuition');
     }
 
     match /payroll/{payrollId} {
       allow read, get, list: if canReadSchoolManagement();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || (signedIn() && sameSchoolRequest() && (isSchoolManagementRole() && customPermOk(['payroll', 'staff_payroll'])))
         || staffCanCreate('payroll');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['payroll', 'staff_payroll'])))
         || staffCanChange('payroll');
     }
 
     match /inventory/{itemId} {
       allow read, get, list: if canReadSchoolManagement();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
+        || (signedIn() && sameSchoolRequest() && (isSchoolManagementRole() && customPermOk(['inventory', 'inventory_and_assets'])))
         || staffCanCreate('inventory');
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
+        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['inventory', 'inventory_and_assets'])))
         || staffCanChange('inventory');
     }
 
@@ -1730,9 +1738,9 @@ service cloud.firestore {
     match /behavior/{docId} {
       allow read, get, list: if canReadAcademicOrParentLink();
       allow create: if isSuperAdmin()
-        || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
+        || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId) && customPermOk(['behavior', 'behavior_management']));
       allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
+        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId) && customPermOk(['behavior', 'behavior_management']));
     }
 
     match /exams/{docId} {
