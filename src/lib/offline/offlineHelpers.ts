@@ -1,11 +1,7 @@
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { OfflineActor } from './offlineTypes';
-import {
-  createClientMutationId,
-  safeFirestoreAdd,
-  safeFirestoreSet,
-} from './offlineSync';
+import { createClientMutationId } from './offlineSync';
 import { buildConversationPrivacyStamp } from '../conversationPrivacy';
 import { withMessageRetentionFields } from '../dataRetention';
 
@@ -54,18 +50,17 @@ export async function sendChatMessageOfflineSafe(
     createdAt: serverTimestamp(),
     read: false,
     clientMutationId,
-    messageStatus: 'pending_local',
+    messageStatus: 'sent',
     ...privacyStamp,
   });
 
-  const messageResult = await safeFirestoreAdd('system_messages', messageData, {
-    module: 'messages',
-    actor: input.actor,
-    clientMutationId,
-  });
-
+  // Firestore's own write queue: the message shows in the thread at once (with a
+  // "sending" clock) and is delivered when the connection returns. The app's separate
+  // offline queue hid the message and did not deliver it after reconnecting.
+  const messageRef = doc(collection(db, 'system_messages'));
   const conversationRef = doc(db, 'conversations', input.conversationId);
-  await safeFirestoreSet(
+  const messageWrite = setDoc(messageRef, messageData);
+  const conversationWrite = setDoc(
     conversationRef,
     {
       conversationId: input.conversationId,
@@ -76,11 +71,11 @@ export async function sendChatMessageOfflineSafe(
       clientMutationId,
       ...privacyStamp,
     },
-    { module: 'messages', actor: input.actor, clientMutationId },
     { merge: true },
   );
+  await Promise.all([messageWrite, conversationWrite]);
 
-  return { mode: messageResult.mode, messageId: messageResult.id };
+  return { mode: 'online', messageId: messageRef.id };
 }
 
 export function offlineActorFromProfile(profile: {

@@ -148,21 +148,38 @@ export function buildPlatformOpsUnreadMessagesQuery(): Query {
   );
 }
 
+/** A message just sent has no server time yet (pending serverTimestamp): it belongs at the end. */
+function messageMillis(m: ThreadMessage): number {
+  const ms = m.createdAt?.toMillis?.();
+  return typeof ms === 'number' ? ms : Number.MAX_SAFE_INTEGER;
+}
+
 export function sortThreadMessagesChronological<T extends ThreadMessage>(
   docs: T[],
 ): T[] {
-  return [...docs].sort((a, b) => {
-    const timeA = a.createdAt?.toMillis?.() ?? 0;
-    const timeB = b.createdAt?.toMillis?.() ?? 0;
-    return timeA - timeB;
-  });
+  return docs
+    .map((doc, index) => ({ doc, index }))
+    .sort((a, b) => messageMillis(a.doc) - messageMillis(b.doc) || a.index - b.index)
+    .map((x) => x.doc);
 }
 
 function threadMessagesSignature(docs: ThreadMessage[]): string {
   if (docs.length === 0) return '0';
   const last = docs[docs.length - 1];
   const unread = docs.filter((m) => !m.read).length;
-  return `${docs.length}:${last.id}:${unread}`;
+  // pending + last time: a sent message turning "confirmed" must re-render its tick and time
+  const pending = docs.filter((m) => m._pending === true).length;
+  const lastTime = last.createdAt?.toMillis?.() ?? 'p';
+  return `${docs.length}:${last.id}:${unread}:${pending}:${lastTime}`;
+}
+
+/** Map a message snapshot, flagging writes the server has not confirmed yet. */
+export function threadMessageFromSnapshot(docSnap: {
+  id: string;
+  data: () => Record<string, unknown>;
+  metadata: { hasPendingWrites: boolean };
+}): ThreadMessage {
+  return { id: docSnap.id, ...docSnap.data(), _pending: docSnap.metadata.hasPendingWrites };
 }
 
 /** Skip setState when snapshot payload is unchanged — reduces render storms. */

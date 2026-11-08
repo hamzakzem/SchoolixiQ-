@@ -16,8 +16,8 @@ import {
 import { unregisterPushToken } from './pushService';
 import { writeLoginLog } from './loginLog';
 
-/** Cleanup must never keep someone signed in: each step gets a few seconds, then we move on. */
-const CLEANUP_TIMEOUT_MS = 4000;
+/** Cleanup must never keep someone waiting: the steps run together and get 1.5 s, then we move on. */
+const CLEANUP_TIMEOUT_MS = 1500;
 
 function withTimeout(task: Promise<unknown>, ms = CLEANUP_TIMEOUT_MS): Promise<void> {
   return new Promise((resolve) => {

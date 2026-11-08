@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useChatFocusSelection } from '../../hooks/useChatFocusSelection';
+import { settleWithin, CHAT_SEND_WAIT_MS } from '../../lib/settleWithin';
 import { useAuth } from '../../lib/AuthContext';
 import { db, storage } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc, orderBy, setDoc } from 'firebase/firestore';
@@ -19,6 +21,7 @@ import { markSystemMessagesRead } from '../../lib/chatMessageReads';
 import { markChatPerf, openChatSnapshotListener, resetChatPerf } from '../../lib/chatPerf';
 import {
   applyThreadMessagesIfChanged,
+  threadMessageFromSnapshot,
   buildThreadMessagesQuery,
   shouldMarkThreadUnread,
   unreadIdsForReceiver,
@@ -202,10 +205,7 @@ export default function AdminChatTab() {
     const untrackMessages = openChatSnapshotListener('AdminChatTab:messages');
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data() as any
-      }));
+      const docs = snapshot.docs.map((d) => threadMessageFromSnapshot(d) as any);
 
       const sorted = applyThreadMessagesIfChanged(docs, messagesSigRef, setMessages);
 
@@ -293,6 +293,8 @@ export default function AdminChatTab() {
         setSelectedFile(null);
       }
 
+      // Writes show in the thread at once; don't hold the composer until the server confirms.
+      const work = (async () => {
       const sendResult = await sendChatMessageOfflineSafe({
         actor: offlineActorFromProfile(profile),
         conversationId: convId,
@@ -332,6 +334,10 @@ export default function AdminChatTab() {
         toast('سيتم إرسال الإشعار بعد المزامنة', { icon: 'ℹ️' });
       }
 
+      })();
+      if ((await settleWithin(work, CHAT_SEND_WAIT_MS)) === 'pending') {
+        work.catch(() => toast.error(isRtl ? 'تعذّر إرسال الرسالة — تحقق من الاتصال وأعد المحاولة' : 'Message could not be sent — check your connection'));
+      }
       setLastInteractionTimes(prev => ({ ...prev, [activeContact.id]: Date.now() }));
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'system_messages');
@@ -384,6 +390,11 @@ export default function AdminChatTab() {
     role: c.role,
     extra: c,
   }));
+
+  useChatFocusSelection(shellContacts, (contact) => {
+    setActiveContact({ id: contact.id, name: contact.name, type: contact.type || contact.role || 'user', extra: contact.extra });
+    setMobileShowChat(true);
+  });
 
   const parentStudentPhoto = (contactId: string) =>
     students.find((s) => s.parentIds?.includes(contactId))?.photoUrl;
