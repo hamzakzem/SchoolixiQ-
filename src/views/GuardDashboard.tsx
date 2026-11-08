@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { signOutWithCleanup } from '../lib/authLogout';
-import { ShieldCheck, LogOut, Search, CheckCircle, XCircle, Bell, Phone, User } from 'lucide-react';
+import { ShieldCheck, LogOut, Search, CheckCircle, XCircle, Bell, User, KeyRound, WifiOff, RefreshCw } from 'lucide-react';
 import { NotificationCenter } from '../components/NotificationCenter';
 import { useNotificationBadges } from '../lib/NotificationBadgeContext';
 import { useNotificationRouteRedirect } from '../lib/useNotificationRouteRedirect';
@@ -33,23 +33,70 @@ export default function GuardDashboard() {
     schoolData?.packagePermissions,
   );
   const [requests, setRequests] = useState<DismissalRequest[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [codeInput, setCodeInput] = useState('');
   const [search, setSearch] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const busy = busyId !== null;
   const [showNotifications, setShowNotifications] = useState(false);
   const { totalUnread } = useNotificationBadges();
   useNotificationRouteRedirect('guard', () => {});
 
   useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!profile?.schoolId || !smartGateEnabled) return;
-    return subscribeSchoolDismissals(profile.schoolId, setRequests);
-  }, [profile?.schoolId, smartGateEnabled]);
+    setLoadError(false);
+    return subscribeSchoolDismissals(
+      profile.schoolId,
+      (rows) => {
+        setRequests(rows);
+        setLoaded(true);
+        setLoadError(false);
+      },
+      () => {
+        setLoadError(true);
+        setLoaded(true);
+      },
+    );
+  }, [profile?.schoolId, smartGateEnabled, reloadNonce]);
 
   const pendingRequests = useMemo(() => filterPendingForGuard(requests), [requests]);
 
+  const normCode = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const code = normCode(codeInput);
+  const codeMatches = useMemo(
+    () => (code.length >= 3 ? pendingRequests.filter((r) => normCode(String(r.token || '')).includes(code)) : []),
+    [pendingRequests, code],
+  );
+  const todayCount = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return requests.filter((r) => {
+      const c = r.createdAt as unknown as { toMillis?: () => number; seconds?: number } | number | undefined;
+      const ms = typeof c === 'number' ? c : c?.toMillis ? c.toMillis() : c?.seconds ? c.seconds * 1000 : 0;
+      return ms >= start.getTime();
+    }).length;
+  }, [requests]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    if (code.length >= 3) return codeMatches;
     if (!q) return pendingRequests;
     return pendingRequests.filter(
       (r) =>
@@ -58,33 +105,46 @@ export default function GuardDashboard() {
         r.parentName.toLowerCase().includes(q) ||
         r.registrationNumber?.toLowerCase().includes(q),
     );
-  }, [pendingRequests, search]);
+  }, [pendingRequests, search, code, codeMatches]);
 
   const groupedByClass = useMemo(() => groupDismissalsByClass(filtered), [filtered]);
 
   const handleVerify = async (requestId: string) => {
-    if (!profile) return;
-    setBusy(true);
+    if (!profile || busy) return;
+    if (!online) {
+      toast.error('لا يوجد اتصال بالإنترنت — لا يمكن تنفيذ الإجراء الآن');
+      return;
+    }
+    setBusyId(requestId);
     try {
-      await guardVerifyDismissal(requestId, {
-        uid: profile.uid,
-        name: profile.name || 'حارس',
-      });
+      await guardVerifyDismissal(
+        requestId,
+        { uid: profile.uid, name: profile.name || 'حارس' },
+        undefined,
+        code.length >= 3 ? codeInput : undefined,
+      );
       toast.success('تم التحقق — أُرسل للإدارة');
       setExpandedId(null);
+      setConfirmId(null);
+      setCodeInput('');
     } catch (e: unknown) {
       toast.error(userFacingError(e, 'فشل التحقق'));
     } finally {
-      setBusy(false);
+      setBusyId(null);
     }
   };
 
   const handleReject = async (requestId: string) => {
-    if (!profile || !rejectReason.trim()) {
+    if (!profile || busy) return;
+    if (!rejectReason.trim()) {
       toast.error('أدخل سبب الرفض');
       return;
     }
-    setBusy(true);
+    if (!online) {
+      toast.error('لا يوجد اتصال بالإنترنت — لا يمكن تنفيذ الإجراء الآن');
+      return;
+    }
+    setBusyId(requestId);
     try {
       await guardRejectDismissal(requestId, rejectReason.trim(), {
         uid: profile.uid,
@@ -96,7 +156,7 @@ export default function GuardDashboard() {
     } catch (e: unknown) {
       toast.error(userFacingError(e, 'فشل الرفض'));
     } finally {
-      setBusy(false);
+      setBusyId(null);
     }
   };
 
@@ -162,12 +222,48 @@ export default function GuardDashboard() {
           stats={[
             { label: 'بانتظارك', value: filtered.length },
             { label: 'صفوف', value: Object.keys(groupedByClass).length },
-            { label: 'إجمالي اليوم', value: requests.length },
+            { label: 'طلبات اليوم', value: todayCount },
           ]}
           headerExtra={
             <span className="dw-badge dw-badge--pending">بانتظار التحقق</span>
           }
         >
+          {!online && (
+            <div className="col-span-full dw-glass-card dw-glass-card--no-lift flex items-center gap-2 text-sm text-amber-300" role="alert">
+              <WifiOff size={16} aria-hidden /> لا يوجد اتصال بالإنترنت — الإجراءات متوقفة حتى عودة الاتصال
+            </div>
+          )}
+          {loadError && (
+            <div className="col-span-full dw-glass-card dw-glass-card--no-lift flex items-center justify-between gap-3 text-sm text-red-300" role="alert">
+              <span>تعذّر تحميل الطلبات.</span>
+              <button type="button" className="dw-btn dw-btn--ghost" onClick={() => { setLoaded(false); setReloadNonce((n) => n + 1); }}>
+                <RefreshCw size={14} /> إعادة المحاولة
+              </button>
+            </div>
+          )}
+          <div className="col-span-full mb-2 relative">
+            <KeyRound
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dw-gold-400)] pointer-events-none z-10"
+              size={16}
+              aria-hidden
+            />
+            <input
+              value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value)}
+              placeholder="رمز ولي الأمر (مثال: AB12-CD34)"
+              className="dw-input font-mono"
+              style={{ paddingInlineStart: '2.5rem' }}
+              dir="ltr"
+              autoCapitalize="characters"
+              autoComplete="off"
+              aria-label="رمز ولي الأمر"
+            />
+            {code.length >= 3 && (
+              <p className={`text-xs mt-1 ${codeMatches.length ? 'text-emerald-300' : 'text-red-300'}`}>
+                {codeMatches.length ? `تطابق ${codeMatches.length} طلب` : 'لا يوجد طلب بهذا الرمز'}
+              </p>
+            )}
+          </div>
           <div className="col-span-full mb-2 relative">
             <Search
               className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dw-slate-muted)] pointer-events-none z-10"
@@ -177,7 +273,7 @@ export default function GuardDashboard() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="بحث بالاسم أو الصف..."
+              placeholder="بحث بالاسم أو الصف أو ولي الأمر..."
               className="dw-input"
               style={{ paddingInlineStart: '2.5rem' }}
               aria-label="بحث في الطلبات"
@@ -228,7 +324,7 @@ export default function GuardDashboard() {
                         <p className="text-xs text-[var(--dw-slate-muted)]">{r.pickupNote}</p>
                       )}
                       <p className="flex items-center gap-2 text-xs text-[var(--dw-gold-400)] font-mono">
-                        <Phone size={12} aria-hidden />
+                        <KeyRound size={12} aria-hidden />
                         رمز: {r.token}
                       </p>
                     </div>
@@ -236,18 +332,23 @@ export default function GuardDashboard() {
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        disabled={busy}
-                        onClick={() => handleVerify(r.id)}
+                        disabled={busy || !online}
+                        onClick={() => (confirmId === r.id ? handleVerify(r.id) : (setConfirmId(r.id), setExpandedId(null)))}
                         className="dw-btn dw-btn--success"
                         aria-label={`مطابقة بيانات ${r.studentName}`}
                       >
                         <CheckCircle size={16} />
-                        مطابقة البيانات
+                        {busyId === r.id ? 'جارٍ الإرسال…' : confirmId === r.id ? 'تأكيد وإرسال للإدارة' : 'مطابقة البيانات'}
                       </button>
+                      {confirmId === r.id && !busy && (
+                        <button type="button" className="dw-btn dw-btn--ghost" onClick={() => setConfirmId(null)}>
+                          تراجع
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => setExpandedId(expanded ? null : r.id)}
+                        onClick={() => { setConfirmId(null); setExpandedId(expanded ? null : r.id); }}
                         className="dw-btn dw-btn--danger"
                       >
                         <XCircle size={16} />
@@ -266,7 +367,7 @@ export default function GuardDashboard() {
                         />
                         <button
                           type="button"
-                          disabled={busy}
+                          disabled={busy || !online}
                           onClick={() => handleReject(r.id)}
                           className="dw-btn dw-btn--danger w-full"
                         >
@@ -286,9 +387,14 @@ export default function GuardDashboard() {
             </div>
           ))}
 
-          {filtered.length === 0 && (
+          {!loaded && !loadError && (
+            <div className="col-span-full dw-empty dw-glass-card" aria-busy="true">جارٍ تحميل الطلبات…</div>
+          )}
+          {loaded && !loadError && filtered.length === 0 && (
             <div className="col-span-full dw-empty dw-glass-card">
-              لا توجد طلبات بانتظار المراجعة — أنت محدّث ✓
+              {code.length >= 3 || search.trim()
+                ? 'لا توجد نتائج مطابقة'
+                : 'لا توجد طلبات بانتظار المراجعة — أنت محدّث ✓'}
             </div>
           )}
         </DismissalWorkflowListShell>

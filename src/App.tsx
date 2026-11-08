@@ -93,6 +93,18 @@ import SchoolPresenceTracker from "./components/SchoolPresenceTracker";
 import { isPwaLaunchQuery, isPwaStandalone } from "./lib/pwaUtils";
 import { setupGlobalNotificationClickRouting } from "./lib/notificationRouting";
 
+function registrationErrorMessage(err: unknown): string {
+  const code = String((err as { code?: string })?.code || "");
+  if (code === "registration/timeout")
+    return "الاتصال بطيء: لم يتأكد الخادم من استلام الطلب بعد. سيُرسَل تلقائياً عند عودة الاتصال، أبقِ هذه الصفحة مفتوحة (لن يتكرر الطلب).";
+  if (code === "auth/account-active") return "هذا الحساب مفعّل مسبقاً.";
+  if (code === "permission-denied" || code === "unauthenticated")
+    return "انتهت الجلسة أو لا تملك الصلاحية. سجّل الدخول مجدداً ثم أعد المحاولة.";
+  if (code === "unavailable" || /offline|network/i.test(String((err as Error)?.message || "")))
+    return "لا يوجد اتصال بالإنترنت. أعد المحاولة عند عودة الاتصال.";
+  return "تعذّر إرسال الطلب. أعد المحاولة.";
+}
+
 const DEFAULT_PACKAGES = [
   {
     id: "basic",
@@ -535,6 +547,21 @@ const AppContent = () => {
       unsubs.forEach((unsub) => unsub());
     };
   }, [loading, user, profile, autoLinkChecked]);
+
+  // Watchdog: never stay on the loading skeleton forever (listeners failing/offline/slow).
+  useEffect(() => {
+    if (onboardingState !== "loading" || loading || !user || !autoLinkChecked) return;
+    if (profile && !isPendingSchoolAdmin(profile)) return;
+    const t = setTimeout(() => {
+      setOnboardingState((prev) => {
+        if (prev !== "loading") return prev;
+        if (profile?.pendingRegistrationId || profile?.status === "pending" || profile?.subscriptionStatus === "pending")
+          return "waiting_approval";
+        return profile?.role === "admin" ? "packages" : "options";
+      });
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [onboardingState, loading, user, profile, autoLinkChecked]);
 
   // Refresh token after approval; reload only if profile is still pending (real-time listener fallback)
   useEffect(() => {
@@ -1132,7 +1159,7 @@ const AppContent = () => {
                                 setOnboardingState("waiting_approval");
                               } catch (err) {
                                 console.error("Package subscription failed:", err);
-                                toast.error("حدث خطأ أثناء الإرسال");
+                                toast.error(registrationErrorMessage(err));
                               } finally {
                                 setIsCreatingProfile(false);
                               }
@@ -1204,7 +1231,8 @@ const AppContent = () => {
                       );
                       setOnboardingState("waiting_approval");
                     } catch (err) {
-                      toast.error("حدث خطأ أثناء الإرسال");
+                      console.error("School registration failed:", err);
+                      toast.error(registrationErrorMessage(err));
                     } finally {
                       setIsCreatingProfile(false);
                     }

@@ -32,14 +32,28 @@ async function dismissalFetch(
   if (!token) throw new Error('يرجى تسجيل الدخول أولاً');
 
   const url = getApiUrl(endpoint);
-  return fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
+  // A dropped connection must not leave the gate screen waiting forever. Retrying is safe:
+  // every write carries a stable idempotency key.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'AbortError') {
+      throw new Error('انتهت مهلة الاتصال. تحقق من الإنترنت وأعد المحاولة (لن يتكرر الإجراء).');
+    }
+    throw new Error('تعذّر الاتصال بالخادم. تحقق من الإنترنت وأعد المحاولة.');
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function parseJson(res: Response) {
@@ -60,11 +74,11 @@ export async function apiCreateDismissalRequest(body: Record<string, unknown>) {
   return (await parseJson(res)) as { id: string; token: string; status: string };
 }
 
-export async function apiGuardVerifyDismissal(requestId: string, note?: string) {
+export async function apiGuardVerifyDismissal(requestId: string, note?: string, token?: string) {
   const idempotencyKey = stableKey('guard-verify', requestId);
   const res = await dismissalFetch('/api/dismissal/guard-verify', {
     method: 'POST',
-    body: JSON.stringify({ requestId, note, idempotencyKey }),
+    body: JSON.stringify({ requestId, note, token, idempotencyKey }),
   });
   const data = await parseJson(res);
   clearStableKey('guard-verify', requestId);

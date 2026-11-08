@@ -3001,6 +3001,7 @@ function compactEventLog(events, archiveBeforeDays = 30) {
 }
 
 // dismissalApi.mjs
+import { randomInt } from "node:crypto";
 var DISMISSAL_COL = "dismissal_requests";
 var DISMISSAL_LOGS_COL = "dismissal_logs";
 var TOKEN_TTL_MS = 10 * 60 * 1e3;
@@ -3019,7 +3020,8 @@ function httpError(message, code, status = 400) {
   return err;
 }
 function generateToken() {
-  const part = () => Math.random().toString(36).slice(2, 6).toUpperCase();
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const part = () => Array.from({ length: 4 }, () => alphabet[randomInt(alphabet.length)]).join("");
   return `${part()}-${part()}`;
 }
 async function loadUser(db, uid) {
@@ -3238,6 +3240,13 @@ async function guardVerifyDismissalApi(db, uid, body) {
   const schoolId = String(data.schoolId || "");
   assertSchool(user, schoolId);
   await verifyStudentMatch(db, data, schoolId);
+  const typed = String(body.token || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (typed) {
+    const real = String(data.token || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!real || typed !== real) {
+      throw httpError("\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0645\u062F\u062E\u0644 \u0644\u0627 \u064A\u0637\u0627\u0628\u0642 \u0631\u0645\u0632 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628", "TOKEN_MISMATCH", 400);
+    }
+  }
   return runTransitionApi(db, uid, body, TRANSITIONS.guardVerify, String(user.name || "\u062D\u0627\u0631\u0633"), {
     metadata: { note },
     fields: {
