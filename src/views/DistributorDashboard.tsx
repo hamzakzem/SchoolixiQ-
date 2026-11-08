@@ -19,6 +19,7 @@ import { useAuth } from "../lib/AuthContext";
 import { useLanguage } from "../lib/LanguageContext";
 import { signOutWithCleanup } from "../lib/authLogout";
 import { shouldIgnoreFirestoreListenerError } from "../lib/logoutGuard";
+import { settleWithin, CHAT_SEND_WAIT_MS } from "../lib/settleWithin";
 import { fetchDistributorDashboard } from "../lib/distributorApi";
 import { DashboardSmartAssistantHost } from "../components/smart-assistant/DashboardSmartAssistant";
 import { NotificationCenter } from "../components/NotificationCenter";
@@ -207,7 +208,7 @@ export default function DistributorDashboard() {
     setSendingChat(true);
     try {
       const conversationId = distributorConversationId(distributorId);
-      await sendDistributorSupportMessage({
+      const work = sendDistributorSupportMessage({
         conversationId,
         distributorId,
         senderId: profile.uid,
@@ -215,6 +216,9 @@ export default function DistributorDashboard() {
         senderName: profile.name,
         text: chatInput,
       });
+      if ((await settleWithin(work, CHAT_SEND_WAIT_MS)) === 'pending') {
+        work.catch(() => toast.error(isRtl ? 'تعذّر إرسال الرسالة — تحقق من الاتصال' : 'Message could not be sent — check your connection'));
+      }
       setChatInput("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "فشل إرسال الرسالة");

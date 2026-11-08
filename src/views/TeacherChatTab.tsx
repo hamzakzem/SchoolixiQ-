@@ -1,5 +1,7 @@
 import { resolveTeacherClassIds } from "../lib/teacherClass";
+import { useChatFocusSelection } from '../hooks/useChatFocusSelection';
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { settleWithin, CHAT_SEND_WAIT_MS } from '../lib/settleWithin';
 import { useAuth } from "../lib/AuthContext";
 import { db, storage } from "../lib/firebase";
 import {
@@ -43,6 +45,7 @@ import { markSystemMessagesRead } from "../lib/chatMessageReads";
 import { markChatPerf, openChatSnapshotListener, recordChatRender, resetChatPerf } from "../lib/chatPerf";
 import {
   applyThreadMessagesIfChanged,
+  threadMessageFromSnapshot,
   buildThreadMessagesQuery,
   shouldMarkThreadUnread,
   unreadIdsForReceiver,
@@ -326,10 +329,7 @@ export default function TeacherChatTab() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const docs = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as any),
-        }));
+        const docs = snapshot.docs.map((d) => threadMessageFromSnapshot(d) as any);
 
         const sorted = applyThreadMessagesIfChanged(docs, messagesSigRef, setMessages);
 
@@ -426,6 +426,8 @@ export default function TeacherChatTab() {
         setSelectedFile(null);
       }
 
+      // Writes show in the thread at once; don't hold the composer until the server confirms.
+      const work = (async () => {
       await addDoc(collection(db, "system_messages"), withMessageRetentionFields({
         conversationId: convId,
         schoolId: profile.schoolId,
@@ -482,6 +484,10 @@ export default function TeacherChatTab() {
             metadata: { senderId: profile.uid, conversationId: convId, routeTarget: 'chat' },
           });
         }
+      }
+      })();
+      if ((await settleWithin(work, CHAT_SEND_WAIT_MS)) === 'pending') {
+        work.catch(() => toast.error(isRtl ? 'تعذّر إرسال الرسالة — تحقق من الاتصال وأعد المحاولة' : 'Message could not be sent — check your connection'));
       }
       
       setLastInteractionTimes(prev => ({ ...prev, [receiverId]: Date.now() }));
@@ -571,6 +577,11 @@ export default function TeacherChatTab() {
     extra: (c as { extra?: Record<string, any> }).extra,
     subtitle: c.type === 'admin' ? (isRtl ? 'إدارة المدرسة' : 'School Management') : undefined,
   }));
+
+  useChatFocusSelection(shellContacts, (contact) => {
+    setActiveContact({ id: contact.id, name: contact.name, type: (contact.type as 'admin' | 'parent') || 'parent', extra: contact.extra });
+    setMobileShowChat(true);
+  });
 
   const parentStudentPhoto = (contactId: string) =>
     students.find((st) => st.parentIds?.includes(contactId))?.photoUrl;

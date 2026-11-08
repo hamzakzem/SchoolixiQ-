@@ -90,6 +90,7 @@ import {
   resolveNotificationTab,
   getNotificationActionLabel,
 } from "../lib/notificationRouting";
+import { chatFocusFromNotification, requestChatFocus } from '../lib/chatFocus';
 import {
   registerWebPushDevice,
   isWebPushConfigured,
@@ -814,6 +815,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
     if (targetTab && activeTabSetter) {
       notificationDiag.clickRoute({ notifId: n.id, targetTab, type: n.type });
+      if (targetTab === 'chat') requestChatFocus(chatFocusFromNotification(n));
       activeTabSetter(targetTab);
       onClose();
       return;
@@ -830,6 +832,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     await consumeNotificationOnOpen(n);
     if (targetTab && activeTabSetter) {
       notificationDiag.clickRoute({ notifId: n.id, targetTab, type: n.type });
+      if (targetTab === 'chat') requestChatFocus(chatFocusFromNotification(n));
       activeTabSetter(targetTab);
       setSelectedNotification(null);
       setMainView('list');

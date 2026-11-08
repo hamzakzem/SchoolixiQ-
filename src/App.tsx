@@ -1639,7 +1639,7 @@ function isFirestoreInternalError(error?: Error | null): boolean {
   return /FIRESTORE \([^)]*\) INTERNAL ASSERTION FAILED/.test(String(error?.message || ''));
 }
 
-const FIRESTORE_RECOVERY_KEY = 'schoolix_firestore_recover_at';
+const FIRESTORE_RECOVERY_KEY = 'schoolix_firestore_recover_at'; // shared with lib/firestoreHealth
 
 /** Reload once (at most every 2 minutes) instead of showing a technical error page. */
 function FirestoreRecovery() {

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import {
   Check,
   CheckCheck,
+  Clock3,
   Copy,
   CornerUpLeft,
   Forward,
@@ -343,7 +344,15 @@ export function ChatMessageBubble({
             <span className="text-[10px] text-[#0B2345]/45 dark:text-slate-400 font-semibold tabular-nums leading-none">
               {formatMessageTime(msg.createdAt)}
             </span>
-            {isMe && msg.read !== undefined ? (
+            {isMe && msg._pending ? (
+              <span
+                className="text-[#0B2345]/40 dark:text-slate-500"
+                title={isRtl ? 'قيد الإرسال' : 'Sending'}
+                aria-label={isRtl ? 'قيد الإرسال' : 'Sending'}
+              >
+                <Clock3 size={12} />
+              </span>
+            ) : isMe && msg.read !== undefined ? (
               <span className="text-[#0B2345]/40 dark:text-slate-500" aria-hidden>
                 {msg.read ? (
                   <CheckCheck size={13} className="text-[#D4AF37]" />

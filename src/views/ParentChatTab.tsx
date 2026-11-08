@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useChatFocusSelection } from '../hooks/useChatFocusSelection';
+import { settleWithin, CHAT_SEND_WAIT_MS } from '../lib/settleWithin';
 import { useAuth } from "../lib/AuthContext";
 import { db, storage } from "../lib/firebase";
 import {
@@ -36,6 +38,7 @@ import { markSystemMessagesRead } from "../lib/chatMessageReads";
 import { markChatPerf, openChatSnapshotListener, resetChatPerf } from "../lib/chatPerf";
 import {
   applyThreadMessagesIfChanged,
+  threadMessageFromSnapshot,
   buildThreadMessagesQuery,
   shouldMarkThreadUnread,
   unreadIdsForReceiver,
@@ -266,10 +269,7 @@ export default function ParentChatTab() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const docs = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as any),
-        }));
+        const docs = snapshot.docs.map((d) => threadMessageFromSnapshot(d) as any);
 
         const sorted = applyThreadMessagesIfChanged(docs, messagesSigRef, setMessages);
 
@@ -366,6 +366,8 @@ export default function ParentChatTab() {
         setSelectedFile(null);
       }
 
+      // Writes show in the thread at once; don't hold the composer until the server confirms.
+      const work = (async () => {
       await addDoc(collection(db, "system_messages"), withMessageRetentionFields({
         conversationId: convId,
         schoolId: profile.schoolId,
@@ -423,6 +425,10 @@ export default function ParentChatTab() {
             metadata: { senderId: profile.uid, conversationId: convId, routeTarget: 'chat' },
           });
         }
+      }
+      })();
+      if ((await settleWithin(work, CHAT_SEND_WAIT_MS)) === 'pending') {
+        work.catch(() => toast.error(isRtl ? 'تعذّر إرسال الرسالة — تحقق من الاتصال وأعد المحاولة' : 'Message could not be sent — check your connection'));
       }
       
       setLastInteractionTimes(prev => ({ ...prev, [receiverId]: Date.now() }));
@@ -493,6 +499,11 @@ export default function ParentChatTab() {
     subtitle: c.subtitle,
     extra: c,
   }));
+
+  useChatFocusSelection(shellContacts, (contact) => {
+    setActiveContact({ id: contact.id, name: contact.name, type: contact.type as 'admin' | 'teacher', subtitle: contact.subtitle });
+    setMobileShowChat(true);
+  });
 
   const renderContactAvatar = (contact: ChatShellContact, isSelected: boolean, size: 'list' | 'header' | 'message' = 'list') => {
     if (contact.type === 'admin') {

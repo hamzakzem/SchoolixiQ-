@@ -4,6 +4,9 @@ import { initializeFirestore, connectFirestoreEmulator, memoryLocalCache, doc, g
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { installFirestoreHealthWatch } from './firestoreHealth';
+
+installFirestoreHealthWatch();
 
 // Global error interrupter for unhandled IndexedDB / Connection Lost errors
 if (typeof window !== 'undefined') {

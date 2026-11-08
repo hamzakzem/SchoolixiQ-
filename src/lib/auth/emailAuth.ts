@@ -84,6 +84,21 @@ export async function signUpWithEmail(input: EmailSignUpInput): Promise<User> {
   return user;
 }
 
+/**
+ * School-admin record repairs run in the background: they used to block the login button
+ * for several server round trips. The profile listener picks their result up live.
+ */
+function healAfterLogin(email: string, uid: string): void {
+  void (async () => {
+    try {
+      await healAdminActivationOnLogin(email, uid);
+      await healSchoolDataOnLogin(email, uid);
+    } catch (healErr) {
+      console.warn('Heal school data on login failed', healErr);
+    }
+  })();
+}
+
 export async function signInWithEmail(
   email: string,
   password: string,
@@ -92,12 +107,7 @@ export async function signInWithEmail(
 
   try {
     const result = await signInWithEmailAndPassword(auth, emailTrimmed, password);
-    try {
-      await healAdminActivationOnLogin(emailTrimmed, result.user.uid);
-      await healSchoolDataOnLogin(emailTrimmed, result.user.uid);
-    } catch (healErr) {
-      console.warn('Heal school data on login failed', healErr);
-    }
+    healAfterLogin(emailTrimmed, result.user.uid);
     return result.user;
   } catch (signInErr) {
     if (password.trim() !== password) {
@@ -107,12 +117,7 @@ export async function signInWithEmail(
           emailTrimmed,
           password.trim(),
         );
-        try {
-          await healAdminActivationOnLogin(emailTrimmed, retry.user.uid);
-          await healSchoolDataOnLogin(emailTrimmed, retry.user.uid);
-        } catch (healErr) {
-          console.warn('Heal school data on login failed', healErr);
-        }
+        healAfterLogin(emailTrimmed, retry.user.uid);
         return retry.user;
       } catch {
         /* fall through to original error */

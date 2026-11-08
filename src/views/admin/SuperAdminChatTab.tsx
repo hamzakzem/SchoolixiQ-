@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useChatFocusSelection } from '../../hooks/useChatFocusSelection';
 import { useAuth } from '../../lib/AuthContext';
 import { db, storage } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc, orderBy, setDoc, getDoc } from 'firebase/firestore';
@@ -18,6 +19,7 @@ import { markSystemMessagesRead } from '../../lib/chatMessageReads';
 import { markChatPerf, openChatSnapshotListener, resetChatPerf } from '../../lib/chatPerf';
 import {
   applyThreadMessagesIfChanged,
+  threadMessageFromSnapshot,
   buildAssistantOwnedOpsConversationsQuery,
   buildAssistantOwnedOpsUnreadMessagesQuery,
   buildAssistantOwnedThreadMessagesQuery,
@@ -55,6 +57,7 @@ import {
 import { adminPermanentDeleteMessage, startPlatformConversation, adminCloseConversation } from '../../lib/adminApi';
 import { ChatSettingsPanel } from '../../components/chat/ChatSettingsPanel';
 import { ChatControlCenter } from '../../components/chat/ChatControlCenter';
+import { settleWithin, CHAT_SEND_WAIT_MS } from '../../lib/settleWithin';
 
 const BROADCAST_ID = '__broadcast__';
 
@@ -593,10 +596,7 @@ export default function SuperAdminChatTab() {
 
     const q = buildThreadMessagesQueryForKeys(activeContact.id, threadKeys);
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as any),
-      }));
+      const docs = snapshot.docs.map((docSnap) => threadMessageFromSnapshot(docSnap) as any);
       mergeAndApply(docs);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'SuperAdminChatTab:system_messages');
@@ -791,7 +791,13 @@ export default function SuperAdminChatTab() {
           isRtl ? `تم إرسال الرسالة إلى ${sent} مدرسة` : `Message sent to ${sent} schools`,
         );
       } else {
-        await sendToSchool(activeContact, messageText, filePayload);
+        // The message shows in the thread at once; don't hold the composer until the server confirms.
+        const work = sendToSchool(activeContact, messageText, filePayload);
+        if ((await settleWithin(work, CHAT_SEND_WAIT_MS)) === 'pending') {
+          work.catch(() =>
+            toast.error(isRtl ? 'تعذّر إرسال الرسالة — تحقق من الاتصال وأعد المحاولة' : 'Message could not be sent — check your connection'),
+          );
+        }
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'system_messages');
@@ -849,6 +855,11 @@ export default function SuperAdminChatTab() {
     type: entry.type || entry.contactType || 'school',
     extra: entry.extra || entry,
   }));
+
+  useChatFocusSelection(shellContacts, (contact) => {
+    setActiveContact({ id: contact.id, name: contact.name, type: contact.type || 'school', extra: contact.extra });
+    setMobileShowChat(true);
+  });
 
   const renderContactAvatar = (contact: ChatShellContact, isSelected: boolean, size: 'list' | 'header' | 'message' = 'list') => {
     if (contact.id === BROADCAST_ID) {
