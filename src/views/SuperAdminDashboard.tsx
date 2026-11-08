@@ -259,6 +259,10 @@ export default function SuperAdminDashboard() {
   const [userDeleteConfirmId, setUserDeleteConfirmId] = useState<string | null>(
     null,
   );
+  const [packageRefs, setPackageRefs] = useState<{
+    id: string; schoolsCount: number; requestsCount: number; schools: { id: string; name: string }[];
+  } | null>(null);
+  const [packageMigrateTarget, setPackageMigrateTarget] = useState("");
   const [packageDeleteConfirmId, setPackageDeleteConfirmId] = useState<
     string | null
   >(null);
@@ -1033,12 +1037,12 @@ export default function SuperAdminDashboard() {
             if (items.length > 0) {
               setPackages(items);
             } else {
-              setPackages(DEFAULT_PACKAGES);
+              setPackages(DEFAULT_PACKAGES.map((p) => ({ ...p, __fallback: true })));
             }
           },
           (error) => {
             handleFirestoreError(error, OperationType.GET, "packages", false);
-            setPackages(DEFAULT_PACKAGES);
+            setPackages(DEFAULT_PACKAGES.map((p) => ({ ...p, __fallback: true })));
           },
         ),
       );
@@ -1778,61 +1782,53 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleDeletePackage = async (id: string) => {
-    const loadingToast = toast.loading("جاري حذف الباقة...");
+  const planApiHeaders = async () => {
+    const token = await auth.currentUser?.getIdToken();
+    return { Authorization: `Bearer ${token}`, "X-Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
+  };
+
+  // Step 1: look for references before offering any deletion.
+  const startDeletePackage = async (pkg: any) => {
+    if (pkg.__fallback) {
+      toast.error("هذه باقة افتراضية معروضة فقط (غير محفوظة في قاعدة البيانات). أضف باقاتك الخاصة وستختفي تلقائياً.");
+      return;
+    }
+    const loadingToast = toast.loading("جاري فحص ارتباطات الباقة...");
     try {
-      let apiSuccess = false;
-      let apiErrorDetail = "";
-
-      try {
-        const token = await auth.currentUser?.getIdToken();
-        const response = await fetch(
-          `/api/admin/plans/${encodeURIComponent(id)}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "X-Authorization": `Bearer ${token}`
-            },
-          },
-        );
-
-        if (response.ok) {
-          apiSuccess = true;
-        } else {
-          try {
-            const errRes = await response.json();
-            apiErrorDetail =
-              errRes.error || errRes.message || `Status: ${response.status}`;
-          } catch (e) {
-            apiErrorDetail = `Status: ${response.status}`;
-          }
-          console.warn(
-            `API delete returned status ${response.status}. Trying direct client-side write...`,
-          );
-        }
-      } catch (apiErr: any) {
-        apiErrorDetail = apiErr.message || String(apiErr);
-        console.warn(
-          "API delete threw an error. Trying direct client-side write...",
-          apiErr,
-        );
-      }
-
-      if (!apiSuccess) {
-        try {
-          // Fallback to direct client-side Firestore delete
-          await deleteDoc(doc(db, "packages", id));
-        } catch (firestoreErr: any) {
-          throw new Error(
-            `فشل حذف الباقة عبر الخادم وعبر قاعدة البيانات مباشرة. خطأ الخادم: ${apiErrorDetail}. خطأ قاعدة البيانات: ${firestoreErr.message}`,
-          );
-        }
-      }
-
+      const res = await fetch(`/api/admin/plans/${encodeURIComponent(pkg.id)}/references`, { headers: await planApiHeaders() });
+      const data = await res.json().catch(() => ({}));
       toast.dismiss(loadingToast);
-      toast.success("تم حذف الباقة بنجاح");
+      if (!res.ok) throw new Error(data.error || `Status: ${res.status}`);
+      if (!data.exists) { toast.error("الباقة غير موجودة في قاعدة البيانات"); return; }
+      setPackageMigrateTarget("");
+      if (data.schoolsCount + data.requestsCount > 0) {
+        setPackageRefs({ id: pkg.id, schoolsCount: data.schoolsCount, requestsCount: data.requestsCount, schools: data.schools || [] });
+        setPackageDeleteConfirmId(null);
+      } else {
+        setPackageRefs(null);
+        setPackageDeleteConfirmId(pkg.id);
+      }
+    } catch (error: any) {
+      toast.dismiss(loadingToast);
+      toast.error(error.message || "تعذّر فحص ارتباطات الباقة");
+    }
+  };
+
+  // Step 2: delete (unreferenced) or resolve links first (migrate / detach / archive).
+  const handleDeletePackage = async (id: string, mode: "" | "migrate" | "detach" | "archive" = "") => {
+    const loadingToast = toast.loading(mode === "archive" ? "جاري أرشفة الباقة..." : "جاري حذف الباقة...");
+    try {
+      const response = await fetch(`/api/admin/plans/${encodeURIComponent(id)}/delete`, {
+        method: "POST",
+        headers: await planApiHeaders(),
+        body: JSON.stringify({ mode, targetPlanId: mode === "migrate" ? packageMigrateTarget : undefined }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || data.error || `Status: ${response.status}`);
+      toast.dismiss(loadingToast);
+      toast.success(mode === "archive" ? "تمت أرشفة الباقة (محفوظة مع كل الاشتراكات)" : "تم حذف الباقة بنجاح");
       setPackageDeleteConfirmId(null);
+      setPackageRefs(null);
     } catch (error: any) {
       toast.dismiss(loadingToast);
       toast.error(error.message || "حدث خطأ أثناء حذف الباقة");
@@ -3091,6 +3087,9 @@ export default function SuperAdminDashboard() {
                         </div>
                         <h4 className="text-xl font-bold text-slate-800 mb-2">
                           {pkg.name}
+                          {pkg.archived && (
+                            <span className="mr-2 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">مؤرشفة</span>
+                          )}
                         </h4>
                         <div className="flex flex-col gap-1.5 mb-6">
                           <div className="flex items-baseline gap-1">
@@ -3133,7 +3132,61 @@ export default function SuperAdminDashboard() {
                           ))}
                         </ul>
                         <div className="flex flex-col gap-2">
-                          {packageDeleteConfirmId === pkg.id ? (
+                          {packageRefs?.id === pkg.id ? (
+                            <div className="flex flex-col gap-2 text-sm">
+                              <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 font-bold leading-6">
+                                لا يمكن حذف هذه الباقة مباشرة: مرتبطة بـ {packageRefs.schoolsCount} مدرسة
+                                {packageRefs.requestsCount > 0 ? ` و${packageRefs.requestsCount} طلب اشتراك` : ""}.
+                                {packageRefs.schools.length > 0 && (
+                                  <div className="text-xs font-normal mt-1">
+                                    {packageRefs.schools.slice(0, 5).map((x) => x.name).join("، ")}
+                                    {packageRefs.schoolsCount > 5 ? "…" : ""}
+                                  </div>
+                                )}
+                              </div>
+                              <select
+                                value={packageMigrateTarget}
+                                onChange={(e) => setPackageMigrateTarget(e.target.value)}
+                                className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold text-xs"
+                              >
+                                <option value="">-- باقة بديلة لنقل الاشتراكات --</option>
+                                {packages.filter((p: any) => p.id !== pkg.id && !p.archived && !p.__fallback).map((p: any) => (
+                                  <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                              </select>
+                              <button
+                                disabled={!packageMigrateTarget}
+                                onClick={() => {
+                                  if (window.confirm("سيتم نقل كل المدارس والطلبات المرتبطة إلى الباقة البديلة ثم حذف هذه الباقة نهائياً. متابعة؟")) handleDeletePackage(pkg.id, "migrate");
+                                }}
+                                className="w-full py-2.5 bg-blue-600 disabled:opacity-40 text-white rounded-xl font-bold text-xs"
+                              >
+                                نقل الاشتراكات إلى الباقة البديلة ثم الحذف
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm("سيتم فك ارتباط المدارس بهذه الباقة (تبقى سجلاتها واسم الباقة السابقة محفوظين) ثم حذف الباقة. متابعة؟")) handleDeletePackage(pkg.id, "detach");
+                                }}
+                                className="w-full py-2.5 bg-red-600 text-white rounded-xl font-bold text-xs"
+                              >
+                                فك الارتباط مع حفظ السجلات ثم الحذف
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm("ستُؤرشف الباقة وتُخفى من التسجيل مع بقاء الاشتراكات الحالية كما هي. متابعة؟")) handleDeletePackage(pkg.id, "archive");
+                                }}
+                                className="w-full py-2.5 bg-slate-800 text-white rounded-xl font-bold text-xs"
+                              >
+                                أرشفة الباقة بدلاً من الحذف
+                              </button>
+                              <button
+                                onClick={() => setPackageRefs(null)}
+                                className="w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs"
+                              >
+                                إلغاء
+                              </button>
+                            </div>
+                          ) : packageDeleteConfirmId === pkg.id ? (
                             <div className="flex flex-col gap-2 animate-in fade-in zoom-in duration-300">
                               <button
                                 onClick={() => handleDeletePackage(pkg.id)}
@@ -3187,9 +3240,7 @@ export default function SuperAdminDashboard() {
                                 تعديل
                               </button>
                               <button
-                                onClick={() =>
-                                  setPackageDeleteConfirmId(pkg.id)
-                                }
+                                onClick={() => startDeletePackage(pkg)}
                                 className="py-3 bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 rounded-2xl font-bold hover:bg-red-500 hover:text-white transition-all font-sans text-sm flex items-center justify-center gap-2 border border-red-100 dark:border-red-900/30"
                               >
                                 <Trash2 size={14} />
@@ -5433,7 +5484,7 @@ export default function SuperAdminDashboard() {
                           className="w-full pr-12 pl-4 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/10 focus:border-blue-500 transition-all appearance-none cursor-pointer"
                         >
                           <option value="">-- اضغط لاختيار باقة --</option>
-                          {packages.map((p) => (
+                          {packages.filter((p) => !p.archived).map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name} ({p.price.toLocaleString()} د.ع /{" "}
                               {p.durationDays} يوم)

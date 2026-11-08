@@ -5031,19 +5031,91 @@ async function startServer() {
       res.status(500).json({ error: error.message });
     }
   });
-  app.delete("/api/admin/plans/:id", verifyAdmin, async (req, res) => {
+  async function planReferences(db, id) {
+    const schoolDocs = /* @__PURE__ */ new Map();
+    for (const field of ["planId", "packageId"]) {
+      const snap = await db.collection("schools").where(field, "==", id).get();
+      snap.docs.forEach((d) => schoolDocs.set(d.id, d));
+    }
+    const reqDocs = /* @__PURE__ */ new Map();
+    for (const field of ["planId", "packageId"]) {
+      const snap = await db.collection("subscriptionRequests").where(field, "==", id).get();
+      snap.docs.forEach((d) => reqDocs.set(d.id, d));
+    }
+    return {
+      schools: [...schoolDocs.values()].map((d) => ({ id: d.id, name: d.data()?.name || d.id })),
+      requests: [...reqDocs.values()].map((d) => ({ id: d.id, status: d.data()?.status || "" }))
+    };
+  }
+  app.get("/api/admin/plans/:id/references", verifyAdmin, async (req, res) => {
     if (!await actorHasPlatformPermission(req, "manage_packages")) return res.status(403).json({ error: "SuperAdmin access required" });
     try {
       const db = getDb();
       const { id } = req.params;
-      const beforeDoc = await db.collection("packages").doc(id).get();
-      await db.collection("packages").doc(id).delete();
-      await logAudit(req, "DELETE_PLAN", { before: beforeDoc.data() || null });
-      res.json({ success: true });
+      const exists = (await db.collection("packages").doc(id).get()).exists;
+      const refs = await planReferences(db, id);
+      res.json({ exists, schoolsCount: refs.schools.length, requestsCount: refs.requests.length, schools: refs.schools.slice(0, 20) });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
+  const handlePlanDelete = async (req, res) => {
+    if (!await actorHasPlatformPermission(req, "manage_packages")) return res.status(403).json({ error: "SuperAdmin access required" });
+    try {
+      const db = getDb();
+      const { id } = req.params;
+      const mode = String(req.body?.mode || req.query?.mode || "");
+      const targetPlanId = String(req.body?.targetPlanId || req.query?.targetPlanId || "");
+      const ref = db.collection("packages").doc(id);
+      const beforeDoc = await ref.get();
+      if (!beforeDoc.exists) return res.status(404).json({ error: "\u0627\u0644\u0628\u0627\u0642\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629 \u0641\u064A \u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A (\u0642\u062F \u062A\u0643\u0648\u0646 \u0628\u0627\u0642\u0629 \u0627\u0641\u062A\u0631\u0627\u0636\u064A\u0629 \u063A\u064A\u0631 \u0645\u062D\u0641\u0648\u0638\u0629)" });
+      const refs = await planReferences(db, id);
+      const linked = refs.schools.length + refs.requests.length;
+      if (mode === "archive") {
+        await ref.update({ archived: true, showInRegistration: false, archivedAt: admin4.firestore.FieldValue.serverTimestamp() });
+        await logAudit(req, "ARCHIVE_PLAN", { before: beforeDoc.data() || null, metadata: { schools: refs.schools.length } });
+        return res.json({ success: true, archived: true });
+      }
+      if (linked > 0 && mode !== "migrate" && mode !== "detach") {
+        return res.status(409).json({ error: "PLAN_HAS_REFERENCES", message: "\u0627\u0644\u0628\u0627\u0642\u0629 \u0645\u0631\u062A\u0628\u0637\u0629 \u0628\u0633\u062C\u0644\u0627\u062A \u0648\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641\u0647\u0627 \u0645\u0628\u0627\u0634\u0631\u0629", schoolsCount: refs.schools.length, requestsCount: refs.requests.length });
+      }
+      if (mode === "migrate") {
+        if (!targetPlanId || targetPlanId === id) return res.status(400).json({ error: "\u0627\u062E\u062A\u0631 \u0628\u0627\u0642\u0629 \u0628\u062F\u064A\u0644\u0629 \u0645\u062E\u062A\u0644\u0641\u0629" });
+        const target = await db.collection("packages").doc(targetPlanId).get();
+        if (!target.exists || target.data()?.archived) return res.status(400).json({ error: "\u0627\u0644\u0628\u0627\u0642\u0629 \u0627\u0644\u0628\u062F\u064A\u0644\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629 \u0623\u0648 \u0645\u0624\u0631\u0634\u0641\u0629" });
+      }
+      const targetName = mode === "migrate" ? (await db.collection("packages").doc(targetPlanId).get()).data()?.name : void 0;
+      const ops = [];
+      for (const s of refs.schools) {
+        const sref = db.collection("schools").doc(s.id);
+        const cur = (await sref.get()).data() || {};
+        const patch = mode === "migrate" ? { planId: targetPlanId, ...cur.packageId === id ? { packageId: targetPlanId } : {}, ...cur.packageName ? { packageName: targetName } : {} } : { planId: "", ...cur.packageId === id ? { packageId: "" } : {}, previousPlanId: id, previousPlanName: beforeDoc.data()?.name || id };
+        ops.push([sref, patch]);
+      }
+      for (const r of refs.requests) {
+        const rref = db.collection("subscriptionRequests").doc(r.id);
+        const cur = (await rref.get()).data() || {};
+        const patch = mode === "migrate" ? { ...cur.planId === id ? { planId: targetPlanId } : {}, ...cur.packageId === id ? { packageId: targetPlanId } : {} } : { previousPlanId: id, previousPlanName: beforeDoc.data()?.name || id, ...cur.planId === id ? { planId: "" } : {}, ...cur.packageId === id ? { packageId: "" } : {} };
+        ops.push([rref, patch]);
+      }
+      for (let i = 0; i < ops.length; i += 400) {
+        const batch = db.batch();
+        ops.slice(i, i + 400).forEach(([r, p]) => batch.update(r, p));
+        await batch.commit();
+      }
+      const after = await planReferences(db, id);
+      if (after.schools.length + after.requests.length > 0) {
+        return res.status(409).json({ error: "PLAN_HAS_REFERENCES", message: "\u062A\u0639\u0630\u0651\u0631 \u0641\u0643 \u0643\u0644 \u0627\u0644\u0627\u0631\u062A\u0628\u0627\u0637\u0627\u062A \u0628\u0623\u0645\u0627\u0646\u060C \u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u062D\u0630\u0641" });
+      }
+      await ref.delete();
+      await logAudit(req, "DELETE_PLAN", { before: beforeDoc.data() || null, metadata: { mode: mode || "none", schools: refs.schools.length, requests: refs.requests.length, targetPlanId: targetPlanId || null } });
+      res.json({ success: true, mode: mode || "none", schools: refs.schools.length, requests: refs.requests.length });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  };
+  app.delete("/api/admin/plans/:id", verifyAdmin, handlePlanDelete);
+  app.post("/api/admin/plans/:id/delete", verifyAdmin, handlePlanDelete);
   app.post("/api/admin/delete-user", verifyAdmin, async (req, res) => {
     const body = req.body || {};
     const userId = String(body.userId || body.uid || "").trim();

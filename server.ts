@@ -1313,19 +1313,102 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/plans/:id', verifyAdmin, async (req: any, res: any) => {
+  // Everything that points at a package. Deleting a package that is still referenced would orphan these.
+  async function planReferences(db: any, id: string) {
+    const schoolDocs = new Map<string, any>();
+    for (const field of ['planId', 'packageId']) {
+      const snap = await db.collection('schools').where(field, '==', id).get();
+      snap.docs.forEach((d: any) => schoolDocs.set(d.id, d));
+    }
+    const reqDocs = new Map<string, any>();
+    for (const field of ['planId', 'packageId']) {
+      const snap = await db.collection('subscriptionRequests').where(field, '==', id).get();
+      snap.docs.forEach((d: any) => reqDocs.set(d.id, d));
+    }
+    return {
+      schools: [...schoolDocs.values()].map((d: any) => ({ id: d.id, name: d.data()?.name || d.id })),
+      requests: [...reqDocs.values()].map((d: any) => ({ id: d.id, status: d.data()?.status || '' })),
+    };
+  }
+
+  app.get('/api/admin/plans/:id/references', verifyAdmin, async (req: any, res: any) => {
     if (!(await actorHasPlatformPermission(req, 'manage_packages'))) return res.status(403).json({ error: 'SuperAdmin access required' });
     try {
       const db = getDb();
       const { id } = req.params;
-      const beforeDoc = await db.collection('packages').doc(id).get();
-      await db.collection('packages').doc(id).delete();
-      await logAudit(req, 'DELETE_PLAN', { before: beforeDoc.data() || null });
-      res.json({ success: true });
+      const exists = (await db.collection('packages').doc(id).get()).exists;
+      const refs = await planReferences(db, id);
+      res.json({ exists, schoolsCount: refs.schools.length, requestsCount: refs.requests.length, schools: refs.schools.slice(0, 20) });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // mode: none (only when unreferenced) | migrate (+targetPlanId) | detach | archive
+  const handlePlanDelete = async (req: any, res: any) => {
+    if (!(await actorHasPlatformPermission(req, 'manage_packages'))) return res.status(403).json({ error: 'SuperAdmin access required' });
+    try {
+      const db = getDb();
+      const { id } = req.params;
+      const mode = String(req.body?.mode || req.query?.mode || '');
+      const targetPlanId = String(req.body?.targetPlanId || req.query?.targetPlanId || '');
+      const ref = db.collection('packages').doc(id);
+      const beforeDoc = await ref.get();
+      if (!beforeDoc.exists) return res.status(404).json({ error: 'الباقة غير موجودة في قاعدة البيانات (قد تكون باقة افتراضية غير محفوظة)' });
+      const refs = await planReferences(db, id);
+      const linked = refs.schools.length + refs.requests.length;
+
+      if (mode === 'archive') {
+        await ref.update({ archived: true, showInRegistration: false, archivedAt: admin.firestore.FieldValue.serverTimestamp() });
+        await logAudit(req, 'ARCHIVE_PLAN', { before: beforeDoc.data() || null, metadata: { schools: refs.schools.length } });
+        return res.json({ success: true, archived: true });
+      }
+      if (linked > 0 && mode !== 'migrate' && mode !== 'detach') {
+        return res.status(409).json({ error: 'PLAN_HAS_REFERENCES', message: 'الباقة مرتبطة بسجلات ولا يمكن حذفها مباشرة', schoolsCount: refs.schools.length, requestsCount: refs.requests.length });
+      }
+      if (mode === 'migrate') {
+        if (!targetPlanId || targetPlanId === id) return res.status(400).json({ error: 'اختر باقة بديلة مختلفة' });
+        const target = await db.collection('packages').doc(targetPlanId).get();
+        if (!target.exists || target.data()?.archived) return res.status(400).json({ error: 'الباقة البديلة غير موجودة أو مؤرشفة' });
+      }
+      // Re-point / detach every reference in batches, then re-verify before deleting.
+      const targetName = mode === 'migrate' ? (await db.collection('packages').doc(targetPlanId).get()).data()?.name : undefined;
+      const ops: Array<[any, any]> = [];
+      for (const s of refs.schools) {
+        const sref = db.collection('schools').doc(s.id);
+        const cur = (await sref.get()).data() || {};
+        const patch: any = mode === 'migrate'
+          ? { planId: targetPlanId, ...(cur.packageId === id ? { packageId: targetPlanId } : {}), ...(cur.packageName ? { packageName: targetName } : {}) }
+          : { planId: '', ...(cur.packageId === id ? { packageId: '' } : {}), previousPlanId: id, previousPlanName: beforeDoc.data()?.name || id };
+        ops.push([sref, patch]);
+      }
+      for (const r of refs.requests) {
+        const rref = db.collection('subscriptionRequests').doc(r.id);
+        const cur = (await rref.get()).data() || {};
+        const patch: any = mode === 'migrate'
+          ? { ...(cur.planId === id ? { planId: targetPlanId } : {}), ...(cur.packageId === id ? { packageId: targetPlanId } : {}) }
+          : { previousPlanId: id, previousPlanName: beforeDoc.data()?.name || id, ...(cur.planId === id ? { planId: '' } : {}), ...(cur.packageId === id ? { packageId: '' } : {}) };
+        ops.push([rref, patch]);
+      }
+      for (let i = 0; i < ops.length; i += 400) {
+        const batch = db.batch();
+        ops.slice(i, i + 400).forEach(([r, p]) => batch.update(r, p));
+        await batch.commit();
+      }
+      const after = await planReferences(db, id);
+      if (after.schools.length + after.requests.length > 0) {
+        return res.status(409).json({ error: 'PLAN_HAS_REFERENCES', message: 'تعذّر فك كل الارتباطات بأمان، لم يتم الحذف' });
+      }
+      await ref.delete();
+      await logAudit(req, 'DELETE_PLAN', { before: beforeDoc.data() || null, metadata: { mode: mode || 'none', schools: refs.schools.length, requests: refs.requests.length, targetPlanId: targetPlanId || null } });
+      res.json({ success: true, mode: mode || 'none', schools: refs.schools.length, requests: refs.requests.length });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  };
+  app.delete('/api/admin/plans/:id', verifyAdmin, handlePlanDelete);
+  // POST alias: some proxies/WAFs block DELETE requests or strip their bodies.
+  app.post('/api/admin/plans/:id/delete', verifyAdmin, handlePlanDelete);
 
   app.post('/api/admin/delete-user', verifyAdmin, async (req: any, res: any) => {
     const body = req.body || {};
