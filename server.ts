@@ -108,6 +108,21 @@ const serviceAccount = {
   privateKey: sanitizeEnv(process.env.FIREBASE_PRIVATE_KEY),
 };
 
+/** Shape check only (never prints the key): catches a truncated/garbled FIREBASE_PRIVATE_KEY before any delete runs. */
+function validateServiceAccount(sa: { projectId?: string; clientEmail?: string; privateKey?: string }): { valid: boolean; problems: string[] } {
+  const problems: string[] = [];
+  if (!sa.projectId) problems.push('FIREBASE_PROJECT_ID missing');
+  if (!sa.clientEmail) problems.push('FIREBASE_CLIENT_EMAIL missing');
+  else if (!/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(sa.clientEmail)) problems.push('FIREBASE_CLIENT_EMAIL is not a service-account email');
+  if (!sa.privateKey) problems.push('FIREBASE_PRIVATE_KEY missing');
+  else if (!/^-----BEGIN PRIVATE KEY-----\n[\s\S]+\n-----END PRIVATE KEY-----\n?$/.test(sa.privateKey)) problems.push('FIREBASE_PRIVATE_KEY is not a valid PEM (check the \\n line breaks)');
+  return { valid: problems.length === 0, problems };
+}
+const serviceAccountCheck = validateServiceAccount(serviceAccount);
+if (!serviceAccountCheck.valid && (serviceAccount.clientEmail || serviceAccount.privateKey)) {
+  console.error('[CONFIG] Firebase Admin credentials are present but invalid: ' + serviceAccountCheck.problems.join('; '));
+}
+
 if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   try {
     admin.initializeApp({
@@ -900,6 +915,9 @@ async function startServer() {
         ...(serviceAccount.clientEmail ? [] : ['FIREBASE_CLIENT_EMAIL']),
         ...(serviceAccount.privateKey ? [] : ['FIREBASE_PRIVATE_KEY']),
       ],
+      adminCredentialsValid: serviceAccountCheck.valid,
+      adminCredentialProblems: serviceAccountCheck.problems, // text only, never values
+      deletionEnabled: !deletionUnavailable(),
       adminAppInitialized: admin.apps.length > 0,
       firestore: { ok: false, errorClass: null as string | null },
       cronSecretConfigured: Boolean(resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET)),
@@ -954,7 +972,10 @@ async function startServer() {
     purgeAccount: (userId: string) => runUserPermanentDelete({ db: getDb(), authAdmin: admin.auth(), adminSdk: admin, userId }),
     purgeSchoolMessages: (schoolId: string) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() }),
   });
+  /** In production, deletion needs real Admin credentials: refuse up front, before touching any data. */
+  const deletionUnavailable = () => process.env.NODE_ENV === 'production' && !serviceAccountCheck.valid && !process.env.FIRESTORE_EMULATOR_HOST && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE;
   const deletionRoute = (fn: (ctx: any, uid: string, body: any) => Promise<any>) => async (req: any, res: any) => {
+    if (deletionUnavailable()) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
     try {
       res.json(await fn(deletionCtx(), req.user.uid, req.body || {}));
     } catch (e: any) {
@@ -965,6 +986,7 @@ async function startServer() {
   };
   // Legacy endpoints delegate here so every delete is authorised, cascaded, trashed and audited the same way.
   const legacyEngineDelete = async (req: any, res: any, collection: string, id: string, okMessage: string) => {
+    if (deletionUnavailable()) return res.status(503).json({ ok: false, success: false, error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
     try {
       const out = await deleteRecords(deletionCtx(), req.user.uid, { collection, ids: [id], mode: 'trash', confirmBulk: false });
       const r = out.results?.[0];
@@ -1547,6 +1569,7 @@ async function startServer() {
 
   // Legacy school deletion routes are thin wrappers over the unified, checkpointed school deletion job.
   const legacySchoolDelete = async (req: any, res: any, schoolId: string) => {
+    if (deletionUnavailable()) return res.status(503).json({ ok: false, error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً. لم يتم حذف أي بيانات.' });
     const body = req.body || {};
     try {
       const out = await deleteSchool(deletionCtx(), req.user.uid, {

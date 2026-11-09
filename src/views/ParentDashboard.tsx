@@ -1532,18 +1532,9 @@ export default function ParentDashboard() {
         toast.success(
           isRtl ? "تم إخفاء الواجب بنجاح" : "Homework hidden successfully",
         );
-      } else {
-        // Regular deletion for per-student records (grades, reports, behavioral etc)
-        await deleteDoc(doc(db, collectionName, docId));
-        toast.success(
-          isRtl
-            ? "تم الحذف من حسابك بنجاح"
-            : "Successfully deleted from your account",
-        );
       }
     } catch (error) {
       console.error("Delete error:", error);
-      handleFirestoreError(error, OperationType.DELETE, collectionName, false);
       toast.error(isRtl ? "فشل عملية الحذف" : "Failed to delete record");
     }
   };

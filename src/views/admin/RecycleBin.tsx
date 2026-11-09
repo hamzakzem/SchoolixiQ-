@@ -29,6 +29,7 @@ type Bundle = {
   label: string;
   status: string;
   kind?: string;
+  retention?: string;
   childCounts?: Record<string, number>;
   deletedBy?: { name?: string; role?: string };
   deletedAt?: { toDate?: () => Date };
@@ -125,7 +126,7 @@ export default function RecycleBin() {
     setBusyBundle(b.id);
     try {
       await restoreFromTrash(b.id);
-      toast.success(isRtl ? 'تمت الاستعادة مع السجلات المرتبطة' : 'Restored with related records');
+      toast.success(isRtl ? 'تمت الاستعادة مع السجلات والملفات المرتبطة' : 'Restored with related records and files');
     } catch (e) {
       toast.error(deleteErrorMessage(e, isRtl ? 'فشلت الاستعادة' : 'Restore failed'));
     } finally {
@@ -208,7 +209,8 @@ export default function RecycleBin() {
         <div className="space-y-3" data-testid="trash-bundles">
           {bundles.map((b) => {
             const counts = Object.entries(b.childCounts || {}).filter(([, n]) => n > 0);
-            const pending = b.status !== 'trashed';
+            const restoring = b.status === 'restoring';
+            const pending = b.status !== 'trashed' && !restoring;
             return (
               <div key={b.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
@@ -224,6 +226,18 @@ export default function RecycleBin() {
                       <p className="text-[10px] font-bold text-slate-500 mt-1">
                         {isRtl ? 'يتضمن: ' : 'Includes: '}
                         {counts.map(([c, n]) => `${COLLECTION_LABELS[c] || c} ×${n}`).join('، ')}
+                      </p>
+                    )}
+                    {b.retention === 'protected' && !pending && (
+                      <p className="text-[10px] font-bold text-slate-500 mt-1">
+                        {isRtl ? 'يتضمن سجلات مالية/أكاديمية: لا يُحذف تلقائياً' : 'Contains financial/academic records: never auto-purged'}
+                      </p>
+                    )}
+                    {restoring && (
+                      <p className="text-[10px] font-bold text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle size={12} />
+                        {isRtl ? 'الاستعادة غير مكتملة — أعد المحاولة لإكمالها' : 'Restore incomplete — retry to finish'}
+                        {b.lastError ? ` (${b.lastError})` : ''}
                       </p>
                     )}
                     {pending && (
@@ -245,9 +259,9 @@ export default function RecycleBin() {
                       <>
                         <button type="button" onClick={() => handleRestoreBundle(b)} disabled={busyBundle === b.id} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-xl font-bold text-xs border border-emerald-200 dark:border-emerald-800 disabled:opacity-50">
                           <RotateCcw size={14} />
-                          {busyBundle === b.id ? '...' : isRtl ? 'استعادة' : 'Restore'}
+                          {busyBundle === b.id ? '...' : restoring ? (isRtl ? 'إكمال الاستعادة' : 'Finish restore') : isRtl ? 'استعادة' : 'Restore'}
                         </button>
-                        {canPurge && (
+                        {canPurge && !restoring && (
                           <button type="button" onClick={() => { setPurgeTarget(b); setPurgeText(''); }} disabled={busyBundle === b.id} className="flex items-center gap-1.5 px-3 py-2 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 rounded-xl font-bold text-xs border border-red-200 dark:border-red-800 disabled:opacity-50">
                             <Trash2 size={14} />
                             {isRtl ? 'حذف نهائي' : 'Delete forever'}

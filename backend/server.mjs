@@ -5503,6 +5503,19 @@ var serviceAccount = {
   clientEmail: sanitizeEnv(process.env.FIREBASE_CLIENT_EMAIL),
   privateKey: sanitizeEnv(process.env.FIREBASE_PRIVATE_KEY)
 };
+function validateServiceAccount(sa) {
+  const problems = [];
+  if (!sa.projectId) problems.push("FIREBASE_PROJECT_ID missing");
+  if (!sa.clientEmail) problems.push("FIREBASE_CLIENT_EMAIL missing");
+  else if (!/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(sa.clientEmail)) problems.push("FIREBASE_CLIENT_EMAIL is not a service-account email");
+  if (!sa.privateKey) problems.push("FIREBASE_PRIVATE_KEY missing");
+  else if (!/^-----BEGIN PRIVATE KEY-----\n[\s\S]+\n-----END PRIVATE KEY-----\n?$/.test(sa.privateKey)) problems.push("FIREBASE_PRIVATE_KEY is not a valid PEM (check the \\n line breaks)");
+  return { valid: problems.length === 0, problems };
+}
+var serviceAccountCheck = validateServiceAccount(serviceAccount);
+if (!serviceAccountCheck.valid && (serviceAccount.clientEmail || serviceAccount.privateKey)) {
+  console.error("[CONFIG] Firebase Admin credentials are present but invalid: " + serviceAccountCheck.problems.join("; "));
+}
 if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   try {
     admin4.initializeApp({
@@ -6155,6 +6168,10 @@ async function startServer() {
         ...serviceAccount.clientEmail ? [] : ["FIREBASE_CLIENT_EMAIL"],
         ...serviceAccount.privateKey ? [] : ["FIREBASE_PRIVATE_KEY"]
       ],
+      adminCredentialsValid: serviceAccountCheck.valid,
+      adminCredentialProblems: serviceAccountCheck.problems,
+      // text only, never values
+      deletionEnabled: !deletionUnavailable(),
       adminAppInitialized: admin4.apps.length > 0,
       firestore: { ok: false, errorClass: null },
       cronSecretConfigured: Boolean(resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET)),
@@ -6202,7 +6219,9 @@ async function startServer() {
     purgeAccount: (userId) => runUserPermanentDelete({ db: getDb(), authAdmin: admin4.auth(), adminSdk: admin4, userId }),
     purgeSchoolMessages: (schoolId) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() })
   });
+  const deletionUnavailable = () => process.env.NODE_ENV === "production" && !serviceAccountCheck.valid && !process.env.FIRESTORE_EMULATOR_HOST && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE;
   const deletionRoute = (fn) => async (req, res) => {
+    if (deletionUnavailable()) return res.status(503).json({ error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B (\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u062E\u0627\u062F\u0645). \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
     try {
       res.json(await fn(deletionCtx(), req.user.uid, req.body || {}));
     } catch (e) {
@@ -6212,6 +6231,7 @@ async function startServer() {
     }
   };
   const legacyEngineDelete = async (req, res, collection, id, okMessage) => {
+    if (deletionUnavailable()) return res.status(503).json({ ok: false, success: false, error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B (\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u062E\u0627\u062F\u0645). \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
     try {
       const out = await deleteRecords(deletionCtx(), req.user.uid, { collection, ids: [id], mode: "trash", confirmBulk: false });
       const r = out.results?.[0];
@@ -6697,6 +6717,7 @@ async function startServer() {
     return legacyEngineDelete(req, res, "users", userId, "\u062A\u0645 \u062A\u0639\u0637\u064A\u0644 \u0627\u0644\u062D\u0633\u0627\u0628 \u0648\u0646\u0642\u0644\u0647 \u0625\u0644\u0649 \u0633\u0644\u0629 \u0627\u0644\u0645\u062D\u0630\u0648\u0641\u0627\u062A");
   });
   const legacySchoolDelete = async (req, res, schoolId) => {
+    if (deletionUnavailable()) return res.status(503).json({ ok: false, error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B. \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
     const body = req.body || {};
     try {
       const out = await deleteSchool(deletionCtx(), req.user.uid, {

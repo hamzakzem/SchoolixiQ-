@@ -30,8 +30,9 @@ await ensureUser('admin2@e2e.test', 'admin', 'S2');
 const who = { admin1: 'admin@e2e.test', staff1: 'staff@e2e.test', teacher1: 'teacher@e2e.test', parent1: 'parent@e2e.test', guard1: 'guard@e2e.test', sassist1: 'sassist@e2e.test', admin2: 'admin2@e2e.test', super: 'super@e2e.test' };
 const tk = {}; for (const [k, e] of Object.entries(who)) tk[k] = await token(e);
 
-const COLS = ['students','classes','subjects','homework','teacher_reports','advanced_reports','behavior_reports','behavior','grades','attendance','announcements','installments','payments','payroll','inventory','market','marketplace','orders','id_cards','student_archives'];
-for (const c of COLS) await db.doc(`${c}/RD_${c}`).set({ schoolId: 'S1', teacherId: 'x', studentId: 'y', name: 'rd' });
+const COLS = ['students','classes','subjects','homework','teacher_reports','advanced_reports','behavior_reports','behavior','grades','attendance','announcements','installments','payments','payroll','inventory','market','marketplace','orders','id_cards','student_archives','notifications','registrations','subscriptionRequests'];
+for (const c of COLS) await db.doc(`${c}/RD_${c}`).set({ schoolId: 'S1', teacherId: 'x', studentId: 'y', name: 'rd', userId: 'x', status: 'pending' });
+await db.doc('notifications/RD_notifications').set({ schoolId: 'S1', userId: tk.parent1.uid, recipientId: tk.parent1.uid, createdBy: tk.admin1.uid }); // the recipient and the author must not be able to delete it directly either
 await db.doc('recycle_bin/RDB1').set({ schoolId: 'S1', collection: 'students', status: 'trashed' });
 await db.doc('recycle_bin/RDB1/items/i1').set({ path: 'students/x' });
 await db.doc('deletion_logs/RDL1').set({ schoolId: 'S1', result: 'success' });
@@ -57,5 +58,5 @@ for (const [name, expect] of [['admin1', true], ['sassist1', null], ['teacher1',
 }
 T('staff cannot read bin of own school unless management role (info)', true);
 // legitimate own-identity audit write still works
-T('admin1 can write own audit log', (await post(tk.admin1.t, 'audit_logs', 'ok1', { schoolId: 'S1', actorId: tk.admin1.uid, actorRole: 'admin', action: 'x', uid: tk.admin1.uid, performedBy: tk.admin1.uid })) === 200);
+T('admin1 can write own audit log', (await post(tk.admin1.t, 'audit_logs', 'ok' + Date.now(), { schoolId: 'S1', actorId: tk.admin1.uid, actorRole: 'admin', action: 'x', uid: tk.admin1.uid, performedBy: tk.admin1.uid })) === 200);
 console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
