@@ -11,9 +11,12 @@ function cronSecretMatches(provided, secret) {
 }
 
 // messageNotifications.mjs
-var RECENT_WINDOW_MS = 60 * 60 * 1e3;
+var LIVE_WINDOW_MS = 5 * 60 * 1e3;
+var MAX_BACKLOG_MS = 24 * 60 * 60 * 1e3;
+var DEFAULT_BACKLOG_MS = 60 * 60 * 1e3;
+var STALE_MESSAGE_MS = 60 * 1e3;
+var CHECKPOINT_DOC = ["system", "notificationWorkers"];
 var SWEEP_INTERVAL_MS = 3 * 60 * 1e3;
-var SWEEP_WINDOW_MS = 15 * 60 * 1e3;
 var SUPER_ADMIN_ROLES = ["superadmin", "super_admin"];
 var SCHOOL_ADMIN_ROLES = ["admin", "school_admin", "assistant", "school_assistant"];
 var messageNotificationsStatus = { startedAt: null, listenerAttached: false, restarts: 0, lastErrorAt: null, lastError: null, lastSweepAt: null, lastSweepOk: null };
@@ -91,6 +94,8 @@ async function notifyForSystemMessage(db, adminSdk, messageId, msg) {
   const recipients = await resolveMessageRecipients(db, msg);
   const FieldValue = adminSdk.firestore.FieldValue;
   const schoolId = String(msg.schoolId || "");
+  const msgAt = toMs(msg.createdAt);
+  const stale = msgAt > 0 && Date.now() - msgAt > STALE_MESSAGE_MS;
   let created = 0;
   for (const [uid, kind] of recipients) {
     const ref = db.collection("notifications").doc(notificationIdFor(messageId, uid));
@@ -123,8 +128,8 @@ async function notifyForSystemMessage(db, adminSdk, messageId, msg) {
         ...msg.senderRole ? { senderRole: msg.senderRole } : {},
         ...toSuper ? { audience: "super_admin" } : kind === "admin" ? { audience: "school_admin" } : {},
         createdBy: String(msg.senderId),
-        pushDelivery: { status: "pending" },
-        createdAt: FieldValue.serverTimestamp()
+        pushDelivery: stale ? { status: "skipped", reason: "stale_message" } : { status: "pending" },
+        createdAt: stale ? msg.createdAt : FieldValue.serverTimestamp()
       });
       created += 1;
     } catch (e) {
@@ -137,10 +142,47 @@ async function notifyForSystemMessage(db, adminSdk, messageId, msg) {
   });
   return { messageId, created, recipients: recipients.size };
 }
+async function loadCheckpoint(db) {
+  try {
+    const snap = await db.collection(CHECKPOINT_DOC[0]).doc(CHECKPOINT_DOC[1]).get();
+    return toMs(snap.get("messagesCheckpoint")) || null;
+  } catch {
+    return null;
+  }
+}
+async function saveCheckpoint(db, adminSdk, ms) {
+  await db.collection(CHECKPOINT_DOC[0]).doc(CHECKPOINT_DOC[1]).set({ messagesCheckpoint: adminSdk.firestore.Timestamp.fromMillis(ms), updatedAt: adminSdk.firestore.FieldValue.serverTimestamp() }, { merge: true });
+}
+async function processBacklog(db, adminSdk, sinceMs, log = console, pageSize = 100, maxPages = 20) {
+  let cursor = null;
+  let firstFailedMs = null;
+  let processed = 0;
+  for (let page = 0; page < maxPages; page++) {
+    let q = db.collection("system_messages").where("createdAt", ">=", adminSdk.firestore.Timestamp.fromMillis(sinceMs)).orderBy("createdAt", "asc").limit(pageSize);
+    if (cursor) q = q.startAfter(cursor);
+    const snap = await q.get();
+    if (snap.empty) break;
+    for (const d of snap.docs) {
+      const data = d.data();
+      if (data.serverNotifiedAt) continue;
+      try {
+        await notifyForSystemMessage(db, adminSdk, d.id, data);
+        processed += 1;
+      } catch (e) {
+        log.error("[MessageNotifications] backlog item failed", d.id, e?.message);
+        if (firstFailedMs === null) firstFailedMs = toMs(data.createdAt);
+      }
+    }
+    cursor = snap.docs[snap.docs.length - 1];
+    if (snap.size < pageSize) break;
+  }
+  return { processed, firstFailedMs };
+}
 function setupSystemMessageNotifications(db, adminSdk, log = console) {
   let unsub = null;
   let stopped = false;
   let backoff = 1e3;
+  let running = false;
   const inflight = /* @__PURE__ */ new Set();
   messageNotificationsStatus.startedAt = (/* @__PURE__ */ new Date()).toISOString();
   const handle = (doc) => {
@@ -148,11 +190,11 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
     inflight.add(doc.id);
     notifyForSystemMessage(db, adminSdk, doc.id, doc.data()).catch((e) => log.error("[MessageNotifications] failed", doc.id, e?.message)).finally(() => setTimeout(() => inflight.delete(doc.id), 3e4));
   };
-  const cutoff = () => adminSdk.firestore.Timestamp.fromMillis(Date.now() - RECENT_WINDOW_MS);
   const start = () => {
     if (stopped) return;
     try {
-      unsub = db.collection("system_messages").where("createdAt", ">=", cutoff()).onSnapshot(
+      const since = adminSdk.firestore.Timestamp.fromMillis(Date.now() - LIVE_WINDOW_MS);
+      unsub = db.collection("system_messages").where("createdAt", ">=", since).onSnapshot(
         (snap) => {
           backoff = 1e3;
           messageNotificationsStatus.listenerAttached = true;
@@ -181,19 +223,28 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
     }
   };
   start();
-  const sweep = setInterval(async () => {
+  const pass = async () => {
+    if (running || stopped) return;
+    running = true;
     try {
-      const since = adminSdk.firestore.Timestamp.fromMillis(Date.now() - SWEEP_WINDOW_MS);
-      const snap = await db.collection("system_messages").where("createdAt", ">=", since).orderBy("createdAt", "desc").limit(50).get();
-      snap.docs.forEach(handle);
+      const now = Date.now();
+      const checkpoint = await loadCheckpoint(db);
+      const since = Math.min(now, Math.max(checkpoint ?? now - DEFAULT_BACKLOG_MS, now - MAX_BACKLOG_MS));
+      const { processed, firstFailedMs } = await processBacklog(db, adminSdk, since, log);
+      await saveCheckpoint(db, adminSdk, firstFailedMs ?? now - 6e4);
       messageNotificationsStatus.lastSweepAt = (/* @__PURE__ */ new Date()).toISOString();
-      messageNotificationsStatus.lastSweepOk = true;
+      messageNotificationsStatus.lastSweepOk = firstFailedMs === null;
+      if (processed > 0) log.info?.("[MessageNotifications] backlog processed", processed);
     } catch (e) {
       messageNotificationsStatus.lastSweepAt = (/* @__PURE__ */ new Date()).toISOString();
       messageNotificationsStatus.lastSweepOk = false;
-      log.error("[MessageNotifications] sweep failed", e?.message);
+      log.error("[MessageNotifications] backlog pass failed", e?.message);
+    } finally {
+      running = false;
     }
-  }, SWEEP_INTERVAL_MS);
+  };
+  setTimeout(pass, 2e3);
+  const sweep = setInterval(pass, SWEEP_INTERVAL_MS);
   sweep.unref?.();
   return () => {
     stopped = true;
@@ -2098,6 +2149,23 @@ function canActorDeleteStudent(actorRole, actorSchoolId) {
 // notificationPushDispatch.ts
 var PUSH_MAX_AGE_MS = 10 * 60 * 1e3;
 var TERMINAL_STATUSES = /* @__PURE__ */ new Set(["sent", "partial", "skipped", "no_tokens", "failed", "error"]);
+var PUSH_MAX_ATTEMPTS = 3;
+var PUSH_RETRY_DELAYS_MS = [3e4, 9e4];
+var TRANSIENT_CODES = /* @__PURE__ */ new Set([
+  "messaging/server-unavailable",
+  "messaging/internal-error",
+  "messaging/unknown-error",
+  "messaging/quota-exceeded",
+  "app/network-error",
+  "app/network-timeout"
+]);
+function isTransientPushError(err) {
+  const e = err;
+  const code = String(e?.errorInfo?.code ?? e?.code ?? "");
+  if (TRANSIENT_CODES.has(code)) return true;
+  if (["4", "8", "13", "14"].includes(code)) return true;
+  return /ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up|fetch failed|UNAVAILABLE|DEADLINE_EXCEEDED|timed? ?out/i.test(String(e?.message ?? ""));
+}
 function logPush(event, meta) {
   console.info(`[Notifications] ${event}`, meta);
 }
@@ -2122,6 +2190,30 @@ function isWithinPushAgeWindow(notif, maxAgeMs = PUSH_MAX_AGE_MS) {
   const ms = getCreatedAtMs(notif);
   if (ms === null) return true;
   return Date.now() - ms <= maxAgeMs;
+}
+async function scheduleRetryOrFail(docRef, adminSdk, notif, reason) {
+  const prev = Number(notif.pushDelivery?.attempts || 0);
+  const attempts = prev + 1;
+  const notifId = docRef.id;
+  if (attempts >= PUSH_MAX_ATTEMPTS) {
+    await writePushDelivery(docRef, adminSdk, { status: "error", error: reason, attempts });
+    logPush("PUSH_SEND_ERROR", { notifId, error: reason, attempts, final: true });
+    return { notifId, status: "error", reason };
+  }
+  const delay = PUSH_RETRY_DELAYS_MS[Math.min(prev, PUSH_RETRY_DELAYS_MS.length - 1)];
+  await docRef.set(
+    {
+      pushDelivery: {
+        status: "retry",
+        attempts,
+        lastError: reason.slice(0, 120),
+        nextAttemptAt: adminSdk.firestore.Timestamp.fromMillis(Date.now() + delay)
+      }
+    },
+    { merge: true }
+  );
+  logPush("PUSH_SEND_RETRY", { notifId, attempts, inMs: delay, reason: reason.slice(0, 120) });
+  return { notifId, status: "retry", reason };
 }
 async function writePushDelivery(docRef, adminSdk, payload) {
   await docRef.set(
@@ -2159,6 +2251,9 @@ async function claimNotificationForPush(docRef, adminSdk) {
       return { claimed: false, notif, skipReason: "too_old" };
     }
     const delivery = notif.pushDelivery;
+    if (delivery?.status === "retry" && delivery.nextAttemptAt?.toMillis && delivery.nextAttemptAt.toMillis() > Date.now()) {
+      return { claimed: false, notif, skipReason: "locked" };
+    }
     if (delivery?.status === "pending" && delivery.lockedAt?.toMillis) {
       const lockedMs = delivery.lockedAt.toMillis();
       if (Date.now() - lockedMs < 6e4) {
@@ -2386,6 +2481,9 @@ async function dispatchPushForNotificationDoc(db, adminSdk, notifId, notif) {
         prunedTokens: invalidTokens.length
       });
     }
+    if (response.successCount === 0 && response.failureCount > 0 && invalidTokens.length < response.failureCount && response.responses.some((r) => !r.success && isTransientPushError(r.error))) {
+      return await scheduleRetryOrFail(docRef, adminSdk, notif, "fcm_transient_failure");
+    }
     const status = response.failureCount === 0 ? "sent" : "partial";
     await writePushDelivery(docRef, adminSdk, {
       status,
@@ -2414,6 +2512,10 @@ async function dispatchPushForNotificationDoc(db, adminSdk, notifId, notif) {
     };
   } catch (err) {
     const message2 = err instanceof Error ? err.message : String(err);
+    if (isTransientPushError(err)) {
+      const r = await scheduleRetryOrFail(docRef, adminSdk, notif, message2).catch(() => null);
+      if (r) return r;
+    }
     await writePushDelivery(docRef, adminSdk, { status: "error", error: message2 }).catch(() => {
     });
     await writeNotificationAuditLog(db, adminSdk, {
@@ -4370,6 +4472,9 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
     console.error("Firebase Admin Initialization Error");
   }
 } else {
+  console.error(
+    "[CONFIG] Firebase Admin credentials are missing (FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY). Every server-side Firestore operation (push, chat notifications, gate, admin APIs) will fail until they are set. See /api/public/status."
+  );
   try {
     admin4.initializeApp({
       storageBucket: firebaseConfig.storageBucket
@@ -5002,6 +5107,11 @@ async function startServer() {
     };
     const out = {
       credentialMode: serviceAccount.clientEmail && serviceAccount.privateKey ? "service_account_env" : "default_credentials",
+      // Names only (never values): which Admin credentials the host did not provide.
+      missingEnv: [
+        ...serviceAccount.clientEmail ? [] : ["FIREBASE_CLIENT_EMAIL"],
+        ...serviceAccount.privateKey ? [] : ["FIREBASE_PRIVATE_KEY"]
+      ],
       adminAppInitialized: admin4.apps.length > 0,
       firestore: { ok: false, errorClass: null },
       cronSecretConfigured: Boolean(resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET)),
