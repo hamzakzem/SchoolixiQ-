@@ -1208,9 +1208,16 @@ service cloud.firestore {
 
     match /payments/{paymentId} {
       allow read, get, list: if canReadAcademicOrParentLink();
-      allow create: if isSuperAdmin()
+      // A student whose ledger needs a financial review (after a payment was cancelled) cannot receive new payments until an
+      // authorised manager completes the review (POST /api/records/resolve-financial-review).
+      function studentLedgerClear() {
+        return !('studentId' in request.resource.data)
+          || !exists(/databases/$(database)/documents/students/$(request.resource.data.studentId))
+          || get(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.get('financialReviewRequired', false) != true;
+      }
+      allow create: if studentLedgerClear() && (isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
-        || staffCanCreate('tuition');
+        || staffCanCreate('tuition'));
       allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
@@ -1593,7 +1600,8 @@ service cloud.firestore {
           && isSchoolManagementRole()
           && request.resource.data.sentBy == request.auth.uid
         );
-      allow update, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if false; // audit-style log: never deleted from a browser
     }
 
     // -------------------------------------------------------------------------
@@ -1709,7 +1717,8 @@ service cloud.firestore {
           && userSchoolId() == resource.data.schoolId
           && isSchoolManagementRole()
         );
-      allow update, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if false; // audit-style log: never deleted from a browser
     }
 
     match /system_diagnostics/{diagId} {
@@ -1721,7 +1730,8 @@ service cloud.firestore {
       allow create: if signedIn() && hasSchoolId(request.resource.data);
       allow read, get, list: if isSuperAdmin()
         || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && isSchoolManagementReadRole());
-      allow update, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if false; // audit-style log: never deleted from a browser
     }
 
     // -------------------------------------------------------------------------
@@ -1774,7 +1784,8 @@ service cloud.firestore {
 
     match /logs/{docId} {
       allow create: if signedIn();
-      allow read, get, list, update, delete: if isSuperAdmin();
+      allow read, get, list, update: if isSuperAdmin();
+      allow delete: if false;
     }
 
     // -------------------------------------------------------------------------
@@ -1924,7 +1935,8 @@ service cloud.firestore {
     }
     match /notification_logs/{id} {
       allow read, get, list: if isSuperAdmin();
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
+      allow delete: if false;
     }
 
     // -------------------------------------------------------------------------

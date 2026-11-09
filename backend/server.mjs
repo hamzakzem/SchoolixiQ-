@@ -1293,7 +1293,7 @@ async function voidPayment(ctx, actorUid, body) {
       let reallocated = false;
       if (sameSchool && reconciles) {
         let left = Math.max(0, payTotal - amount);
-        const sorted = [...instDocs].sort((x, y) => toMs2(x.get("dueDate")) - toMs2(y.get("dueDate")));
+        const sorted = [...instDocs].sort((x, y) => toMs2(x.get("dueDate")) - toMs2(y.get("dueDate")) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
         for (const d of sorted) {
           const due = Number(d.get("amount") || 0);
           const paid = Math.min(due, left);

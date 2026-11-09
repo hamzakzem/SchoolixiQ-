@@ -690,7 +690,7 @@ export async function voidPayment(ctx, actorUid, body) {
       if (sameSchool && reconciles) {
         // ledger was consistent: re-allocate the remaining money over the installments
         let left = Math.max(0, payTotal - amount);
-        const sorted = [...instDocs].sort((x, y) => toMs(x.get('dueDate')) - toMs(y.get('dueDate')));
+        const sorted = [...instDocs].sort((x, y) => (toMs(x.get('dueDate')) - toMs(y.get('dueDate'))) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0)); // deterministic: due date, then id
         for (const d of sorted) {
           const due = Number(d.get('amount') || 0);
           const paid = Math.min(due, left); left -= paid;

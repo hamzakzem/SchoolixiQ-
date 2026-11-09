@@ -64,8 +64,12 @@ await db.doc('market/P2MK2').set({ schoolId: 'S1', name: 'منتج 2', imageUrl:
 await db.doc('market/P2MK3').set({ schoolId: 'S1', name: 'منتج 3', imageUrl: shared });
 r = await del(K.admin, 'market', 'P2MK2');
 T('a file shared with another live record is NOT moved', r.j.results[0].ok && await fexists('schools/S1/store/products/222-shared.png') && (await bundle(r.j.results[0].bundleId)).storageReferences?.shared === 1);
-r = await del(K.admin, 'market', 'P2MK3');
-T('…and moves once the last record using it is deleted', r.j.results[0].ok && !(await fexists('schools/S1/store/products/222-shared.png')));
+const sharedB1 = r.j.results[0].bundleId;
+r = await del(K.admin, 'market', 'P2MK3'); const sharedB2 = r.j.results[0].bundleId;
+T('…the second record: the first one’s bin copy still references the file (restorable) → still not moved', r.j.results[0].ok && await fexists('schools/S1/store/products/222-shared.png'));
+await api(K.admin, '/api/records/purge', { bundleId: sharedB1, confirmText: 'حذف نهائي' });
+r = await api(K.admin, '/api/records/purge', { bundleId: sharedB2, confirmText: 'حذف نهائي' });
+T('…and is deleted when the LAST bundle using it is purged', r.s === 200 && !(await fexists('schools/S1/store/products/222-shared.png')));
 
 const foreign = await put('schools/S2/store/products/333-other.png', 'T3');
 await db.doc('market/P2MK4').set({ schoolId: 'S1', name: 'يشير لملف مدرسة أخرى', imageUrl: foreign });

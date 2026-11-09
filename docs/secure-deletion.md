@@ -17,7 +17,7 @@ read from Firestore **on the server** (nothing the browser sends — role, schoo
 - **Money**: payments are never deleted (not even permanently). `void-payment` keeps amount/date/receipt/collector, stores who/when/why
   in `history`, reverses the student balance **once** and re-allocates the remaining money over the installments (earliest due first, like
   the payment screen). If the stored installments do not add up to the payments (manual toggles, extra payments) nothing is guessed:
-  the student is flagged `financialReviewRequired`, new payments for that student are blocked, and an admin confirms the review
+  the student is flagged `financialReviewRequired`, new payments for that student are **refused by the Firestore rule** (not only the UI), and an admin confirms the review
   (`resolve-financial-review`, logged). Installments with money on them are never deleted; deleting a student keeps its payments and
   paid installments flagged `studentDeleted`.
 - **Requests**: approved registration/subscription requests are decision records (never deleted). Rejecting/approving = status change.
@@ -34,23 +34,63 @@ read from Firestore **on the server** (nothing the browser sends — role, schoo
 ## Storage Cleanup Registry (`backend/storageRegistry.mjs`)
 Files are discovered from the record itself (every string, nested, including links embedded in free text; `gs://`, firebasestorage,
 storage.googleapis, emulator URLs) plus folders that belong to exactly one record (`students/{school}/{id}/`, `users/{uid}/`,
-`market/{id}/`). A file is moved only if its path is safe (no traversal), inside the record's own scope
-(`schools/{school}/`, `students/{school}/`, record folders) and not referenced by another live record of the school (shared files stay).
+`market/{id}/`). A file is moved to `_trash` only if **all** hold:
+1. its path is safe (no `..`, no leading `/`, no `//`, no control characters) and inside the record's own scope
+   (`schools/{school}/`, `students/{school}/`, the record's own folder) — otherwise `out_of_scope`: never touched, not even by a permanent delete;
+2. **no other record of ANY school references it**. Verified with a *global* server-side scan (Admin SDK, all schools, paginated 500/page,
+   bounded to 200 000 documents): live records, the main record and `items` of every other bundle in any bin (restorable data keeps its
+   files in use). References are found in every string of the document (nested arrays/objects, free text);
+3. the scan completed. If it cannot (bound exceeded) the file is **left in place** (`unverified`), the bundle gets
+   `storageWarnings: [{code: "REFERENCE_SCAN_INCOMPLETE"}]` and the audit log entry carries `storage.unverified`. Query errors
+   are not swallowed: the job fails and is retried.
+Identifiers of another tenant's records are never written into job data (`sharedWith` is only `same_school` / `other_tenant`).
+**Purge re-verifies**: a file referenced again after the delete is *rescued* back to its original path (`filesRescued`); if the check cannot
+complete the trashed copy is kept (`filesRetained`); files left in place because they were shared are removed by the purge of the
+last bundle that used them, once nothing references them. School deletion applies the same checks to every file of the school.
 Paths: `students/{school}/{id}/photo_*`, `schools/{school}/store/products|logo|idcards/*`, `users/{uid}/*`, `market/{id}/*`,
 `chat_files/*`, `chat_attachments/*` (the last two belong to the message cleaner, hard delete by design).
+Limit: the scan reads every document of the scanned collections; at very large scale a maintained reference index is the next step
+(until then the bound makes it fail closed, never delete).
 
-## Delete paths that are NOT in the generic engine (each with a stated reason)
-| Path | Why | Control |
+## Preview environments (Hostinger / Cloudflare / any other)
+Evidence from the repository (the Hostinger preview runtime itself cannot be inspected from here):
+- Both GitHub workflows run only on push to `main` (and manual dispatch); pull requests and feature branches deploy nothing from GitHub.
+  A Hostinger Git preview is built by Hostinger itself, outside GitHub Actions.
+- The committed web client config (`firebase-applet-config.json`) names the **production** project `yala-safari-iq`: any build of any
+  branch, including a preview, talks to production Firestore/Auth/Storage with the *client* SDK (subject to the security rules).
+- A preview's backend gets whatever environment variables the Hostinger site defines; whether they include the production Admin
+  credentials is **unknown** from the repository. CORS (`server.ts`) allows only the production origins (+ `APP_URL`), so a preview page
+  calling its own backend with an `Origin` header is blocked unless `APP_URL` is set to the preview domain.
+Therefore destructive operations **fail closed outside production hosts** (`backend/runtimeGuard.mjs`):
+all destructive routes (`/api/records/*`, `/api/admin/delete-*`, school/message/plan/distributor deletes) answer `503
+DESTRUCTIVE_OPS_DISABLED` unless the request host is `*.schoolixiq.com|iq` or the process runs on the Firebase emulators; known preview
+hosts (`*.hostingersite.com`, `pages.dev`, `vercel.app`, `netlify.app`, …) and unknown hosts are refused; `DEPLOY_ENV=preview|staging`
+or `DELETION_DISABLED=true` force-disable; the background sweep runs only on a process that has served a production host and never one that
+served a preview host; the web client also refuses these calls on preview hosts.
+`node scripts/check-preview-isolation.mjs` (npm `check:preview-isolation`, workflow `pr-safety.yml`) fails if a PR/branch workflow
+deploys or uses Firebase credentials, if a preview/staging config file names the production project or Admin credentials, if service-account
+material is in the repo or the build, or if the guard/wiring regresses; `scripts/e2e/preview-isolation.test.mjs` proves it fails on unsafe fixtures
+and exercises the real server.
+Not covered (outside this PR's scope, **needs a Hostinger-side decision**): a preview that holds the production Admin credentials can still
+run the *other* background workers (push dispatcher, chat notifications) and non-destructive server routes against production data.
+Give the preview its own environment variables (no `FIREBASE_PRIVATE_KEY`) or a dedicated Firebase project.
+
+## Delete paths that are NOT in the generic engine (verified, each with a stated reason)
+| Path | Verified behaviour | Why it stays outside |
 |---|---|---|
-| Chat messages (`/api/admin/messages/permanent-delete`) and user conversation purge | privacy/abuse removal must be irreversible | Super Admin only, per-target lock, `deletion_logs` entry via `deleteChatMessage` / `runAuditedPlatformDelete` |
-| Plans/packages (`DELETE_PLAN`) | references must be migrated first (PR #30 logic) | `manage_packages` check + lock + `deletion_logs` |
-| Users' own `users/{uid}` claim/migration deletes (`AuthContext`, `profileProvisioning`) | account provisioning, not data deletion | rules: only `canClaimProvisionedUserDoc` |
-| Operational logs deleted by Super Admin rules (`login_logs`, `print_logs`, `tuition_reminder_*`, `notification_logs`, `system_diagnostics`, `logs`, `school_presence`, `assistant_tickets/events`, `distributor_support_*`, `system*`) | platform telemetry/support data, no school records | rules: Super Admin only |
-Everything else (students … assistant content, distributors, notifications, requests, schools, accounts) is covered; direct client deletes are denied by rules
-(`rules-deletion.mjs` proves it for 8 roles × 35 collections).
+| Chat messages (`/api/admin/messages/permanent-delete`) and user conversation purge | Super Admin only (admin/teacher/parent get 403 in `deletion-phase4`), per-target lock, `deletion_logs` entry (`DELETE_MESSAGE_PERMANENT`, `PURGE_USER_CONVERSATIONS`) | Privacy/abuse removal must be irreversible; a trash copy would defeat it. A super admin can purge any user's conversations by design (platform policy unchanged) |
+| School messaging on school deletion | Messages are removed **only on the permanent purge** of a school bundle, after which the bundle (and therefore restore) no longer exists; a *trashed* school keeps its messages untouched, so a restore never loses messages | Same privacy reason; documented order prevents a half-restorable state |
+| Plans/packages (`DELETE_PLAN`) | `manage_packages` permission (Super Admin or delegated assistant) checked server-side, references migrated first, lock + `deletion_logs` | Reference-migration logic (PR #30) |
+| `distributorMonthlyCommissions` | Never touched by distributor deletion (rules: no client create/update/delete); the school keeps `distributorDeleted/CommissionPaused` flags | Commission ledger = financial history, retained by policy |
+| Operational/audit-style logs (`login_logs`, `print_logs`, `tuition_reminder_logs`, `logs`, `notification_logs`) | **Client deletion closed in rules** (no code ever deleted them); Super Admin may still create/update where it could before | Tamper-proofing; any future clean-up must be a server job |
+| Telemetry/support data (`tuition_reminder_tracking`, `system_diagnostics`, `school_presence`, `assistant_tickets/events`, `distributor_support_*`, `system*`) | Super Admin only by rules; no school records inside | Platform data, not tenant records |
+| Users' own `users/{uid}` claim/migration deletes (`AuthContext`, `profileProvisioning`) | rules: only `canClaimProvisionedUserDoc` | Account provisioning, not data deletion |
+| Non-Firebase links in free text (external URLs, `data:` URIs) | Not recognised as Storage files → **never** deleted or moved (fails safe: possible orphan files, never data loss) | Not our objects |
+Everything else (students … assistant content, distributors, notifications, requests, schools, accounts) is covered; direct client deletes are
+denied by rules (`rules-deletion.mjs` proves it for 8 roles × 40 collections).
 
 ## Hostinger (not applied by this branch)
-Without valid Admin credentials every delete answers `503 ADMIN_UNAVAILABLE` before touching data. Set in hPanel:
+Without valid Admin credentials every delete answers `503 ADMIN_UNAVAILABLE` before touching data. Set in hPanel (production site only):
 `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` (service-account email), `FIREBASE_PRIVATE_KEY` (PEM; `\n` escapes accepted),
 `NOTIFICATION_CRON_SECRET` (≥ 32 chars). `/api/public/status` shows `adminCredentialsValid`, `adminCredentialProblems`,
 `deletionEnabled` (names/messages only, never values). Use a dedicated service account limited to Firestore, Storage and Auth admin.
@@ -66,10 +106,12 @@ Without valid Admin credentials every delete answers `503 ADMIN_UNAVAILABLE` bef
 
 ## Tests (Firebase emulators; run each after restarting the emulator — they create data)
 `scripts/e2e/`: `deletion-api.test.mjs`, `deletion-phase2.test.mjs`, `deletion-phase3.test.mjs`, `deletion-phase4.test.mjs`,
+`deletion-phase5.test.mjs` (cross-school Storage), `deletion-phase6-finance.test.mjs` (payment cancellation), `preview-isolation.test.mjs`,
 `rules-deletion.mjs`, `rules-school-isolation.mjs`, `deletion-ui.cjs`, `deletion-ui-finance.cjs` (+ existing suites).
 
 ## Known limits
-- Free-text links that are not Firebase Storage URLs are not discovered as files.
-- Distributor commission history (`distributorMonthlyCommissions`) is never touched by distributor deletion.
-- The generic restore of a *school* does not recreate messaging that a permanent purge removed.
+- Free-text links that are not Firebase Storage URLs are not discovered as files (see table).
+- The reference scan is O(documents) per delete that has files; bounded, fails closed.
+- A file that lives in School A's folder and stays referenced only by School B after A deleted its record can never be removed by B (out of scope): it remains until a platform operator cleans it.
+- Hostinger preview runtime was not inspectable from this environment (sandbox proxy returns 403 for that host).
 - Nothing here was exercised against production Firebase (credentials not available).

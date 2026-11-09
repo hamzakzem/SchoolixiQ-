@@ -30,7 +30,7 @@ await ensureUser('admin2@e2e.test', 'admin', 'S2');
 const who = { admin1: 'admin@e2e.test', staff1: 'staff@e2e.test', teacher1: 'teacher@e2e.test', parent1: 'parent@e2e.test', guard1: 'guard@e2e.test', sassist1: 'sassist@e2e.test', admin2: 'admin2@e2e.test', super: 'super@e2e.test' };
 const tk = {}; for (const [k, e] of Object.entries(who)) tk[k] = await token(e);
 
-const COLS = ['students','classes','subjects','homework','teacher_reports','advanced_reports','behavior_reports','behavior','grades','attendance','announcements','installments','payments','payroll','inventory','market','marketplace','orders','id_cards','student_archives','notifications','registrations','subscriptionRequests','schools','packages','distributors','distributorCoupons','assistant_categories','assistant_flows','assistant_answers','assistant_keywords','assistant_settings','staff','exams','fees','expenses','dismissal_requests'];
+const COLS = ['students','classes','subjects','homework','teacher_reports','advanced_reports','behavior_reports','behavior','grades','attendance','announcements','installments','payments','payroll','inventory','market','marketplace','orders','id_cards','student_archives','notifications','registrations','subscriptionRequests','schools','packages','distributors','distributorCoupons','assistant_categories','assistant_flows','assistant_answers','assistant_keywords','assistant_settings','staff','exams','fees','expenses','dismissal_requests','login_logs','print_logs','tuition_reminder_logs','logs','notification_logs'];
 for (const c of COLS) await db.doc(`${c}/RD_${c}`).set({ schoolId: 'S1', teacherId: 'x', studentId: 'y', name: 'rd', userId: 'x', status: 'pending' });
 await db.doc('notifications/RD_notifications').set({ schoolId: 'S1', userId: tk.parent1.uid, recipientId: tk.parent1.uid, createdBy: tk.admin1.uid }); // the recipient and the author must not be able to delete it directly either
 await db.doc('recycle_bin/RDB1').set({ schoolId: 'S1', collection: 'students', status: 'trashed' });
@@ -59,4 +59,13 @@ for (const [name, expect] of [['admin1', true], ['sassist1', null], ['teacher1',
 T('staff cannot read bin of own school unless management role (info)', true);
 // legitimate own-identity audit write still works
 T('admin1 can write own audit log', (await post(tk.admin1.t, 'audit_logs', 'ok' + Date.now(), { schoolId: 'S1', actorId: tk.admin1.uid, actorRole: 'admin', action: 'x', uid: tk.admin1.uid, performedBy: tk.admin1.uid })) === 200);
+// payments: blocked while the student's ledger awaits a financial review (rule-level, not just the UI)
+await db.doc('students/RD_FLAGGED').set({ schoolId: 'S1', name: 'x', financialReviewRequired: true });
+await db.doc('students/RD_CLEAR').set({ schoolId: 'S1', name: 'y' });
+const stamp = Date.now();
+T('admin cannot create a payment for a student flagged for financial review', (await post(tk.admin1.t, 'payments', 'rdp_f' + stamp, { schoolId: 'S1', studentId: 'RD_FLAGGED', amount: '10' })) !== 200);
+T('super admin cannot either (the review must be completed first)', (await post(tk.super.t, 'payments', 'rdp_fs' + stamp, { schoolId: 'S1', studentId: 'RD_FLAGGED', amount: '10' })) !== 200);
+T('…while a normal student still accepts a payment (no regression)', (await post(tk.admin1.t, 'payments', 'rdp_c' + stamp, { schoolId: 'S1', studentId: 'RD_CLEAR', amount: '10' })) === 200);
+await db.doc('students/RD_FLAGGED').update({ financialReviewRequired: admin.firestore.FieldValue.delete() });
+T('…and the flagged student accepts payments again once the review is completed', (await post(tk.admin1.t, 'payments', 'rdp_f2' + stamp, { schoolId: 'S1', studentId: 'RD_FLAGGED', amount: '10' })) === 200);
 console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
