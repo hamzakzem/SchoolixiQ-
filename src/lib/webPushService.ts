@@ -345,11 +345,16 @@ function attachForegroundMessageListener() {
   messageListenerAttached = true;
   onMessage(webMessaging, (payload) => {
     console.info('[Notifications] FCM foreground', payload?.data?.type || payload?.notification?.title);
-    if (payload.notification?.title) {
+    if (payload.notification?.title && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      // Same tag as the in-app notification listener (AudioNotificationManager) and the service
+      // worker: the browser collapses them into ONE system notification instead of showing the
+      // same event twice while the app is open.
+      const tag = payload.data?.notificationId || payload.data?.dedupKey || undefined;
       new Notification(payload.notification.title, {
         body: payload.notification.body,
         icon: '/favicon.ico',
         data: payload.data,
+        ...(tag ? { tag } : {}),
       });
     }
   });

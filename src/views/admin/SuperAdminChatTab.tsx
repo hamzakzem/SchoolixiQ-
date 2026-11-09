@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useChatFocusSelection } from '../../hooks/useChatFocusSelection';
 import { useAuth } from '../../lib/AuthContext';
 import { db, storage } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc, orderBy, setDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc, orderBy, setDoc, getDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useLanguage } from '../../lib/LanguageContext';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
@@ -660,7 +660,12 @@ export default function SuperAdminChatTab() {
       schoolId: school.id,
     });
 
-    await addDoc(collection(db, 'system_messages'), withMessageRetentionFields({
+    // One atomic write (message + conversation): a single round trip, nothing half-sent.
+    // The recipients' notifications are created by the server from the message itself
+    // (idempotent, one per recipient), so they no longer depend on this browser staying online.
+    const messageRef = doc(collection(db, 'system_messages'));
+    const batch = writeBatch(db);
+    batch.set(messageRef, withMessageRetentionFields({
       conversationId: convId,
       conversationKey: convId,
       schoolId: school.id,
@@ -679,8 +684,7 @@ export default function SuperAdminChatTab() {
       read: false,
       ...privacyStamp,
     }));
-
-    await setDoc(
+    batch.set(
       doc(db, 'conversations', convId),
       {
         conversationId: convId,
@@ -697,23 +701,7 @@ export default function SuperAdminChatTab() {
       },
       { merge: true },
     );
-
-    const q = query(
-      collection(db, 'users'),
-      where('schoolId', '==', school.id),
-      where('role', 'in', ['admin', 'assistant', 'school_assistant']),
-    );
-    const adminSnaps = await getDocs(q);
-    const adminIds = adminSnaps.docs.map((d) => d.id);
-    if (adminIds.length > 0) {
-      await notificationService.sendToMultiple(adminIds, {
-        title: 'رسالة جديدة من إدارة المنصة',
-        message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
-        type: 'system',
-        schoolId: school.id,
-        metadata: { senderId: profile.uid, conversationId: convId, audience: 'school_admin', routeTarget: 'chat' },
-      });
-    }
+    await batch.commit();
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {

@@ -452,39 +452,7 @@ export default function TeacherChatTab() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      if (activeContact.type === "parent") {
-        await notificationService.send({
-          userId: receiverId,
-          title: "رسالة جديدة من المعلم",
-          message:
-            messageText.substring(0, 50) +
-            (messageText.length > 50 ? "..." : ""),
-          type: "system",
-          schoolId: profile.schoolId,
-          metadata: { senderId: profile.uid, conversationId: convId, routeTarget: 'chat' },
-        });
-      } else if (activeContact.type === "admin") {
-        const { getDocs, query, collection, where } =
-          await import("firebase/firestore");
-        const q = query(
-          collection(db, "users"),
-          where("schoolId", "==", profile.schoolId),
-          where("role", "in", ["admin", "assistant"]),
-        );
-        const adminSnaps = await getDocs(q);
-        const adminIds = adminSnaps.docs.map((d) => d.id);
-        if (adminIds.length > 0) {
-          await notificationService.sendToMultiple(adminIds, {
-            title: "رسالة جديدة من معلم (الإدارة)",
-            message:
-              messageText.substring(0, 50) +
-              (messageText.length > 50 ? "..." : ""),
-            type: "system",
-            schoolId: profile.schoolId,
-            metadata: { senderId: profile.uid, conversationId: convId, routeTarget: 'chat' },
-          });
-        }
-      }
+      // Recipients' notifications are created by the server from the message (idempotent).
       })();
       if ((await settleWithin(work, CHAT_SEND_WAIT_MS)) === 'pending') {
         work.catch(() => toast.error(isRtl ? 'تعذّر إرسال الرسالة — تحقق من الاتصال وأعد المحاولة' : 'Message could not be sent — check your connection'));

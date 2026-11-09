@@ -11,7 +11,9 @@ on:
       - firestore.rules
       - storage.rules
       - firebase.json
+      - firestore.indexes.json
       - scripts/deploy-firebase-rules.mjs
+      - scripts/deploy-firestore-indexes.mjs
   workflow_dispatch:
 
 concurrency:
@@ -57,6 +59,11 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
         run: node scripts/deploy-firebase-rules.mjs
+
+      - name: Create missing Firestore indexes (additive, best effort)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+        run: node scripts/deploy-firestore-indexes.mjs
 
       - name: Remove credentials
         if: always()

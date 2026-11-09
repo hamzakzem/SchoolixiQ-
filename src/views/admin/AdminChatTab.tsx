@@ -308,31 +308,8 @@ export default function AdminChatTab() {
         fileName,
       });
 
-      if (sendResult.mode === 'online') {
-        if (activeContact.id === 'super_admin') {
-          console.info('[Notifications] SUPER_ADMIN_PRODUCER_FIXED', {
-            source: 'AdminChatTab',
-            conversationId: convId,
-          });
-          await notificationService.notifySuperAdmins({
-            title: 'رسالة جديدة من إدارة مدرسة',
-            message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
-            type: 'system',
-            metadata: { senderId: profile.uid, conversationId: convId, schoolId: profile.schoolId, routeTarget: 'chat' }
-          });
-        } else {
-          await notificationService.send({
-            userId: activeContact.id,
-            title: 'رسالة جديدة من الإدارة',
-            message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
-            type: 'system',
-            schoolId: profile.schoolId,
-            metadata: { senderId: profile.uid, conversationId: convId, routeTarget: 'chat' }
-          });
-        }
-      } else {
-        toast('سيتم إرسال الإشعار بعد المزامنة', { icon: 'ℹ️' });
-      }
+      // Notifications for the recipients are created by the server from the message (idempotent).
+      void sendResult;
 
       })();
       if ((await settleWithin(work, CHAT_SEND_WAIT_MS)) === 'pending') {
