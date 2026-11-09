@@ -3,7 +3,7 @@ import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { initializeFirestore, connectFirestoreEmulator, memoryLocalCache, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
-import firebaseConfig from '../../firebase-applet-config.json';
+import firebaseConfig from './firebaseConfig';
 import { installFirestoreHealthWatch } from './firestoreHealth';
 
 installFirestoreHealthWatch();

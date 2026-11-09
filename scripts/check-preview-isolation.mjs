@@ -88,6 +88,31 @@ const server = readRepo('server.ts');
 /startDeletionSweep\(.*backgroundDestructiveAllowed\)/.test(server) ? ok('server.ts gates the background sweep') : bad('server.ts does not gate the background sweep');
 /PREVIEW_HOST_RE\.test\(window\.location\.hostname\)/.test(readRepo('src/lib/deletionApi.ts')) ? ok('client refuses destructive calls on preview hosts') : bad('client has no preview guard');
 
+// 6. background-process inventory + identity wiring (backend/runtimeEnv.mjs)
+const STARTERS = ['setupNotificationPushListener', 'setupSystemMessageNotifications', 'startDeletionSweep', 'scheduleCredentialScrub', 'scheduleChatThreadMigration'];
+for (const st of STARTERS) {
+  const calls = (server.match(new RegExp(`\\b${st}\\(`, 'g')) || []).length;
+  const viaRegistry = new RegExp(`registerWorker\\('[^']+',\\s*\\(\\)\\s*=>\\s*\\{[^}]*\\b${st}\\(`).test(server);
+  calls === 1 && viaRegistry ? ok(`${st} is started only through registerWorker (environment-gated)`) : bad(`${st} is called outside registerWorker (${calls} call sites)`);
+}
+/registerWorker\('app-url-config'/.test(server) && !/collection\('system'\)\.doc\('config'\)\.set\(/.test(server.replace(/registerWorker\('app-url-config'[\s\S]*?\n    \}\);\n/, '')) ? ok('the startup write to system/config happens only inside the gated app-url-config worker') : bad('system/config is written outside the gated worker');
+// every file that creates timers/listeners must be a known, reviewed background process
+const KNOWN_TIMER_FILES = new Set(['backend/chatThreadMigration.mjs', 'backend/credentialScrub.mjs', 'backend/deletionService.mjs', 'backend/messageNotifications.mjs', 'backend/notificationPushDispatch.ts', 'notificationPushDispatch.ts']);
+const timerFiles = tracked.filter((f) => /\.(mjs|ts|js|cjs)$/.test(f) && !/^(src|scripts|android|ios|schoolix_flutter|functions|node_modules|dist)\//.test(f) && !/(^|\/)(server\.(mjs|ts|js))$|vite\.config|capacitor/.test(f)).filter((f) => { try { return /setInterval\(|\.onSnapshot\(|node-cron|cron\.schedule/.test(read(f)); } catch { return false; } });
+const unknownTimers = timerFiles.filter((f) => !KNOWN_TIMER_FILES.has(f));
+unknownTimers.length === 0 ? ok(`background timer/listener inventory is exactly the reviewed set (${timerFiles.length} files)`) : bad(`NEW background timer/listener file(s) not reviewed for environment gating: ${unknownTimers.join(', ')}`);
+// scheduler endpoints
+const internalRoutes = [...server.matchAll(/app\.(?:get|post)\('(\/api\/internal\/[^']+)'/g)].map((m) => m[1]);
+const guardPos = server.indexOf('INTERNAL_ROUTE_RE.test(req.path)');
+const firstRoutePos = Math.min(...internalRoutes.map((r) => server.indexOf(r)).filter((i) => i > 0), Infinity);
+guardPos > 0 && guardPos < firstRoutePos ? ok(`all ${internalRoutes.length} /api/internal/* routes are registered after the environment guard`) : bad('the /api/internal guard is missing or registered after the routes');
+for (const f of ['backend/dismissalRecoveryWorker.mjs', 'backend/dismissalCompactionWorker.mjs']) /\/api\/internal\//.test(readRepo(f)) ? ok(`${f} exposes only /api/internal/* (covered by the guard)`) : bad(`${f} exposes a route outside /api/internal`);
+/deployment\.adminAllowed/.test(server) && /disabledAdminCredential/.test(server) ? ok('Admin initialisation is gated by the verified deployment (disabled credential otherwise)') : bad('Admin initialisation is not gated');
+const cfgSrc = readRepo('src/lib/firebaseConfig.ts');
+/previewBlocked/.test(cfgSrc) && /PRODUCTION_PROJECT_ID/.test(cfgSrc) && /preview-blocked/.test(cfgSrc) ? ok('the web client blocks preview hosts configured with the production project') : bad('web client preview block missing');
+/previewBlocked/.test(readRepo('src/main.tsx')) ? ok('main.tsx renders the blocked notice instead of the app') : bad('main.tsx does not honour previewBlocked');
+for (const f of ['src/lib/firebase.ts', 'src/lib/apiUtils.ts', 'src/lib/webPushService.ts']) /firebase-applet-config\.json/.test(readRepo(f)) ? bad(`${f} imports the committed (production) config directly, bypassing the preview guard`) : ok(`${f} uses the guarded config`);
+
 // INFO
 const cfg = JSON.parse(readRepo('firebase-applet-config.json'));
 info(`committed web client config project: ${cfg.projectId} (public client identifiers; every deployment built from this branch, including previews, talks to this project)`);

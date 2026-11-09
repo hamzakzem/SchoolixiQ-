@@ -1,4 +1,4 @@
-import firebaseConfig from '../../firebase-applet-config.json';
+import firebaseConfig from './firebaseConfig';
 
 /** Reject AI Studio preview hosts only — not production Cloud Run (*.run.app). */
 const AI_STUDIO_BACKEND_PATTERN = /ais-(pre|dev)|99877674137\.europe-west2\.run\.app/i;

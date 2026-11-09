@@ -1,5 +1,6 @@
 import { cronSecretMatches } from './backend/cronSecret.mjs';
 import { setupSystemMessageNotifications, messageNotificationsStatus } from './backend/messageNotifications.mjs';
+import { resolveDeployment, appUrlConfigFields, configureWorkers, registerWorker, tryStartWorkers, workersAllowedNow, workerStatus, noteProductionHost, disabledAdminCredential, INTERNAL_ROUTE_RE, PRODUCTION_FIREBASE_PROJECT_ID } from './backend/runtimeEnv.mjs';
 import { destructiveOpsAllowed, backgroundDestructiveAllowed, noteServedHost, requestHost, DESTRUCTIVE_ROUTE_RE } from './backend/runtimeGuard.mjs';
 import { PERMANENT_CONFIRM_TEXT, runAuditedPlatformDelete, deleteChatMessage, deleteSchool, previewSchoolDeletion, deleteNotifications, deleteRecords, restoreBundle, purgeBundle, sweepDeletions, startDeletionSweep, loadActor, voidPayment, resolveFinancialReview } from './backend/deletionService.mjs';
 import express from 'express';
@@ -124,11 +125,35 @@ if (!serviceAccountCheck.valid && (serviceAccount.clientEmail || serviceAccount.
   console.error('[CONFIG] Firebase Admin credentials are present but invalid: ' + serviceAccountCheck.problems.join('; '));
 }
 
-if (serviceAccount.clientEmail && serviceAccount.privateKey) {
+// ── Which deployment is this, and may it use Admin credentials? (backend/runtimeEnv.mjs; fail closed) ──
+const deployment = resolveDeployment({
+  env: process.env,
+  clientEmail: serviceAccount.clientEmail,
+  explicitProjectId: sanitizeEnv(process.env.FIREBASE_PROJECT_ID),
+  hasPrivateKey: Boolean(serviceAccount.privateKey),
+});
+configureWorkers(deployment, console);
+// The committed config names the PRODUCTION bucket: a non-production project must bring its own (never inherit production's).
+const adminStorageBucket: string | undefined =
+  deployment.adminProjectId && deployment.adminProjectId !== PRODUCTION_FIREBASE_PROJECT_ID
+    ? sanitizeEnv(process.env.FIREBASE_STORAGE_BUCKET) || undefined
+    : deployment.adminAllowed
+      ? sanitizeEnv(process.env.FIREBASE_STORAGE_BUCKET) || firebaseConfig.storageBucket
+      : undefined;
+console.log(`[ENV] deployment=${deployment.kind} (${deployment.reason}); admin=${deployment.adminAllowed ? 'enabled' : 'DISABLED'} (${deployment.adminReason}); background=${deployment.workers}`);
+
+if (!deployment.adminAllowed) {
+  // Never fall back silently: every Admin call fails with ADMIN_DISABLED until the environment is configured correctly.
+  admin.initializeApp({
+    credential: disabledAdminCredential(deployment.adminReason) as any,
+    projectId: 'admin-disabled-unverified-environment',
+  });
+  console.error(`[CONFIG] Firebase Admin is DISABLED in this deployment: ${deployment.adminReason}. Set DEPLOY_ENV (production | preview) and matching credentials in the hosting panel.`);
+} else if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   try {
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount as any),
-      storageBucket: firebaseConfig.storageBucket, // Added
+      credential: admin.credential.cert({ ...serviceAccount, projectId: deployment.adminProjectId || serviceAccount.projectId } as any),
+      storageBucket: adminStorageBucket,
     });
     console.log('Firebase Admin initialized with service account.');
   } catch (e: any) {
@@ -142,7 +167,7 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   // Try default initialization (works if running on GCP with permissions)
   try {
     admin.initializeApp({
-      storageBucket: firebaseConfig.storageBucket, // Added
+      storageBucket: adminStorageBucket,
     });
     console.log('Firebase Admin initialized with defaults.');
   } catch (e) {
@@ -353,6 +378,13 @@ async function startServer() {
   app.use((req: any, res: any, next: any) => {
     const host = requestHost(req.headers, req.hostname);
     noteServedHost(host);
+    // proof that this process really serves production (inherited-variable defence); starts waiting production workers
+    if (noteProductionHost(host)) tryStartWorkers();
+    // cron / scheduler endpoints touch Firestore with Admin: refuse unless the environment is proven (explicit, safe error)
+    if (INTERNAL_ROUTE_RE.test(req.path) && !workersAllowedNow(deployment)) {
+      console.warn('[env] blocked background endpoint', { path: req.path, kind: deployment.kind, reason: deployment.reason });
+      return res.status(503).json({ ok: false, success: false, error: 'BACKGROUND_DISABLED', deployment: deployment.kind, message: 'العمليات الخلفية المجدولة معطّلة في هذه البيئة (معاينة/غير موثّقة). لم يتم تغيير أي بيانات.' });
+    }
     if (req.method !== 'GET' && req.method !== 'OPTIONS' && DESTRUCTIVE_ROUTE_RE.test(req.path)) {
       const verdict = destructiveOpsAllowed({ host });
       if (!verdict.allowed) {
@@ -930,6 +962,7 @@ async function startServer() {
         ...(serviceAccount.clientEmail ? [] : ['FIREBASE_CLIENT_EMAIL']),
         ...(serviceAccount.privateKey ? [] : ['FIREBASE_PRIVATE_KEY']),
       ],
+      deployment: { kind: deployment.kind, reason: deployment.reason, adminEnabled: deployment.adminAllowed, adminReason: deployment.adminReason, adminProjectVerified: deployment.adminProjectId || null, targetsProductionProject: deployment.targetsProduction, workers: workerStatus() },
       adminCredentialsValid: serviceAccountCheck.valid,
       adminCredentialProblems: serviceAccountCheck.problems, // text only, never values
       deletionEnabled: !deletionUnavailable(),
@@ -989,7 +1022,7 @@ async function startServer() {
     purgeSchoolMessages: (schoolId: string) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() }),
   });
   /** In production, deletion needs real Admin credentials: refuse up front, before touching any data. */
-  const deletionUnavailable = () => process.env.NODE_ENV === 'production' && !serviceAccountCheck.valid && !process.env.FIRESTORE_EMULATOR_HOST && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE;
+  const deletionUnavailable = () => !process.env.FIRESTORE_EMULATOR_HOST && (!deployment.adminAllowed || (process.env.NODE_ENV === 'production' && !serviceAccountCheck.valid && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE));
   const deletionRoute = (fn: (ctx: any, uid: string, body: any) => Promise<any>) => async (req: any, res: any) => {
     if (deletionUnavailable()) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
     try {
@@ -2676,55 +2709,39 @@ async function startServer() {
     console.log('SERVER_READY', { host: '0.0.0.0', port: PORT });
     console.log(`Server running on http://localhost:${PORT}`);
 
-    // Server-driven FCM push: self-healing listener + backlog + sweep (10-minute age cutoff)
-    try {
+    // Every background process goes through registerWorker(): nothing runs unless the deployment is proven
+    // (emulator, a preview on its OWN Firebase project, or production after a production-host request was observed).
+    // A preview can therefore never become a production worker, whatever environment variables it inherited.
+    registerWorker('notification-push-listener', () => {
       const db = getDb();
+      // Server-driven FCM push: self-healing listener + backlog + sweep (10-minute age cutoff)
       setupNotificationPushListener(db, admin);
+    });
+    registerWorker('chat-notifications', () => {
       // Chat notifications are created here, once per message and recipient (deterministic ids)
-      setupSystemMessageNotifications(db, admin);
-      // finish interrupted deletions and purge expired trash
-      // background cleanup only on a process that has proven it serves production (or on emulators)
+      setupSystemMessageNotifications(getDb(), admin);
+    });
+    registerWorker('deletion-sweep', () => {
+      // finish interrupted deletions and purge expired trash (also gated by the destructive-ops guard)
       startDeletionSweep(deletionCtx(), console, 3 * 60 * 1000, backgroundDestructiveAllowed);
-    } catch (e: any) {
-      console.error('[Notifications] PUSH_SEND_ERROR gateway init:', e.message);
-    }
-
+    });
     // Delete passwords older app versions stored as readable text in Firestore
-    scheduleCredentialScrub(getDb, admin);
-
+    registerWorker('credential-scrub', () => { scheduleCredentialScrub(getDb, admin); });
     // Move super-admin replies stored under the old per-admin thread id into the thread schools read
-    scheduleChatThreadMigration(getDb, admin);
+    registerWorker('chat-thread-migration', () => { scheduleChatThreadMigration(getDb, admin); });
 
-    // Save APP_URL dynamically to Firestore system config so all clients (including Mobile Apps) have access to the actual server URL
-    // CRITICAL: We ONLY save in production, and only if it's not a development/dev environment.
-    // This prevents development servers from contaminating the shared database.
-    const isProductionEnv = process.env.NODE_ENV === 'production';
-    const isDevUrl = process.env.APP_URL && (
-      process.env.APP_URL.includes('-dev-') || 
-      process.env.APP_URL.includes('localhost') || 
-      process.env.APP_URL.includes('127.0.0.1')
-    );
-
-    if (process.env.APP_URL) {
-      try {
-        const db = getDb();
-        const appUrlClean = process.env.APP_URL.replace(/\/$/, '');
-        if (isProductionEnv && !isDevUrl) {
-          await db.collection('system').doc('config').set({
-            appUrl: appUrlClean,
-            appUrlProd: appUrlClean
-          }, { merge: true });
-          console.log(`Successfully saved production APP_URL (${appUrlClean}) to system/config.`);
-        } else {
-          await db.collection('system').doc('config').set({
-            appUrlDev: appUrlClean
-          }, { merge: true });
-          console.log(`Successfully saved development APP_URL (${appUrlClean}) to system/config (appUrlDev).`);
-        }
-      } catch (err: any) {
-        console.error('Failed to save APP_URL to system/config:', err.message);
-      }
-    }
+    // Save APP_URL to Firestore system config so all clients (including mobile apps) know the server URL.
+    // Production writes `appUrlProd` only when APP_URL really is a production host; a preview on its own project writes `appUrlDev`.
+    registerWorker('app-url-config', () => {
+      if (!process.env.APP_URL) return;
+      const { fields, reason } = appUrlConfigFields({ kind: deployment.kind, appUrl: process.env.APP_URL });
+      if (!fields) { console.warn(`[env] system/config not updated: ${reason}`); return; }
+      if (reason.startsWith('APP_URL is not')) console.warn(`[env] ${reason}`);
+      getDb().collection('system').doc('config').set(fields, { merge: true })
+        .then(() => console.log(`Saved ${Object.keys(fields).join('+')} to system/config.`))
+        .catch((err: any) => console.error('Failed to save APP_URL to system/config:', err.message));
+    });
+    tryStartWorkers();
   });
 }
 

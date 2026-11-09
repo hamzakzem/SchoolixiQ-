@@ -19,7 +19,8 @@
   "requiredEnv": [
     "NODE_ENV=production",
     "PORT (injected by Hostinger)",
-    "Firebase Admin credentials as required by the server",
+    "DEPLOY_ENV=production (production site ONLY; a preview must set DEPLOY_ENV=preview and use a separate Firebase project)",
+    "Firebase Admin credentials as required by the server (production project credentials: production site ONLY)",
     "TUITION_CRON_SECRET or CRON_SECRET",
     "NOTIFICATION_CRON_SECRET or CRON_SECRET"
   ]

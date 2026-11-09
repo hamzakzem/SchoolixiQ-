@@ -256,10 +256,147 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
   };
 }
 
-// runtimeGuard.mjs
+// runtimeEnv.mjs
+var PRODUCTION_FIREBASE_PROJECT_ID = "yala-safari-iq";
 var PRODUCTION_HOST_RE = /(^|\.)schoolixiq\.(com|iq)$/i;
-var PREVIEW_HOST_RE = /\.(hostingersite\.com|pages\.dev|netlify\.app|vercel\.app|web\.app|firebaseapp\.com|run\.app|onrender\.com|herokuapp\.com)$/i;
 var NON_PROD_ENVS = ["preview", "staging", "development", "dev", "test"];
+var SA_EMAIL_RE = /^[^@\s]+@([a-z0-9-]+)\.iam\.gserviceaccount\.com$/i;
+function projectFromServiceAccountEmail(email) {
+  const m = SA_EMAIL_RE.exec(String(email || "").trim());
+  return m ? m[1].toLowerCase() : "";
+}
+function resolveDeployment({ env = process.env, clientEmail = "", explicitProjectId = "", hasPrivateKey = false } = {}) {
+  const emailProject = projectFromServiceAccountEmail(clientEmail);
+  const explicit = String(explicitProjectId || "").trim().toLowerCase();
+  const hasCreds = Boolean(clientEmail && hasPrivateKey);
+  const problems = [];
+  let adminProjectId = "";
+  if (hasCreds) {
+    if (!emailProject) problems.push("FIREBASE_CLIENT_EMAIL is not a service-account e-mail: project cannot be verified");
+    else if (explicit && explicit !== emailProject) problems.push("FIREBASE_PROJECT_ID does not match the project of FIREBASE_CLIENT_EMAIL");
+    else adminProjectId = emailProject;
+  }
+  const targetsProduction = adminProjectId === PRODUCTION_FIREBASE_PROJECT_ID;
+  const declared = String(env.DEPLOY_ENV || "").trim().toLowerCase();
+  let kind = "unknown";
+  let reason = "DEPLOY_ENV is not set to a known value";
+  if (env.FIRESTORE_EMULATOR_HOST) {
+    kind = "emulator";
+    reason = "Firebase emulator";
+  } else if (NON_PROD_ENVS.includes(declared)) {
+    kind = "preview";
+    reason = `DEPLOY_ENV=${declared}`;
+  } else if (declared === "production") {
+    if (env.NODE_ENV !== "production") reason = "DEPLOY_ENV=production requires NODE_ENV=production";
+    else if (hasCreds && !targetsProduction) reason = "DEPLOY_ENV=production but the Admin credentials belong to another project";
+    else if (problems.length) reason = problems[0];
+    else {
+      kind = "production";
+      reason = "DEPLOY_ENV=production";
+    }
+  } else if (declared) reason = `unrecognised DEPLOY_ENV "${declared}"`;
+  let adminAllowed = false;
+  let adminReason = "";
+  if (kind === "emulator") {
+    adminAllowed = true;
+    adminReason = "emulator";
+  } else if (kind === "production") {
+    adminAllowed = true;
+    adminReason = "verified production";
+  } else if (kind === "preview") {
+    if (!hasCreds) {
+      adminAllowed = false;
+      adminReason = "preview without Admin credentials";
+    } else if (!adminProjectId) {
+      adminAllowed = false;
+      adminReason = problems[0] || "credentials unverifiable";
+    } else if (targetsProduction) {
+      adminAllowed = false;
+      adminReason = "preview holds PRODUCTION Admin credentials: ignored";
+    } else {
+      adminAllowed = true;
+      adminReason = `preview on separate project ${adminProjectId}`;
+    }
+  } else {
+    adminAllowed = false;
+    adminReason = hasCreds ? `Admin credentials ignored: ${reason}` : reason;
+  }
+  if (kind === "production" && !hasCreds) adminReason = "production without explicit credentials";
+  let workers;
+  if (kind === "emulator") workers = "now";
+  else if (kind === "preview") workers = adminAllowed ? "now" : "never";
+  else if (kind === "production") workers = "after_production_host";
+  else workers = "never";
+  return { kind, reason, adminProjectId, targetsProduction, hasCreds, adminAllowed, adminReason, workers, problems };
+}
+var productionHostSeen = false;
+function noteProductionHost(host) {
+  if (PRODUCTION_HOST_RE.test(String(host || ""))) {
+    const first = !productionHostSeen;
+    productionHostSeen = true;
+    return first;
+  }
+  return false;
+}
+function workersAllowedNow(decision) {
+  if (decision.workers === "now") return true;
+  if (decision.workers === "after_production_host") return productionHostSeen;
+  return false;
+}
+var pending = [];
+var started = /* @__PURE__ */ new Set();
+var _decision = null;
+var _log = console;
+function configureWorkers(decision, log = console) {
+  _decision = decision;
+  _log = log;
+}
+function registerWorker(name, start) {
+  pending.push({ name, start });
+  tryStartWorkers();
+}
+function tryStartWorkers() {
+  if (!_decision || !workersAllowedNow(_decision)) return [];
+  const ran = [];
+  for (const w of pending.splice(0)) {
+    if (started.has(w.name)) continue;
+    started.add(w.name);
+    try {
+      w.start();
+      ran.push(w.name);
+    } catch (e) {
+      _log.error?.(`[env] worker ${w.name} failed to start`, e?.message);
+    }
+  }
+  return ran;
+}
+function workerStatus() {
+  return { started: [...started], waiting: pending.map((w) => w.name), mode: _decision?.workers ?? "unconfigured", allowedNow: _decision ? workersAllowedNow(_decision) : false };
+}
+var disabledAdminCredential = (why) => ({
+  getAccessToken: async () => {
+    throw Object.assign(new Error(`ADMIN_DISABLED: ${why}`), { code: "ADMIN_DISABLED" });
+  }
+});
+var INTERNAL_ROUTE_RE = /^\/api\/internal\//;
+function appUrlConfigFields({ kind, appUrl }) {
+  const clean = String(appUrl || "").replace(/\/$/, "");
+  let host = "";
+  try {
+    host = new URL(clean).hostname.toLowerCase();
+  } catch {
+    return { fields: null, reason: "invalid APP_URL" };
+  }
+  const isDevUrl = clean.includes("-dev-") || clean.includes("localhost") || clean.includes("127.0.0.1");
+  if (kind === "production" && PRODUCTION_HOST_RE.test(host) && !isDevUrl) return { fields: { appUrl: clean, appUrlProd: clean }, reason: "production host" };
+  if (kind === "unknown") return { fields: null, reason: "unverified environment" };
+  return { fields: { appUrlDev: clean }, reason: kind === "production" ? "APP_URL is not a production host: dev field only" : "non-production deployment" };
+}
+
+// runtimeGuard.mjs
+var PRODUCTION_HOST_RE2 = /(^|\.)schoolixiq\.(com|iq)$/i;
+var PREVIEW_HOST_RE = /\.(hostingersite\.com|pages\.dev|netlify\.app|vercel\.app|web\.app|firebaseapp\.com|run\.app|onrender\.com|herokuapp\.com)$/i;
+var NON_PROD_ENVS2 = ["preview", "staging", "development", "dev", "test"];
 function requestHost(headers = {}, hostname = "") {
   const raw = String(headers["x-forwarded-host"] || headers.host || hostname || "").split(",")[0].trim().toLowerCase();
   return raw.replace(/:\d+$/, "");
@@ -267,22 +404,22 @@ function requestHost(headers = {}, hostname = "") {
 function destructiveOpsAllowed({ host, env = process.env }) {
   if (env.FIRESTORE_EMULATOR_HOST) return { allowed: true, reason: "emulator" };
   if (String(env.DELETION_DISABLED || "").toLowerCase() === "true") return { allowed: false, reason: "DELETION_DISABLED" };
-  if (NON_PROD_ENVS.includes(String(env.DEPLOY_ENV || "").toLowerCase())) return { allowed: false, reason: "DEPLOY_ENV" };
+  if (NON_PROD_ENVS2.includes(String(env.DEPLOY_ENV || "").toLowerCase())) return { allowed: false, reason: "DEPLOY_ENV" };
   if (PREVIEW_HOST_RE.test(host)) return { allowed: false, reason: "PREVIEW_HOST" };
-  if (!PRODUCTION_HOST_RE.test(host)) return { allowed: false, reason: "UNKNOWN_HOST" };
+  if (!PRODUCTION_HOST_RE2.test(host)) return { allowed: false, reason: "UNKNOWN_HOST" };
   return { allowed: true, reason: "production_host" };
 }
-var productionHostSeen = false;
+var productionHostSeen2 = false;
 var previewHostSeen = false;
 function noteServedHost(host, env = process.env) {
-  if (PRODUCTION_HOST_RE.test(host) && !PREVIEW_HOST_RE.test(host)) productionHostSeen = true;
+  if (PRODUCTION_HOST_RE2.test(host) && !PREVIEW_HOST_RE.test(host)) productionHostSeen2 = true;
   else if (PREVIEW_HOST_RE.test(host)) previewHostSeen = true;
 }
 function backgroundDestructiveAllowed(env = process.env) {
   if (env.FIRESTORE_EMULATOR_HOST) return true;
   if (String(env.DELETION_DISABLED || "").toLowerCase() === "true") return false;
-  if (NON_PROD_ENVS.includes(String(env.DEPLOY_ENV || "").toLowerCase())) return false;
-  return productionHostSeen && !previewHostSeen;
+  if (NON_PROD_ENVS2.includes(String(env.DEPLOY_ENV || "").toLowerCase())) return false;
+  return productionHostSeen2 && !previewHostSeen;
 }
 var DESTRUCTIVE_ROUTE_RE = /^\/api\/(records\/|admin\/(delete-user|delete-student|delete-school|schools\/[^/]+\/permanent-delete|messages\/(permanent-delete|purge-user-conversations)|distributors\/[^/]+\/delete|plans\/[^/]+\/delete))/;
 
@@ -4457,9 +4594,9 @@ function hasEventId(events, eventId) {
 }
 function lockExpired(data) {
   if (!data?.isProcessing) return true;
-  const started = data.processingStartedAt?.toDate?.() || data.processingStartedAt;
-  if (!started) return true;
-  const ms = started instanceof Date ? started.getTime() : new Date(started).getTime();
+  const started2 = data.processingStartedAt?.toDate?.() || data.processingStartedAt;
+  if (!started2) return true;
+  const ms = started2 instanceof Date ? started2.getTime() : new Date(started2).getTime();
   return Date.now() - ms > LOCK_TTL_MS;
 }
 function assertCanAcquireLock(data, uid) {
@@ -5504,9 +5641,9 @@ async function getDistributorDashboardPayload(db, uid) {
 // dismissalRecoveryWorker.mjs
 var DISMISSAL_COL2 = "dismissal_requests";
 function lockAge(data) {
-  const started = data.processingStartedAt?.toDate?.() || data.processingStartedAt;
-  if (!started) return null;
-  const ms = started instanceof Date ? started.getTime() : new Date(started).getTime();
+  const started2 = data.processingStartedAt?.toDate?.() || data.processingStartedAt;
+  if (!started2) return null;
+  const ms = started2 instanceof Date ? started2.getTime() : new Date(started2).getTime();
   return Date.now() - ms;
 }
 async function repairDrift(db, docRef, data, reason = "drift_detected") {
@@ -5766,12 +5903,26 @@ var serviceAccountCheck = validateServiceAccount(serviceAccount);
 if (!serviceAccountCheck.valid && (serviceAccount.clientEmail || serviceAccount.privateKey)) {
   console.error("[CONFIG] Firebase Admin credentials are present but invalid: " + serviceAccountCheck.problems.join("; "));
 }
-if (serviceAccount.clientEmail && serviceAccount.privateKey) {
+var deployment = resolveDeployment({
+  env: process.env,
+  clientEmail: serviceAccount.clientEmail,
+  explicitProjectId: sanitizeEnv(process.env.FIREBASE_PROJECT_ID),
+  hasPrivateKey: Boolean(serviceAccount.privateKey)
+});
+configureWorkers(deployment, console);
+var adminStorageBucket = deployment.adminProjectId && deployment.adminProjectId !== PRODUCTION_FIREBASE_PROJECT_ID ? sanitizeEnv(process.env.FIREBASE_STORAGE_BUCKET) || void 0 : deployment.adminAllowed ? sanitizeEnv(process.env.FIREBASE_STORAGE_BUCKET) || firebaseConfig.storageBucket : void 0;
+console.log(`[ENV] deployment=${deployment.kind} (${deployment.reason}); admin=${deployment.adminAllowed ? "enabled" : "DISABLED"} (${deployment.adminReason}); background=${deployment.workers}`);
+if (!deployment.adminAllowed) {
+  admin4.initializeApp({
+    credential: disabledAdminCredential(deployment.adminReason),
+    projectId: "admin-disabled-unverified-environment"
+  });
+  console.error(`[CONFIG] Firebase Admin is DISABLED in this deployment: ${deployment.adminReason}. Set DEPLOY_ENV (production | preview) and matching credentials in the hosting panel.`);
+} else if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   try {
     admin4.initializeApp({
-      credential: admin4.credential.cert(serviceAccount),
-      storageBucket: firebaseConfig.storageBucket
-      // Added
+      credential: admin4.credential.cert({ ...serviceAccount, projectId: deployment.adminProjectId || serviceAccount.projectId }),
+      storageBucket: adminStorageBucket
     });
     console.log("Firebase Admin initialized with service account.");
   } catch (e) {
@@ -5783,8 +5934,7 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   );
   try {
     admin4.initializeApp({
-      storageBucket: firebaseConfig.storageBucket
-      // Added
+      storageBucket: adminStorageBucket
     });
     console.log("Firebase Admin initialized with defaults.");
   } catch (e) {
@@ -5957,6 +6107,11 @@ async function startServer() {
   app.use((req, res, next) => {
     const host = requestHost(req.headers, req.hostname);
     noteServedHost(host);
+    if (noteProductionHost(host)) tryStartWorkers();
+    if (INTERNAL_ROUTE_RE.test(req.path) && !workersAllowedNow(deployment)) {
+      console.warn("[env] blocked background endpoint", { path: req.path, kind: deployment.kind, reason: deployment.reason });
+      return res.status(503).json({ ok: false, success: false, error: "BACKGROUND_DISABLED", deployment: deployment.kind, message: "\u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A \u0627\u0644\u062E\u0644\u0641\u064A\u0629 \u0627\u0644\u0645\u062C\u062F\u0648\u0644\u0629 \u0645\u0639\u0637\u0651\u0644\u0629 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0628\u064A\u0626\u0629 (\u0645\u0639\u0627\u064A\u0646\u0629/\u063A\u064A\u0631 \u0645\u0648\u062B\u0651\u0642\u0629). \u0644\u0645 \u064A\u062A\u0645 \u062A\u063A\u064A\u064A\u0631 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
+    }
     if (req.method !== "GET" && req.method !== "OPTIONS" && DESTRUCTIVE_ROUTE_RE.test(req.path)) {
       const verdict = destructiveOpsAllowed({ host });
       if (!verdict.allowed) {
@@ -6430,6 +6585,7 @@ async function startServer() {
         ...serviceAccount.clientEmail ? [] : ["FIREBASE_CLIENT_EMAIL"],
         ...serviceAccount.privateKey ? [] : ["FIREBASE_PRIVATE_KEY"]
       ],
+      deployment: { kind: deployment.kind, reason: deployment.reason, adminEnabled: deployment.adminAllowed, adminReason: deployment.adminReason, adminProjectVerified: deployment.adminProjectId || null, targetsProductionProject: deployment.targetsProduction, workers: workerStatus() },
       adminCredentialsValid: serviceAccountCheck.valid,
       adminCredentialProblems: serviceAccountCheck.problems,
       // text only, never values
@@ -6488,7 +6644,7 @@ async function startServer() {
     })() }),
     purgeSchoolMessages: (schoolId) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() })
   });
-  const deletionUnavailable = () => process.env.NODE_ENV === "production" && !serviceAccountCheck.valid && !process.env.FIRESTORE_EMULATOR_HOST && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE;
+  const deletionUnavailable = () => !process.env.FIRESTORE_EMULATOR_HOST && (!deployment.adminAllowed || process.env.NODE_ENV === "production" && !serviceAccountCheck.valid && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE);
   const deletionRoute = (fn) => async (req, res) => {
     if (deletionUnavailable()) return res.status(503).json({ error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B (\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u062E\u0627\u062F\u0645). \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
     try {
@@ -7932,38 +8088,33 @@ async function startServer() {
     console.log("PORT_LISTENING", { host: "0.0.0.0", port: PORT });
     console.log("SERVER_READY", { host: "0.0.0.0", port: PORT });
     console.log(`Server running on http://localhost:${PORT}`);
-    try {
+    registerWorker("notification-push-listener", () => {
       const db = getDb();
       setupNotificationPushListener(db, admin4);
-      setupSystemMessageNotifications(db, admin4);
+    });
+    registerWorker("chat-notifications", () => {
+      setupSystemMessageNotifications(getDb(), admin4);
+    });
+    registerWorker("deletion-sweep", () => {
       startDeletionSweep(deletionCtx(), console, 3 * 60 * 1e3, backgroundDestructiveAllowed);
-    } catch (e) {
-      console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
-    }
-    scheduleCredentialScrub(getDb, admin4);
-    scheduleChatThreadMigration(getDb, admin4);
-    const isProductionEnv2 = process.env.NODE_ENV === "production";
-    const isDevUrl = process.env.APP_URL && (process.env.APP_URL.includes("-dev-") || process.env.APP_URL.includes("localhost") || process.env.APP_URL.includes("127.0.0.1"));
-    if (process.env.APP_URL) {
-      try {
-        const db = getDb();
-        const appUrlClean = process.env.APP_URL.replace(/\/$/, "");
-        if (isProductionEnv2 && !isDevUrl) {
-          await db.collection("system").doc("config").set({
-            appUrl: appUrlClean,
-            appUrlProd: appUrlClean
-          }, { merge: true });
-          console.log(`Successfully saved production APP_URL (${appUrlClean}) to system/config.`);
-        } else {
-          await db.collection("system").doc("config").set({
-            appUrlDev: appUrlClean
-          }, { merge: true });
-          console.log(`Successfully saved development APP_URL (${appUrlClean}) to system/config (appUrlDev).`);
-        }
-      } catch (err) {
-        console.error("Failed to save APP_URL to system/config:", err.message);
+    });
+    registerWorker("credential-scrub", () => {
+      scheduleCredentialScrub(getDb, admin4);
+    });
+    registerWorker("chat-thread-migration", () => {
+      scheduleChatThreadMigration(getDb, admin4);
+    });
+    registerWorker("app-url-config", () => {
+      if (!process.env.APP_URL) return;
+      const { fields, reason } = appUrlConfigFields({ kind: deployment.kind, appUrl: process.env.APP_URL });
+      if (!fields) {
+        console.warn(`[env] system/config not updated: ${reason}`);
+        return;
       }
-    }
+      if (reason.startsWith("APP_URL is not")) console.warn(`[env] ${reason}`);
+      getDb().collection("system").doc("config").set(fields, { merge: true }).then(() => console.log(`Saved ${Object.keys(fields).join("+")} to system/config.`)).catch((err) => console.error("Failed to save APP_URL to system/config:", err.message));
+    });
+    tryStartWorkers();
   });
 }
 startServer().catch((error) => {
