@@ -16,6 +16,7 @@ var SWEEP_INTERVAL_MS = 3 * 60 * 1e3;
 var SWEEP_WINDOW_MS = 15 * 60 * 1e3;
 var SUPER_ADMIN_ROLES = ["superadmin", "super_admin"];
 var SCHOOL_ADMIN_ROLES = ["admin", "school_admin", "assistant", "school_assistant"];
+var messageNotificationsStatus = { startedAt: null, listenerAttached: false, restarts: 0, lastErrorAt: null, lastError: null, lastSweepAt: null, lastSweepOk: null };
 function notificationIdFor(messageId, userId) {
   return `msgn_${messageId}_${userId}`;
 }
@@ -141,6 +142,7 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
   let stopped = false;
   let backoff = 1e3;
   const inflight = /* @__PURE__ */ new Set();
+  messageNotificationsStatus.startedAt = (/* @__PURE__ */ new Date()).toISOString();
   const handle = (doc) => {
     if (inflight.has(doc.id)) return;
     inflight.add(doc.id);
@@ -153,11 +155,16 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
       unsub = db.collection("system_messages").where("createdAt", ">=", cutoff()).onSnapshot(
         (snap) => {
           backoff = 1e3;
+          messageNotificationsStatus.listenerAttached = true;
           snap.docChanges().forEach((c) => {
             if (c.type === "added") handle(c.doc);
           });
         },
         (err) => {
+          messageNotificationsStatus.listenerAttached = false;
+          messageNotificationsStatus.restarts += 1;
+          messageNotificationsStatus.lastErrorAt = (/* @__PURE__ */ new Date()).toISOString();
+          messageNotificationsStatus.lastError = String(err?.code ?? err?.message ?? "error").slice(0, 80);
           log.error("[MessageNotifications] listener error, restarting", err?.message);
           try {
             unsub?.();
@@ -179,7 +186,11 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
       const since = adminSdk.firestore.Timestamp.fromMillis(Date.now() - SWEEP_WINDOW_MS);
       const snap = await db.collection("system_messages").where("createdAt", ">=", since).orderBy("createdAt", "desc").limit(50).get();
       snap.docs.forEach(handle);
+      messageNotificationsStatus.lastSweepAt = (/* @__PURE__ */ new Date()).toISOString();
+      messageNotificationsStatus.lastSweepOk = true;
     } catch (e) {
+      messageNotificationsStatus.lastSweepAt = (/* @__PURE__ */ new Date()).toISOString();
+      messageNotificationsStatus.lastSweepOk = false;
       log.error("[MessageNotifications] sweep failed", e?.message);
     }
   }, SWEEP_INTERVAL_MS);
@@ -2464,12 +2475,14 @@ async function processNotificationPush(db, adminSdk, notifId, notif) {
   }
   return dispatchPushForNotificationDoc(db, adminSdk, notifId, claim.notif || notif);
 }
+var pushListenerStatus = { startedAt: null, listenerAttached: false, restarts: 0, lastErrorAt: null, lastError: null, lastSweepAt: null, lastSweepOk: null };
 function setupNotificationPushListener(db, adminSdk) {
   let unsub = null;
   let stopped = false;
   let backoff = 1e3;
   let recycleTimer = null;
   const inflight = /* @__PURE__ */ new Set();
+  pushListenerStatus.startedAt = (/* @__PURE__ */ new Date()).toISOString();
   const handle = (notifId, notif) => {
     if (inflight.has(notifId) || isPushTerminal(notif)) return;
     inflight.add(notifId);
@@ -2487,12 +2500,17 @@ function setupNotificationPushListener(db, adminSdk) {
     unsub = db.collection("notifications").where("createdAt", ">=", cutoff).onSnapshot(
       (snapshot) => {
         backoff = 1e3;
+        pushListenerStatus.listenerAttached = true;
         for (const change of snapshot.docChanges()) {
           if (change.type !== "added") continue;
           handle(change.doc.id, change.doc.data());
         }
       },
       (err) => {
+        pushListenerStatus.listenerAttached = false;
+        pushListenerStatus.restarts += 1;
+        pushListenerStatus.lastErrorAt = (/* @__PURE__ */ new Date()).toISOString();
+        pushListenerStatus.lastError = String(err.code ?? err.message ?? "error").slice(0, 80);
         logPush("PUSH_SEND_ERROR", { event: "listener_restart", error: err.message });
         setTimeout(start, backoff);
         backoff = Math.min(backoff * 2, 6e4);
@@ -2504,9 +2522,14 @@ function setupNotificationPushListener(db, adminSdk) {
   recycleTimer = setInterval(start, 30 * 60 * 1e3);
   recycleTimer.unref?.();
   const sweep = setInterval(() => {
-    void pollRecentNotificationsForPush(db, adminSdk, 30).catch(
-      (e) => logPush("PUSH_SEND_ERROR", { event: "sweep", error: e instanceof Error ? e.message : String(e) })
-    );
+    void pollRecentNotificationsForPush(db, adminSdk, 30).then(() => {
+      pushListenerStatus.lastSweepAt = (/* @__PURE__ */ new Date()).toISOString();
+      pushListenerStatus.lastSweepOk = true;
+    }).catch((e) => {
+      pushListenerStatus.lastSweepAt = (/* @__PURE__ */ new Date()).toISOString();
+      pushListenerStatus.lastSweepOk = false;
+      logPush("PUSH_SEND_ERROR", { event: "sweep", error: e instanceof Error ? e.message : String(e) });
+    });
   }, 2 * 60 * 1e3);
   sweep.unref?.();
   logPush("PUSH_SEND_START", { event: "fcm_gateway_initialized" });
@@ -4964,6 +4987,37 @@ async function startServer() {
       console.error("Public verify student error:", error);
       return res.status(500).json({ error: "SERVER_ERROR", message: "Unable to verify student" });
     }
+  });
+  app.get("/api/public/status", async (_req, res) => {
+    const classify = (e) => {
+      const m = String(e?.message || "");
+      const c = e?.code;
+      if (/Could not load the default credentials|Unable to detect a Project Id|default credentials/i.test(m)) return "no_credentials";
+      if (/DECODER|PEM|private key|invalid_grant|invalid_rapt|Getting metadata from plugin/i.test(m)) return "invalid_credentials";
+      if (c === 7 || /PERMISSION_DENIED/.test(m)) return "permission_denied";
+      if (c === 5 || /NOT_FOUND/.test(m)) return "database_not_found";
+      if (c === 16 || /UNAUTHENTICATED/.test(m)) return "unauthenticated";
+      if (c === 8 || /RESOURCE_EXHAUSTED|quota/i.test(m)) return "quota_exhausted";
+      return "error";
+    };
+    const out = {
+      credentialMode: serviceAccount.clientEmail && serviceAccount.privateKey ? "service_account_env" : "default_credentials",
+      adminAppInitialized: admin4.apps.length > 0,
+      firestore: { ok: false, errorClass: null },
+      cronSecretConfigured: Boolean(resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET)),
+      pushListener: pushListenerStatus,
+      messageNotifications: messageNotificationsStatus,
+      uptimeSeconds: Math.round(process.uptime()),
+      checkedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    try {
+      await getDb().collection("system").doc("config").get();
+      out.firestore.ok = true;
+    } catch (e) {
+      out.firestore.errorClass = classify(e);
+    }
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(out.firestore.ok ? 200 : 503).json(out);
   });
   app.get("/api/public/featured-schools", async (_req, res) => {
     try {
