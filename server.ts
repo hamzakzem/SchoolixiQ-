@@ -118,6 +118,10 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
     console.error('Firebase Admin Initialization Error');
   }
 } else {
+  console.error(
+    '[CONFIG] Firebase Admin credentials are missing (FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY). ' +
+    'Every server-side Firestore operation (push, chat notifications, gate, admin APIs) will fail until they are set. See /api/public/status.',
+  );
   // Try default initialization (works if running on GCP with permissions)
   try {
     admin.initializeApp({
@@ -890,6 +894,11 @@ async function startServer() {
     };
     const out: any = {
       credentialMode: serviceAccount.clientEmail && serviceAccount.privateKey ? 'service_account_env' : 'default_credentials',
+      // Names only (never values): which Admin credentials the host did not provide.
+      missingEnv: [
+        ...(serviceAccount.clientEmail ? [] : ['FIREBASE_CLIENT_EMAIL']),
+        ...(serviceAccount.privateKey ? [] : ['FIREBASE_PRIVATE_KEY']),
+      ],
       adminAppInitialized: admin.apps.length > 0,
       firestore: { ok: false, errorClass: null as string | null },
       cronSecretConfigured: Boolean(resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET)),

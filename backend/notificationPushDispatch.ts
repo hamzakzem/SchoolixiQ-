@@ -10,9 +10,26 @@ export const PUSH_MAX_AGE_MS = 10 * 60 * 1000;
 
 const TERMINAL_STATUSES = new Set(['sent', 'partial', 'skipped', 'no_tokens', 'failed', 'error']);
 
+/** A failed push is retried a few times (only while the notification is still fresh). */
+export const PUSH_MAX_ATTEMPTS = 3;
+const PUSH_RETRY_DELAYS_MS = [30_000, 90_000];
+
+const TRANSIENT_CODES = new Set([
+  'messaging/server-unavailable', 'messaging/internal-error', 'messaging/unknown-error',
+  'messaging/quota-exceeded', 'app/network-error', 'app/network-timeout',
+]);
+
+export function isTransientPushError(err: unknown): boolean {
+  const e = err as { code?: unknown; errorInfo?: { code?: string }; message?: unknown } | undefined;
+  const code = String(e?.errorInfo?.code ?? e?.code ?? '');
+  if (TRANSIENT_CODES.has(code)) return true;
+  if (['4', '8', '13', '14'].includes(code)) return true; // gRPC DEADLINE / RESOURCE_EXHAUSTED / INTERNAL / UNAVAILABLE
+  return /ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up|fetch failed|UNAVAILABLE|DEADLINE_EXCEEDED|timed? ?out/i.test(String(e?.message ?? ''));
+}
+
 export type PushDispatchResult = {
   notifId: string;
-  status: 'sent' | 'partial' | 'skipped' | 'no_tokens' | 'failed' | 'error';
+  status: 'sent' | 'partial' | 'skipped' | 'no_tokens' | 'failed' | 'error' | 'retry';
   reason?: string;
   successCount?: number;
   failureCount?: number;
@@ -51,6 +68,37 @@ export function isWithinPushAgeWindow(
   const ms = getCreatedAtMs(notif);
   if (ms === null) return true;
   return Date.now() - ms <= maxAgeMs;
+}
+
+/** Schedule another attempt, or give up (terminal 'error') after PUSH_MAX_ATTEMPTS. */
+async function scheduleRetryOrFail(
+  docRef: DocumentReference,
+  adminSdk: typeof admin,
+  notif: Record<string, unknown>,
+  reason: string,
+): Promise<PushDispatchResult> {
+  const prev = Number((notif.pushDelivery as { attempts?: number } | undefined)?.attempts || 0);
+  const attempts = prev + 1;
+  const notifId = docRef.id;
+  if (attempts >= PUSH_MAX_ATTEMPTS) {
+    await writePushDelivery(docRef, adminSdk, { status: 'error', error: reason, attempts });
+    logPush('PUSH_SEND_ERROR', { notifId, error: reason, attempts, final: true });
+    return { notifId, status: 'error', reason };
+  }
+  const delay = PUSH_RETRY_DELAYS_MS[Math.min(prev, PUSH_RETRY_DELAYS_MS.length - 1)];
+  await docRef.set(
+    {
+      pushDelivery: {
+        status: 'retry',
+        attempts,
+        lastError: reason.slice(0, 120),
+        nextAttemptAt: adminSdk.firestore.Timestamp.fromMillis(Date.now() + delay),
+      },
+    },
+    { merge: true },
+  );
+  logPush('PUSH_SEND_RETRY', { notifId, attempts, inMs: delay, reason: reason.slice(0, 120) });
+  return { notifId, status: 'retry', reason };
 }
 
 async function writePushDelivery(
@@ -100,7 +148,14 @@ export async function claimNotificationForPush(
       return { claimed: false, notif, skipReason: 'too_old' };
     }
 
-    const delivery = notif.pushDelivery as { status?: string; lockedAt?: { toMillis?: () => number } } | undefined;
+    const delivery = notif.pushDelivery as {
+      status?: string;
+      lockedAt?: { toMillis?: () => number };
+      nextAttemptAt?: { toMillis?: () => number };
+    } | undefined;
+    if (delivery?.status === 'retry' && delivery.nextAttemptAt?.toMillis && delivery.nextAttemptAt.toMillis() > Date.now()) {
+      return { claimed: false, notif, skipReason: 'locked' }; // waiting for its retry time
+    }
     if (delivery?.status === 'pending' && delivery.lockedAt?.toMillis) {
       const lockedMs = delivery.lockedAt.toMillis();
       if (Date.now() - lockedMs < 60_000) {
@@ -399,6 +454,15 @@ export async function dispatchPushForNotificationDoc(
       });
     }
 
+    if (
+      response.successCount === 0 &&
+      response.failureCount > 0 &&
+      invalidTokens.length < response.failureCount &&
+      response.responses.some((r) => !r.success && isTransientPushError(r.error))
+    ) {
+      return await scheduleRetryOrFail(docRef, adminSdk, notif, 'fcm_transient_failure');
+    }
+
     const status = response.failureCount === 0 ? 'sent' : 'partial';
     await writePushDelivery(docRef, adminSdk, {
       status,
@@ -430,6 +494,10 @@ export async function dispatchPushForNotificationDoc(
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    if (isTransientPushError(err)) {
+      const r = await scheduleRetryOrFail(docRef, adminSdk, notif, message).catch(() => null);
+      if (r) return r;
+    }
     await writePushDelivery(docRef, adminSdk, { status: 'error', error: message }).catch(() => {});
     await writeNotificationAuditLog(db, adminSdk, {
       sender: String(notif.senderId || 'system'),

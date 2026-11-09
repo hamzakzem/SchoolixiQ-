@@ -14,9 +14,12 @@
  *    so a restart/idle period delays a notification instead of losing it.
  */
 
-const RECENT_WINDOW_MS = 60 * 60 * 1000; // notifications are still created for messages up to 1h old
+const LIVE_WINDOW_MS = 5 * 60 * 1000;          // realtime listener only needs very recent messages
+const MAX_BACKLOG_MS = 24 * 60 * 60 * 1000;    // never look further back than a day after an outage
+const DEFAULT_BACKLOG_MS = 60 * 60 * 1000;     // first run ever (no checkpoint yet)
+const STALE_MESSAGE_MS = 60 * 1000;            // older than this = backlog: keep the real time, never push it
+const CHECKPOINT_DOC = ['system', 'notificationWorkers'];
 const SWEEP_INTERVAL_MS = 3 * 60 * 1000;
-const SWEEP_WINDOW_MS = 15 * 60 * 1000;
 const SUPER_ADMIN_ROLES = ['superadmin', 'super_admin'];
 const SCHOOL_ADMIN_ROLES = ['admin', 'school_admin', 'assistant', 'school_assistant'];
 
@@ -115,6 +118,10 @@ export async function notifyForSystemMessage(db, adminSdk, messageId, msg) {
   const recipients = await resolveMessageRecipients(db, msg);
   const FieldValue = adminSdk.firestore.FieldValue;
   const schoolId = String(msg.schoolId || '');
+  // A message found late (server was down) keeps its real time and is NOT pushed: the in-app
+  // notification still appears in the right place, but a restart never floods phones with old pushes.
+  const msgAt = toMs(msg.createdAt);
+  const stale = msgAt > 0 && Date.now() - msgAt > STALE_MESSAGE_MS;
   let created = 0;
   for (const [uid, kind] of recipients) {
     const ref = db.collection('notifications').doc(notificationIdFor(messageId, uid));
@@ -147,8 +154,8 @@ export async function notifyForSystemMessage(db, adminSdk, messageId, msg) {
         ...(msg.senderRole ? { senderRole: msg.senderRole } : {}),
         ...(toSuper ? { audience: 'super_admin' } : kind === 'admin' ? { audience: 'school_admin' } : {}),
         createdBy: String(msg.senderId),
-        pushDelivery: { status: 'pending' },
-        createdAt: FieldValue.serverTimestamp(),
+        pushDelivery: stale ? { status: 'skipped', reason: 'stale_message' } : { status: 'pending' },
+        createdAt: stale ? msg.createdAt : FieldValue.serverTimestamp(),
       });
       created += 1;
     } catch (e) {
@@ -164,14 +171,62 @@ export async function notifyForSystemMessage(db, adminSdk, messageId, msg) {
   return { messageId, created, recipients: recipients.size };
 }
 
+async function loadCheckpoint(db) {
+  try {
+    const snap = await db.collection(CHECKPOINT_DOC[0]).doc(CHECKPOINT_DOC[1]).get();
+    return toMs(snap.get('messagesCheckpoint')) || null;
+  } catch { return null; }
+}
+
+async function saveCheckpoint(db, adminSdk, ms) {
+  await db.collection(CHECKPOINT_DOC[0]).doc(CHECKPOINT_DOC[1])
+    .set({ messagesCheckpoint: adminSdk.firestore.Timestamp.fromMillis(ms), updatedAt: adminSdk.firestore.FieldValue.serverTimestamp() }, { merge: true });
+}
+
 /**
- * Self-healing listener: windowed query (small initial snapshot), processes the backlog,
- * restarts itself with backoff on error, and a periodic sweep as a safety net.
+ * Process every message from `sinceMs` on, oldest first, in pages, one at a time (no burst).
+ * Returns the time of the first message that could NOT be processed (null if all done), so the
+ * checkpoint never moves past an unfinished message.
+ */
+export async function processBacklog(db, adminSdk, sinceMs, log = console, pageSize = 100, maxPages = 20) {
+  let cursor = null;
+  let firstFailedMs = null;
+  let processed = 0;
+  for (let page = 0; page < maxPages; page++) {
+    let q = db.collection('system_messages')
+      .where('createdAt', '>=', adminSdk.firestore.Timestamp.fromMillis(sinceMs)).orderBy('createdAt', 'asc').limit(pageSize);
+    if (cursor) q = q.startAfter(cursor);
+    const snap = await q.get();
+    if (snap.empty) break;
+    for (const d of snap.docs) {
+      const data = d.data();
+      if (data.serverNotifiedAt) continue;
+      try {
+        await notifyForSystemMessage(db, adminSdk, d.id, data);
+        processed += 1;
+      } catch (e) {
+        log.error('[MessageNotifications] backlog item failed', d.id, e?.message);
+        if (firstFailedMs === null) firstFailedMs = toMs(data.createdAt);
+      }
+    }
+    cursor = snap.docs[snap.docs.length - 1];
+    if (snap.size < pageSize) break;
+  }
+  return { processed, firstFailedMs };
+}
+
+/**
+ * Self-healing workers:
+ *  - realtime listener on the last few minutes (restarts itself with backoff);
+ *  - on start and every few minutes, a backlog pass from a DURABLE checkpoint (Firestore doc
+ *    system/notificationWorkers) so a stop of any length (up to a day) delays notifications
+ *    instead of losing them; the checkpoint only advances past messages that are fully processed.
  */
 export function setupSystemMessageNotifications(db, adminSdk, log = console) {
   let unsub = null;
   let stopped = false;
   let backoff = 1000;
+  let running = false;
   const inflight = new Set();
   messageNotificationsStatus.startedAt = new Date().toISOString();
 
@@ -183,12 +238,11 @@ export function setupSystemMessageNotifications(db, adminSdk, log = console) {
       .finally(() => setTimeout(() => inflight.delete(doc.id), 30_000));
   };
 
-  const cutoff = () => adminSdk.firestore.Timestamp.fromMillis(Date.now() - RECENT_WINDOW_MS);
-
   const start = () => {
     if (stopped) return;
     try {
-      unsub = db.collection('system_messages').where('createdAt', '>=', cutoff()).onSnapshot(
+      const since = adminSdk.firestore.Timestamp.fromMillis(Date.now() - LIVE_WINDOW_MS);
+      unsub = db.collection('system_messages').where('createdAt', '>=', since).onSnapshot(
         (snap) => {
           backoff = 1000;
           messageNotificationsStatus.listenerAttached = true;
@@ -213,19 +267,29 @@ export function setupSystemMessageNotifications(db, adminSdk, log = console) {
   };
   start();
 
-  const sweep = setInterval(async () => {
+  const pass = async () => {
+    if (running || stopped) return;
+    running = true;
     try {
-      const since = adminSdk.firestore.Timestamp.fromMillis(Date.now() - SWEEP_WINDOW_MS);
-      const snap = await db.collection('system_messages').where('createdAt', '>=', since).orderBy('createdAt', 'desc').limit(50).get();
-      snap.docs.forEach(handle);
+      const now = Date.now();
+      const checkpoint = await loadCheckpoint(db);
+      const since = Math.min(now, Math.max(checkpoint ?? now - DEFAULT_BACKLOG_MS, now - MAX_BACKLOG_MS));
+      const { processed, firstFailedMs } = await processBacklog(db, adminSdk, since, log);
+      // never move past an unfinished message; keep 60s of overlap for clock skew / in-flight writes
+      await saveCheckpoint(db, adminSdk, firstFailedMs ?? now - 60_000);
       messageNotificationsStatus.lastSweepAt = new Date().toISOString();
-      messageNotificationsStatus.lastSweepOk = true;
+      messageNotificationsStatus.lastSweepOk = firstFailedMs === null;
+      if (processed > 0) log.info?.('[MessageNotifications] backlog processed', processed);
     } catch (e) {
       messageNotificationsStatus.lastSweepAt = new Date().toISOString();
       messageNotificationsStatus.lastSweepOk = false;
-      log.error('[MessageNotifications] sweep failed', e?.message);
+      log.error('[MessageNotifications] backlog pass failed', e?.message);
+    } finally {
+      running = false;
     }
-  }, SWEEP_INTERVAL_MS);
+  };
+  setTimeout(pass, 2000); // catch up right after (re)start
+  const sweep = setInterval(pass, SWEEP_INTERVAL_MS);
   sweep.unref?.();
 
   return () => { stopped = true; clearInterval(sweep); try { unsub?.(); } catch { /* ignore */ } };

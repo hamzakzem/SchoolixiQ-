@@ -1,8 +1,8 @@
 // Server-side chat notification + push-claim idempotency, against the Firestore emulator.
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 npx tsx scripts/e2e/message-notifications.test.ts
 import admin from 'firebase-admin';
-import { notifyForSystemMessage, setupSystemMessageNotifications, notificationIdFor } from '../../backend/messageNotifications.mjs';
-import { claimNotificationForPush } from '../../notificationPushDispatch.ts';
+import { notifyForSystemMessage, setupSystemMessageNotifications, notificationIdFor, processBacklog } from '../../backend/messageNotifications.mjs';
+import { claimNotificationForPush, processNotificationPush } from '../../notificationPushDispatch.ts';
 
 process.env.FIRESTORE_EMULATOR_HOST ||= '127.0.0.1:8085';
 if (!admin.apps.length) admin.initializeApp({ projectId: 'yala-safari-iq' });
@@ -114,5 +114,47 @@ if (won === 0) {
   const st = (await ref.get()).get('pushDelivery.status');
   T('…and when none won, the running server had already taken it (status set)', ['pending', 'sent', 'partial', 'no_tokens', 'skipped', 'error'].includes(st), String(st));
 }
+
+// 9. outage recovery: durable checkpoint, no loss within a day, no flood of old pushes
+const ago = (min: number) => admin.firestore.Timestamp.fromMillis(Date.now() - min * 60_000);
+const old = async (id: string, minutesAgo: number) => db.doc(`system_messages/${id}`).set({ schoolId: 'S1', conversationId: 'superadmin_S1', senderId: 'n_sa', senderRole: 'superadmin', receiverId: 'n_teacher', content: 'قديمة ' + id, createdAt: ago(minutesAgo), read: false });
+await old('o1', 180); await old('o2', 30); await old('o3', 40 * 60);
+const res = await processBacklog(db, admin, Date.now() - 24 * 3600_000, { error() {}, info() {}, log() {} } as any);
+const o1 = await notifsFor('o1'), o2 = await notifsFor('o2'), o3 = await notifsFor('o3');
+T('messages missed during a 3h outage are still notified (no loss)', o1.length === 1 && o2.length === 1, `${o1.length},${o2.length}`);
+T('older than the 24h cap is left alone', o3.length === 0);
+T('backlog notification keeps the real message time (right place in the bell)', Math.abs(o1[0].get('createdAt').toMillis() - (Date.now() - 180 * 60_000)) < 60_000);
+T('backlog is never pushed (no burst of old pushes)', [...o1, ...o2].every((d) => d.get('pushDelivery.status') === 'skipped' && d.get('pushDelivery.reason') === 'stale_message'));
+T('backlog processing reports no failure → checkpoint may advance', res.firstFailedMs === null && res.processed >= 2);
+const stopCp = setupSystemMessageNotifications(db, admin, { error() {}, info() {}, log() {} } as any);
+let cp = null as any;
+for (let i = 0; i < 30 && !cp; i++) { await wait(300); cp = (await db.doc('system/notificationWorkers').get()).get('messagesCheckpoint'); }
+stopCp();
+T('durable checkpoint is written to Firestore', !!cp && cp.toMillis() <= Date.now() && cp.toMillis() > Date.now() - 5 * 60_000);
+
+// 10. FCM failure handling: transient → bounded retries with delay; permanent → no retry
+await db.doc('users/n_push').set({ role: 'teacher', schoolId: 'S1', fcmTokens: ['tok-1'], fcmDevices: [{ deviceId: 'd1', token: 'tok-1', platform: 'web' }], name: 'P' });
+const failing = (code: string, msg = 'x') => { const stub: any = Object.create(admin, { messaging: { value: () => ({ sendEach: async (m: any[]) => ({ successCount: 0, failureCount: m.length, responses: m.map(() => ({ success: false, error: Object.assign(new Error(msg), { code }) })) }) }) } }); return stub; };
+const mkN = async () => { const r = await db.collection('notifications').add({ userId: 'n_push', schoolId: 'S1', title: 't', message: 'm', type: 'system', createdAt: admin.firestore.Timestamp.now(), read: false, pushDelivery: { status: 'retry', attempts: 0, nextAttemptAt: admin.firestore.Timestamp.fromMillis(Date.now() + 120_000) } }); return r; };
+const due = (r: any) => r.set({ pushDelivery: { nextAttemptAt: admin.firestore.Timestamp.fromMillis(Date.now() - 1000) } }, { merge: true });
+const stat = async (r: any) => (await r.get()).get('pushDelivery');
+const retryRef = await mkN();
+await due(retryRef);
+await processNotificationPush(db, failing('messaging/server-unavailable') as any, retryRef.id, (await retryRef.get()).data()!);
+let st = await stat(retryRef);
+T('transient FCM failure → scheduled for retry (not dropped)', st.status === 'retry' && st.attempts === 1 && st.nextAttemptAt.toMillis() > Date.now(), JSON.stringify([st.status, st.attempts]));
+const early = await processNotificationPush(db, failing('messaging/server-unavailable') as any, retryRef.id, (await retryRef.get()).data()!);
+T('no retry before its delay (no hammering)', (await stat(retryRef)).attempts === 1, JSON.stringify(early));
+for (const n of [2, 3]) {
+  await retryRef.set({ pushDelivery: { nextAttemptAt: admin.firestore.Timestamp.fromMillis(Date.now() - 1000) } }, { merge: true });
+  await processNotificationPush(db, failing('messaging/server-unavailable') as any, retryRef.id, (await retryRef.get()).data()!);
+}
+st = await stat(retryRef);
+T('gives up after 3 attempts (terminal error, no endless retry)', st.status === 'error' && st.attempts === 3, JSON.stringify([st.status, st.attempts]));
+const permRef = await mkN();
+await due(permRef);
+await processNotificationPush(db, failing('messaging/registration-token-not-registered') as any, permRef.id, (await permRef.get()).data()!);
+st = await stat(permRef);
+T('permanent failure (dead token) is not retried', st.status !== 'retry' && ['partial', 'sent', 'no_tokens', 'error'].includes(st.status), String(st.status));
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

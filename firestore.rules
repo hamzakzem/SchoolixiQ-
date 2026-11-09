@@ -779,7 +779,10 @@ service cloud.firestore {
           && schoolId != ''
           && resource.data.schoolId == schoolId
           && (
-            role in ['admin', 'school_admin', 'assistant', 'school_assistant', 'teacher', 'staff']
+            // Teachers are NOT school-wide readers: their threads embed their own uid (clause above)
+            // or are addressed to them (receiverId), so the platform ↔ school-admin conversation and
+            // other people's threads stay private. Staff keep the shared administration inbox.
+            role in ['admin', 'school_admin', 'assistant', 'school_assistant', 'staff']
             || (role in ['admin', 'school_admin'] && resource.data.receiverId == 'admin')
           )
         )
