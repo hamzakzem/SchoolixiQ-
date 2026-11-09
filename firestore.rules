@@ -868,7 +868,8 @@ service cloud.firestore {
     // Subscription plans — public catalog; only Super Admin may mutate.
     match /packages/{packageId} {
       allow read, get, list: if true;
-      allow create, update, delete: if isSuperAdmin() || platformAssistantHasAny(['manage_packages']);
+      allow create, update: if isSuperAdmin() || platformAssistantHasAny(['manage_packages']);
+      allow delete: if false; // POST /api/admin/plans/:id (migrates references, locked + audited)
     }
 
     // Distributors & coupons — Super Admin manages status/canLogin; distributors read own record only.
@@ -878,12 +879,14 @@ service cloud.firestore {
         || (isDistributor() && userDistributorId() == distributorId);
       allow list: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
       // Approval, commission % and coupons are decided by the super admin only.
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
+      allow delete: if false; // POST /api/records/delete (collection distributors)
     }
 
     match /distributorCoupons/{couponId} {
       allow read, get, list: if isSuperAdmin() || platformAssistantHasAny(['manage_distributors']);
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
+      allow delete: if false; // removed with their distributor by the engine
     }
 
     function canManageDistributors() {
@@ -1029,7 +1032,7 @@ service cloud.firestore {
           && preservesSchoolSubscriptionFields()
           && studentCountStepOk()
         );
-      allow delete: if isSuperAdmin();
+      allow delete: if false; // POST /api/records/delete-school (preview, confirmations, resumable job)
 
       match /settings/{settingId} {
         allow read, get, list: if signedIn() && (isSchoolMember(schoolId) || isPlatformAssistant());
@@ -1730,7 +1733,8 @@ service cloud.firestore {
         || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && isSchoolManagementReadRole());
       allow create: if isSuperAdmin()
         || (signedIn() && hasSchoolId(request.resource.data) && canManageSchool(request.resource.data.schoolId));
-      allow update, delete: if isSuperAdmin()
+      allow delete: if false; // server deletion engine only
+      allow update: if isSuperAdmin()
         || (signedIn() && hasSchoolId(resource.data) && canManageSchool(resource.data.schoolId));
     }
 
@@ -1745,7 +1749,8 @@ service cloud.firestore {
       allow read, get, list: if canReadSchoolAcademicWide();
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
-      allow update, delete: if isSuperAdmin()
+      allow delete: if false; // server deletion engine only
+      allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
     }
 
@@ -1753,7 +1758,8 @@ service cloud.firestore {
       allow read, get, list: if canReadAcademicOrParentLink();
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
-      allow update, delete: if isSuperAdmin()
+      allow delete: if false; // server deletion engine only
+      allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
     }
 
@@ -1761,7 +1767,8 @@ service cloud.firestore {
       allow read, get, list: if canReadSchoolManagement();
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole());
-      allow update, delete: if isSuperAdmin()
+      allow delete: if false; // server deletion engine only
+      allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && isSchoolManagementRole());
     }
 
@@ -1820,8 +1827,7 @@ service cloud.firestore {
 
       allow update: if isSuperAdmin();
 
-      allow delete: if isSuperAdmin()
-        || (isDismissalSchoolStaff() && sameDismissalSchool());
+      allow delete: if false; // dismissal records are history; removed only with the school by the server job
     }
 
     match /dismissal_logs/{logId} {
@@ -1878,19 +1884,23 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /assistant_categories/{id} {
       allow read, get, list: if true;
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
+      allow delete: if false; // POST /api/records/delete (trash + audit)
     }
     match /assistant_flows/{id} {
       allow read, get, list: if true;
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
+      allow delete: if false; // POST /api/records/delete (trash + audit)
     }
     match /assistant_answers/{id} {
       allow read, get, list: if true;
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
+      allow delete: if false; // POST /api/records/delete (trash + audit)
     }
     match /assistant_keywords/{id} {
       allow read, get, list: if true;
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
+      allow delete: if false; // POST /api/records/delete (trash + audit)
     }
     match /assistant_tickets/{id} {
       allow create: if true
@@ -1909,7 +1919,8 @@ service cloud.firestore {
     }
     match /assistant_settings/{id} {
       allow read, get, list: if true;
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
+      allow delete: if false;
     }
     match /notification_logs/{id} {
       allow read, get, list: if isSuperAdmin();

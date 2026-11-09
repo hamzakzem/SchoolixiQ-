@@ -73,6 +73,19 @@ export const POLICIES = {
   // administrative decision and are never deleted; rejecting a request is a separate status change.
   registrations: { roles: [], superOnly: true, neverDelete: (d) => REQUEST_DECIDED.includes(String(d.status || '')), neverDeleteMessage: 'طلب معتمد: سجل قرار إداري يُحتفظ به ولا يُحذف', label: (d) => d.schoolName || d.name || d.email || 'طلب تسجيل' },
   subscriptionRequests: { roles: [], superOnly: true, neverDelete: (d) => REQUEST_DECIDED.includes(String(d.status || '')), neverDeleteMessage: 'طلب معتمد: سجل قرار إداري يُحتفظ به ولا يُحذف', label: (d) => d.schoolName || d.name || 'طلب اشتراك' },
+  // Distributors (platform, Super Admin only): coupons go to the trash; schools keep their history but stop accruing commission.
+  distributors: {
+    roles: [], superOnly: true, retention: 'protected', label: (d) => d.name || d.email || 'موزع',
+    children: [
+      { col: 'distributorCoupons', field: 'distributorId' },
+      { col: 'schools', field: 'distributorId', keepIf: () => true, flags: { distributorCommissionPaused: true, distributorDeleted: true } },
+    ],
+  },
+  // Smart-assistant catalogue (platform content, Super Admin only): recoverable like everything else.
+  assistant_categories: { roles: [], superOnly: true, label: (d) => d.name || d.title || 'تصنيف' },
+  assistant_flows: { roles: [], superOnly: true, label: (d) => d.name || d.title || 'مسار' },
+  assistant_answers: { roles: [], superOnly: true, label: (d) => d.title || d.question || 'إجابة' },
+  assistant_keywords: { roles: [], superOnly: true, label: (d) => d.keyword || d.name || 'كلمة مفتاحية' },
   id_cards: { roles: MGMT_ROLES, perms: ['id_cards', 'id_card_generation'], label: (d) => `بطاقة ${d.studentName || ''}`.trim() },
   student_archives: { retention: 'protected', roles: MGMT_ROLES, perms: ['student_archive'], label: (d) => `أرشيف ${d.studentName || ''}`.trim() },
 };
@@ -90,6 +103,9 @@ function httpError(status, code, message) {
 }
 
 function asArray(v) { return Array.isArray(v) ? v.map(String) : []; }
+/** Document ids only: no path separators, no dot segments, bounded length (an id must never address another path). */
+const SAFE_ID = /^[A-Za-z0-9_\-:.@]{1,200}$/;
+const isSafeId = (id) => SAFE_ID.test(id) && id !== '.' && id !== '..' && !id.includes('..');
 const ts = (adminSdk) => adminSdk.firestore.FieldValue.serverTimestamp();
 
 export async function loadActor(db, uid) {
@@ -159,7 +175,7 @@ async function collectDependants(db, policy, collection, id, schoolId) {
   for (const c of policy.children || []) {
     for (const d of await queryAll(db, c.col, c.field, id, schoolId)) {
       const data = d.data();
-      if (c.keepIf && c.keepIf(data)) kept.push({ col: c.col, id: d.id });
+      if (c.keepIf && c.keepIf(data)) kept.push({ col: c.col, id: d.id, ...(c.flags ? { flags: c.flags } : {}) });
       else items.push({ col: c.col, id: d.id, data });
     }
   }
@@ -291,7 +307,9 @@ async function runTrashSteps(ctx, bundleId) {
     if (!steps.kept) {
       const stored = (await ref.get()).data() || {};
       const label = String(stored.label || '');
-      const ops = (stored.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), { studentDeleted: true, studentDeletedAt: ts(adminSdk), studentNameSnapshot: label, deletionBundleId: bundleId }, { merge: true }));
+      const ops = (stored.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), k.flags
+        ? { ...k.flags, deletedRelationAt: ts(adminSdk), deletionBundleId: bundleId }
+        : { studentDeleted: true, studentDeletedAt: ts(adminSdk), studentNameSnapshot: label, deletionBundleId: bundleId }, { merge: true }));
       await commitInBatches(db, ops);
       await mark('kept');
     }
@@ -331,7 +349,7 @@ export async function deleteRecords(ctx, actorUid, body) {
   const isAccount = collection === 'users';
   if (!ids.length) throw httpError(400, 'INVALID_BODY', 'لم يتم تحديد سجلات');
   if (ids.length > MAX_IDS) throw httpError(400, 'TOO_MANY', `الحد الأقصى ${MAX_IDS} سجل في العملية الواحدة`);
-  if (!isAccount && !POLICIES[collection]) throw httpError(400, 'UNSUPPORTED_COLLECTION', 'نوع السجل غير مدعوم للحذف');
+  if (!isAccount && !Object.hasOwn(POLICIES, collection)) throw httpError(400, 'UNSUPPORTED_COLLECTION', 'نوع السجل غير مدعوم للحذف');
   // explicit confirmations are enforced by the server, not only shown by the UI
   if (ids.length > 1 && body.confirmBulk !== true) throw httpError(400, 'CONFIRM_BULK_REQUIRED', 'الحذف الجماعي يتطلب تأكيداً صريحاً');
   if (permanent && body.confirmText !== PERMANENT_CONFIRM_TEXT) throw httpError(400, 'CONFIRM_PERMANENT_REQUIRED', 'الحذف النهائي يتطلب كتابة عبارة التأكيد');
@@ -345,6 +363,7 @@ export async function deleteRecords(ctx, actorUid, body) {
     const owner = newOwner();
     let locked = false;
     try {
+      if (!isSafeId(id)) throw httpError(400, 'INVALID_ID', 'معرّف السجل غير صالح');
       // replay of an already executed request: same answer, nothing executed twice
       const idemKey = idemBase ? `${idemBase}:${collection}:${id}` : '';
       if (idemKey) {
@@ -426,6 +445,7 @@ export async function deleteRecords(ctx, actorUid, body) {
 export async function restoreBundle(ctx, actorUid, bundleId) {
   const { db, adminSdk, faults } = ctx;
   const actor = await loadActor(db, actorUid);
+  if (!isSafeId(String(bundleId || ''))) throw httpError(400, 'INVALID_ID', 'معرّف غير صالح');
   const ref = bundleRef(db, String(bundleId || ''));
   const snap = await ref.get();
   if (!snap.exists) throw httpError(404, 'BUNDLE_NOT_FOUND', 'السجل غير موجود في السلة');
@@ -474,7 +494,7 @@ export async function restoreBundle(ctx, actorUid, bundleId) {
       if (!rsteps.links) {
         if (b.collection === 'students') await commitInBatches(db, asArray(b.parentLinks).map((uid) => (batch) => batch.update(db.collection('users').doc(uid), { studentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) })));
         if (b.kind === 'account') await commitInBatches(db, asArray(b.studentLinks).map((sid) => (batch) => batch.update(db.collection('students').doc(sid), { parentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) })));
-        await commitInBatches(db, (b.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), { studentDeleted: FV(adminSdk).delete(), studentDeletedAt: FV(adminSdk).delete(), studentNameSnapshot: FV(adminSdk).delete(), deletionBundleId: FV(adminSdk).delete() }, { merge: true })));
+        await commitInBatches(db, (b.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), Object.fromEntries((k.flags ? [...Object.keys(k.flags), 'deletedRelationAt'] : ['studentDeleted', 'studentDeletedAt', 'studentNameSnapshot']).concat('deletionBundleId').map((key) => [key, FV(adminSdk).delete()])), { merge: true })));
         await rmark('links');
       }
       if (!rsteps.counter && policy?.counter) {
@@ -546,6 +566,7 @@ export async function purgeBundle(ctx, actorUid, body) {
   const { db, adminSdk } = ctx;
   const actor = await loadActor(db, actorUid);
   const bundleId = String(body.bundleId || '');
+  if (!isSafeId(bundleId)) throw httpError(400, 'INVALID_ID', 'معرّف غير صالح');
   const snap = await bundleRef(db, bundleId).get();
   if (!snap.exists) throw httpError(404, 'BUNDLE_NOT_FOUND', 'السجل غير موجود في السلة');
   const b = snap.data();
@@ -631,7 +652,7 @@ export async function voidPayment(ctx, actorUid, body) {
   const reason = String(body.reason || '').trim().slice(0, 300);
   const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: actor.schoolId, collection: 'payments', recordId: paymentId, action: 'VOID_PAYMENT' };
   try {
-    if (!paymentId) throw httpError(400, 'INVALID_BODY', 'معرّف الدفعة مطلوب');
+    if (!paymentId || !isSafeId(paymentId)) throw httpError(400, 'INVALID_BODY', 'معرّف الدفعة غير صالح');
     if (reason.length < 3) throw httpError(400, 'REASON_REQUIRED', 'سبب الإلغاء مطلوب');
     const ref = db.collection('payments').doc(paymentId);
     const out = await db.runTransaction(async (t) => {
@@ -643,18 +664,49 @@ export async function voidPayment(ctx, actorUid, body) {
       const amount = Number(p.amount || 0);
       const stRef = p.studentId ? db.collection('students').doc(String(p.studentId)) : null;
       const stSnap = stRef ? await t.get(stRef) : null;
-      const instRefs = asArray(p.installmentIds).map((i) => db.collection('installments').doc(i));
-      const instSnaps = await Promise.all(instRefs.map((r) => t.get(r)));
+      const sameSchool = !!stSnap?.exists && String(stSnap.get('schoolId') || '') === String(p.schoolId || '');
+      // the student's whole ledger is read to re-allocate what is left (earliest due date first, like the payment screen)
+      let instDocs = [], payDocs = [];
+      if (sameSchool) {
+        const [is, ps] = await Promise.all([
+          t.get(db.collection('installments').where('studentId', '==', String(p.studentId)).where('schoolId', '==', String(p.schoolId))),
+          t.get(db.collection('payments').where('studentId', '==', String(p.studentId)).where('schoolId', '==', String(p.schoolId))),
+        ]);
+        instDocs = is.docs; payDocs = ps.docs;
+      }
+      const toMs = (v) => (v?.toMillis ? v.toMillis() : v?.seconds ? v.seconds * 1000 : Date.parse(v) || 0);
+      const paidOf = (d) => (String(d.get('status')) === 'paid' ? Number(d.get('paidAmount') ?? d.get('amount') ?? 0) : Number(d.get('paidAmount') || 0));
+      const instPaid = instDocs.reduce((a, d) => a + paidOf(d), 0);
+      const payTotal = payDocs.filter((d) => d.get('status') !== 'voided').reduce((a, d) => a + Number(d.get('amount') || 0), 0);
+      const reconciles = Math.abs(instPaid - payTotal) < 0.01;
       t.update(ref, {
         status: 'voided', voidedAt: ts(adminSdk), voidedBy: { uid: actor.uid, name: actor.name, role: actor.role }, voidReason: reason,
         history: FV(adminSdk).arrayUnion({ action: 'voided', at: Date.now(), by: actor.uid, reason, amount }),
       });
-      if (stSnap?.exists && String(stSnap.get('schoolId') || '') === String(p.schoolId || '')) t.update(stRef, { tuitionBalance: FV(adminSdk).increment(-amount) });
-      instSnaps.forEach((is, i) => { if (is.exists) t.update(instRefs[i], { reviewRequired: true, reviewReason: `إلغاء الدفعة ${paymentId}` }); });
-      return { replay: false, amount };
+      if (sameSchool) t.update(stRef, { tuitionBalance: FV(adminSdk).increment(-amount) });
+      let reallocated = false;
+      if (sameSchool && reconciles) {
+        // ledger was consistent: re-allocate the remaining money over the installments
+        let left = Math.max(0, payTotal - amount);
+        const sorted = [...instDocs].sort((x, y) => toMs(x.get('dueDate')) - toMs(y.get('dueDate')));
+        for (const d of sorted) {
+          const due = Number(d.get('amount') || 0);
+          const paid = Math.min(due, left); left -= paid;
+          const status = paid >= due && due > 0 ? 'paid' : paid > 0 ? 'partial' : 'pending';
+          const cur = { status: String(d.get('status')), paid: paidOf(d) };
+          if (cur.status === status && Math.abs(cur.paid - paid) < 0.01) continue;
+          t.update(d.ref, { status, paidAmount: paid, paidAt: status === 'paid' ? (d.get('paidAt') || ts(adminSdk)) : FV(adminSdk).delete(), reallocatedBy: `void:${paymentId}` });
+        }
+        reallocated = true;
+      } else if (sameSchool) {
+        // the stored installments do not add up to the payments (manual toggles / extra payments): do NOT guess.
+        t.update(stRef, { financialReviewRequired: true, financialReviewReason: `إلغاء الدفعة ${paymentId}: الأقساط لا تطابق الدفعات، مراجعة مالية مطلوبة`, financialReviewAt: ts(adminSdk) });
+        instDocs.forEach((d) => t.update(d.ref, { reviewRequired: true, reviewReason: `إلغاء الدفعة ${paymentId}` }));
+      }
+      return { replay: false, amount, reallocated, reviewRequired: !reallocated };
     });
-    await writeLog(db, adminSdk, { ...base, result: 'success', replay: out.replay, amount: out.amount ?? null });
-    return { ok: true, replay: out.replay };
+    await writeLog(db, adminSdk, { ...base, result: 'success', replay: out.replay, amount: out.amount ?? null, reallocated: out.reallocated ?? null });
+    return { ok: true, replay: out.replay, reallocated: out.reallocated ?? null, reviewRequired: out.reviewRequired ?? null };
   } catch (e) {
     await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? 'refused' : 'failed', errorCode: e.code || 'ERROR', error: String(e.message || e).slice(0, 200) });
     throw e;
@@ -669,7 +721,7 @@ const NOTIF_OWNER_FIELDS = ['userId', 'recipientId', 'receiverId'];
 export async function deleteNotifications(ctx, actorUid, body) {
   const { db, adminSdk } = ctx;
   const actor = await loadActor(db, actorUid);
-  const ids = [...new Set(asArray(body.ids))].filter(Boolean);
+  const ids = [...new Set(asArray(body.ids))].filter((i) => i && isSafeId(i));
   if (!ids.length) throw httpError(400, 'INVALID_BODY', 'لم يتم تحديد إشعارات');
   if (ids.length > 100) throw httpError(400, 'TOO_MANY', 'الحد الأقصى 100 إشعار في الطلب الواحد');
   const results = [];
@@ -700,7 +752,7 @@ export async function deleteNotifications(ctx, actorUid, body) {
 //   disabled, files are moved to _trash; audit/login logs are NEVER touched. Purge = permanent.
 // ══════════════════════════════════════════════════════════════════════════════════════════════
 export const SCHOOL_DELETE_ORDER = [
-  'notifications', 'dismissal_requests', 'dismissal_logs', 'dismissal_snapshots', 'print_logs', 'notification_preferences',
+  'notifications', 'notification_logs', 'tuition_reminder_logs', 'tuition_reminder_tracking', 'logs', 'dismissal_requests', 'dismissal_logs', 'dismissal_snapshots', 'print_logs', 'notification_preferences',
   'orders', 'market', 'marketplace', 'inventory', 'payroll', 'payments', 'installments', 'fees', 'expenses', 'exams',
   'student_archives', 'id_cards', 'behavior_reports', 'behavior', 'teacher_reports', 'advanced_reports', 'grades',
   'attendance', 'attendance_records', 'homework', 'announcements', 'subscriptionRequests', 'registrations',
@@ -720,6 +772,7 @@ export async function previewSchoolDeletion(ctx, actorUid, schoolId) {
   const { db } = ctx;
   const actor = await loadActor(db, actorUid);
   if (!actor.isSuper) throw httpError(403, 'FORBIDDEN_ROLE', 'حذف المدرسة لمدير النظام فقط');
+  if (!isSafeId(String(schoolId || ''))) throw httpError(400, 'INVALID_ID', 'معرّف غير صالح');
   const school = await db.collection('schools').doc(String(schoolId || '')).get();
   if (!school.exists) throw httpError(404, 'NOT_FOUND', 'المدرسة غير موجودة');
   const counts = {};
@@ -797,6 +850,19 @@ async function runSchoolTrashSteps(ctx, bundleId) {
       if (failedFiles) throw new Error(`تعذّر نقل ${failedFiles} ملف`);
       await mark('files');
     }
+    // sub-collections of the school document (e.g. settings) do not disappear with it: copy them into the bundle first
+    if (!steps.sub) {
+      const subs = await db.collection('schools').doc(schoolId).listCollections();
+      for (const sc of subs) {
+        for (;;) {
+          const snap = await sc.limit(PAGE).get();
+          if (snap.empty) break;
+          await commitInBatches(db, snap.docs.map((d) => (batch) => batch.set(ref.collection('items').doc(`sub_${sc.id}__${d.id}`), { col: 'schoolsub', sub: sc.id, docId: d.id, data: d.data() })));
+          await commitInBatches(db, snap.docs.map((d) => (batch) => batch.delete(d.ref)));
+        }
+      }
+      await mark('sub');
+    }
     if (!steps.delete) {
       await db.collection('schools').doc(schoolId).delete();
       await mark('delete');
@@ -824,7 +890,7 @@ export async function deleteSchool(ctx, actorUid, body) {
   let locked = false;
   try {
     if (!actor.isSuper) throw httpError(403, 'FORBIDDEN_ROLE', 'حذف المدرسة لمدير النظام فقط');
-    if (!schoolId) throw httpError(400, 'INVALID_BODY', 'معرّف المدرسة مطلوب');
+    if (!schoolId || !isSafeId(schoolId)) throw httpError(400, 'INVALID_BODY', 'معرّف المدرسة غير صالح');
     const sc = await db.collection('schools').doc(schoolId).get();
     if (!sc.exists) throw httpError(404, 'NOT_FOUND', 'المدرسة غير موجودة');
     const name = String(sc.get('name') || '').trim();
@@ -880,7 +946,8 @@ async function restoreSchoolBundle(ctx, ref, b, actor) {
         const ops = [];
         for (const d of snap.docs) {
           const col = d.get('col');
-          if (col === 'shared_users') ops.push((batch) => batch.set(db.collection('users').doc(d.get('docId')), d.get('data'), { merge: true }));
+          if (col === 'schoolsub') ops.push((batch) => batch.set(db.collection('schools').doc(schoolId).collection(d.get('sub')).doc(d.get('docId')), d.get('data')));
+          else if (col === 'shared_users') ops.push((batch) => batch.set(db.collection('users').doc(d.get('docId')), d.get('data'), { merge: true }));
           else ops.push((batch) => batch.set(db.collection(col).doc(d.get('docId')), d.get('data')));
         }
         await commitInBatches(db, ops);
@@ -905,5 +972,85 @@ async function restoreSchoolBundle(ctx, ref, b, actor) {
   } catch (e) {
     await ref.set({ status: 'restoring', jobStatus: 'PARTIALLY_COMPLETED', lastError: String(e?.message || e).slice(0, 200) }, { merge: true }).catch(() => {});
     throw e.status ? e : Object.assign(httpError(500, 'RESTORE_INCOMPLETE', 'الاستعادة غير مكتملة — أعد المحاولة'), { cause: e });
+  }
+}
+
+/** An admin confirms that a student's ledger was reviewed after a payment void; clears the review flags (logged). */
+export async function resolveFinancialReview(ctx, actorUid, body) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const studentId = String(body.studentId || '');
+  const note = String(body.note || '').trim().slice(0, 300);
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: actor.schoolId, collection: 'students', recordId: studentId, action: 'RESOLVE_FINANCIAL_REVIEW' };
+  try {
+    if (!studentId || !isSafeId(studentId) || note.length < 3) throw httpError(400, 'INVALID_BODY', 'معرّف الطالب وملاحظة المراجعة مطلوبان');
+    const st = await db.collection('students').doc(studentId).get();
+    if (!st.exists) throw httpError(404, 'NOT_FOUND', 'الطالب غير موجود');
+    authorizeDelete(actor, 'payments', POLICIES.payments, { schoolId: st.get('schoolId') }, { permanent: false });
+    const insts = await db.collection('installments').where('studentId', '==', studentId).where('schoolId', '==', String(st.get('schoolId'))).get();
+    await commitInBatches(db, [
+      (b) => b.update(st.ref, { financialReviewRequired: FV(adminSdk).delete(), financialReviewReason: FV(adminSdk).delete(), financialReviewAt: FV(adminSdk).delete(), financialReviewedBy: actor.uid, financialReviewNote: note }),
+      ...insts.docs.filter((d) => d.get('reviewRequired')).map((d) => (b) => b.update(d.ref, { reviewRequired: FV(adminSdk).delete(), reviewReason: FV(adminSdk).delete() })),
+    ]);
+    await writeLog(db, adminSdk, { ...base, result: 'success', note });
+    return { ok: true };
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? 'refused' : 'failed', errorCode: e.code || 'ERROR', error: String(e.message || e).slice(0, 200) });
+    throw e;
+  }
+}
+
+/**
+ * Chat messages: Super Admin only, hard delete by design (privacy / abuse removal; a trash copy would defeat the purpose).
+ * Goes through the same lock + audit log as every other delete; the message cleaner removes its Storage attachments.
+ */
+export async function deleteChatMessage(ctx, actorUid, body) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const messageId = String(body.messageId || '');
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: '', collection: 'system_messages', recordId: messageId, mode: 'permanent', action: 'DELETE_MESSAGE_PERMANENT' };
+  const lockKey = `system_messages__${messageId}`;
+  const owner = newOwner();
+  let locked = false;
+  try {
+    if (!actor.isSuper) throw httpError(403, 'FORBIDDEN_ROLE', 'الحذف النهائي للرسائل مسموح لمدير النظام فقط');
+    if (!messageId || !isSafeId(messageId)) throw httpError(400, 'MESSAGE_ID_REQUIRED', 'معرّف الرسالة غير صالح');
+    await acquireLock(ctx, lockKey, owner); locked = true;
+    const result = await ctx.permanentlyDeleteMessage({ messageId, deletedBy: actor.uid });
+    await writeLog(db, adminSdk, { ...base, result: result?.ok === false ? 'refused' : 'success', conversationId: result?.conversationId ?? null });
+    return result;
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? 'refused' : 'failed', errorCode: e.code || 'ERROR', error: String(e.message || e).slice(0, 200) });
+    throw e;
+  } finally {
+    if (locked) await releaseLock(ctx, lockKey, owner);
+  }
+}
+
+/**
+ * Super-Admin-only hard deletes that have their own cleaner (e.g. purging a user's conversations):
+ * same actor check, per-target lock and deletion_logs entry as every engine delete.
+ */
+export async function runAuditedPlatformDelete(ctx, actorUid, { action, collection, recordId, confirm, authorized = false }, fn) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: '', collection, recordId, mode: 'permanent', action };
+  const lockKey = `${collection}__${recordId}`;
+  const owner = newOwner();
+  let locked = false;
+  try {
+    // `authorized`: the caller already verified a delegated platform permission server-side (e.g. manage_packages)
+    if (!actor.isSuper && !authorized) throw httpError(403, 'FORBIDDEN_ROLE', 'هذا الإجراء لمدير النظام فقط');
+    if (!recordId) throw httpError(400, 'INVALID_BODY', 'المعرّف مطلوب');
+    if (confirm === false) throw httpError(400, 'CONFIRM_REQUIRED', 'التأكيد مطلوب');
+    await acquireLock(ctx, lockKey, owner); locked = true;
+    const out = await fn();
+    await writeLog(db, adminSdk, { ...base, result: 'success' });
+    return out;
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? 'refused' : 'failed', errorCode: e.code || 'ERROR', error: String(e.message || e).slice(0, 200) });
+    throw e;
+  } finally {
+    if (locked) await releaseLock(ctx, lockKey, owner);
   }
 }

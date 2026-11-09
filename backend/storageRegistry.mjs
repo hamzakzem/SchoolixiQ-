@@ -55,25 +55,44 @@ export function allowedScopes({ schoolId, collection, recordId }) {
   return scopes;
 }
 
-/** Object path from a Firebase download URL / gs:// / storage.googleapis URL / emulator URL; null if not one of ours. */
+const safeDecode = (v) => { try { return decodeURIComponent(v); } catch { return null; } };
+
+/** Object path from ONE Firebase download URL / gs:// / storage.googleapis URL / emulator URL; null if not ours. */
 export function pathFromUrl(value, bucketName) {
   if (typeof value !== 'string' || value.length < 8 || value.startsWith('data:')) return null;
   let m = /^gs:\/\/([^/]+)\/(.+)$/.exec(value);
-  if (m) return m[1] === bucketName ? decodeURIComponent(m[2]) : null;
+  if (m) return m[1] === bucketName ? safeDecode(m[2]) : null;
   m = /^https?:\/\/[^/]+\/v0\/b\/([^/]+)\/o\/([^?#]+)/.exec(value);
-  if (m) return m[1] === bucketName ? decodeURIComponent(m[2]) : null;
+  if (m) return m[1] === bucketName ? safeDecode(m[2]) : null;
   m = /^https:\/\/storage\.googleapis\.com\/([^/]+)\/([^?#]+)/.exec(value);
-  if (m) return m[1] === bucketName ? decodeURIComponent(m[2]) : null;
+  if (m) return m[1] === bucketName ? safeDecode(m[2]) : null;
   return null;
 }
 
-/** Every Storage path referenced anywhere inside a (nested) document. */
+// URLs embedded anywhere in free text (descriptions, rich text, markdown, JSON strings)
+const EMBEDDED_URL = /(?:gs:\/\/[^\s"'<>)\]]+|https?:\/\/[^\s"'<>)\]]*(?:\/v0\/b\/[^\s"'<>)\]]+|storage\.googleapis\.com\/[^\s"'<>)\]]+))/g;
+
+/** Every Storage path referenced anywhere inside a (nested) document, including URLs embedded in text. */
 export function extractStoragePaths(data, bucketName, out = new Set(), depth = 0) {
-  if (data == null || depth > 4) return out;
-  if (typeof data === 'string') { const p = pathFromUrl(data, bucketName); if (p) out.add(p); return out; }
+  if (data == null || depth > 6) return out;
+  if (typeof data === 'string') {
+    const direct = pathFromUrl(data, bucketName);
+    if (direct) out.add(direct);
+    else if (data.length > 20 && (data.includes('/v0/b/') || data.includes('gs://') || data.includes('storage.googleapis.com'))) {
+      for (const url of data.match(EMBEDDED_URL) || []) { const p = pathFromUrl(url, bucketName); if (p) out.add(p); }
+    }
+    return out;
+  }
   if (Array.isArray(data)) { data.forEach((v) => extractStoragePaths(v, bucketName, out, depth + 1)); return out; }
   if (typeof data === 'object') Object.values(data).forEach((v) => extractStoragePaths(v, bucketName, out, depth + 1));
   return out;
+}
+
+/** Reject anything that could escape its folder: traversal, absolute, double slash, control characters. */
+export function isSafeObjectPath(path) {
+  return typeof path === 'string' && path.length > 0 && path.length < 1024
+    && !path.startsWith('/') && !path.includes('//') && !path.split('/').some((seg) => seg === '..' || seg === '.')
+    && !/[\u0000-\u001f]/.test(path);
 }
 
 const inScope = (path, scopes) => scopes.some((s) => path.startsWith(s));
@@ -84,11 +103,10 @@ async function buildReferenceIndex(db, bucketName, schoolId) {
   for (const [col, fields] of Object.entries(FILE_REF_FIELDS)) {
     let q = db.collection(col);
     if (schoolId) q = q.where('schoolId', '==', schoolId);
-    const snap = await q.select(...fields.map(([f]) => f)).get();
+    // whole documents are scanned (not only the known fields) so links embedded in any text still count as "shared"
+    const snap = await q.get();
     for (const d of snap.docs) {
-      for (const [field] of fields) {
-        for (const p of extractStoragePaths(d.get(field), bucketName)) if (!index.has(p)) index.set(p, `${col}/${d.id}`);
-      }
+      for (const p of extractStoragePaths(d.data(), bucketName)) if (!index.has(p)) index.set(p, `${col}/${d.id}`);
     }
   }
   return index;
@@ -109,7 +127,7 @@ export async function planFiles(ctx, { schoolId, collection, recordId, records }
   // exclusive folders (may hold files no field points to)
   for (const r of records) {
     for (const prefix of exclusivePrefixes(r.collection, r.id, schoolId)) {
-      if (!inScope(prefix, scopes)) continue;
+      if (!isSafeObjectPath(prefix.replace(/\/$/, '')) || !inScope(prefix, scopes)) continue;
       const [files] = await bucket.getFiles({ prefix });
       for (const f of files) if (!found.has(f.name)) found.set(f.name, `${r.collection}/${r.id}`);
     }
@@ -117,7 +135,7 @@ export async function planFiles(ctx, { schoolId, collection, recordId, records }
   const plan = [];
   const refIndex = found.size ? await buildReferenceIndex(ctx.db, bucketName, schoolId) : new Map();
   for (const [path, owner] of found) {
-    if (!inScope(path, scopes)) { plan.push({ path, owner, status: 'out_of_scope' }); continue; }
+    if (!isSafeObjectPath(path) || !inScope(path, scopes)) { plan.push({ path, owner, status: 'out_of_scope' }); continue; }
     const shared = refIndex.get(path) || null;
     plan.push(shared ? { path, owner, status: 'shared', sharedWith: shared } : { path, owner, status: 'move' });
   }

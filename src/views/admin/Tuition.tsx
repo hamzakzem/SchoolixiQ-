@@ -128,6 +128,10 @@ export default function Tuition() {
       return;
     }
 
+    if (selectedStudent.financialReviewRequired) {
+      toast.error('هذا الطالب بحاجة إلى مراجعة مالية بعد إلغاء دفعة. أنهِ المراجعة من «إعدادات الرسوم» قبل تسجيل دفعة جديدة');
+      return;
+    }
     paymentInFlightRef.current = true;
     setIsProcessingPayment(true);
 

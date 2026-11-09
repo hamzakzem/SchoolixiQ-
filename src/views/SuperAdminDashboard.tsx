@@ -4,6 +4,7 @@ import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import { signOutWithCleanup } from "../lib/authLogout";
 import { deleteRecord } from "../lib/deletionApi";
+import SchoolBundlesPanel from "../components/superadmin/SchoolBundlesPanel";
 import { adminCreateUser, adminDeleteUser, adminAccrueCommissionOnPaymentConfirmed, adminFinalizeSchoolTracking, adminValidateDistributorCoupon, adminPurgeUserConversations } from "../lib/adminApi";
 import { clearMessagingCache } from "../lib/offline/offlineDataCache";
 import { resolveMessagingAccess } from "../lib/messagingAccess";
@@ -2679,6 +2680,7 @@ export default function SuperAdminDashboard() {
             >
               {activeTab === "schools" ? (
                 <>
+                  <SchoolBundlesPanel />
                   <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md group gap-4">
                     <div id="overview-header-group">
                       <h3

@@ -287,21 +287,35 @@ function allowedScopes({ schoolId, collection, recordId }) {
   if (collection === "users") scopes.push(`users/${recordId}/`);
   return scopes;
 }
+var safeDecode = (v) => {
+  try {
+    return decodeURIComponent(v);
+  } catch {
+    return null;
+  }
+};
 function pathFromUrl(value, bucketName) {
   if (typeof value !== "string" || value.length < 8 || value.startsWith("data:")) return null;
   let m = /^gs:\/\/([^/]+)\/(.+)$/.exec(value);
-  if (m) return m[1] === bucketName ? decodeURIComponent(m[2]) : null;
+  if (m) return m[1] === bucketName ? safeDecode(m[2]) : null;
   m = /^https?:\/\/[^/]+\/v0\/b\/([^/]+)\/o\/([^?#]+)/.exec(value);
-  if (m) return m[1] === bucketName ? decodeURIComponent(m[2]) : null;
+  if (m) return m[1] === bucketName ? safeDecode(m[2]) : null;
   m = /^https:\/\/storage\.googleapis\.com\/([^/]+)\/([^?#]+)/.exec(value);
-  if (m) return m[1] === bucketName ? decodeURIComponent(m[2]) : null;
+  if (m) return m[1] === bucketName ? safeDecode(m[2]) : null;
   return null;
 }
+var EMBEDDED_URL = /(?:gs:\/\/[^\s"'<>)\]]+|https?:\/\/[^\s"'<>)\]]*(?:\/v0\/b\/[^\s"'<>)\]]+|storage\.googleapis\.com\/[^\s"'<>)\]]+))/g;
 function extractStoragePaths(data, bucketName, out = /* @__PURE__ */ new Set(), depth = 0) {
-  if (data == null || depth > 4) return out;
+  if (data == null || depth > 6) return out;
   if (typeof data === "string") {
-    const p = pathFromUrl(data, bucketName);
-    if (p) out.add(p);
+    const direct = pathFromUrl(data, bucketName);
+    if (direct) out.add(direct);
+    else if (data.length > 20 && (data.includes("/v0/b/") || data.includes("gs://") || data.includes("storage.googleapis.com"))) {
+      for (const url of data.match(EMBEDDED_URL) || []) {
+        const p = pathFromUrl(url, bucketName);
+        if (p) out.add(p);
+      }
+    }
     return out;
   }
   if (Array.isArray(data)) {
@@ -311,17 +325,18 @@ function extractStoragePaths(data, bucketName, out = /* @__PURE__ */ new Set(), 
   if (typeof data === "object") Object.values(data).forEach((v) => extractStoragePaths(v, bucketName, out, depth + 1));
   return out;
 }
+function isSafeObjectPath(path2) {
+  return typeof path2 === "string" && path2.length > 0 && path2.length < 1024 && !path2.startsWith("/") && !path2.includes("//") && !path2.split("/").some((seg) => seg === ".." || seg === ".") && !/[\u0000-\u001f]/.test(path2);
+}
 var inScope = (path2, scopes) => scopes.some((s) => path2.startsWith(s));
 async function buildReferenceIndex(db, bucketName, schoolId) {
   const index = /* @__PURE__ */ new Map();
   for (const [col, fields] of Object.entries(FILE_REF_FIELDS)) {
     let q = db.collection(col);
     if (schoolId) q = q.where("schoolId", "==", schoolId);
-    const snap = await q.select(...fields.map(([f]) => f)).get();
+    const snap = await q.get();
     for (const d of snap.docs) {
-      for (const [field] of fields) {
-        for (const p of extractStoragePaths(d.get(field), bucketName)) if (!index.has(p)) index.set(p, `${col}/${d.id}`);
-      }
+      for (const p of extractStoragePaths(d.data(), bucketName)) if (!index.has(p)) index.set(p, `${col}/${d.id}`);
     }
   }
   return index;
@@ -336,7 +351,7 @@ async function planFiles(ctx, { schoolId, collection, recordId, records }) {
   }
   for (const r of records) {
     for (const prefix of exclusivePrefixes(r.collection, r.id, schoolId)) {
-      if (!inScope(prefix, scopes)) continue;
+      if (!isSafeObjectPath(prefix.replace(/\/$/, "")) || !inScope(prefix, scopes)) continue;
       const [files] = await bucket.getFiles({ prefix });
       for (const f of files) if (!found.has(f.name)) found.set(f.name, `${r.collection}/${r.id}`);
     }
@@ -344,7 +359,7 @@ async function planFiles(ctx, { schoolId, collection, recordId, records }) {
   const plan = [];
   const refIndex = found.size ? await buildReferenceIndex(ctx.db, bucketName, schoolId) : /* @__PURE__ */ new Map();
   for (const [path2, owner] of found) {
-    if (!inScope(path2, scopes)) {
+    if (!isSafeObjectPath(path2) || !inScope(path2, scopes)) {
       plan.push({ path: path2, owner, status: "out_of_scope" });
       continue;
     }
@@ -493,6 +508,22 @@ var POLICIES = {
   // administrative decision and are never deleted; rejecting a request is a separate status change.
   registrations: { roles: [], superOnly: true, neverDelete: (d) => REQUEST_DECIDED.includes(String(d.status || "")), neverDeleteMessage: "\u0637\u0644\u0628 \u0645\u0639\u062A\u0645\u062F: \u0633\u062C\u0644 \u0642\u0631\u0627\u0631 \u0625\u062F\u0627\u0631\u064A \u064A\u064F\u062D\u062A\u0641\u0638 \u0628\u0647 \u0648\u0644\u0627 \u064A\u064F\u062D\u0630\u0641", label: (d) => d.schoolName || d.name || d.email || "\u0637\u0644\u0628 \u062A\u0633\u062C\u064A\u0644" },
   subscriptionRequests: { roles: [], superOnly: true, neverDelete: (d) => REQUEST_DECIDED.includes(String(d.status || "")), neverDeleteMessage: "\u0637\u0644\u0628 \u0645\u0639\u062A\u0645\u062F: \u0633\u062C\u0644 \u0642\u0631\u0627\u0631 \u0625\u062F\u0627\u0631\u064A \u064A\u064F\u062D\u062A\u0641\u0638 \u0628\u0647 \u0648\u0644\u0627 \u064A\u064F\u062D\u0630\u0641", label: (d) => d.schoolName || d.name || "\u0637\u0644\u0628 \u0627\u0634\u062A\u0631\u0627\u0643" },
+  // Distributors (platform, Super Admin only): coupons go to the trash; schools keep their history but stop accruing commission.
+  distributors: {
+    roles: [],
+    superOnly: true,
+    retention: "protected",
+    label: (d) => d.name || d.email || "\u0645\u0648\u0632\u0639",
+    children: [
+      { col: "distributorCoupons", field: "distributorId" },
+      { col: "schools", field: "distributorId", keepIf: () => true, flags: { distributorCommissionPaused: true, distributorDeleted: true } }
+    ]
+  },
+  // Smart-assistant catalogue (platform content, Super Admin only): recoverable like everything else.
+  assistant_categories: { roles: [], superOnly: true, label: (d) => d.name || d.title || "\u062A\u0635\u0646\u064A\u0641" },
+  assistant_flows: { roles: [], superOnly: true, label: (d) => d.name || d.title || "\u0645\u0633\u0627\u0631" },
+  assistant_answers: { roles: [], superOnly: true, label: (d) => d.title || d.question || "\u0625\u062C\u0627\u0628\u0629" },
+  assistant_keywords: { roles: [], superOnly: true, label: (d) => d.keyword || d.name || "\u0643\u0644\u0645\u0629 \u0645\u0641\u062A\u0627\u062D\u064A\u0629" },
   id_cards: { roles: MGMT_ROLES, perms: ["id_cards", "id_card_generation"], label: (d) => `\u0628\u0637\u0627\u0642\u0629 ${d.studentName || ""}`.trim() },
   student_archives: { retention: "protected", roles: MGMT_ROLES, perms: ["student_archive"], label: (d) => `\u0623\u0631\u0634\u064A\u0641 ${d.studentName || ""}`.trim() }
 };
@@ -508,6 +539,8 @@ function httpError(status, code, message) {
 function asArray(v) {
   return Array.isArray(v) ? v.map(String) : [];
 }
+var SAFE_ID = /^[A-Za-z0-9_\-:.@]{1,200}$/;
+var isSafeId = (id) => SAFE_ID.test(id) && id !== "." && id !== ".." && !id.includes("..");
 var ts = (adminSdk) => adminSdk.firestore.FieldValue.serverTimestamp();
 async function loadActor(db, uid) {
   const snap = await db.collection("users").doc(uid).get();
@@ -572,7 +605,7 @@ async function collectDependants(db, policy, collection, id, schoolId) {
   for (const c of policy.children || []) {
     for (const d of await queryAll(db, c.col, c.field, id, schoolId)) {
       const data = d.data();
-      if (c.keepIf && c.keepIf(data)) kept.push({ col: c.col, id: d.id });
+      if (c.keepIf && c.keepIf(data)) kept.push({ col: c.col, id: d.id, ...c.flags ? { flags: c.flags } : {} });
       else items.push({ col: c.col, id: d.id, data });
     }
   }
@@ -715,7 +748,7 @@ async function runTrashSteps(ctx, bundleId) {
     if (!steps.kept) {
       const stored = (await ref.get()).data() || {};
       const label = String(stored.label || "");
-      const ops = (stored.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), { studentDeleted: true, studentDeletedAt: ts(adminSdk), studentNameSnapshot: label, deletionBundleId: bundleId }, { merge: true }));
+      const ops = (stored.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), k.flags ? { ...k.flags, deletedRelationAt: ts(adminSdk), deletionBundleId: bundleId } : { studentDeleted: true, studentDeletedAt: ts(adminSdk), studentNameSnapshot: label, deletionBundleId: bundleId }, { merge: true }));
       await commitInBatches(db, ops);
       await mark("kept");
     }
@@ -757,7 +790,7 @@ async function deleteRecords(ctx, actorUid, body) {
   const isAccount = collection === "users";
   if (!ids.length) throw httpError(400, "INVALID_BODY", "\u0644\u0645 \u064A\u062A\u0645 \u062A\u062D\u062F\u064A\u062F \u0633\u062C\u0644\u0627\u062A");
   if (ids.length > MAX_IDS) throw httpError(400, "TOO_MANY", `\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649 ${MAX_IDS} \u0633\u062C\u0644 \u0641\u064A \u0627\u0644\u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u0648\u0627\u062D\u062F\u0629`);
-  if (!isAccount && !POLICIES[collection]) throw httpError(400, "UNSUPPORTED_COLLECTION", "\u0646\u0648\u0639 \u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645 \u0644\u0644\u062D\u0630\u0641");
+  if (!isAccount && !Object.hasOwn(POLICIES, collection)) throw httpError(400, "UNSUPPORTED_COLLECTION", "\u0646\u0648\u0639 \u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645 \u0644\u0644\u062D\u0630\u0641");
   if (ids.length > 1 && body.confirmBulk !== true) throw httpError(400, "CONFIRM_BULK_REQUIRED", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u062C\u0645\u0627\u0639\u064A \u064A\u062A\u0637\u0644\u0628 \u062A\u0623\u0643\u064A\u062F\u0627\u064B \u0635\u0631\u064A\u062D\u0627\u064B");
   if (permanent && body.confirmText !== PERMANENT_CONFIRM_TEXT) throw httpError(400, "CONFIRM_PERMANENT_REQUIRED", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u064A\u062A\u0637\u0644\u0628 \u0643\u062A\u0627\u0628\u0629 \u0639\u0628\u0627\u0631\u0629 \u0627\u0644\u062A\u0623\u0643\u064A\u062F");
   const idemBase = body.idempotencyKey ? String(body.idempotencyKey).slice(0, 80) : "";
@@ -769,6 +802,7 @@ async function deleteRecords(ctx, actorUid, body) {
     const owner = newOwner();
     let locked = false;
     try {
+      if (!isSafeId(id)) throw httpError(400, "INVALID_ID", "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
       const idemKey = idemBase ? `${idemBase}:${collection}:${id}` : "";
       if (idemKey) {
         const prev = await db.collection("recycle_bin").where("idemKey", "==", idemKey).limit(1).get();
@@ -864,6 +898,7 @@ async function deleteRecords(ctx, actorUid, body) {
 async function restoreBundle(ctx, actorUid, bundleId) {
   const { db, adminSdk, faults } = ctx;
   const actor = await loadActor(db, actorUid);
+  if (!isSafeId(String(bundleId || ""))) throw httpError(400, "INVALID_ID", "\u0645\u0639\u0631\u0651\u0641 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
   const ref = bundleRef(db, String(bundleId || ""));
   const snap = await ref.get();
   if (!snap.exists) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
@@ -922,7 +957,7 @@ async function restoreBundle(ctx, actorUid, bundleId) {
       if (!rsteps.links) {
         if (b.collection === "students") await commitInBatches(db, asArray(b.parentLinks).map((uid) => (batch) => batch.update(db.collection("users").doc(uid), { studentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) })));
         if (b.kind === "account") await commitInBatches(db, asArray(b.studentLinks).map((sid) => (batch) => batch.update(db.collection("students").doc(sid), { parentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) })));
-        await commitInBatches(db, (b.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), { studentDeleted: FV(adminSdk).delete(), studentDeletedAt: FV(adminSdk).delete(), studentNameSnapshot: FV(adminSdk).delete(), deletionBundleId: FV(adminSdk).delete() }, { merge: true })));
+        await commitInBatches(db, (b.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), Object.fromEntries((k.flags ? [...Object.keys(k.flags), "deletedRelationAt"] : ["studentDeleted", "studentDeletedAt", "studentNameSnapshot"]).concat("deletionBundleId").map((key) => [key, FV(adminSdk).delete()])), { merge: true })));
         await rmark("links");
       }
       if (!rsteps.counter && policy?.counter) {
@@ -1005,6 +1040,7 @@ async function purgeBundle(ctx, actorUid, body) {
   const { db, adminSdk } = ctx;
   const actor = await loadActor(db, actorUid);
   const bundleId = String(body.bundleId || "");
+  if (!isSafeId(bundleId)) throw httpError(400, "INVALID_ID", "\u0645\u0639\u0631\u0651\u0641 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
   const snap = await bundleRef(db, bundleId).get();
   if (!snap.exists) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
   const b = snap.data();
@@ -1104,7 +1140,7 @@ async function voidPayment(ctx, actorUid, body) {
   const reason = String(body.reason || "").trim().slice(0, 300);
   const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: actor.schoolId, collection: "payments", recordId: paymentId, action: "VOID_PAYMENT" };
   try {
-    if (!paymentId) throw httpError(400, "INVALID_BODY", "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u062F\u0641\u0639\u0629 \u0645\u0637\u0644\u0648\u0628");
+    if (!paymentId || !isSafeId(paymentId)) throw httpError(400, "INVALID_BODY", "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u062F\u0641\u0639\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
     if (reason.length < 3) throw httpError(400, "REASON_REQUIRED", "\u0633\u0628\u0628 \u0627\u0644\u0625\u0644\u063A\u0627\u0621 \u0645\u0637\u0644\u0648\u0628");
     const ref = db.collection("payments").doc(paymentId);
     const out = await db.runTransaction(async (t) => {
@@ -1116,8 +1152,21 @@ async function voidPayment(ctx, actorUid, body) {
       const amount = Number(p.amount || 0);
       const stRef = p.studentId ? db.collection("students").doc(String(p.studentId)) : null;
       const stSnap = stRef ? await t.get(stRef) : null;
-      const instRefs = asArray(p.installmentIds).map((i) => db.collection("installments").doc(i));
-      const instSnaps = await Promise.all(instRefs.map((r) => t.get(r)));
+      const sameSchool = !!stSnap?.exists && String(stSnap.get("schoolId") || "") === String(p.schoolId || "");
+      let instDocs = [], payDocs = [];
+      if (sameSchool) {
+        const [is, ps] = await Promise.all([
+          t.get(db.collection("installments").where("studentId", "==", String(p.studentId)).where("schoolId", "==", String(p.schoolId))),
+          t.get(db.collection("payments").where("studentId", "==", String(p.studentId)).where("schoolId", "==", String(p.schoolId)))
+        ]);
+        instDocs = is.docs;
+        payDocs = ps.docs;
+      }
+      const toMs2 = (v) => v?.toMillis ? v.toMillis() : v?.seconds ? v.seconds * 1e3 : Date.parse(v) || 0;
+      const paidOf = (d) => String(d.get("status")) === "paid" ? Number(d.get("paidAmount") ?? d.get("amount") ?? 0) : Number(d.get("paidAmount") || 0);
+      const instPaid = instDocs.reduce((a, d) => a + paidOf(d), 0);
+      const payTotal = payDocs.filter((d) => d.get("status") !== "voided").reduce((a, d) => a + Number(d.get("amount") || 0), 0);
+      const reconciles = Math.abs(instPaid - payTotal) < 0.01;
       t.update(ref, {
         status: "voided",
         voidedAt: ts(adminSdk),
@@ -1125,14 +1174,29 @@ async function voidPayment(ctx, actorUid, body) {
         voidReason: reason,
         history: FV(adminSdk).arrayUnion({ action: "voided", at: Date.now(), by: actor.uid, reason, amount })
       });
-      if (stSnap?.exists && String(stSnap.get("schoolId") || "") === String(p.schoolId || "")) t.update(stRef, { tuitionBalance: FV(adminSdk).increment(-amount) });
-      instSnaps.forEach((is, i) => {
-        if (is.exists) t.update(instRefs[i], { reviewRequired: true, reviewReason: `\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u062F\u0641\u0639\u0629 ${paymentId}` });
-      });
-      return { replay: false, amount };
+      if (sameSchool) t.update(stRef, { tuitionBalance: FV(adminSdk).increment(-amount) });
+      let reallocated = false;
+      if (sameSchool && reconciles) {
+        let left = Math.max(0, payTotal - amount);
+        const sorted = [...instDocs].sort((x, y) => toMs2(x.get("dueDate")) - toMs2(y.get("dueDate")));
+        for (const d of sorted) {
+          const due = Number(d.get("amount") || 0);
+          const paid = Math.min(due, left);
+          left -= paid;
+          const status = paid >= due && due > 0 ? "paid" : paid > 0 ? "partial" : "pending";
+          const cur = { status: String(d.get("status")), paid: paidOf(d) };
+          if (cur.status === status && Math.abs(cur.paid - paid) < 0.01) continue;
+          t.update(d.ref, { status, paidAmount: paid, paidAt: status === "paid" ? d.get("paidAt") || ts(adminSdk) : FV(adminSdk).delete(), reallocatedBy: `void:${paymentId}` });
+        }
+        reallocated = true;
+      } else if (sameSchool) {
+        t.update(stRef, { financialReviewRequired: true, financialReviewReason: `\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u062F\u0641\u0639\u0629 ${paymentId}: \u0627\u0644\u0623\u0642\u0633\u0627\u0637 \u0644\u0627 \u062A\u0637\u0627\u0628\u0642 \u0627\u0644\u062F\u0641\u0639\u0627\u062A\u060C \u0645\u0631\u0627\u062C\u0639\u0629 \u0645\u0627\u0644\u064A\u0629 \u0645\u0637\u0644\u0648\u0628\u0629`, financialReviewAt: ts(adminSdk) });
+        instDocs.forEach((d) => t.update(d.ref, { reviewRequired: true, reviewReason: `\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u062F\u0641\u0639\u0629 ${paymentId}` }));
+      }
+      return { replay: false, amount, reallocated, reviewRequired: !reallocated };
     });
-    await writeLog(db, adminSdk, { ...base, result: "success", replay: out.replay, amount: out.amount ?? null });
-    return { ok: true, replay: out.replay };
+    await writeLog(db, adminSdk, { ...base, result: "success", replay: out.replay, amount: out.amount ?? null, reallocated: out.reallocated ?? null });
+    return { ok: true, replay: out.replay, reallocated: out.reallocated ?? null, reviewRequired: out.reviewRequired ?? null };
   } catch (e) {
     await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
     throw e;
@@ -1142,7 +1206,7 @@ var NOTIF_OWNER_FIELDS = ["userId", "recipientId", "receiverId"];
 async function deleteNotifications(ctx, actorUid, body) {
   const { db, adminSdk } = ctx;
   const actor = await loadActor(db, actorUid);
-  const ids = [...new Set(asArray(body.ids))].filter(Boolean);
+  const ids = [...new Set(asArray(body.ids))].filter((i) => i && isSafeId(i));
   if (!ids.length) throw httpError(400, "INVALID_BODY", "\u0644\u0645 \u064A\u062A\u0645 \u062A\u062D\u062F\u064A\u062F \u0625\u0634\u0639\u0627\u0631\u0627\u062A");
   if (ids.length > 100) throw httpError(400, "TOO_MANY", "\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649 100 \u0625\u0634\u0639\u0627\u0631 \u0641\u064A \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0648\u0627\u062D\u062F");
   const results = [];
@@ -1183,6 +1247,10 @@ async function deleteNotifications(ctx, actorUid, body) {
 }
 var SCHOOL_DELETE_ORDER = [
   "notifications",
+  "notification_logs",
+  "tuition_reminder_logs",
+  "tuition_reminder_tracking",
+  "logs",
   "dismissal_requests",
   "dismissal_logs",
   "dismissal_snapshots",
@@ -1231,6 +1299,7 @@ async function previewSchoolDeletion(ctx, actorUid, schoolId) {
   const { db } = ctx;
   const actor = await loadActor(db, actorUid);
   if (!actor.isSuper) throw httpError(403, "FORBIDDEN_ROLE", "\u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637");
+  if (!isSafeId(String(schoolId || ""))) throw httpError(400, "INVALID_ID", "\u0645\u0639\u0631\u0651\u0641 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
   const school = await db.collection("schools").doc(String(schoolId || "")).get();
   if (!school.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
   const counts = {};
@@ -1319,6 +1388,18 @@ async function runSchoolTrashSteps(ctx, bundleId) {
       if (failedFiles) throw new Error(`\u062A\u0639\u0630\u0651\u0631 \u0646\u0642\u0644 ${failedFiles} \u0645\u0644\u0641`);
       await mark("files");
     }
+    if (!steps.sub) {
+      const subs = await db.collection("schools").doc(schoolId).listCollections();
+      for (const sc of subs) {
+        for (; ; ) {
+          const snap = await sc.limit(PAGE).get();
+          if (snap.empty) break;
+          await commitInBatches(db, snap.docs.map((d) => (batch) => batch.set(ref.collection("items").doc(`sub_${sc.id}__${d.id}`), { col: "schoolsub", sub: sc.id, docId: d.id, data: d.data() })));
+          await commitInBatches(db, snap.docs.map((d) => (batch) => batch.delete(d.ref)));
+        }
+      }
+      await mark("sub");
+    }
     if (!steps.delete) {
       await db.collection("schools").doc(schoolId).delete();
       await mark("delete");
@@ -1347,7 +1428,7 @@ async function deleteSchool(ctx, actorUid, body) {
   let locked = false;
   try {
     if (!actor.isSuper) throw httpError(403, "FORBIDDEN_ROLE", "\u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637");
-    if (!schoolId) throw httpError(400, "INVALID_BODY", "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0645\u0637\u0644\u0648\u0628");
+    if (!schoolId || !isSafeId(schoolId)) throw httpError(400, "INVALID_BODY", "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
     const sc = await db.collection("schools").doc(schoolId).get();
     if (!sc.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
     const name = String(sc.get("name") || "").trim();
@@ -1432,7 +1513,8 @@ async function restoreSchoolBundle(ctx, ref, b, actor) {
         const ops = [];
         for (const d of snap.docs) {
           const col = d.get("col");
-          if (col === "shared_users") ops.push((batch) => batch.set(db.collection("users").doc(d.get("docId")), d.get("data"), { merge: true }));
+          if (col === "schoolsub") ops.push((batch) => batch.set(db.collection("schools").doc(schoolId).collection(d.get("sub")).doc(d.get("docId")), d.get("data")));
+          else if (col === "shared_users") ops.push((batch) => batch.set(db.collection("users").doc(d.get("docId")), d.get("data"), { merge: true }));
           else ops.push((batch) => batch.set(db.collection(col).doc(d.get("docId")), d.get("data")));
         }
         await commitInBatches(db, ops);
@@ -1464,6 +1546,75 @@ async function restoreSchoolBundle(ctx, ref, b, actor) {
     await ref.set({ status: "restoring", jobStatus: "PARTIALLY_COMPLETED", lastError: String(e?.message || e).slice(0, 200) }, { merge: true }).catch(() => {
     });
     throw e.status ? e : Object.assign(httpError(500, "RESTORE_INCOMPLETE", "\u0627\u0644\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u063A\u064A\u0631 \u0645\u0643\u062A\u0645\u0644\u0629 \u2014 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629"), { cause: e });
+  }
+}
+async function resolveFinancialReview(ctx, actorUid, body) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const studentId = String(body.studentId || "");
+  const note = String(body.note || "").trim().slice(0, 300);
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: actor.schoolId, collection: "students", recordId: studentId, action: "RESOLVE_FINANCIAL_REVIEW" };
+  try {
+    if (!studentId || !isSafeId(studentId) || note.length < 3) throw httpError(400, "INVALID_BODY", "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0627\u0644\u0628 \u0648\u0645\u0644\u0627\u062D\u0638\u0629 \u0627\u0644\u0645\u0631\u0627\u062C\u0639\u0629 \u0645\u0637\u0644\u0648\u0628\u0627\u0646");
+    const st = await db.collection("students").doc(studentId).get();
+    if (!st.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+    authorizeDelete(actor, "payments", POLICIES.payments, { schoolId: st.get("schoolId") }, { permanent: false });
+    const insts = await db.collection("installments").where("studentId", "==", studentId).where("schoolId", "==", String(st.get("schoolId"))).get();
+    await commitInBatches(db, [
+      (b) => b.update(st.ref, { financialReviewRequired: FV(adminSdk).delete(), financialReviewReason: FV(adminSdk).delete(), financialReviewAt: FV(adminSdk).delete(), financialReviewedBy: actor.uid, financialReviewNote: note }),
+      ...insts.docs.filter((d) => d.get("reviewRequired")).map((d) => (b) => b.update(d.ref, { reviewRequired: FV(adminSdk).delete(), reviewReason: FV(adminSdk).delete() }))
+    ]);
+    await writeLog(db, adminSdk, { ...base, result: "success", note });
+    return { ok: true };
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+    throw e;
+  }
+}
+async function deleteChatMessage(ctx, actorUid, body) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const messageId = String(body.messageId || "");
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: "", collection: "system_messages", recordId: messageId, mode: "permanent", action: "DELETE_MESSAGE_PERMANENT" };
+  const lockKey = `system_messages__${messageId}`;
+  const owner = newOwner();
+  let locked = false;
+  try {
+    if (!actor.isSuper) throw httpError(403, "FORBIDDEN_ROLE", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0631\u0633\u0627\u0626\u0644 \u0645\u0633\u0645\u0648\u062D \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637");
+    if (!messageId || !isSafeId(messageId)) throw httpError(400, "MESSAGE_ID_REQUIRED", "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
+    await acquireLock(ctx, lockKey, owner);
+    locked = true;
+    const result = await ctx.permanentlyDeleteMessage({ messageId, deletedBy: actor.uid });
+    await writeLog(db, adminSdk, { ...base, result: result?.ok === false ? "refused" : "success", conversationId: result?.conversationId ?? null });
+    return result;
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+    throw e;
+  } finally {
+    if (locked) await releaseLock(ctx, lockKey, owner);
+  }
+}
+async function runAuditedPlatformDelete(ctx, actorUid, { action, collection, recordId, confirm, authorized = false }, fn) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: "", collection, recordId, mode: "permanent", action };
+  const lockKey = `${collection}__${recordId}`;
+  const owner = newOwner();
+  let locked = false;
+  try {
+    if (!actor.isSuper && !authorized) throw httpError(403, "FORBIDDEN_ROLE", "\u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637");
+    if (!recordId) throw httpError(400, "INVALID_BODY", "\u0627\u0644\u0645\u0639\u0631\u0651\u0641 \u0645\u0637\u0644\u0648\u0628");
+    if (confirm === false) throw httpError(400, "CONFIRM_REQUIRED", "\u0627\u0644\u062A\u0623\u0643\u064A\u062F \u0645\u0637\u0644\u0648\u0628");
+    await acquireLock(ctx, lockKey, owner);
+    locked = true;
+    const out = await fn();
+    await writeLog(db, adminSdk, { ...base, result: "success" });
+    return out;
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+    throw e;
+  } finally {
+    if (locked) await releaseLock(ctx, lockKey, owner);
   }
 }
 
@@ -3028,36 +3179,6 @@ async function rejectDistributor({ db, adminSdk, distributorId, actorUid, reason
     updatedAt: FieldValue.serverTimestamp()
   });
   return { distributorId, status: "rejected" };
-}
-async function deleteDistributorRecords({ db, adminSdk, distributorId, actorUid }) {
-  const ref = db.collection(DISTRIBUTORS_COL).doc(distributorId);
-  const snap = await ref.get();
-  if (!snap.exists) {
-    throw badRequest("DISTRIBUTOR_NOT_FOUND", "DISTRIBUTOR_NOT_FOUND");
-  }
-  const FieldValue = adminSdk.firestore.FieldValue;
-  const [coupons, schools] = await Promise.all([
-    db.collection(COUPONS_COL).where("distributorId", "==", distributorId).get(),
-    db.collection("schools").where("distributorId", "==", distributorId).get()
-  ]);
-  const writes = [
-    ...coupons.docs.map((d) => (b) => b.delete(d.ref)),
-    ...schools.docs.map(
-      (d) => (b) => b.update(d.ref, {
-        distributorCommissionPaused: true,
-        distributorDeleted: true,
-        distributorDeletedAt: FieldValue.serverTimestamp(),
-        distributorDeletedBy: actorUid
-      })
-    ),
-    (b) => b.delete(ref)
-  ];
-  for (let i = 0; i < writes.length; i += 400) {
-    const batch = db.batch();
-    writes.slice(i, i + 400).forEach((w) => w(batch));
-    await batch.commit();
-  }
-  return { couponsDeleted: coupons.size, schoolsPaused: schools.size };
 }
 
 // roleHierarchy.ts
@@ -6217,6 +6338,13 @@ async function startServer() {
     bucket: () => getStorage().bucket(),
     canActorDeleteUser,
     purgeAccount: (userId) => runUserPermanentDelete({ db: getDb(), authAdmin: admin4.auth(), adminSdk: admin4, userId }),
+    permanentlyDeleteMessage: (args) => permanentlyDeleteMessage(getDb(), { ...args, bucket: (() => {
+      try {
+        return getStorage().bucket();
+      } catch {
+        return null;
+      }
+    })() }),
     purgeSchoolMessages: (schoolId) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() })
   });
   const deletionUnavailable = () => process.env.NODE_ENV === "production" && !serviceAccountCheck.valid && !process.env.FIRESTORE_EMULATOR_HOST && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE;
@@ -6249,6 +6377,7 @@ async function startServer() {
   app.post("/api/records/delete-notifications", verifyToken, deletionRoute((c, uid, b) => deleteNotifications(c, uid, b)));
   app.post("/api/records/school-preview", verifyToken, deletionRoute((c, uid, b) => previewSchoolDeletion(c, uid, String(b.schoolId || ""))));
   app.post("/api/records/delete-school", verifyToken, deletionRoute((c, uid, b) => deleteSchool(c, uid, b)));
+  app.post("/api/records/resolve-financial-review", verifyToken, deletionRoute((c, uid, b) => resolveFinancialReview(c, uid, b)));
   app.post("/api/records/void-payment", verifyToken, deletionRoute((c, uid, b) => voidPayment(c, uid, b)));
   app.post("/api/records/purge", verifyToken, deletionRoute((c, uid, b) => purgeBundle(c, uid, b)));
   app.post("/api/records/resume", verifyToken, deletionRoute(async (c, uid) => {
@@ -6695,7 +6824,7 @@ async function startServer() {
       if (after.schools.length + after.requests.length > 0) {
         return res.status(409).json({ error: "PLAN_HAS_REFERENCES", message: "\u062A\u0639\u0630\u0651\u0631 \u0641\u0643 \u0643\u0644 \u0627\u0644\u0627\u0631\u062A\u0628\u0627\u0637\u0627\u062A \u0628\u0623\u0645\u0627\u0646\u060C \u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u062D\u0630\u0641" });
       }
-      await ref.delete();
+      await runAuditedPlatformDelete(deletionCtx(), req.user.uid, { action: "DELETE_PLAN", collection: "packages", recordId: id, confirm: true, authorized: true }, () => ref.delete());
       await logAudit(req, "DELETE_PLAN", { before: beforeDoc.data() || null, metadata: { mode: mode || "none", schools: refs.schools.length, requests: refs.requests.length, targetPlanId: targetPlanId || null } });
       res.json({ success: true, mode: mode || "none", schools: refs.schools.length, requests: refs.requests.length });
     } catch (error) {
@@ -6742,45 +6871,15 @@ async function startServer() {
   });
   app.post("/api/admin/schools/:schoolId/permanent-delete", verifyAdmin, async (req, res) => legacySchoolDelete(req, res, String(req.params.schoolId || "").trim()));
   app.post("/api/admin/messages/permanent-delete", verifyAdmin, async (req, res) => {
+    if (deletionUnavailable()) return res.status(503).json({ error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B. \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
-        return res.status(403).json({
-          error: "FORBIDDEN",
-          message: "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0631\u0633\u0627\u0626\u0644 \u0645\u0633\u0645\u0648\u062D \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637"
-        });
-      }
-      const messageId = String(req.body?.messageId || "").trim();
-      if (!messageId) {
-        return res.status(400).json({ error: "MESSAGE_ID_REQUIRED", message: "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u0645\u0637\u0644\u0648\u0628" });
-      }
-      let bucket = null;
-      try {
-        bucket = getStorage().bucket();
-      } catch {
-        bucket = null;
-      }
-      const result = await permanentlyDeleteMessage(getDb(), {
-        messageId,
-        deletedBy: req.user.uid,
-        bucket
-      });
-      if (!result.ok) {
-        return res.status(404).json({ error: result.error || "NOT_FOUND", message: "\u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629" });
-      }
-      await logAudit(req, "DELETE_MESSAGE", {
-        metadata: {
-          messageId,
-          targetConversation: result.conversationId,
-          conversationDeleted: result.conversationDeleted
-        }
-      });
+      const result = await deleteChatMessage(deletionCtx(), req.user.uid, { messageId: req.body?.messageId });
+      if (result?.ok === false) return res.status(404).json({ error: result.error || "NOT_FOUND", message: "\u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629" });
+      await logAudit(req, "DELETE_MESSAGE", { metadata: { messageId: req.body?.messageId, targetConversation: result.conversationId, conversationDeleted: result.conversationDeleted } });
       res.json({ success: true, ...result });
     } catch (error) {
-      console.error("Permanent Delete Message Error:", error);
-      res.status(500).json({
-        error: error.message || "Internal Server Error",
-        message: error.message || "\u0641\u0634\u0644 \u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0631\u0633\u0627\u0644\u0629"
-      });
+      console.error("Permanent delete message error:", error);
+      res.status(error.status || 500).json({ error: error.code || "ERROR", message: error.message || "\u0641\u0634\u0644 \u062D\u0630\u0641 \u0627\u0644\u0631\u0633\u0627\u0644\u0629" });
     }
   });
   app.post("/api/admin/messages/purge-user-conversations", verifyAdmin, async (req, res) => {
@@ -6808,10 +6907,13 @@ async function startServer() {
       } catch {
         bucket = null;
       }
-      const result = await purgeUserConversations(getDb(), targetUserId, {
-        bucket,
-        actorId: req.user.uid
-      });
+      if (deletionUnavailable()) return res.status(503).json({ error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B. \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
+      const result = await runAuditedPlatformDelete(
+        deletionCtx(),
+        req.user.uid,
+        { action: "PURGE_USER_CONVERSATIONS", collection: "conversations", recordId: targetUserId, confirm: confirm === "DELETE" },
+        () => purgeUserConversations(getDb(), targetUserId, { bucket, actorId: req.user.uid })
+      );
       await logAudit(req, "PURGE_USER_CONVERSATIONS", {
         metadata: {
           targetUserId,
@@ -6823,7 +6925,7 @@ async function startServer() {
       res.json({ success: true, ...result });
     } catch (error) {
       console.error("Purge User Conversations Error:", error);
-      res.status(500).json({
+      res.status(error.status || 500).json({
         error: error.message || "Internal Server Error",
         message: error.message || "\u0641\u0634\u0644 \u062D\u0630\u0641 \u0645\u062D\u0627\u062F\u062B\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645"
       });
@@ -7095,6 +7197,7 @@ async function startServer() {
         return res.status(403).json({ error: "FORBIDDEN", message: "\u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0632\u0639\u064A\u0646 \u0645\u062E\u0635\u0635 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637" });
       }
       const db = getDb();
+      const distMode = req.body?.permanent === true ? "permanent" : "trash";
       const snap = await db.collection("distributors").doc(distributorId).get();
       if (!snap.exists) {
         return res.status(404).json({ error: "DISTRIBUTOR_NOT_FOUND", message: "\u0627\u0644\u0645\u0648\u0632\u0639 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F" });
@@ -7106,17 +7209,19 @@ async function startServer() {
       linkedUsers.docs.forEach((d) => userIds.add(d.id));
       let usersDeleted = 0;
       for (const uid of userIds) {
-        const out = await deleteRecords(deletionCtx(), req.user.uid, { collection: "users", ids: [uid], mode: "permanent", confirmText: PERMANENT_CONFIRM_TEXT });
+        const out = await deleteRecords(deletionCtx(), req.user.uid, { collection: "users", ids: [uid], mode: distMode, confirmText: distMode === "permanent" ? PERMANENT_CONFIRM_TEXT : void 0 });
         const r0 = out.results?.[0];
         if (r0?.ok) usersDeleted += 1;
         else if (r0?.code !== "NOT_FOUND") throw Object.assign(new Error(r0?.message || "\u062A\u0639\u0630\u0651\u0631 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0648\u0632\u0639"), { code: r0?.code });
       }
-      const result = await deleteDistributorRecords({ db, adminSdk: admin4, distributorId, actorUid: req.user.uid });
-      await logAudit(req, "DISTRIBUTOR_DELETE", { before: snap.data(), metadata: { distributorId, usersDeleted, ...result } });
-      res.json({ ok: true, distributorId, usersDeleted, ...result });
+      const dout = await deleteRecords(deletionCtx(), req.user.uid, { collection: "distributors", ids: [distributorId], mode: distMode, confirmText: distMode === "permanent" ? PERMANENT_CONFIRM_TEXT : void 0 });
+      const d0 = dout.results?.[0];
+      if (!d0?.ok) throw Object.assign(new Error(d0?.message || "\u062A\u0639\u0630\u0651\u0631 \u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0632\u0639"), { code: d0?.code, status: 409 });
+      await logAudit(req, "DISTRIBUTOR_DELETE", { before: snap.data(), metadata: { distributorId, usersDeleted, bundleId: d0.bundleId } });
+      res.json({ ok: true, distributorId, usersDeleted, bundleId: d0.bundleId });
     } catch (error) {
       console.error("Delete distributor error:", error);
-      res.status(500).json({ error: error.code || "DELETE_FAILED", message: error.message || "\u0641\u0634\u0644 \u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0632\u0639" });
+      res.status(error.status || 500).json({ error: error.code || "DELETE_FAILED", message: error.message || "\u0641\u0634\u0644 \u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0632\u0639" });
     }
   });
   app.post("/api/admin/distributors/reject", verifyAdmin, async (req, res) => {

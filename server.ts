@@ -1,6 +1,6 @@
 import { cronSecretMatches } from './backend/cronSecret.mjs';
 import { setupSystemMessageNotifications, messageNotificationsStatus } from './backend/messageNotifications.mjs';
-import { PERMANENT_CONFIRM_TEXT, deleteSchool, previewSchoolDeletion, deleteNotifications, deleteRecords, restoreBundle, purgeBundle, sweepDeletions, startDeletionSweep, loadActor, voidPayment } from './backend/deletionService.mjs';
+import { PERMANENT_CONFIRM_TEXT, runAuditedPlatformDelete, deleteChatMessage, deleteSchool, previewSchoolDeletion, deleteNotifications, deleteRecords, restoreBundle, purgeBundle, sweepDeletions, startDeletionSweep, loadActor, voidPayment, resolveFinancialReview } from './backend/deletionService.mjs';
 import express from 'express';
 import compression from 'compression';
 import path from 'path';
@@ -970,6 +970,7 @@ async function startServer() {
     bucket: () => getStorage().bucket(),
     canActorDeleteUser,
     purgeAccount: (userId: string) => runUserPermanentDelete({ db: getDb(), authAdmin: admin.auth(), adminSdk: admin, userId }),
+    permanentlyDeleteMessage: (args: any) => permanentlyDeleteMessage(getDb(), { ...args, bucket: (() => { try { return getStorage().bucket(); } catch { return null; } })() }),
     purgeSchoolMessages: (schoolId: string) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() }),
   });
   /** In production, deletion needs real Admin credentials: refuse up front, before touching any data. */
@@ -1004,6 +1005,7 @@ async function startServer() {
   app.post('/api/records/delete-notifications', verifyToken, deletionRoute((c, uid, b) => deleteNotifications(c, uid, b)));
   app.post('/api/records/school-preview', verifyToken, deletionRoute((c, uid, b) => previewSchoolDeletion(c, uid, String(b.schoolId || ''))));
   app.post('/api/records/delete-school', verifyToken, deletionRoute((c, uid, b) => deleteSchool(c, uid, b)));
+  app.post('/api/records/resolve-financial-review', verifyToken, deletionRoute((c, uid, b) => resolveFinancialReview(c, uid, b)));
   app.post('/api/records/void-payment', verifyToken, deletionRoute((c, uid, b) => voidPayment(c, uid, b)));
   app.post('/api/records/purge', verifyToken, deletionRoute((c, uid, b) => purgeBundle(c, uid, b)));
   app.post('/api/records/resume', verifyToken, deletionRoute(async (c, uid) => {
@@ -1540,7 +1542,8 @@ async function startServer() {
       if (after.schools.length + after.requests.length > 0) {
         return res.status(409).json({ error: 'PLAN_HAS_REFERENCES', message: 'تعذّر فك كل الارتباطات بأمان، لم يتم الحذف' });
       }
-      await ref.delete();
+      // packages are platform configuration (Super Admin only, references migrated above): same lock + deletion_logs entry as every delete
+      await runAuditedPlatformDelete(deletionCtx(), req.user.uid, { action: 'DELETE_PLAN', collection: 'packages', recordId: id, confirm: true, authorized: true }, () => ref.delete());
       await logAudit(req, 'DELETE_PLAN', { before: beforeDoc.data() || null, metadata: { mode: mode || 'none', schools: refs.schools.length, requests: refs.requests.length, targetPlanId: targetPlanId || null } });
       res.json({ success: true, mode: mode || 'none', schools: refs.schools.length, requests: refs.requests.length });
     } catch (error: any) {
@@ -1596,49 +1599,18 @@ async function startServer() {
 
   // Super Admin only — hard-delete a chat message (Admin SDK; client deleteDoc forbidden for non-superadmin)
   app.post('/api/admin/messages/permanent-delete', verifyAdmin, async (req: any, res: any) => {
+    if (deletionUnavailable()) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً. لم يتم حذف أي بيانات.' });
     try {
-      if (!isSuperAdminRole(req.user.role)) {
-        return res.status(403).json({
-          error: 'FORBIDDEN',
-          message: 'الحذف النهائي للرسائل مسموح لمدير النظام فقط',
-        });
-      }
-      const messageId = String(req.body?.messageId || '').trim();
-      if (!messageId) {
-        return res.status(400).json({ error: 'MESSAGE_ID_REQUIRED', message: 'معرّف الرسالة مطلوب' });
-      }
-      let bucket = null;
-      try {
-        bucket = getStorage().bucket();
-      } catch {
-        bucket = null;
-      }
-      const result = await permanentlyDeleteMessage(getDb(), {
-        messageId,
-        deletedBy: req.user.uid,
-        bucket,
-      });
-      if (!result.ok) {
-        return res.status(404).json({ error: result.error || 'NOT_FOUND', message: 'الرسالة غير موجودة' });
-      }
-      await logAudit(req, 'DELETE_MESSAGE', {
-        metadata: {
-          messageId,
-          targetConversation: result.conversationId,
-          conversationDeleted: result.conversationDeleted,
-        },
-      });
+      const result = await deleteChatMessage(deletionCtx(), req.user.uid, { messageId: req.body?.messageId });
+      if (result?.ok === false) return res.status(404).json({ error: result.error || 'NOT_FOUND', message: 'الرسالة غير موجودة' });
+      await logAudit(req, 'DELETE_MESSAGE', { metadata: { messageId: req.body?.messageId, targetConversation: result.conversationId, conversationDeleted: result.conversationDeleted } });
       res.json({ success: true, ...result });
     } catch (error: any) {
-      console.error('Permanent Delete Message Error:', error);
-      res.status(500).json({
-        error: error.message || 'Internal Server Error',
-        message: error.message || 'فشل الحذف النهائي للرسالة',
-      });
+      console.error('Permanent delete message error:', error);
+      res.status(error.status || 500).json({ error: error.code || 'ERROR', message: error.message || 'فشل حذف الرسالة' });
     }
   });
 
-  // Super Admin only — permanently purge all conversations/messages for a user
   app.post('/api/admin/messages/purge-user-conversations', verifyAdmin, async (req: any, res: any) => {
     try {
       if (!isSuperAdminRole(req.user.role)) {
@@ -1664,10 +1636,10 @@ async function startServer() {
       } catch {
         bucket = null;
       }
-      const result = await purgeUserConversations(getDb(), targetUserId, {
-        bucket,
-        actorId: req.user.uid,
-      });
+      if (deletionUnavailable()) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً. لم يتم حذف أي بيانات.' });
+      const result = await runAuditedPlatformDelete(deletionCtx(), req.user.uid, { action: 'PURGE_USER_CONVERSATIONS', collection: 'conversations', recordId: targetUserId, confirm: confirm === 'DELETE' }, () =>
+        purgeUserConversations(getDb(), targetUserId, { bucket, actorId: req.user.uid }),
+      );
       await logAudit(req, 'PURGE_USER_CONVERSATIONS', {
         metadata: {
           targetUserId,
@@ -1679,7 +1651,7 @@ async function startServer() {
       res.json({ success: true, ...result });
     } catch (error: any) {
       console.error('Purge User Conversations Error:', error);
-      res.status(500).json({
+      res.status(error.status || 500).json({
         error: error.message || 'Internal Server Error',
         message: error.message || 'فشل حذف محادثات المستخدم',
       });
@@ -1985,6 +1957,8 @@ async function startServer() {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'حذف الموزعين مخصص لمدير النظام فقط' });
       }
       const db = getDb();
+      // default: recoverable (trash). Permanent only when explicitly requested.
+      const distMode = req.body?.permanent === true ? 'permanent' : 'trash';
       const snap = await db.collection('distributors').doc(distributorId).get();
       if (!snap.exists) {
         return res.status(404).json({ error: 'DISTRIBUTOR_NOT_FOUND', message: 'الموزع غير موجود' });
@@ -1997,17 +1971,20 @@ async function startServer() {
       let usersDeleted = 0;
       for (const uid of userIds) {
         // the linked login is removed through the unified engine (permission checks, audit log, resumable)
-        const out = await deleteRecords(deletionCtx(), req.user.uid, { collection: 'users', ids: [uid], mode: 'permanent', confirmText: PERMANENT_CONFIRM_TEXT });
+        const out = await deleteRecords(deletionCtx(), req.user.uid, { collection: 'users', ids: [uid], mode: distMode, confirmText: distMode === 'permanent' ? PERMANENT_CONFIRM_TEXT : undefined });
         const r0 = out.results?.[0];
         if (r0?.ok) usersDeleted += 1;
         else if (r0?.code !== 'NOT_FOUND') throw Object.assign(new Error(r0?.message || 'تعذّر حذف حساب الموزع'), { code: r0?.code });
       }
-      const result = await deleteDistributorRecords({ db, adminSdk: admin, distributorId, actorUid: req.user.uid });
-      await logAudit(req, 'DISTRIBUTOR_DELETE', { before: snap.data(), metadata: { distributorId, usersDeleted, ...result } });
-      res.json({ ok: true, distributorId, usersDeleted, ...result });
+      // the distributor record itself goes through the unified engine too (coupons to trash, schools keep history)
+      const dout = await deleteRecords(deletionCtx(), req.user.uid, { collection: 'distributors', ids: [distributorId], mode: distMode, confirmText: distMode === 'permanent' ? PERMANENT_CONFIRM_TEXT : undefined });
+      const d0 = dout.results?.[0];
+      if (!d0?.ok) throw Object.assign(new Error(d0?.message || 'تعذّر حذف الموزع'), { code: d0?.code, status: 409 });
+      await logAudit(req, 'DISTRIBUTOR_DELETE', { before: snap.data(), metadata: { distributorId, usersDeleted, bundleId: d0.bundleId } });
+      res.json({ ok: true, distributorId, usersDeleted, bundleId: d0.bundleId });
     } catch (error: any) {
       console.error('Delete distributor error:', error);
-      res.status(500).json({ error: error.code || 'DELETE_FAILED', message: error.message || 'فشل حذف الموزع' });
+      res.status(error.status || 500).json({ error: error.code || 'DELETE_FAILED', message: error.message || 'فشل حذف الموزع' });
     }
   });
 

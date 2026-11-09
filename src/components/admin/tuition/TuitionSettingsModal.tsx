@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings2, X, RefreshCw, CalendarRange } from 'lucide-react';
 import { AppModalPortal } from '../../AppModalPortal';
+import VoidPaymentsPanel from './VoidPaymentsPanel';
 import { db } from '../../../lib/firebase';
 import { deleteRecords, deleteErrorMessage } from '../../../lib/deletionApi';
 import { doc, updateDoc, collection, serverTimestamp, setDoc, query, where, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
@@ -286,6 +287,7 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
           </div>
         )}
       </form>
+      <VoidPaymentsPanel schoolId={schoolId} students={students} />
     </AppModalPortal>
   );
 }

@@ -6,7 +6,8 @@ export type DeletableCollection =
   | 'students' | 'classes' | 'subjects' | 'homework' | 'teacher_reports' | 'advanced_reports'
   | 'behavior_reports' | 'behavior' | 'grades' | 'attendance' | 'announcements' | 'installments'
   | 'payments' | 'payroll' | 'inventory' | 'market' | 'marketplace' | 'orders' | 'id_cards'
-  | 'student_archives' | 'users';
+  | 'student_archives' | 'users' | 'distributors' | 'registrations' | 'subscriptionRequests'
+  | 'assistant_categories' | 'assistant_flows' | 'assistant_answers' | 'assistant_keywords';
 
 export const PERMANENT_CONFIRM_TEXT = 'حذف نهائي';
 
@@ -109,3 +110,6 @@ export async function deleteNotificationsApi(ids: string[]): Promise<number> {
   const out = await call('/api/records/delete-notifications', { ids: [...new Set(ids)].slice(0, 100) });
   return Number(out.deleted || 0);
 }
+
+/** After a payment was cancelled and the ledger needed manual review: confirm it was reviewed. */
+export const resolveFinancialReview = (studentId: string, note: string) => call('/api/records/resolve-financial-review', { studentId, note });
