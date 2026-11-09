@@ -20,6 +20,9 @@ const SWEEP_WINDOW_MS = 15 * 60 * 1000;
 const SUPER_ADMIN_ROLES = ['superadmin', 'super_admin'];
 const SCHOOL_ADMIN_ROLES = ['admin', 'school_admin', 'assistant', 'school_assistant'];
 
+/** Coarse runtime status for /api/public/status (no secrets, no data). */
+export const messageNotificationsStatus = { startedAt: null, listenerAttached: false, restarts: 0, lastErrorAt: null, lastError: null, lastSweepAt: null, lastSweepOk: null };
+
 export function notificationIdFor(messageId, userId) {
   return `msgn_${messageId}_${userId}`;
 }
@@ -170,6 +173,7 @@ export function setupSystemMessageNotifications(db, adminSdk, log = console) {
   let stopped = false;
   let backoff = 1000;
   const inflight = new Set();
+  messageNotificationsStatus.startedAt = new Date().toISOString();
 
   const handle = (doc) => {
     if (inflight.has(doc.id)) return;
@@ -187,9 +191,14 @@ export function setupSystemMessageNotifications(db, adminSdk, log = console) {
       unsub = db.collection('system_messages').where('createdAt', '>=', cutoff()).onSnapshot(
         (snap) => {
           backoff = 1000;
+          messageNotificationsStatus.listenerAttached = true;
           snap.docChanges().forEach((c) => { if (c.type === 'added') handle(c.doc); });
         },
         (err) => {
+          messageNotificationsStatus.listenerAttached = false;
+          messageNotificationsStatus.restarts += 1;
+          messageNotificationsStatus.lastErrorAt = new Date().toISOString();
+          messageNotificationsStatus.lastError = String(err?.code ?? err?.message ?? 'error').slice(0, 80);
           log.error('[MessageNotifications] listener error, restarting', err?.message);
           try { unsub?.(); } catch { /* ignore */ }
           setTimeout(start, backoff);
@@ -209,7 +218,11 @@ export function setupSystemMessageNotifications(db, adminSdk, log = console) {
       const since = adminSdk.firestore.Timestamp.fromMillis(Date.now() - SWEEP_WINDOW_MS);
       const snap = await db.collection('system_messages').where('createdAt', '>=', since).orderBy('createdAt', 'desc').limit(50).get();
       snap.docs.forEach(handle);
+      messageNotificationsStatus.lastSweepAt = new Date().toISOString();
+      messageNotificationsStatus.lastSweepOk = true;
     } catch (e) {
+      messageNotificationsStatus.lastSweepAt = new Date().toISOString();
+      messageNotificationsStatus.lastSweepOk = false;
       log.error('[MessageNotifications] sweep failed', e?.message);
     }
   }, SWEEP_INTERVAL_MS);

@@ -1,5 +1,5 @@
 import { cronSecretMatches } from './backend/cronSecret.mjs';
-import { setupSystemMessageNotifications } from './backend/messageNotifications.mjs';
+import { setupSystemMessageNotifications, messageNotificationsStatus } from './backend/messageNotifications.mjs';
 import express from 'express';
 import compression from 'compression';
 import path from 'path';
@@ -41,6 +41,7 @@ import {
 } from './backend/roleHierarchy.ts';
 import {
   setupNotificationPushListener,
+  pushListenerStatus,
   pollRecentNotificationsForPush,
   processNotificationPush,
 } from './notificationPushDispatch.ts';
@@ -871,6 +872,40 @@ async function startServer() {
       console.error('Public verify student error:', error);
       return res.status(500).json({ error: 'SERVER_ERROR', message: 'Unable to verify student' });
     }
+  });
+
+  // Coarse health of the server's Firebase Admin connection and the background notification
+  // workers. No secrets, no data: only booleans, an error CLASS, and timestamps.
+  app.get('/api/public/status', async (_req: any, res: any) => {
+    const classify = (e: any): string => {
+      const m = String(e?.message || '');
+      const c = e?.code;
+      if (/Could not load the default credentials|Unable to detect a Project Id|default credentials/i.test(m)) return 'no_credentials';
+      if (/DECODER|PEM|private key|invalid_grant|invalid_rapt|Getting metadata from plugin/i.test(m)) return 'invalid_credentials';
+      if (c === 7 || /PERMISSION_DENIED/.test(m)) return 'permission_denied';
+      if (c === 5 || /NOT_FOUND/.test(m)) return 'database_not_found';
+      if (c === 16 || /UNAUTHENTICATED/.test(m)) return 'unauthenticated';
+      if (c === 8 || /RESOURCE_EXHAUSTED|quota/i.test(m)) return 'quota_exhausted';
+      return 'error';
+    };
+    const out: any = {
+      credentialMode: serviceAccount.clientEmail && serviceAccount.privateKey ? 'service_account_env' : 'default_credentials',
+      adminAppInitialized: admin.apps.length > 0,
+      firestore: { ok: false, errorClass: null as string | null },
+      cronSecretConfigured: Boolean(resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET)),
+      pushListener: pushListenerStatus,
+      messageNotifications: messageNotificationsStatus,
+      uptimeSeconds: Math.round(process.uptime()),
+      checkedAt: new Date().toISOString(),
+    };
+    try {
+      await getDb().collection('system').doc('config').get();
+      out.firestore.ok = true;
+    } catch (e: any) {
+      out.firestore.errorClass = classify(e);
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(out.firestore.ok ? 200 : 503).json(out);
   });
 
   // Featured schools for the landing page / footer: only public marketing fields, never the school document.

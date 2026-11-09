@@ -509,6 +509,12 @@ export async function processNotificationPush(
   return dispatchPushForNotificationDoc(db, adminSdk, notifId, claim.notif || notif);
 }
 
+/** Coarse runtime status for /api/public/status (no secrets, no data). */
+export const pushListenerStatus: {
+  startedAt: string | null; listenerAttached: boolean; restarts: number;
+  lastErrorAt: string | null; lastError: string | null; lastSweepAt: string | null; lastSweepOk: boolean | null;
+} = { startedAt: null, listenerAttached: false, restarts: 0, lastErrorAt: null, lastError: null, lastSweepAt: null, lastSweepOk: null };
+
 /**
  * Real-time push listener. Self-healing:
  *  - listens only to notifications from the last PUSH_MAX_AGE_MS (small initial snapshot, instead of
@@ -525,6 +531,7 @@ export function setupNotificationPushListener(db: Firestore, adminSdk: typeof ad
   let backoff = 1000;
   let recycleTimer: NodeJS.Timeout | null = null;
   const inflight = new Set<string>();
+  pushListenerStatus.startedAt = new Date().toISOString();
 
   const handle = (notifId: string, notif: Record<string, unknown>) => {
     if (inflight.has(notifId) || isPushTerminal(notif)) return;
@@ -541,12 +548,17 @@ export function setupNotificationPushListener(db: Firestore, adminSdk: typeof ad
     unsub = db.collection('notifications').where('createdAt', '>=', cutoff).onSnapshot(
       (snapshot) => {
         backoff = 1000;
+        pushListenerStatus.listenerAttached = true;
         for (const change of snapshot.docChanges()) {
           if (change.type !== 'added') continue;
           handle(change.doc.id, change.doc.data() as Record<string, unknown>);
         }
       },
       (err) => {
+        pushListenerStatus.listenerAttached = false;
+        pushListenerStatus.restarts += 1;
+        pushListenerStatus.lastErrorAt = new Date().toISOString();
+        pushListenerStatus.lastError = String((err as { code?: unknown }).code ?? err.message ?? 'error').slice(0, 80);
         logPush('PUSH_SEND_ERROR', { event: 'listener_restart', error: err.message });
         setTimeout(start, backoff);
         backoff = Math.min(backoff * 2, 60_000);
@@ -560,9 +572,13 @@ export function setupNotificationPushListener(db: Firestore, adminSdk: typeof ad
   recycleTimer.unref?.();
 
   const sweep = setInterval(() => {
-    void pollRecentNotificationsForPush(db, adminSdk, 30).catch((e) =>
-      logPush('PUSH_SEND_ERROR', { event: 'sweep', error: e instanceof Error ? e.message : String(e) }),
-    );
+    void pollRecentNotificationsForPush(db, adminSdk, 30)
+      .then(() => { pushListenerStatus.lastSweepAt = new Date().toISOString(); pushListenerStatus.lastSweepOk = true; })
+      .catch((e) => {
+        pushListenerStatus.lastSweepAt = new Date().toISOString();
+        pushListenerStatus.lastSweepOk = false;
+        logPush('PUSH_SEND_ERROR', { event: 'sweep', error: e instanceof Error ? e.message : String(e) });
+      });
   }, 2 * 60 * 1000);
   sweep.unref?.();
 
