@@ -11,7 +11,7 @@
   "dependencies": {
     "compression": "^1.8.1",
     "dotenv": "^17.2.3",
-    "express": "^4.21.2",
+    "express": "^4.22.3",
     "firebase-admin": "^13.8.0"
   },
   "devDependencies": {
@@ -22,6 +22,15 @@
     "typescript": "~5.8.2"
   },
   "overrides": {
-    "esbuild": "0.25.12"
+    "esbuild": "0.25.12",
+    "google-gax": {
+      "uuid": "^11.1.1"
+    },
+    "gaxios": {
+      "uuid": "^11.1.1"
+    },
+    "teeny-request": {
+      "uuid": "^11.1.1"
+    }
   }
 }
