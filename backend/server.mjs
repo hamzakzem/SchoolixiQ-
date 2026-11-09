@@ -23,11 +23,11 @@ var messageNotificationsStatus = { startedAt: null, listenerAttached: false, res
 function notificationIdFor(messageId, userId) {
   return `msgn_${messageId}_${userId}`;
 }
-function toMs(ts) {
-  if (!ts) return 0;
-  if (typeof ts.toMillis === "function") return ts.toMillis();
-  if (typeof ts._seconds === "number") return ts._seconds * 1e3;
-  const ms = new Date(ts).getTime();
+function toMs(ts2) {
+  if (!ts2) return 0;
+  if (typeof ts2.toMillis === "function") return ts2.toMillis();
+  if (typeof ts2._seconds === "number") return ts2._seconds * 1e3;
+  const ms = new Date(ts2).getTime();
   return Number.isFinite(ms) ? ms : 0;
 }
 function preview(text) {
@@ -254,6 +254,436 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
     } catch {
     }
   };
+}
+
+// deletionService.mjs
+var TRASH_DAYS = 30;
+var BATCH = 400;
+var MAX_IDS = 200;
+var PERMANENT_CONFIRM_TEXT = "\u062D\u0630\u0641 \u0646\u0647\u0627\u0626\u064A";
+var MGMT_ROLES = ["admin", "school_admin", "assistant", "school_assistant", "staff"];
+var FULL_ROLES = ["admin", "school_admin"];
+var SUPER = ["superadmin", "super_admin"];
+var POLICIES = {
+  students: {
+    roles: FULL_ROLES,
+    label: (d) => d.name || d.fullName || "\u0637\u0627\u0644\u0628",
+    children: [
+      { col: "grades", field: "studentId" },
+      { col: "attendance", field: "studentId" },
+      { col: "installments", field: "studentId" },
+      { col: "payments", field: "studentId" },
+      { col: "behavior_reports", field: "studentId" },
+      { col: "advanced_reports", field: "studentId" },
+      { col: "teacher_reports", field: "studentId" },
+      { col: "student_archives", field: "studentId" },
+      { col: "orders", field: "studentId" },
+      { col: "behavior", field: "studentId" }
+    ],
+    childById: ["id_cards"],
+    studentUserDoc: true,
+    counter: { path: ["schools", "{schoolId}"], field: "studentCount", delta: -1 },
+    filePrefixes: (id, schoolId) => [`students/${schoolId}/${id}/`, `students/${id}/`]
+  },
+  classes: {
+    roles: MGMT_ROLES,
+    perms: ["classes"],
+    label: (d) => d.name || "\u0635\u0641",
+    blockedIfReferenced: { col: "students", field: "classId", message: "\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0635\u0641 \u064A\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u0637\u0644\u0627\u0628. \u0627\u0646\u0642\u0644 \u0627\u0644\u0637\u0644\u0627\u0628 \u0623\u0648\u0644\u0627\u064B" },
+    children: [{ col: "subjects", field: "classId" }, { col: "homework", field: "classId" }]
+  },
+  subjects: { roles: MGMT_ROLES, perms: ["grades", "classes", "school_subjects", "exams_and_results"], label: (d) => d.name || "\u0645\u0627\u062F\u0629" },
+  homework: { roles: MGMT_ROLES, perms: ["homework", "homework_and_tasks"], teacherOwn: "teacherId", label: (d) => d.title || "\u0648\u0627\u062C\u0628" },
+  teacher_reports: { roles: MGMT_ROLES, perms: ["evaluation_reports", "student_evaluation_reports"], teacherOwn: "teacherId", label: (d) => d.title || d.studentName || "\u062A\u0642\u0631\u064A\u0631" },
+  advanced_reports: { roles: MGMT_ROLES, perms: ["advanced_reports"], label: (d) => d.title || d.studentName || "\u062A\u0642\u0631\u064A\u0631 \u0645\u062A\u0642\u062F\u0645" },
+  behavior_reports: { roles: MGMT_ROLES, perms: ["behavior", "behavior_management"], label: (d) => d.title || d.studentName || "\u062A\u0642\u0631\u064A\u0631 \u0633\u0644\u0648\u0643" },
+  behavior: { roles: MGMT_ROLES, perms: ["behavior", "behavior_management"], label: (d) => d.title || d.studentName || "\u0633\u0644\u0648\u0643" },
+  grades: { roles: MGMT_ROLES, perms: ["grades", "exams_and_results"], label: (d) => `${d.subject || "\u062F\u0631\u062C\u0629"} ${d.studentName || ""}`.trim() },
+  attendance: { roles: MGMT_ROLES, perms: ["attendance", "attendance_track"], label: (d) => `\u062D\u0636\u0648\u0631 ${d.studentName || d.date || ""}`.trim() },
+  announcements: { roles: MGMT_ROLES, perms: ["announcements"], label: (d) => d.title || "\u0625\u0639\u0644\u0627\u0646" },
+  installments: { roles: MGMT_ROLES, perms: ["tuition", "tuition_fees"], label: (d) => `\u0642\u0633\u0637 ${d.studentName || ""}`.trim() },
+  payments: { roles: MGMT_ROLES, perms: ["tuition", "tuition_fees"], label: (d) => `\u062F\u0641\u0639\u0629 ${d.studentName || ""}`.trim() },
+  payroll: { roles: MGMT_ROLES, perms: ["payroll", "staff_payroll"], label: (d) => `\u0631\u0627\u062A\u0628 ${d.userName || ""}`.trim() },
+  inventory: { roles: MGMT_ROLES, perms: ["inventory", "inventory_and_assets"], label: (d) => d.name || "\u0645\u0627\u062F\u0629 \u0645\u062E\u0632\u0648\u0646" },
+  market: { roles: MGMT_ROLES, perms: ["market", "marketplace_ordering"], label: (d) => d.name || "\u0645\u0646\u062A\u062C", filePrefixes: (id) => [`market/${id}/`] },
+  orders: { roles: MGMT_ROLES, perms: ["market", "marketplace_ordering"], label: (d) => `\u0637\u0644\u0628 ${d.studentName || d.parentName || ""}`.trim() },
+  id_cards: { roles: MGMT_ROLES, perms: ["id_cards", "id_card_generation"], label: (d) => `\u0628\u0637\u0627\u0642\u0629 ${d.studentName || ""}`.trim() },
+  student_archives: { roles: MGMT_ROLES, perms: ["student_archive"], label: (d) => `\u0623\u0631\u0634\u064A\u0641 ${d.studentName || ""}`.trim() }
+};
+var ACCOUNT_ROLES = ["teacher", "staff", "school_assistant", "assistant", "parent", "guard"];
+function httpError(status, code, message) {
+  const e = new Error(message);
+  e.status = status;
+  e.code = code;
+  return e;
+}
+function asArray(v) {
+  return Array.isArray(v) ? v.map(String) : [];
+}
+var ts = (adminSdk) => adminSdk.firestore.FieldValue.serverTimestamp();
+async function loadActor(db, uid) {
+  const snap = await db.collection("users").doc(uid).get();
+  if (!snap.exists) throw httpError(403, "USER_NOT_FOUND", "\u062D\u0633\u0627\u0628\u0643 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+  const d = snap.data() || {};
+  if (d.disabled === true || d.status === "disabled" || d.status === "suspended") {
+    throw httpError(403, "ACCOUNT_DISABLED", "\u0627\u0644\u062D\u0633\u0627\u0628 \u0645\u0639\u0637\u0651\u0644");
+  }
+  const role = String(d.role || "");
+  return {
+    uid,
+    role,
+    schoolId: String(d.schoolId || ""),
+    name: String(d.name || d.displayName || ""),
+    email: String(d.email || ""),
+    permissions: Array.isArray(d.permissions) ? d.permissions.map(String) : null,
+    isSuper: SUPER.includes(role)
+  };
+}
+function writeLog(db, adminSdk, entry) {
+  return db.collection("deletion_logs").add({ ...entry, at: ts(adminSdk) }).catch((e) => {
+    console.error("[deletion] audit log write FAILED", entry.action, entry.recordId, e?.message);
+  });
+}
+function authorizeDelete(actor, collection, policy, data, { permanent }) {
+  if (actor.isSuper) return;
+  const schoolId = String(data.schoolId || "");
+  if (!actor.schoolId || !schoolId || actor.schoolId !== schoolId) {
+    throw httpError(403, "FORBIDDEN_SCHOOL", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649");
+  }
+  if (permanent && !FULL_ROLES.includes(actor.role)) {
+    throw httpError(403, "FORBIDDEN_PERMANENT", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0641\u0642\u0637");
+  }
+  if (actor.role === "teacher") {
+    if (policy.teacherOwn && String(data[policy.teacherOwn] || "") === actor.uid) return;
+    throw httpError(403, "FORBIDDEN_ROLE", "\u0644\u0627 \u062A\u0645\u0644\u0643 \u0635\u0644\u0627\u062D\u064A\u0629 \u0627\u0644\u062D\u0630\u0641");
+  }
+  if (!policy.roles.includes(actor.role)) throw httpError(403, "FORBIDDEN_ROLE", "\u0644\u0627 \u062A\u0645\u0644\u0643 \u0635\u0644\u0627\u062D\u064A\u0629 \u0627\u0644\u062D\u0630\u0641");
+  if (FULL_ROLES.includes(actor.role)) return;
+  if (!policy.perms || !actor.permissions || !actor.permissions.some((p) => policy.perms.includes(p))) {
+    throw httpError(403, "FORBIDDEN_PERMISSION", "\u0644\u064A\u0633\u062A \u0644\u062F\u064A\u0643 \u0635\u0644\u0627\u062D\u064A\u0629 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0646\u0648\u0639 \u0645\u0646 \u0627\u0644\u0633\u062C\u0644\u0627\u062A");
+  }
+}
+async function queryAll(db, col, field, value, schoolId) {
+  let q = db.collection(col).where(field, "==", value);
+  if (schoolId) q = q.where("schoolId", "==", schoolId);
+  return (await q.get()).docs;
+}
+async function commitInBatches(db, ops) {
+  for (let i = 0; i < ops.length; i += BATCH) {
+    const b = db.batch();
+    ops.slice(i, i + BATCH).forEach((fn) => fn(b));
+    await b.commit();
+  }
+}
+function bundleRef(db, id) {
+  return db.collection("recycle_bin").doc(id);
+}
+async function collectDependants(db, policy, collection, id, schoolId) {
+  const items = [];
+  for (const c of policy.children || []) {
+    for (const d of await queryAll(db, c.col, c.field, id, schoolId)) items.push({ col: c.col, id: d.id, data: d.data() });
+  }
+  for (const col of policy.childById || []) {
+    const d = await db.collection(col).doc(id).get();
+    if (d.exists) items.push({ col, id, data: d.data() });
+  }
+  if (policy.studentUserDoc) {
+    const u = await db.collection("users").doc(id).get();
+    if (u.exists && String((u.data() || {}).schoolId || "") === schoolId) items.push({ col: "users", id, data: u.data() });
+  }
+  return items;
+}
+async function runTrashSteps(ctx, bundleId) {
+  const { db, adminSdk, faults } = ctx;
+  const ref = bundleRef(db, bundleId);
+  const snap = await ref.get();
+  if (!snap.exists) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
+  const b = snap.data();
+  if (b.status === "trashed") return b;
+  const policy = POLICIES[b.collection];
+  const steps = { ...b.steps || {} };
+  const mark = async (name, extra = {}) => {
+    steps[name] = true;
+    await ref.set({ steps, ...extra, lastError: null, updatedAt: ts(adminSdk) }, { merge: true });
+  };
+  const fail = (name) => {
+    if (faults?.[name]) {
+      const e = new Error("injected fault at " + name);
+      e.injected = true;
+      throw e;
+    }
+  };
+  try {
+    if (!steps.snapshot) {
+      const main = await db.collection(b.collection).doc(b.recordId).get();
+      if (!main.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+      const deps = policy ? await collectDependants(db, policy, b.collection, b.recordId, b.schoolId) : [];
+      const counts = {};
+      deps.forEach((d) => {
+        counts[d.col] = (counts[d.col] || 0) + 1;
+      });
+      let parentLinks = [];
+      if (b.collection === "students") {
+        const pu = await db.collection("users").where("studentIds", "array-contains", b.recordId).get();
+        parentLinks = pu.docs.map((d) => d.id);
+      }
+      await ref.set({ record: main.data(), childCounts: counts, parentLinks }, { merge: true });
+      const itemOps = deps.map((d) => (batch) => batch.set(ref.collection("items").doc(`${d.col}__${d.id}`), { col: d.col, docId: d.id, data: d.data }));
+      await commitInBatches(db, itemOps);
+      await mark("snapshot");
+    }
+    fail("after_snapshot");
+    if (!steps.delete) {
+      const items = await ref.collection("items").get();
+      const ops = items.docs.map((d) => (batch) => batch.delete(db.collection(d.get("col")).doc(d.get("docId"))));
+      await commitInBatches(db, ops);
+      fail("mid_delete");
+      await db.collection(b.collection).doc(b.recordId).delete();
+      await mark("delete");
+    }
+    if (!steps.unlink && b.collection === "students") {
+      const stored = (await ref.get()).data() || {};
+      const ops = asArray(stored.parentLinks).map((uid) => (batch) => batch.update(db.collection("users").doc(uid), { studentIds: adminSdk.firestore.FieldValue.arrayRemove(b.recordId) }));
+      await commitInBatches(db, ops.length ? ops : []);
+      await mark("unlink");
+    }
+    if (!steps.counter && policy?.counter) {
+      const path2 = policy.counter.path.map((p) => p.replace("{schoolId}", b.schoolId));
+      await db.doc(path2.join("/")).update({ [policy.counter.field]: adminSdk.firestore.FieldValue.increment(policy.counter.delta) }).catch(() => {
+      });
+      await mark("counter");
+    }
+    if (!steps.auth && b.kind === "account") {
+      try {
+        await ctx.authAdmin.updateUser(b.recordId, { disabled: true });
+      } catch (e) {
+        if (e?.code !== "auth/user-not-found") throw e;
+      }
+      await mark("auth");
+    }
+    fail("before_finalize");
+    await ref.set({ status: "trashed", trashedAt: ts(adminSdk), steps, lastError: null }, { merge: true });
+    return (await ref.get()).data();
+  } catch (e) {
+    await ref.set({ status: "trashing", steps, lastError: String(e?.message || e).slice(0, 200), updatedAt: ts(adminSdk) }, { merge: true }).catch(() => {
+    });
+    throw e;
+  }
+}
+async function deleteRecords(ctx, actorUid, body) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const collection = String(body.collection || "");
+  const ids = [...new Set(asArray(body.ids))].filter(Boolean);
+  const permanent = body.mode === "permanent";
+  const isAccount = collection === "users";
+  if (!ids.length) throw httpError(400, "INVALID_BODY", "\u0644\u0645 \u064A\u062A\u0645 \u062A\u062D\u062F\u064A\u062F \u0633\u062C\u0644\u0627\u062A");
+  if (ids.length > MAX_IDS) throw httpError(400, "TOO_MANY", `\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649 ${MAX_IDS} \u0633\u062C\u0644 \u0641\u064A \u0627\u0644\u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u0648\u0627\u062D\u062F\u0629`);
+  if (!isAccount && !POLICIES[collection]) throw httpError(400, "UNSUPPORTED_COLLECTION", "\u0646\u0648\u0639 \u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645 \u0644\u0644\u062D\u0630\u0641");
+  if (ids.length > 1 && body.confirmBulk !== true) throw httpError(400, "CONFIRM_BULK_REQUIRED", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u062C\u0645\u0627\u0639\u064A \u064A\u062A\u0637\u0644\u0628 \u062A\u0623\u0643\u064A\u062F\u0627\u064B \u0635\u0631\u064A\u062D\u0627\u064B");
+  if (permanent && body.confirmText !== PERMANENT_CONFIRM_TEXT) throw httpError(400, "CONFIRM_PERMANENT_REQUIRED", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u064A\u062A\u0637\u0644\u0628 \u0643\u062A\u0627\u0628\u0629 \u0639\u0628\u0627\u0631\u0629 \u0627\u0644\u062A\u0623\u0643\u064A\u062F");
+  const results = [];
+  for (const id of ids) {
+    const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: actor.schoolId, collection, recordId: id, mode: permanent ? "permanent" : "trash", bulk: ids.length > 1 };
+    try {
+      const doc = await db.collection(collection).doc(id).get();
+      if (!doc.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+      const data = doc.data() || {};
+      let policy;
+      if (isAccount) {
+        const role = String(data.role || "");
+        if (!ctx.canActorDeleteUser) throw httpError(500, "MISCONFIGURED", "\u0645\u0635\u0627\u062F\u0642\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u0647\u064A\u0623\u0629");
+        if (SUPER.includes(role) || !ACCOUNT_ROLES.includes(role)) throw httpError(403, "FORBIDDEN_PRIVILEGED", "\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0646\u0648\u0639 \u0645\u0646 \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A");
+        if (!actor.isSuper) {
+          if (!actor.schoolId || String(data.schoolId || "") !== actor.schoolId) throw httpError(403, "FORBIDDEN_SCHOOL", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 \u0645\u0646 \u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649");
+          if (!ctx.canActorDeleteUser(actor.role, role, actor.schoolId)) throw httpError(403, "FORBIDDEN_RANK", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 \u0628\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0645\u0633\u0627\u0648\u064A\u0629 \u0623\u0648 \u0623\u0639\u0644\u0649");
+          if (id === actor.uid) throw httpError(403, "FORBIDDEN_SELF", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628\u0643 \u0628\u0646\u0641\u0633\u0643");
+          if (actor.role !== "admin" && actor.role !== "school_admin") {
+            const need = role === "parent" ? ["parents"] : role === "guard" || role === "teacher" || role === "staff" ? ["staff", "staff_manage"] : ["assistants", "assistants_manage"];
+            if (!actor.permissions || !actor.permissions.some((p) => need.includes(p))) throw httpError(403, "FORBIDDEN_PERMISSION", "\u0644\u064A\u0633\u062A \u0644\u062F\u064A\u0643 \u0635\u0644\u0627\u062D\u064A\u0629 \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A");
+          }
+        }
+        policy = { roles: MGMT_ROLES, label: (d) => d.name || d.email || "\u062D\u0633\u0627\u0628", accountRole: role };
+      } else {
+        policy = POLICIES[collection];
+        authorizeDelete(actor, collection, policy, data, { permanent });
+        if (policy.blockedIfReferenced) {
+          const ref = await queryAll(db, policy.blockedIfReferenced.col, policy.blockedIfReferenced.field, id, String(data.schoolId || ""));
+          if (ref.length) throw httpError(409, "HAS_DEPENDENTS", policy.blockedIfReferenced.message);
+        }
+      }
+      const schoolId = String(data.schoolId || actor.schoolId || "");
+      const bundleId = `${collection}__${id}__${Date.now().toString(36)}`;
+      const existing = await db.collection("recycle_bin").where("recordKey", "==", `${collection}/${id}`).where("status", "in", ["trashing", "trashed"]).limit(1).get();
+      let bid = bundleId;
+      if (!existing.empty) bid = existing.docs[0].id;
+      else {
+        await bundleRef(db, bid).set({
+          bundleId: bid,
+          recordKey: `${collection}/${id}`,
+          collection,
+          recordId: id,
+          schoolId,
+          kind: isAccount ? "account" : "record",
+          label: String((policy.label ? policy.label(data) : id) || id).slice(0, 120),
+          status: "trashing",
+          steps: {},
+          deletedBy: { uid: actor.uid, name: actor.name, role: actor.role },
+          deletedAt: ts(adminSdk),
+          purgeAfter: adminSdk.firestore.Timestamp.fromMillis(Date.now() + TRASH_DAYS * 864e5),
+          accountRole: policy.accountRole || null
+        });
+      }
+      await runTrashSteps(ctx, bid);
+      let purged = null;
+      if (permanent) purged = await purgeBundleInternal(ctx, bid, actor);
+      await writeLog(db, adminSdk, { ...base, action: permanent ? "DELETE_PERMANENT" : "DELETE_TO_TRASH", result: "success", bundleId: bid, label: policy.label ? policy.label(data) : id, childCounts: (await bundleRef(db, bid).get()).get("childCounts") || {}, files: purged?.filesDeleted ?? 0 });
+      results.push({ id, ok: true, bundleId: bid, permanent });
+    } catch (e) {
+      await writeLog(db, adminSdk, { ...base, action: permanent ? "DELETE_PERMANENT" : "DELETE_TO_TRASH", result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+      results.push({ id, ok: false, code: e.code || "ERROR", message: e.message, partial: !e.status || e.status >= 500 });
+    }
+  }
+  return { results, ok: results.every((r) => r.ok) };
+}
+async function restoreBundle(ctx, actorUid, bundleId) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const ref = bundleRef(db, String(bundleId || ""));
+  const snap = await ref.get();
+  if (!snap.exists) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
+  const b = snap.data();
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: b.schoolId, collection: b.collection, recordId: b.recordId, bundleId: b.bundleId, action: "RESTORE" };
+  try {
+    if (!actor.isSuper && (!actor.schoolId || actor.schoolId !== b.schoolId)) throw httpError(403, "FORBIDDEN_SCHOOL", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649");
+    const policy = POLICIES[b.collection];
+    authorizeDelete(actor, b.collection, policy || { roles: MGMT_ROLES, perms: [] }, { schoolId: b.schoolId, ...b.record || {} }, { permanent: false });
+    if (b.status !== "trashed") throw httpError(409, "NOT_RESTORABLE", "\u0644\u0627 \u064A\u0645\u0643\u0646 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0647\u0630\u0627 \u0627\u0644\u0633\u062C\u0644 (\u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629 \u0623\u0648 \u0642\u064A\u062F \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629)");
+    const live = await db.collection(b.collection).doc(b.recordId).get();
+    if (live.exists) throw httpError(409, "CONFLICT", "\u064A\u0648\u062C\u062F \u0633\u062C\u0644 \u0628\u0646\u0641\u0633 \u0627\u0644\u0645\u0639\u0631\u0651\u0641 \u062D\u0627\u0644\u064A\u0627\u064B");
+    const items = await ref.collection("items").get();
+    const ops = items.docs.map((d) => (batch) => batch.set(db.collection(d.get("col")).doc(d.get("docId")), d.get("data")));
+    ops.push((batch) => batch.set(db.collection(b.collection).doc(b.recordId), b.record || {}));
+    await commitInBatches(db, ops);
+    if (b.collection === "students") {
+      const links = asArray(b.parentLinks).map((uid) => (batch) => batch.update(db.collection("users").doc(uid), { studentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) }));
+      await commitInBatches(db, links);
+    }
+    if (policy?.counter) {
+      const path2 = policy.counter.path.map((p) => p.replace("{schoolId}", b.schoolId));
+      await db.doc(path2.join("/")).update({ [policy.counter.field]: adminSdk.firestore.FieldValue.increment(-policy.counter.delta) }).catch(() => {
+      });
+    }
+    if (b.kind === "account") await ctx.authAdmin.updateUser(b.recordId, { disabled: false }).catch((e) => {
+      if (e?.code !== "auth/user-not-found") throw e;
+    });
+    await commitInBatches(db, items.docs.map((d) => (batch) => batch.delete(d.ref)));
+    await ref.set({ status: "restored", restoredAt: ts(adminSdk), restoredBy: { uid: actor.uid, name: actor.name }, record: adminSdk.firestore.FieldValue.delete() }, { merge: true });
+    await writeLog(db, adminSdk, { ...base, result: "success", label: b.label });
+    return { ok: true, bundleId: b.bundleId };
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+    throw e;
+  }
+}
+async function purgeBundleInternal(ctx, bundleId, actor) {
+  const { db, adminSdk, faults } = ctx;
+  const ref = bundleRef(db, bundleId);
+  const snap = await ref.get();
+  const b = snap.data();
+  if (!b) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
+  if (b.status === "purged") return { filesDeleted: 0 };
+  const policy = POLICIES[b.collection];
+  await ref.set({ status: "purging", updatedAt: ts(adminSdk) }, { merge: true });
+  let filesDeleted = 0;
+  try {
+    if (policy?.filePrefixes && !faults?.skipFiles) {
+      if (faults?.storage) throw new Error("injected storage fault");
+      const bucket = ctx.bucket();
+      for (const prefix of policy.filePrefixes(b.recordId, b.schoolId)) {
+        const [files] = await bucket.getFiles({ prefix });
+        for (const f of files) {
+          await f.delete({ ignoreNotFound: true });
+          filesDeleted += 1;
+        }
+      }
+    }
+    if (b.kind === "account" && ctx.purgeAccount) await ctx.purgeAccount(b.recordId);
+    if (policy?.studentUserDoc) {
+      try {
+        await ctx.authAdmin.deleteUser(b.recordId);
+      } catch (e) {
+        if (e?.code !== "auth/user-not-found") throw e;
+      }
+    }
+    const items = await ref.collection("items").get();
+    await commitInBatches(db, items.docs.map((d) => (batch) => batch.delete(d.ref)));
+    await ref.set({ status: "purged", purgedAt: ts(adminSdk), purgedBy: { uid: actor?.uid || "system", name: actor?.name || "system" }, record: adminSdk.firestore.FieldValue.delete(), filesDeleted }, { merge: true });
+    return { filesDeleted };
+  } catch (e) {
+    await ref.set({ status: "purging", lastError: String(e?.message || e).slice(0, 200) }, { merge: true });
+    throw e;
+  }
+}
+async function purgeBundle(ctx, actorUid, body) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const bundleId = String(body.bundleId || "");
+  const snap = await bundleRef(db, bundleId).get();
+  if (!snap.exists) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
+  const b = snap.data();
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: b.schoolId, collection: b.collection, recordId: b.recordId, bundleId, action: "PURGE", label: b.label };
+  try {
+    if (!actor.isSuper && (!actor.schoolId || actor.schoolId !== b.schoolId)) throw httpError(403, "FORBIDDEN_SCHOOL", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649");
+    if (!actor.isSuper && !FULL_ROLES.includes(actor.role)) throw httpError(403, "FORBIDDEN_PERMANENT", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0641\u0642\u0637");
+    if (body.confirmText !== PERMANENT_CONFIRM_TEXT) throw httpError(400, "CONFIRM_PERMANENT_REQUIRED", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u064A\u062A\u0637\u0644\u0628 \u0643\u062A\u0627\u0628\u0629 \u0639\u0628\u0627\u0631\u0629 \u0627\u0644\u062A\u0623\u0643\u064A\u062F");
+    if (!["trashed", "purging"].includes(b.status)) throw httpError(409, "NOT_PURGEABLE", "\u0627\u0644\u0633\u062C\u0644 \u0644\u064A\u0633 \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
+    const r = await purgeBundleInternal(ctx, bundleId, actor);
+    await writeLog(db, adminSdk, { ...base, result: "success", files: r.filesDeleted });
+    return { ok: true };
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+    throw e;
+  }
+}
+async function sweepDeletions(ctx, log = console) {
+  const { db, adminSdk } = ctx;
+  const out = { resumed: 0, purged: 0, failed: 0 };
+  const stuck = await db.collection("recycle_bin").where("status", "in", ["trashing", "purging"]).limit(50).get();
+  for (const d of stuck.docs) {
+    const updated = d.get("updatedAt")?.toMillis?.() || d.get("deletedAt")?.toMillis?.() || 0;
+    if (Date.now() - updated < 6e4) continue;
+    try {
+      if (d.get("status") === "trashing") await runTrashSteps(ctx, d.id);
+      else await purgeBundleInternal(ctx, d.id, null);
+      out.resumed += 1;
+      await writeLog(db, adminSdk, { action: "RESUME", result: "success", actorUid: "system", actorName: "system", actorRole: "system", schoolId: d.get("schoolId"), collection: d.get("collection"), recordId: d.get("recordId"), bundleId: d.id });
+    } catch (e) {
+      out.failed += 1;
+      log.error?.("[deletion] resume failed", d.id, e?.message);
+    }
+  }
+  const trashed = await db.collection("recycle_bin").where("status", "==", "trashed").limit(200).get();
+  const nowMs = Date.now();
+  const expired = trashed.docs.filter((d) => (d.get("purgeAfter")?.toMillis?.() || Infinity) <= nowMs).slice(0, 25);
+  for (const d of expired) {
+    try {
+      await purgeBundleInternal(ctx, d.id, null);
+      out.purged += 1;
+      await writeLog(db, adminSdk, { action: "PURGE_EXPIRED", result: "success", actorUid: "system", actorName: "system", actorRole: "system", schoolId: d.get("schoolId"), collection: d.get("collection"), recordId: d.get("recordId"), bundleId: d.id });
+    } catch (e) {
+      out.failed += 1;
+      log.error?.("[deletion] purge expired failed", d.id, e?.message);
+    }
+  }
+  return out;
+}
+function startDeletionSweep(ctx, log = console, intervalMs = 3 * 60 * 1e3) {
+  const t = setInterval(() => {
+    sweepDeletions(ctx, log).catch((e) => log.error?.("[deletion] sweep failed", e?.message));
+  }, intervalMs);
+  t.unref?.();
+  return () => clearInterval(t);
 }
 
 // server.ts
@@ -3335,9 +3765,9 @@ function compactEventLog(events, archiveBeforeDays = 30) {
   }
   const cutoff = Date.now() - archiveBeforeDays * 24 * 60 * 60 * 1e3;
   const isOld = (ev) => {
-    const ts = ev?.timestamp?.toDate?.() || ev?.timestamp;
-    if (!ts) return false;
-    const ms = ts instanceof Date ? ts.getTime() : new Date(ts).getTime();
+    const ts2 = ev?.timestamp?.toDate?.() || ev?.timestamp;
+    if (!ts2) return false;
+    const ms = ts2 instanceof Date ? ts2.getTime() : new Date(ts2).getTime();
     return ms < cutoff;
   };
   const terminal = deriveState(list);
@@ -3367,7 +3797,7 @@ var MANAGER_ROLES = /* @__PURE__ */ new Set([
   "superadmin",
   "super_admin"
 ]);
-function httpError(message, code, status = 400) {
+function httpError2(message, code, status = 400) {
   const err = new Error(message);
   err.code = code;
   err.status = status;
@@ -3383,11 +3813,11 @@ function tokenExpiryMs(data) {
 }
 function assertTokenUsable(data) {
   if (data?.tokenConsumedAt) {
-    throw httpError("\u062A\u0645 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0647\u0630\u0627 \u0627\u0644\u0631\u0645\u0632 \u0645\u0633\u0628\u0642\u0627\u064B", "TOKEN_CONSUMED", 409);
+    throw httpError2("\u062A\u0645 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0647\u0630\u0627 \u0627\u0644\u0631\u0645\u0632 \u0645\u0633\u0628\u0642\u0627\u064B", "TOKEN_CONSUMED", 409);
   }
   const exp = tokenExpiryMs(data);
   if (exp > 0 && Date.now() > exp) {
-    throw httpError("\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0631\u0645\u0632 \u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631. \u0627\u0637\u0644\u0628 \u0645\u0646\u0647 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0631\u0645\u0632 \u0645\u0646 \u0627\u0644\u062A\u0637\u0628\u064A\u0642 \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629", "TOKEN_EXPIRED", 410);
+    throw httpError2("\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0631\u0645\u0632 \u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631. \u0627\u0637\u0644\u0628 \u0645\u0646\u0647 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0631\u0645\u0632 \u0645\u0646 \u0627\u0644\u062A\u0637\u0628\u064A\u0642 \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629", "TOKEN_EXPIRED", 410);
   }
 }
 function generateToken() {
@@ -3397,39 +3827,39 @@ function generateToken() {
 }
 async function loadUser(db, uid) {
   const snap = await db.collection("users").doc(uid).get();
-  if (!snap.exists) throw httpError("\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "USER_NOT_FOUND", 403);
+  if (!snap.exists) throw httpError2("\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "USER_NOT_FOUND", 403);
   return { uid, ...snap.data() };
 }
 function assertRole(user, roles, message) {
   if (!roles.has(String(user.role || ""))) {
-    throw httpError(message || "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D", "FORBIDDEN_ROLE", 403);
+    throw httpError2(message || "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D", "FORBIDDEN_ROLE", 403);
   }
 }
 function assertSchool(user, schoolId) {
   const isSuper = ["superadmin", "super_admin"].includes(String(user.role || ""));
   if (!isSuper && String(user.schoolId || "") !== schoolId) {
-    throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u0627\u0644\u0648\u0635\u0648\u0644 \u0644\u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649", "FORBIDDEN_SCHOOL", 403);
+    throw httpError2("\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u0627\u0644\u0648\u0635\u0648\u0644 \u0644\u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649", "FORBIDDEN_SCHOOL", 403);
   }
 }
 async function resolveStudent(db, studentId, parentId, schoolId) {
   const snap = await db.collection("students").doc(studentId).get();
-  if (!snap.exists) throw httpError("\u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "STUDENT_NOT_FOUND", 404);
+  if (!snap.exists) throw httpError2("\u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "STUDENT_NOT_FOUND", 404);
   const data = snap.data() || {};
   if (String(data.schoolId || "") !== schoolId) {
-    throw httpError("\u0627\u0644\u0637\u0627\u0644\u0628 \u0644\u0627 \u064A\u0646\u062A\u0645\u064A \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062F\u0631\u0633\u0629", "INVALID_SCHOOL", 400);
+    throw httpError2("\u0627\u0644\u0637\u0627\u0644\u0628 \u0644\u0627 \u064A\u0646\u062A\u0645\u064A \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062F\u0631\u0633\u0629", "INVALID_SCHOOL", 400);
   }
   const parentIds = Array.isArray(data.parentIds) ? data.parentIds.filter(Boolean) : [];
   if (!parentIds.includes(parentId)) {
-    throw httpError("\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628", "FORBIDDEN_PARENT", 403);
+    throw httpError2("\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628", "FORBIDDEN_PARENT", 403);
   }
   const classId = String(data.classId || "").trim();
-  if (!classId) throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0644\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0631\u062A\u0628\u0637 \u0628\u0635\u0641 \u0635\u062D\u064A\u062D", "NO_CLASS", 400);
+  if (!classId) throw httpError2("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0644\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0631\u062A\u0628\u0637 \u0628\u0635\u0641 \u0635\u062D\u064A\u062D", "NO_CLASS", 400);
   const classSnap = await db.collection("classes").doc(classId).get();
   if (!classSnap.exists || String(classSnap.data()?.schoolId || "") !== schoolId) {
-    throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0644\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0631\u062A\u0628\u0637 \u0628\u0635\u0641 \u0635\u062D\u064A\u062D", "NO_CLASS", 400);
+    throw httpError2("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0644\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0631\u062A\u0628\u0637 \u0628\u0635\u0641 \u0635\u062D\u064A\u062D", "NO_CLASS", 400);
   }
   const className = String(classSnap.data()?.name || "").trim();
-  if (!className) throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0644\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0631\u062A\u0628\u0637 \u0628\u0635\u0641 \u0635\u062D\u064A\u062D", "NO_CLASS", 400);
+  if (!className) throw httpError2("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0644\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0631\u062A\u0628\u0637 \u0628\u0635\u0641 \u0635\u062D\u064A\u062D", "NO_CLASS", 400);
   return {
     studentId,
     studentName: String(data.name || "").trim(),
@@ -3451,18 +3881,18 @@ async function findActiveForStudent(db, studentId, schoolId) {
 async function getRequestOrThrow(db, requestId) {
   const ref = db.collection(DISMISSAL_COL).doc(requestId);
   const snap = await ref.get();
-  if (!snap.exists) throw httpError("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
+  if (!snap.exists) throw httpError2("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
   return { ref, data: snap.data(), id: snap.id };
 }
 async function verifyStudentMatch(db, data, schoolId) {
   const studentSnap = await db.collection("students").doc(String(data.studentId)).get();
-  if (!studentSnap.exists) throw httpError("\u062A\u0639\u0630\u0631 \u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0627\u0644\u0628", "STUDENT_NOT_FOUND", 400);
+  if (!studentSnap.exists) throw httpError2("\u062A\u0639\u0630\u0631 \u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0627\u0644\u0628", "STUDENT_NOT_FOUND", 400);
   const student = studentSnap.data() || {};
   if (String(student.schoolId || "") !== schoolId) {
-    throw httpError("\u0627\u0644\u0637\u0627\u0644\u0628 \u0644\u0627 \u064A\u0646\u062A\u0645\u064A \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062F\u0631\u0633\u0629", "INVALID_SCHOOL", 400);
+    throw httpError2("\u0627\u0644\u0637\u0627\u0644\u0628 \u0644\u0627 \u064A\u0646\u062A\u0645\u064A \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062F\u0631\u0633\u0629", "INVALID_SCHOOL", 400);
   }
   if (String(student.classId || "") !== String(data.classId || "")) {
-    throw httpError("\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0635\u0641 \u0644\u0627 \u062A\u0637\u0627\u0628\u0642 \u0633\u062C\u0644 \u0627\u0644\u0637\u0627\u0644\u0628", "CLASS_MISMATCH", 400);
+    throw httpError2("\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0635\u0641 \u0644\u0627 \u062A\u0637\u0627\u0628\u0642 \u0633\u062C\u0644 \u0627\u0644\u0637\u0627\u0644\u0628", "CLASS_MISMATCH", 400);
   }
 }
 function runTransitionTx(tx, ref, requestId, freshData, uid, actorName, config, extra = {}) {
@@ -3524,11 +3954,11 @@ async function createDismissalRequestApi(db, uid, body) {
   assertRole(user, /* @__PURE__ */ new Set(["parent"]), "\u0641\u0642\u0637 \u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631 \u064A\u0645\u0643\u0646\u0647 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D");
   const schoolId = String(body.schoolId || user.schoolId || "");
   const studentId = String(body.studentId || "");
-  if (!schoolId || !studentId) throw httpError("\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0643\u062A\u0645\u0644\u0629", "INVALID_BODY", 400);
+  if (!schoolId || !studentId) throw httpError2("\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0643\u062A\u0645\u0644\u0629", "INVALID_BODY", 400);
   assertSchool(user, schoolId);
   const verified = await resolveStudent(db, studentId, uid, schoolId);
   if (await findActiveForStudent(db, studentId, schoolId)) {
-    throw httpError("\u064A\u0648\u062C\u062F \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0646\u0634\u0637 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628 \u0628\u0627\u0644\u0641\u0639\u0644", "ACTIVE_EXISTS", 409);
+    throw httpError2("\u064A\u0648\u062C\u062F \u0637\u0644\u0628 \u062A\u0633\u0631\u064A\u062D \u0646\u0634\u0637 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628 \u0628\u0627\u0644\u0641\u0639\u0644", "ACTIVE_EXISTS", 409);
   }
   const token = generateToken();
   const now = /* @__PURE__ */ new Date();
@@ -3582,14 +4012,14 @@ async function createDismissalRequestApi(db, uid, body) {
 }
 async function runTransitionApi(db, uid, body, cfg, actorName, extraFields = {}) {
   const requestId = String(body.requestId || "");
-  if (!requestId) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
+  if (!requestId) throw httpError2("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
   const { ref, data } = await getRequestOrThrow(db, requestId);
   const schoolId = String(data.schoolId || "");
   const idempotencyKey = body.idempotencyKey || body.clientIdempotencyKey;
   let result;
   await db.runTransaction(async (tx) => {
     const fresh = await tx.get(ref);
-    if (!fresh.exists) throw httpError("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
+    if (!fresh.exists) throw httpError2("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
     result = runTransitionTx(tx, ref, requestId, fresh.data(), uid, actorName, cfg, {
       idempotencyKey,
       metadata: extraFields.metadata,
@@ -3605,20 +4035,20 @@ async function refreshDismissalTokenApi(db, uid, body) {
   const user = await loadUser(db, uid);
   assertRole(user, /* @__PURE__ */ new Set(["parent"]), "\u0641\u0642\u0637 \u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631 \u064A\u0645\u0643\u0646\u0647 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0631\u0645\u0632");
   const requestId = String(body.requestId || "");
-  if (!requestId) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
+  if (!requestId) throw httpError2("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
   const { ref } = await getRequestOrThrow(db, requestId);
   let out;
   await db.runTransaction(async (tx) => {
     const fresh = await tx.get(ref);
-    if (!fresh.exists) throw httpError("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
+    if (!fresh.exists) throw httpError2("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
     const data = fresh.data();
     assertSchool(user, String(data.schoolId || ""));
     const owners = Array.isArray(data.parentIds) ? data.parentIds : [];
     if (String(data.parentId || "") !== uid && !owners.includes(uid)) {
-      throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062A\u062C\u062F\u064A\u062F \u0631\u0645\u0632 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628", "FORBIDDEN_PARENT", 403);
+      throw httpError2("\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062A\u062C\u062F\u064A\u062F \u0631\u0645\u0632 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628", "FORBIDDEN_PARENT", 403);
     }
     if (resolveEffectiveState(data) !== STATES.REQUESTED) {
-      throw httpError("\u0644\u0627 \u064A\u0645\u0643\u0646 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0631\u0645\u0632 \u0628\u0639\u062F \u0628\u062F\u0621 \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629", "INVALID_STATE", 409);
+      throw httpError2("\u0644\u0627 \u064A\u0645\u0643\u0646 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0631\u0645\u0632 \u0628\u0639\u062F \u0628\u062F\u0621 \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629", "INVALID_STATE", 409);
     }
     const token = generateToken();
     const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
@@ -3639,7 +4069,7 @@ async function guardVerifyDismissalApi(db, uid, body) {
   assertRole(user, /* @__PURE__ */ new Set(["guard"]), "\u0641\u0642\u0637 \u0627\u0644\u062D\u0627\u0631\u0633 \u064A\u0645\u0643\u0646\u0647 \u0627\u0644\u062A\u062D\u0642\u0642");
   const requestId = String(body.requestId || "");
   const note = String(body.note || "").trim();
-  if (!requestId) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
+  if (!requestId) throw httpError2("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
   const { data } = await getRequestOrThrow(db, requestId);
   const schoolId = String(data.schoolId || "");
   assertSchool(user, schoolId);
@@ -3649,7 +4079,7 @@ async function guardVerifyDismissalApi(db, uid, body) {
   if (typed) {
     const real = String(data.token || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!real || typed !== real) {
-      throw httpError("\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0645\u062F\u062E\u0644 \u0644\u0627 \u064A\u0637\u0627\u0628\u0642 \u0631\u0645\u0632 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628", "TOKEN_MISMATCH", 400);
+      throw httpError2("\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0645\u062F\u062E\u0644 \u0644\u0627 \u064A\u0637\u0627\u0628\u0642 \u0631\u0645\u0632 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628", "TOKEN_MISMATCH", 400);
     }
   }
   return runTransitionApi(db, uid, body, TRANSITIONS.guardVerify, String(user.name || "\u062D\u0627\u0631\u0633"), {
@@ -3667,7 +4097,7 @@ async function guardRejectDismissalApi(db, uid, body) {
   assertRole(user, /* @__PURE__ */ new Set(["guard"]), "\u0641\u0642\u0637 \u0627\u0644\u062D\u0627\u0631\u0633 \u064A\u0645\u0643\u0646\u0647 \u0627\u0644\u0631\u0641\u0636");
   const requestId = String(body.requestId || "");
   const reason = String(body.reason || body.rejectReason || "").trim();
-  if (!requestId || !reason) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0648\u0633\u0628\u0628 \u0627\u0644\u0631\u0641\u0636 \u0645\u0637\u0644\u0648\u0628\u0627\u0646", "INVALID_BODY", 400);
+  if (!requestId || !reason) throw httpError2("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0648\u0633\u0628\u0628 \u0627\u0644\u0631\u0641\u0636 \u0645\u0637\u0644\u0648\u0628\u0627\u0646", "INVALID_BODY", 400);
   const { data } = await getRequestOrThrow(db, requestId);
   assertSchool(user, String(data.schoolId || ""));
   return runTransitionApi(db, uid, body, TRANSITIONS.guardReject, String(user.name || "\u062D\u0627\u0631\u0633"), {
@@ -3685,7 +4115,7 @@ async function managerApproveDismissalApi(db, uid, body) {
   const user = await loadUser(db, uid);
   assertRole(user, MANAGER_ROLES, "\u0641\u0642\u0637 \u0627\u0644\u0625\u062F\u0627\u0631\u0629 \u064A\u0645\u0643\u0646\u0647\u0627 \u0627\u0644\u0627\u0639\u062A\u0645\u0627\u062F");
   const requestId = String(body.requestId || "");
-  if (!requestId) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
+  if (!requestId) throw httpError2("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0637\u0644\u0648\u0628", "INVALID_BODY", 400);
   const { ref, data } = await getRequestOrThrow(db, requestId);
   const schoolId = String(data.schoolId || "");
   assertSchool(user, schoolId);
@@ -3696,7 +4126,7 @@ async function managerApproveDismissalApi(db, uid, body) {
   let result;
   await db.runTransaction(async (tx) => {
     const fresh = await tx.get(ref);
-    if (!fresh.exists) throw httpError("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
+    if (!fresh.exists) throw httpError2("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", "NOT_FOUND", 404);
     const freshData = fresh.data();
     result = runTransitionTx(tx, ref, requestId, freshData, uid, managerName, cfg, {
       idempotencyKey: body.idempotencyKey || body.clientIdempotencyKey,
@@ -3743,7 +4173,7 @@ async function managerRejectDismissalApi(db, uid, body) {
   assertRole(user, MANAGER_ROLES, "\u0641\u0642\u0637 \u0627\u0644\u0625\u062F\u0627\u0631\u0629 \u064A\u0645\u0643\u0646\u0647\u0627 \u0627\u0644\u0631\u0641\u0636");
   const requestId = String(body.requestId || "");
   const reason = String(body.reason || body.rejectReason || "").trim();
-  if (!requestId || !reason) throw httpError("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0648\u0633\u0628\u0628 \u0627\u0644\u0631\u0641\u0636 \u0645\u0637\u0644\u0648\u0628\u0627\u0646", "INVALID_BODY", 400);
+  if (!requestId || !reason) throw httpError2("\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0637\u0644\u0628 \u0648\u0633\u0628\u0628 \u0627\u0644\u0631\u0641\u0636 \u0645\u0637\u0644\u0648\u0628\u0627\u0646", "INVALID_BODY", 400);
   const { data } = await getRequestOrThrow(db, requestId);
   assertSchool(user, String(data.schoolId || ""));
   return runTransitionApi(db, uid, body, TRANSITIONS.managerReject, String(user.name || "\u0645\u062F\u064A\u0631"), {
@@ -3760,7 +4190,7 @@ async function listPendingDismissalsApi(db, uid, query = {}) {
   const user = await loadUser(db, uid);
   const role = String(user.role || "");
   const schoolId = String(query.schoolId || user.schoolId || "");
-  if (!schoolId) throw httpError("\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0645\u0637\u0644\u0648\u0628\u0629", "INVALID_BODY", 400);
+  if (!schoolId) throw httpError2("\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0645\u0637\u0644\u0648\u0628\u0629", "INVALID_BODY", 400);
   assertSchool(user, schoolId);
   if (role === "guard") {
     const snap = await db.collection(DISMISSAL_COL).where("schoolId", "==", schoolId).where("status", "in", GUARD_QUEUE).limit(100).get();
@@ -3770,13 +4200,13 @@ async function listPendingDismissalsApi(db, uid, query = {}) {
     const snap = await db.collection(DISMISSAL_COL).where("schoolId", "==", schoolId).where("parentId", "==", uid).limit(50).get();
     return snap.docs.map((d) => serializeRequest(d.id, d.data())).filter((r) => GUARD_QUEUE.includes(r.derivedStatus));
   }
-  throw httpError("\u063A\u064A\u0631 \u0645\u0635\u0631\u062D", "FORBIDDEN_ROLE", 403);
+  throw httpError2("\u063A\u064A\u0631 \u0645\u0635\u0631\u062D", "FORBIDDEN_ROLE", 403);
 }
 async function listVerifiedDismissalsApi(db, uid, query = {}) {
   const user = await loadUser(db, uid);
   assertRole(user, MANAGER_ROLES, "\u0641\u0642\u0637 \u0627\u0644\u0625\u062F\u0627\u0631\u0629 \u064A\u0645\u0643\u0646\u0647\u0627 \u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0627\u062A");
   const schoolId = String(query.schoolId || user.schoolId || "");
-  if (!schoolId) throw httpError("\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0645\u0637\u0644\u0648\u0628\u0629", "INVALID_BODY", 400);
+  if (!schoolId) throw httpError2("\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0645\u0637\u0644\u0648\u0628\u0629", "INVALID_BODY", 400);
   assertSchool(user, schoolId);
   const snap = await db.collection(DISMISSAL_COL).where("schoolId", "==", schoolId).where("status", "in", MANAGER_QUEUE).limit(100).get();
   return snap.docs.map((d) => serializeRequest(d.id, d.data())).filter((r) => MANAGER_QUEUE.includes(r.derivedStatus) && !r.isProcessing);
@@ -5150,6 +5580,36 @@ async function startServer() {
       return res.status(500).json({ error: "SERVER_ERROR", schools: [] });
     }
   });
+  const deletionCtx = () => ({
+    db: getDb(),
+    adminSdk: admin4,
+    authAdmin: admin4.auth(),
+    bucket: () => getStorage().bucket(),
+    canActorDeleteUser,
+    purgeAccount: (userId) => runUserPermanentDelete({ db: getDb(), authAdmin: admin4.auth(), adminSdk: admin4, userId })
+  });
+  const deletionRoute = (fn) => async (req, res) => {
+    try {
+      res.json(await fn(deletionCtx(), req.user.uid, req.body || {}));
+    } catch (e) {
+      const noCreds = /Could not load the default credentials|Unable to detect a Project Id/i.test(String(e?.message || ""));
+      if (noCreds) return res.status(503).json({ error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B (\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u062E\u0627\u062F\u0645). \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
+      return res.status(e.status || 500).json({ error: e.code || "ERROR", message: e.message });
+    }
+  };
+  app.post("/api/records/delete", verifyToken, deletionRoute((c, uid, b) => deleteRecords(c, uid, b)));
+  app.post("/api/records/restore", verifyToken, deletionRoute((c, uid, b) => restoreBundle(c, uid, b.bundleId)));
+  app.post("/api/records/purge", verifyToken, deletionRoute((c, uid, b) => purgeBundle(c, uid, b)));
+  app.post("/api/records/resume", verifyToken, deletionRoute(async (c, uid) => {
+    const actor = await loadActor(c.db, uid);
+    if (!actor.isSuper && !["admin", "school_admin"].includes(actor.role)) {
+      const e = new Error("\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D");
+      e.status = 403;
+      e.code = "FORBIDDEN_ROLE";
+      throw e;
+    }
+    return sweepDeletions(c);
+  }));
   app.get("/api/download/schoolixiq.mobileconfig", (req, res) => {
     const host = req.get("host") || "schoolixiq.com";
     const protocol = req.headers["x-forwarded-proto"] === "https" || req.secure ? "https" : "http";
@@ -6796,6 +7256,7 @@ async function startServer() {
       const db = getDb();
       setupNotificationPushListener(db, admin4);
       setupSystemMessageNotifications(db, admin4);
+      startDeletionSweep(deletionCtx());
     } catch (e) {
       console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
     }

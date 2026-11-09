@@ -1068,8 +1068,7 @@ service cloud.firestore {
         || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
         || staffCanChange('students')
         || canParentUpdateStudent();
-      allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isAdmin());
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     // Registration / subscription requests — open create; scoped read/update.
@@ -1097,9 +1096,7 @@ service cloud.firestore {
         || canAdminSelfAssignSchool(userId)
         || canSelfUpdateAdminOnboarding(userId)
         || canAdminUpdateUserInSchool(userId);
-      allow delete: if isSuperAdmin()
-        || (signedIn() && isAdmin() && hasSchoolId(resource.data) && sameSchool(resource))
-        || canClaimProvisionedUserDoc(userId);
+      allow delete: if canClaimProvisionedUserDoc(userId); // account deletion goes through POST /api/records/delete
     }
 
     match /users/metadata {
@@ -1125,9 +1122,7 @@ service cloud.firestore {
           staffCanChange('schedules')
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['schedule', 'updatedAt'])
         );
-      allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
-        || staffCanChange('classes');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /attendance/{attendanceId} {
@@ -1135,9 +1130,7 @@ service cloud.firestore {
       allow create, update: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId) && customPermOk(['attendance', 'attendance_track']))
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId) && customPermOk(['attendance', 'attendance_track']));
-      allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['attendance', 'attendance_track'])))
-        || staffCanChange('attendance');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /homework/{homeworkId} {
@@ -1150,14 +1143,7 @@ service cloud.firestore {
           signedIn() && isParent() && sameSchool(resource)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenFor'])
         );
-      allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['homework', 'homework_and_tasks'])))
-        || staffCanChange('homework')
-        || (
-          signedIn() && sameSchool(resource) && isTeacher()
-          && resource.data.keys().hasAll(['teacherId'])
-          && resource.data.teacherId == request.auth.uid
-        );
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /grades/{gradeId} {
@@ -1166,17 +1152,14 @@ service cloud.firestore {
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId) && customPermOk(['grades', 'exams_and_results']));
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId) && customPermOk(['grades', 'exams_and_results']));
-      allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['grades', 'exams_and_results'])))
-        || staffCanChange('grades');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /subjects/{subjectId} {
       allow read, get, list: if canReadSchoolAcademicWide();
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /teacher_reports/{reportId} {
@@ -1185,8 +1168,7 @@ service cloud.firestore {
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
-      allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /advanced_reports/{reportId} {
@@ -1201,9 +1183,7 @@ service cloud.firestore {
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
-      allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
-        || staffCanChange('advanced_reports');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /behavior_reports/{reportId} {
@@ -1212,17 +1192,14 @@ service cloud.firestore {
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
       allow update: if isSuperAdmin()
         || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
-      allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
-        || staffCanChange('behavior');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /announcements/{announcementId} {
       allow read, get, list: if canReadSchoolAcademicWide();
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId));
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId));
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /payments/{paymentId} {
@@ -1230,9 +1207,7 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
         || staffCanCreate('tuition');
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
-        || staffCanChange('tuition');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /installments/{installmentId} {
@@ -1240,9 +1215,7 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && (isSchoolManagementRole() && customPermOk(['tuition', 'tuition_fees'])))
         || staffCanCreate('tuition');
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['tuition', 'tuition_fees'])))
-        || staffCanChange('tuition');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /payroll/{payrollId} {
@@ -1250,9 +1223,7 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && (isSchoolManagementRole() && customPermOk(['payroll', 'staff_payroll'])))
         || staffCanCreate('payroll');
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['payroll', 'staff_payroll'])))
-        || staffCanChange('payroll');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /inventory/{itemId} {
@@ -1260,9 +1231,7 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && (isSchoolManagementRole() && customPermOk(['inventory', 'inventory_and_assets'])))
         || staffCanCreate('inventory');
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && (isSchoolManagementRole() && customPermOk(['inventory', 'inventory_and_assets'])))
-        || staffCanChange('inventory');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /market/{itemId} {
@@ -1270,9 +1239,7 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
         || staffCanCreate('market');
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
-        || staffCanChange('market');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /marketplace/{itemId} {
@@ -1280,9 +1247,7 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
         || staffCanCreate('market');
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
-        || staffCanChange('market');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /orders/{orderId} {
@@ -1302,9 +1267,7 @@ service cloud.firestore {
           && hasSchoolId(request.resource.data)
           && canManageSchool(request.resource.data.schoolId)
         );
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && hasSchoolId(resource.data) && canManageSchool(resource.data.schoolId))
-        || staffCanChange('market');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /subscriptionRequests/{requestId} {
@@ -1331,9 +1294,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['parentEmail', 'residenceAddress', 'updatedAt'])
         );
-      allow delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
-        || staffCanChange('id_cards');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /student_archives/{archiveId} {
@@ -1341,9 +1302,7 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isSchoolManagementRole())
         || staffCanCreate('student_archive');
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && isSchoolManagementRole())
-        || staffCanChange('student_archive');
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     // -------------------------------------------------------------------------
@@ -1694,11 +1653,16 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /audit_logs/{logId} {
+      // Client-origin entries can only be written under the writer's OWN identity and school
+      // (no impersonation) and are immutable afterwards. Deletions are recorded by the server in
+      // deletion_logs, which no client can write.
       allow create: if signedIn()
-        && (
-          (hasSchoolId(request.resource.data) && request.resource.data.actorId == request.auth.uid)
-          || request.resource.data.userId == request.auth.uid
-        );
+        && request.resource.data.keys().hasAll(['actorId', 'actorRole', 'schoolId'])
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.actorRole == userRole()
+        && (isSuperAdmin() || request.resource.data.schoolId == userSchoolId())
+        && request.resource.data.get('uid', request.auth.uid) == request.auth.uid
+        && request.resource.data.get('performedBy', request.auth.uid) == request.auth.uid;
       allow read, get, list: if isSuperAdmin()
         || (
           signedIn()
@@ -1706,7 +1670,29 @@ service cloud.firestore {
           && userSchoolId() == resource.data.schoolId
           && isSchoolManagementRole()
         );
-      allow update, delete: if isSuperAdmin();
+      allow update, delete: if false;
+    }
+
+    // Deletion audit trail + trash. Written only by the server (Admin SDK).
+    match /deletion_logs/{logId} {
+      allow read, get, list: if isSuperAdmin()
+        || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && isSchoolManagementRole());
+      allow write: if false;
+    }
+
+    match /recycle_bin/{bundleId} {
+      allow read, get, list: if isSuperAdmin()
+        || (signedIn() && hasSchoolId(resource.data) && userSchoolId() == resource.data.schoolId && isSchoolManagementRole());
+      allow write: if false;
+      match /items/{itemId} {
+        allow read, get, list: if isSuperAdmin()
+          || (
+            signedIn()
+            && isSchoolManagementRole()
+            && get(/databases/$(database)/documents/recycle_bin/$(bundleId)).data.schoolId == userSchoolId()
+          );
+        allow write: if false;
+      }
     }
 
     match /login_logs/{logId} {
@@ -1752,8 +1738,7 @@ service cloud.firestore {
       allow read, get, list: if canReadAcademicOrParentLink();
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && canWriteSchoolData(request.resource.data.schoolId) && customPermOk(['behavior', 'behavior_management']));
-      allow update, delete: if isSuperAdmin()
-        || (signedIn() && sameSchool(resource) && canWriteSchoolData(resource.data.schoolId) && customPermOk(['behavior', 'behavior_management']));
+      allow delete: if false; // deletions go through POST /api/records/delete (server-side authorisation, trash, audit)
     }
 
     match /exams/{docId} {

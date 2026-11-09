@@ -1,5 +1,6 @@
 import { cronSecretMatches } from './backend/cronSecret.mjs';
 import { setupSystemMessageNotifications, messageNotificationsStatus } from './backend/messageNotifications.mjs';
+import { deleteRecords, restoreBundle, purgeBundle, sweepDeletions, startDeletionSweep, loadActor } from './backend/deletionService.mjs';
 import express from 'express';
 import compression from 'compression';
 import path from 'path';
@@ -940,6 +941,35 @@ async function startServer() {
       return res.status(500).json({ error: 'SERVER_ERROR', schools: [] });
     }
   });
+
+  // --- Secure deletion (trash / restore / permanent) -------------------------------------------
+  // Authorisation, school isolation, cascade, files and the audit log all live in
+  // backend/deletionService.mjs; the browser can no longer delete these collections directly.
+  const deletionCtx = () => ({
+    db: getDb(),
+    adminSdk: admin,
+    authAdmin: admin.auth(),
+    bucket: () => getStorage().bucket(),
+    canActorDeleteUser,
+    purgeAccount: (userId: string) => runUserPermanentDelete({ db: getDb(), authAdmin: admin.auth(), adminSdk: admin, userId }),
+  });
+  const deletionRoute = (fn: (ctx: any, uid: string, body: any) => Promise<any>) => async (req: any, res: any) => {
+    try {
+      res.json(await fn(deletionCtx(), req.user.uid, req.body || {}));
+    } catch (e: any) {
+      const noCreds = /Could not load the default credentials|Unable to detect a Project Id/i.test(String(e?.message || ''));
+      if (noCreds) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
+      return res.status(e.status || 500).json({ error: e.code || 'ERROR', message: e.message });
+    }
+  };
+  app.post('/api/records/delete', verifyToken, deletionRoute((c, uid, b) => deleteRecords(c, uid, b)));
+  app.post('/api/records/restore', verifyToken, deletionRoute((c, uid, b) => restoreBundle(c, uid, b.bundleId)));
+  app.post('/api/records/purge', verifyToken, deletionRoute((c, uid, b) => purgeBundle(c, uid, b)));
+  app.post('/api/records/resume', verifyToken, deletionRoute(async (c, uid) => {
+    const actor = await loadActor(c.db, uid);
+    if (!actor.isSuper && !['admin', 'school_admin'].includes(actor.role)) { const e: any = new Error('غير مسموح'); e.status = 403; e.code = 'FORBIDDEN_ROLE'; throw e; }
+    return sweepDeletions(c);
+  }));
 
   // iOS Configuration Profile Download API
   app.get('/api/download/schoolixiq.mobileconfig', (req, res) => {
@@ -2866,6 +2896,8 @@ async function startServer() {
       setupNotificationPushListener(db, admin);
       // Chat notifications are created here, once per message and recipient (deterministic ids)
       setupSystemMessageNotifications(db, admin);
+      // finish interrupted deletions and purge expired trash
+      startDeletionSweep(deletionCtx());
     } catch (e: any) {
       console.error('[Notifications] PUSH_SEND_ERROR gateway init:', e.message);
     }
