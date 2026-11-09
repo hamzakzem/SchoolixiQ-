@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
 import { AppModalPortal } from '../../components/AppModalPortal';
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 export default function Evaluations() {
   const { profile } = useAuth();
@@ -147,12 +148,12 @@ export default function Evaluations() {
   const handleDeleteReport = async (id: string) => {
     if (confirm(isRtl ? 'هل أنت متأكد من حذف هذا التقييم؟' : 'Are you sure you want to delete this evaluation?')) {
       try {
-        await deleteDoc(doc(db, 'teacher_reports', id));
+        await deleteRecord('teacher_reports', id);
         await notificationService.deleteBySourceId(id, profile.schoolId);
         toast.success(isRtl ? 'تم حذف التقييم بنجاح' : 'Evaluation deleted successfully');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `teacher_reports/${id}`);
-        toast.error(isRtl ? 'فشل الحذف' : 'Deletion failed');
+        toast.error(deleteErrorMessage(error, isRtl ? 'فشل الحذف' : 'Deletion failed'));
       }
     }
   };

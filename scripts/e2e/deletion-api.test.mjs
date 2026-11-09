@@ -180,6 +180,12 @@ const tb = r.j.results[0].bundleId;
 T('admin deletes a teacher account → user doc gone, login DISABLED (not deleted)', r.j.results[0].ok === true && !(await exists('users/' + accts.victimTeacher.uid)) && (await admin.auth().getUser(accts.victimTeacher.uid)).disabled === true);
 r = await api(T_.admin, '/api/records/restore', { bundleId: tb });
 T('restoring the account re-enables the login', r.s === 200 && (await exists('users/' + accts.victimTeacher.uid)) && (await admin.auth().getUser(accts.victimTeacher.uid)).disabled === false);
+await db.doc('students/DSTP').set({ name: 'طالب ولي الأمر', schoolId: 'S1', classId: 'DC1', parentIds: [accts.victimParent.uid] });
+r = await del(T_.admin, 'users', accts.victimParent.uid);
+const pBundle = r.j.results[0].bundleId;
+T('deleting a parent account removes it from its students', r.j.results[0].ok === true && !((await db.doc('students/DSTP').get()).get('parentIds') || []).includes(accts.victimParent.uid));
+r = await api(T_.admin, '/api/records/restore', { bundleId: pBundle });
+T('restoring the parent account re-links its students', r.s === 200 && ((await db.doc('students/DSTP').get()).get('parentIds') || []).includes(accts.victimParent.uid));
 r = await del(T_.admin, 'users', accts.victimParent.uid, { mode: 'permanent', confirmText: 'حذف نهائي' });
 T('permanent account delete removes the Auth login too', r.j.results[0].ok === true && !(await exists('users/' + accts.victimParent.uid)) && await admin.auth().getUser(accts.victimParent.uid).then(() => false, () => true));
 

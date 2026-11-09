@@ -20,6 +20,7 @@ import { setOfflineDataStale } from '../../lib/offline/offlineStatus';
 import { adminCreateUser, adminDeleteUser } from '../../lib/adminApi';
 import { ActionMenu } from '../../components/ui/ActionMenu';
 import { AppModalPortal } from '../../components/AppModalPortal';
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit' }) {
   const { profile } = useAuth();
@@ -325,65 +326,17 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     setIsDeleting(id);
     const loadingToast = toast.loading('جاري حذف سجل الطالب...');
     try {
-      const studentRef = doc(db, 'students', id);
-      const userRef = doc(db, 'users', id);
-
-      // Legacy: some students had a login doc with the same id. Most don't,
-      // and rules refuse reading a missing users doc, which would fail the
-      // whole transaction — so check it outside and treat a refusal as none.
-      let linkedUserSchoolId: string | null = null;
-      try {
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) linkedUserSchoolId = String(userSnap.data()?.schoolId || '');
-      } catch {
-        linkedUserSchoolId = null;
-      }
-
-      await runTransaction(db, async (transaction) => {
-        // All reads before any writes (Firestore transaction requirement).
-        const studentSnap = await transaction.get(studentRef);
-
-        if (!studentSnap.exists()) {
-          throw new Error('سجل الطالب غير موجود');
-        }
-
-        const studentData = studentSnap.data() || {};
-        const studentSchoolId = String(studentData.schoolId || '');
-        if (!isSuperAdmin && studentSchoolId !== profile.schoolId) {
-          throw new Error('غير مسموح بحذف طالب من مدرسة أخرى');
-        }
-        if (!studentSchoolId) {
-          throw new Error('سجل الطالب لا يحتوي على معرف المدرسة');
-        }
-
-        const schoolRef = doc(db, 'schools', studentSchoolId);
-        const schoolSnap = await transaction.get(schoolRef);
-        if (!schoolSnap.exists()) {
-          throw new Error('سجل المدرسة غير موجود');
-        }
-
-        const shouldDeleteLinkedUser =
-          linkedUserSchoolId !== null &&
-          (isSuperAdmin || linkedUserSchoolId === profile.schoolId);
-
-        transaction.delete(studentRef);
-        if (shouldDeleteLinkedUser) {
-          transaction.delete(userRef);
-        }
-        transaction.update(schoolRef, {
-          studentCount: increment(-1),
-        });
-      });
+      // Server-side: permission + school isolation + cascade + trash + audit.
+      await deleteRecord('students', id, 'trash');
 
       setStudents((prev) => prev.filter((s) => s.id !== id));
       setConfirmDeleteId(null);
       toast.dismiss(loadingToast);
-      toast.success('تم حذف الطالب نهائياً من النظام');
+      toast.success('تم نقل الطالب وسجلاته إلى سلة المحذوفات (يمكن استرجاعه)');
     } catch (error: unknown) {
       toast.dismiss(loadingToast);
       console.error('Delete student error:', error);
-      handleFirestoreError(error, OperationType.DELETE, `students/${id}`);
-      const message = error instanceof Error ? error.message : 'فشل في حذف الطالب';
+      const message = deleteErrorMessage(error, 'فشل في حذف الطالب');
       toast.error(message);
     } finally {
       setIsDeleting(null);
@@ -517,38 +470,14 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
   const handleDeleteParentAccount = async () => {
     if (!parentToDelete || !profile?.schoolId) return;
     setIsLoadingParents(true);
-    const loadingToast = toast.loading('جاري حذف حساب ولي الأمر نهائياً...');
+    const loadingToast = toast.loading('جاري حذف حساب ولي الأمر...');
     
     try {
-      // 1. Find all students linked to this parent in this school
-      const studentsQ = query(
-        collection(db, 'students'),
-        where('schoolId', '==', profile.schoolId),
-        where('parentIds', 'array-contains', parentToDelete.id)
-      );
-      const studentsSnap = await getDocs(studentsQ);
-      
-      // 2. Remove parent ID from all those students
-      const unlinkPromises = studentsSnap.docs.map(studentDoc => 
-        updateDoc(doc(db, 'students', studentDoc.id), {
-          parentIds: arrayRemove(parentToDelete.id)
-        })
-      );
-      await Promise.all(unlinkPromises);
-      
-      // 3. Delete from Firebase Auth (using Admin API)
-      try {
-        await adminDeleteUser(parentToDelete.id);
-      } catch (authErr) {
-        console.warn('Auth deletion failed or user not in Auth:', authErr);
-        // Continue anyway if Firestore delete is needed
-      }
-      
-      // 4. Delete user document from Firestore
-      await deleteDoc(doc(db, 'users', parentToDelete.id));
+      // Server-side: unlinks the parent from students, disables the login and keeps a restorable copy.
+      await deleteRecord('users', parentToDelete.id, 'trash');
       
       toast.dismiss(loadingToast);
-      toast.success('تم حذف حساب ولي الأمر نهائياً من النظام');
+      toast.success('تم تعطيل حساب ولي الأمر ونقله إلى سلة المحذوفات (يمكن استرجاعه)');
       
       // Update local state if the modal is open
       setLinkedParents(prev => prev.filter(p => p.id !== parentToDelete.id));
@@ -556,7 +485,7 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
     } catch (error: any) {
       toast.dismiss(loadingToast);
       console.error('Delete parent account error:', error);
-      toast.error(error.message || 'فشل حذف الحساب');
+      toast.error(deleteErrorMessage(error, 'فشل حذف الحساب'));
     } finally {
       setIsLoadingParents(false);
     }

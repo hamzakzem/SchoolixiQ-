@@ -95,3 +95,8 @@ export const deleteRecord = (collection: DeletableCollection, id: string, mode: 
 export const restoreFromTrash = (bundleId: string) => call('/api/records/restore', { bundleId });
 export const purgeFromTrash = (bundleId: string, confirmText: string) => call('/api/records/purge', { bundleId, confirmText });
 export const resumeDeletions = () => call('/api/records/resume', {});
+
+/** Best message to show a user for a failed delete (real server reason when available). */
+export function deleteErrorMessage(e: unknown, fallback: string): string {
+  return e instanceof DeletionError && e.message ? e.message : fallback;
+}

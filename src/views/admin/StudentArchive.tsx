@@ -34,6 +34,7 @@ import {
   OperationType,
 } from "../../lib/firestore-errors";
 import { printElement } from "../../lib/printUtils";
+import { deleteRecords, deleteErrorMessage } from "../../lib/deletionApi";
 
 const ARCHIVE_COLUMNS = [
   {
@@ -229,18 +230,19 @@ export default function StudentArchive() {
     if (!gradesToDelete.length) return;
 
     try {
-      const batch = writeBatch(db);
-      gradesToDelete.forEach((g) => {
-        batch.delete(doc(db, "grades", g.id));
+      await deleteRecords({
+        collection: "grades",
+        ids: gradesToDelete.map((g) => g.id),
+        mode: "trash",
+        confirmBulk: true,
       });
-      await batch.commit();
 
       setStudentGrades((prev) => prev.filter((g) => g.year !== year));
       toast.success(`تم حذف درجات عام ${year} بنجاح`);
       setYearToDelete(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, "grades");
-      toast.error("فشل في حذف السجل");
+      toast.error(deleteErrorMessage(error, "فشل في حذف السجل"));
     }
   };
 

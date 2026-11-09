@@ -59,6 +59,7 @@ export const POLICIES = {
   payroll: { roles: MGMT_ROLES, perms: ['payroll', 'staff_payroll'], label: (d) => `راتب ${d.userName || ''}`.trim() },
   inventory: { roles: MGMT_ROLES, perms: ['inventory', 'inventory_and_assets'], label: (d) => d.name || 'مادة مخزون' },
   market: { roles: MGMT_ROLES, perms: ['market', 'marketplace_ordering'], label: (d) => d.name || 'منتج', filePrefixes: (id) => [`market/${id}/`] },
+  marketplace: { roles: MGMT_ROLES, perms: ['market', 'marketplace_ordering'], label: (d) => d.name || 'منتج', filePrefixes: (id) => [`market/${id}/`] },
   orders: { roles: MGMT_ROLES, perms: ['market', 'marketplace_ordering'], label: (d) => `طلب ${d.studentName || d.parentName || ''}`.trim() },
   id_cards: { roles: MGMT_ROLES, perms: ['id_cards', 'id_card_generation'], label: (d) => `بطاقة ${d.studentName || ''}`.trim() },
   student_archives: { roles: MGMT_ROLES, perms: ['student_archive'], label: (d) => `أرشيف ${d.studentName || ''}`.trim() },
@@ -179,7 +180,12 @@ async function runTrashSteps(ctx, bundleId) {
         const pu = await db.collection('users').where('studentIds', 'array-contains', b.recordId).get();
         parentLinks = pu.docs.map((d) => d.id);
       }
-      await ref.set({ record: main.data(), childCounts: counts, parentLinks }, { merge: true });
+      let studentLinks = [];
+      if (b.kind === 'account' && main.data()?.role === 'parent') {
+        const sq = await db.collection('students').where('parentIds', 'array-contains', b.recordId).get();
+        studentLinks = sq.docs.filter((d) => !b.schoolId || d.get('schoolId') === b.schoolId).map((d) => d.id);
+      }
+      await ref.set({ record: main.data(), childCounts: counts, parentLinks, studentLinks }, { merge: true });
       const itemOps = deps.map((d) => (batch) => batch.set(ref.collection('items').doc(`${d.col}__${d.id}`), { col: d.col, docId: d.id, data: d.data }));
       await commitInBatches(db, itemOps);
       await mark('snapshot');
@@ -200,6 +206,13 @@ async function runTrashSteps(ctx, bundleId) {
       const ops = asArray(stored.parentLinks).map((uid) => (batch) => batch.update(db.collection('users').doc(uid), { studentIds: adminSdk.firestore.FieldValue.arrayRemove(b.recordId) }));
       await commitInBatches(db, ops.length ? ops : []);
       await mark('unlink');
+    }
+    // 3b) a deleted parent account no longer appears on its students
+    if (!steps.unlinkStudents && b.kind === 'account') {
+      const stored = (await ref.get()).data() || {};
+      const ops = asArray(stored.studentLinks).map((sid) => (batch) => batch.update(db.collection('students').doc(sid), { parentIds: adminSdk.firestore.FieldValue.arrayRemove(b.recordId) }));
+      await commitInBatches(db, ops);
+      await mark('unlinkStudents');
     }
     // 4) counters
     if (!steps.counter && policy?.counter) {
@@ -315,6 +328,10 @@ export async function restoreBundle(ctx, actorUid, bundleId) {
     if (b.collection === 'students') {
       const links = asArray(b.parentLinks).map((uid) => (batch) => batch.update(db.collection('users').doc(uid), { studentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) }));
       await commitInBatches(db, links);
+    }
+    if (b.kind === 'account') {
+      const relink = asArray(b.studentLinks).map((sid) => (batch) => batch.update(db.collection('students').doc(sid), { parentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) }));
+      await commitInBatches(db, relink);
     }
     if (policy?.counter) {
       const path = policy.counter.path.map((p) => p.replace('{schoolId}', b.schoolId));

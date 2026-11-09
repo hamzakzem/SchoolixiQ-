@@ -26,6 +26,7 @@ import {
   subjectNameExists,
   type SchoolSubjectOption,
 } from '../../lib/schoolSubjects';
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 export default function SchoolSubjectsManagement() {
   const { profile } = useAuth();
@@ -191,12 +192,12 @@ export default function SchoolSubjectsManagement() {
         return;
       }
 
-      await deleteDoc(doc(db, SCHOOL_SUBJECTS_COLLECTION, confirmDelete.id));
+      await deleteRecord('subjects', confirmDelete.id);
       toast.success('تم حذف المادة بنجاح');
       setConfirmDelete(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
-      toast.error('فشل في حذف المادة');
+      toast.error(deleteErrorMessage(error, 'فشل في حذف المادة'));
     } finally {
       setSaving(false);
     }

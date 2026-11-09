@@ -14,6 +14,7 @@ import { getOfflineStatusSnapshot } from '../../lib/offline/offlineStatus';
 import { homeworkMatchesStudent, collectParentIdsFromStudents } from '../../lib/schoolSync';
 import { getHomeworkSubjectDisplay } from '../../lib/homeworkSubjects';
 import { buildTeacherRedactionContext } from '../../lib/userProfile';
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 export default function Homework() {
   const { profile } = useAuth();
@@ -182,12 +183,12 @@ export default function Homework() {
           await safeFirestoreDelete();
           return;
         }
-        await deleteDoc(doc(db, 'homework', id));
+        await deleteRecord('homework', id);
         await notificationService.deleteBySourceId(id, profile.schoolId);
         toast.success(isRtl ? 'تم حذف الواجب بنجاح' : 'Homework deleted successfully');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `homework/${id}`);
-        toast.error(isRtl ? 'فشل الحذف' : 'Deletion failed');
+        toast.error(deleteErrorMessage(error, isRtl ? 'فشل الحذف' : 'Deletion failed'));
       }
     }
   };

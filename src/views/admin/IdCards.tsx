@@ -47,6 +47,7 @@ import {
   resolveSchoolId,
   saveIdCard,
 } from "../../lib/idCardFirestore";
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 export default function IdCards() {
   const { profile } = useAuth();
@@ -289,12 +290,12 @@ export default function IdCards() {
       )
     ) {
       try {
-        await deleteDoc(doc(db, "id_cards", studentId));
+        await deleteRecord("id_cards", studentId);
         toast.success(
           isRtl ? "تم حذف الهوية بنجاح" : "ID Card deleted successfully",
         );
       } catch (error) {
-        toast.error(isRtl ? "فشل الحذف" : "Deletion failed");
+        toast.error(deleteErrorMessage(error, isRtl ? "فشل الحذف" : "Deletion failed"));
         handleFirestoreError(
           error,
           OperationType.DELETE,

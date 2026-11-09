@@ -22,6 +22,7 @@ import {
   uploadStoreProductImage,
   MAX_STORE_IMAGE_BYTES,
 } from '../../lib/storeProducts';
+import { deleteRecord, deleteErrorMessage, type DeletableCollection } from '../../lib/deletionApi';
 
 export default function Marketplace() {
   const { profile } = useAuth();
@@ -72,14 +73,15 @@ export default function Marketplace() {
       try {
         setUploading(true); // Reuse uploading state for deletion loading if needed, or just perform logic
         try {
-          await deleteDoc(doc(db, STORE_COLLECTION, id));
-        } catch {
-          await deleteDoc(doc(db, LEGACY_STORE_COLLECTION, id));
+          await deleteRecord(STORE_COLLECTION as DeletableCollection, id);
+        } catch (err) {
+          if ((err as { code?: string })?.code !== 'NOT_FOUND') throw err;
+          await deleteRecord(LEGACY_STORE_COLLECTION as DeletableCollection, id);
         }
         toast.success('تم حذف المنتج بنجاح');
         setDeletingId(null);
       } catch (error) {
-        toast.error('حدث خطأ أثناء الحذف');
+        toast.error(deleteErrorMessage(error, 'حدث خطأ أثناء الحذف'));
       } finally {
         setUploading(false);
       }
@@ -147,11 +149,11 @@ export default function Marketplace() {
   const handleDeleteOrder = async (orderId: string) => {
     if (deletingOrderId === orderId) {
       try {
-        await deleteDoc(doc(db, 'orders', orderId));
+        await deleteRecord('orders', orderId);
         toast.success('تم حذف الطلب بنجاح');
         setDeletingOrderId(null);
       } catch (error) {
-        toast.error('فشل في حذف الطلب');
+        toast.error(deleteErrorMessage(error, 'فشل في حذف الطلب'));
       }
     } else {
       setDeletingOrderId(orderId);
