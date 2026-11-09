@@ -10,6 +10,190 @@ function cronSecretMatches(provided, secret) {
   return timingSafeEqual(a, b);
 }
 
+// messageNotifications.mjs
+var RECENT_WINDOW_MS = 60 * 60 * 1e3;
+var SWEEP_INTERVAL_MS = 3 * 60 * 1e3;
+var SWEEP_WINDOW_MS = 15 * 60 * 1e3;
+var SUPER_ADMIN_ROLES = ["superadmin", "super_admin"];
+var SCHOOL_ADMIN_ROLES = ["admin", "school_admin", "assistant", "school_assistant"];
+function notificationIdFor(messageId, userId) {
+  return `msgn_${messageId}_${userId}`;
+}
+function toMs(ts) {
+  if (!ts) return 0;
+  if (typeof ts.toMillis === "function") return ts.toMillis();
+  if (typeof ts._seconds === "number") return ts._seconds * 1e3;
+  const ms = new Date(ts).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+function preview(text) {
+  const t = String(text || "").trim();
+  return t.length > 50 ? `${t.slice(0, 50)}...` : t;
+}
+function titleFor(senderRole, recipientKind) {
+  const r = String(senderRole || "").toLowerCase();
+  if (r === "superadmin" || r === "super_admin") return "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0645\u0646\u0635\u0629";
+  if (r === "platform_assistant") return "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0645\u0633\u0627\u0639\u062F \u0627\u0644\u0645\u0646\u0635\u0629";
+  if (r === "teacher") return recipientKind === "admin" ? "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0645\u0639\u0644\u0645 (\u0627\u0644\u0625\u062F\u0627\u0631\u0629)" : "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0627\u0644\u0645\u0639\u0644\u0645";
+  if (r === "parent") return recipientKind === "admin" ? "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0648\u0644\u064A \u0623\u0645\u0631 (\u0627\u0644\u0625\u062F\u0627\u0631\u0629)" : "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0648\u0644\u064A \u0627\u0644\u0623\u0645\u0631";
+  if (["admin", "school_admin", "assistant", "school_assistant", "staff"].includes(r)) {
+    return recipientKind === "super_admin" ? "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0625\u062F\u0627\u0631\u0629 \u0645\u062F\u0631\u0633\u0629" : "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0627\u0644\u0625\u062F\u0627\u0631\u0629";
+  }
+  return "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629";
+}
+async function resolveMessageRecipients(db, msg) {
+  const schoolId = String(msg.schoolId || "");
+  const receiver = String(msg.receiverId || "");
+  const sender = String(msg.senderId || "");
+  const out = /* @__PURE__ */ new Map();
+  if (!receiver) return out;
+  if (SUPER_ADMIN_ROLES.includes(receiver) || receiver === "super_admin") {
+    const snap = await db.collection("users").where("role", "in", SUPER_ADMIN_ROLES).limit(50).get();
+    snap.docs.forEach((d) => out.set(d.id, "super_admin"));
+  } else if (receiver === "admin") {
+    if (!schoolId) return out;
+    const snap = await db.collection("users").where("schoolId", "==", schoolId).where("role", "in", SCHOOL_ADMIN_ROLES).limit(100).get();
+    snap.docs.forEach((d) => out.set(d.id, "admin"));
+  } else {
+    const u = await db.collection("users").doc(receiver).get();
+    if (u.exists) {
+      const data = u.data() || {};
+      const sameSchool = !schoolId || String(data.schoolId || "") === schoolId;
+      const isSuper = SUPER_ADMIN_ROLES.includes(String(data.role || ""));
+      if (sameSchool || isSuper) out.set(u.id, String(data.role || "user"));
+    }
+  }
+  out.delete(sender);
+  return out;
+}
+function isNotifiable(msg) {
+  if (!msg || msg.deleted === true || msg.deletedAt || msg.isDeleted === true) return false;
+  if (!msg.senderId || !msg.receiverId) return false;
+  const visibility = msg.conversationPrivacy?.visibility;
+  if (visibility === "platform_assistant_private") return false;
+  return true;
+}
+async function legacyClientNotificationExists(db, msg, userId) {
+  const conv = String(msg.conversationId || "");
+  if (!conv) return false;
+  const snap = await db.collection("notifications").where("userId", "==", userId).where("metadata.conversationId", "==", conv).limit(25).get();
+  const at = toMs(msg.createdAt);
+  return snap.docs.some((d) => {
+    if (d.id.startsWith("msgn_")) return false;
+    const n = d.data() || {};
+    return String(n.createdBy || n.senderId || "") === String(msg.senderId) && Math.abs(toMs(n.createdAt) - at) < 6e4;
+  });
+}
+async function notifyForSystemMessage(db, adminSdk, messageId, msg) {
+  if (msg?.serverNotifiedAt) return { messageId, created: 0, skipped: "already_processed" };
+  if (!isNotifiable(msg)) return { messageId, created: 0, skipped: "not_notifiable" };
+  const recipients = await resolveMessageRecipients(db, msg);
+  const FieldValue = adminSdk.firestore.FieldValue;
+  const schoolId = String(msg.schoolId || "");
+  let created = 0;
+  for (const [uid, kind] of recipients) {
+    const ref = db.collection("notifications").doc(notificationIdFor(messageId, uid));
+    try {
+      if (await legacyClientNotificationExists(db, msg, uid)) continue;
+      const toSuper = kind === "super_admin";
+      const metadata = {
+        senderId: msg.senderId,
+        conversationId: msg.conversationId || "",
+        messageId,
+        routeTarget: "chat",
+        category: "messages",
+        ...toSuper ? { audience: "super_admin", originalRecipient: "super_admin", sourceSchoolId: schoolId, schoolId } : {},
+        ...!toSuper && kind === "admin" ? { audience: "school_admin" } : {}
+      };
+      await ref.create({
+        title: titleFor(msg.senderRole, kind),
+        message: preview(msg.content) || "\u0645\u0644\u0641 \u0645\u0631\u0641\u0642",
+        type: "system",
+        schoolId: toSuper ? "system" : schoolId,
+        userId: uid,
+        recipientId: uid,
+        receiverId: uid,
+        read: false,
+        category: "messages",
+        routeTarget: "chat",
+        metadata,
+        senderId: msg.senderId,
+        ...msg.senderName ? { senderName: msg.senderName } : {},
+        ...msg.senderRole ? { senderRole: msg.senderRole } : {},
+        ...toSuper ? { audience: "super_admin" } : kind === "admin" ? { audience: "school_admin" } : {},
+        createdBy: String(msg.senderId),
+        pushDelivery: { status: "pending" },
+        createdAt: FieldValue.serverTimestamp()
+      });
+      created += 1;
+    } catch (e) {
+      if (e?.code !== 6 && !/already exists/i.test(String(e?.message || ""))) {
+        console.error("[MessageNotifications] create failed", { messageId, uid, error: e?.message });
+      }
+    }
+  }
+  await db.collection("system_messages").doc(messageId).update({ serverNotifiedAt: FieldValue.serverTimestamp() }).catch(() => {
+  });
+  return { messageId, created, recipients: recipients.size };
+}
+function setupSystemMessageNotifications(db, adminSdk, log = console) {
+  let unsub = null;
+  let stopped = false;
+  let backoff = 1e3;
+  const inflight = /* @__PURE__ */ new Set();
+  const handle = (doc) => {
+    if (inflight.has(doc.id)) return;
+    inflight.add(doc.id);
+    notifyForSystemMessage(db, adminSdk, doc.id, doc.data()).catch((e) => log.error("[MessageNotifications] failed", doc.id, e?.message)).finally(() => setTimeout(() => inflight.delete(doc.id), 3e4));
+  };
+  const cutoff = () => adminSdk.firestore.Timestamp.fromMillis(Date.now() - RECENT_WINDOW_MS);
+  const start = () => {
+    if (stopped) return;
+    try {
+      unsub = db.collection("system_messages").where("createdAt", ">=", cutoff()).onSnapshot(
+        (snap) => {
+          backoff = 1e3;
+          snap.docChanges().forEach((c) => {
+            if (c.type === "added") handle(c.doc);
+          });
+        },
+        (err) => {
+          log.error("[MessageNotifications] listener error, restarting", err?.message);
+          try {
+            unsub?.();
+          } catch {
+          }
+          setTimeout(start, backoff);
+          backoff = Math.min(backoff * 2, 6e4);
+        }
+      );
+    } catch (e) {
+      log.error("[MessageNotifications] listener start failed", e?.message);
+      setTimeout(start, backoff);
+      backoff = Math.min(backoff * 2, 6e4);
+    }
+  };
+  start();
+  const sweep = setInterval(async () => {
+    try {
+      const since = adminSdk.firestore.Timestamp.fromMillis(Date.now() - SWEEP_WINDOW_MS);
+      const snap = await db.collection("system_messages").where("createdAt", ">=", since).orderBy("createdAt", "desc").limit(50).get();
+      snap.docs.forEach(handle);
+    } catch (e) {
+      log.error("[MessageNotifications] sweep failed", e?.message);
+    }
+  }, SWEEP_INTERVAL_MS);
+  sweep.unref?.();
+  return () => {
+    stopped = true;
+    clearInterval(sweep);
+    try {
+      unsub?.();
+    } catch {
+    }
+  };
+}
+
 // server.ts
 import express from "express";
 import compression from "compression";
@@ -2281,27 +2465,60 @@ async function processNotificationPush(db, adminSdk, notifId, notif) {
   return dispatchPushForNotificationDoc(db, adminSdk, notifId, claim.notif || notif);
 }
 function setupNotificationPushListener(db, adminSdk) {
-  let isInitialSnapshot = true;
-  db.collection("notifications").onSnapshot(
-    (snapshot) => {
-      if (!snapshot) return;
-      if (isInitialSnapshot) {
-        isInitialSnapshot = false;
-        logPush("PUSH_SEND_START", { event: "listener_ready", skippedInitial: snapshot.size });
-        return;
-      }
-      for (const change of snapshot.docChanges()) {
-        if (change.type !== "added") continue;
-        const notifId = change.doc.id;
-        const notif = change.doc.data();
-        void processNotificationPush(db, adminSdk, notifId, notif);
-      }
-    },
-    (err) => {
-      logPush("PUSH_SEND_ERROR", { event: "listener", error: err.message });
+  let unsub = null;
+  let stopped = false;
+  let backoff = 1e3;
+  let recycleTimer = null;
+  const inflight = /* @__PURE__ */ new Set();
+  const handle = (notifId, notif) => {
+    if (inflight.has(notifId) || isPushTerminal(notif)) return;
+    inflight.add(notifId);
+    void processNotificationPush(db, adminSdk, notifId, notif).finally(() => {
+      setTimeout(() => inflight.delete(notifId), 3e4);
+    });
+  };
+  const start = () => {
+    if (stopped) return;
+    try {
+      unsub?.();
+    } catch {
     }
-  );
+    const cutoff = adminSdk.firestore.Timestamp.fromMillis(Date.now() - PUSH_MAX_AGE_MS);
+    unsub = db.collection("notifications").where("createdAt", ">=", cutoff).onSnapshot(
+      (snapshot) => {
+        backoff = 1e3;
+        for (const change of snapshot.docChanges()) {
+          if (change.type !== "added") continue;
+          handle(change.doc.id, change.doc.data());
+        }
+      },
+      (err) => {
+        logPush("PUSH_SEND_ERROR", { event: "listener_restart", error: err.message });
+        setTimeout(start, backoff);
+        backoff = Math.min(backoff * 2, 6e4);
+      }
+    );
+    logPush("PUSH_SEND_START", { event: "listener_ready", windowMs: PUSH_MAX_AGE_MS });
+  };
+  start();
+  recycleTimer = setInterval(start, 30 * 60 * 1e3);
+  recycleTimer.unref?.();
+  const sweep = setInterval(() => {
+    void pollRecentNotificationsForPush(db, adminSdk, 30).catch(
+      (e) => logPush("PUSH_SEND_ERROR", { event: "sweep", error: e instanceof Error ? e.message : String(e) })
+    );
+  }, 2 * 60 * 1e3);
+  sweep.unref?.();
   logPush("PUSH_SEND_START", { event: "fcm_gateway_initialized" });
+  return () => {
+    stopped = true;
+    clearInterval(sweep);
+    if (recycleTimer) clearInterval(recycleTimer);
+    try {
+      unsub?.();
+    } catch {
+    }
+  };
 }
 async function pollRecentNotificationsForPush(db, adminSdk, limit = 50) {
   const cutoff = adminSdk.firestore.Timestamp.fromMillis(Date.now() - PUSH_MAX_AGE_MS);
@@ -6414,6 +6631,7 @@ async function startServer() {
     try {
       const db = getDb();
       setupNotificationPushListener(db, admin4);
+      setupSystemMessageNotifications(db, admin4);
     } catch (e) {
       console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
     }

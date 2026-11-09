@@ -509,33 +509,70 @@ export async function processNotificationPush(
   return dispatchPushForNotificationDoc(db, adminSdk, notifId, claim.notif || notif);
 }
 
-/** Real-time listener — skips initial snapshot to avoid mass-resend of historical docs. */
-export function setupNotificationPushListener(db: Firestore, adminSdk: typeof admin): void {
-  let isInitialSnapshot = true;
+/**
+ * Real-time push listener. Self-healing:
+ *  - listens only to notifications from the last PUSH_MAX_AGE_MS (small initial snapshot, instead of
+ *    reading the whole collection on every start) and ALSO pushes that recent backlog, so a restart
+ *    or an idle/sleeping host delays a push instead of losing it (the claim transaction makes
+ *    re-processing safe: a notification is sent at most once);
+ *  - restarts itself with backoff if the stream fails (it used to die silently);
+ *  - re-creates the query periodically so the window does not grow forever;
+ *  - a periodic sweep covers anything a dropped event may have missed.
+ */
+export function setupNotificationPushListener(db: Firestore, adminSdk: typeof admin): () => void {
+  let unsub: (() => void) | null = null;
+  let stopped = false;
+  let backoff = 1000;
+  let recycleTimer: NodeJS.Timeout | null = null;
+  const inflight = new Set<string>();
 
-  db.collection('notifications').onSnapshot(
-    (snapshot) => {
-      if (!snapshot) return;
+  const handle = (notifId: string, notif: Record<string, unknown>) => {
+    if (inflight.has(notifId) || isPushTerminal(notif)) return;
+    inflight.add(notifId);
+    void processNotificationPush(db, adminSdk, notifId, notif).finally(() => {
+      setTimeout(() => inflight.delete(notifId), 30_000);
+    });
+  };
 
-      if (isInitialSnapshot) {
-        isInitialSnapshot = false;
-        logPush('PUSH_SEND_START', { event: 'listener_ready', skippedInitial: snapshot.size });
-        return;
-      }
+  const start = () => {
+    if (stopped) return;
+    try { unsub?.(); } catch { /* ignore */ }
+    const cutoff = adminSdk.firestore.Timestamp.fromMillis(Date.now() - PUSH_MAX_AGE_MS);
+    unsub = db.collection('notifications').where('createdAt', '>=', cutoff).onSnapshot(
+      (snapshot) => {
+        backoff = 1000;
+        for (const change of snapshot.docChanges()) {
+          if (change.type !== 'added') continue;
+          handle(change.doc.id, change.doc.data() as Record<string, unknown>);
+        }
+      },
+      (err) => {
+        logPush('PUSH_SEND_ERROR', { event: 'listener_restart', error: err.message });
+        setTimeout(start, backoff);
+        backoff = Math.min(backoff * 2, 60_000);
+      },
+    );
+    logPush('PUSH_SEND_START', { event: 'listener_ready', windowMs: PUSH_MAX_AGE_MS });
+  };
 
-      for (const change of snapshot.docChanges()) {
-        if (change.type !== 'added') continue;
-        const notifId = change.doc.id;
-        const notif = change.doc.data() as Record<string, unknown>;
-        void processNotificationPush(db, adminSdk, notifId, notif);
-      }
-    },
-    (err) => {
-      logPush('PUSH_SEND_ERROR', { event: 'listener', error: err.message });
-    },
-  );
+  start();
+  recycleTimer = setInterval(start, 30 * 60 * 1000);
+  recycleTimer.unref?.();
+
+  const sweep = setInterval(() => {
+    void pollRecentNotificationsForPush(db, adminSdk, 30).catch((e) =>
+      logPush('PUSH_SEND_ERROR', { event: 'sweep', error: e instanceof Error ? e.message : String(e) }),
+    );
+  }, 2 * 60 * 1000);
+  sweep.unref?.();
 
   logPush('PUSH_SEND_START', { event: 'fcm_gateway_initialized' });
+  return () => {
+    stopped = true;
+    clearInterval(sweep);
+    if (recycleTimer) clearInterval(recycleTimer);
+    try { unsub?.(); } catch { /* ignore */ }
+  };
 }
 
 /** Poll endpoint for Cloud Scheduler when Firestore trigger is unavailable. */

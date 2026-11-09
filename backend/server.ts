@@ -1,4 +1,5 @@
 import { cronSecretMatches } from './cronSecret.mjs';
+import { setupSystemMessageNotifications } from './messageNotifications.mjs';
 import express from 'express';
 import compression from 'compression';
 import path from 'path';
@@ -2815,10 +2816,12 @@ async function startServer() {
     console.log('SERVER_READY', { host: '0.0.0.0', port: PORT });
     console.log(`Server running on http://localhost:${PORT}`);
 
-    // Server-driven FCM push (skips initial snapshot; 10-minute age cutoff)
+    // Server-driven FCM push: self-healing listener + backlog + sweep (10-minute age cutoff)
     try {
       const db = getDb();
       setupNotificationPushListener(db, admin);
+      // Chat notifications are created here, once per message and recipient (deterministic ids)
+      setupSystemMessageNotifications(db, admin);
     } catch (e: any) {
       console.error('[Notifications] PUSH_SEND_ERROR gateway init:', e.message);
     }

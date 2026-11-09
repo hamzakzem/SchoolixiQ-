@@ -277,7 +277,8 @@ self.addEventListener('push', (event) => {
     silent: Boolean(silent),
     requireInteraction: false,
     tag: data.notificationId || data.dedupKey || `sx-${Date.now()}`,
-    renotify: true,
+    // same tag = same event: replace silently instead of buzzing again
+    renotify: false,
     data: {
       url,
       route,
