@@ -1633,8 +1633,8 @@ export default function StudentsList({ mode = 'edit' }: { mode?: 'view' | 'edit'
           </div>
           <h2 className="sx-app-modal-panel__title mb-2">تأكيد حذف الطالب</h2>
           <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-            هل أنت متأكد من حذف سجل الطالب <span className="font-bold text-slate-900 dark:text-white">{students.find(s => s.id === confirmDeleteId)?.name}</span> نهائياً؟ 
-            <span className="block mt-2 text-red-500 font-bold text-xs">هذا الإجراء سيؤدي لحذف كافة البيانات المرتبطة ولا يمكن التراجع عنه.</span>
+            هل أنت متأكد من حذف سجل الطالب <span className="font-bold text-slate-900 dark:text-white">{students.find(s => s.id === confirmDeleteId)?.name}</span> ؟ 
+            <span className="block mt-2 text-amber-600 font-bold text-xs">سيُنقل الطالب مع درجاته وحضوره وأقساطه وبقية سجلاته إلى سلة المحذوفات، ويمكن استعادته خلال 30 يوماً. الحذف النهائي من سلة المحذوفات (لمدير المدرسة فقط).</span>
           </p>
         </div>
         <div className="sx-app-modal-panel__footer flex flex-col-reverse md:flex-row-reverse gap-4">

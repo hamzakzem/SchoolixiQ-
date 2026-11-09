@@ -962,6 +962,20 @@ async function startServer() {
       return res.status(e.status || 500).json({ error: e.code || 'ERROR', message: e.message });
     }
   };
+  // Legacy endpoints delegate here so every delete is authorised, cascaded, trashed and audited the same way.
+  const legacyEngineDelete = async (req: any, res: any, collection: string, id: string, okMessage: string) => {
+    try {
+      const out = await deleteRecords(deletionCtx(), req.user.uid, { collection, ids: [id], mode: 'trash', confirmBulk: false });
+      const r = out.results?.[0];
+      if (r?.ok) return res.json({ ok: true, success: true, message: okMessage, bundleId: r.bundleId, data: { id } });
+      const status = /^FORBIDDEN/.test(r?.code || '') ? 403 : r?.code === 'NOT_FOUND' ? 404 : r?.code === 'HAS_DEPENDENTS' ? 409 : 400;
+      return res.status(status).json({ ok: false, success: false, error: r?.code || 'ERROR', message: r?.message || 'تعذّر الحذف' });
+    } catch (e: any) {
+      const noCreds = /Could not load the default credentials|Unable to detect a Project Id/i.test(String(e?.message || ''));
+      if (noCreds) return res.status(503).json({ ok: false, success: false, error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
+      return res.status(e.status || 500).json({ ok: false, success: false, error: e.code || 'ERROR', message: e.message });
+    }
+  };
   app.post('/api/records/delete', verifyToken, deletionRoute((c, uid, b) => deleteRecords(c, uid, b)));
   app.post('/api/records/restore', verifyToken, deletionRoute((c, uid, b) => restoreBundle(c, uid, b.bundleId)));
   app.post('/api/records/purge', verifyToken, deletionRoute((c, uid, b) => purgeBundle(c, uid, b)));
@@ -1518,6 +1532,11 @@ async function startServer() {
 
     if (!userId) {
       return res.status(400).json({ error: 'USER_ID_REQUIRED', message: 'userId مطلوب' });
+    }
+
+    // School-level actors go through the deletion engine (permissions, trash, audit). Only platform super admins keep the legacy path.
+    if (!isSuperAdminRole(req.user.role)) {
+      return legacyEngineDelete(req, res, 'users', userId, 'تم تعطيل الحساب ونقله إلى سلة المحذوفات');
     }
 
     try {
@@ -2380,65 +2399,9 @@ async function startServer() {
   });
 
   app.post('/api/admin/delete-student', verifyAdmin, async (req: any, res: any) => {
-    const { id } = req.body;
+    const id = String(req.body?.id || '').trim();
     if (!id) return res.status(400).json({ error: 'Student ID required' });
-    
-    try {
-      if (!canActorDeleteStudent(req.user.role, req.user.schoolId)) {
-        return res.status(403).json({
-          error: 'FORBIDDEN',
-          message: 'غير مسموح لك بحذف الطلاب',
-        });
-      }
-
-      const db = getDb();
-      const studentDoc = await db.collection('students').doc(id).get();
-      const beforeData = studentDoc.exists ? studentDoc.data() : null;
-      const schoolId = beforeData?.schoolId;
-
-      // 2. Enforce school boundary verification for multi-tenancy
-      if (req.user.role !== 'superadmin') {
-        if (!schoolId || schoolId !== req.user.schoolId) {
-          return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مسموح لك بحذف طلاب مدرسة أخرى' });
-        }
-      }
-
-      await db.runTransaction(async (transaction) => {
-        // 1. Delete from Firestore collections
-        transaction.delete(db.collection('students').doc(id));
-        transaction.delete(db.collection('users').doc(id));
-
-        // 2. Decrement school student counter
-        if (schoolId) {
-          transaction.update(db.collection('schools').doc(schoolId), {
-            studentCount: admin.firestore.FieldValue.increment(-1)
-          });
-        }
-      });
-
-      // 3. Delete from Auth (if exists) - outside transaction
-      try {
-        await admin.auth().deleteUser(id);
-      } catch (authError) {
-        // Expected if students don't have accounts
-      }
-
-      // 4. Log audit
-      await logAudit(req, 'DELETE_STUDENT', { before: beforeData, metadata: { targetId: id } });
-
-      res.json({
-        success: true,
-        message: 'تم حذف الطالب بنجاح',
-        data: { id }
-      });
-    } catch (error: any) {
-      console.error('Delete Student Error:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Internal Server Error',
-        message: error.message || 'حدث خطأ أثناء حذف الطالب'
-      });
-    }
+    return legacyEngineDelete(req, res, 'students', id, 'تم نقل الطالب إلى سلة المحذوفات');
   });
 
   app.post('/api/admin/backup', verifyAdmin, async (req: any, res: any) => {

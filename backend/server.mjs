@@ -2585,12 +2585,6 @@ function canActorSyncClaims(actorRole, targetRole, actorSchoolId) {
   }
   return false;
 }
-function canActorDeleteStudent(actorRole, actorSchoolId) {
-  const actor = normalizeEffectiveRole(actorRole, actorSchoolId);
-  if (isSuperAdminRole(actor)) return true;
-  if (actor === "platform_assistant") return false;
-  return isSchoolAdminRole(actor);
-}
 
 // notificationPushDispatch.ts
 var PUSH_MAX_AGE_MS = 10 * 60 * 1e3;
@@ -5613,6 +5607,19 @@ async function startServer() {
       return res.status(e.status || 500).json({ error: e.code || "ERROR", message: e.message });
     }
   };
+  const legacyEngineDelete = async (req, res, collection, id, okMessage) => {
+    try {
+      const out = await deleteRecords(deletionCtx(), req.user.uid, { collection, ids: [id], mode: "trash", confirmBulk: false });
+      const r = out.results?.[0];
+      if (r?.ok) return res.json({ ok: true, success: true, message: okMessage, bundleId: r.bundleId, data: { id } });
+      const status = /^FORBIDDEN/.test(r?.code || "") ? 403 : r?.code === "NOT_FOUND" ? 404 : r?.code === "HAS_DEPENDENTS" ? 409 : 400;
+      return res.status(status).json({ ok: false, success: false, error: r?.code || "ERROR", message: r?.message || "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u062D\u0630\u0641" });
+    } catch (e) {
+      const noCreds = /Could not load the default credentials|Unable to detect a Project Id/i.test(String(e?.message || ""));
+      if (noCreds) return res.status(503).json({ ok: false, success: false, error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B (\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u062E\u0627\u062F\u0645). \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
+      return res.status(e.status || 500).json({ ok: false, success: false, error: e.code || "ERROR", message: e.message });
+    }
+  };
   app.post("/api/records/delete", verifyToken, deletionRoute((c, uid, b) => deleteRecords(c, uid, b)));
   app.post("/api/records/restore", verifyToken, deletionRoute((c, uid, b) => restoreBundle(c, uid, b.bundleId)));
   app.post("/api/records/purge", verifyToken, deletionRoute((c, uid, b) => purgeBundle(c, uid, b)));
@@ -6076,6 +6083,9 @@ async function startServer() {
     const confirmSelfDelete = body.confirmSelfDelete === true;
     if (!userId) {
       return res.status(400).json({ error: "USER_ID_REQUIRED", message: "userId \u0645\u0637\u0644\u0648\u0628" });
+    }
+    if (!isSuperAdminRole3(req.user.role)) {
+      return legacyEngineDelete(req, res, "users", userId, "\u062A\u0645 \u062A\u0639\u0637\u064A\u0644 \u0627\u0644\u062D\u0633\u0627\u0628 \u0648\u0646\u0642\u0644\u0647 \u0625\u0644\u0649 \u0633\u0644\u0629 \u0627\u0644\u0645\u062D\u0630\u0648\u0641\u0627\u062A");
     }
     try {
       const db = getDb();
@@ -6845,51 +6855,9 @@ async function startServer() {
     }
   });
   app.post("/api/admin/delete-student", verifyAdmin, async (req, res) => {
-    const { id } = req.body;
+    const id = String(req.body?.id || "").trim();
     if (!id) return res.status(400).json({ error: "Student ID required" });
-    try {
-      if (!canActorDeleteStudent(req.user.role, req.user.schoolId)) {
-        return res.status(403).json({
-          error: "FORBIDDEN",
-          message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0627\u0644\u0637\u0644\u0627\u0628"
-        });
-      }
-      const db = getDb();
-      const studentDoc = await db.collection("students").doc(id).get();
-      const beforeData = studentDoc.exists ? studentDoc.data() : null;
-      const schoolId = beforeData?.schoolId;
-      if (req.user.role !== "superadmin") {
-        if (!schoolId || schoolId !== req.user.schoolId) {
-          return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0637\u0644\u0627\u0628 \u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649" });
-        }
-      }
-      await db.runTransaction(async (transaction) => {
-        transaction.delete(db.collection("students").doc(id));
-        transaction.delete(db.collection("users").doc(id));
-        if (schoolId) {
-          transaction.update(db.collection("schools").doc(schoolId), {
-            studentCount: admin4.firestore.FieldValue.increment(-1)
-          });
-        }
-      });
-      try {
-        await admin4.auth().deleteUser(id);
-      } catch (authError) {
-      }
-      await logAudit(req, "DELETE_STUDENT", { before: beforeData, metadata: { targetId: id } });
-      res.json({
-        success: true,
-        message: "\u062A\u0645 \u062D\u0630\u0641 \u0627\u0644\u0637\u0627\u0644\u0628 \u0628\u0646\u062C\u0627\u062D",
-        data: { id }
-      });
-    } catch (error) {
-      console.error("Delete Student Error:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal Server Error",
-        message: error.message || "\u062D\u062F\u062B \u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062D\u0630\u0641 \u0627\u0644\u0637\u0627\u0644\u0628"
-      });
-    }
+    return legacyEngineDelete(req, res, "students", id, "\u062A\u0645 \u0646\u0642\u0644 \u0627\u0644\u0637\u0627\u0644\u0628 \u0625\u0644\u0649 \u0633\u0644\u0629 \u0627\u0644\u0645\u062D\u0630\u0648\u0641\u0627\u062A");
   });
   app.post("/api/admin/backup", verifyAdmin, async (req, res) => {
     if (req.user.role !== "superadmin") return res.status(403).json({ error: "SuperAdmin access required" });
