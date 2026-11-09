@@ -3,6 +3,7 @@ import { clsx } from "clsx";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import { signOutWithCleanup } from "../lib/authLogout";
+import { deleteRecord } from "../lib/deletionApi";
 import { adminCreateUser, adminDeleteUser, adminAccrueCommissionOnPaymentConfirmed, adminFinalizeSchoolTracking, adminValidateDistributorCoupon, adminPurgeUserConversations } from "../lib/adminApi";
 import { clearMessagingCache } from "../lib/offline/offlineDataCache";
 import { resolveMessagingAccess } from "../lib/messagingAccess";
@@ -1285,10 +1286,28 @@ export default function SuperAdminDashboard() {
     await adminAccrueCommissionOnPaymentConfirmed(schoolId);
   };
 
+  /** Approved / rejected requests are DECISION RECORDS: they are marked, never deleted (orders go through the deletion engine). */
+  const closeRequest = async (
+    source: string,
+    requestId: string,
+    decision: "approved" | "rejected",
+  ) => {
+    if (source === "orders") {
+      await deleteRecord("orders", requestId);
+      return;
+    }
+    await updateDoc(doc(db, source, requestId), {
+      status: decision,
+      decidedAt: serverTimestamp(),
+      decidedBy: profile?.uid || null,
+      updatedAt: serverTimestamp(),
+    });
+  };
+
   const scheduleRegistrationCleanup = (source: string, requestId: string) => {
     setTimeout(async () => {
-      await deleteDoc(doc(db, source, requestId)).catch((e) =>
-        console.error("Failed to clean up approved registration:", e),
+      await closeRequest(source, requestId, "approved").catch((e) =>
+        console.error("Failed to close approved registration:", e),
       );
     }, 10000);
   };
@@ -1341,8 +1360,7 @@ export default function SuperAdminDashboard() {
         });
       }
 
-      const requestRef = doc(db, source, id);
-      await deleteDoc(requestRef);
+      await closeRequest(source, id, "rejected");
 
       toast.dismiss(loadingToast);
       toast.success("تم إلغاء الطلب وتحويل حالة المدرسة إلى مرفوض");
@@ -1972,7 +1990,7 @@ export default function SuperAdminDashboard() {
       // Cleanup request notification if applicable
       if (activeRequestId && activeRequestSource) {
         try {
-          await deleteDoc(doc(db, activeRequestSource, activeRequestId));
+          await closeRequest(activeRequestSource, activeRequestId, "approved");
           setActiveRequestId(null);
           setActiveRequestSource(null);
         } catch (e) {

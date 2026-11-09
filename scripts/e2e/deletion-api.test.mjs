@@ -80,8 +80,8 @@ T('dependants cascaded (grades, attendance, installments, behavior, reports, id 
 T('other school data untouched', (await exists('students/XST1')) && (await exists('grades/XG1')));
 T('parent link removed (no dangling studentIds)', !((await db.doc('users/' + accts.parent.uid).get()).get('studentIds') || []).includes('DST1'));
 T('school student counter decremented', (await db.doc('schools/S1').get()).get('studentCount') === 4);
-const files1 = (await bucket.getFiles({ prefix: 'students/S1/DST1/' }))[0].length;
-T('files are KEPT while in trash (recoverable)', files1 === 1);
+const files1 = (await bucket.getFiles({ prefix: `_trash/${bundleId}/students/S1/DST1/` }))[0].length;
+T('files are KEPT (moved to _trash, not deleted) while in trash', files1 === 1 && (await bucket.getFiles({ prefix: 'students/S1/DST1/' }))[0].length === 0);
 const b = (await db.doc('recycle_bin/' + bundleId).get()).data();
 T('trash bundle records who/what/when and dependants', b.status === 'trashed' && b.deletedBy.uid === accts.admin.uid && b.schoolId === 'S1' && b.childCounts.grades === 2 && b.label === 'طالب للحذف');
 let lg = await logs({ recordId: 'DST1', action: 'DELETE_TO_TRASH' });
@@ -92,6 +92,7 @@ r = await api(T_.admin2, '/api/records/restore', { bundleId });
 T('another school’s admin cannot restore it (403)', r.s === 403 && r.j.error === 'FORBIDDEN_SCHOOL');
 r = await api(T_.admin, '/api/records/restore', { bundleId });
 T('restore brings the student back', r.s === 200 && (await exists('students/DST1')));
+T('restore brings the student photo back to its original path', (await bucket.file('students/S1/DST1/photo.png').exists())[0] && (await bucket.getFiles({ prefix: `_trash/${bundleId}/` }))[0].length === 0);
 T('restore brings every dependant back', (await exists('grades/DG1')) && (await exists('grades/DG2')) && (await exists('attendance/DA1')) && (await exists('installments/DI1')) && (await exists('id_cards/DST1')) && (await exists('behavior_reports/DB1')));
 T('restore re-links the parent and fixes the counter', ((await db.doc('users/' + accts.parent.uid).get()).get('studentIds') || []).includes('DST1') && (await db.doc('schools/S1').get()).get('studentCount') === 5);
 T('restore is logged (success) and the refused foreign attempt too', (await logs({ recordId: 'DST1', action: 'RESTORE', result: 'success' })).length === 1 && (await logs({ recordId: 'DST1', action: 'RESTORE', result: 'refused' })).length === 1);

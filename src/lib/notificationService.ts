@@ -1,3 +1,4 @@
+import { deleteNotificationsApi } from './deletionApi';
 import { auth, db } from './firebase';
 import {
   collection,
@@ -465,7 +466,7 @@ export const notificationService = {
    */
   async delete(notificationId: string, notification?: Record<string, unknown>) {
     try {
-      await deleteDoc(doc(db, 'notifications', notificationId));
+      if ((await deleteNotificationsApi([notificationId])) < 1) throw new Error('NOT_DELETED');
       devLog('DELETE', { notificationId });
       return true;
     } catch (error) {
@@ -499,13 +500,9 @@ export const notificationService = {
     if (candidates.length === 0) return 0;
 
     try {
-      const batch = writeBatch(db);
-      candidates.forEach((n) => {
-        batch.delete(doc(db, 'notifications', n.id));
-      });
-      await batch.commit();
-      devLog('DELETE_ALL_READ', { count: candidates.length });
-      return candidates.length;
+      const deleted = await deleteNotificationsApi(candidates.map((n) => n.id));
+      devLog('DELETE_ALL_READ', { count: deleted });
+      return deleted;
     } catch (error) {
       if (isResourceExhaustedError(error)) {
         handleResourceExhausted('notification_delete_all_read');
@@ -553,13 +550,7 @@ export const notificationService = {
     if (expired.length === 0) return 0;
 
     try {
-      const batch = writeBatch(db);
-      let count = 0;
-      for (const n of expired.slice(0, 50)) {
-        batch.delete(doc(db, 'notifications', n.id));
-        count += 1;
-      }
-      await batch.commit();
+      const count = await deleteNotificationsApi(expired.slice(0, 50).map((n) => n.id));
       devLog('CLEANUP_EXPIRED_SEEN', { deleted: count });
       return count;
     } catch (error) {
@@ -575,37 +566,9 @@ export const notificationService = {
   /**
    * Delete notifications by their source ID
    */
-  async deleteBySourceId(sourceId: string, schoolId?: string) {
-    try {
-      if (!schoolId) {
-        console.warn('deleteBySourceId skipped: schoolId is required for scoped deletion');
-        return false;
-      }
-      const scoped = [
-        where('schoolId', '==', schoolId),
-        where('metadata.sourceId', '==', sourceId),
-      ];
-      let snap;
-      try {
-        snap = await getDocs(query(collection(db, 'notifications'), ...scoped));
-      } catch {
-        // Not allowed to see everyone's copies: remove the ones this user sent
-        const uid = auth.currentUser?.uid;
-        if (!uid) return false;
-        snap = await getDocs(
-          query(collection(db, 'notifications'), ...scoped, where('createdBy', '==', uid)),
-        );
-      }
-      const batch = writeBatch(db);
-      snap.docs.forEach(d => {
-        batch.delete(d.ref);
-      });
-      await batch.commit();
-      return true;
-    } catch (error) {
-      console.error('Error deleting notifications by source ID:', error);
-      return false;
-    }
+  async deleteBySourceId(_sourceId: string, _schoolId?: string) {
+    // Notifications that point at a deleted record are removed (and restored with it) by the server deletion engine.
+    return true;
   },
 
   /**

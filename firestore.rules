@@ -1079,7 +1079,8 @@ service cloud.firestore {
         || canReadOwnRegistration(resource.data);
       allow update: if isSuperAdmin()
         || (signedIn() && canReadOwnRegistration(resource.data) && resource.data.status == 'pending');
-      allow delete: if isSuperAdmin();
+      // approved requests are decision records; super admin closes them by status, deletion goes through the server engine
+      allow delete: if false;
     }
 
     // -------------------------------------------------------------------------
@@ -1276,7 +1277,8 @@ service cloud.firestore {
         || (signedIn() && hasSchoolId(resource.data) && canManageSchool(resource.data.schoolId));
       allow create: if isSuperAdmin()
         || (signedIn() && sameSchoolRequest() && isAdmin());
-      allow update, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if false;
     }
 
     match /id_cards/{cardId} {
@@ -1530,10 +1532,8 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
         || (isNotificationRecipient() && notificationSchoolMatchesViewer())
         || isSuperAdminInboxNotification();
-      allow delete: if isSuperAdmin()
-        || (isNotificationRecipient() && notificationSchoolMatchesViewer())
-        || isSuperAdminInboxNotification()
-        || isNotificationCreator();
+      // Deletion goes through POST /api/records/delete-notifications (ownership + school checked on the server, logged).
+      allow delete: if false;
     }
 
     match /notification_preferences/{prefId} {

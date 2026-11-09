@@ -495,7 +495,7 @@ export default function Tuition() {
     s.registrationNumber?.includes(searchTerm)
   );
 
-  const totalCollected = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const totalCollected = payments.reduce((sum, p) => sum + (p.status === 'voided' ? 0 : (p.amount || 0)), 0);
   const totalArrears = computeTotalArrears(installments);
   const lateInstallments = computeLateInstallments(installments, students);
 

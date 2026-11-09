@@ -100,3 +100,12 @@ export const resumeDeletions = () => call('/api/records/resume', {});
 export function deleteErrorMessage(e: unknown, fallback: string): string {
   return e instanceof DeletionError && e.message ? e.message : fallback;
 }
+
+/** Cancel a payment keeping its record (amount, date, receipt, collector) — payments are never deleted. */
+export const voidPayment = (paymentId: string, reason: string) => call('/api/records/void-payment', { paymentId, reason });
+
+/** Delete the caller's own notifications (server checks ownership/school). */
+export async function deleteNotificationsApi(ids: string[]): Promise<number> {
+  const out = await call('/api/records/delete-notifications', { ids: [...new Set(ids)].slice(0, 100) });
+  return Number(out.deleted || 0);
+}

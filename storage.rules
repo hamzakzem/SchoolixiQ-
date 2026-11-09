@@ -1,4 +1,6 @@
 rules_version = '2';
+// Files are removed ONLY by the server deletion engine (Admin SDK): no client rule grants `delete`.
+// Deleted records' files are moved to _trash/ (default deny) and restored or purged by the server.
 service firebase.storage {
   match /b/{bucket}/o {
     // 1. Default Deny
@@ -112,13 +114,13 @@ service firebase.storage {
     // 2. Profiles: Authenticated users can read all user profile images, but only owners can upload
     match /users/{userId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
     }
 
     // 3. School store product images (school admin/staff of same school)
     match /schools/{schoolId}/store/products/{fileName} {
       allow read: if isSignedIn();
-      allow write: if canManageSchoolAssets(schoolId)
+      allow create, update: if canManageSchoolAssets(schoolId)
         && isAllowedImageUpload(fileName, 5 * 1024 * 1024)
         && isStoreProductFileName(fileName);
     }
@@ -126,7 +128,7 @@ service firebase.storage {
     // 4. School logo
     match /schools/{schoolId}/logo/{fileName} {
       allow read: if isSignedIn();
-      allow write: if canManageSchoolAssets(schoolId)
+      allow create, update: if canManageSchoolAssets(schoolId)
         && isAllowedImageUpload(fileName, 2 * 1024 * 1024)
         && isSchoolLogoFileName(fileName);
     }
@@ -134,7 +136,7 @@ service firebase.storage {
     // 4b. ID card watermark / background images
     match /schools/{schoolId}/idcards/{fileName} {
       allow read: if isSignedIn();
-      allow write: if canManageSchoolAssets(schoolId)
+      allow create, update: if canManageSchoolAssets(schoolId)
         && isAllowedImageUpload(fileName, 5 * 1024 * 1024)
         && fileName.matches('watermark_[0-9]+\\.(jpg|jpeg|png|webp)');
     }
@@ -149,7 +151,7 @@ service firebase.storage {
     // (pages display photos through download URLs, which do not depend on this read rule)
     match /students/{schoolId}/{studentId}/{fileName} {
       allow read: if isSuperAdmin() || sameSchool(schoolId);
-      allow write: if canManageSchoolAssets(schoolId)
+      allow create, update: if canManageSchoolAssets(schoolId)
         && isStudentPhotoFileName(fileName)
         && isAllowedImageUpload(fileName, 5 * 1024 * 1024);
     }
@@ -157,7 +159,7 @@ service firebase.storage {
     // Legacy generic path (superadmin only)
     match /students/{studentId}/{allPaths=**} {
       allow read: if isSuperAdmin() || sameSchool(studentId);
-      allow write: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
     }
 
     // Conversation ids embed the participant uid or the school id
@@ -182,7 +184,7 @@ service firebase.storage {
         && resource == null
         && request.resource.size > 0
         && request.resource.size < 50 * 1024 * 1024;
-      allow update, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin();
     }
 
     // Legacy chat attachments path (no longer written by the app)
@@ -194,7 +196,7 @@ service firebase.storage {
     // Legacy store image path (backward compatibility)
     match /market/{itemId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn()
+      allow create, update: if isSignedIn()
         && userDocExists()
         && userRole() in ['admin', 'school_admin', 'assistant', 'staff', 'superadmin', 'super_admin'];
     }
@@ -202,19 +204,19 @@ service firebase.storage {
     // Public footer partner logos (Super Admin upload, public read)
     match /public/footer/success-partners/{fileName} {
       allow read: if true;
-      allow write: if isSuperAdmin()
+      allow create, update: if isSuperAdmin()
         && isAllowedImageUpload(fileName, 2 * 1024 * 1024);
     }
 
     match /public/footer/our-partners/{fileName} {
       allow read: if true;
-      allow write: if isSuperAdmin()
+      allow create, update: if isSuperAdmin()
         && isAllowedImageUpload(fileName, 2 * 1024 * 1024);
     }
 
     match /system/{allPaths=**} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow create, update: if isSuperAdmin();
     }
   }
 }

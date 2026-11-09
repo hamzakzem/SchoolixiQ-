@@ -256,34 +256,215 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
   };
 }
 
+// storageRegistry.mjs
+var TRASH_ROOT = "_trash";
+var FILE_REF_FIELDS = {
+  students: [["photoUrl"], ["photo"], ["avatar"], ["idCardUrl"]],
+  users: [["photoUrl"], ["photoURL"], ["avatar"]],
+  market: [["imageUrl"], ["image"], ["images", true]],
+  marketplace: [["imageUrl"], ["image"], ["images", true]],
+  inventory: [["imageUrl"], ["image"]],
+  homework: [["attachmentUrl"], ["fileUrl"], ["imageUrl"], ["attachments", true]],
+  announcements: [["imageUrl"], ["attachmentUrl"], ["fileUrl"], ["attachments", true]],
+  teacher_reports: [["attachmentUrl"], ["fileUrl"]],
+  advanced_reports: [["attachmentUrl"], ["fileUrl"]],
+  behavior_reports: [["attachmentUrl"], ["fileUrl"]],
+  id_cards: [["photoUrl"], ["imageUrl"]],
+  student_archives: [["fileUrl"], ["attachmentUrl"], ["photoUrl"]],
+  orders: [["imageUrl"]]
+};
+function exclusivePrefixes(collection, id, schoolId) {
+  if (collection === "students") return [`students/${schoolId}/${id}/`, `students/${id}/`];
+  if (collection === "market" || collection === "marketplace") return [`market/${id}/`];
+  if (collection === "users") return [`users/${id}/`];
+  return [];
+}
+function allowedScopes({ schoolId, collection, recordId }) {
+  const scopes = [];
+  if (schoolId) scopes.push(`schools/${schoolId}/`, `students/${schoolId}/`);
+  if (collection === "students") scopes.push(`students/${recordId}/`);
+  if (collection === "market" || collection === "marketplace") scopes.push(`market/${recordId}/`);
+  if (collection === "users") scopes.push(`users/${recordId}/`);
+  return scopes;
+}
+function pathFromUrl(value, bucketName) {
+  if (typeof value !== "string" || value.length < 8 || value.startsWith("data:")) return null;
+  let m = /^gs:\/\/([^/]+)\/(.+)$/.exec(value);
+  if (m) return m[1] === bucketName ? decodeURIComponent(m[2]) : null;
+  m = /^https?:\/\/[^/]+\/v0\/b\/([^/]+)\/o\/([^?#]+)/.exec(value);
+  if (m) return m[1] === bucketName ? decodeURIComponent(m[2]) : null;
+  m = /^https:\/\/storage\.googleapis\.com\/([^/]+)\/([^?#]+)/.exec(value);
+  if (m) return m[1] === bucketName ? decodeURIComponent(m[2]) : null;
+  return null;
+}
+function extractStoragePaths(data, bucketName, out = /* @__PURE__ */ new Set(), depth = 0) {
+  if (data == null || depth > 4) return out;
+  if (typeof data === "string") {
+    const p = pathFromUrl(data, bucketName);
+    if (p) out.add(p);
+    return out;
+  }
+  if (Array.isArray(data)) {
+    data.forEach((v) => extractStoragePaths(v, bucketName, out, depth + 1));
+    return out;
+  }
+  if (typeof data === "object") Object.values(data).forEach((v) => extractStoragePaths(v, bucketName, out, depth + 1));
+  return out;
+}
+var inScope = (path2, scopes) => scopes.some((s) => path2.startsWith(s));
+async function buildReferenceIndex(db, bucketName, schoolId) {
+  const index = /* @__PURE__ */ new Map();
+  for (const [col, fields] of Object.entries(FILE_REF_FIELDS)) {
+    let q = db.collection(col);
+    if (schoolId) q = q.where("schoolId", "==", schoolId);
+    const snap = await q.select(...fields.map(([f]) => f)).get();
+    for (const d of snap.docs) {
+      for (const [field] of fields) {
+        for (const p of extractStoragePaths(d.get(field), bucketName)) if (!index.has(p)) index.set(p, `${col}/${d.id}`);
+      }
+    }
+  }
+  return index;
+}
+async function planFiles(ctx, { schoolId, collection, recordId, records }) {
+  const bucket = ctx.bucket();
+  const bucketName = bucket.name;
+  const scopes = allowedScopes({ schoolId, collection, recordId });
+  const found = /* @__PURE__ */ new Map();
+  for (const r of records) {
+    for (const p of extractStoragePaths(r.data, bucketName)) if (!found.has(p)) found.set(p, `${r.collection}/${r.id}`);
+  }
+  for (const r of records) {
+    for (const prefix of exclusivePrefixes(r.collection, r.id, schoolId)) {
+      if (!inScope(prefix, scopes)) continue;
+      const [files] = await bucket.getFiles({ prefix });
+      for (const f of files) if (!found.has(f.name)) found.set(f.name, `${r.collection}/${r.id}`);
+    }
+  }
+  const plan = [];
+  const refIndex = found.size ? await buildReferenceIndex(ctx.db, bucketName, schoolId) : /* @__PURE__ */ new Map();
+  for (const [path2, owner] of found) {
+    if (!inScope(path2, scopes)) {
+      plan.push({ path: path2, owner, status: "out_of_scope" });
+      continue;
+    }
+    const shared = refIndex.get(path2) || null;
+    plan.push(shared ? { path: path2, owner, status: "shared", sharedWith: shared } : { path: path2, owner, status: "move" });
+  }
+  return plan;
+}
+var trashPathOf = (bundleId, path2) => `${TRASH_ROOT}/${bundleId}/${path2}`;
+async function moveFilesToTrash(ctx, bundleRef2, bundleId, plan) {
+  const bucket = ctx.bucket();
+  let failed = 0;
+  for (const item of plan) {
+    const key = Buffer.from(item.path).toString("base64url").slice(0, 200);
+    const fref = bundleRef2.collection("files").doc(key);
+    if (item.status !== "move") {
+      await fref.set({ ...item, trashPath: null }, { merge: true });
+      continue;
+    }
+    const existing = await fref.get();
+    if (existing.exists && existing.get("status") === "trashed") continue;
+    const trashPath = trashPathOf(bundleId, item.path);
+    try {
+      if (ctx.faults?.fileTrash && String(item.path).includes(ctx.faults.fileTrash)) throw new Error("injected file move fault");
+      const src = bucket.file(item.path);
+      const [srcExists] = await src.exists();
+      if (!srcExists) {
+        const [dstExists] = await bucket.file(trashPath).exists();
+        await fref.set({ ...item, trashPath, status: dstExists ? "trashed" : "missing", error: null }, { merge: true });
+        continue;
+      }
+      await src.move(trashPath);
+      await fref.set({ ...item, trashPath, status: "trashed", error: null }, { merge: true });
+    } catch (e) {
+      failed += 1;
+      await fref.set({ ...item, trashPath, status: "failed", error: String(e?.message || e).slice(0, 200), attempts: (existing.get?.("attempts") || 0) + 1 }, { merge: true });
+    }
+  }
+  return { failed };
+}
+async function restoreFilesFromTrash(ctx, bundleRef2) {
+  const bucket = ctx.bucket();
+  const snap = await bundleRef2.collection("files").get();
+  let restored = 0, failed = 0, missing = 0;
+  for (const d of snap.docs) {
+    const f = d.data();
+    if (f.status === "restored" || f.status === "shared" || f.status === "out_of_scope") continue;
+    if (f.status === "missing") {
+      missing += 1;
+      continue;
+    }
+    try {
+      if (ctx.faults?.fileRestore && String(f.path).includes(ctx.faults.fileRestore)) throw new Error("injected file restore fault");
+      const trash = bucket.file(f.trashPath);
+      const [tExists] = await trash.exists();
+      if (!tExists) {
+        const [oExists] = await bucket.file(f.path).exists();
+        if (oExists) {
+          await d.ref.set({ status: "restored" }, { merge: true });
+          restored += 1;
+          continue;
+        }
+        throw new Error("trashed file not found");
+      }
+      await trash.move(f.path);
+      await d.ref.set({ status: "restored", error: null }, { merge: true });
+      restored += 1;
+    } catch (e) {
+      failed += 1;
+      await d.ref.set({ status: "restore_failed", error: String(e?.message || e).slice(0, 200) }, { merge: true });
+    }
+  }
+  return { restored, failed, missing };
+}
+async function purgeTrashedFiles(ctx, bundleRef2, bundleId) {
+  const bucket = ctx.bucket();
+  if (ctx.faults?.storage) throw new Error("injected storage fault");
+  const [files] = await bucket.getFiles({ prefix: `${TRASH_ROOT}/${bundleId}/` });
+  let deleted = 0;
+  for (const f of files) {
+    await f.delete({ ignoreNotFound: true });
+    deleted += 1;
+  }
+  const snap = await bundleRef2.collection("files").get();
+  for (const d of snap.docs) await d.ref.set({ status: "purged" }, { merge: true });
+  return { deleted };
+}
+
 // deletionService.mjs
 var TRASH_DAYS = 30;
+var MAX_RETRIES = 6;
+var LOCK_MS = 5 * 60 * 1e3;
 var BATCH = 400;
 var MAX_IDS = 200;
 var PERMANENT_CONFIRM_TEXT = "\u062D\u0630\u0641 \u0646\u0647\u0627\u0626\u064A";
 var MGMT_ROLES = ["admin", "school_admin", "assistant", "school_assistant", "staff"];
 var FULL_ROLES = ["admin", "school_admin"];
 var SUPER = ["superadmin", "super_admin"];
+var REQUEST_DECIDED = ["approved", "active", "activated", "accepted", "completed"];
+var isMoneyInstallment = (d) => ["paid", "partial"].includes(String(d.status || "")) || Number(d.paidAmount || 0) > 0;
 var POLICIES = {
   students: {
     roles: FULL_ROLES,
     label: (d) => d.name || d.fullName || "\u0637\u0627\u0644\u0628",
     children: [
-      { col: "grades", field: "studentId" },
+      { col: "grades", field: "studentId", retention: "protected" },
       { col: "attendance", field: "studentId" },
-      { col: "installments", field: "studentId" },
-      { col: "payments", field: "studentId" },
+      // accounting trail: payments and any installment that has money on it are KEPT (flagged), never deleted
+      { col: "installments", field: "studentId", keepIf: (d) => isMoneyInstallment(d), retention: "protected" },
+      { col: "payments", field: "studentId", keepIf: () => true, retention: "protected" },
       { col: "behavior_reports", field: "studentId" },
       { col: "advanced_reports", field: "studentId" },
       { col: "teacher_reports", field: "studentId" },
-      { col: "student_archives", field: "studentId" },
+      { col: "student_archives", field: "studentId", retention: "protected" },
       { col: "orders", field: "studentId" },
       { col: "behavior", field: "studentId" }
     ],
     childById: ["id_cards"],
     studentUserDoc: true,
-    counter: { path: ["schools", "{schoolId}"], field: "studentCount", delta: -1 },
-    filePrefixes: (id, schoolId) => [`students/${schoolId}/${id}/`, `students/${id}/`]
+    counter: { path: ["schools", "{schoolId}"], field: "studentCount", delta: -1 }
   },
   classes: {
     roles: MGMT_ROLES,
@@ -293,25 +474,31 @@ var POLICIES = {
     children: [{ col: "subjects", field: "classId" }, { col: "homework", field: "classId" }]
   },
   subjects: { roles: MGMT_ROLES, perms: ["grades", "classes", "school_subjects", "exams_and_results"], label: (d) => d.name || "\u0645\u0627\u062F\u0629" },
-  homework: { roles: MGMT_ROLES, perms: ["homework", "homework_and_tasks"], teacherOwn: "teacherId", label: (d) => d.title || "\u0648\u0627\u062C\u0628" },
-  teacher_reports: { roles: MGMT_ROLES, perms: ["evaluation_reports", "student_evaluation_reports"], teacherOwn: "teacherId", label: (d) => d.title || d.studentName || "\u062A\u0642\u0631\u064A\u0631" },
-  advanced_reports: { roles: MGMT_ROLES, perms: ["advanced_reports"], label: (d) => d.title || d.studentName || "\u062A\u0642\u0631\u064A\u0631 \u0645\u062A\u0642\u062F\u0645" },
+  homework: { children: [{ col: "notifications", field: "metadata.sourceId" }], roles: MGMT_ROLES, perms: ["homework", "homework_and_tasks"], teacherOwn: "teacherId", label: (d) => d.title || "\u0648\u0627\u062C\u0628" },
+  teacher_reports: { children: [{ col: "notifications", field: "metadata.sourceId" }], roles: MGMT_ROLES, perms: ["evaluation_reports", "student_evaluation_reports"], teacherOwn: "teacherId", label: (d) => d.title || d.studentName || "\u062A\u0642\u0631\u064A\u0631" },
+  advanced_reports: { children: [{ col: "notifications", field: "metadata.sourceId" }], roles: MGMT_ROLES, perms: ["advanced_reports"], label: (d) => d.title || d.studentName || "\u062A\u0642\u0631\u064A\u0631 \u0645\u062A\u0642\u062F\u0645" },
   behavior_reports: { roles: MGMT_ROLES, perms: ["behavior", "behavior_management"], label: (d) => d.title || d.studentName || "\u062A\u0642\u0631\u064A\u0631 \u0633\u0644\u0648\u0643" },
   behavior: { roles: MGMT_ROLES, perms: ["behavior", "behavior_management"], label: (d) => d.title || d.studentName || "\u0633\u0644\u0648\u0643" },
-  grades: { roles: MGMT_ROLES, perms: ["grades", "exams_and_results"], label: (d) => `${d.subject || "\u062F\u0631\u062C\u0629"} ${d.studentName || ""}`.trim() },
+  grades: { retention: "protected", roles: MGMT_ROLES, perms: ["grades", "exams_and_results"], label: (d) => `${d.subject || "\u062F\u0631\u062C\u0629"} ${d.studentName || ""}`.trim() },
   attendance: { roles: MGMT_ROLES, perms: ["attendance", "attendance_track"], label: (d) => `\u062D\u0636\u0648\u0631 ${d.studentName || d.date || ""}`.trim() },
-  announcements: { roles: MGMT_ROLES, perms: ["announcements"], label: (d) => d.title || "\u0625\u0639\u0644\u0627\u0646" },
-  installments: { roles: MGMT_ROLES, perms: ["tuition", "tuition_fees"], label: (d) => `\u0642\u0633\u0637 ${d.studentName || ""}`.trim() },
-  payments: { roles: MGMT_ROLES, perms: ["tuition", "tuition_fees"], label: (d) => `\u062F\u0641\u0639\u0629 ${d.studentName || ""}`.trim() },
-  payroll: { roles: MGMT_ROLES, perms: ["payroll", "staff_payroll"], label: (d) => `\u0631\u0627\u062A\u0628 ${d.userName || ""}`.trim() },
+  announcements: { children: [{ col: "notifications", field: "metadata.sourceId" }], roles: MGMT_ROLES, perms: ["announcements"], label: (d) => d.title || "\u0625\u0639\u0644\u0627\u0646" },
+  installments: { retention: "protected", neverDelete: (d) => isMoneyInstallment(d), neverDeleteMessage: "\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0645\u0633\u062F\u0651\u062F (\u0643\u0644\u064A\u0627\u064B \u0623\u0648 \u062C\u0632\u0626\u064A\u0627\u064B) \u0633\u062C\u0644 \u0645\u0627\u0644\u064A \u0644\u0627 \u064A\u064F\u062D\u0630\u0641. \u0623\u0644\u063A\u0650 \u0627\u0644\u062A\u0633\u062F\u064A\u062F \u0623\u0648 \u0635\u062D\u0651\u062D\u0647 \u0628\u062F\u0644\u0627\u064B \u0645\u0646 \u0627\u0644\u062D\u0630\u0641", roles: MGMT_ROLES, perms: ["tuition", "tuition_fees"], label: (d) => `\u0642\u0633\u0637 ${d.studentName || ""}`.trim() },
+  payments: { retention: "protected", neverDelete: () => true, neverDeleteMessage: "\u0627\u0644\u062F\u0641\u0639\u0627\u062A \u0627\u0644\u0645\u0627\u0644\u064A\u0629 \u0644\u0627 \u062A\u064F\u062D\u0630\u0641. \u0627\u0633\u062A\u062E\u062F\u0645 \xAB\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u062F\u0641\u0639\u0629\xBB \u0644\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0625\u0644\u063A\u0627\u0621 \u0645\u0639 \u062D\u0641\u0638 \u0627\u0644\u0623\u062B\u0631 \u0627\u0644\u0645\u062D\u0627\u0633\u0628\u064A", roles: MGMT_ROLES, perms: ["tuition", "tuition_fees"], label: (d) => `\u062F\u0641\u0639\u0629 ${d.studentName || ""}`.trim() },
+  payroll: { retention: "protected", roles: MGMT_ROLES, perms: ["payroll", "staff_payroll"], label: (d) => `\u0631\u0627\u062A\u0628 ${d.userName || ""}`.trim() },
   inventory: { roles: MGMT_ROLES, perms: ["inventory", "inventory_and_assets"], label: (d) => d.name || "\u0645\u0627\u062F\u0629 \u0645\u062E\u0632\u0648\u0646" },
-  market: { roles: MGMT_ROLES, perms: ["market", "marketplace_ordering"], label: (d) => d.name || "\u0645\u0646\u062A\u062C", filePrefixes: (id) => [`market/${id}/`] },
-  marketplace: { roles: MGMT_ROLES, perms: ["market", "marketplace_ordering"], label: (d) => d.name || "\u0645\u0646\u062A\u062C", filePrefixes: (id) => [`market/${id}/`] },
+  market: { roles: MGMT_ROLES, perms: ["market", "marketplace_ordering"], label: (d) => d.name || "\u0645\u0646\u062A\u062C" },
+  marketplace: { roles: MGMT_ROLES, perms: ["market", "marketplace_ordering"], label: (d) => d.name || "\u0645\u0646\u062A\u062C" },
   orders: { roles: MGMT_ROLES, perms: ["market", "marketplace_ordering"], label: (d) => `\u0637\u0644\u0628 ${d.studentName || d.parentName || ""}`.trim() },
+  // Registration / subscription requests: platform super admin only. Approved ones are the record of an
+  // administrative decision and are never deleted; rejecting a request is a separate status change.
+  registrations: { roles: [], superOnly: true, neverDelete: (d) => REQUEST_DECIDED.includes(String(d.status || "")), neverDeleteMessage: "\u0637\u0644\u0628 \u0645\u0639\u062A\u0645\u062F: \u0633\u062C\u0644 \u0642\u0631\u0627\u0631 \u0625\u062F\u0627\u0631\u064A \u064A\u064F\u062D\u062A\u0641\u0638 \u0628\u0647 \u0648\u0644\u0627 \u064A\u064F\u062D\u0630\u0641", label: (d) => d.schoolName || d.name || d.email || "\u0637\u0644\u0628 \u062A\u0633\u062C\u064A\u0644" },
+  subscriptionRequests: { roles: [], superOnly: true, neverDelete: (d) => REQUEST_DECIDED.includes(String(d.status || "")), neverDeleteMessage: "\u0637\u0644\u0628 \u0645\u0639\u062A\u0645\u062F: \u0633\u062C\u0644 \u0642\u0631\u0627\u0631 \u0625\u062F\u0627\u0631\u064A \u064A\u064F\u062D\u062A\u0641\u0638 \u0628\u0647 \u0648\u0644\u0627 \u064A\u064F\u062D\u0630\u0641", label: (d) => d.schoolName || d.name || "\u0637\u0644\u0628 \u0627\u0634\u062A\u0631\u0627\u0643" },
   id_cards: { roles: MGMT_ROLES, perms: ["id_cards", "id_card_generation"], label: (d) => `\u0628\u0637\u0627\u0642\u0629 ${d.studentName || ""}`.trim() },
-  student_archives: { roles: MGMT_ROLES, perms: ["student_archive"], label: (d) => `\u0623\u0631\u0634\u064A\u0641 ${d.studentName || ""}`.trim() }
+  student_archives: { retention: "protected", roles: MGMT_ROLES, perms: ["student_archive"], label: (d) => `\u0623\u0631\u0634\u064A\u0641 ${d.studentName || ""}`.trim() }
 };
 var ACCOUNT_ROLES = ["teacher", "staff", "school_assistant", "assistant", "parent", "guard"];
+var ACCOUNT_POLICY = { children: [{ col: "notifications", field: "userId" }], retention: "standard" };
+var PLATFORM_ACCOUNT_ROLES = ["admin", "school_admin", "distributor", "platform_assistant"];
 function httpError(status, code, message) {
   const e = new Error(message);
   e.status = status;
@@ -381,8 +568,13 @@ function bundleRef(db, id) {
 }
 async function collectDependants(db, policy, collection, id, schoolId) {
   const items = [];
+  const kept = [];
   for (const c of policy.children || []) {
-    for (const d of await queryAll(db, c.col, c.field, id, schoolId)) items.push({ col: c.col, id: d.id, data: d.data() });
+    for (const d of await queryAll(db, c.col, c.field, id, schoolId)) {
+      const data = d.data();
+      if (c.keepIf && c.keepIf(data)) kept.push({ col: c.col, id: d.id });
+      else items.push({ col: c.col, id: d.id, data });
+    }
   }
   for (const col of policy.childById || []) {
     const d = await db.collection(col).doc(id).get();
@@ -392,8 +584,27 @@ async function collectDependants(db, policy, collection, id, schoolId) {
     const u = await db.collection("users").doc(id).get();
     if (u.exists && String((u.data() || {}).schoolId || "") === schoolId) items.push({ col: "users", id, data: u.data() });
   }
-  return items;
+  return { items, kept };
 }
+var FV = (adminSdk) => adminSdk.firestore.FieldValue;
+var backoffMs = (retry) => Math.min(6e4 * 2 ** Math.max(0, retry), 36e5);
+async function acquireLock(ctx, key, owner) {
+  const ref = ctx.db.collection("deletion_locks").doc(key);
+  await ctx.db.runTransaction(async (t) => {
+    const s = await t.get(ref);
+    if (s.exists && s.get("expiresAt") > Date.now() && s.get("owner") !== owner) throw httpError(409, "IN_PROGRESS", "\u0647\u0646\u0627\u0643 \u0639\u0645\u0644\u064A\u0629 \u062D\u0630\u0641/\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0642\u064A\u062F \u0627\u0644\u062A\u0646\u0641\u064A\u0630 \u0644\u0647\u0630\u0627 \u0627\u0644\u0633\u062C\u0644. \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629 \u0628\u0639\u062F \u0642\u0644\u064A\u0644");
+    t.set(ref, { owner, expiresAt: Date.now() + LOCK_MS, at: Date.now() });
+  });
+}
+async function releaseLock(ctx, key, owner) {
+  const ref = ctx.db.collection("deletion_locks").doc(key);
+  await ctx.db.runTransaction(async (t) => {
+    const s = await t.get(ref);
+    if (s.exists && s.get("owner") === owner) t.delete(ref);
+  }).catch(() => {
+  });
+}
+var newOwner = () => `${process.pid}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 async function runTrashSteps(ctx, bundleId) {
   const { db, adminSdk, faults } = ctx;
   const ref = bundleRef(db, bundleId);
@@ -401,7 +612,7 @@ async function runTrashSteps(ctx, bundleId) {
   if (!snap.exists) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
   const b = snap.data();
   if (b.status === "trashed") return b;
-  const policy = POLICIES[b.collection];
+  const policy = b.kind === "account" ? ACCOUNT_POLICY : POLICIES[b.collection];
   const steps = { ...b.steps || {} };
   const mark = async (name, extra = {}) => {
     steps[name] = true;
@@ -414,14 +625,19 @@ async function runTrashSteps(ctx, bundleId) {
       throw e;
     }
   };
+  await ref.set({ jobStatus: "PROCESSING", updatedAt: ts(adminSdk) }, { merge: true });
   try {
     if (!steps.snapshot) {
       const main = await db.collection(b.collection).doc(b.recordId).get();
       if (!main.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
-      const deps = policy ? await collectDependants(db, policy, b.collection, b.recordId, b.schoolId) : [];
+      const { items: deps, kept } = policy ? await collectDependants(db, policy, b.collection, b.recordId, b.schoolId) : { items: [], kept: [] };
       const counts = {};
       deps.forEach((d) => {
         counts[d.col] = (counts[d.col] || 0) + 1;
+      });
+      const keptCounts = {};
+      kept.forEach((k) => {
+        keptCounts[k.col] = (keptCounts[k.col] || 0) + 1;
       });
       let parentLinks = [];
       if (b.collection === "students") {
@@ -433,7 +649,25 @@ async function runTrashSteps(ctx, bundleId) {
         const sq = await db.collection("students").where("parentIds", "array-contains", b.recordId).get();
         studentLinks = sq.docs.filter((d) => !b.schoolId || d.get("schoolId") === b.schoolId).map((d) => d.id);
       }
-      await ref.set({ record: main.data(), childCounts: counts, parentLinks, studentLinks }, { merge: true });
+      let distributorLink = null;
+      if (b.kind === "account" && main.data()?.role === "distributor" && main.data()?.distributorId) {
+        const dd = await db.collection("distributors").doc(String(main.data().distributorId)).get();
+        if (dd.exists) distributorLink = { id: dd.id, canLogin: dd.get("canLogin") ?? null, userId: dd.get("userId") ?? null };
+      }
+      const protectedKids = (policy?.children || []).some((c) => c.retention === "protected" && (counts[c.col] || 0) > 0);
+      const protect = policy?.retention === "protected" || protectedKids || Object.keys(keptCounts).length > 0;
+      await ref.set({
+        record: main.data(),
+        childCounts: counts,
+        keptRefs: kept,
+        keptCounts,
+        parentLinks,
+        studentLinks,
+        distributorLink,
+        relatedRecords: { ...counts },
+        processedItems: deps.length,
+        ...protect ? { retention: "protected", purgeAfter: null, expiresAt: null } : {}
+      }, { merge: true });
       const itemOps = deps.map((d) => (batch) => batch.set(ref.collection("items").doc(`${d.col}__${d.id}`), { col: d.col, docId: d.id, data: d.data }));
       await commitInBatches(db, itemOps);
       await mark("snapshot");
@@ -447,6 +681,25 @@ async function runTrashSteps(ctx, bundleId) {
       await db.collection(b.collection).doc(b.recordId).delete();
       await mark("delete");
     }
+    if (!steps.files) {
+      const cur = (await ref.get()).data() || {};
+      const items = await ref.collection("items").get();
+      const records = [{ collection: b.collection, id: b.recordId, data: cur.record || {} }, ...items.docs.map((d) => ({ collection: d.get("col"), id: d.get("docId"), data: d.get("data") }))];
+      let plan = [];
+      let failedFiles = 0;
+      if (!faults?.skipFiles) {
+        plan = await planFiles(ctx, { schoolId: b.schoolId, collection: b.collection, recordId: b.recordId, records });
+        failedFiles = (await moveFilesToTrash(ctx, ref, b.id || b.bundleId, plan)).failed;
+      }
+      const summary = plan.reduce((a, p) => {
+        a[p.status] = (a[p.status] || 0) + 1;
+        return a;
+      }, {});
+      await ref.set({ storageReferences: summary, failedItems: failedFiles }, { merge: true });
+      if (failedFiles) throw new Error(`\u062A\u0639\u0630\u0651\u0631 \u0646\u0642\u0644 ${failedFiles} \u0645\u0644\u0641 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629 \u2014 \u0633\u062A\u064F\u0639\u0627\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B`);
+      await mark("files");
+    }
+    fail("after_files");
     if (!steps.unlink && b.collection === "students") {
       const stored = (await ref.get()).data() || {};
       const ops = asArray(stored.parentLinks).map((uid) => (batch) => batch.update(db.collection("users").doc(uid), { studentIds: adminSdk.firestore.FieldValue.arrayRemove(b.recordId) }));
@@ -458,6 +711,13 @@ async function runTrashSteps(ctx, bundleId) {
       const ops = asArray(stored.studentLinks).map((sid) => (batch) => batch.update(db.collection("students").doc(sid), { parentIds: adminSdk.firestore.FieldValue.arrayRemove(b.recordId) }));
       await commitInBatches(db, ops);
       await mark("unlinkStudents");
+    }
+    if (!steps.kept) {
+      const stored = (await ref.get()).data() || {};
+      const label = String(stored.label || "");
+      const ops = (stored.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), { studentDeleted: true, studentDeletedAt: ts(adminSdk), studentNameSnapshot: label, deletionBundleId: bundleId }, { merge: true }));
+      await commitInBatches(db, ops);
+      await mark("kept");
     }
     if (!steps.counter && policy?.counter) {
       const path2 = policy.counter.path.map((p) => p.replace("{schoolId}", b.schoolId));
@@ -473,11 +733,17 @@ async function runTrashSteps(ctx, bundleId) {
       }
       await mark("auth");
     }
+    if (!steps.distributor && b.kind === "account") {
+      const dl = (await ref.get()).get("distributorLink");
+      if (dl) await db.collection("distributors").doc(dl.id).set({ canLogin: false, updatedAt: ts(adminSdk) }, { merge: true });
+      await mark("distributor");
+    }
     fail("before_finalize");
-    await ref.set({ status: "trashed", trashedAt: ts(adminSdk), steps, lastError: null }, { merge: true });
+    await ref.set({ status: "trashed", jobStatus: "COMPLETED", trashedAt: ts(adminSdk), steps, lastError: null, retryCount: 0 }, { merge: true });
     return (await ref.get()).data();
   } catch (e) {
-    await ref.set({ status: "trashing", steps, lastError: String(e?.message || e).slice(0, 200), updatedAt: ts(adminSdk) }, { merge: true }).catch(() => {
+    const retry = (b.retryCount || 0) + 1;
+    await ref.set({ status: "trashing", jobStatus: retry >= MAX_RETRIES ? "FAILED" : "PARTIALLY_COMPLETED", steps, retryCount: retry, lastError: String(e?.message || e).slice(0, 200), updatedAt: ts(adminSdk) }, { merge: true }).catch(() => {
     });
     throw e;
   }
@@ -494,10 +760,25 @@ async function deleteRecords(ctx, actorUid, body) {
   if (!isAccount && !POLICIES[collection]) throw httpError(400, "UNSUPPORTED_COLLECTION", "\u0646\u0648\u0639 \u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645 \u0644\u0644\u062D\u0630\u0641");
   if (ids.length > 1 && body.confirmBulk !== true) throw httpError(400, "CONFIRM_BULK_REQUIRED", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u062C\u0645\u0627\u0639\u064A \u064A\u062A\u0637\u0644\u0628 \u062A\u0623\u0643\u064A\u062F\u0627\u064B \u0635\u0631\u064A\u062D\u0627\u064B");
   if (permanent && body.confirmText !== PERMANENT_CONFIRM_TEXT) throw httpError(400, "CONFIRM_PERMANENT_REQUIRED", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u064A\u062A\u0637\u0644\u0628 \u0643\u062A\u0627\u0628\u0629 \u0639\u0628\u0627\u0631\u0629 \u0627\u0644\u062A\u0623\u0643\u064A\u062F");
+  const idemBase = body.idempotencyKey ? String(body.idempotencyKey).slice(0, 80) : "";
   const results = [];
   for (const id of ids) {
     const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: actor.schoolId, collection, recordId: id, mode: permanent ? "permanent" : "trash", bulk: ids.length > 1 };
+    const action = permanent ? "DELETE_PERMANENT" : "DELETE_TO_TRASH";
+    const lockKey = `${collection}__${id}`;
+    const owner = newOwner();
+    let locked = false;
     try {
+      const idemKey = idemBase ? `${idemBase}:${collection}:${id}` : "";
+      if (idemKey) {
+        const prev = await db.collection("recycle_bin").where("idemKey", "==", idemKey).limit(1).get();
+        if (!prev.empty && prev.docs[0].get("schoolId") === (actor.isSuper ? prev.docs[0].get("schoolId") : actor.schoolId)) {
+          results.push({ id, ok: true, bundleId: prev.docs[0].id, replay: true, permanent });
+          continue;
+        }
+      }
+      await acquireLock(ctx, lockKey, owner);
+      locked = true;
       const doc = await db.collection(collection).doc(id).get();
       if (!doc.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
       const data = doc.data() || {};
@@ -505,123 +786,201 @@ async function deleteRecords(ctx, actorUid, body) {
       if (isAccount) {
         const role = String(data.role || "");
         if (!ctx.canActorDeleteUser) throw httpError(500, "MISCONFIGURED", "\u0645\u0635\u0627\u062F\u0642\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u0647\u064A\u0623\u0629");
-        if (SUPER.includes(role) || !ACCOUNT_ROLES.includes(role)) throw httpError(403, "FORBIDDEN_PRIVILEGED", "\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0646\u0648\u0639 \u0645\u0646 \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A");
+        if (id === actor.uid) throw httpError(403, "FORBIDDEN_SELF", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628\u0643 \u0628\u0646\u0641\u0633\u0643");
+        if (SUPER.includes(role)) throw httpError(403, "FORBIDDEN_PRIVILEGED", "\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 \u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0639\u0628\u0631 \u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u0627\u0631");
+        const allowedRoles = actor.isSuper ? [...ACCOUNT_ROLES, ...PLATFORM_ACCOUNT_ROLES] : ACCOUNT_ROLES;
+        if (!allowedRoles.includes(role)) throw httpError(403, "FORBIDDEN_PRIVILEGED", "\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0646\u0648\u0639 \u0645\u0646 \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A");
         if (!actor.isSuper) {
           if (!actor.schoolId || String(data.schoolId || "") !== actor.schoolId) throw httpError(403, "FORBIDDEN_SCHOOL", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 \u0645\u0646 \u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649");
           if (!ctx.canActorDeleteUser(actor.role, role, actor.schoolId)) throw httpError(403, "FORBIDDEN_RANK", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 \u0628\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0645\u0633\u0627\u0648\u064A\u0629 \u0623\u0648 \u0623\u0639\u0644\u0649");
-          if (id === actor.uid) throw httpError(403, "FORBIDDEN_SELF", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628\u0643 \u0628\u0646\u0641\u0633\u0643");
           if (actor.role !== "admin" && actor.role !== "school_admin") {
             const need = role === "parent" ? ["parents"] : role === "guard" || role === "teacher" || role === "staff" ? ["staff", "staff_manage"] : ["assistants", "assistants_manage"];
             if (!actor.permissions || !actor.permissions.some((p) => need.includes(p))) throw httpError(403, "FORBIDDEN_PERMISSION", "\u0644\u064A\u0633\u062A \u0644\u062F\u064A\u0643 \u0635\u0644\u0627\u062D\u064A\u0629 \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A");
           }
+        } else if (!ctx.canActorDeleteUser(actor.role, role, actor.schoolId)) {
+          throw httpError(403, "FORBIDDEN_RANK", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u062D\u0633\u0627\u0628");
         }
-        policy = { roles: MGMT_ROLES, label: (d) => d.name || d.email || "\u062D\u0633\u0627\u0628", accountRole: role };
+        policy = { roles: MGMT_ROLES, label: (d) => d.name || d.email || "\u062D\u0633\u0627\u0628", accountRole: role, children: [{ col: "notifications", field: "userId" }], retention: "standard" };
       } else {
         policy = POLICIES[collection];
         authorizeDelete(actor, collection, policy, data, { permanent });
+        if (policy.neverDelete?.(data)) throw httpError(409, "FINANCIAL_RECORD_PROTECTED", policy.neverDeleteMessage || "\u0627\u0644\u0633\u062C\u0644 \u0627\u0644\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u0639\u062A\u0645\u062F \u0644\u0627 \u064A\u064F\u062D\u0630\u0641. \u0627\u0633\u062A\u062E\u062F\u0645 \u0625\u0644\u063A\u0627\u0621/\u062A\u0635\u062D\u064A\u062D \u0627\u0644\u0639\u0645\u0644\u064A\u0629");
         if (policy.blockedIfReferenced) {
           const ref = await queryAll(db, policy.blockedIfReferenced.col, policy.blockedIfReferenced.field, id, String(data.schoolId || ""));
           if (ref.length) throw httpError(409, "HAS_DEPENDENTS", policy.blockedIfReferenced.message);
         }
       }
-      const schoolId = String(data.schoolId || actor.schoolId || "");
+      const schoolId = String(data.schoolId || (actor.isSuper ? "" : actor.schoolId) || "");
       const bundleId = `${collection}__${id}__${Date.now().toString(36)}`;
       const existing = await db.collection("recycle_bin").where("recordKey", "==", `${collection}/${id}`).where("status", "in", ["trashing", "trashed"]).limit(1).get();
       let bid = bundleId;
       if (!existing.empty) bid = existing.docs[0].id;
       else {
+        const protect = policy.retention === "protected";
         await bundleRef(db, bid).set({
           bundleId: bid,
+          jobId: bid,
           recordKey: `${collection}/${id}`,
           collection,
+          entityType: collection,
           recordId: id,
+          entityId: id,
           schoolId,
           kind: isAccount ? "account" : "record",
           label: String((policy.label ? policy.label(data) : id) || id).slice(0, 120),
           status: "trashing",
+          jobStatus: "PENDING",
           steps: {},
+          initiatedBy: { uid: actor.uid, name: actor.name, role: actor.role },
           deletedBy: { uid: actor.uid, name: actor.name, role: actor.role },
           deletedAt: ts(adminSdk),
-          purgeAfter: adminSdk.firestore.Timestamp.fromMillis(Date.now() + TRASH_DAYS * 864e5),
-          accountRole: policy.accountRole || null
+          createdAt: ts(adminSdk),
+          retention: protect ? "protected" : "standard",
+          purgeAfter: protect ? null : adminSdk.firestore.Timestamp.fromMillis(Date.now() + TRASH_DAYS * 864e5),
+          expiresAt: protect ? null : adminSdk.firestore.Timestamp.fromMillis(Date.now() + TRASH_DAYS * 864e5),
+          processedItems: 0,
+          failedItems: 0,
+          retryCount: 0,
+          relatedRecords: {},
+          storageReferences: {},
+          accountRole: policy.accountRole || null,
+          ...idemKey ? { idemKey } : {}
         });
       }
       await runTrashSteps(ctx, bid);
       let purged = null;
       if (permanent) purged = await purgeBundleInternal(ctx, bid, actor);
-      await writeLog(db, adminSdk, { ...base, action: permanent ? "DELETE_PERMANENT" : "DELETE_TO_TRASH", result: "success", bundleId: bid, label: policy.label ? policy.label(data) : id, childCounts: (await bundleRef(db, bid).get()).get("childCounts") || {}, files: purged?.filesDeleted ?? 0 });
+      await writeLog(db, adminSdk, { ...base, action, result: "success", bundleId: bid, label: policy.label ? policy.label(data) : id, childCounts: (await bundleRef(db, bid).get()).get("childCounts") || {}, files: purged?.filesDeleted ?? 0 });
       results.push({ id, ok: true, bundleId: bid, permanent });
     } catch (e) {
-      await writeLog(db, adminSdk, { ...base, action: permanent ? "DELETE_PERMANENT" : "DELETE_TO_TRASH", result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+      await writeLog(db, adminSdk, { ...base, action, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
       results.push({ id, ok: false, code: e.code || "ERROR", message: e.message, partial: !e.status || e.status >= 500 });
+    } finally {
+      if (locked) await releaseLock(ctx, lockKey, owner);
     }
   }
   return { results, ok: results.every((r) => r.ok) };
 }
 async function restoreBundle(ctx, actorUid, bundleId) {
-  const { db, adminSdk } = ctx;
+  const { db, adminSdk, faults } = ctx;
   const actor = await loadActor(db, actorUid);
   const ref = bundleRef(db, String(bundleId || ""));
   const snap = await ref.get();
   if (!snap.exists) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
-  const b = snap.data();
+  let b = snap.data();
   const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: b.schoolId, collection: b.collection, recordId: b.recordId, bundleId: b.bundleId, action: "RESTORE" };
+  const lockKey = `${b.collection}__${b.recordId}`;
+  const owner = newOwner();
+  let locked = false;
   try {
     if (!actor.isSuper && (!actor.schoolId || actor.schoolId !== b.schoolId)) throw httpError(403, "FORBIDDEN_SCHOOL", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649");
+    if (b.kind === "school") {
+      if (!actor.isSuper) throw httpError(403, "FORBIDDEN_ROLE", "\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637");
+    } else if (b.kind === "account") {
+      if (!actor.isSuper && !ctx.canActorDeleteUser(actor.role, b.accountRole, actor.schoolId)) throw httpError(403, "FORBIDDEN_RANK", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0647\u0630\u0627 \u0627\u0644\u062D\u0633\u0627\u0628");
+      if (!actor.isSuper && !FULL_ROLES.includes(actor.role)) authorizeDelete(actor, "users", { roles: MGMT_ROLES, perms: ["parents", "staff", "staff_manage", "assistants", "assistants_manage"] }, { schoolId: b.schoolId }, { permanent: false });
+    } else {
+      authorizeDelete(actor, b.collection, POLICIES[b.collection] || { roles: MGMT_ROLES, perms: [] }, { schoolId: b.schoolId, ...b.record || {} }, { permanent: false });
+    }
+    if (!["trashed", "restoring"].includes(b.status)) throw httpError(409, "NOT_RESTORABLE", "\u0644\u0627 \u064A\u0645\u0643\u0646 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0647\u0630\u0627 \u0627\u0644\u0633\u062C\u0644 (\u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629 \u0623\u0648 \u0642\u064A\u062F \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629)");
+    await acquireLock(ctx, lockKey, owner);
+    locked = true;
+    b = (await ref.get()).data();
+    if (b.status === "restored") return { ok: true, bundleId: b.bundleId, replay: true };
+    if (b.kind === "school") {
+      const out = await restoreSchoolBundle(ctx, ref, b, actor);
+      await writeLog(db, adminSdk, { ...base, result: "success", label: b.label });
+      return out;
+    }
+    const rsteps = { ...b.rsteps || {} };
+    const rmark = async (name, extra = {}) => {
+      rsteps[name] = true;
+      await ref.set({ rsteps, ...extra, updatedAt: ts(adminSdk) }, { merge: true });
+    };
+    const rfail = (name) => {
+      if (faults?.["restore_" + name]) {
+        const e = new Error("injected fault at restore " + name);
+        e.injected = true;
+        throw e;
+      }
+    };
+    if (b.status === "trashed") {
+      const live = await db.collection(b.collection).doc(b.recordId).get();
+      if (live.exists) throw httpError(409, "CONFLICT", "\u064A\u0648\u062C\u062F \u0633\u062C\u0644 \u0628\u0646\u0641\u0633 \u0627\u0644\u0645\u0639\u0631\u0651\u0641 \u062D\u0627\u0644\u064A\u0627\u064B");
+    }
+    await ref.set({ status: "restoring", jobStatus: "RESTORING", updatedAt: ts(adminSdk) }, { merge: true });
     const policy = POLICIES[b.collection];
-    authorizeDelete(actor, b.collection, policy || { roles: MGMT_ROLES, perms: [] }, { schoolId: b.schoolId, ...b.record || {} }, { permanent: false });
-    if (b.status !== "trashed") throw httpError(409, "NOT_RESTORABLE", "\u0644\u0627 \u064A\u0645\u0643\u0646 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0647\u0630\u0627 \u0627\u0644\u0633\u062C\u0644 (\u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629 \u0623\u0648 \u0642\u064A\u062F \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629)");
-    const live = await db.collection(b.collection).doc(b.recordId).get();
-    if (live.exists) throw httpError(409, "CONFLICT", "\u064A\u0648\u062C\u062F \u0633\u062C\u0644 \u0628\u0646\u0641\u0633 \u0627\u0644\u0645\u0639\u0631\u0651\u0641 \u062D\u0627\u0644\u064A\u0627\u064B");
     const items = await ref.collection("items").get();
-    const ops = items.docs.map((d) => (batch) => batch.set(db.collection(d.get("col")).doc(d.get("docId")), d.get("data")));
-    ops.push((batch) => batch.set(db.collection(b.collection).doc(b.recordId), b.record || {}));
-    await commitInBatches(db, ops);
-    if (b.collection === "students") {
-      const links = asArray(b.parentLinks).map((uid) => (batch) => batch.update(db.collection("users").doc(uid), { studentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) }));
-      await commitInBatches(db, links);
-    }
-    if (b.kind === "account") {
-      const relink = asArray(b.studentLinks).map((sid) => (batch) => batch.update(db.collection("students").doc(sid), { parentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) }));
-      await commitInBatches(db, relink);
-    }
-    if (policy?.counter) {
-      const path2 = policy.counter.path.map((p) => p.replace("{schoolId}", b.schoolId));
-      await db.doc(path2.join("/")).update({ [policy.counter.field]: adminSdk.firestore.FieldValue.increment(-policy.counter.delta) }).catch(() => {
+    try {
+      if (!rsteps.docs) {
+        const ops = items.docs.map((d) => (batch) => batch.set(db.collection(d.get("col")).doc(d.get("docId")), d.get("data")));
+        ops.push((batch) => batch.set(db.collection(b.collection).doc(b.recordId), b.record || {}));
+        await commitInBatches(db, ops);
+        await rmark("docs");
+      }
+      rfail("after_docs");
+      if (!rsteps.links) {
+        if (b.collection === "students") await commitInBatches(db, asArray(b.parentLinks).map((uid) => (batch) => batch.update(db.collection("users").doc(uid), { studentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) })));
+        if (b.kind === "account") await commitInBatches(db, asArray(b.studentLinks).map((sid) => (batch) => batch.update(db.collection("students").doc(sid), { parentIds: adminSdk.firestore.FieldValue.arrayUnion(b.recordId) })));
+        await commitInBatches(db, (b.keptRefs || []).map((k) => (batch) => batch.set(db.collection(k.col).doc(k.id), { studentDeleted: FV(adminSdk).delete(), studentDeletedAt: FV(adminSdk).delete(), studentNameSnapshot: FV(adminSdk).delete(), deletionBundleId: FV(adminSdk).delete() }, { merge: true })));
+        await rmark("links");
+      }
+      if (!rsteps.counter && policy?.counter) {
+        const path2 = policy.counter.path.map((p) => p.replace("{schoolId}", b.schoolId));
+        await db.doc(path2.join("/")).update({ [policy.counter.field]: FV(adminSdk).increment(-policy.counter.delta) }).catch(() => {
+        });
+        await rmark("counter");
+      }
+      if (!rsteps.auth && b.kind === "account") {
+        await ctx.authAdmin.updateUser(b.recordId, { disabled: false }).catch((e) => {
+          if (e?.code !== "auth/user-not-found") throw e;
+        });
+        if (b.distributorLink) await db.collection("distributors").doc(b.distributorLink.id).set({ canLogin: b.distributorLink.canLogin ?? true }, { merge: true });
+        await rmark("auth");
+      }
+      let fileStats = { restored: 0, failed: 0, missing: 0 };
+      if (!rsteps.files) {
+        if (!faults?.skipFiles) fileStats = await restoreFilesFromTrash(ctx, ref);
+        if (fileStats.failed) throw httpError(207, "RESTORE_INCOMPLETE", `\u062A\u0645\u062A \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0627\u0644\u0633\u062C\u0644\u0627\u062A \u0644\u0643\u0646 \u062A\u0639\u0630\u0651\u0631\u062A \u0627\u0633\u062A\u0639\u0627\u062F\u0629 ${fileStats.failed} \u0645\u0644\u0641. \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629 \u0644\u0625\u0643\u0645\u0627\u0644 \u0627\u0644\u0627\u0633\u062A\u0639\u0627\u062F\u0629`);
+        await rmark("files", { restoredFiles: fileStats.restored, missingFiles: fileStats.missing });
+      }
+      await commitInBatches(db, items.docs.map((d) => (batch) => batch.delete(d.ref)));
+      await ref.set({ status: "restored", jobStatus: "RESTORED", restoredAt: ts(adminSdk), restoredBy: { uid: actor.uid, name: actor.name }, record: FV(adminSdk).delete(), lastError: null }, { merge: true });
+      await writeLog(db, adminSdk, { ...base, result: "success", label: b.label, files: fileStats.restored, missingFiles: fileStats.missing });
+      return { ok: true, bundleId: b.bundleId, restoredFiles: fileStats.restored, missingFiles: (await ref.get()).get("missingFiles") || 0 };
+    } catch (e) {
+      await ref.set({ status: "restoring", jobStatus: "PARTIALLY_COMPLETED", lastError: String(e?.message || e).slice(0, 200), updatedAt: ts(adminSdk) }, { merge: true }).catch(() => {
       });
+      throw e.status ? e : Object.assign(httpError(500, "RESTORE_INCOMPLETE", "\u0627\u0644\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u063A\u064A\u0631 \u0645\u0643\u062A\u0645\u0644\u0629 \u2014 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629: " + String(e?.message || e).slice(0, 120)), { cause: e });
     }
-    if (b.kind === "account") await ctx.authAdmin.updateUser(b.recordId, { disabled: false }).catch((e) => {
-      if (e?.code !== "auth/user-not-found") throw e;
-    });
-    await commitInBatches(db, items.docs.map((d) => (batch) => batch.delete(d.ref)));
-    await ref.set({ status: "restored", restoredAt: ts(adminSdk), restoredBy: { uid: actor.uid, name: actor.name }, record: adminSdk.firestore.FieldValue.delete() }, { merge: true });
-    await writeLog(db, adminSdk, { ...base, result: "success", label: b.label });
-    return { ok: true, bundleId: b.bundleId };
   } catch (e) {
-    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 && e.code !== "RESTORE_INCOMPLETE" ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
     throw e;
+  } finally {
+    if (locked) await releaseLock(ctx, lockKey, owner);
   }
 }
 async function purgeBundleInternal(ctx, bundleId, actor) {
-  const { db, adminSdk, faults } = ctx;
+  const { db, adminSdk } = ctx;
   const ref = bundleRef(db, bundleId);
   const snap = await ref.get();
   const b = snap.data();
   if (!b) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
   if (b.status === "purged") return { filesDeleted: 0 };
   const policy = POLICIES[b.collection];
-  await ref.set({ status: "purging", updatedAt: ts(adminSdk) }, { merge: true });
+  await ref.set({ status: "purging", jobStatus: "PROCESSING", updatedAt: ts(adminSdk) }, { merge: true });
   let filesDeleted = 0;
   try {
-    if (policy?.filePrefixes && !faults?.skipFiles) {
-      if (faults?.storage) throw new Error("injected storage fault");
-      const bucket = ctx.bucket();
-      for (const prefix of policy.filePrefixes(b.recordId, b.schoolId)) {
-        const [files] = await bucket.getFiles({ prefix });
-        for (const f of files) {
-          await f.delete({ ignoreNotFound: true });
-          filesDeleted += 1;
-        }
+    if (!ctx.faults?.skipFiles) filesDeleted = (await purgeTrashedFiles(ctx, ref, b.bundleId)).deleted;
+    if (b.kind === "school") {
+      const users = await ref.collection("items").where("col", "==", "users").get();
+      const uids = users.docs.map((d) => d.get("docId"));
+      for (let i = 0; i < uids.length; i += 1e3) await ctx.authAdmin.deleteUsers(uids.slice(i, i + 1e3));
+      if (ctx.purgeSchoolMessages) await ctx.purgeSchoolMessages(b.recordId);
+      for (; ; ) {
+        const s2 = await ref.collection("items").limit(PAGE).get();
+        if (s2.empty) break;
+        await commitInBatches(db, s2.docs.map((d) => (batch) => batch.delete(d.ref)));
       }
     }
     if (b.kind === "account" && ctx.purgeAccount) await ctx.purgeAccount(b.recordId);
@@ -634,10 +993,11 @@ async function purgeBundleInternal(ctx, bundleId, actor) {
     }
     const items = await ref.collection("items").get();
     await commitInBatches(db, items.docs.map((d) => (batch) => batch.delete(d.ref)));
-    await ref.set({ status: "purged", purgedAt: ts(adminSdk), purgedBy: { uid: actor?.uid || "system", name: actor?.name || "system" }, record: adminSdk.firestore.FieldValue.delete(), filesDeleted }, { merge: true });
+    await ref.set({ status: "purged", jobStatus: "PERMANENTLY_DELETED", purgedAt: ts(adminSdk), purgedBy: { uid: actor?.uid || "system", name: actor?.name || "system" }, record: FV(adminSdk).delete(), filesDeleted, lastError: null }, { merge: true });
     return { filesDeleted };
   } catch (e) {
-    await ref.set({ status: "purging", lastError: String(e?.message || e).slice(0, 200) }, { merge: true });
+    const retry = (b.retryCount || 0) + 1;
+    await ref.set({ status: "purging", jobStatus: retry >= MAX_RETRIES ? "FAILED" : "PARTIALLY_COMPLETED", retryCount: retry, lastError: String(e?.message || e).slice(0, 200), updatedAt: ts(adminSdk) }, { merge: true });
     throw e;
   }
 }
@@ -649,40 +1009,74 @@ async function purgeBundle(ctx, actorUid, body) {
   if (!snap.exists) throw httpError(404, "BUNDLE_NOT_FOUND", "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
   const b = snap.data();
   const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: b.schoolId, collection: b.collection, recordId: b.recordId, bundleId, action: "PURGE", label: b.label };
+  const lockKey = `${b.collection}__${b.recordId}`;
+  const owner = newOwner();
+  let locked = false;
   try {
-    if (!actor.isSuper && (!actor.schoolId || actor.schoolId !== b.schoolId)) throw httpError(403, "FORBIDDEN_SCHOOL", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649");
-    if (!actor.isSuper && !FULL_ROLES.includes(actor.role)) throw httpError(403, "FORBIDDEN_PERMANENT", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0641\u0642\u0637");
+    if (b.kind === "school") {
+      if (!actor.isSuper) throw httpError(403, "FORBIDDEN_ROLE", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0645\u062F\u0631\u0633\u0629 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637");
+    } else {
+      if (!actor.isSuper && (!actor.schoolId || actor.schoolId !== b.schoolId)) throw httpError(403, "FORBIDDEN_SCHOOL", "\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u062F\u0631\u0633\u0629 \u0623\u062E\u0631\u0649");
+      if (!actor.isSuper && !FULL_ROLES.includes(actor.role)) throw httpError(403, "FORBIDDEN_PERMANENT", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0641\u0642\u0637");
+    }
     if (body.confirmText !== PERMANENT_CONFIRM_TEXT) throw httpError(400, "CONFIRM_PERMANENT_REQUIRED", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u064A\u062A\u0637\u0644\u0628 \u0643\u062A\u0627\u0628\u0629 \u0639\u0628\u0627\u0631\u0629 \u0627\u0644\u062A\u0623\u0643\u064A\u062F");
     if (!["trashed", "purging"].includes(b.status)) throw httpError(409, "NOT_PURGEABLE", "\u0627\u0644\u0633\u062C\u0644 \u0644\u064A\u0633 \u0641\u064A \u0627\u0644\u0633\u0644\u0629");
+    await acquireLock(ctx, lockKey, owner);
+    locked = true;
     const r = await purgeBundleInternal(ctx, bundleId, actor);
     await writeLog(db, adminSdk, { ...base, result: "success", files: r.filesDeleted });
     return { ok: true };
   } catch (e) {
     await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
     throw e;
+  } finally {
+    if (locked) await releaseLock(ctx, lockKey, owner);
   }
 }
-async function sweepDeletions(ctx, log = console) {
+async function sweepDeletions(ctx, log = console, { force = false } = {}) {
   const { db, adminSdk } = ctx;
-  const out = { resumed: 0, purged: 0, failed: 0 };
+  const out = { resumed: 0, purged: 0, failed: 0, skipped: 0 };
   const stuck = await db.collection("recycle_bin").where("status", "in", ["trashing", "purging"]).limit(50).get();
   for (const d of stuck.docs) {
     const updated = d.get("updatedAt")?.toMillis?.() || d.get("deletedAt")?.toMillis?.() || 0;
-    if (Date.now() - updated < 6e4) continue;
+    const retry = d.get("retryCount") || 0;
+    if (!force && (Date.now() - updated < backoffMs(retry) || retry >= MAX_RETRIES)) {
+      out.skipped += 1;
+      continue;
+    }
+    if (force && retry >= MAX_RETRIES) await d.ref.set({ retryCount: 0 }, { merge: true });
+    const lockKey = `${d.get("collection")}__${d.get("recordId")}`;
+    const owner = newOwner();
     try {
-      if (d.get("status") === "trashing") await runTrashSteps(ctx, d.id);
+      await acquireLock(ctx, lockKey, owner);
+    } catch {
+      out.skipped += 1;
+      continue;
+    }
+    try {
+      if (d.get("status") === "trashing") await (d.get("kind") === "school" ? runSchoolTrashSteps(ctx, d.id) : runTrashSteps(ctx, d.id));
       else await purgeBundleInternal(ctx, d.id, null);
       out.resumed += 1;
       await writeLog(db, adminSdk, { action: "RESUME", result: "success", actorUid: "system", actorName: "system", actorRole: "system", schoolId: d.get("schoolId"), collection: d.get("collection"), recordId: d.get("recordId"), bundleId: d.id });
     } catch (e) {
       out.failed += 1;
       log.error?.("[deletion] resume failed", d.id, e?.message);
+    } finally {
+      await releaseLock(ctx, lockKey, owner);
     }
   }
   const trashed = await db.collection("recycle_bin").where("status", "==", "trashed").limit(200).get();
   const nowMs = Date.now();
-  const expired = trashed.docs.filter((d) => (d.get("purgeAfter")?.toMillis?.() || Infinity) <= nowMs).slice(0, 25);
+  const expired = trashed.docs.filter((d) => d.get("retention") !== "protected" && (d.get("purgeAfter")?.toMillis?.() || Infinity) <= nowMs).slice(0, 25);
   for (const d of expired) {
+    const lockKey = `${d.get("collection")}__${d.get("recordId")}`;
+    const owner = newOwner();
+    try {
+      await acquireLock(ctx, lockKey, owner);
+    } catch {
+      out.skipped += 1;
+      continue;
+    }
     try {
       await purgeBundleInternal(ctx, d.id, null);
       out.purged += 1;
@@ -690,6 +1084,8 @@ async function sweepDeletions(ctx, log = console) {
     } catch (e) {
       out.failed += 1;
       log.error?.("[deletion] purge expired failed", d.id, e?.message);
+    } finally {
+      await releaseLock(ctx, lockKey, owner);
     }
   }
   return out;
@@ -700,6 +1096,375 @@ function startDeletionSweep(ctx, log = console, intervalMs = 3 * 60 * 1e3) {
   }, intervalMs);
   t.unref?.();
   return () => clearInterval(t);
+}
+async function voidPayment(ctx, actorUid, body) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const paymentId = String(body.paymentId || "");
+  const reason = String(body.reason || "").trim().slice(0, 300);
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId: actor.schoolId, collection: "payments", recordId: paymentId, action: "VOID_PAYMENT" };
+  try {
+    if (!paymentId) throw httpError(400, "INVALID_BODY", "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u062F\u0641\u0639\u0629 \u0645\u0637\u0644\u0648\u0628");
+    if (reason.length < 3) throw httpError(400, "REASON_REQUIRED", "\u0633\u0628\u0628 \u0627\u0644\u0625\u0644\u063A\u0627\u0621 \u0645\u0637\u0644\u0648\u0628");
+    const ref = db.collection("payments").doc(paymentId);
+    const out = await db.runTransaction(async (t) => {
+      const s = await t.get(ref);
+      if (!s.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u062F\u0641\u0639\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
+      const p = s.data() || {};
+      authorizeDelete(actor, "payments", POLICIES.payments, p, { permanent: false });
+      if (p.status === "voided") return { replay: true };
+      const amount = Number(p.amount || 0);
+      const stRef = p.studentId ? db.collection("students").doc(String(p.studentId)) : null;
+      const stSnap = stRef ? await t.get(stRef) : null;
+      const instRefs = asArray(p.installmentIds).map((i) => db.collection("installments").doc(i));
+      const instSnaps = await Promise.all(instRefs.map((r) => t.get(r)));
+      t.update(ref, {
+        status: "voided",
+        voidedAt: ts(adminSdk),
+        voidedBy: { uid: actor.uid, name: actor.name, role: actor.role },
+        voidReason: reason,
+        history: FV(adminSdk).arrayUnion({ action: "voided", at: Date.now(), by: actor.uid, reason, amount })
+      });
+      if (stSnap?.exists && String(stSnap.get("schoolId") || "") === String(p.schoolId || "")) t.update(stRef, { tuitionBalance: FV(adminSdk).increment(-amount) });
+      instSnaps.forEach((is, i) => {
+        if (is.exists) t.update(instRefs[i], { reviewRequired: true, reviewReason: `\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u062F\u0641\u0639\u0629 ${paymentId}` });
+      });
+      return { replay: false, amount };
+    });
+    await writeLog(db, adminSdk, { ...base, result: "success", replay: out.replay, amount: out.amount ?? null });
+    return { ok: true, replay: out.replay };
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+    throw e;
+  }
+}
+var NOTIF_OWNER_FIELDS = ["userId", "recipientId", "receiverId"];
+async function deleteNotifications(ctx, actorUid, body) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const ids = [...new Set(asArray(body.ids))].filter(Boolean);
+  if (!ids.length) throw httpError(400, "INVALID_BODY", "\u0644\u0645 \u064A\u062A\u0645 \u062A\u062D\u062F\u064A\u062F \u0625\u0634\u0639\u0627\u0631\u0627\u062A");
+  if (ids.length > 100) throw httpError(400, "TOO_MANY", "\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649 100 \u0625\u0634\u0639\u0627\u0631 \u0641\u064A \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0648\u0627\u062D\u062F");
+  const results = [];
+  const toDelete = [];
+  for (const id of ids) {
+    const s = await db.collection("notifications").doc(id).get();
+    if (!s.exists) {
+      results.push({ id, ok: false, code: "NOT_FOUND" });
+      continue;
+    }
+    const d = s.data() || {};
+    const own = NOTIF_OWNER_FIELDS.some((f) => d[f] && String(d[f]) === actor.uid);
+    const sameSchool = actor.schoolId && String(d.schoolId || "") === actor.schoolId;
+    const authored = d.createdBy && String(d.createdBy) === actor.uid && sameSchool;
+    const adminAudience = sameSchool && FULL_ROLES.includes(actor.role) && ["school_admin", "all_school"].includes(String(d.audience || ""));
+    const superInbox = actor.isSuper && (d.userId === "super_admin" || own);
+    if (actor.isSuper || own || authored || adminAudience || superInbox) {
+      toDelete.push(s.ref);
+      results.push({ id, ok: true });
+    } else results.push({ id, ok: false, code: "FORBIDDEN_OWNER" });
+  }
+  await commitInBatches(db, toDelete.map((r) => (batch) => batch.delete(r)));
+  await writeLog(db, adminSdk, {
+    actorUid: actor.uid,
+    actorName: actor.name,
+    actorRole: actor.role,
+    schoolId: actor.schoolId,
+    collection: "notifications",
+    recordId: ids[0],
+    action: "DELETE_NOTIFICATIONS",
+    result: results.every((r) => r.ok) ? "success" : results.some((r) => r.ok) ? "partial" : "refused",
+    count: toDelete.length,
+    requested: ids.length,
+    mode: "permanent",
+    bulk: ids.length > 1
+  });
+  return { results, ok: results.every((r) => r.ok), deleted: toDelete.length };
+}
+var SCHOOL_DELETE_ORDER = [
+  "notifications",
+  "dismissal_requests",
+  "dismissal_logs",
+  "dismissal_snapshots",
+  "print_logs",
+  "notification_preferences",
+  "orders",
+  "market",
+  "marketplace",
+  "inventory",
+  "payroll",
+  "payments",
+  "installments",
+  "fees",
+  "expenses",
+  "exams",
+  "student_archives",
+  "id_cards",
+  "behavior_reports",
+  "behavior",
+  "teacher_reports",
+  "advanced_reports",
+  "grades",
+  "attendance",
+  "attendance_records",
+  "homework",
+  "announcements",
+  "subscriptionRequests",
+  "registrations",
+  "subjects",
+  "classes",
+  "staff",
+  "students",
+  "users"
+];
+var SCHOOL_RETAINED = ["audit_logs", "login_logs", "deletion_logs", "recycle_bin"];
+var SCHOOL_CONFIRM_TEXT = "\u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629";
+var PAGE = 300;
+async function countByQuery(db, col, schoolId) {
+  try {
+    return (await db.collection(col).where("schoolId", "==", schoolId).count().get()).data().count;
+  } catch {
+    return (await db.collection(col).where("schoolId", "==", schoolId).get()).size;
+  }
+}
+async function previewSchoolDeletion(ctx, actorUid, schoolId) {
+  const { db } = ctx;
+  const actor = await loadActor(db, actorUid);
+  if (!actor.isSuper) throw httpError(403, "FORBIDDEN_ROLE", "\u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637");
+  const school = await db.collection("schools").doc(String(schoolId || "")).get();
+  if (!school.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
+  const counts = {};
+  for (const col of SCHOOL_DELETE_ORDER) counts[col] = await countByQuery(db, col, schoolId);
+  const users = await db.collection("users").where("schoolId", "==", schoolId).get();
+  const shared = users.docs.filter((d) => asArray(d.get("schoolIds")).some((s) => s !== schoolId)).length;
+  const superUsers = users.docs.filter((d) => SUPER.includes(String(d.get("role")))).length;
+  let files = 0;
+  try {
+    for (const prefix of [`schools/${schoolId}/`, `students/${schoolId}/`]) files += (await ctx.bucket().getFiles({ prefix }))[0].length;
+  } catch {
+    files = -1;
+  }
+  return { schoolId, schoolName: school.get("name") || "", counts, accounts: users.size - shared - superUsers, sharedAccounts: shared, protectedAccounts: superUsers, files, retained: SCHOOL_RETAINED, confirmText: SCHOOL_CONFIRM_TEXT };
+}
+async function runSchoolTrashSteps(ctx, bundleId) {
+  const { db, adminSdk, faults } = ctx;
+  const ref = bundleRef(db, bundleId);
+  const b = (await ref.get()).data();
+  if (b.status === "trashed") return b;
+  const steps = { ...b.steps || {} };
+  const schoolId = b.recordId;
+  const mark = async (name, extra = {}) => {
+    steps[name] = true;
+    await ref.set({ steps, ...extra, lastError: null, updatedAt: ts(adminSdk) }, { merge: true });
+  };
+  await ref.set({ jobStatus: "PROCESSING", updatedAt: ts(adminSdk) }, { merge: true });
+  try {
+    if (!steps.snapshot) {
+      const sc = await db.collection("schools").doc(schoolId).get();
+      if (!sc.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
+      await ref.set({ record: sc.data(), retention: "protected", purgeAfter: null, expiresAt: null }, { merge: true });
+      await mark("snapshot");
+    }
+    for (const col of SCHOOL_DELETE_ORDER) {
+      if (steps[`col:${col}`]) continue;
+      for (; ; ) {
+        const snap = await db.collection(col).where("schoolId", "==", schoolId).limit(PAGE).get();
+        const docs = snap.docs.filter((d) => !(col === "users" && SUPER.includes(String(d.get("role")))));
+        if (!docs.length && snap.empty) break;
+        const mine = [], sharedFix = [];
+        for (const d of docs) {
+          if (col === "users" && asArray(d.get("schoolIds")).some((s) => s !== schoolId)) sharedFix.push(d);
+          else mine.push(d);
+        }
+        await commitInBatches(db, mine.map((d) => (batch) => batch.set(ref.collection("items").doc(`${col}__${d.id}`), { col, docId: d.id, data: d.data() })));
+        if (faults?.school_mid && col === faults.school_mid) {
+          const e = new Error("injected fault in " + col);
+          e.injected = true;
+          throw e;
+        }
+        await commitInBatches(db, mine.map((d) => (batch) => batch.delete(d.ref)));
+        for (const d of sharedFix) {
+          const others = asArray(d.get("schoolIds")).filter((s) => s !== schoolId);
+          await ref.collection("items").doc(`shared__${d.id}`).set({ col: "shared_users", docId: d.id, data: { schoolId: d.get("schoolId"), schoolIds: d.get("schoolIds") } });
+          await d.ref.set({ schoolId: others[0], schoolIds: others }, { merge: true });
+        }
+        if (!mine.length && !sharedFix.length) break;
+      }
+      await mark(`col:${col}`);
+    }
+    if (!steps.auth) {
+      const items = await ref.collection("items").where("col", "==", "users").get();
+      for (const d of items.docs) {
+        if (d.get("authDone")) continue;
+        try {
+          await ctx.authAdmin.updateUser(d.get("docId"), { disabled: true });
+        } catch (e) {
+          if (e?.code !== "auth/user-not-found") throw e;
+        }
+        await d.ref.set({ authDone: true }, { merge: true });
+      }
+      await mark("auth");
+    }
+    if (!steps.files) {
+      let failedFiles = 0, plan = [];
+      if (!faults?.skipFiles) {
+        const bucket = ctx.bucket();
+        for (const prefix of [`schools/${schoolId}/`, `students/${schoolId}/`]) {
+          const [files] = await bucket.getFiles({ prefix });
+          plan.push(...files.map((f) => ({ path: f.name, owner: `schools/${schoolId}`, status: "move" })));
+        }
+        failedFiles = (await moveFilesToTrash(ctx, ref, bundleId, plan)).failed;
+      }
+      await ref.set({ storageReferences: { move: plan.length }, failedItems: failedFiles }, { merge: true });
+      if (failedFiles) throw new Error(`\u062A\u0639\u0630\u0651\u0631 \u0646\u0642\u0644 ${failedFiles} \u0645\u0644\u0641`);
+      await mark("files");
+    }
+    if (!steps.delete) {
+      await db.collection("schools").doc(schoolId).delete();
+      await mark("delete");
+    }
+    const counts = {};
+    (await ref.collection("items").select("col").get()).docs.forEach((d) => {
+      counts[d.get("col")] = (counts[d.get("col")] || 0) + 1;
+    });
+    await ref.set({ status: "trashed", jobStatus: "COMPLETED", trashedAt: ts(adminSdk), steps, childCounts: counts, relatedRecords: counts, processedItems: Object.values(counts).reduce((a, n) => a + n, 0), retryCount: 0, lastError: null }, { merge: true });
+    return (await ref.get()).data();
+  } catch (e) {
+    const retry = (b.retryCount || 0) + 1;
+    await ref.set({ status: "trashing", jobStatus: retry >= MAX_RETRIES ? "FAILED" : "PARTIALLY_COMPLETED", steps, retryCount: retry, lastError: String(e?.message || e).slice(0, 200), updatedAt: ts(adminSdk) }, { merge: true }).catch(() => {
+    });
+    throw e;
+  }
+}
+async function deleteSchool(ctx, actorUid, body) {
+  const { db, adminSdk } = ctx;
+  const actor = await loadActor(db, actorUid);
+  const schoolId = String(body.schoolId || "");
+  const permanent = body.mode === "permanent";
+  const base = { actorUid: actor.uid, actorName: actor.name, actorRole: actor.role, schoolId, collection: "schools", recordId: schoolId, mode: permanent ? "permanent" : "trash", action: permanent ? "DELETE_SCHOOL_PERMANENT" : "DELETE_SCHOOL" };
+  const lockKey = `schools__${schoolId}`;
+  const owner = newOwner();
+  let locked = false;
+  try {
+    if (!actor.isSuper) throw httpError(403, "FORBIDDEN_ROLE", "\u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645 \u0641\u0642\u0637");
+    if (!schoolId) throw httpError(400, "INVALID_BODY", "\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0645\u0637\u0644\u0648\u0628");
+    const sc = await db.collection("schools").doc(schoolId).get();
+    if (!sc.exists) throw httpError(404, "NOT_FOUND", "\u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
+    const name = String(sc.get("name") || "").trim();
+    if (body.confirmSchoolId !== schoolId) throw httpError(400, "CONFIRM_SCHOOL_REQUIRED", "\u064A\u062C\u0628 \u0625\u062F\u062E\u0627\u0644 \u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0644\u0644\u062A\u0623\u0643\u064A\u062F");
+    if (name && String(body.confirmName || "").trim() !== name) throw httpError(400, "CONFIRM_NAME_REQUIRED", "\u0627\u0633\u0645 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0627\u0644\u0645\u0643\u062A\u0648\u0628 \u063A\u064A\u0631 \u0645\u0637\u0627\u0628\u0642");
+    if (body.confirmText !== SCHOOL_CONFIRM_TEXT) throw httpError(400, "CONFIRM_TEXT_REQUIRED", `\u0627\u0643\u062A\u0628 \xAB${SCHOOL_CONFIRM_TEXT}\xBB \u0644\u0644\u062A\u0623\u0643\u064A\u062F`);
+    if (permanent && body.confirmPermanentText !== PERMANENT_CONFIRM_TEXT) throw httpError(400, "CONFIRM_PERMANENT_REQUIRED", "\u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u064A\u062A\u0637\u0644\u0628 \u0643\u062A\u0627\u0628\u0629 \u0639\u0628\u0627\u0631\u0629 \u0627\u0644\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u0645\u0633\u062A\u0642\u0644\u0629");
+    await acquireLock(ctx, lockKey, owner);
+    locked = true;
+    const existing = await db.collection("recycle_bin").where("recordKey", "==", `schools/${schoolId}`).where("status", "in", ["trashing", "trashed", "purging"]).limit(1).get();
+    const preview2 = await previewSchoolDeletion(ctx, actorUid, schoolId);
+    let bid;
+    if (!existing.empty) bid = existing.docs[0].id;
+    else {
+      bid = `schools__${schoolId}__${Date.now().toString(36)}`;
+      await bundleRef(db, bid).set({
+        bundleId: bid,
+        jobId: bid,
+        recordKey: `schools/${schoolId}`,
+        collection: "schools",
+        entityType: "school",
+        recordId: schoolId,
+        entityId: schoolId,
+        schoolId,
+        kind: "school",
+        label: name || schoolId,
+        status: "trashing",
+        jobStatus: "PENDING",
+        steps: {},
+        initiatedBy: { uid: actor.uid, name: actor.name, role: actor.role },
+        deletedBy: { uid: actor.uid, name: actor.name, role: actor.role },
+        deletedAt: ts(adminSdk),
+        createdAt: ts(adminSdk),
+        retention: "protected",
+        purgeAfter: null,
+        expiresAt: null,
+        processedItems: 0,
+        failedItems: 0,
+        retryCount: 0,
+        relatedRecords: {},
+        storageReferences: {},
+        preview: preview2
+      });
+    }
+    await runSchoolTrashSteps(ctx, bid);
+    let purged = null;
+    if (permanent) purged = await purgeBundleInternal(ctx, bid, actor);
+    await writeLog(db, adminSdk, { ...base, result: "success", bundleId: bid, label: name, preview: { counts: preview2.counts, accounts: preview2.accounts, files: preview2.files }, files: purged?.filesDeleted ?? 0 });
+    return { ok: true, bundleId: bid, preview: preview2 };
+  } catch (e) {
+    await writeLog(db, adminSdk, { ...base, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
+    throw e;
+  } finally {
+    if (locked) await releaseLock(ctx, lockKey, owner);
+  }
+}
+async function restoreSchoolBundle(ctx, ref, b, actor) {
+  const { db, adminSdk } = ctx;
+  const rsteps = { ...b.rsteps || {} };
+  const rmark = async (name, extra = {}) => {
+    rsteps[name] = true;
+    await ref.set({ rsteps, ...extra, updatedAt: ts(adminSdk) }, { merge: true });
+  };
+  const schoolId = b.recordId;
+  if (b.status === "trashed") {
+    const live = await db.collection("schools").doc(schoolId).get();
+    if (live.exists) throw httpError(409, "CONFLICT", "\u062A\u0648\u062C\u062F \u0645\u062F\u0631\u0633\u0629 \u0628\u0646\u0641\u0633 \u0627\u0644\u0645\u0639\u0631\u0651\u0641 \u062D\u0627\u0644\u064A\u0627\u064B");
+  }
+  await ref.set({ status: "restoring", jobStatus: "RESTORING", updatedAt: ts(adminSdk) }, { merge: true });
+  try {
+    if (!rsteps.school) {
+      await db.collection("schools").doc(schoolId).set(b.record || {});
+      await rmark("school");
+    }
+    if (!rsteps.items) {
+      let last = null;
+      for (; ; ) {
+        let q = ref.collection("items").orderBy(adminSdk.firestore.FieldPath.documentId()).limit(PAGE);
+        if (last) q = q.startAfter(last);
+        const snap = await q.get();
+        if (snap.empty) break;
+        const ops = [];
+        for (const d of snap.docs) {
+          const col = d.get("col");
+          if (col === "shared_users") ops.push((batch) => batch.set(db.collection("users").doc(d.get("docId")), d.get("data"), { merge: true }));
+          else ops.push((batch) => batch.set(db.collection(col).doc(d.get("docId")), d.get("data")));
+        }
+        await commitInBatches(db, ops);
+        last = snap.docs[snap.docs.length - 1];
+      }
+      await rmark("items");
+    }
+    if (!rsteps.auth) {
+      const users = await ref.collection("items").where("col", "==", "users").get();
+      for (const d of users.docs) await ctx.authAdmin.updateUser(d.get("docId"), { disabled: false }).catch((e) => {
+        if (e?.code !== "auth/user-not-found") throw e;
+      });
+      await rmark("auth");
+    }
+    let fileStats = { restored: 0, failed: 0, missing: 0 };
+    if (!rsteps.files) {
+      if (!ctx.faults?.skipFiles) fileStats = await restoreFilesFromTrash(ctx, ref);
+      if (fileStats.failed) throw httpError(207, "RESTORE_INCOMPLETE", `\u062A\u0645\u062A \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0627\u0644\u0633\u062C\u0644\u0627\u062A \u0644\u0643\u0646 \u062A\u0639\u0630\u0651\u0631\u062A \u0627\u0633\u062A\u0639\u0627\u062F\u0629 ${fileStats.failed} \u0645\u0644\u0641. \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629`);
+      await rmark("files", { restoredFiles: fileStats.restored });
+    }
+    for (; ; ) {
+      const s = await ref.collection("items").limit(PAGE).get();
+      if (s.empty) break;
+      await commitInBatches(db, s.docs.map((d) => (batch) => batch.delete(d.ref)));
+    }
+    await ref.set({ status: "restored", jobStatus: "RESTORED", restoredAt: ts(adminSdk), restoredBy: { uid: actor.uid, name: actor.name }, record: FV(adminSdk).delete(), lastError: null }, { merge: true });
+    return { ok: true, bundleId: b.bundleId, restoredFiles: fileStats.restored };
+  } catch (e) {
+    await ref.set({ status: "restoring", jobStatus: "PARTIALLY_COMPLETED", lastError: String(e?.message || e).slice(0, 200) }, { merge: true }).catch(() => {
+    });
+    throw e.status ? e : Object.assign(httpError(500, "RESTORE_INCOMPLETE", "\u0627\u0644\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u063A\u064A\u0631 \u0645\u0643\u062A\u0645\u0644\u0629 \u2014 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629"), { cause: e });
+  }
 }
 
 // server.ts
@@ -880,168 +1645,6 @@ async function permanentlyDeleteMessage(db, params) {
     conversationId,
     conversationDeleted,
     storageDeleted
-  };
-}
-
-// schoolPermanentDelete.mjs
-var SCHOOL_SCOPED_COLLECTIONS = [
-  "students",
-  "classes",
-  "attendance",
-  "attendance_records",
-  "grades",
-  "homework",
-  "announcements",
-  "behavior_reports",
-  "teacher_reports",
-  "advanced_reports",
-  "installments",
-  "payments",
-  "payroll",
-  "inventory",
-  "notifications",
-  "dismissal_requests",
-  "dismissal_logs",
-  "dismissal_snapshots",
-  "id_cards",
-  "student_archives",
-  "staff",
-  "behavior",
-  "exams",
-  "fees",
-  "expenses",
-  "logs",
-  "market",
-  "marketplace",
-  "orders",
-  "subscriptionRequests",
-  "subjects",
-  "print_logs",
-  "audit_logs",
-  "login_logs",
-  // messaging cleaned via deleteSchoolMessages() before generic loop
-  "notification_preferences",
-  "registrations"
-];
-async function deleteSchoolScopedCollection(db, collectionName, schoolId) {
-  let deleted = 0;
-  const snap = await db.collection(collectionName).where("schoolId", "==", schoolId).get();
-  if (snap.empty) return 0;
-  const docs = snap.docs;
-  const batchSize = 400;
-  for (let i = 0; i < docs.length; i += batchSize) {
-    const chunk = docs.slice(i, i + batchSize);
-    const batch = db.batch();
-    chunk.forEach((docSnap) => batch.delete(docSnap.ref));
-    await batch.commit();
-    deleted += chunk.length;
-  }
-  return deleted;
-}
-async function deleteAuthUsersInBatches(authAdmin, uids, warnings) {
-  let deleted = 0;
-  const batchSize = 1e3;
-  for (let i = 0; i < uids.length; i += batchSize) {
-    const chunk = uids.slice(i, i + batchSize);
-    try {
-      const result = await authAdmin.deleteUsers(chunk);
-      const failures = result.errors?.length || 0;
-      deleted += chunk.length - failures;
-      for (const entry of result.errors || []) {
-        const uid = chunk[entry.index];
-        warnings.push(`Auth delete failed for ${uid}: ${entry.error?.message || "unknown"}`);
-      }
-    } catch (error) {
-      warnings.push(`Auth batch delete failed: ${error?.message || error}`);
-      for (const uid of chunk) {
-        try {
-          await authAdmin.deleteUser(uid);
-          deleted += 1;
-        } catch (singleError) {
-          if (singleError?.code !== "auth/user-not-found") {
-            warnings.push(`Auth delete failed for ${uid}: ${singleError?.message || singleError}`);
-          }
-        }
-      }
-    }
-  }
-  return deleted;
-}
-async function runSchoolPermanentDelete({
-  db,
-  authAdmin,
-  schoolId,
-  confirm,
-  schoolName,
-  confirmName,
-  bucket = null
-}) {
-  if (confirm !== true) {
-    const err = new Error("confirm:true is required for permanent school delete");
-    err.status = 400;
-    throw err;
-  }
-  const schoolRef = db.collection("schools").doc(schoolId);
-  const schoolSnap = await schoolRef.get();
-  if (!schoolSnap.exists) {
-    const err = new Error(`School not found: ${schoolId}`);
-    err.status = 404;
-    throw err;
-  }
-  const schoolData = schoolSnap.data() || {};
-  const expectedName = String(schoolData.name || "").trim();
-  const providedName = String(schoolName || confirmName || "").trim();
-  if (expectedName) {
-    if (!providedName || providedName !== expectedName) {
-      const err = new Error("School name confirmation does not match");
-      err.status = 400;
-      throw err;
-    }
-  }
-  const warnings = [];
-  const deletedCounts = {
-    users: 0,
-    authUsers: 0,
-    schools: 0
-  };
-  try {
-    const msgCleanup = await deleteSchoolMessages(db, schoolId, { bucket });
-    deletedCounts.system_messages = msgCleanup.deleted.system_messages;
-    deletedCounts.conversations = msgCleanup.deleted.conversations;
-    deletedCounts.chat_notifications = msgCleanup.deleted.notifications;
-    deletedCounts.chat_storage = msgCleanup.deleted.storageFiles;
-    for (const w of msgCleanup.warnings || []) warnings.push(w);
-  } catch (error) {
-    warnings.push(`deleteSchoolMessages failed: ${error?.message || error}`);
-  }
-  const usersSnap = await db.collection("users").where("schoolId", "==", schoolId).get();
-  const userIds = usersSnap.docs.map((docSnap) => docSnap.id);
-  deletedCounts.authUsers = await deleteAuthUsersInBatches(authAdmin, userIds, warnings);
-  const userDocs = usersSnap.docs;
-  const userBatchSize = 400;
-  for (let i = 0; i < userDocs.length; i += userBatchSize) {
-    const chunk = userDocs.slice(i, i + userBatchSize);
-    const batch = db.batch();
-    chunk.forEach((docSnap) => batch.delete(docSnap.ref));
-    await batch.commit();
-    deletedCounts.users += chunk.length;
-  }
-  for (const colName of SCHOOL_SCOPED_COLLECTIONS) {
-    try {
-      deletedCounts[colName] = await deleteSchoolScopedCollection(db, colName, schoolId);
-    } catch (error) {
-      warnings.push(`Failed to cleanup ${colName}: ${error?.message || error}`);
-      deletedCounts[colName] = 0;
-    }
-  }
-  await schoolRef.delete();
-  deletedCounts.schools = 1;
-  return {
-    ok: true,
-    schoolId,
-    schoolName: expectedName,
-    deletedCounts,
-    warnings
   };
 }
 
@@ -4390,14 +4993,14 @@ function scheduleCredentialScrub(getDb2, adminSdk, { intervalMs = 6 * 60 * 60 * 
 
 // chatThreadMigration.mjs
 var LEGACY = /^superadmin:([^:]+):school:(.+)$/;
-var PAGE = 400;
+var PAGE2 = 400;
 var sharedKey = (schoolId) => `superadmin_${schoolId}`;
 var millis = (v) => v && typeof v.toMillis === "function" ? v.toMillis() : 0;
 async function moveMessages(db) {
   let moved = 0;
   let cursor = null;
   for (let pass = 0; pass < 50; pass += 1) {
-    let q = db.collection("system_messages").where("conversationId", ">=", "superadmin:").where("conversationId", "<", "superadmin;").orderBy("conversationId").limit(PAGE);
+    let q = db.collection("system_messages").where("conversationId", ">=", "superadmin:").where("conversationId", "<", "superadmin;").orderBy("conversationId").limit(PAGE2);
     if (cursor) q = q.startAfter(cursor);
     const snap = await q.get();
     if (snap.empty) break;
@@ -4416,7 +5019,7 @@ async function moveMessages(db) {
       await batch.commit();
       moved += ops;
     }
-    if (snap.size < PAGE) break;
+    if (snap.size < PAGE2) break;
   }
   return moved;
 }
@@ -5596,7 +6199,8 @@ async function startServer() {
     authAdmin: admin4.auth(),
     bucket: () => getStorage().bucket(),
     canActorDeleteUser,
-    purgeAccount: (userId) => runUserPermanentDelete({ db: getDb(), authAdmin: admin4.auth(), adminSdk: admin4, userId })
+    purgeAccount: (userId) => runUserPermanentDelete({ db: getDb(), authAdmin: admin4.auth(), adminSdk: admin4, userId }),
+    purgeSchoolMessages: (schoolId) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() })
   });
   const deletionRoute = (fn) => async (req, res) => {
     try {
@@ -5622,6 +6226,10 @@ async function startServer() {
   };
   app.post("/api/records/delete", verifyToken, deletionRoute((c, uid, b) => deleteRecords(c, uid, b)));
   app.post("/api/records/restore", verifyToken, deletionRoute((c, uid, b) => restoreBundle(c, uid, b.bundleId)));
+  app.post("/api/records/delete-notifications", verifyToken, deletionRoute((c, uid, b) => deleteNotifications(c, uid, b)));
+  app.post("/api/records/school-preview", verifyToken, deletionRoute((c, uid, b) => previewSchoolDeletion(c, uid, String(b.schoolId || ""))));
+  app.post("/api/records/delete-school", verifyToken, deletionRoute((c, uid, b) => deleteSchool(c, uid, b)));
+  app.post("/api/records/void-payment", verifyToken, deletionRoute((c, uid, b) => voidPayment(c, uid, b)));
   app.post("/api/records/purge", verifyToken, deletionRoute((c, uid, b) => purgeBundle(c, uid, b)));
   app.post("/api/records/resume", verifyToken, deletionRoute(async (c, uid) => {
     const actor = await loadActor(c.db, uid);
@@ -5631,7 +6239,7 @@ async function startServer() {
       e.code = "FORBIDDEN_ROLE";
       throw e;
     }
-    return sweepDeletions(c);
+    return sweepDeletions(c, console, { force: true });
   }));
   app.get("/api/download/schoolixiq.mobileconfig", (req, res) => {
     const host = req.get("host") || "schoolixiq.com";
@@ -6084,211 +6692,34 @@ async function startServer() {
     if (!userId) {
       return res.status(400).json({ error: "USER_ID_REQUIRED", message: "userId \u0645\u0637\u0644\u0648\u0628" });
     }
-    if (!isSuperAdminRole3(req.user.role)) {
-      return legacyEngineDelete(req, res, "users", userId, "\u062A\u0645 \u062A\u0639\u0637\u064A\u0644 \u0627\u0644\u062D\u0633\u0627\u0628 \u0648\u0646\u0642\u0644\u0647 \u0625\u0644\u0649 \u0633\u0644\u0629 \u0627\u0644\u0645\u062D\u0630\u0648\u0641\u0627\u062A");
-    }
-    try {
-      const db = getDb();
-      const userDoc = await db.collection("users").doc(userId).get();
-      const beforeData = userDoc.exists ? userDoc.data() || {} : {};
-      const targetRole = beforeData.role;
-      if (!isSuperAdminRole3(req.user.role)) {
-        const actorSchoolId = String(req.user.schoolId || "").trim();
-        const sameSchool = userDoc.exists && actorSchoolId.length > 0 && String(beforeData.schoolId || "") === actorSchoolId;
-        if (!sameSchool || !canActorDeleteUser(req.user.role, targetRole, actorSchoolId)) {
-          return res.status(403).json({
-            error: "FORBIDDEN",
-            message: "\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645"
-          });
-        }
-      }
-      let authExists = false;
-      try {
-        await admin4.auth().getUser(userId);
-        authExists = true;
-      } catch (authError) {
-        if (authError.code !== "auth/user-not-found") {
-          throw authError;
-        }
-      }
-      if (!userDoc.exists && !authExists) {
-        return res.status(404).json({
-          error: "USER_NOT_FOUND",
-          message: "\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0641\u064A Auth \u0623\u0648 Firestore"
-        });
-      }
-      if (isSuperAdminRole3(targetRole) && !confirmSuperAdminDelete) {
-        return res.status(403).json({
-          error: "CONFIRMATION_REQUIRED",
-          message: "\u062D\u0630\u0641 \u062D\u0633\u0627\u0628 Super Admin \u064A\u062A\u0637\u0644\u0628 confirmSuperAdminDelete:true"
-        });
-      }
-      if (userId === req.user.uid && !confirmSelfDelete) {
-        return res.status(403).json({
-          error: "CONFIRMATION_REQUIRED",
-          message: "\u062D\u0630\u0641 \u062D\u0633\u0627\u0628\u0643 \u0627\u0644\u062D\u0627\u0644\u064A \u064A\u062A\u0637\u0644\u0628 confirmSelfDelete:true"
-        });
-      }
-      const result = await runUserPermanentDelete({
-        db,
-        authAdmin: admin4.auth(),
-        adminSdk: admin4,
-        userId
-      });
-      const distributorId = String(beforeData.distributorId || "").trim();
-      if (beforeData.role === "distributor" && distributorId) {
-        const distRef = db.collection("distributors").doc(distributorId);
-        const distSnap = await distRef.get();
-        if (distSnap.exists && distSnap.data()?.userId === userId) {
-          await distRef.update({
-            canLogin: false,
-            userId: admin4.firestore.FieldValue.delete(),
-            updatedAt: admin4.firestore.FieldValue.serverTimestamp()
-          });
-        }
-      }
-      await logAudit(req, "DELETE_USER", {
-        before: userDoc.exists ? beforeData : null,
-        metadata: { targetUid: userId, result }
-      });
-      res.json({
-        ok: true,
-        success: true,
-        deletedAuth: result.deletedAuth,
-        deletedFirestoreUser: result.deletedFirestoreUser,
-        warnings: result.warnings,
-        data: result,
-        message: "\u062A\u0645 \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628 \u0628\u0646\u062C\u0627\u062D"
-      });
-    } catch (error) {
-      console.error("Delete User Error:", error);
-      res.status(error.status || 500).json({
-        success: false,
-        ok: false,
-        error: error.message || "Internal Server Error",
-        message: error.message || "\u062D\u062F\u062B \u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628"
-      });
-    }
+    void confirmSelfDelete;
+    void confirmSuperAdminDelete;
+    return legacyEngineDelete(req, res, "users", userId, "\u062A\u0645 \u062A\u0639\u0637\u064A\u0644 \u0627\u0644\u062D\u0633\u0627\u0628 \u0648\u0646\u0642\u0644\u0647 \u0625\u0644\u0649 \u0633\u0644\u0629 \u0627\u0644\u0645\u062D\u0630\u0648\u0641\u0627\u062A");
   });
-  app.post("/api/admin/delete-school", verifyAdmin, async (req, res) => {
-    const { schoolId } = req.body;
-    if (!schoolId) return res.status(400).json({ error: "School ID required" });
-    try {
-      if (req.user.role !== "superadmin") {
-        return res.status(403).json({ error: "FORBIDDEN", message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629. \u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0645\u062E\u0635\u0635 \u0644\u0644\u0645\u0637\u0648\u0631/SuperAdmin \u0641\u0642\u0637" });
-      }
-      const db = getDb();
-      const usersQuery = await db.collection("users").where("schoolId", "==", schoolId).get();
-      const userDeletions = usersQuery.docs.map(async (uDoc) => {
-        try {
-          await admin4.auth().deleteUser(uDoc.id);
-        } catch (e) {
-        }
-        await uDoc.ref.delete();
-      });
-      await Promise.all(userDeletions);
-      const studentsQuery = await db.collection("students").where("schoolId", "==", schoolId).get();
-      const studentDeletions = studentsQuery.docs.map((sDoc) => sDoc.ref.delete());
-      await Promise.all(studentDeletions);
-      const collectionsToCleanup = [
-        "staff",
-        "homework",
-        "exams",
-        "fees",
-        "expenses",
-        "logs",
-        "notifications",
-        "attendance",
-        "announcements",
-        "payroll",
-        "inventory",
-        "market",
-        "orders",
-        "payments",
-        "behavior_reports",
-        "behavior",
-        "grades",
-        "installments",
-        "teacher_reports",
-        "classes",
-        "subscriptionRequests"
-      ];
-      const deleteCollectionForSchool = async (colName) => {
-        try {
-          const snap = await db.collection(colName).where("schoolId", "==", schoolId).get();
-          if (!snap.empty) {
-            const docs = snap.docs;
-            const batchSize = 400;
-            for (let i = 0; i < docs.length; i += batchSize) {
-              const chunk = docs.slice(i, i + batchSize);
-              const batch = db.batch();
-              chunk.forEach((doc) => batch.delete(doc.ref));
-              await batch.commit();
-            }
-          }
-        } catch (e) {
-          console.error(`Cleanup failed for ${colName}:`, e);
-        }
-      };
-      await Promise.all(collectionsToCleanup.map((colName) => deleteCollectionForSchool(colName)));
-      await db.collection("schools").doc(schoolId).delete();
-      await logAudit(req, "DELETE_SCHOOL", { metadata: { targetSchoolId: schoolId } });
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Delete School Error:", error);
-      res.status(500).json({ error: error.message || "Internal Server Error" });
-    }
-  });
-  app.post("/api/admin/schools/:schoolId/permanent-delete", verifyAdmin, async (req, res) => {
-    const { schoolId } = req.params;
+  const legacySchoolDelete = async (req, res, schoolId) => {
     const body = req.body || {};
-    const confirm = body.confirm === true;
-    const schoolName = body.schoolName ?? body.confirmName;
-    if (!schoolId) {
-      return res.status(400).json({ error: "SCHOOL_ID_REQUIRED", message: "School ID required" });
-    }
     try {
-      if (!isSuperAdminRole3(req.user.role)) {
-        return res.status(403).json({
-          error: "FORBIDDEN",
-          message: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D \u0644\u0643 \u0628\u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0646\u0647\u0627\u0626\u064A\u0627\u064B. \u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0645\u062E\u0635\u0635 \u0644\u0644SuperAdmin \u0641\u0642\u0637"
-        });
-      }
-      const result = await runSchoolPermanentDelete({
-        db: getDb(),
-        authAdmin: admin4.auth(),
+      const out = await deleteSchool(deletionCtx(), req.user.uid, {
         schoolId,
-        confirm,
-        schoolName: schoolName != null ? String(schoolName) : void 0,
-        confirmName: body.confirmName != null ? String(body.confirmName) : void 0,
-        bucket: (() => {
-          try {
-            return getStorage().bucket();
-          } catch {
-            return null;
-          }
-        })()
+        mode: body.permanent === true ? "permanent" : "trash",
+        confirmSchoolId: body.confirmSchoolId ?? (body.confirm === true ? schoolId : void 0),
+        confirmName: body.confirmName ?? body.schoolName,
+        confirmText: body.confirmText,
+        confirmPermanentText: body.confirmPermanentText
       });
-      await logAudit(req, "PERMANENT_DELETE_SCHOOL", {
-        metadata: { targetSchoolId: schoolId, result }
-      });
-      res.json({
-        ok: true,
-        success: true,
-        schoolId: result.schoolId,
-        deletedCounts: result.deletedCounts,
-        warnings: result.warnings,
-        summary: result
-      });
-    } catch (error) {
-      console.error("Permanent Delete School Error:", error);
-      res.status(error.status || 500).json({
-        ok: false,
-        error: error.message || "Internal Server Error",
-        message: error.message || "\u0641\u0634\u0644 \u0627\u0644\u062D\u0630\u0641 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0644\u0644\u0645\u062F\u0631\u0633\u0629"
-      });
+      res.json({ ok: true, success: true, bundleId: out.bundleId, summary: out.preview, schoolId });
+    } catch (e) {
+      const noCreds = /Could not load the default credentials|Unable to detect a Project Id/i.test(String(e?.message || ""));
+      if (noCreds) return res.status(503).json({ ok: false, error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B. \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
+      res.status(e.status || 500).json({ ok: false, success: false, error: e.code || "ERROR", message: e.message || "\u0641\u0634\u0644 \u062D\u0630\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629" });
     }
+  };
+  app.post("/api/admin/delete-school", verifyAdmin, async (req, res) => {
+    const schoolId = String(req.body?.schoolId || "").trim();
+    if (!schoolId) return res.status(400).json({ error: "School ID required" });
+    return legacySchoolDelete(req, res, schoolId);
   });
+  app.post("/api/admin/schools/:schoolId/permanent-delete", verifyAdmin, async (req, res) => legacySchoolDelete(req, res, String(req.params.schoolId || "").trim()));
   app.post("/api/admin/messages/permanent-delete", verifyAdmin, async (req, res) => {
     try {
       if (!isSuperAdminRole3(req.user.role)) {
@@ -6654,12 +7085,10 @@ async function startServer() {
       linkedUsers.docs.forEach((d) => userIds.add(d.id));
       let usersDeleted = 0;
       for (const uid of userIds) {
-        try {
-          await runUserPermanentDelete({ db, authAdmin: admin4.auth(), adminSdk: admin4, userId: uid });
-          usersDeleted += 1;
-        } catch (e) {
-          if (e?.status !== 404) throw e;
-        }
+        const out = await deleteRecords(deletionCtx(), req.user.uid, { collection: "users", ids: [uid], mode: "permanent", confirmText: PERMANENT_CONFIRM_TEXT });
+        const r0 = out.results?.[0];
+        if (r0?.ok) usersDeleted += 1;
+        else if (r0?.code !== "NOT_FOUND") throw Object.assign(new Error(r0?.message || "\u062A\u0639\u0630\u0651\u0631 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0648\u0632\u0639"), { code: r0?.code });
       }
       const result = await deleteDistributorRecords({ db, adminSdk: admin4, distributorId, actorUid: req.user.uid });
       await logAudit(req, "DISTRIBUTOR_DELETE", { before: snap.data(), metadata: { distributorId, usersDeleted, ...result } });
