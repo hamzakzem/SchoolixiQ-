@@ -1,5 +1,7 @@
 // Server-side chat notification + push-claim idempotency, against the Firestore emulator.
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 npx tsx scripts/e2e/message-notifications.test.ts
+// Run it WITHOUT the app server running: the server's own push/chat workers would otherwise race the
+// test's fixtures (they correctly process the same documents).
 import admin from 'firebase-admin';
 import { notifyForSystemMessage, setupSystemMessageNotifications, notificationIdFor, processBacklog } from '../../backend/messageNotifications.mjs';
 import { claimNotificationForPush, processNotificationPush } from '../../notificationPushDispatch.ts';
