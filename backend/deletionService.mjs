@@ -15,7 +15,7 @@
  *    only this server can write and that has no expiry.
  */
 
-import { planFiles, moveFilesToTrash, restoreFilesFromTrash, purgeTrashedFiles } from './storageRegistry.mjs';
+import { planFiles, moveFilesToTrash, restoreFilesFromTrash, purgeTrashedFiles, buildReferenceIndex } from './storageRegistry.mjs';
 
 const TRASH_DAYS = 30;
 const MAX_RETRIES = 6;
@@ -280,11 +280,12 @@ async function runTrashSteps(ctx, bundleId) {
       let plan = [];
       let failedFiles = 0;
       if (!faults?.skipFiles) {
-        plan = await planFiles(ctx, { schoolId: b.schoolId, collection: b.collection, recordId: b.recordId, records });
+        plan = await planFiles(ctx, { schoolId: b.schoolId, collection: b.collection, recordId: b.recordId, records, excludeBundleId: b.bundleId });
         failedFiles = (await moveFilesToTrash(ctx, ref, b.id || b.bundleId, plan)).failed;
       }
       const summary = plan.reduce((a, p) => { a[p.status] = (a[p.status] || 0) + 1; return a; }, {});
-      await ref.set({ storageReferences: summary, failedItems: failedFiles }, { merge: true });
+      const warnings = summary.unverified ? [{ code: 'REFERENCE_SCAN_INCOMPLETE', files: summary.unverified, message: 'تعذّر التحقق من مراجع الملفات في كل المدارس؛ تُركت الملفات في مكانها (لم تُحذف ولم تُنقل)' }] : [];
+      await ref.set({ storageReferences: summary, failedItems: failedFiles, storageWarnings: warnings }, { merge: true });
       if (failedFiles) throw new Error(`تعذّر نقل ${failedFiles} ملف إلى السلة — ستُعاد المحاولة تلقائياً`);
       await mark('files');
     }
@@ -429,7 +430,7 @@ export async function deleteRecords(ctx, actorUid, body) {
       await runTrashSteps(ctx, bid);
       let purged = null;
       if (permanent) purged = await purgeBundleInternal(ctx, bid, actor);
-      await writeLog(db, adminSdk, { ...base, action, result: 'success', bundleId: bid, label: policy.label ? policy.label(data) : id, childCounts: (await bundleRef(db, bid).get()).get('childCounts') || {}, files: purged?.filesDeleted ?? 0 });
+      await writeLog(db, adminSdk, { ...base, action, result: 'success', bundleId: bid, label: policy.label ? policy.label(data) : id, childCounts: (await bundleRef(db, bid).get()).get('childCounts') || {}, files: purged?.filesDeleted ?? 0, storage: (await bundleRef(db, bid).get()).get('storageReferences') || {} });
       results.push({ id, ok: true, bundleId: bid, permanent });
     } catch (e) {
       await writeLog(db, adminSdk, { ...base, action, result: e.status && e.status < 500 ? 'refused' : 'failed', errorCode: e.code || 'ERROR', error: String(e.message || e).slice(0, 200) });
@@ -540,7 +541,8 @@ async function purgeBundleInternal(ctx, bundleId, actor) {
   await ref.set({ status: 'purging', jobStatus: 'PROCESSING', updatedAt: ts(adminSdk) }, { merge: true });
   let filesDeleted = 0;
   try {
-    if (!ctx.faults?.skipFiles) filesDeleted = (await purgeTrashedFiles(ctx, ref, b.bundleId)).deleted;
+    let filesRescued = 0, filesRetained = 0;
+    if (!ctx.faults?.skipFiles) { const pr = await purgeTrashedFiles(ctx, ref, b.bundleId); filesDeleted = pr.deleted; filesRescued = pr.rescued; filesRetained = pr.retained; }
     if (b.kind === 'school') {
       // permanent: the school's logins and its messaging go too (these are not restorable)
       const users = await ref.collection('items').where('col', '==', 'users').get();
@@ -553,8 +555,8 @@ async function purgeBundleInternal(ctx, bundleId, actor) {
     if (policy?.studentUserDoc) { try { await ctx.authAdmin.deleteUser(b.recordId); } catch (e) { if (e?.code !== 'auth/user-not-found') throw e; } }
     const items = await ref.collection('items').get();
     await commitInBatches(db, items.docs.map((d) => (batch) => batch.delete(d.ref)));
-    await ref.set({ status: 'purged', jobStatus: 'PERMANENTLY_DELETED', purgedAt: ts(adminSdk), purgedBy: { uid: actor?.uid || 'system', name: actor?.name || 'system' }, record: FV(adminSdk).delete(), filesDeleted, lastError: null }, { merge: true });
-    return { filesDeleted };
+    await ref.set({ status: 'purged', jobStatus: 'PERMANENTLY_DELETED', purgedAt: ts(adminSdk), purgedBy: { uid: actor?.uid || 'system', name: actor?.name || 'system' }, record: FV(adminSdk).delete(), filesDeleted, filesRescued, filesRetained, lastError: null }, { merge: true });
+    return { filesDeleted, filesRescued, filesRetained };
   } catch (e) {
     const retry = (b.retryCount || 0) + 1;
     await ref.set({ status: 'purging', jobStatus: retry >= MAX_RETRIES ? 'FAILED' : 'PARTIALLY_COMPLETED', retryCount: retry, lastError: String(e?.message || e).slice(0, 200), updatedAt: ts(adminSdk) }, { merge: true });
@@ -635,8 +637,8 @@ export async function sweepDeletions(ctx, log = console, { force = false } = {})
   return out;
 }
 
-export function startDeletionSweep(ctx, log = console, intervalMs = 3 * 60 * 1000) {
-  const t = setInterval(() => { sweepDeletions(ctx, log).catch((e) => log.error?.('[deletion] sweep failed', e?.message)); }, intervalMs);
+export function startDeletionSweep(ctx, log = console, intervalMs = 3 * 60 * 1000, isAllowed = () => true) {
+  const t = setInterval(() => { if (!isAllowed()) return; sweepDeletions(ctx, log).catch((e) => log.error?.('[deletion] sweep failed', e?.message)); }, intervalMs);
   t.unref?.();
   return () => clearInterval(t);
 }
@@ -844,9 +846,16 @@ async function runSchoolTrashSteps(ctx, bundleId) {
           const [files] = await bucket.getFiles({ prefix });
           plan.push(...files.map((f) => ({ path: f.name, owner: `schools/${schoolId}`, status: 'move' })));
         }
+        // a file another school (or a binned record) still points at is never moved; an incomplete check fails closed
+        const refs = plan.length ? await buildReferenceIndex(ctx, { excludeBundleId: bundleId }) : { index: new Map(), complete: true };
+        for (const item of plan) {
+          if (!refs.complete) { item.status = 'unverified'; item.reason = refs.reason; }
+          else if (refs.index.has(item.path)) { item.status = 'shared'; item.sharedWith = 'other_tenant'; }
+        }
         failedFiles = (await moveFilesToTrash(ctx, ref, bundleId, plan)).failed;
       }
-      await ref.set({ storageReferences: { move: plan.length }, failedItems: failedFiles }, { merge: true });
+      const sum = plan.reduce((a, p) => { a[p.status] = (a[p.status] || 0) + 1; return a; }, {});
+      await ref.set({ storageReferences: sum, failedItems: failedFiles, storageWarnings: sum.unverified ? [{ code: 'REFERENCE_SCAN_INCOMPLETE', files: sum.unverified }] : [] }, { merge: true });
       if (failedFiles) throw new Error(`تعذّر نقل ${failedFiles} ملف`);
       await mark('files');
     }

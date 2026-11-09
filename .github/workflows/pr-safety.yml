@@ -1,0 +1,23 @@
+name: PR safety checks
+
+# Static checks only: no secrets, no deployment, no network. Runs on pull requests so a preview can never be wired to
+# production Firebase credentials unnoticed (see scripts/check-preview-isolation.mjs).
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  preview-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Preview isolation check
+        run: node scripts/check-preview-isolation.mjs
+      - name: Preview isolation self-test (the check must fail on unsafe fixtures)
+        run: node scripts/e2e/preview-isolation.test.mjs

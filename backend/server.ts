@@ -1,5 +1,6 @@
 import { cronSecretMatches } from './cronSecret.mjs';
 import { setupSystemMessageNotifications, messageNotificationsStatus } from './messageNotifications.mjs';
+import { destructiveOpsAllowed, backgroundDestructiveAllowed, noteServedHost, requestHost, DESTRUCTIVE_ROUTE_RE } from './runtimeGuard.mjs';
 import { PERMANENT_CONFIRM_TEXT, runAuditedPlatformDelete, deleteChatMessage, deleteSchool, previewSchoolDeletion, deleteNotifications, deleteRecords, restoreBundle, purgeBundle, sweepDeletions, startDeletionSweep, loadActor, voidPayment, resolveFinancialReview } from './deletionService.mjs';
 import express from 'express';
 import compression from 'compression';
@@ -347,6 +348,20 @@ async function startServer() {
 
   // Compress all responses (JS, CSS, HTML, API/JSON payloads)
   app.use(compression());
+
+  // Preview / unknown hosts can never run destructive operations (see backend/runtimeGuard.mjs); fail closed, before any handler or data access.
+  app.use((req: any, res: any, next: any) => {
+    const host = requestHost(req.headers, req.hostname);
+    noteServedHost(host);
+    if (req.method !== 'GET' && req.method !== 'OPTIONS' && DESTRUCTIVE_ROUTE_RE.test(req.path)) {
+      const verdict = destructiveOpsAllowed({ host });
+      if (!verdict.allowed) {
+        console.warn('[deletion] blocked destructive request', { path: req.path, reason: verdict.reason });
+        return res.status(503).json({ ok: false, success: false, error: 'DESTRUCTIVE_OPS_DISABLED', reason: verdict.reason, message: 'العمليات الحساسة (حذف/استعادة/إلغاء) غير متاحة في بيئة المعاينة أو على نطاق غير معتمد. لم يتم تغيير أي بيانات.' });
+      }
+    }
+    next();
+  });
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -2668,7 +2683,8 @@ async function startServer() {
       // Chat notifications are created here, once per message and recipient (deterministic ids)
       setupSystemMessageNotifications(db, admin);
       // finish interrupted deletions and purge expired trash
-      startDeletionSweep(deletionCtx());
+      // background cleanup only on a process that has proven it serves production (or on emulators)
+      startDeletionSweep(deletionCtx(), console, 3 * 60 * 1000, backgroundDestructiveAllowed);
     } catch (e: any) {
       console.error('[Notifications] PUSH_SEND_ERROR gateway init:', e.message);
     }

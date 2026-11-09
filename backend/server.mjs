@@ -256,6 +256,36 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
   };
 }
 
+// runtimeGuard.mjs
+var PRODUCTION_HOST_RE = /(^|\.)schoolixiq\.(com|iq)$/i;
+var PREVIEW_HOST_RE = /\.(hostingersite\.com|pages\.dev|netlify\.app|vercel\.app|web\.app|firebaseapp\.com|run\.app|onrender\.com|herokuapp\.com)$/i;
+var NON_PROD_ENVS = ["preview", "staging", "development", "dev", "test"];
+function requestHost(headers = {}, hostname = "") {
+  const raw = String(headers["x-forwarded-host"] || headers.host || hostname || "").split(",")[0].trim().toLowerCase();
+  return raw.replace(/:\d+$/, "");
+}
+function destructiveOpsAllowed({ host, env = process.env }) {
+  if (env.FIRESTORE_EMULATOR_HOST) return { allowed: true, reason: "emulator" };
+  if (String(env.DELETION_DISABLED || "").toLowerCase() === "true") return { allowed: false, reason: "DELETION_DISABLED" };
+  if (NON_PROD_ENVS.includes(String(env.DEPLOY_ENV || "").toLowerCase())) return { allowed: false, reason: "DEPLOY_ENV" };
+  if (PREVIEW_HOST_RE.test(host)) return { allowed: false, reason: "PREVIEW_HOST" };
+  if (!PRODUCTION_HOST_RE.test(host)) return { allowed: false, reason: "UNKNOWN_HOST" };
+  return { allowed: true, reason: "production_host" };
+}
+var productionHostSeen = false;
+var previewHostSeen = false;
+function noteServedHost(host, env = process.env) {
+  if (PRODUCTION_HOST_RE.test(host) && !PREVIEW_HOST_RE.test(host)) productionHostSeen = true;
+  else if (PREVIEW_HOST_RE.test(host)) previewHostSeen = true;
+}
+function backgroundDestructiveAllowed(env = process.env) {
+  if (env.FIRESTORE_EMULATOR_HOST) return true;
+  if (String(env.DELETION_DISABLED || "").toLowerCase() === "true") return false;
+  if (NON_PROD_ENVS.includes(String(env.DEPLOY_ENV || "").toLowerCase())) return false;
+  return productionHostSeen && !previewHostSeen;
+}
+var DESTRUCTIVE_ROUTE_RE = /^\/api\/(records\/|admin\/(delete-user|delete-student|delete-school|schools\/[^/]+\/permanent-delete|messages\/(permanent-delete|purge-user-conversations)|distributors\/[^/]+\/delete|plans\/[^/]+\/delete))/;
+
 // storageRegistry.mjs
 var TRASH_ROOT = "_trash";
 var FILE_REF_FIELDS = {
@@ -329,19 +359,62 @@ function isSafeObjectPath(path2) {
   return typeof path2 === "string" && path2.length > 0 && path2.length < 1024 && !path2.startsWith("/") && !path2.includes("//") && !path2.split("/").some((seg) => seg === ".." || seg === ".") && !/[\u0000-\u001f]/.test(path2);
 }
 var inScope = (path2, scopes) => scopes.some((s) => path2.startsWith(s));
-async function buildReferenceIndex(db, bucketName, schoolId) {
+var REF_SCAN_COLLECTIONS = [.../* @__PURE__ */ new Set([...Object.keys(FILE_REF_FIELDS), "schools", "classes", "subjects", "behavior", "payroll", "attendance_records"])];
+var SCAN_PAGE = 500;
+var DEFAULT_MAX_SCAN = 2e5;
+async function buildReferenceIndex(ctx, { excludeBundleId = null } = {}) {
+  const bucketName = ctx.bucket().name;
+  const max = ctx.maxRefScan ?? DEFAULT_MAX_SCAN;
   const index = /* @__PURE__ */ new Map();
-  for (const [col, fields] of Object.entries(FILE_REF_FIELDS)) {
-    let q = db.collection(col);
-    if (schoolId) q = q.where("schoolId", "==", schoolId);
-    const snap = await q.get();
-    for (const d of snap.docs) {
-      for (const p of extractStoragePaths(d.data(), bucketName)) if (!index.has(p)) index.set(p, `${col}/${d.id}`);
+  let scanned = 0;
+  const add = (data, schoolId) => {
+    for (const p of extractStoragePaths(data, bucketName)) if (!index.has(p)) index.set(p, { schoolId: String(schoolId || "") });
+  };
+  const ID = ctx.adminSdk.firestore.FieldPath.documentId();
+  for (const col of REF_SCAN_COLLECTIONS) {
+    let last2 = null;
+    for (; ; ) {
+      let q = ctx.db.collection(col).orderBy(ID).limit(SCAN_PAGE);
+      if (last2) q = q.startAfter(last2);
+      const snap = await q.get();
+      if (snap.empty) break;
+      scanned += snap.size;
+      if (scanned > max) return { index, complete: false, scanned, reason: "REFERENCE_SCAN_INCOMPLETE" };
+      for (const d of snap.docs) add(d.data(), d.get("schoolId"));
+      last2 = snap.docs[snap.docs.length - 1];
+      if (snap.size < SCAN_PAGE) break;
     }
   }
-  return index;
+  let last = null;
+  for (; ; ) {
+    let q = ctx.db.collection("recycle_bin").orderBy(ID).limit(SCAN_PAGE);
+    if (last) q = q.startAfter(last);
+    const snap = await q.get();
+    if (snap.empty) break;
+    scanned += snap.size;
+    if (scanned > max) return { index, complete: false, scanned, reason: "REFERENCE_SCAN_INCOMPLETE" };
+    for (const d of snap.docs) if (d.id !== excludeBundleId && ["trashing", "trashed", "restoring"].includes(d.get("status"))) add(d.get("record"), d.get("schoolId"));
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < SCAN_PAGE) break;
+  }
+  let lastItem = null;
+  for (; ; ) {
+    let q = ctx.db.collectionGroup("items").orderBy(ID).limit(SCAN_PAGE);
+    if (lastItem) q = q.startAfter(lastItem);
+    const snap = await q.get();
+    if (snap.empty) break;
+    scanned += snap.size;
+    if (scanned > max) return { index, complete: false, scanned, reason: "REFERENCE_SCAN_INCOMPLETE" };
+    for (const d of snap.docs) {
+      if (d.ref.parent.parent?.id === excludeBundleId) continue;
+      add(d.get("data"), "");
+    }
+    lastItem = snap.docs[snap.docs.length - 1];
+    if (snap.size < SCAN_PAGE) break;
+  }
+  return { index, complete: true, scanned };
 }
-async function planFiles(ctx, { schoolId, collection, recordId, records }) {
+async function planFiles(ctx, { schoolId, collection, recordId, records, excludeBundleId = null }) {
   const bucket = ctx.bucket();
   const bucketName = bucket.name;
   const scopes = allowedScopes({ schoolId, collection, recordId });
@@ -357,14 +430,19 @@ async function planFiles(ctx, { schoolId, collection, recordId, records }) {
     }
   }
   const plan = [];
-  const refIndex = found.size ? await buildReferenceIndex(ctx.db, bucketName, schoolId) : /* @__PURE__ */ new Map();
+  const candidates = [...found].filter(([path2]) => isSafeObjectPath(path2) && inScope(path2, scopes));
+  const refs = candidates.length ? await buildReferenceIndex(ctx, { excludeBundleId }) : { index: /* @__PURE__ */ new Map(), complete: true };
   for (const [path2, owner] of found) {
     if (!isSafeObjectPath(path2) || !inScope(path2, scopes)) {
       plan.push({ path: path2, owner, status: "out_of_scope" });
       continue;
     }
-    const shared = refIndex.get(path2) || null;
-    plan.push(shared ? { path: path2, owner, status: "shared", sharedWith: shared } : { path: path2, owner, status: "move" });
+    if (!refs.complete) {
+      plan.push({ path: path2, owner, status: "unverified", reason: refs.reason });
+      continue;
+    }
+    const hit = refs.index.get(path2);
+    plan.push(hit ? { path: path2, owner, status: "shared", sharedWith: hit.schoolId && hit.schoolId !== String(schoolId || "") ? "other_tenant" : "same_school" } : { path: path2, owner, status: "move" });
   }
   return plan;
 }
@@ -406,7 +484,7 @@ async function restoreFilesFromTrash(ctx, bundleRef2) {
   let restored = 0, failed = 0, missing = 0;
   for (const d of snap.docs) {
     const f = d.data();
-    if (f.status === "restored" || f.status === "shared" || f.status === "out_of_scope") continue;
+    if (["restored", "shared", "out_of_scope", "unverified", "retained_unverified_inplace"].includes(f.status)) continue;
     if (f.status === "missing") {
       missing += 1;
       continue;
@@ -437,15 +515,44 @@ async function restoreFilesFromTrash(ctx, bundleRef2) {
 async function purgeTrashedFiles(ctx, bundleRef2, bundleId) {
   const bucket = ctx.bucket();
   if (ctx.faults?.storage) throw new Error("injected storage fault");
-  const [files] = await bucket.getFiles({ prefix: `${TRASH_ROOT}/${bundleId}/` });
-  let deleted = 0;
-  for (const f of files) {
-    await f.delete({ ignoreNotFound: true });
-    deleted += 1;
-  }
   const snap = await bundleRef2.collection("files").get();
-  for (const d of snap.docs) await d.ref.set({ status: "purged" }, { merge: true });
-  return { deleted };
+  const trashed = snap.docs.filter((d) => d.get("status") === "trashed" || d.get("status") === "retained_unverified");
+  let deleted = 0, rescued = 0, retained = 0;
+  const refs = trashed.length ? await buildReferenceIndex(ctx, { excludeBundleId: bundleId }) : { index: /* @__PURE__ */ new Map(), complete: true };
+  for (const d of trashed) {
+    const f = d.data();
+    if (!refs.complete) {
+      retained += 1;
+      await d.ref.set({ status: "retained_unverified", reason: refs.reason }, { merge: true });
+      continue;
+    }
+    if (refs.index.has(f.path)) {
+      const [orig] = await bucket.file(f.path).exists();
+      if (!orig) await bucket.file(f.trashPath).move(f.path);
+      else await bucket.file(f.trashPath).delete({ ignoreNotFound: true });
+      rescued += 1;
+      await d.ref.set({ status: "rescued" }, { merge: true });
+      continue;
+    }
+    await bucket.file(f.trashPath).delete({ ignoreNotFound: true });
+    deleted += 1;
+    await d.ref.set({ status: "purged" }, { merge: true });
+  }
+  const inPlace = snap.docs.filter((d) => ["shared", "unverified"].includes(d.get("status")) && isSafeObjectPath(d.get("path") || ""));
+  if (inPlace.length) {
+    const r2 = trashed.length ? refs : await buildReferenceIndex(ctx, { excludeBundleId: bundleId });
+    for (const d of inPlace) {
+      if (!r2.complete) {
+        retained += 1;
+        continue;
+      }
+      if (r2.index.has(d.get("path"))) continue;
+      await bucket.file(d.get("path")).delete({ ignoreNotFound: true });
+      deleted += 1;
+      await d.ref.set({ status: "purged" }, { merge: true });
+    }
+  }
+  return { deleted, rescued, retained };
 }
 
 // deletionService.mjs
@@ -721,14 +828,15 @@ async function runTrashSteps(ctx, bundleId) {
       let plan = [];
       let failedFiles = 0;
       if (!faults?.skipFiles) {
-        plan = await planFiles(ctx, { schoolId: b.schoolId, collection: b.collection, recordId: b.recordId, records });
+        plan = await planFiles(ctx, { schoolId: b.schoolId, collection: b.collection, recordId: b.recordId, records, excludeBundleId: b.bundleId });
         failedFiles = (await moveFilesToTrash(ctx, ref, b.id || b.bundleId, plan)).failed;
       }
       const summary = plan.reduce((a, p) => {
         a[p.status] = (a[p.status] || 0) + 1;
         return a;
       }, {});
-      await ref.set({ storageReferences: summary, failedItems: failedFiles }, { merge: true });
+      const warnings = summary.unverified ? [{ code: "REFERENCE_SCAN_INCOMPLETE", files: summary.unverified, message: "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0645\u0631\u0627\u062C\u0639 \u0627\u0644\u0645\u0644\u0641\u0627\u062A \u0641\u064A \u0643\u0644 \u0627\u0644\u0645\u062F\u0627\u0631\u0633\u061B \u062A\u064F\u0631\u0643\u062A \u0627\u0644\u0645\u0644\u0641\u0627\u062A \u0641\u064A \u0645\u0643\u0627\u0646\u0647\u0627 (\u0644\u0645 \u062A\u064F\u062D\u0630\u0641 \u0648\u0644\u0645 \u062A\u064F\u0646\u0642\u0644)" }] : [];
+      await ref.set({ storageReferences: summary, failedItems: failedFiles, storageWarnings: warnings }, { merge: true });
       if (failedFiles) throw new Error(`\u062A\u0639\u0630\u0651\u0631 \u0646\u0642\u0644 ${failedFiles} \u0645\u0644\u0641 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629 \u2014 \u0633\u062A\u064F\u0639\u0627\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B`);
       await mark("files");
     }
@@ -884,7 +992,7 @@ async function deleteRecords(ctx, actorUid, body) {
       await runTrashSteps(ctx, bid);
       let purged = null;
       if (permanent) purged = await purgeBundleInternal(ctx, bid, actor);
-      await writeLog(db, adminSdk, { ...base, action, result: "success", bundleId: bid, label: policy.label ? policy.label(data) : id, childCounts: (await bundleRef(db, bid).get()).get("childCounts") || {}, files: purged?.filesDeleted ?? 0 });
+      await writeLog(db, adminSdk, { ...base, action, result: "success", bundleId: bid, label: policy.label ? policy.label(data) : id, childCounts: (await bundleRef(db, bid).get()).get("childCounts") || {}, files: purged?.filesDeleted ?? 0, storage: (await bundleRef(db, bid).get()).get("storageReferences") || {} });
       results.push({ id, ok: true, bundleId: bid, permanent });
     } catch (e) {
       await writeLog(db, adminSdk, { ...base, action, result: e.status && e.status < 500 ? "refused" : "failed", errorCode: e.code || "ERROR", error: String(e.message || e).slice(0, 200) });
@@ -1006,7 +1114,13 @@ async function purgeBundleInternal(ctx, bundleId, actor) {
   await ref.set({ status: "purging", jobStatus: "PROCESSING", updatedAt: ts(adminSdk) }, { merge: true });
   let filesDeleted = 0;
   try {
-    if (!ctx.faults?.skipFiles) filesDeleted = (await purgeTrashedFiles(ctx, ref, b.bundleId)).deleted;
+    let filesRescued = 0, filesRetained = 0;
+    if (!ctx.faults?.skipFiles) {
+      const pr = await purgeTrashedFiles(ctx, ref, b.bundleId);
+      filesDeleted = pr.deleted;
+      filesRescued = pr.rescued;
+      filesRetained = pr.retained;
+    }
     if (b.kind === "school") {
       const users = await ref.collection("items").where("col", "==", "users").get();
       const uids = users.docs.map((d) => d.get("docId"));
@@ -1028,8 +1142,8 @@ async function purgeBundleInternal(ctx, bundleId, actor) {
     }
     const items = await ref.collection("items").get();
     await commitInBatches(db, items.docs.map((d) => (batch) => batch.delete(d.ref)));
-    await ref.set({ status: "purged", jobStatus: "PERMANENTLY_DELETED", purgedAt: ts(adminSdk), purgedBy: { uid: actor?.uid || "system", name: actor?.name || "system" }, record: FV(adminSdk).delete(), filesDeleted, lastError: null }, { merge: true });
-    return { filesDeleted };
+    await ref.set({ status: "purged", jobStatus: "PERMANENTLY_DELETED", purgedAt: ts(adminSdk), purgedBy: { uid: actor?.uid || "system", name: actor?.name || "system" }, record: FV(adminSdk).delete(), filesDeleted, filesRescued, filesRetained, lastError: null }, { merge: true });
+    return { filesDeleted, filesRescued, filesRetained };
   } catch (e) {
     const retry = (b.retryCount || 0) + 1;
     await ref.set({ status: "purging", jobStatus: retry >= MAX_RETRIES ? "FAILED" : "PARTIALLY_COMPLETED", retryCount: retry, lastError: String(e?.message || e).slice(0, 200), updatedAt: ts(adminSdk) }, { merge: true });
@@ -1126,8 +1240,9 @@ async function sweepDeletions(ctx, log = console, { force = false } = {}) {
   }
   return out;
 }
-function startDeletionSweep(ctx, log = console, intervalMs = 3 * 60 * 1e3) {
+function startDeletionSweep(ctx, log = console, intervalMs = 3 * 60 * 1e3, isAllowed = () => true) {
   const t = setInterval(() => {
+    if (!isAllowed()) return;
     sweepDeletions(ctx, log).catch((e) => log.error?.("[deletion] sweep failed", e?.message));
   }, intervalMs);
   t.unref?.();
@@ -1382,9 +1497,23 @@ async function runSchoolTrashSteps(ctx, bundleId) {
           const [files] = await bucket.getFiles({ prefix });
           plan.push(...files.map((f) => ({ path: f.name, owner: `schools/${schoolId}`, status: "move" })));
         }
+        const refs = plan.length ? await buildReferenceIndex(ctx, { excludeBundleId: bundleId }) : { index: /* @__PURE__ */ new Map(), complete: true };
+        for (const item of plan) {
+          if (!refs.complete) {
+            item.status = "unverified";
+            item.reason = refs.reason;
+          } else if (refs.index.has(item.path)) {
+            item.status = "shared";
+            item.sharedWith = "other_tenant";
+          }
+        }
         failedFiles = (await moveFilesToTrash(ctx, ref, bundleId, plan)).failed;
       }
-      await ref.set({ storageReferences: { move: plan.length }, failedItems: failedFiles }, { merge: true });
+      const sum = plan.reduce((a, p) => {
+        a[p.status] = (a[p.status] || 0) + 1;
+        return a;
+      }, {});
+      await ref.set({ storageReferences: sum, failedItems: failedFiles, storageWarnings: sum.unverified ? [{ code: "REFERENCE_SCAN_INCOMPLETE", files: sum.unverified }] : [] }, { merge: true });
       if (failedFiles) throw new Error(`\u062A\u0639\u0630\u0651\u0631 \u0646\u0642\u0644 ${failedFiles} \u0645\u0644\u0641`);
       await mark("files");
     }
@@ -5825,6 +5954,18 @@ async function startServer() {
     next();
   });
   app.use(compression());
+  app.use((req, res, next) => {
+    const host = requestHost(req.headers, req.hostname);
+    noteServedHost(host);
+    if (req.method !== "GET" && req.method !== "OPTIONS" && DESTRUCTIVE_ROUTE_RE.test(req.path)) {
+      const verdict = destructiveOpsAllowed({ host });
+      if (!verdict.allowed) {
+        console.warn("[deletion] blocked destructive request", { path: req.path, reason: verdict.reason });
+        return res.status(503).json({ ok: false, success: false, error: "DESTRUCTIVE_OPS_DISABLED", reason: verdict.reason, message: "\u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A \u0627\u0644\u062D\u0633\u0627\u0633\u0629 (\u062D\u0630\u0641/\u0627\u0633\u062A\u0639\u0627\u062F\u0629/\u0625\u0644\u063A\u0627\u0621) \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u0641\u064A \u0628\u064A\u0626\u0629 \u0627\u0644\u0645\u0639\u0627\u064A\u0646\u0629 \u0623\u0648 \u0639\u0644\u0649 \u0646\u0637\u0627\u0642 \u063A\u064A\u0631 \u0645\u0639\u062A\u0645\u062F. \u0644\u0645 \u064A\u062A\u0645 \u062A\u063A\u064A\u064A\u0631 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
+      }
+    }
+    next();
+  });
   app.use(express.json({ limit: "10mb" }));
   app.set("trust proxy", 1);
   const publicRateHits = /* @__PURE__ */ new Map();
@@ -7795,7 +7936,7 @@ async function startServer() {
       const db = getDb();
       setupNotificationPushListener(db, admin4);
       setupSystemMessageNotifications(db, admin4);
-      startDeletionSweep(deletionCtx());
+      startDeletionSweep(deletionCtx(), console, 3 * 60 * 1e3, backgroundDestructiveAllowed);
     } catch (e) {
       console.error("[Notifications] PUSH_SEND_ERROR gateway init:", e.message);
     }

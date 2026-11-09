@@ -1,0 +1,96 @@
+#!/usr/bin/env node
+/**
+ * Fails (exit 1) when a Preview environment could reach production Firebase with destructive power.
+ *   node scripts/check-preview-isolation.mjs [--dist dist]
+ * Checks (static, no network, no secrets needed):
+ *  1. no workflow deploys or injects Firebase Admin credentials on pull_request / non-main branches
+ *  2. no preview/staging config file (.env.preview, *.preview.*, wrangler/pages config) names the production project or credentials
+ *  3. no service-account material in tracked files or in the build output
+ *  4. the runtime guard refuses destructive operations for every preview host and unknown host, and allows production hosts
+ *  5. the server wires the guard (middleware + background sweep gate) and the client refuses destructive calls on preview hosts
+ * INFO (not a failure): the committed web client config targets the production project — that is why 4 and 5 must hold.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
+import { destructiveOpsAllowed, backgroundDestructiveAllowed, noteServedHost, _resetForTests, DESTRUCTIVE_ROUTE_RE } from '../backend/runtimeGuard.mjs';
+
+const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+// ISOLATION_ROOT lets the self-test point workflows/config/secret scanning at a deliberately broken fixture repo
+const root = process.env.ISOLATION_ROOT ? path.resolve(process.env.ISOLATION_ROOT) : repoRoot;
+const PROD_PROJECT = 'yala-safari-iq';
+let failures = 0;
+const ok = (m) => console.log('PASS', m);
+const bad = (m) => { failures += 1; console.log('FAIL', m); };
+const info = (m) => console.log('INFO', m);
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const tracked = execSync('git ls-files', { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean);
+
+// 1. workflows
+const wfDir = path.join(root, '.github/workflows');
+for (const f of fs.existsSync(wfDir) ? fs.readdirSync(wfDir) : []) {
+  const text = fs.readFileSync(path.join(wfDir, f), 'utf8');
+  const onBlock = /^on:\s*\n([\s\S]*?)(?=^\S)/m.exec(text)?.[1] || '';
+  const triggersPR = /pull_request(_target)?\s*:/.test(onBlock) || /^\s*pull_request(_target)?\s*$/m.test(onBlock);
+  const nonMainPush = /push:\s*\n\s*branches:\s*\n((?:\s*-\s*.+\n)+)/.exec(onBlock)?.[1]?.split('\n').map((l) => l.replace(/^\s*-\s*/, '').trim().replace(/["']/g, '')).filter(Boolean).some((b) => b !== 'main') ?? false;
+  const usesAdminSecrets = /secrets\.(FIREBASE_PRIVATE_KEY|FIREBASE_CLIENT_EMAIL|FIREBASE_SERVICE_ACCOUNT|GOOGLE_APPLICATION_CREDENTIALS|FIREBASE_TOKEN)/i.test(text);
+  const deploys = /(firebase deploy|deploy-firebase|hostinger|rsync|scp |ftp)/i.test(text);
+  if ((triggersPR || nonMainPush) && (usesAdminSecrets || deploys)) bad(`workflow ${f} runs on pull_request/non-main AND deploys or uses Firebase credentials`);
+  else ok(`workflow ${f}: ${triggersPR || nonMainPush ? 'PR/branch workflow without deploy or Firebase secrets' : 'runs only on main/manual'}`);
+}
+
+// 2. preview/staging config files
+const previewFiles = tracked.filter((f) => /(^|\/)(\.env\.(preview|staging)|wrangler\.toml|\.dev\.vars|netlify\.toml|vercel\.json)$|\.(preview|staging)\.(json|env|ya?ml|toml)$/i.test(f));
+if (previewFiles.length === 0) ok('no preview/staging configuration file is tracked (Cloudflare/Hostinger previews are configured outside the repo)');
+for (const f of previewFiles) {
+  const t = read(f);
+  if (t.includes(PROD_PROJECT) || /FIREBASE_(PRIVATE_KEY|CLIENT_EMAIL)/.test(t)) bad(`preview config ${f} references the production Firebase project or Admin credentials`);
+  else ok(`preview config ${f} does not reference production Firebase`);
+}
+
+// 3. secrets in tracked files / build output
+const SECRET_RE = /-----BEGIN (RSA |EC )?PRIVATE KEY-----\s*[A-Za-z0-9+/=\n\\r]{200,}|"private_key"\s*:\s*"-----BEGIN|"client_email"\s*:\s*"[^"]+\.iam\.gserviceaccount\.com"/;
+let leaked = [];
+for (const f of tracked) {
+  if (/\.(png|jpg|jpeg|webp|gif|ico|apk|woff2?|ttf|otf|mp4|mp3|pdf|lock)$/i.test(f) || f === 'package-lock.json') continue;
+  let t; try { t = read(f); } catch { continue; }
+  if (SECRET_RE.test(t)) leaked.push(f);
+}
+const distIdx = process.argv.indexOf('--dist');
+const dist = path.join(root, distIdx > 0 ? process.argv[distIdx + 1] : 'dist');
+const walk = (d) => fs.existsSync(d) ? fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]) : [];
+for (const f of walk(dist).filter((x) => /\.(js|mjs|json|html|map|txt)$/.test(x))) { if (SECRET_RE.test(fs.readFileSync(f, 'utf8'))) leaked.push(path.relative(root, f)); }
+if (leaked.length) bad(`service-account material found in: ${leaked.join(', ')}`); else ok(`no service-account material in tracked files or in ${path.relative(root, dist) || 'dist'} (${walk(dist).length} build files scanned)`);
+
+// 4. runtime guard behaviour
+const blockedHosts = ['yellowgreen-loris-564484.hostingersite.com', 'x.pages.dev', 'app-git-branch.vercel.app', 'foo.netlify.app', 'localhost', '203.0.113.7', 'evilschoolixiq.com', 'schoolixiq.com.evil.io', ''];
+const allowedHosts = ['schoolixiq.com', 'www.schoolixiq.com', 'app.schoolixiq.iq'];
+const noEmu = {};
+for (const h of blockedHosts) destructiveOpsAllowed({ host: h, env: noEmu }).allowed ? bad(`guard ALLOWS destructive ops for host "${h}"`) : ok(`guard blocks host "${h}"`);
+for (const h of allowedHosts) destructiveOpsAllowed({ host: h, env: noEmu }).allowed ? ok(`guard allows production host ${h}`) : bad(`guard blocks production host ${h}`);
+!destructiveOpsAllowed({ host: 'schoolixiq.com', env: { DEPLOY_ENV: 'preview' } }).allowed ? ok('DEPLOY_ENV=preview blocks even a production host name') : bad('DEPLOY_ENV=preview does not block');
+!destructiveOpsAllowed({ host: 'schoolixiq.com', env: { DELETION_DISABLED: 'true' } }).allowed ? ok('DELETION_DISABLED=true is a working kill switch') : bad('kill switch ineffective');
+destructiveOpsAllowed({ host: 'whatever', env: { FIRESTORE_EMULATOR_HOST: '127.0.0.1:8085' } }).allowed ? ok('emulator runs are allowed (cannot reach production)') : bad('emulator runs blocked');
+_resetForTests();
+!backgroundDestructiveAllowed(noEmu) ? ok('background sweep stays off until a production host request is seen') : bad('background sweep runs without proof of production');
+noteServedHost('yellowgreen-loris-564484.hostingersite.com'); noteServedHost('schoolixiq.com');
+!backgroundDestructiveAllowed(noEmu) ? ok('…and stays off once a preview host was seen on the same process') : bad('background sweep runs on a process that served a preview host');
+_resetForTests();
+for (const p of ['/api/records/delete', '/api/records/restore', '/api/records/purge', '/api/records/void-payment', '/api/records/delete-school', '/api/admin/delete-user', '/api/admin/delete-student', '/api/admin/delete-school', '/api/admin/schools/S1/permanent-delete', '/api/admin/messages/permanent-delete', '/api/admin/messages/purge-user-conversations', '/api/admin/distributors/D1/delete', '/api/admin/plans/P1/delete']) {
+  DESTRUCTIVE_ROUTE_RE.test(p) ? null : bad(`route ${p} is not covered by the destructive-route guard`);
+}
+ok('every known destructive route matches the guard pattern');
+
+// 5. wiring
+const readRepo = (p) => fs.readFileSync(path.join(repoRoot, p), 'utf8');
+const server = readRepo('server.ts');
+/destructiveOpsAllowed\(\{ host \}\)/.test(server) && /DESTRUCTIVE_ROUTE_RE\.test\(req\.path\)/.test(server) ? ok('server.ts applies the guard as middleware before any handler') : bad('server.ts does not apply the runtime guard');
+/startDeletionSweep\(.*backgroundDestructiveAllowed\)/.test(server) ? ok('server.ts gates the background sweep') : bad('server.ts does not gate the background sweep');
+/PREVIEW_HOST_RE\.test\(window\.location\.hostname\)/.test(readRepo('src/lib/deletionApi.ts')) ? ok('client refuses destructive calls on preview hosts') : bad('client has no preview guard');
+
+// INFO
+const cfg = JSON.parse(readRepo('firebase-applet-config.json'));
+info(`committed web client config project: ${cfg.projectId} (public client identifiers; every deployment built from this branch, including previews, talks to this project)`);
+info('Hostinger preview runtime variables cannot be read from the repository — preview Admin access is therefore treated as UNKNOWN and destructive operations stay disabled there');
+console.log(failures ? `\n${failures} check(s) FAILED` : '\nAll preview-isolation checks passed');
+process.exit(failures ? 1 : 0);

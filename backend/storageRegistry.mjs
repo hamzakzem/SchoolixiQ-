@@ -97,26 +97,74 @@ export function isSafeObjectPath(path) {
 
 const inScope = (path, scopes) => scopes.some((s) => path.startsWith(s));
 
-/** path -> "collection/id" of the first live record in the school that references it (one scan per collection). */
-async function buildReferenceIndex(db, bucketName, schoolId) {
+/** Collections that may hold file links, scanned GLOBALLY (all schools): a file is shared if ANY tenant still points at it. */
+const REF_SCAN_COLLECTIONS = [...new Set([...Object.keys(FILE_REF_FIELDS), 'schools', 'classes', 'subjects', 'behavior', 'payroll', 'attendance_records'])];
+const SCAN_PAGE = 500;
+const DEFAULT_MAX_SCAN = 200_000;
+
+/**
+ * Global reference index: object path -> { schoolId, same } of a live (or trashed) record that still references it.
+ * Scans every school with bounded, paginated Admin queries. Returns { complete:false } instead of guessing when the bound is hit;
+ * query errors propagate (the job is retried) — callers must treat an incomplete index as "unknown = in use".
+ * `excludeBundleId`: the bundle being processed (its own snapshot would otherwise count as a reference).
+ */
+export async function buildReferenceIndex(ctx, { excludeBundleId = null } = {}) {
+  const bucketName = ctx.bucket().name;
+  const max = ctx.maxRefScan ?? DEFAULT_MAX_SCAN;
   const index = new Map();
-  for (const [col, fields] of Object.entries(FILE_REF_FIELDS)) {
-    let q = db.collection(col);
-    if (schoolId) q = q.where('schoolId', '==', schoolId);
-    // whole documents are scanned (not only the known fields) so links embedded in any text still count as "shared"
-    const snap = await q.get();
-    for (const d of snap.docs) {
-      for (const p of extractStoragePaths(d.data(), bucketName)) if (!index.has(p)) index.set(p, `${col}/${d.id}`);
+  let scanned = 0;
+  const add = (data, schoolId) => { for (const p of extractStoragePaths(data, bucketName)) if (!index.has(p)) index.set(p, { schoolId: String(schoolId || '') }); };
+  const ID = ctx.adminSdk.firestore.FieldPath.documentId();
+  for (const col of REF_SCAN_COLLECTIONS) {
+    let last = null;
+    for (;;) {
+      let q = ctx.db.collection(col).orderBy(ID).limit(SCAN_PAGE);
+      if (last) q = q.startAfter(last);
+      const snap = await q.get();
+      if (snap.empty) break;
+      scanned += snap.size;
+      if (scanned > max) return { index, complete: false, scanned, reason: 'REFERENCE_SCAN_INCOMPLETE' };
+      for (const d of snap.docs) add(d.data(), d.get('schoolId'));
+      last = snap.docs[snap.docs.length - 1];
+      if (snap.size < SCAN_PAGE) break;
     }
   }
-  return index;
+  // records waiting in ANY school's recycle bin can still be restored: they keep their files in use
+  let last = null;
+  for (;;) {
+    let q = ctx.db.collection('recycle_bin').orderBy(ID).limit(SCAN_PAGE);
+    if (last) q = q.startAfter(last);
+    const snap = await q.get();
+    if (snap.empty) break;
+    scanned += snap.size;
+    if (scanned > max) return { index, complete: false, scanned, reason: 'REFERENCE_SCAN_INCOMPLETE' };
+    for (const d of snap.docs) if (d.id !== excludeBundleId && ['trashing', 'trashed', 'restoring'].includes(d.get('status'))) add(d.get('record'), d.get('schoolId'));
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < SCAN_PAGE) break;
+  }
+  let lastItem = null;
+  for (;;) {
+    let q = ctx.db.collectionGroup('items').orderBy(ID).limit(SCAN_PAGE);
+    if (lastItem) q = q.startAfter(lastItem);
+    const snap = await q.get();
+    if (snap.empty) break;
+    scanned += snap.size;
+    if (scanned > max) return { index, complete: false, scanned, reason: 'REFERENCE_SCAN_INCOMPLETE' };
+    for (const d of snap.docs) {
+      if (d.ref.parent.parent?.id === excludeBundleId) continue;
+      add(d.get('data'), ''); // items of other bundles: school unknown → reported as other_tenant (conservative)
+    }
+    lastItem = snap.docs[snap.docs.length - 1];
+    if (snap.size < SCAN_PAGE) break;
+  }
+  return { index, complete: true, scanned };
 }
 
 /**
  * Plan: which files belong to the records of a bundle. `records` = [{collection,id,data}] (main + dependants).
  * Returns [{path, status}] where status is 'move' | 'shared' | 'out_of_scope'.
  */
-export async function planFiles(ctx, { schoolId, collection, recordId, records }) {
+export async function planFiles(ctx, { schoolId, collection, recordId, records, excludeBundleId = null }) {
   const bucket = ctx.bucket();
   const bucketName = bucket.name;
   const scopes = allowedScopes({ schoolId, collection, recordId });
@@ -133,11 +181,14 @@ export async function planFiles(ctx, { schoolId, collection, recordId, records }
     }
   }
   const plan = [];
-  const refIndex = found.size ? await buildReferenceIndex(ctx.db, bucketName, schoolId) : new Map();
+  const candidates = [...found].filter(([path]) => isSafeObjectPath(path) && inScope(path, scopes));
+  const refs = candidates.length ? await buildReferenceIndex(ctx, { excludeBundleId }) : { index: new Map(), complete: true };
   for (const [path, owner] of found) {
     if (!isSafeObjectPath(path) || !inScope(path, scopes)) { plan.push({ path, owner, status: 'out_of_scope' }); continue; }
-    const shared = refIndex.get(path) || null;
-    plan.push(shared ? { path, owner, status: 'shared', sharedWith: shared } : { path, owner, status: 'move' });
+    if (!refs.complete) { plan.push({ path, owner, status: 'unverified', reason: refs.reason }); continue; } // fail closed: unknown = in use
+    const hit = refs.index.get(path);
+    // the other tenant's identifiers are never written into data this school can reach: only "same_school" / "other_tenant"
+    plan.push(hit ? { path, owner, status: 'shared', sharedWith: hit.schoolId && hit.schoolId !== String(schoolId || '') ? 'other_tenant' : 'same_school' } : { path, owner, status: 'move' });
   }
   return plan;
 }
@@ -181,7 +232,7 @@ export async function restoreFilesFromTrash(ctx, bundleRef) {
   let restored = 0, failed = 0, missing = 0;
   for (const d of snap.docs) {
     const f = d.data();
-    if (f.status === 'restored' || f.status === 'shared' || f.status === 'out_of_scope') continue;
+    if (['restored', 'shared', 'out_of_scope', 'unverified', 'retained_unverified_inplace'].includes(f.status)) continue; // never moved: nothing to bring back
     if (f.status === 'missing') { missing += 1; continue; }
     try {
       if (ctx.faults?.fileRestore && String(f.path).includes(ctx.faults.fileRestore)) throw new Error('injected file restore fault');
@@ -203,14 +254,40 @@ export async function restoreFilesFromTrash(ctx, bundleRef) {
   return { restored, failed, missing };
 }
 
-/** Permanently remove the trashed copies (purge). Never touches anything outside `_trash/{bundleId}/`. */
+/**
+ * Permanently remove the trashed copies (purge). Re-verifies first: a file that is referenced again (by any school, live or in a
+ * bin) is rescued back to its original path; if the check cannot complete the trashed copy is KEPT (fail closed).
+ */
 export async function purgeTrashedFiles(ctx, bundleRef, bundleId) {
   const bucket = ctx.bucket();
   if (ctx.faults?.storage) throw new Error('injected storage fault');
-  const [files] = await bucket.getFiles({ prefix: `${TRASH_ROOT}/${bundleId}/` });
-  let deleted = 0;
-  for (const f of files) { await f.delete({ ignoreNotFound: true }); deleted += 1; }
   const snap = await bundleRef.collection('files').get();
-  for (const d of snap.docs) await d.ref.set({ status: 'purged' }, { merge: true });
-  return { deleted };
+  const trashed = snap.docs.filter((d) => d.get('status') === 'trashed' || d.get('status') === 'retained_unverified');
+  let deleted = 0, rescued = 0, retained = 0;
+  const refs = trashed.length ? await buildReferenceIndex(ctx, { excludeBundleId: bundleId }) : { index: new Map(), complete: true };
+  for (const d of trashed) {
+    const f = d.data();
+    if (!refs.complete) { retained += 1; await d.ref.set({ status: 'retained_unverified', reason: refs.reason }, { merge: true }); continue; }
+    if (refs.index.has(f.path)) {
+      const [orig] = await bucket.file(f.path).exists();
+      if (!orig) await bucket.file(f.trashPath).move(f.path);
+      else await bucket.file(f.trashPath).delete({ ignoreNotFound: true });
+      rescued += 1; await d.ref.set({ status: 'rescued' }, { merge: true }); continue;
+    }
+    await bucket.file(f.trashPath).delete({ ignoreNotFound: true });
+    deleted += 1; await d.ref.set({ status: 'purged' }, { merge: true });
+  }
+  // files that were left IN PLACE because something else referenced them (or the check was incomplete): once nothing references
+  // them any more, the purge of the last bundle that used them removes them (in-scope paths only; others are never planned for deletion)
+  const inPlace = snap.docs.filter((d) => ['shared', 'unverified'].includes(d.get('status')) && isSafeObjectPath(d.get('path') || ''));
+  if (inPlace.length) {
+    const r2 = trashed.length ? refs : await buildReferenceIndex(ctx, { excludeBundleId: bundleId });
+    for (const d of inPlace) {
+      if (!r2.complete) { retained += 1; continue; }
+      if (r2.index.has(d.get('path'))) continue; // still in use elsewhere
+      await bucket.file(d.get('path')).delete({ ignoreNotFound: true });
+      deleted += 1; await d.ref.set({ status: 'purged' }, { merge: true });
+    }
+  }
+  return { deleted, rescued, retained };
 }

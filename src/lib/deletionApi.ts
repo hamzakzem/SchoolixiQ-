@@ -39,7 +39,13 @@ export function deletionMessage(code?: string, fallback?: string): string {
   return (code && FRIENDLY[code]) || fallback || 'تعذّر تنفيذ الحذف';
 }
 
+const PREVIEW_HOST_RE = /\.(hostingersite\.com|pages\.dev|netlify\.app|vercel\.app|web\.app|firebaseapp\.com|run\.app)$/i;
+
 async function call(path: string, body: Record<string, unknown>) {
+  // Preview deployments share the production Firebase client config: destructive calls are refused here and again on the server.
+  if (typeof window !== 'undefined' && PREVIEW_HOST_RE.test(window.location.hostname)) {
+    throw new DeletionError('هذه بيئة معاينة: الحذف والاستعادة وإلغاء الدفعات معطّلة فيها. لم يتم تغيير أي بيانات', 'PREVIEW_DISABLED');
+  }
   await ensureBackendApiBaseUrl();
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new DeletionError('يرجى تسجيل الدخول أولاً', 'UNAUTHENTICATED');
