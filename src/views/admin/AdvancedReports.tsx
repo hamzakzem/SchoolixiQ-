@@ -11,6 +11,7 @@ import { toast } from 'react-hot-toast';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 import { notificationService } from '../../lib/notificationService';
 import { AppModalPortal } from '../../components/AppModalPortal';
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 type AdvancedReportsProps = {
   lockedClassId?: string;
@@ -231,12 +232,12 @@ export default function AdvancedReports({
   const handleDeleteReport = async (id: string) => {
     if (confirm(isRtl ? 'هل أنت متأكد من حذف هذا التقرير؟' : 'Are you sure you want to delete this report?')) {
       try {
-        await deleteDoc(doc(db, 'advanced_reports', id));
+        await deleteRecord('advanced_reports', id);
         await notificationService.deleteBySourceId(id, profile.schoolId);
         toast.success(isRtl ? 'تم حذف التقرير بنجاح' : 'Report deleted successfully');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `advanced_reports/${id}`);
-        toast.error(isRtl ? 'فشل الحذف' : 'Deletion failed');
+        toast.error(deleteErrorMessage(error, isRtl ? 'فشل الحذف' : 'Deletion failed'));
       }
     }
   };

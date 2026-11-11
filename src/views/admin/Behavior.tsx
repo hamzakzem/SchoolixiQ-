@@ -11,6 +11,7 @@ import { safeFirestoreAdd } from '../../lib/offline/offlineSync';
 import { offlineActorFromProfile } from '../../lib/offline/offlineHelpers';
 import { useLanguage } from '../../lib/LanguageContext';
 import { AppModalPortal } from '../../components/AppModalPortal';
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 export default function Behavior() {
   const { isRtl } = useLanguage();
@@ -136,13 +137,13 @@ export default function Behavior() {
     if (!reportToDelete) return;
     setLoading(true);
     try {
-      await deleteDoc(doc(db, 'behavior_reports', reportToDelete));
+      await deleteRecord('behavior_reports', reportToDelete);
       setReports(prev => prev.filter(r => r.id !== reportToDelete));
       toast.success('تم حذف التقرير بنجاح');
       setReportToDelete(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'behavior_reports');
-      toast.error('حدث خطأ أثناء الحذف');
+      toast.error(deleteErrorMessage(error, 'حدث خطأ أثناء الحذف'));
     } finally {
       setLoading(false);
     }

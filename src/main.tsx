@@ -9,6 +9,7 @@ import './styles/app-bar.css';
 import './styles/academic-theme.css';
 import './styles/chrome-v3.css';
 import { initSentry } from './lib/sentryWrapper';
+import { previewBlocked } from './lib/firebaseConfig';
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   let dsn = import.meta.env.VITE_SENTRY_DSN;
@@ -147,9 +148,18 @@ if (typeof document !== 'undefined') {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <SystemConfigProvider>
-    <App />
-  </SystemConfigProvider>
+  previewBlocked ? (
+    // Preview deployment configured with the PRODUCTION Firebase project: nothing is loaded, nothing reaches production.
+    <div dir="rtl" style={{ padding: 32, fontFamily: 'sans-serif', maxWidth: 640, margin: '48px auto', lineHeight: 1.8 }} data-testid="preview-blocked">
+      <h2>بيئة معاينة غير مهيأة</h2>
+      <p>هذه النسخة تعمل على نطاق معاينة لكنها مضبوطة على مشروع الإنتاج. أوقفنا الاتصال بالكامل حمايةً لبيانات المدارس.</p>
+      <p>اضبط متغيرات VITE_FIREBASE_* لمشروع Firebase مستقل للمعاينة ثم أعد البناء.</p>
+    </div>
+  ) : (
+    <SystemConfigProvider>
+      <App />
+    </SystemConfigProvider>
+  )
 );
 
 // PWA Service Worker — register + force update check. Reload-on-replace handled in installChunkLoadRecovery.

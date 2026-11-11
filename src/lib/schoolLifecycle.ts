@@ -90,15 +90,30 @@ export async function restoreArchivedSchool(schoolId: string, actor: Actor): Pro
   });
 }
 
+export async function previewSchoolDeletion(schoolId: string): Promise<Record<string, any>> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('يجب تسجيل الدخول كSuper Admin');
+  const res = await fetch(getApiUrl('/api/records/school-preview'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ schoolId }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(String(json.message || json.error || 'تعذّر جلب تقرير الحذف'));
+  return json;
+}
+
+/** Deletes the whole school through the unified server job (to the recycle bin; restorable by Super Admin). */
 export async function permanentDeleteSchool(params: {
   schoolId: string;
   confirmName: string;
+  confirmText?: string;
 }): Promise<{ summary?: Record<string, unknown> }> {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('يجب تسجيل الدخول كSuper Admin');
 
   const response = await fetch(
-    getApiUrl(`/api/admin/schools/${encodeURIComponent(params.schoolId)}/permanent-delete`),
+    getApiUrl('/api/records/delete-school'),
     {
       method: 'POST',
       headers: {
@@ -107,9 +122,11 @@ export async function permanentDeleteSchool(params: {
         'X-Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
-        confirm: true,
-        schoolName: params.confirmName,
+        schoolId: params.schoolId,
+        mode: 'trash',
+        confirmSchoolId: params.schoolId,
         confirmName: params.confirmName,
+        confirmText: params.confirmText || 'حذف المدرسة',
       }),
     },
   );
@@ -134,5 +151,5 @@ export async function permanentDeleteSchool(params: {
     throw new Error(msg);
   }
 
-  return { summary: payload.summary as Record<string, unknown> | undefined };
+  return { summary: payload.preview as Record<string, unknown> | undefined };
 }

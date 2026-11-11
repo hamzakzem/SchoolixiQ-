@@ -1504,7 +1504,17 @@ export default function ParentDashboard() {
   ) => {
     if (!profile?.uid) return;
 
-    // In our system, the parent has full control over these records in their account
+    // Parents can hide a shared homework item for themselves, but never delete school records
+    // (grades, reports, behaviour…): those belong to the school and are removed only by its staff.
+    if (collectionName !== "homework") {
+      toast.error(
+        isRtl
+          ? "لا يمكن لولي الأمر حذف السجلات المدرسية"
+          : "Parents cannot delete school records",
+      );
+      return;
+    }
+
     const confirmDelete = window.confirm(
       isRtl
         ? `هل أنت متأكد من حذف ${itemTitle || "هذا السجل"} من حسابك؟`
@@ -1522,18 +1532,9 @@ export default function ParentDashboard() {
         toast.success(
           isRtl ? "تم إخفاء الواجب بنجاح" : "Homework hidden successfully",
         );
-      } else {
-        // Regular deletion for per-student records (grades, reports, behavioral etc)
-        await deleteDoc(doc(db, collectionName, docId));
-        toast.success(
-          isRtl
-            ? "تم الحذف من حسابك بنجاح"
-            : "Successfully deleted from your account",
-        );
       }
     } catch (error) {
       console.error("Delete error:", error);
-      handleFirestoreError(error, OperationType.DELETE, collectionName, false);
       toast.error(isRtl ? "فشل عملية الحذف" : "Failed to delete record");
     }
   };

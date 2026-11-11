@@ -1,5 +1,8 @@
 import { cronSecretMatches } from './cronSecret.mjs';
 import { setupSystemMessageNotifications, messageNotificationsStatus } from './messageNotifications.mjs';
+import { resolveDeployment, appUrlConfigFields, configureWorkers, registerWorker, tryStartWorkers, workersAllowedNow, workerStatus, locationReport, disabledAdminCredential, INTERNAL_ROUTE_RE, PRODUCTION_FIREBASE_PROJECT_ID } from './runtimeEnv.mjs';
+import { destructiveOpsAllowed, backgroundDestructiveAllowed, internalRouteHostDenied, requestHost, DESTRUCTIVE_ROUTE_RE } from './runtimeGuard.mjs';
+import { PERMANENT_CONFIRM_TEXT, runAuditedPlatformDelete, deleteChatMessage, deleteSchool, previewSchoolDeletion, deleteNotifications, deleteRecords, restoreBundle, purgeBundle, sweepDeletions, startDeletionSweep, loadActor, voidPayment, resolveFinancialReview } from './deletionService.mjs';
 import express from 'express';
 import compression from 'compression';
 import path from 'path';
@@ -11,7 +14,7 @@ import dotEnv from 'dotenv';
 import fs from 'fs';
 import crypto from 'crypto';
 import { runSchoolPermanentDelete } from './schoolPermanentDelete.mjs';
-import { permanentlyDeleteMessage } from './schoolMessageCleanup.mjs';
+import { permanentlyDeleteMessage, deleteSchoolMessages } from './schoolMessageCleanup.mjs';
 import { purgeUserConversations } from './userConversationPurge.mjs';
 import { authorizeConversationAccess } from './messagingAccess.mjs';
 import { startConversation } from './startConversation.mjs';
@@ -107,11 +110,50 @@ const serviceAccount = {
   privateKey: sanitizeEnv(process.env.FIREBASE_PRIVATE_KEY),
 };
 
-if (serviceAccount.clientEmail && serviceAccount.privateKey) {
+/** Shape check only (never prints the key): catches a truncated/garbled FIREBASE_PRIVATE_KEY before any delete runs. */
+function validateServiceAccount(sa: { projectId?: string; clientEmail?: string; privateKey?: string }): { valid: boolean; problems: string[] } {
+  const problems: string[] = [];
+  if (!sa.projectId) problems.push('FIREBASE_PROJECT_ID missing');
+  if (!sa.clientEmail) problems.push('FIREBASE_CLIENT_EMAIL missing');
+  else if (!/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(sa.clientEmail)) problems.push('FIREBASE_CLIENT_EMAIL is not a service-account email');
+  if (!sa.privateKey) problems.push('FIREBASE_PRIVATE_KEY missing');
+  else if (!/^-----BEGIN PRIVATE KEY-----\n[\s\S]+\n-----END PRIVATE KEY-----\n?$/.test(sa.privateKey)) problems.push('FIREBASE_PRIVATE_KEY is not a valid PEM (check the \\n line breaks)');
+  return { valid: problems.length === 0, problems };
+}
+const serviceAccountCheck = validateServiceAccount(serviceAccount);
+if (!serviceAccountCheck.valid && (serviceAccount.clientEmail || serviceAccount.privateKey)) {
+  console.error('[CONFIG] Firebase Admin credentials are present but invalid: ' + serviceAccountCheck.problems.join('; '));
+}
+
+// ── Which deployment is this, and may it use Admin credentials? (backend/runtimeEnv.mjs; fail closed) ──
+const deployment = resolveDeployment({
+  env: process.env,
+  clientEmail: serviceAccount.clientEmail,
+  explicitProjectId: sanitizeEnv(process.env.FIREBASE_PROJECT_ID),
+  hasPrivateKey: Boolean(serviceAccount.privateKey),
+});
+configureWorkers(deployment, console);
+// The committed config names the PRODUCTION bucket: a non-production project must bring its own (never inherit production's).
+const adminStorageBucket: string | undefined =
+  deployment.adminProjectId && deployment.adminProjectId !== PRODUCTION_FIREBASE_PROJECT_ID
+    ? sanitizeEnv(process.env.FIREBASE_STORAGE_BUCKET) || undefined
+    : deployment.adminAllowed
+      ? sanitizeEnv(process.env.FIREBASE_STORAGE_BUCKET) || firebaseConfig.storageBucket
+      : undefined;
+console.log(`[ENV] deployment=${deployment.kind} (${deployment.reason}); admin=${deployment.adminAllowed ? 'enabled' : 'DISABLED'} (${deployment.adminReason}); background=${deployment.workers}`);
+
+if (!deployment.adminAllowed) {
+  // Never fall back silently: every Admin call fails with ADMIN_DISABLED until the environment is configured correctly.
+  admin.initializeApp({
+    credential: disabledAdminCredential(deployment.adminReason) as any,
+    projectId: 'admin-disabled-unverified-environment',
+  });
+  console.error(`[CONFIG] Firebase Admin is DISABLED in this deployment: ${deployment.adminReason}. Set DEPLOY_ENV (production | preview) and matching credentials in the hosting panel.`);
+} else if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   try {
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount as any),
-      storageBucket: firebaseConfig.storageBucket, // Added
+      credential: admin.credential.cert({ ...serviceAccount, projectId: deployment.adminProjectId || serviceAccount.projectId } as any),
+      storageBucket: adminStorageBucket,
     });
     console.log('Firebase Admin initialized with service account.');
   } catch (e: any) {
@@ -125,7 +167,7 @@ if (serviceAccount.clientEmail && serviceAccount.privateKey) {
   // Try default initialization (works if running on GCP with permissions)
   try {
     admin.initializeApp({
-      storageBucket: firebaseConfig.storageBucket, // Added
+      storageBucket: adminStorageBucket,
     });
     console.log('Firebase Admin initialized with defaults.');
   } catch (e) {
@@ -331,6 +373,25 @@ async function startServer() {
 
   // Compress all responses (JS, CSS, HTML, API/JSON payloads)
   app.use(compression());
+
+  // Permission comes from the deployment IDENTITY (environment), never from request data. The Host header (only Host: forwarded-* headers are
+  // ignored) is an extra DENY layer and can never grant anything. See backend/runtimeEnv.mjs and backend/runtimeGuard.mjs.
+  app.use((req: any, res: any, next: any) => {
+    const host = requestHost(req.headers, req.hostname);
+    // cron / scheduler endpoints touch Firestore with Admin: refuse unless this deployment is a verified production/emulator
+    if (INTERNAL_ROUTE_RE.test(req.path) && (!workersAllowedNow(deployment) || internalRouteHostDenied(host))) {
+      console.warn('[env] blocked background endpoint', { path: req.path, kind: deployment.kind, reason: deployment.workersReason });
+      return res.status(503).json({ ok: false, success: false, error: 'BACKGROUND_DISABLED', deployment: deployment.kind, message: 'العمليات الخلفية المجدولة معطّلة في هذه البيئة (معاينة/غير موثّقة). لم يتم تغيير أي بيانات.' });
+    }
+    if (req.method !== 'GET' && req.method !== 'OPTIONS' && DESTRUCTIVE_ROUTE_RE.test(req.path)) {
+      const verdict = destructiveOpsAllowed({ host, deployment });
+      if (!verdict.allowed) {
+        console.warn('[deletion] blocked destructive request', { path: req.path, reason: verdict.reason });
+        return res.status(503).json({ ok: false, success: false, error: 'DESTRUCTIVE_OPS_DISABLED', reason: verdict.reason, message: 'العمليات الحساسة (حذف/استعادة/إلغاء) غير متاحة في بيئة المعاينة أو غير الموثّقة. لم يتم تغيير أي بيانات.' });
+      }
+    }
+    next();
+  });
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -899,6 +960,10 @@ async function startServer() {
         ...(serviceAccount.clientEmail ? [] : ['FIREBASE_CLIENT_EMAIL']),
         ...(serviceAccount.privateKey ? [] : ['FIREBASE_PRIVATE_KEY']),
       ],
+      deployment: { kind: deployment.kind, reason: deployment.reason, adminEnabled: deployment.adminAllowed, adminReason: deployment.adminReason, adminProjectVerified: deployment.adminProjectId || null, targetsProductionProject: deployment.targetsProduction, appUrlVerified: deployment.appUrlVerified, location: locationReport({ appUrlHost: deployment.appUrlHost }), workers: workerStatus() },
+      adminCredentialsValid: serviceAccountCheck.valid,
+      adminCredentialProblems: serviceAccountCheck.problems, // text only, never values
+      deletionEnabled: !deletionUnavailable(),
       adminAppInitialized: admin.apps.length > 0,
       firestore: { ok: false, errorClass: null as string | null },
       cronSecretConfigured: Boolean(resolveCronSecret(process.env.NOTIFICATION_CRON_SECRET, process.env.CRON_SECRET)),
@@ -940,6 +1005,60 @@ async function startServer() {
       return res.status(500).json({ error: 'SERVER_ERROR', schools: [] });
     }
   });
+
+  // --- Secure deletion (trash / restore / permanent) -------------------------------------------
+  // Authorisation, school isolation, cascade, files and the audit log all live in
+  // backend/deletionService.mjs; the browser can no longer delete these collections directly.
+  const deletionCtx = () => ({
+    db: getDb(),
+    adminSdk: admin,
+    authAdmin: admin.auth(),
+    bucket: () => getStorage().bucket(),
+    canActorDeleteUser,
+    purgeAccount: (userId: string) => runUserPermanentDelete({ db: getDb(), authAdmin: admin.auth(), adminSdk: admin, userId }),
+    permanentlyDeleteMessage: (args: any) => permanentlyDeleteMessage(getDb(), { ...args, bucket: (() => { try { return getStorage().bucket(); } catch { return null; } })() }),
+    purgeSchoolMessages: (schoolId: string) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() }),
+  });
+  /** In production, deletion needs real Admin credentials: refuse up front, before touching any data. */
+  const deletionUnavailable = () => !process.env.FIRESTORE_EMULATOR_HOST && (!backgroundDestructiveAllowed(deployment) || (process.env.NODE_ENV === 'production' && !serviceAccountCheck.valid && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE));
+  const deletionRoute = (fn: (ctx: any, uid: string, body: any) => Promise<any>) => async (req: any, res: any) => {
+    if (deletionUnavailable()) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
+    try {
+      res.json(await fn(deletionCtx(), req.user.uid, req.body || {}));
+    } catch (e: any) {
+      const noCreds = /Could not load the default credentials|Unable to detect a Project Id/i.test(String(e?.message || ''));
+      if (noCreds) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
+      return res.status(e.status || 500).json({ error: e.code || 'ERROR', message: e.message });
+    }
+  };
+  // Legacy endpoints delegate here so every delete is authorised, cascaded, trashed and audited the same way.
+  const legacyEngineDelete = async (req: any, res: any, collection: string, id: string, okMessage: string) => {
+    if (deletionUnavailable()) return res.status(503).json({ ok: false, success: false, error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
+    try {
+      const out = await deleteRecords(deletionCtx(), req.user.uid, { collection, ids: [id], mode: 'trash', confirmBulk: false });
+      const r = out.results?.[0];
+      if (r?.ok) return res.json({ ok: true, success: true, message: okMessage, bundleId: r.bundleId, data: { id } });
+      const status = /^FORBIDDEN/.test(r?.code || '') ? 403 : r?.code === 'NOT_FOUND' ? 404 : r?.code === 'HAS_DEPENDENTS' ? 409 : 400;
+      return res.status(status).json({ ok: false, success: false, error: r?.code || 'ERROR', message: r?.message || 'تعذّر الحذف' });
+    } catch (e: any) {
+      const noCreds = /Could not load the default credentials|Unable to detect a Project Id/i.test(String(e?.message || ''));
+      if (noCreds) return res.status(503).json({ ok: false, success: false, error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
+      return res.status(e.status || 500).json({ ok: false, success: false, error: e.code || 'ERROR', message: e.message });
+    }
+  };
+  app.post('/api/records/delete', verifyToken, deletionRoute((c, uid, b) => deleteRecords(c, uid, b)));
+  app.post('/api/records/restore', verifyToken, deletionRoute((c, uid, b) => restoreBundle(c, uid, b.bundleId)));
+  app.post('/api/records/delete-notifications', verifyToken, deletionRoute((c, uid, b) => deleteNotifications(c, uid, b)));
+  app.post('/api/records/school-preview', verifyToken, deletionRoute((c, uid, b) => previewSchoolDeletion(c, uid, String(b.schoolId || ''))));
+  app.post('/api/records/delete-school', verifyToken, deletionRoute((c, uid, b) => deleteSchool(c, uid, b)));
+  app.post('/api/records/resolve-financial-review', verifyToken, deletionRoute((c, uid, b) => resolveFinancialReview(c, uid, b)));
+  app.post('/api/records/void-payment', verifyToken, deletionRoute((c, uid, b) => voidPayment(c, uid, b)));
+  app.post('/api/records/purge', verifyToken, deletionRoute((c, uid, b) => purgeBundle(c, uid, b)));
+  app.post('/api/records/resume', verifyToken, deletionRoute(async (c, uid) => {
+    const actor = await loadActor(c.db, uid);
+    if (!actor.isSuper && !['admin', 'school_admin'].includes(actor.role)) { const e: any = new Error('غير مسموح'); e.status = 403; e.code = 'FORBIDDEN_ROLE'; throw e; }
+    return sweepDeletions(c, console, { force: true });
+  }));
 
   // iOS Configuration Profile Download API
   app.get('/api/download/schoolixiq.mobileconfig', (req, res) => {
@@ -1469,7 +1588,8 @@ async function startServer() {
       if (after.schools.length + after.requests.length > 0) {
         return res.status(409).json({ error: 'PLAN_HAS_REFERENCES', message: 'تعذّر فك كل الارتباطات بأمان، لم يتم الحذف' });
       }
-      await ref.delete();
+      // packages are platform configuration (Super Admin only, references migrated above): same lock + deletion_logs entry as every delete
+      await runAuditedPlatformDelete(deletionCtx(), req.user.uid, { action: 'DELETE_PLAN', collection: 'packages', recordId: id, confirm: true, authorized: true }, () => ref.delete());
       await logAudit(req, 'DELETE_PLAN', { before: beforeDoc.data() || null, metadata: { mode: mode || 'none', schools: refs.schools.length, requests: refs.requests.length, targetPlanId: targetPlanId || null } });
       res.json({ success: true, mode: mode || 'none', schools: refs.schools.length, requests: refs.requests.length });
     } catch (error: any) {
@@ -1490,274 +1610,53 @@ async function startServer() {
       return res.status(400).json({ error: 'USER_ID_REQUIRED', message: 'userId مطلوب' });
     }
 
-    try {
-      const db = getDb();
-      const userDoc = await db.collection('users').doc(userId).get();
-      const beforeData = userDoc.exists ? userDoc.data() || {} : {};
-      const targetRole = beforeData.role;
-
-      // Super admin: anyone. School admin: lower-ranked users (teacher, staff,
-      // assistant, parent, guard) of their own school only — the staff,
-      // parents and assistants pages delete accounts through this endpoint.
-      if (!isSuperAdminRole(req.user.role)) {
-        const actorSchoolId = String(req.user.schoolId || '').trim();
-        const sameSchool =
-          userDoc.exists && actorSchoolId.length > 0 && String(beforeData.schoolId || '') === actorSchoolId;
-        if (!sameSchool || !canActorDeleteUser(req.user.role, targetRole, actorSchoolId)) {
-          return res.status(403).json({
-            error: 'FORBIDDEN',
-            message: 'غير مسموح لك بحذف هذا المستخدم',
-          });
-        }
-      }
-
-      let authExists = false;
-      try {
-        await admin.auth().getUser(userId);
-        authExists = true;
-      } catch (authError: any) {
-        if (authError.code !== 'auth/user-not-found') {
-          throw authError;
-        }
-      }
-
-      if (!userDoc.exists && !authExists) {
-        return res.status(404).json({
-          error: 'USER_NOT_FOUND',
-          message: 'المستخدم غير موجود في Auth أو Firestore',
-        });
-      }
-
-      if (isSuperAdminRole(targetRole) && !confirmSuperAdminDelete) {
-        return res.status(403).json({
-          error: 'CONFIRMATION_REQUIRED',
-          message: 'حذف حساب Super Admin يتطلب confirmSuperAdminDelete:true',
-        });
-      }
-
-      if (userId === req.user.uid && !confirmSelfDelete) {
-        return res.status(403).json({
-          error: 'CONFIRMATION_REQUIRED',
-          message: 'حذف حسابك الحالي يتطلب confirmSelfDelete:true',
-        });
-      }
-
-      const result = await runUserPermanentDelete({
-        db,
-        authAdmin: admin.auth(),
-        adminSdk: admin,
-        userId,
-      });
-
-      // A deleted distributor login must not leave its distributor record looking loggable.
-      const distributorId = String(beforeData.distributorId || '').trim();
-      if (beforeData.role === 'distributor' && distributorId) {
-        const distRef = db.collection('distributors').doc(distributorId);
-        const distSnap = await distRef.get();
-        if (distSnap.exists && distSnap.data()?.userId === userId) {
-          await distRef.update({
-            canLogin: false,
-            userId: admin.firestore.FieldValue.delete(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        }
-      }
-
-      await logAudit(req, 'DELETE_USER', {
-        before: userDoc.exists ? beforeData : null,
-        metadata: { targetUid: userId, result },
-      });
-
-      res.json({
-        ok: true,
-        success: true,
-        deletedAuth: result.deletedAuth,
-        deletedFirestoreUser: result.deletedFirestoreUser,
-        warnings: result.warnings,
-        data: result,
-        message: 'تم حذف الحساب بنجاح',
-      });
-    } catch (error: any) {
-      console.error('Delete User Error:', error);
-      res.status(error.status || 500).json({
-        success: false,
-        ok: false,
-        error: error.message || 'Internal Server Error',
-        message: error.message || 'حدث خطأ أثناء حذف الحساب',
-      });
-    }
+    // Every delete-user request goes through the unified deletion engine (permissions, trash, audit, resume).
+    // (the legacy confirmSelfDelete / confirmSuperAdminDelete flags no longer bypass anything: the engine refuses both)
+    void confirmSelfDelete; void confirmSuperAdminDelete;
+    return legacyEngineDelete(req, res, 'users', userId, 'تم تعطيل الحساب ونقله إلى سلة المحذوفات');
   });
 
-  app.post('/api/admin/delete-school', verifyAdmin, async (req: any, res: any) => {
-    const { schoolId } = req.body;
-    if (!schoolId) return res.status(400).json({ error: 'School ID required' });
-    
-    try {
-      // 1. Restrict delete-school strictly to superadmin
-      if (req.user.role !== 'superadmin') {
-        return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مصرح لك بحذف المدرسة. هذا الإجراء مخصص للمطور/SuperAdmin فقط' });
-      }
-
-      const db = getDb();
-      
-      // 1. Delete all users associated with this school
-      const usersQuery = await db.collection('users').where('schoolId', '==', schoolId).get();
-      const userDeletions = usersQuery.docs.map(async (uDoc) => {
-        try {
-          await admin.auth().deleteUser(uDoc.id);
-        } catch (e) {
-          // ignore auth not found
-        }
-        await uDoc.ref.delete();
-      });
-      await Promise.all(userDeletions);
-
-      // 2. Delete all students
-      const studentsQuery = await db.collection('students').where('schoolId', '==', schoolId).get();
-      const studentDeletions = studentsQuery.docs.map(sDoc => sDoc.ref.delete());
-      await Promise.all(studentDeletions);
-
-      // 3. Delete other related collections in parallel and chunked batches
-      const collectionsToCleanup = [
-        "staff", "homework", "exams", "fees", "expenses", "logs", 
-        "notifications", "attendance", "announcements", "payroll", 
-        "inventory", "market", "orders", "payments", "behavior_reports", 
-        "behavior", "grades", "installments", "teacher_reports", "classes", "subscriptionRequests"
-      ];
-      
-      const deleteCollectionForSchool = async (colName: string) => {
-        try {
-          const snap = await db.collection(colName).where('schoolId', '==', schoolId).get();
-          if (!snap.empty) {
-            // Firestore batches have a limit of 500 operations
-            const docs = snap.docs;
-            const batchSize = 400;
-            for (let i = 0; i < docs.length; i += batchSize) {
-              const chunk = docs.slice(i, i + batchSize);
-              const batch = db.batch();
-              chunk.forEach(doc => batch.delete(doc.ref));
-              await batch.commit();
-            }
-          }
-        } catch (e) {
-          console.error(`Cleanup failed for ${colName}:`, e);
-        }
-      };
-
-      await Promise.all(collectionsToCleanup.map(colName => deleteCollectionForSchool(colName)));
-
-      // 4. Finally delete school
-      await db.collection('schools').doc(schoolId).delete();
-      await logAudit(req, 'DELETE_SCHOOL', { metadata: { targetSchoolId: schoolId } });
-
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error('Delete School Error:', error);
-      res.status(500).json({ error: error.message || 'Internal Server Error' });
-    }
-  });
-
-  app.post('/api/admin/schools/:schoolId/permanent-delete', verifyAdmin, async (req: any, res: any) => {
-    const { schoolId } = req.params;
+  // Legacy school deletion routes are thin wrappers over the unified, checkpointed school deletion job.
+  const legacySchoolDelete = async (req: any, res: any, schoolId: string) => {
+    if (deletionUnavailable()) return res.status(503).json({ ok: false, error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً. لم يتم حذف أي بيانات.' });
     const body = req.body || {};
-    const confirm = body.confirm === true;
-    const schoolName = body.schoolName ?? body.confirmName;
-
-    if (!schoolId) {
-      return res.status(400).json({ error: 'SCHOOL_ID_REQUIRED', message: 'School ID required' });
-    }
-
     try {
-      if (!isSuperAdminRole(req.user.role)) {
-        return res.status(403).json({
-          error: 'FORBIDDEN',
-          message: 'غير مصرح لك بحذف المدرسة نهائياً. هذا الإجراء مخصص للSuperAdmin فقط',
-        });
-      }
-
-      const result = await runSchoolPermanentDelete({
-        db: getDb(),
-        authAdmin: admin.auth(),
+      const out = await deleteSchool(deletionCtx(), req.user.uid, {
         schoolId,
-        confirm,
-        schoolName: schoolName != null ? String(schoolName) : undefined,
-        confirmName: body.confirmName != null ? String(body.confirmName) : undefined,
-        bucket: (() => {
-          try {
-            return getStorage().bucket();
-          } catch {
-            return null;
-          }
-        })(),
+        mode: body.permanent === true ? 'permanent' : 'trash',
+        confirmSchoolId: body.confirmSchoolId ?? (body.confirm === true ? schoolId : undefined),
+        confirmName: body.confirmName ?? body.schoolName,
+        confirmText: body.confirmText,
+        confirmPermanentText: body.confirmPermanentText,
       });
-
-      await logAudit(req, 'PERMANENT_DELETE_SCHOOL', {
-        metadata: { targetSchoolId: schoolId, result },
-      });
-
-      res.json({
-        ok: true,
-        success: true,
-        schoolId: result.schoolId,
-        deletedCounts: result.deletedCounts,
-        warnings: result.warnings,
-        summary: result,
-      });
-    } catch (error: any) {
-      console.error('Permanent Delete School Error:', error);
-      res.status(error.status || 500).json({
-        ok: false,
-        error: error.message || 'Internal Server Error',
-        message: error.message || 'فشل الحذف النهائي للمدرسة',
-      });
+      res.json({ ok: true, success: true, bundleId: out.bundleId, summary: out.preview, schoolId });
+    } catch (e: any) {
+      const noCreds = /Could not load the default credentials|Unable to detect a Project Id/i.test(String(e?.message || ''));
+      if (noCreds) return res.status(503).json({ ok: false, error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً. لم يتم حذف أي بيانات.' });
+      res.status(e.status || 500).json({ ok: false, success: false, error: e.code || 'ERROR', message: e.message || 'فشل حذف المدرسة' });
     }
+  };
+  app.post('/api/admin/delete-school', verifyAdmin, async (req: any, res: any) => {
+    const schoolId = String(req.body?.schoolId || '').trim();
+    if (!schoolId) return res.status(400).json({ error: 'School ID required' });
+    return legacySchoolDelete(req, res, schoolId);
   });
+  app.post('/api/admin/schools/:schoolId/permanent-delete', verifyAdmin, async (req: any, res: any) => legacySchoolDelete(req, res, String(req.params.schoolId || '').trim()));
 
   // Super Admin only — hard-delete a chat message (Admin SDK; client deleteDoc forbidden for non-superadmin)
   app.post('/api/admin/messages/permanent-delete', verifyAdmin, async (req: any, res: any) => {
+    if (deletionUnavailable()) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً. لم يتم حذف أي بيانات.' });
     try {
-      if (!isSuperAdminRole(req.user.role)) {
-        return res.status(403).json({
-          error: 'FORBIDDEN',
-          message: 'الحذف النهائي للرسائل مسموح لمدير النظام فقط',
-        });
-      }
-      const messageId = String(req.body?.messageId || '').trim();
-      if (!messageId) {
-        return res.status(400).json({ error: 'MESSAGE_ID_REQUIRED', message: 'معرّف الرسالة مطلوب' });
-      }
-      let bucket = null;
-      try {
-        bucket = getStorage().bucket();
-      } catch {
-        bucket = null;
-      }
-      const result = await permanentlyDeleteMessage(getDb(), {
-        messageId,
-        deletedBy: req.user.uid,
-        bucket,
-      });
-      if (!result.ok) {
-        return res.status(404).json({ error: result.error || 'NOT_FOUND', message: 'الرسالة غير موجودة' });
-      }
-      await logAudit(req, 'DELETE_MESSAGE', {
-        metadata: {
-          messageId,
-          targetConversation: result.conversationId,
-          conversationDeleted: result.conversationDeleted,
-        },
-      });
+      const result = await deleteChatMessage(deletionCtx(), req.user.uid, { messageId: req.body?.messageId });
+      if (result?.ok === false) return res.status(404).json({ error: result.error || 'NOT_FOUND', message: 'الرسالة غير موجودة' });
+      await logAudit(req, 'DELETE_MESSAGE', { metadata: { messageId: req.body?.messageId, targetConversation: result.conversationId, conversationDeleted: result.conversationDeleted } });
       res.json({ success: true, ...result });
     } catch (error: any) {
-      console.error('Permanent Delete Message Error:', error);
-      res.status(500).json({
-        error: error.message || 'Internal Server Error',
-        message: error.message || 'فشل الحذف النهائي للرسالة',
-      });
+      console.error('Permanent delete message error:', error);
+      res.status(error.status || 500).json({ error: error.code || 'ERROR', message: error.message || 'فشل حذف الرسالة' });
     }
   });
 
-  // Super Admin only — permanently purge all conversations/messages for a user
   app.post('/api/admin/messages/purge-user-conversations', verifyAdmin, async (req: any, res: any) => {
     try {
       if (!isSuperAdminRole(req.user.role)) {
@@ -1783,10 +1682,10 @@ async function startServer() {
       } catch {
         bucket = null;
       }
-      const result = await purgeUserConversations(getDb(), targetUserId, {
-        bucket,
-        actorId: req.user.uid,
-      });
+      if (deletionUnavailable()) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً. لم يتم حذف أي بيانات.' });
+      const result = await runAuditedPlatformDelete(deletionCtx(), req.user.uid, { action: 'PURGE_USER_CONVERSATIONS', collection: 'conversations', recordId: targetUserId, confirm: confirm === 'DELETE' }, () =>
+        purgeUserConversations(getDb(), targetUserId, { bucket, actorId: req.user.uid }),
+      );
       await logAudit(req, 'PURGE_USER_CONVERSATIONS', {
         metadata: {
           targetUserId,
@@ -1798,7 +1697,7 @@ async function startServer() {
       res.json({ success: true, ...result });
     } catch (error: any) {
       console.error('Purge User Conversations Error:', error);
-      res.status(500).json({
+      res.status(error.status || 500).json({
         error: error.message || 'Internal Server Error',
         message: error.message || 'فشل حذف محادثات المستخدم',
       });
@@ -2104,6 +2003,8 @@ async function startServer() {
         return res.status(403).json({ error: 'FORBIDDEN', message: 'حذف الموزعين مخصص لمدير النظام فقط' });
       }
       const db = getDb();
+      // default: recoverable (trash). Permanent only when explicitly requested.
+      const distMode = req.body?.permanent === true ? 'permanent' : 'trash';
       const snap = await db.collection('distributors').doc(distributorId).get();
       if (!snap.exists) {
         return res.status(404).json({ error: 'DISTRIBUTOR_NOT_FOUND', message: 'الموزع غير موجود' });
@@ -2115,19 +2016,21 @@ async function startServer() {
       linkedUsers.docs.forEach((d) => userIds.add(d.id));
       let usersDeleted = 0;
       for (const uid of userIds) {
-        try {
-          await runUserPermanentDelete({ db, authAdmin: admin.auth(), adminSdk: admin, userId: uid });
-          usersDeleted += 1;
-        } catch (e: any) {
-          if (e?.status !== 404) throw e;
-        }
+        // the linked login is removed through the unified engine (permission checks, audit log, resumable)
+        const out = await deleteRecords(deletionCtx(), req.user.uid, { collection: 'users', ids: [uid], mode: distMode, confirmText: distMode === 'permanent' ? PERMANENT_CONFIRM_TEXT : undefined });
+        const r0 = out.results?.[0];
+        if (r0?.ok) usersDeleted += 1;
+        else if (r0?.code !== 'NOT_FOUND') throw Object.assign(new Error(r0?.message || 'تعذّر حذف حساب الموزع'), { code: r0?.code });
       }
-      const result = await deleteDistributorRecords({ db, adminSdk: admin, distributorId, actorUid: req.user.uid });
-      await logAudit(req, 'DISTRIBUTOR_DELETE', { before: snap.data(), metadata: { distributorId, usersDeleted, ...result } });
-      res.json({ ok: true, distributorId, usersDeleted, ...result });
+      // the distributor record itself goes through the unified engine too (coupons to trash, schools keep history)
+      const dout = await deleteRecords(deletionCtx(), req.user.uid, { collection: 'distributors', ids: [distributorId], mode: distMode, confirmText: distMode === 'permanent' ? PERMANENT_CONFIRM_TEXT : undefined });
+      const d0 = dout.results?.[0];
+      if (!d0?.ok) throw Object.assign(new Error(d0?.message || 'تعذّر حذف الموزع'), { code: d0?.code, status: 409 });
+      await logAudit(req, 'DISTRIBUTOR_DELETE', { before: snap.data(), metadata: { distributorId, usersDeleted, bundleId: d0.bundleId } });
+      res.json({ ok: true, distributorId, usersDeleted, bundleId: d0.bundleId });
     } catch (error: any) {
       console.error('Delete distributor error:', error);
-      res.status(500).json({ error: error.code || 'DELETE_FAILED', message: error.message || 'فشل حذف الموزع' });
+      res.status(error.status || 500).json({ error: error.code || 'DELETE_FAILED', message: error.message || 'فشل حذف الموزع' });
     }
   });
 
@@ -2350,65 +2253,9 @@ async function startServer() {
   });
 
   app.post('/api/admin/delete-student', verifyAdmin, async (req: any, res: any) => {
-    const { id } = req.body;
+    const id = String(req.body?.id || '').trim();
     if (!id) return res.status(400).json({ error: 'Student ID required' });
-    
-    try {
-      if (!canActorDeleteStudent(req.user.role, req.user.schoolId)) {
-        return res.status(403).json({
-          error: 'FORBIDDEN',
-          message: 'غير مسموح لك بحذف الطلاب',
-        });
-      }
-
-      const db = getDb();
-      const studentDoc = await db.collection('students').doc(id).get();
-      const beforeData = studentDoc.exists ? studentDoc.data() : null;
-      const schoolId = beforeData?.schoolId;
-
-      // 2. Enforce school boundary verification for multi-tenancy
-      if (req.user.role !== 'superadmin') {
-        if (!schoolId || schoolId !== req.user.schoolId) {
-          return res.status(403).json({ error: 'FORBIDDEN', message: 'غير مسموح لك بحذف طلاب مدرسة أخرى' });
-        }
-      }
-
-      await db.runTransaction(async (transaction) => {
-        // 1. Delete from Firestore collections
-        transaction.delete(db.collection('students').doc(id));
-        transaction.delete(db.collection('users').doc(id));
-
-        // 2. Decrement school student counter
-        if (schoolId) {
-          transaction.update(db.collection('schools').doc(schoolId), {
-            studentCount: admin.firestore.FieldValue.increment(-1)
-          });
-        }
-      });
-
-      // 3. Delete from Auth (if exists) - outside transaction
-      try {
-        await admin.auth().deleteUser(id);
-      } catch (authError) {
-        // Expected if students don't have accounts
-      }
-
-      // 4. Log audit
-      await logAudit(req, 'DELETE_STUDENT', { before: beforeData, metadata: { targetId: id } });
-
-      res.json({
-        success: true,
-        message: 'تم حذف الطالب بنجاح',
-        data: { id }
-      });
-    } catch (error: any) {
-      console.error('Delete Student Error:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Internal Server Error',
-        message: error.message || 'حدث خطأ أثناء حذف الطالب'
-      });
-    }
+    return legacyEngineDelete(req, res, 'students', id, 'تم نقل الطالب إلى سلة المحذوفات');
   });
 
   app.post('/api/admin/backup', verifyAdmin, async (req: any, res: any) => {
@@ -2860,52 +2707,39 @@ async function startServer() {
     console.log('SERVER_READY', { host: '0.0.0.0', port: PORT });
     console.log(`Server running on http://localhost:${PORT}`);
 
-    // Server-driven FCM push: self-healing listener + backlog + sweep (10-minute age cutoff)
-    try {
+    // Every background process goes through registerWorker(): nothing runs unless the deployment is proven
+    // (emulator, a preview on its OWN Firebase project, or production after a production-host request was observed).
+    // A preview can therefore never become a production worker, whatever environment variables it inherited.
+    registerWorker('notification-push-listener', () => {
       const db = getDb();
+      // Server-driven FCM push: self-healing listener + backlog + sweep (10-minute age cutoff)
       setupNotificationPushListener(db, admin);
+    });
+    registerWorker('chat-notifications', () => {
       // Chat notifications are created here, once per message and recipient (deterministic ids)
-      setupSystemMessageNotifications(db, admin);
-    } catch (e: any) {
-      console.error('[Notifications] PUSH_SEND_ERROR gateway init:', e.message);
-    }
-
+      setupSystemMessageNotifications(getDb(), admin);
+    });
+    registerWorker('deletion-sweep', () => {
+      // finish interrupted deletions and purge expired trash (also gated by the destructive-ops guard)
+      startDeletionSweep(deletionCtx(), console, 3 * 60 * 1000, () => backgroundDestructiveAllowed(deployment));
+    });
     // Delete passwords older app versions stored as readable text in Firestore
-    scheduleCredentialScrub(getDb, admin);
-
+    registerWorker('credential-scrub', () => { scheduleCredentialScrub(getDb, admin); });
     // Move super-admin replies stored under the old per-admin thread id into the thread schools read
-    scheduleChatThreadMigration(getDb, admin);
+    registerWorker('chat-thread-migration', () => { scheduleChatThreadMigration(getDb, admin); });
 
-    // Save APP_URL dynamically to Firestore system config so all clients (including Mobile Apps) have access to the actual server URL
-    // CRITICAL: We ONLY save in production, and only if it's not a development/dev environment.
-    // This prevents development servers from contaminating the shared database.
-    const isProductionEnv = process.env.NODE_ENV === 'production';
-    const isDevUrl = process.env.APP_URL && (
-      process.env.APP_URL.includes('-dev-') || 
-      process.env.APP_URL.includes('localhost') || 
-      process.env.APP_URL.includes('127.0.0.1')
-    );
-
-    if (process.env.APP_URL) {
-      try {
-        const db = getDb();
-        const appUrlClean = process.env.APP_URL.replace(/\/$/, '');
-        if (isProductionEnv && !isDevUrl) {
-          await db.collection('system').doc('config').set({
-            appUrl: appUrlClean,
-            appUrlProd: appUrlClean
-          }, { merge: true });
-          console.log(`Successfully saved production APP_URL (${appUrlClean}) to system/config.`);
-        } else {
-          await db.collection('system').doc('config').set({
-            appUrlDev: appUrlClean
-          }, { merge: true });
-          console.log(`Successfully saved development APP_URL (${appUrlClean}) to system/config (appUrlDev).`);
-        }
-      } catch (err: any) {
-        console.error('Failed to save APP_URL to system/config:', err.message);
-      }
-    }
+    // Save APP_URL to Firestore system config so all clients (including mobile apps) know the server URL.
+    // Production writes `appUrlProd` only when APP_URL really is a production host; a preview on its own project writes `appUrlDev`.
+    registerWorker('app-url-config', () => {
+      if (!process.env.APP_URL) return;
+      const { fields, reason } = appUrlConfigFields({ kind: deployment.kind, appUrl: process.env.APP_URL });
+      if (!fields) { console.warn(`[env] system/config not updated: ${reason}`); return; }
+      if (reason.startsWith('APP_URL is not')) console.warn(`[env] ${reason}`);
+      getDb().collection('system').doc('config').set(fields, { merge: true })
+        .then(() => console.log(`Saved ${Object.keys(fields).join('+')} to system/config.`))
+        .catch((err: any) => console.error('Failed to save APP_URL to system/config:', err.message));
+    });
+    tryStartWorkers();
   });
 }
 

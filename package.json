@@ -20,7 +20,8 @@
     "start": "node server.js",
     "postinstall": "node scripts/postinstall-build.mjs",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "check:preview-isolation": "node scripts/check-preview-isolation.mjs"
   },
   "engines": {
     "node": "22.x"

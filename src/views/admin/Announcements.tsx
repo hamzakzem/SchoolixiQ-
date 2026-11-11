@@ -11,6 +11,7 @@ import { handleFirestoreError, OperationType } from '../../lib/firestore-errors'
 import { notificationService } from '../../lib/notificationService';
 import { AppModalPortal } from '../../components/AppModalPortal';
 import { FloatingMenu } from '../../components/ui/FloatingMenu';
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 export default function Announcements() {
   const { profile } = useAuth();
@@ -153,27 +154,12 @@ export default function Announcements() {
   const handleDelete = async (id: string) => {
     const path = `announcements/${id}`;
     try {
-      const title = announcements.find((a) => a.id === id)?.title || id;
-      await softDeleteDocument('announcements', id, {
-        uid: profile!.uid,
-        name: profile!.name || profile!.email || 'admin',
-      });
-      await logAction({
-        schoolId: profile!.schoolId!,
-        actorId: profile!.uid,
-        actorRole: profile!.role,
-        action: 'soft_delete',
-        entityType: 'announcements',
-        entityId: id,
-        beforeSummary: title,
-        afterSummary: 'محذوف إلى سلة المحذوفات',
-      });
+      await deleteRecord('announcements', id, 'trash');
       setAnnouncements((prev) => prev.filter((a) => a.id !== id));
       toast.success('تم نقل الإعلان إلى سلة المحذوفات');
       setDeleteConfirmId(null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, path);
-      toast.error('حدث خطأ أثناء الحذف');
+      toast.error(deleteErrorMessage(error, 'حدث خطأ أثناء الحذف'));
     }
   };
 

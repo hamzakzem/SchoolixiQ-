@@ -46,6 +46,7 @@ import {
 } from '../../lib/dailySummaryUtils';
 import { OverviewTuitionQuickReminder } from './OverviewTuitionQuickReminder';
 import { AppModalPortal } from '../../components/AppModalPortal';
+import { deleteRecords, deleteErrorMessage } from '../../lib/deletionApi';
 
 type ModalType = 'present' | 'absent' | 'market' | null;
 
@@ -481,17 +482,20 @@ export default function DailySummary({ onGoToAttendance }: DailySummaryProps) {
 
     setDeletingAttendance(true);
     try {
-      await Promise.all(
-        attendanceDocs.map((d) => deleteDoc(doc(db, 'attendance', d.id))),
-      );
+      await deleteRecords({
+        collection: 'attendance',
+        ids: attendanceDocs.map((d) => d.id),
+        mode: 'trash',
+        confirmBulk: true,
+      });
       toast.success(
         isRtl
-          ? 'تم حذف سجل الحضور والغياب لليوم من قاعدة البيانات'
-          : 'Today\'s attendance records were permanently deleted',
+          ? 'تم نقل سجل الحضور والغياب لليوم إلى سلة المحذوفات (يمكن استرجاعه)'
+          : 'Today\'s attendance records were moved to the recycle bin (restorable)',
       );
       closeAttendanceModal();
-    } catch {
-      toast.error(isRtl ? 'فشل الحذف' : 'Delete failed');
+    } catch (err) {
+      toast.error(deleteErrorMessage(err, isRtl ? 'فشل الحذف' : 'Delete failed'));
     } finally {
       setDeletingAttendance(false);
     }

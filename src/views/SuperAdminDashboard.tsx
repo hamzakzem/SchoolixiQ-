@@ -3,6 +3,8 @@ import { clsx } from "clsx";
 import { db, auth, storage } from "../lib/firebase";
 import { sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import { signOutWithCleanup } from "../lib/authLogout";
+import { deleteRecord } from "../lib/deletionApi";
+import SchoolBundlesPanel from "../components/superadmin/SchoolBundlesPanel";
 import { adminCreateUser, adminDeleteUser, adminAccrueCommissionOnPaymentConfirmed, adminFinalizeSchoolTracking, adminValidateDistributorCoupon, adminPurgeUserConversations } from "../lib/adminApi";
 import { clearMessagingCache } from "../lib/offline/offlineDataCache";
 import { resolveMessagingAccess } from "../lib/messagingAccess";
@@ -1285,10 +1287,28 @@ export default function SuperAdminDashboard() {
     await adminAccrueCommissionOnPaymentConfirmed(schoolId);
   };
 
+  /** Approved / rejected requests are DECISION RECORDS: they are marked, never deleted (orders go through the deletion engine). */
+  const closeRequest = async (
+    source: string,
+    requestId: string,
+    decision: "approved" | "rejected",
+  ) => {
+    if (source === "orders") {
+      await deleteRecord("orders", requestId);
+      return;
+    }
+    await updateDoc(doc(db, source, requestId), {
+      status: decision,
+      decidedAt: serverTimestamp(),
+      decidedBy: profile?.uid || null,
+      updatedAt: serverTimestamp(),
+    });
+  };
+
   const scheduleRegistrationCleanup = (source: string, requestId: string) => {
     setTimeout(async () => {
-      await deleteDoc(doc(db, source, requestId)).catch((e) =>
-        console.error("Failed to clean up approved registration:", e),
+      await closeRequest(source, requestId, "approved").catch((e) =>
+        console.error("Failed to close approved registration:", e),
       );
     }, 10000);
   };
@@ -1341,8 +1361,7 @@ export default function SuperAdminDashboard() {
         });
       }
 
-      const requestRef = doc(db, source, id);
-      await deleteDoc(requestRef);
+      await closeRequest(source, id, "rejected");
 
       toast.dismiss(loadingToast);
       toast.success("تم إلغاء الطلب وتحويل حالة المدرسة إلى مرفوض");
@@ -1972,7 +1991,7 @@ export default function SuperAdminDashboard() {
       // Cleanup request notification if applicable
       if (activeRequestId && activeRequestSource) {
         try {
-          await deleteDoc(doc(db, activeRequestSource, activeRequestId));
+          await closeRequest(activeRequestSource, activeRequestId, "approved");
           setActiveRequestId(null);
           setActiveRequestSource(null);
         } catch (e) {
@@ -2661,6 +2680,7 @@ export default function SuperAdminDashboard() {
             >
               {activeTab === "schools" ? (
                 <>
+                  <SchoolBundlesPanel />
                   <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between mb-6 md:mb-8 bg-white dark:bg-slate-900 p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md group gap-4">
                     <div id="overview-header-group">
                       <h3

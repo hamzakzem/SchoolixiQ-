@@ -1594,15 +1594,8 @@ const AppContent = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      if (myRequest?.id) {
-                        deleteDoc(
-                          doc(db, "registrations", myRequest.id),
-                        ).then(() => {
-                           setOnboardingState("options");
-                        });
-                      } else {
-                        setOnboardingState("options");
-                      }
+                      // A rejected request stays as the record of the decision (it is never deleted by the user).
+                      setOnboardingState("options");
                     }}
                     className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition-all cursor-pointer"
                   >

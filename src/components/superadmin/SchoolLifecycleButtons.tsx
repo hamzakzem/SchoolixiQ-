@@ -6,6 +6,7 @@ import {
   archiveSchool,
   getSchoolStatusLabel,
   permanentDeleteSchool,
+  previewSchoolDeletion,
   reactivateSchool,
   restoreArchivedSchool,
   suspendSchool,
@@ -58,6 +59,8 @@ export function SchoolLifecycleButtons({
   const [busy, setBusy] = useState(false);
   const [permanentOpen, setPermanentOpen] = useState(false);
   const [confirmName, setConfirmName] = useState('');
+  const [confirmPhrase, setConfirmPhrase] = useState('');
+  const [preview, setPreview] = useState<Record<string, any> | null>(null);
 
   const actor = {
     uid: profile?.uid || '',
@@ -193,7 +196,10 @@ export function SchoolLifecycleButtons({
           disabled={busy}
           onClick={() => {
             setConfirmName('');
+            setConfirmPhrase('');
+            setPreview(null);
             setPermanentOpen(true);
+            previewSchoolDeletion(school.id).then(setPreview).catch(() => setPreview(null));
           }}
           className={`${btn} sx-school-action-btn--danger`}
         >
@@ -213,15 +219,32 @@ export function SchoolLifecycleButtons({
             className="w-full px-3 py-2 rounded-lg border border-red-200 text-xs font-bold"
             dir="auto"
           />
+          {preview && (
+            <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 text-right" data-testid="school-delete-preview">
+              {isRtl ? 'سيتأثر: ' : 'Affected: '}
+              {Object.entries(preview.counts || {}).filter(([, n]) => Number(n) > 0).map(([c, n]) => `${c} ×${n}`).join('، ') || '—'}
+              {` · ${isRtl ? 'حسابات' : 'accounts'} ×${preview.accounts ?? 0} · ${isRtl ? 'ملفات' : 'files'} ×${preview.files ?? 0}`}
+            </p>
+          )}
+          <p className="text-[10px] font-bold text-red-800 dark:text-red-300 text-right">
+            {isRtl ? `ثم اكتب عبارة التأكيد: ${preview?.confirmText || 'حذف المدرسة'}` : 'Then type the confirmation phrase'}
+          </p>
+          <input
+            value={confirmPhrase}
+            onChange={(e) => setConfirmPhrase(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-red-200 text-xs font-bold"
+            dir="auto"
+          />
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={busy || confirmName.trim() !== school.name.trim()}
+              disabled={busy || confirmName.trim() !== school.name.trim() || confirmPhrase.trim() !== 'حذف المدرسة'}
               onClick={() =>
                 run(isRtl ? 'جاري الحذف النهائي...' : 'Deleting...', async () => {
                   await permanentDeleteSchool({
                     schoolId: school.id,
                     confirmName: confirmName.trim(),
+                    confirmText: confirmPhrase.trim(),
                   });
                   setPermanentOpen(false);
                   setConfirmName('');
@@ -230,7 +253,7 @@ export function SchoolLifecycleButtons({
               }
               className="flex-1 py-2 bg-red-600 text-white rounded-lg text-[10px] font-black disabled:opacity-50"
             >
-              {isRtl ? 'تأكيد الحذف النهائي' : 'Confirm permanent delete'}
+              {isRtl ? 'حذف المدرسة (إلى سلة المحذوفات)' : 'Delete school (to recycle bin)'}
             </button>
             <button
               type="button"

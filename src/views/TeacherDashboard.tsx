@@ -122,6 +122,7 @@ import AdvancedReports from "./admin/AdvancedReports";
 import IdCards from "./admin/IdCards";
 
 import { useLanguage } from "../lib/LanguageContext";
+import { deleteRecord, deleteErrorMessage } from "../lib/deletionApi";
 
 function teacherSnapshotError(queryName: string) {
   return (error: unknown) => {
@@ -1063,15 +1064,18 @@ export default function TeacherDashboard() {
 
     const loadingToast = toast.loading(t("deleting"));
     try {
-      await deleteDoc(doc(db, "homework", id));
+      await deleteRecord("homework", id);
       await notificationService.deleteBySourceId(id, profile.schoolId);
       toast.success(t("homeworkDeleted"), { id: loadingToast });
     } catch (error) {
       console.error("Error deleting homework:", error);
       toast.error(
-        isRtl
-          ? "حدث خطأ أثناء الحذف - قد لا تملك الصلاحية الكافية"
-          : "Error deleting - insufficient permissions",
+        deleteErrorMessage(
+          error,
+          isRtl
+            ? "حدث خطأ أثناء الحذف - قد لا تملك الصلاحية الكافية"
+            : "Error deleting - insufficient permissions",
+        ),
         { id: loadingToast },
       );
       try {
@@ -1086,15 +1090,18 @@ export default function TeacherDashboard() {
     if (!id) return;
     const loadingToast = toast.loading(t("deleting"));
     try {
-      await deleteDoc(doc(db, "teacher_reports", id));
+      await deleteRecord("teacher_reports", id);
       await notificationService.deleteBySourceId(id, profile.schoolId);
       toast.success(t("reportDeleted"), { id: loadingToast });
     } catch (error) {
       console.error("Error deleting report:", error);
       toast.error(
-        isRtl
-          ? "حدث خطأ أثناء الحذف - قد لا تملك الصلاحية الكافية"
-          : "Error deleting - insufficient permissions",
+        deleteErrorMessage(
+          error,
+          isRtl
+            ? "حدث خطأ أثناء الحذف - قد لا تملك الصلاحية الكافية"
+            : "Error deleting - insufficient permissions",
+        ),
         { id: loadingToast },
       );
       try {

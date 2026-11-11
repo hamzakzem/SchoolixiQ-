@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Settings2, X, RefreshCw, CalendarRange } from 'lucide-react';
 import { AppModalPortal } from '../../AppModalPortal';
+import VoidPaymentsPanel from './VoidPaymentsPanel';
 import { db } from '../../../lib/firebase';
+import { deleteRecords, deleteErrorMessage } from '../../../lib/deletionApi';
 import { doc, updateDoc, collection, serverTimestamp, setDoc, query, where, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 
@@ -73,6 +75,7 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
          const classStudents = students.filter(s => s.classId === selectedClassId);
          if (classStudents.length > 0) {
            const batch = writeBatch(db);
+           const pendingInstallmentIds: string[] = [];
 
            for (const student of classStudents) {
              // 1. Update Student totalTuition
@@ -89,9 +92,9 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
                 where('status', '==', 'pending')
              );
              const installmentsSnap = await getDocs(q);
-             installmentsSnap.docs.forEach(docSnap => {
-                batch.delete(docSnap.ref);
-             });
+             // Pending installments are replaced through the server deletion engine (permission check, trash, audit);
+             // anything already paid/partial is accounting history and is never touched here.
+             pendingInstallmentIds.push(...installmentsSnap.docs.map((d) => d.id));
 
              // 3. Generate new installments based on remaining tuition balance
              const paidBalance = student.tuitionBalance || 0;
@@ -128,6 +131,9 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
                 }
              }
            }
+           for (let i = 0; i < pendingInstallmentIds.length; i += 200) {
+             await deleteRecords({ collection: 'installments', ids: pendingInstallmentIds.slice(i, i + 200), mode: 'trash', confirmBulk: true });
+           }
            await batch.commit();
          }
       }
@@ -135,7 +141,7 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
       toast.success('تم حفظ إعدادات الرسوم بنجاح');
       onClose();
     } catch (error: any) {
-      toast.error('حدث خطأ أثناء حفظ الإعدادات');
+      toast.error(deleteErrorMessage(error, 'حدث خطأ أثناء حفظ الإعدادات'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -281,6 +287,7 @@ export default function TuitionSettingsModal({ onClose, classes, students, schoo
           </div>
         )}
       </form>
+      <VoidPaymentsPanel schoolId={schoolId} students={students} />
     </AppModalPortal>
   );
 }

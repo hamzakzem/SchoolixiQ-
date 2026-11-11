@@ -7,6 +7,7 @@ import { Package, AlertCircle, Plus, Trash2, Edit2, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { auth } from '../../lib/firebase';
 import { AppModalPortal } from '../../components/AppModalPortal';
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 export default function Inventory() {
   const { profile } = useAuth();
@@ -68,13 +69,13 @@ export default function Inventory() {
   const confirmDelete = async () => {
     if (!showDeleteConfirm) return;
     try {
-      await deleteDoc(doc(db, 'inventory', showDeleteConfirm));
+      await deleteRecord('inventory', showDeleteConfirm);
       toast.success('تم الحذف بنجاح');
       setShowDeleteConfirm(null);
       if (editingItem?.id === showDeleteConfirm) closeModal();
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, 'inventory');
-      toast.error('خطأ في الحذف');
+      toast.error(deleteErrorMessage(error, 'خطأ في الحذف'));
     }
   };
 

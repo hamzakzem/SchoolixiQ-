@@ -17,6 +17,7 @@ import {
 } from '../../lib/offline/offlineDataCache';
 import { setOfflineDataStale } from '../../lib/offline/offlineStatus';
 import { ActionMenu } from '../../components/ui/ActionMenu';
+import { deleteRecord, deleteErrorMessage } from '../../lib/deletionApi';
 
 export default function Classes() {
   const { profile } = useAuth();
@@ -126,27 +127,13 @@ export default function Classes() {
         return;
       }
 
-      const className = classes.find((c) => c.id === id)?.name || id;
-      await softDeleteDocument('classes', id, {
-        uid: profile!.uid,
-        name: profile!.name || profile!.email || 'admin',
-      });
-      await logAction({
-        schoolId: profile!.schoolId!,
-        actorId: profile!.uid,
-        actorRole: profile!.role,
-        action: 'soft_delete',
-        entityType: 'classes',
-        entityId: id,
-        beforeSummary: className,
-        afterSummary: 'محذوف إلى سلة المحذوفات',
-      });
+      await deleteRecord('classes', id, 'trash');
       setClasses((prev) => prev.filter((c) => c.id !== id));
       toast.success('تم نقل الصف إلى سلة المحذوفات');
       setConfirmDeleteId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `classes/${id}`);
-      toast.error('فشل حذف الصف');
+      toast.error(deleteErrorMessage(error, 'فشل حذف الصف'));
     } finally {
       setIsDeleting(false);
     }

@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { db, auth } from './firebase';
 import { getServiceWorkerUrl } from './serviceWorkerRegistration';
 import { notificationDiag } from './notificationDiagnostics';
-import firebaseConfig from '../../firebase-applet-config.json';
+import firebaseConfig from './firebaseConfig';
 import { getFirestoreDatabaseId } from './apiUtils';
 import { isLogoutInProgress, setLogoutInProgress } from './logoutGuard';
 import {

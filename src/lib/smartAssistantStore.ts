@@ -2,6 +2,7 @@
  * Firestore client for Rule-Based Support Assistant.
  * Public read of active content; Super Admin writes only (enforced by rules).
  */
+import { deleteRecord } from './deletionApi';
 import {
   addDoc,
   collection,
@@ -239,15 +240,15 @@ export async function upsertAnswer(data: AssistantAnswer) {
 }
 export async function deleteCategory(id: string) {
   invalidateAssistantCatalogCache();
-  await deleteDoc(doc(db, COL.categories, id));
+  await deleteRecord('assistant_categories', id);
 }
 export async function deleteFlow(id: string) {
   invalidateAssistantCatalogCache();
-  await deleteDoc(doc(db, COL.flows, id));
+  await deleteRecord('assistant_flows', id);
 }
 export async function deleteAnswer(id: string) {
   invalidateAssistantCatalogCache();
-  await deleteDoc(doc(db, COL.answers, id));
+  await deleteRecord('assistant_answers', id);
 }
 
 export async function logAssistantEvent(input: {
@@ -418,5 +419,5 @@ export async function upsertKeyword(data: AssistantKeyword): Promise<void> {
 
 export async function deleteKeyword(id: string): Promise<void> {
   invalidateAssistantCatalogCache();
-  await deleteDoc(doc(db, COL.keywords, id));
+  await deleteRecord('assistant_keywords', id);
 }
