@@ -1,46 +1,60 @@
 /**
- * Runtime guard for destructive operations (delete, restore, purge, void payment, financial review, school delete, cleanup sweep).
+ * Guard for destructive operations (delete, restore, purge, void payment, financial review, school delete, cleanup sweep).
  *
- * Why: the committed Firebase client config points at the production project (yala-safari-iq) and a Hostinger/other preview that
- * inherits the site's environment variables could also hold production Admin credentials. Isolation of a preview cannot be proven
- * from the repository, so destructive operations FAIL CLOSED unless the request is served from a known production host
- * (schoolixiq.com / schoolixiq.iq) or the process is running against the Firebase emulators.
+ * PRINCIPLE: permission comes from the deployment IDENTITY (process environment, see runtimeEnv.mjs) — never from anything a
+ * client sends. The request host is used only as an extra DENY layer: it can take a permission away, it can never grant one.
+ *   allowed  =  identity allows production operations  AND  the Host header is a production host
+ * A forged header can therefore at most make a request look like a production request, which grants nothing the identity did not
+ * already grant; and a preview identity is refused whatever any header says.
+ *
+ * Only the `Host` header is read. `X-Forwarded-Host` / `Forwarded` / `X-Original-Host` are client-controllable unless the proxy
+ * overwrites them (unproven for the hosting provider) and are deliberately ignored.
  */
-export const PRODUCTION_HOST_RE = /(^|\.)schoolixiq\.(com|iq)$/i;
-export const PREVIEW_HOST_RE = /\.(hostingersite\.com|pages\.dev|netlify\.app|vercel\.app|web\.app|firebaseapp\.com|run\.app|onrender\.com|herokuapp\.com)$/i;
-const NON_PROD_ENVS = ['preview', 'staging', 'development', 'dev', 'test'];
+import { PRODUCTION_HOST_RE, PREVIEW_HOST_RE } from './runtimeEnv.mjs';
+export { PRODUCTION_HOST_RE, PREVIEW_HOST_RE };
 
-/** Host the client used (first x-forwarded-host value, else Host), lower-case, without port. */
+/** Host the client addressed (Host header only), lower-case, without port. Never a forwarded-* header. */
 export function requestHost(headers = {}, hostname = '') {
-  const raw = String(headers['x-forwarded-host'] || headers.host || hostname || '').split(',')[0].trim().toLowerCase();
+  const raw = String(headers.host || hostname || '').split(',')[0].trim().toLowerCase();
   return raw.replace(/:\d+$/, '');
 }
 
-export function destructiveOpsAllowed({ host, env = process.env }) {
-  // Firebase emulators cannot reach production data, whatever the host name is.
-  if (env.FIRESTORE_EMULATOR_HOST) return { allowed: true, reason: 'emulator' };
+/** Identity-only decision shared by requests and background sweeps. */
+function identityAllowsProductionOps(deployment, env) {
+  if (!deployment) return { allowed: false, reason: 'NO_DEPLOYMENT_IDENTITY' };
+  if (deployment.kind === 'emulator') return { allowed: true, reason: 'emulator' };
   if (String(env.DELETION_DISABLED || '').toLowerCase() === 'true') return { allowed: false, reason: 'DELETION_DISABLED' };
-  if (NON_PROD_ENVS.includes(String(env.DEPLOY_ENV || '').toLowerCase())) return { allowed: false, reason: 'DEPLOY_ENV' };
-  if (PREVIEW_HOST_RE.test(host)) return { allowed: false, reason: 'PREVIEW_HOST' };
-  if (!PRODUCTION_HOST_RE.test(host)) return { allowed: false, reason: 'UNKNOWN_HOST' };
-  return { allowed: true, reason: 'production_host' };
+  if (deployment.kind !== 'production') return { allowed: false, reason: `DEPLOYMENT_${String(deployment.kind || 'unknown').toUpperCase()}` };
+  if (!deployment.adminAllowed) return { allowed: false, reason: 'ADMIN_DISABLED' };
+  if (!deployment.appUrlVerified) return { allowed: false, reason: 'APP_URL_NOT_PRODUCTION' };
+  return { allowed: true, reason: 'verified_production' };
 }
 
-let productionHostSeen = false;
-let previewHostSeen = false;
-/** Called for every request: lets background cleanup (no request context) know where this process is really served. */
-export function noteServedHost(host, env = process.env) {
-  if (PRODUCTION_HOST_RE.test(host) && !PREVIEW_HOST_RE.test(host)) productionHostSeen = true;
-  else if (PREVIEW_HOST_RE.test(host)) previewHostSeen = true;
+/**
+ * Request-scoped destructive operations. `deployment` = result of resolveDeployment(); `host` = requestHost(headers).
+ * The host can only deny.
+ */
+export function destructiveOpsAllowed({ host = '', deployment = null, env = process.env } = {}) {
+  const id = identityAllowsProductionOps(deployment, env);
+  if (!id.allowed) return id;
+  if (deployment.kind === 'emulator') return id; // emulators cannot reach production data whatever the host says
+  if (PREVIEW_HOST_RE.test(host)) return { allowed: false, reason: 'PREVIEW_HOST' };
+  if (!PRODUCTION_HOST_RE.test(host)) return { allowed: false, reason: 'HOST_NOT_PRODUCTION' };
+  return id;
 }
-/** Background sweeps (purge expired trash, resume jobs) only run on a process that is provably serving production, or on emulators. */
-export function backgroundDestructiveAllowed(env = process.env) {
-  if (env.FIRESTORE_EMULATOR_HOST) return true;
-  if (String(env.DELETION_DISABLED || '').toLowerCase() === 'true') return false;
-  if (NON_PROD_ENVS.includes(String(env.DEPLOY_ENV || '').toLowerCase())) return false;
-  return productionHostSeen && !previewHostSeen;
+
+/** Background destructive work (trash purge, job resume): identity only — there is no request, so no host. */
+export function backgroundDestructiveAllowed(deployment, env = process.env) {
+  return identityAllowsProductionOps(deployment, env).allowed;
 }
-export const _resetForTests = () => { productionHostSeen = false; previewHostSeen = false; };
+
+/**
+ * Cron / scheduler endpoints: identity decides (see runtimeEnv.workersAllowedNow). The only request-derived rule is an extra
+ * deny for hosts that are known preview domains; local callers (cron jobs calling localhost) stay possible.
+ */
+export function internalRouteHostDenied(host) {
+  return PREVIEW_HOST_RE.test(host);
+}
 
 /** Routes whose execution deletes, restores, cancels or purges data. */
 export const DESTRUCTIVE_ROUTE_RE = /^\/api\/(records\/|admin\/(delete-user|delete-student|delete-school|schools\/[^/]+\/permanent-delete|messages\/(permanent-delete|purge-user-conversations)|distributors\/[^/]+\/delete|plans\/[^/]+\/delete))/;

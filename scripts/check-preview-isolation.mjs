@@ -13,7 +13,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import { destructiveOpsAllowed, backgroundDestructiveAllowed, noteServedHost, _resetForTests, DESTRUCTIVE_ROUTE_RE } from '../backend/runtimeGuard.mjs';
+import { destructiveOpsAllowed, backgroundDestructiveAllowed, requestHost, DESTRUCTIVE_ROUTE_RE } from '../backend/runtimeGuard.mjs';
+import { resolveDeployment, workersAllowedNow } from '../backend/runtimeEnv.mjs';
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 // ISOLATION_ROOT lets the self-test point workflows/config/secret scanning at a deliberately broken fixture repo
@@ -62,20 +63,23 @@ const walk = (d) => fs.existsSync(d) ? fs.readdirSync(d, { withFileTypes: true }
 for (const f of walk(dist).filter((x) => /\.(js|mjs|json|html|map|txt)$/.test(x))) { if (SECRET_RE.test(fs.readFileSync(f, 'utf8'))) leaked.push(path.relative(root, f)); }
 if (leaked.length) bad(`service-account material found in: ${leaked.join(', ')}`); else ok(`no service-account material in tracked files or in ${path.relative(root, dist) || 'dist'} (${walk(dist).length} build files scanned)`);
 
-// 4. runtime guard behaviour
+// 4. deployment identity + guard behaviour (headers can only deny, never grant)
+const mk = (env, clientEmail = '') => resolveDeployment({ env: { NODE_ENV: 'production', APP_URL: 'https://schoolixiq.com', ...env }, clientEmail, hasPrivateKey: Boolean(clientEmail) });
+const prod = mk({ DEPLOY_ENV: 'production' }, 'svc@yala-safari-iq.iam.gserviceaccount.com');
 const blockedHosts = ['yellowgreen-loris-564484.hostingersite.com', 'x.pages.dev', 'app-git-branch.vercel.app', 'foo.netlify.app', 'localhost', '203.0.113.7', 'evilschoolixiq.com', 'schoolixiq.com.evil.io', ''];
 const allowedHosts = ['schoolixiq.com', 'www.schoolixiq.com', 'app.schoolixiq.iq'];
-const noEmu = {};
-for (const h of blockedHosts) destructiveOpsAllowed({ host: h, env: noEmu }).allowed ? bad(`guard ALLOWS destructive ops for host "${h}"`) : ok(`guard blocks host "${h}"`);
-for (const h of allowedHosts) destructiveOpsAllowed({ host: h, env: noEmu }).allowed ? ok(`guard allows production host ${h}`) : bad(`guard blocks production host ${h}`);
-!destructiveOpsAllowed({ host: 'schoolixiq.com', env: { DEPLOY_ENV: 'preview' } }).allowed ? ok('DEPLOY_ENV=preview blocks even a production host name') : bad('DEPLOY_ENV=preview does not block');
-!destructiveOpsAllowed({ host: 'schoolixiq.com', env: { DELETION_DISABLED: 'true' } }).allowed ? ok('DELETION_DISABLED=true is a working kill switch') : bad('kill switch ineffective');
-destructiveOpsAllowed({ host: 'whatever', env: { FIRESTORE_EMULATOR_HOST: '127.0.0.1:8085' } }).allowed ? ok('emulator runs are allowed (cannot reach production)') : bad('emulator runs blocked');
-_resetForTests();
-!backgroundDestructiveAllowed(noEmu) ? ok('background sweep stays off until a production host request is seen') : bad('background sweep runs without proof of production');
-noteServedHost('yellowgreen-loris-564484.hostingersite.com'); noteServedHost('schoolixiq.com');
-!backgroundDestructiveAllowed(noEmu) ? ok('…and stays off once a preview host was seen on the same process') : bad('background sweep runs on a process that served a preview host');
-_resetForTests();
+for (const h of blockedHosts) destructiveOpsAllowed({ host: h, deployment: prod }).allowed ? bad(`guard ALLOWS destructive ops for host "${h}" even for a production identity`) : ok(`guard denies host "${h}" (host can only deny)`);
+for (const h of allowedHosts) destructiveOpsAllowed({ host: h, deployment: prod }).allowed ? ok(`production identity + production host ${h} → allowed`) : bad(`production identity + production host ${h} is blocked`);
+for (const kind of ['preview', 'staging', 'development', 'dev', 'test']) {
+  const dep = mk({ DEPLOY_ENV: kind }, 'svc@schoolixiq-preview-x.iam.gserviceaccount.com');
+  const refused = !destructiveOpsAllowed({ host: 'schoolixiq.com', deployment: dep }).allowed && !backgroundDestructiveAllowed(dep) && !workersAllowedNow(dep);
+  refused ? ok(`DEPLOY_ENV=${kind} is an absolute block (production host name, own credentials, cron and workers all refused)`) : bad(`DEPLOY_ENV=${kind} does not block everything`);
+}
+!destructiveOpsAllowed({ host: 'schoolixiq.com', deployment: mk({}, 'svc@yala-safari-iq.iam.gserviceaccount.com') }).allowed ? ok('DEPLOY_ENV missing (unknown identity) blocks') : bad('unknown identity does not block');
+!destructiveOpsAllowed({ host: 'schoolixiq.com', deployment: mk({ DEPLOY_ENV: 'production', APP_URL: 'https://x.hostingersite.com' }, 'svc@yala-safari-iq.iam.gserviceaccount.com') }).allowed ? ok('production without APP_URL on a production host blocks') : bad('APP_URL not verified but allowed');
+!destructiveOpsAllowed({ host: 'schoolixiq.com', deployment: prod, env: { DELETION_DISABLED: 'true' } }).allowed ? ok('DELETION_DISABLED=true is a working kill switch') : bad('kill switch ineffective');
+destructiveOpsAllowed({ host: 'whatever', deployment: mk({ FIRESTORE_EMULATOR_HOST: '127.0.0.1:8085' }) }).allowed ? ok('emulator runs are allowed (cannot reach production)') : bad('emulator runs blocked');
+requestHost({ host: 'x.hostingersite.com', 'x-forwarded-host': 'schoolixiq.com', forwarded: 'host=schoolixiq.com' }) === 'x.hostingersite.com' ? ok('requestHost() ignores X-Forwarded-Host / Forwarded (client-controllable)') : bad('requestHost() trusts a forwarded header');
 for (const p of ['/api/records/delete', '/api/records/restore', '/api/records/purge', '/api/records/void-payment', '/api/records/delete-school', '/api/admin/delete-user', '/api/admin/delete-student', '/api/admin/delete-school', '/api/admin/schools/S1/permanent-delete', '/api/admin/messages/permanent-delete', '/api/admin/messages/purge-user-conversations', '/api/admin/distributors/D1/delete', '/api/admin/plans/P1/delete']) {
   DESTRUCTIVE_ROUTE_RE.test(p) ? null : bad(`route ${p} is not covered by the destructive-route guard`);
 }
@@ -84,8 +88,9 @@ ok('every known destructive route matches the guard pattern');
 // 5. wiring
 const readRepo = (p) => fs.readFileSync(path.join(repoRoot, p), 'utf8');
 const server = readRepo('server.ts');
-/destructiveOpsAllowed\(\{ host \}\)/.test(server) && /DESTRUCTIVE_ROUTE_RE\.test\(req\.path\)/.test(server) ? ok('server.ts applies the guard as middleware before any handler') : bad('server.ts does not apply the runtime guard');
-/startDeletionSweep\(.*backgroundDestructiveAllowed\)/.test(server) ? ok('server.ts gates the background sweep') : bad('server.ts does not gate the background sweep');
+/destructiveOpsAllowed\(\{ host, deployment \}\)/.test(server) && /DESTRUCTIVE_ROUTE_RE\.test\(req\.path\)/.test(server) ? ok('server.ts applies the guard as middleware before any handler') : bad('server.ts does not apply the runtime guard');
+/startDeletionSweep\(.*backgroundDestructiveAllowed\(deployment\)/.test(server) ? ok('server.ts gates the background sweep by deployment identity') : bad('server.ts does not gate the background sweep');
+!/x-forwarded-host|noteProductionHost|noteServedHost|productionHostSeen/i.test(readRepo('backend/runtimeGuard.mjs').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '') + readRepo('backend/runtimeEnv.mjs').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '') + server.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')) ? ok('no code path grants production status from a request header or observed host (forwarded-host / host-seen logic removed)') : bad('a header/host based promotion path exists in runtimeGuard/runtimeEnv/server');
 /PREVIEW_HOST_RE\.test\(window\.location\.hostname\)/.test(readRepo('src/lib/deletionApi.ts')) ? ok('client refuses destructive calls on preview hosts') : bad('client has no preview guard');
 
 // 6. background-process inventory + identity wiring (backend/runtimeEnv.mjs)

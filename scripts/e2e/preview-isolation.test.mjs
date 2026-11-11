@@ -34,7 +34,7 @@ import http from 'node:http';
 import { spawn } from 'node:child_process';
 if (fs.existsSync('dist/server.mjs')) {
   const PORT = 3790 + Math.floor(Math.random() * 100);
-  const env = { ...process.env, NODE_ENV: 'production', PORT: String(PORT) };
+  const env = { ...process.env, NODE_ENV: 'production', PORT: String(PORT), DEPLOY_ENV: 'production', APP_URL: 'https://schoolixiq.com' };
   for (const k of ['FIRESTORE_EMULATOR_HOST', 'FIREBASE_AUTH_EMULATOR_HOST', 'FIREBASE_STORAGE_EMULATOR_HOST', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL']) delete env[k];
   const srv = spawn('node', ['dist/server.mjs'], { env, stdio: 'ignore' });
   await new Promise((r) => setTimeout(r, 9000));
@@ -48,7 +48,7 @@ if (fs.existsSync('dist/server.mjs')) {
     T(`running server: all ${routes.length} destructive routes answer DESTRUCTIVE_OPS_DISABLED (503) for host ${host}`, res.every((x) => x.s === 503 && x.j.error === 'DESTRUCTIVE_OPS_DISABLED'));
   }
   const prod = await Promise.all(routes.map((p) => post('schoolixiq.com', p)));
-  T('running server: for the production host the guard lets the request through to authentication (401, not 503)', prod.every((x) => x.s === 401 || x.s === 403 || x.s === 404));
+  T('running server (verified production identity): for the production host the guard lets the request through to authentication (401, not 503)', prod.every((x) => x.s === 401 || x.s === 403 || x.s === 404));
   srv.kill();
 }
 console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

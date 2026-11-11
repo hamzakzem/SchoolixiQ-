@@ -1,7 +1,7 @@
 import { cronSecretMatches } from './cronSecret.mjs';
 import { setupSystemMessageNotifications, messageNotificationsStatus } from './messageNotifications.mjs';
-import { resolveDeployment, appUrlConfigFields, configureWorkers, registerWorker, tryStartWorkers, workersAllowedNow, workerStatus, noteProductionHost, disabledAdminCredential, INTERNAL_ROUTE_RE, PRODUCTION_FIREBASE_PROJECT_ID } from './runtimeEnv.mjs';
-import { destructiveOpsAllowed, backgroundDestructiveAllowed, noteServedHost, requestHost, DESTRUCTIVE_ROUTE_RE } from './runtimeGuard.mjs';
+import { resolveDeployment, appUrlConfigFields, configureWorkers, registerWorker, tryStartWorkers, workersAllowedNow, workerStatus, locationReport, disabledAdminCredential, INTERNAL_ROUTE_RE, PRODUCTION_FIREBASE_PROJECT_ID } from './runtimeEnv.mjs';
+import { destructiveOpsAllowed, backgroundDestructiveAllowed, internalRouteHostDenied, requestHost, DESTRUCTIVE_ROUTE_RE } from './runtimeGuard.mjs';
 import { PERMANENT_CONFIRM_TEXT, runAuditedPlatformDelete, deleteChatMessage, deleteSchool, previewSchoolDeletion, deleteNotifications, deleteRecords, restoreBundle, purgeBundle, sweepDeletions, startDeletionSweep, loadActor, voidPayment, resolveFinancialReview } from './deletionService.mjs';
 import express from 'express';
 import compression from 'compression';
@@ -374,22 +374,20 @@ async function startServer() {
   // Compress all responses (JS, CSS, HTML, API/JSON payloads)
   app.use(compression());
 
-  // Preview / unknown hosts can never run destructive operations (see backend/runtimeGuard.mjs); fail closed, before any handler or data access.
+  // Permission comes from the deployment IDENTITY (environment), never from request data. The Host header (only Host: forwarded-* headers are
+  // ignored) is an extra DENY layer and can never grant anything. See backend/runtimeEnv.mjs and backend/runtimeGuard.mjs.
   app.use((req: any, res: any, next: any) => {
     const host = requestHost(req.headers, req.hostname);
-    noteServedHost(host);
-    // proof that this process really serves production (inherited-variable defence); starts waiting production workers
-    if (noteProductionHost(host)) tryStartWorkers();
-    // cron / scheduler endpoints touch Firestore with Admin: refuse unless the environment is proven (explicit, safe error)
-    if (INTERNAL_ROUTE_RE.test(req.path) && !workersAllowedNow(deployment)) {
-      console.warn('[env] blocked background endpoint', { path: req.path, kind: deployment.kind, reason: deployment.reason });
+    // cron / scheduler endpoints touch Firestore with Admin: refuse unless this deployment is a verified production/emulator
+    if (INTERNAL_ROUTE_RE.test(req.path) && (!workersAllowedNow(deployment) || internalRouteHostDenied(host))) {
+      console.warn('[env] blocked background endpoint', { path: req.path, kind: deployment.kind, reason: deployment.workersReason });
       return res.status(503).json({ ok: false, success: false, error: 'BACKGROUND_DISABLED', deployment: deployment.kind, message: 'العمليات الخلفية المجدولة معطّلة في هذه البيئة (معاينة/غير موثّقة). لم يتم تغيير أي بيانات.' });
     }
     if (req.method !== 'GET' && req.method !== 'OPTIONS' && DESTRUCTIVE_ROUTE_RE.test(req.path)) {
-      const verdict = destructiveOpsAllowed({ host });
+      const verdict = destructiveOpsAllowed({ host, deployment });
       if (!verdict.allowed) {
         console.warn('[deletion] blocked destructive request', { path: req.path, reason: verdict.reason });
-        return res.status(503).json({ ok: false, success: false, error: 'DESTRUCTIVE_OPS_DISABLED', reason: verdict.reason, message: 'العمليات الحساسة (حذف/استعادة/إلغاء) غير متاحة في بيئة المعاينة أو على نطاق غير معتمد. لم يتم تغيير أي بيانات.' });
+        return res.status(503).json({ ok: false, success: false, error: 'DESTRUCTIVE_OPS_DISABLED', reason: verdict.reason, message: 'العمليات الحساسة (حذف/استعادة/إلغاء) غير متاحة في بيئة المعاينة أو غير الموثّقة. لم يتم تغيير أي بيانات.' });
       }
     }
     next();
@@ -962,7 +960,7 @@ async function startServer() {
         ...(serviceAccount.clientEmail ? [] : ['FIREBASE_CLIENT_EMAIL']),
         ...(serviceAccount.privateKey ? [] : ['FIREBASE_PRIVATE_KEY']),
       ],
-      deployment: { kind: deployment.kind, reason: deployment.reason, adminEnabled: deployment.adminAllowed, adminReason: deployment.adminReason, adminProjectVerified: deployment.adminProjectId || null, targetsProductionProject: deployment.targetsProduction, workers: workerStatus() },
+      deployment: { kind: deployment.kind, reason: deployment.reason, adminEnabled: deployment.adminAllowed, adminReason: deployment.adminReason, adminProjectVerified: deployment.adminProjectId || null, targetsProductionProject: deployment.targetsProduction, appUrlVerified: deployment.appUrlVerified, location: locationReport({ appUrlHost: deployment.appUrlHost }), workers: workerStatus() },
       adminCredentialsValid: serviceAccountCheck.valid,
       adminCredentialProblems: serviceAccountCheck.problems, // text only, never values
       deletionEnabled: !deletionUnavailable(),
@@ -1022,7 +1020,7 @@ async function startServer() {
     purgeSchoolMessages: (schoolId: string) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() }),
   });
   /** In production, deletion needs real Admin credentials: refuse up front, before touching any data. */
-  const deletionUnavailable = () => !process.env.FIRESTORE_EMULATOR_HOST && (!deployment.adminAllowed || (process.env.NODE_ENV === 'production' && !serviceAccountCheck.valid && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE));
+  const deletionUnavailable = () => !process.env.FIRESTORE_EMULATOR_HOST && (!backgroundDestructiveAllowed(deployment) || (process.env.NODE_ENV === 'production' && !serviceAccountCheck.valid && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE));
   const deletionRoute = (fn: (ctx: any, uid: string, body: any) => Promise<any>) => async (req: any, res: any) => {
     if (deletionUnavailable()) return res.status(503).json({ error: 'ADMIN_UNAVAILABLE', message: 'خدمة الحذف غير متاحة حالياً (إعدادات الخادم). لم يتم حذف أي بيانات.' });
     try {
@@ -2723,7 +2721,7 @@ async function startServer() {
     });
     registerWorker('deletion-sweep', () => {
       // finish interrupted deletions and purge expired trash (also gated by the destructive-ops guard)
-      startDeletionSweep(deletionCtx(), console, 3 * 60 * 1000, backgroundDestructiveAllowed);
+      startDeletionSweep(deletionCtx(), console, 3 * 60 * 1000, () => backgroundDestructiveAllowed(deployment));
     });
     // Delete passwords older app versions stored as readable text in Firestore
     registerWorker('credential-scrub', () => { scheduleCredentialScrub(getDb, admin); });

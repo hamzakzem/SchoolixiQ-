@@ -12,14 +12,20 @@
  *  - unknown     = anything else (DEPLOY_ENV missing/ambiguous, or DEPLOY_ENV=production with another project's credentials)
  *  - Admin credentials are used only when: emulator, production, or preview whose credentials belong to a project that is NOT
  *    the production project. In every other case they are IGNORED and Admin is initialised with a credential that always fails.
- *  - Background work (listeners, sweeps, startup writes, /api/internal/* cron) runs only when: emulator, preview on a verified
- *    non-production project, or production AFTER a request on a production host was observed (inherited-variable defence).
+ *  - Background work (listeners, sweeps, startup writes, /api/internal/* cron) runs only when: emulator, or production whose
+ *    configured APP_URL is a production host. A `preview` (or staging/development/test) deployment NEVER runs background work, never
+ *    serves cron and never runs production operations — not even with its own Firebase project. Nothing a client sends (Host,
+ *    X-Forwarded-Host, any header, any secret) can change that: identity comes only from the process environment.
+ *  - Request host names are NOT identity. They are used only as an extra DENY layer (see runtimeGuard.mjs), never to grant anything.
+ *  - Limit (cannot be solved in code): two processes with byte-identical environments are indistinguishable. That is why production
+ *    credentials must live only in an application whose environment no PR/preview build can see (separate application).
  * The project id of Admin credentials is taken from the service-account e-mail (name@PROJECT.iam.gserviceaccount.com); an
  * explicit FIREBASE_PROJECT_ID that disagrees with it makes the credentials unverifiable.
  */
 export const PRODUCTION_FIREBASE_PROJECT_ID = 'yala-safari-iq';
 export const PRODUCTION_HOST_RE = /(^|\.)schoolixiq\.(com|iq)$/i;
-const NON_PROD_ENVS = ['preview', 'staging', 'development', 'dev', 'test'];
+export const PREVIEW_HOST_RE = /\.(hostingersite\.com|pages\.dev|netlify\.app|vercel\.app|web\.app|firebaseapp\.com|run\.app|onrender\.com|herokuapp\.com)$/i;
+export const NON_PROD_ENVS = ['preview', 'staging', 'development', 'dev', 'test'];
 
 const SA_EMAIL_RE = /^[^@\s]+@([a-z0-9-]+)\.iam\.gserviceaccount\.com$/i;
 
@@ -45,6 +51,10 @@ export function resolveDeployment({ env = process.env, clientEmail = '', explici
   }
   const targetsProduction = adminProjectId === PRODUCTION_FIREBASE_PROJECT_ID;
   const declared = String(env.DEPLOY_ENV || '').trim().toLowerCase();
+  // trusted CONFIGURATION (not request data): the application's own public URL must be a production host
+  let appUrlHost = '';
+  try { appUrlHost = new URL(String(env.APP_URL || '').trim()).hostname.toLowerCase(); } catch { appUrlHost = ''; }
+  const appUrlVerified = PRODUCTION_HOST_RE.test(appUrlHost) && !PREVIEW_HOST_RE.test(appUrlHost);
 
   let kind = 'unknown';
   let reason = 'DEPLOY_ENV is not set to a known value';
@@ -71,24 +81,30 @@ export function resolveDeployment({ env = process.env, clientEmail = '', explici
   // production with no credentials at all behaves exactly as before (default credentials / none)
   if (kind === 'production' && !hasCreds) adminReason = 'production without explicit credentials';
 
-  let workers; // when may background work start?
-  if (kind === 'emulator') workers = 'now';
-  else if (kind === 'preview') workers = adminAllowed ? 'now' : 'never';
-  else if (kind === 'production') workers = 'after_production_host';
-  else workers = 'never';
+  let workers = 'never';
+  let workersReason = 'not a verified production deployment';
+  if (kind === 'emulator') { workers = 'now'; workersReason = 'emulator'; }
+  else if (kind === 'production') {
+    if (appUrlVerified) { workers = 'now'; workersReason = 'verified production (DEPLOY_ENV + APP_URL on a production host)'; }
+    else workersReason = 'production declared but APP_URL is missing or not a production host';
+  } else if (kind === 'preview') workersReason = 'preview deployments never run background work or cron';
 
-  return { kind, reason, adminProjectId, targetsProduction, hasCreds, adminAllowed, adminReason, workers, problems };
+  return { kind, reason, adminProjectId, targetsProduction, hasCreds, adminAllowed, adminReason, workers, workersReason, appUrlHost, appUrlVerified, problems };
 }
 
-// ── observed traffic (inherited-variable defence) ────────────────────────────
-let productionHostSeen = false;
-export function noteProductionHost(host) { if (PRODUCTION_HOST_RE.test(String(host || ''))) { const first = !productionHostSeen; productionHostSeen = true; return first; } return false; }
-export const _resetForTests = () => { productionHostSeen = false; started.clear(); pending.length = 0; };
+export const _resetForTests = () => { started.clear(); pending.length = 0; };
 
+/** Background work is allowed by the deployment identity alone (never by anything a request carries). */
 export function workersAllowedNow(decision) {
-  if (decision.workers === 'now') return true;
-  if (decision.workers === 'after_production_host') return productionHostSeen;
-  return false;
+  return decision?.workers === 'now';
+}
+
+/** Report-only: where on disk this process runs vs. the configured APP_URL (diagnostic for a future stricter layer). */
+export function locationReport({ cwd = process.cwd(), appUrlHost = '' } = {}) {
+  const m = /\/domains\/([^/]+)\//.exec(String(cwd).replace(/\\/g, '/'));
+  const domainInPath = m ? m[1].toLowerCase() : null;
+  const norm = (h) => String(h || '').replace(/^www\./, '');
+  return { domainInPath, matchesAppUrl: domainInPath ? norm(domainInPath) === norm(appUrlHost) : null };
 }
 
 // ── worker registry: nothing background starts unless the environment allows it ─────────────
@@ -98,7 +114,7 @@ let _decision = null;
 let _log = console;
 export function configureWorkers(decision, log = console) { _decision = decision; _log = log; }
 
-/** Register a background process. It is started immediately if allowed, otherwise as soon as the environment is proven. */
+/** Register a background process. It is started only if the deployment identity allows background work; otherwise it never runs. */
 export function registerWorker(name, start) {
   pending.push({ name, start });
   tryStartWorkers();
@@ -114,7 +130,7 @@ export function tryStartWorkers() {
   return ran;
 }
 export function workerStatus() {
-  return { started: [...started], waiting: pending.map((w) => w.name), mode: _decision?.workers ?? 'unconfigured', allowedNow: _decision ? workersAllowedNow(_decision) : false };
+  return { started: [...started], waiting: pending.map((w) => w.name), mode: _decision?.workers ?? 'unconfigured', reason: _decision?.workersReason ?? null, allowedNow: _decision ? workersAllowedNow(_decision) : false };
 }
 
 /** Credential object that makes every Admin call fail loudly (never a silent fallback to production). */

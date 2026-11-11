@@ -16,10 +16,10 @@ What the repository can and cannot prove (checked in this PR; Hostinger hPanel i
 
 | `DEPLOY_ENV` | Credentials present | Result |
 |---|---|---|
-| `production` (+ `NODE_ENV=production`) | production project, or none | Admin **enabled**; background workers start after the first request seen on `*.schoolixiq.com/.iq` |
+| `production` (+ `NODE_ENV=production`) | production project, or none | Admin **enabled**; background workers start at boot **only if `APP_URL` is a `schoolixiq.com/.iq` host** (configuration, not request data) |
 | `production` | another project's | `unknown` → Admin **disabled**, no workers |
 | `preview` / `staging` / `development` / `dev` / `test` | **production** project's | Admin **disabled** (credentials ignored), no workers, cron endpoints 503 |
-| `preview` … | a **different** project's (service-account e-mail names it) | Admin enabled on that project; workers allowed (they only act on that project) |
+| `preview` … | a **different** project's (service-account e-mail names it) | Admin enabled on that project; **still no workers, no cron, no destructive operations** (`preview` is an absolute block) |
 | `preview` … | none | Admin disabled |
 | missing / unrecognised / `NODE_ENV` ≠ production | any | `unknown` → Admin **disabled**, no workers, startup write skipped |
 | any + `FIRESTORE_EMULATOR_HOST` | any | emulator (cannot reach production) |
@@ -27,7 +27,8 @@ What the repository can and cannot prove (checked in this PR; Hostinger hPanel i
 "Admin disabled" = Firebase Admin is initialised with a credential that always throws `ADMIN_DISABLED` (never a silent fallback to production).
 Gated processes: FCM push listener, chat-notification listener, deletion sweep, credential scrub, chat-thread migration, the startup write to
 `system/config` (a production URL is written only by a verified production deployment on a production host), every `/api/internal/*` endpoint
-(tuition reminders, push dispatch, chat escalation, dismissal recovery/compaction) and every destructive endpoint (also host-gated).
+(tuition reminders, push dispatch, chat escalation, dismissal recovery/compaction) and every destructive endpoint.
+**Identity comes only from the process environment. No HTTP header can change it**: `Host` is read as an extra *deny* layer only (a preview/unknown host is refused even for a production identity; a production host grants nothing), and `X-Forwarded-Host`, `Forwarded`, `X-Original-Host`… are ignored. A production-declared process whose `APP_URL` is not a production host runs no worker. Limit that no code can fix: two processes with identical environments are indistinguishable — keep production credentials only in an application whose environment no PR/preview build can read (separate application; see the architecture plan).
 The web client refuses to initialise Firebase on a preview host when its config is the production project (shows a notice, sends no requests).
 Check any deployment at `GET /api/public/status` → `deployment` (`kind`, `adminEnabled`, `adminReason`, `workers`), no secrets.
 

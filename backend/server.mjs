@@ -259,6 +259,7 @@ function setupSystemMessageNotifications(db, adminSdk, log = console) {
 // runtimeEnv.mjs
 var PRODUCTION_FIREBASE_PROJECT_ID = "yala-safari-iq";
 var PRODUCTION_HOST_RE = /(^|\.)schoolixiq\.(com|iq)$/i;
+var PREVIEW_HOST_RE = /\.(hostingersite\.com|pages\.dev|netlify\.app|vercel\.app|web\.app|firebaseapp\.com|run\.app|onrender\.com|herokuapp\.com)$/i;
 var NON_PROD_ENVS = ["preview", "staging", "development", "dev", "test"];
 var SA_EMAIL_RE = /^[^@\s]+@([a-z0-9-]+)\.iam\.gserviceaccount\.com$/i;
 function projectFromServiceAccountEmail(email) {
@@ -278,6 +279,13 @@ function resolveDeployment({ env = process.env, clientEmail = "", explicitProjec
   }
   const targetsProduction = adminProjectId === PRODUCTION_FIREBASE_PROJECT_ID;
   const declared = String(env.DEPLOY_ENV || "").trim().toLowerCase();
+  let appUrlHost = "";
+  try {
+    appUrlHost = new URL(String(env.APP_URL || "").trim()).hostname.toLowerCase();
+  } catch {
+    appUrlHost = "";
+  }
+  const appUrlVerified = PRODUCTION_HOST_RE.test(appUrlHost) && !PREVIEW_HOST_RE.test(appUrlHost);
   let kind = "unknown";
   let reason = "DEPLOY_ENV is not set to a known value";
   if (env.FIRESTORE_EMULATOR_HOST) {
@@ -322,26 +330,27 @@ function resolveDeployment({ env = process.env, clientEmail = "", explicitProjec
     adminReason = hasCreds ? `Admin credentials ignored: ${reason}` : reason;
   }
   if (kind === "production" && !hasCreds) adminReason = "production without explicit credentials";
-  let workers;
-  if (kind === "emulator") workers = "now";
-  else if (kind === "preview") workers = adminAllowed ? "now" : "never";
-  else if (kind === "production") workers = "after_production_host";
-  else workers = "never";
-  return { kind, reason, adminProjectId, targetsProduction, hasCreds, adminAllowed, adminReason, workers, problems };
-}
-var productionHostSeen = false;
-function noteProductionHost(host) {
-  if (PRODUCTION_HOST_RE.test(String(host || ""))) {
-    const first = !productionHostSeen;
-    productionHostSeen = true;
-    return first;
-  }
-  return false;
+  let workers = "never";
+  let workersReason = "not a verified production deployment";
+  if (kind === "emulator") {
+    workers = "now";
+    workersReason = "emulator";
+  } else if (kind === "production") {
+    if (appUrlVerified) {
+      workers = "now";
+      workersReason = "verified production (DEPLOY_ENV + APP_URL on a production host)";
+    } else workersReason = "production declared but APP_URL is missing or not a production host";
+  } else if (kind === "preview") workersReason = "preview deployments never run background work or cron";
+  return { kind, reason, adminProjectId, targetsProduction, hasCreds, adminAllowed, adminReason, workers, workersReason, appUrlHost, appUrlVerified, problems };
 }
 function workersAllowedNow(decision) {
-  if (decision.workers === "now") return true;
-  if (decision.workers === "after_production_host") return productionHostSeen;
-  return false;
+  return decision?.workers === "now";
+}
+function locationReport({ cwd = process.cwd(), appUrlHost = "" } = {}) {
+  const m = /\/domains\/([^/]+)\//.exec(String(cwd).replace(/\\/g, "/"));
+  const domainInPath = m ? m[1].toLowerCase() : null;
+  const norm = (h) => String(h || "").replace(/^www\./, "");
+  return { domainInPath, matchesAppUrl: domainInPath ? norm(domainInPath) === norm(appUrlHost) : null };
 }
 var pending = [];
 var started = /* @__PURE__ */ new Set();
@@ -371,7 +380,7 @@ function tryStartWorkers() {
   return ran;
 }
 function workerStatus() {
-  return { started: [...started], waiting: pending.map((w) => w.name), mode: _decision?.workers ?? "unconfigured", allowedNow: _decision ? workersAllowedNow(_decision) : false };
+  return { started: [...started], waiting: pending.map((w) => w.name), mode: _decision?.workers ?? "unconfigured", reason: _decision?.workersReason ?? null, allowedNow: _decision ? workersAllowedNow(_decision) : false };
 }
 var disabledAdminCredential = (why) => ({
   getAccessToken: async () => {
@@ -394,32 +403,32 @@ function appUrlConfigFields({ kind, appUrl }) {
 }
 
 // runtimeGuard.mjs
-var PRODUCTION_HOST_RE2 = /(^|\.)schoolixiq\.(com|iq)$/i;
-var PREVIEW_HOST_RE = /\.(hostingersite\.com|pages\.dev|netlify\.app|vercel\.app|web\.app|firebaseapp\.com|run\.app|onrender\.com|herokuapp\.com)$/i;
-var NON_PROD_ENVS2 = ["preview", "staging", "development", "dev", "test"];
 function requestHost(headers = {}, hostname = "") {
-  const raw = String(headers["x-forwarded-host"] || headers.host || hostname || "").split(",")[0].trim().toLowerCase();
+  const raw = String(headers.host || hostname || "").split(",")[0].trim().toLowerCase();
   return raw.replace(/:\d+$/, "");
 }
-function destructiveOpsAllowed({ host, env = process.env }) {
-  if (env.FIRESTORE_EMULATOR_HOST) return { allowed: true, reason: "emulator" };
+function identityAllowsProductionOps(deployment2, env) {
+  if (!deployment2) return { allowed: false, reason: "NO_DEPLOYMENT_IDENTITY" };
+  if (deployment2.kind === "emulator") return { allowed: true, reason: "emulator" };
   if (String(env.DELETION_DISABLED || "").toLowerCase() === "true") return { allowed: false, reason: "DELETION_DISABLED" };
-  if (NON_PROD_ENVS2.includes(String(env.DEPLOY_ENV || "").toLowerCase())) return { allowed: false, reason: "DEPLOY_ENV" };
+  if (deployment2.kind !== "production") return { allowed: false, reason: `DEPLOYMENT_${String(deployment2.kind || "unknown").toUpperCase()}` };
+  if (!deployment2.adminAllowed) return { allowed: false, reason: "ADMIN_DISABLED" };
+  if (!deployment2.appUrlVerified) return { allowed: false, reason: "APP_URL_NOT_PRODUCTION" };
+  return { allowed: true, reason: "verified_production" };
+}
+function destructiveOpsAllowed({ host = "", deployment: deployment2 = null, env = process.env } = {}) {
+  const id = identityAllowsProductionOps(deployment2, env);
+  if (!id.allowed) return id;
+  if (deployment2.kind === "emulator") return id;
   if (PREVIEW_HOST_RE.test(host)) return { allowed: false, reason: "PREVIEW_HOST" };
-  if (!PRODUCTION_HOST_RE2.test(host)) return { allowed: false, reason: "UNKNOWN_HOST" };
-  return { allowed: true, reason: "production_host" };
+  if (!PRODUCTION_HOST_RE.test(host)) return { allowed: false, reason: "HOST_NOT_PRODUCTION" };
+  return id;
 }
-var productionHostSeen2 = false;
-var previewHostSeen = false;
-function noteServedHost(host, env = process.env) {
-  if (PRODUCTION_HOST_RE2.test(host) && !PREVIEW_HOST_RE.test(host)) productionHostSeen2 = true;
-  else if (PREVIEW_HOST_RE.test(host)) previewHostSeen = true;
+function backgroundDestructiveAllowed(deployment2, env = process.env) {
+  return identityAllowsProductionOps(deployment2, env).allowed;
 }
-function backgroundDestructiveAllowed(env = process.env) {
-  if (env.FIRESTORE_EMULATOR_HOST) return true;
-  if (String(env.DELETION_DISABLED || "").toLowerCase() === "true") return false;
-  if (NON_PROD_ENVS2.includes(String(env.DEPLOY_ENV || "").toLowerCase())) return false;
-  return productionHostSeen2 && !previewHostSeen;
+function internalRouteHostDenied(host) {
+  return PREVIEW_HOST_RE.test(host);
 }
 var DESTRUCTIVE_ROUTE_RE = /^\/api\/(records\/|admin\/(delete-user|delete-student|delete-school|schools\/[^/]+\/permanent-delete|messages\/(permanent-delete|purge-user-conversations)|distributors\/[^/]+\/delete|plans\/[^/]+\/delete))/;
 
@@ -4007,14 +4016,35 @@ async function processNotificationPush(db, adminSdk, notifId, notif) {
   }
   return dispatchPushForNotificationDoc(db, adminSdk, notifId, claim.notif || notif);
 }
-var pushListenerStatus = { startedAt: null, listenerAttached: false, restarts: 0, lastErrorAt: null, lastError: null, lastSweepAt: null, lastSweepOk: null };
+var pushListenerStatus = { startedAt: null, listenerAttached: false, restarts: 0, lastErrorAt: null, lastError: null, lastSweepAt: null, lastSweepOk: null, pendingRetryTimers: 0, attachAttempts: 0 };
 function setupNotificationPushListener(db, adminSdk) {
   let unsub = null;
   let stopped = false;
   let backoff = 1e3;
+  let generation = 0;
+  let retryTimer = null;
   let recycleTimer = null;
   const inflight = /* @__PURE__ */ new Set();
   pushListenerStatus.startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  pushListenerStatus.pendingRetryTimers = 0;
+  const syncRetryStatus = () => {
+    pushListenerStatus.pendingRetryTimers = retryTimer ? 1 : 0;
+  };
+  const cancelRetry = () => {
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+    syncRetryStatus();
+  };
+  const detach = () => {
+    const u = unsub;
+    unsub = null;
+    try {
+      u?.();
+    } catch {
+    }
+  };
   const handle = (notifId, notif) => {
     if (inflight.has(notifId) || isPushTerminal(notif)) return;
     inflight.add(notifId);
@@ -4022,36 +4052,72 @@ function setupNotificationPushListener(db, adminSdk) {
       setTimeout(() => inflight.delete(notifId), 3e4);
     });
   };
-  const start = () => {
-    if (stopped) return;
-    try {
-      unsub?.();
-    } catch {
-    }
-    const cutoff = adminSdk.firestore.Timestamp.fromMillis(Date.now() - PUSH_MAX_AGE_MS);
-    unsub = db.collection("notifications").where("createdAt", ">=", cutoff).onSnapshot(
-      (snapshot) => {
-        backoff = 1e3;
-        pushListenerStatus.listenerAttached = true;
-        for (const change of snapshot.docChanges()) {
-          if (change.type !== "added") continue;
-          handle(change.doc.id, change.doc.data());
-        }
-      },
-      (err) => {
-        pushListenerStatus.listenerAttached = false;
-        pushListenerStatus.restarts += 1;
-        pushListenerStatus.lastErrorAt = (/* @__PURE__ */ new Date()).toISOString();
-        pushListenerStatus.lastError = String(err.code ?? err.message ?? "error").slice(0, 80);
-        logPush("PUSH_SEND_ERROR", { event: "listener_restart", error: err.message });
-        setTimeout(start, backoff);
-        backoff = Math.min(backoff * 2, 6e4);
-      }
-    );
-    logPush("PUSH_SEND_START", { event: "listener_ready", windowMs: PUSH_MAX_AGE_MS });
+  const scheduleRetry = () => {
+    if (stopped || retryTimer) return;
+    const delay = backoff;
+    backoff = Math.min(backoff * 2, 6e4);
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      syncRetryStatus();
+      attach();
+    }, delay);
+    retryTimer.unref?.();
+    syncRetryStatus();
   };
-  start();
-  recycleTimer = setInterval(start, 30 * 60 * 1e3);
+  const recordFailure = (err) => {
+    pushListenerStatus.listenerAttached = false;
+    pushListenerStatus.restarts += 1;
+    pushListenerStatus.lastErrorAt = (/* @__PURE__ */ new Date()).toISOString();
+    const e = err;
+    pushListenerStatus.lastError = String(e?.code ?? e?.message ?? "error").slice(0, 80);
+    logPush("PUSH_SEND_ERROR", { event: "listener_restart", error: String(e?.message ?? err) });
+  };
+  const attach = () => {
+    if (stopped) return;
+    if (unsub || retryTimer) return;
+    const mine = ++generation;
+    pushListenerStatus.attachAttempts += 1;
+    let failedImmediately = false;
+    try {
+      const cutoff = adminSdk.firestore.Timestamp.fromMillis(Date.now() - PUSH_MAX_AGE_MS);
+      const stop = db.collection("notifications").where("createdAt", ">=", cutoff).onSnapshot(
+        (snapshot) => {
+          if (mine !== generation) return;
+          backoff = 1e3;
+          pushListenerStatus.listenerAttached = true;
+          for (const change of snapshot.docChanges()) {
+            if (change.type !== "added") continue;
+            handle(change.doc.id, change.doc.data());
+          }
+        },
+        (err) => {
+          if (mine !== generation) return;
+          failedImmediately = true;
+          if (unsub) detach();
+          recordFailure(err);
+          scheduleRetry();
+        }
+      );
+      if (failedImmediately) {
+        try {
+          stop();
+        } catch {
+        }
+      } else unsub = stop;
+    } catch (e) {
+      recordFailure(e);
+      scheduleRetry();
+      return;
+    }
+    if (!failedImmediately) logPush("PUSH_SEND_START", { event: "listener_ready", windowMs: PUSH_MAX_AGE_MS });
+  };
+  attach();
+  recycleTimer = setInterval(() => {
+    if (stopped || retryTimer || !unsub) return;
+    generation += 1;
+    detach();
+    attach();
+  }, 30 * 60 * 1e3);
   recycleTimer.unref?.();
   const sweep = setInterval(() => {
     void pollRecentNotificationsForPush(db, adminSdk, 30).then(() => {
@@ -4069,10 +4135,9 @@ function setupNotificationPushListener(db, adminSdk) {
     stopped = true;
     clearInterval(sweep);
     if (recycleTimer) clearInterval(recycleTimer);
-    try {
-      unsub?.();
-    } catch {
-    }
+    cancelRetry();
+    generation += 1;
+    detach();
   };
 }
 async function pollRecentNotificationsForPush(db, adminSdk, limit = 50) {
@@ -6106,17 +6171,15 @@ async function startServer() {
   app.use(compression());
   app.use((req, res, next) => {
     const host = requestHost(req.headers, req.hostname);
-    noteServedHost(host);
-    if (noteProductionHost(host)) tryStartWorkers();
-    if (INTERNAL_ROUTE_RE.test(req.path) && !workersAllowedNow(deployment)) {
-      console.warn("[env] blocked background endpoint", { path: req.path, kind: deployment.kind, reason: deployment.reason });
+    if (INTERNAL_ROUTE_RE.test(req.path) && (!workersAllowedNow(deployment) || internalRouteHostDenied(host))) {
+      console.warn("[env] blocked background endpoint", { path: req.path, kind: deployment.kind, reason: deployment.workersReason });
       return res.status(503).json({ ok: false, success: false, error: "BACKGROUND_DISABLED", deployment: deployment.kind, message: "\u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A \u0627\u0644\u062E\u0644\u0641\u064A\u0629 \u0627\u0644\u0645\u062C\u062F\u0648\u0644\u0629 \u0645\u0639\u0637\u0651\u0644\u0629 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0628\u064A\u0626\u0629 (\u0645\u0639\u0627\u064A\u0646\u0629/\u063A\u064A\u0631 \u0645\u0648\u062B\u0651\u0642\u0629). \u0644\u0645 \u064A\u062A\u0645 \u062A\u063A\u064A\u064A\u0631 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
     }
     if (req.method !== "GET" && req.method !== "OPTIONS" && DESTRUCTIVE_ROUTE_RE.test(req.path)) {
-      const verdict = destructiveOpsAllowed({ host });
+      const verdict = destructiveOpsAllowed({ host, deployment });
       if (!verdict.allowed) {
         console.warn("[deletion] blocked destructive request", { path: req.path, reason: verdict.reason });
-        return res.status(503).json({ ok: false, success: false, error: "DESTRUCTIVE_OPS_DISABLED", reason: verdict.reason, message: "\u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A \u0627\u0644\u062D\u0633\u0627\u0633\u0629 (\u062D\u0630\u0641/\u0627\u0633\u062A\u0639\u0627\u062F\u0629/\u0625\u0644\u063A\u0627\u0621) \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u0641\u064A \u0628\u064A\u0626\u0629 \u0627\u0644\u0645\u0639\u0627\u064A\u0646\u0629 \u0623\u0648 \u0639\u0644\u0649 \u0646\u0637\u0627\u0642 \u063A\u064A\u0631 \u0645\u0639\u062A\u0645\u062F. \u0644\u0645 \u064A\u062A\u0645 \u062A\u063A\u064A\u064A\u0631 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
+        return res.status(503).json({ ok: false, success: false, error: "DESTRUCTIVE_OPS_DISABLED", reason: verdict.reason, message: "\u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A \u0627\u0644\u062D\u0633\u0627\u0633\u0629 (\u062D\u0630\u0641/\u0627\u0633\u062A\u0639\u0627\u062F\u0629/\u0625\u0644\u063A\u0627\u0621) \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u0641\u064A \u0628\u064A\u0626\u0629 \u0627\u0644\u0645\u0639\u0627\u064A\u0646\u0629 \u0623\u0648 \u063A\u064A\u0631 \u0627\u0644\u0645\u0648\u062B\u0651\u0642\u0629. \u0644\u0645 \u064A\u062A\u0645 \u062A\u063A\u064A\u064A\u0631 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
       }
     }
     next();
@@ -6585,7 +6648,7 @@ async function startServer() {
         ...serviceAccount.clientEmail ? [] : ["FIREBASE_CLIENT_EMAIL"],
         ...serviceAccount.privateKey ? [] : ["FIREBASE_PRIVATE_KEY"]
       ],
-      deployment: { kind: deployment.kind, reason: deployment.reason, adminEnabled: deployment.adminAllowed, adminReason: deployment.adminReason, adminProjectVerified: deployment.adminProjectId || null, targetsProductionProject: deployment.targetsProduction, workers: workerStatus() },
+      deployment: { kind: deployment.kind, reason: deployment.reason, adminEnabled: deployment.adminAllowed, adminReason: deployment.adminReason, adminProjectVerified: deployment.adminProjectId || null, targetsProductionProject: deployment.targetsProduction, appUrlVerified: deployment.appUrlVerified, location: locationReport({ appUrlHost: deployment.appUrlHost }), workers: workerStatus() },
       adminCredentialsValid: serviceAccountCheck.valid,
       adminCredentialProblems: serviceAccountCheck.problems,
       // text only, never values
@@ -6644,7 +6707,7 @@ async function startServer() {
     })() }),
     purgeSchoolMessages: (schoolId) => deleteSchoolMessages(getDb(), schoolId, { bucket: getStorage().bucket() })
   });
-  const deletionUnavailable = () => !process.env.FIRESTORE_EMULATOR_HOST && (!deployment.adminAllowed || process.env.NODE_ENV === "production" && !serviceAccountCheck.valid && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE);
+  const deletionUnavailable = () => !process.env.FIRESTORE_EMULATOR_HOST && (!backgroundDestructiveAllowed(deployment) || process.env.NODE_ENV === "production" && !serviceAccountCheck.valid && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.K_SERVICE);
   const deletionRoute = (fn) => async (req, res) => {
     if (deletionUnavailable()) return res.status(503).json({ error: "ADMIN_UNAVAILABLE", message: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062D\u0630\u0641 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B (\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u062E\u0627\u062F\u0645). \u0644\u0645 \u064A\u062A\u0645 \u062D\u0630\u0641 \u0623\u064A \u0628\u064A\u0627\u0646\u0627\u062A." });
     try {
@@ -8096,7 +8159,7 @@ async function startServer() {
       setupSystemMessageNotifications(getDb(), admin4);
     });
     registerWorker("deletion-sweep", () => {
-      startDeletionSweep(deletionCtx(), console, 3 * 60 * 1e3, backgroundDestructiveAllowed);
+      startDeletionSweep(deletionCtx(), console, 3 * 60 * 1e3, () => backgroundDestructiveAllowed(deployment));
     });
     registerWorker("credential-scrub", () => {
       scheduleCredentialScrub(getDb, admin4);

@@ -581,7 +581,11 @@ export async function processNotificationPush(
 export const pushListenerStatus: {
   startedAt: string | null; listenerAttached: boolean; restarts: number;
   lastErrorAt: string | null; lastError: string | null; lastSweepAt: string | null; lastSweepOk: boolean | null;
-} = { startedAt: null, listenerAttached: false, restarts: 0, lastErrorAt: null, lastError: null, lastSweepAt: null, lastSweepOk: null };
+  /** 0 or 1: how many retry timers are pending right now (must never exceed 1). */
+  pendingRetryTimers: number;
+  /** how many times a Firestore listener was actually attached (success or failure). */
+  attachAttempts: number;
+} = { startedAt: null, listenerAttached: false, restarts: 0, lastErrorAt: null, lastError: null, lastSweepAt: null, lastSweepOk: null, pendingRetryTimers: 0, attachAttempts: 0 };
 
 /**
  * Real-time push listener. Self-healing:
@@ -592,14 +596,30 @@ export const pushListenerStatus: {
  *  - restarts itself with backoff if the stream fails (it used to die silently);
  *  - re-creates the query periodically so the window does not grow forever;
  *  - a periodic sweep covers anything a dropped event may have missed.
+ *
+ * Lifecycle invariants (a previous version multiplied retry chains while credentials were missing: the periodic
+ * re-creation started a new listener without cancelling the pending error-retry, so every cycle added one more chain):
+ *  - there is at most ONE retry timer at any time (`retryTimer`); scheduling is a no-op while one is pending;
+ *  - a new listener is never attached while one is running or a retry is pending;
+ *  - the periodic re-creation only touches a HEALTHY listener (never during an error/retry state);
+ *  - callbacks of a replaced listener are ignored (generation check), so a late error cannot start another chain;
+ *  - recovery is automatic: the single retry keeps going (back-off capped at 60 s) until the listener attaches, then the
+ *    back-off resets.
  */
 export function setupNotificationPushListener(db: Firestore, adminSdk: typeof admin): () => void {
-  let unsub: (() => void) | null = null;
+  let unsub: (() => void) | null = null;       // the live listener (null when none is running)
   let stopped = false;
   let backoff = 1000;
-  let recycleTimer: NodeJS.Timeout | null = null;
+  let generation = 0;                          // identifies the current listener; stale callbacks are ignored
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;  // THE one and only pending retry
+  let recycleTimer: ReturnType<typeof setInterval> | null = null;
   const inflight = new Set<string>();
   pushListenerStatus.startedAt = new Date().toISOString();
+  pushListenerStatus.pendingRetryTimers = 0;
+
+  const syncRetryStatus = () => { pushListenerStatus.pendingRetryTimers = retryTimer ? 1 : 0; };
+  const cancelRetry = () => { if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; } syncRetryStatus(); };
+  const detach = () => { const u = unsub; unsub = null; try { u?.(); } catch { /* ignore */ } };
 
   const handle = (notifId: string, notif: Record<string, unknown>) => {
     if (inflight.has(notifId) || isPushTerminal(notif)) return;
@@ -609,34 +629,68 @@ export function setupNotificationPushListener(db: Firestore, adminSdk: typeof ad
     });
   };
 
-  const start = () => {
-    if (stopped) return;
-    try { unsub?.(); } catch { /* ignore */ }
-    const cutoff = adminSdk.firestore.Timestamp.fromMillis(Date.now() - PUSH_MAX_AGE_MS);
-    unsub = db.collection('notifications').where('createdAt', '>=', cutoff).onSnapshot(
-      (snapshot) => {
-        backoff = 1000;
-        pushListenerStatus.listenerAttached = true;
-        for (const change of snapshot.docChanges()) {
-          if (change.type !== 'added') continue;
-          handle(change.doc.id, change.doc.data() as Record<string, unknown>);
-        }
-      },
-      (err) => {
-        pushListenerStatus.listenerAttached = false;
-        pushListenerStatus.restarts += 1;
-        pushListenerStatus.lastErrorAt = new Date().toISOString();
-        pushListenerStatus.lastError = String((err as { code?: unknown }).code ?? err.message ?? 'error').slice(0, 80);
-        logPush('PUSH_SEND_ERROR', { event: 'listener_restart', error: err.message });
-        setTimeout(start, backoff);
-        backoff = Math.min(backoff * 2, 60_000);
-      },
-    );
-    logPush('PUSH_SEND_START', { event: 'listener_ready', windowMs: PUSH_MAX_AGE_MS });
+  const scheduleRetry = () => {
+    if (stopped || retryTimer) return;         // exactly one pending retry, ever
+    const delay = backoff;
+    backoff = Math.min(backoff * 2, 60_000);
+    retryTimer = setTimeout(() => { retryTimer = null; syncRetryStatus(); attach(); }, delay);
+    retryTimer.unref?.();
+    syncRetryStatus();
   };
 
-  start();
-  recycleTimer = setInterval(start, 30 * 60 * 1000);
+  const recordFailure = (err: unknown) => {
+    pushListenerStatus.listenerAttached = false;
+    pushListenerStatus.restarts += 1;
+    pushListenerStatus.lastErrorAt = new Date().toISOString();
+    const e = err as { code?: unknown; message?: unknown } | null;
+    pushListenerStatus.lastError = String(e?.code ?? e?.message ?? 'error').slice(0, 80);
+    logPush('PUSH_SEND_ERROR', { event: 'listener_restart', error: String(e?.message ?? err) });
+  };
+
+  const attach = () => {
+    if (stopped) return;
+    if (unsub || retryTimer) return;           // a listener is running or a retry is pending: never start a second one
+    const mine = ++generation;
+    pushListenerStatus.attachAttempts += 1;
+    let failedImmediately = false;
+    try {
+      const cutoff = adminSdk.firestore.Timestamp.fromMillis(Date.now() - PUSH_MAX_AGE_MS);
+      const stop = db.collection('notifications').where('createdAt', '>=', cutoff).onSnapshot(
+        (snapshot) => {
+          if (mine !== generation) return;     // replaced listener
+          backoff = 1000;
+          pushListenerStatus.listenerAttached = true;
+          for (const change of snapshot.docChanges()) {
+            if (change.type !== 'added') continue;
+            handle(change.doc.id, change.doc.data() as Record<string, unknown>);
+          }
+        },
+        (err) => {
+          if (mine !== generation) return;     // a replaced listener's late error must not start another chain
+          failedImmediately = true;
+          if (unsub) detach();
+          recordFailure(err);
+          scheduleRetry();
+        },
+      );
+      if (failedImmediately) { try { stop(); } catch { /* ignore */ } }
+      else unsub = stop;
+    } catch (e) {
+      recordFailure(e);
+      scheduleRetry();
+      return;
+    }
+    if (!failedImmediately) logPush('PUSH_SEND_START', { event: 'listener_ready', windowMs: PUSH_MAX_AGE_MS });
+  };
+
+  attach();
+  // refresh the query window every 30 min — only while the listener is healthy; never during an error/retry state
+  recycleTimer = setInterval(() => {
+    if (stopped || retryTimer || !unsub) return;
+    generation += 1;                           // invalidate the old listener's callbacks
+    detach();
+    attach();
+  }, 30 * 60 * 1000);
   recycleTimer.unref?.();
 
   const sweep = setInterval(() => {
@@ -655,7 +709,9 @@ export function setupNotificationPushListener(db: Firestore, adminSdk: typeof ad
     stopped = true;
     clearInterval(sweep);
     if (recycleTimer) clearInterval(recycleTimer);
-    try { unsub?.(); } catch { /* ignore */ }
+    cancelRetry();
+    generation += 1;
+    detach();
   };
 }
 

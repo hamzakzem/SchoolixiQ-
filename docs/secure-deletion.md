@@ -61,12 +61,12 @@ Evidence from the repository (the Hostinger preview runtime itself cannot be ins
 - A preview's backend gets whatever environment variables the Hostinger site defines; whether they include the production Admin
   credentials is **unknown** from the repository. CORS (`server.ts`) allows only the production origins (+ `APP_URL`), so a preview page
   calling its own backend with an `Origin` header is blocked unless `APP_URL` is set to the preview domain.
-Therefore destructive operations **fail closed outside production hosts** (`backend/runtimeGuard.mjs`):
-all destructive routes (`/api/records/*`, `/api/admin/delete-*`, school/message/plan/distributor deletes) answer `503
-DESTRUCTIVE_OPS_DISABLED` unless the request host is `*.schoolixiq.com|iq` or the process runs on the Firebase emulators; known preview
-hosts (`*.hostingersite.com`, `pages.dev`, `vercel.app`, `netlify.app`, …) and unknown hosts are refused; `DEPLOY_ENV=preview|staging`
-or `DELETION_DISABLED=true` force-disable; the background sweep runs only on a process that has served a production host and never one that
-served a preview host; the web client also refuses these calls on preview hosts.
+Therefore destructive operations, cron endpoints and every background worker **fail closed** (`backend/runtimeEnv.mjs`, `backend/runtimeGuard.mjs`):
+permission comes from the deployment identity in the process environment (`DEPLOY_ENV=production` + credentials of the production project
++ `APP_URL` on a production host, or the Firebase emulators); `DEPLOY_ENV=preview|staging|development|dev|test` is an absolute block (even with
+its own Firebase project); `DELETION_DISABLED=true` is a kill switch. The request `Host` header is only an extra deny layer (preview/unknown hosts
+are refused even for a production identity; a production host grants nothing); `X-Forwarded-Host` and other forwarded headers are ignored. The web
+client also refuses these calls on preview hosts.
 `node scripts/check-preview-isolation.mjs` (npm `check:preview-isolation`, workflow `pr-safety.yml`) fails if a PR/branch workflow
 deploys or uses Firebase credentials, if a preview/staging config file names the production project or Admin credentials, if service-account
 material is in the repo or the build, or if the guard/wiring regresses; `scripts/e2e/preview-isolation.test.mjs` proves it fails on unsafe fixtures
