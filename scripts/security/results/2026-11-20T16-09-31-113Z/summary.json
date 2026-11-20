@@ -1,0 +1,264 @@
+{
+  "runId": "2026-11-20T16-09-31-113Z",
+  "project": "demo-schoolixiq-security",
+  "files": [
+    "rules/a-privilege-escalation.test.mjs"
+  ],
+  "total": 41,
+  "passed": 20,
+  "failed": 21,
+  "notTestable": 0,
+  "skipped": 0,
+  "provenWeaknesses": [
+    "[A1.2][H4] new user cannot self-create role=superadmin even when users/metadata is missing",
+    "[A2.1][C1] new user cannot self-create role=admin for an existing school it does not own",
+    "[A2.2][C1][D2] self-create role=admin for the school whose adminEmail matches is denied when the e-mail is NOT verified",
+    "[A2.3][C1] new user cannot self-create role=teacher inside a school",
+    "[A2.3][C1] new user cannot self-create role=staff inside a school",
+    "[A2.3][C1] new user cannot self-create role=guard inside a school",
+    "[A2.3][C1] new user cannot self-create role=assistant inside a school",
+    "[A4.2][C4] parent without a school cannot attach its profile to an arbitrary school",
+    "[A4.3][H1] school admin cannot move its own profile to another school",
+    "[A5.2][C1] new user cannot self-create a profile that already carries permissions",
+    "[A5.3][C2] school assistant cannot grant itself permissions",
+    "[A6.1][C2] school assistant cannot promote itself to school admin",
+    "[A6.2][C2] school assistant cannot promote itself to superadmin",
+    "[A6.3][H2] new user cannot self-create a legacy &quot;assistant&quot; with no school (treated as platform assistant)",
+    "[A7.1][C2] school admin cannot promote itself to superadmin",
+    "[A7.2][C2] school admin cannot promote a teacher of its school to superadmin",
+    "[A7.3][C2] school admin cannot promote a teacher of its school to platform_assistant",
+    "[A7.4][C7] school admin cannot pre-provision a users document with role=superadmin",
+    "[A7.5][C1+C2] end-to-end: anonymous sign-up cannot reach super-admin-only data",
+    "[A8.3][H4] a self-escalated account cannot delete users/metadata (re-opening the bootstrap path)",
+    "[A8.4][H4] hardening: even a genuine superadmin cannot delete users/metadata"
+  ],
+  "brokenControls": [],
+  "cases": [
+    {
+      "suite": "test",
+      "name": "[A1.1] new user cannot self-create role=superadmin while users/metadata exists",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A1.2][H4] new user cannot self-create role=superadmin even when users/metadata is missing",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create superadmin without metadata (legacy bootstrap path) should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A9.1] users/metadata blocks the legacy bootstrap path by existence alone (initialized=false still blocks)",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A2.1][C1] new user cannot self-create role=admin for an existing school it does not own",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create admin of S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.2][C1][D2] self-create role=admin for the school whose adminEmail matches is denied when the e-mail is NOT verified",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create admin with unverified e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=teacher inside a school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create teacher of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=staff inside a school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create staff of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=guard inside a school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create guard of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=assistant inside a school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create assistant of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=school_assistant inside a school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A2.C1] CONTROL: new user can self-create a plain parent profile with no school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A2.C2] CONTROL: new school admin can self-create an admin draft without a school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A3.1] parent cannot change its own role to superadmin",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A3.2] teacher cannot change its own role to superadmin",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A4.1] linked parent cannot move its own profile to another school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A4.2][C4] parent without a school cannot attach its profile to an arbitrary school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — unlinked parent sets schoolId=S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A4.3][H1] school admin cannot move its own profile to another school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin S1 -> S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A5.1] parent cannot grant itself permissions",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A5.2][C1] new user cannot self-create a profile that already carries permissions",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create with permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A5.3][C2] school assistant cannot grant itself permissions",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — assistant self-grants permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A5.4] staff member cannot grant itself extra permissions",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A6.1][C2] school assistant cannot promote itself to school admin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — assistant -> admin should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A6.2][C2] school assistant cannot promote itself to superadmin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — assistant -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A6.3][H2] new user cannot self-create a legacy &quot;assistant&quot; with no school (treated as platform assistant)",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create schoolless assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.1][C2] school admin cannot promote itself to superadmin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin -> superadmin (self) should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.2][C2] school admin cannot promote a teacher of its school to superadmin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin promotes teacher -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.3][C2] school admin cannot promote a teacher of its school to platform_assistant",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin promotes teacher -> platform_assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.4][C7] school admin cannot pre-provision a users document with role=superadmin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin pre-provisions superadmin doc should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.5][C1+C2] end-to-end: anonymous sign-up cannot reach super-admin-only data",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — read system_config after chain (create=200, promote=200) should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.C1] CONTROL: school admin can change a teacher of its school to staff",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A7.C2] CONTROL: school admin can pre-provision a teacher document for its school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.1] parent1 cannot delete users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.2] parent1 cannot overwrite users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.1] teacher1 cannot delete users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.2] teacher1 cannot overwrite users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.1] admin1 cannot delete users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.2] admin1 cannot overwrite users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.1] sassist1 cannot delete users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.2] sassist1 cannot overwrite users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.3][H4] a self-escalated account cannot delete users/metadata (re-opening the bootstrap path)",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-escalated account deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A8.4][H4] hardening: even a genuine superadmin cannot delete users/metadata",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — superadmin deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    }
+  ]
+}

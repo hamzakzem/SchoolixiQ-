@@ -1,0 +1,1467 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="A. Privilege escalation" time="1.157683" disabled="0" errors="0" tests="41" failures="21" skipped="0" hostname="vm">
+		<testcase name="[A1.1] new user cannot self-create role=superadmin while users/metadata exists" time="0.191099" classname="test"/>
+		<testcase name="[A1.2][H4] new user cannot self-create role=superadmin even when users/metadata is missing" time="0.044889" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-create superadmin without metadata (legacy bootstrap path) should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-create superadmin without metadata (legacy bootstrap path) should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-create superadmin without metadata (legacy bootstrap path) should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-create superadmin without metadata (legacy bootstrap path) should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:20:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A9.1] users/metadata blocks the legacy bootstrap path by existence alone (initialized=false still blocks)" time="0.037165" classname="test"/>
+		<testcase name="[A2.1][C1] new user cannot self-create role=admin for an existing school it does not own" time="0.018486" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-create admin of S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-create admin of S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-create admin of S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-create admin of S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:32:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A2.2][C1][D2] self-create role=admin for the school whose adminEmail matches is denied when the e-mail is NOT verified" time="0.026065" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-create admin with unverified e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-create admin with unverified e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-create admin with unverified e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-create admin with unverified e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:37:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A2.3][C1] new user cannot self-create role=teacher inside a school" time="0.020983" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-create teacher of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-create teacher of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-create teacher of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-create teacher of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:44:7)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A2.3][C1] new user cannot self-create role=staff inside a school" time="0.018776" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-create staff of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-create staff of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-create staff of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-create staff of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:44:7)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A2.3][C1] new user cannot self-create role=guard inside a school" time="0.025267" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-create guard of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-create guard of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-create guard of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-create guard of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:44:7)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A2.3][C1] new user cannot self-create role=assistant inside a school" time="0.024163" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-create assistant of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-create assistant of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-create assistant of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-create assistant of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:44:7)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A2.3][C1] new user cannot self-create role=school_assistant inside a school" time="0.023531" classname="test"/>
+		<testcase name="[A2.C1] CONTROL: new user can self-create a plain parent profile with no school" time="0.023742" classname="test"/>
+		<testcase name="[A2.C2] CONTROL: new school admin can self-create an admin draft without a school" time="0.016092" classname="test"/>
+		<testcase name="[A3.1] parent cannot change its own role to superadmin" time="0.021577" classname="test"/>
+		<testcase name="[A3.2] teacher cannot change its own role to superadmin" time="0.023193" classname="test"/>
+		<testcase name="[A4.1] linked parent cannot move its own profile to another school" time="0.023078" classname="test"/>
+		<testcase name="[A4.2][C4] parent without a school cannot attach its profile to an arbitrary school" time="0.020712" classname="test" failure="SECURITY EXPECTATION VIOLATED — unlinked parent sets schoolId=S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — unlinked parent sets schoolId=S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — unlinked parent sets schoolId=S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — unlinked parent sets schoolId=S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:75:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A4.3][H1] school admin cannot move its own profile to another school" time="0.024410" classname="test" failure="SECURITY EXPECTATION VIOLATED — admin S1 -> S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — admin S1 -> S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — admin S1 -> S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — admin S1 -> S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:79:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A5.1] parent cannot grant itself permissions" time="0.023540" classname="test"/>
+		<testcase name="[A5.2][C1] new user cannot self-create a profile that already carries permissions" time="0.017772" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-create with permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-create with permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-create with permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-create with permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:89:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A5.3][C2] school assistant cannot grant itself permissions" time="0.021505" classname="test" failure="SECURITY EXPECTATION VIOLATED — assistant self-grants permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — assistant self-grants permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — assistant self-grants permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — assistant self-grants permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:93:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A5.4] staff member cannot grant itself extra permissions" time="0.021554" classname="test"/>
+		<testcase name="[A6.1][C2] school assistant cannot promote itself to school admin" time="0.028649" classname="test" failure="SECURITY EXPECTATION VIOLATED — assistant -> admin should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — assistant -> admin should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — assistant -> admin should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — assistant -> admin should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:102:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A6.2][C2] school assistant cannot promote itself to superadmin" time="0.018117" classname="test" failure="SECURITY EXPECTATION VIOLATED — assistant -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — assistant -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — assistant -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — assistant -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:106:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A6.3][H2] new user cannot self-create a legacy &amp;quot;assistant&amp;quot; with no school (treated as platform assistant)" time="0.016601" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-create schoolless assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-create schoolless assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-create schoolless assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-create schoolless assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:111:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A7.1][C2] school admin cannot promote itself to superadmin" time="0.020504" classname="test" failure="SECURITY EXPECTATION VIOLATED — admin -> superadmin (self) should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — admin -> superadmin (self) should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — admin -> superadmin (self) should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — admin -> superadmin (self) should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:116:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A7.2][C2] school admin cannot promote a teacher of its school to superadmin" time="0.041506" classname="test" failure="SECURITY EXPECTATION VIOLATED — admin promotes teacher -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — admin promotes teacher -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — admin promotes teacher -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — admin promotes teacher -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:120:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A7.3][C2] school admin cannot promote a teacher of its school to platform_assistant" time="0.019686" classname="test" failure="SECURITY EXPECTATION VIOLATED — admin promotes teacher -> platform_assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — admin promotes teacher -> platform_assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — admin promotes teacher -> platform_assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — admin promotes teacher -> platform_assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:124:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A7.4][C7] school admin cannot pre-provision a users document with role=superadmin" time="0.020504" classname="test" failure="SECURITY EXPECTATION VIOLATED — admin pre-provisions superadmin doc should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — admin pre-provisions superadmin doc should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — admin pre-provisions superadmin doc should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — admin pre-provisions superadmin doc should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:128:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A7.5][C1+C2] end-to-end: anonymous sign-up cannot reach super-admin-only data" time="0.039539" classname="test" failure="SECURITY EXPECTATION VIOLATED — read system_config after chain (create=200, promote=200) should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — read system_config after chain (create=200, promote=200) should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — read system_config after chain (create=200, promote=200) should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — read system_config after chain (create=200, promote=200) should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:136:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A7.C1] CONTROL: school admin can change a teacher of its school to staff" time="0.019557" classname="test"/>
+		<testcase name="[A7.C2] CONTROL: school admin can pre-provision a teacher document for its school" time="0.016604" classname="test"/>
+		<testcase name="[A8.1] parent1 cannot delete users/metadata" time="0.028541" classname="test"/>
+		<testcase name="[A8.2] parent1 cannot overwrite users/metadata" time="0.022232" classname="test"/>
+		<testcase name="[A8.1] teacher1 cannot delete users/metadata" time="0.027634" classname="test"/>
+		<testcase name="[A8.2] teacher1 cannot overwrite users/metadata" time="0.021126" classname="test"/>
+		<testcase name="[A8.1] admin1 cannot delete users/metadata" time="0.029015" classname="test"/>
+		<testcase name="[A8.2] admin1 cannot overwrite users/metadata" time="0.022169" classname="test"/>
+		<testcase name="[A8.1] sassist1 cannot delete users/metadata" time="0.027711" classname="test"/>
+		<testcase name="[A8.2] sassist1 cannot overwrite users/metadata" time="0.020821" classname="test"/>
+		<testcase name="[A8.3][H4] a self-escalated account cannot delete users/metadata (re-opening the bootstrap path)" time="0.027534" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-escalated account deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-escalated account deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-escalated account deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-escalated account deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:162:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[A8.4][H4] hardening: even a genuine superadmin cannot delete users/metadata" time="0.018359" classname="test" failure="SECURITY EXPECTATION VIOLATED — superadmin deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — superadmin deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — superadmin deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — superadmin deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/a-privilege-escalation.test.mjs:166:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+	</testsuite>
+	<testsuite name="B. Identity and account access" time="0.543252" disabled="0" errors="0" tests="16" failures="9" skipped="0" hostname="vm">
+		<testcase name="[B1.1] a user cannot create a users document under a UID that is not its own" time="0.174501" classname="test"/>
+		<testcase name="[B1.2] a user cannot create a users document that claims another UID inside its own path" time="0.024370" classname="test" failure="SECURITY EXPECTATION VIOLATED — own path with uid field = u_super should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — own path with uid field = u_super should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — own path with uid field = u_super should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — own path with uid field = u_super should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/b-identity.test.mjs:29:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[B2.1] parent cannot edit another parent profile" time="0.024993" classname="test"/>
+		<testcase name="[B2.2] parent cannot delete another parent profile" time="0.021800" classname="test"/>
+		<testcase name="[B2.3] school admin cannot edit the admin of another school" time="0.024757" classname="test"/>
+		<testcase name="[B2.4] school admin cannot delete a co-admin of its own school" time="0.023218" classname="test" failure="SECURITY EXPECTATION VIOLATED — admin1 deletes co-admin should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — admin1 deletes co-admin should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — admin1 deletes co-admin should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — admin1 deletes co-admin should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/b-identity.test.mjs:43:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[B3.1][C3] a stored (self-written) e-mail must not allow deleting the super admin profile" time="0.024618" classname="test" failure="SECURITY EXPECTATION VIOLATED — delete super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — delete super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — delete super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — delete super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/b-identity.test.mjs:49:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[B3.2][C3] a stored (self-written) e-mail must not allow reading the super admin profile" time="0.029852" classname="test" failure="SECURITY EXPECTATION VIOLATED — read super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — read super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — read super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — read super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/b-identity.test.mjs:54:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[B3.3][C3] a stored (self-written) e-mail must not expose another person registration request" time="0.031917" classname="test" failure="SECURITY EXPECTATION VIOLATED — read pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — read pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — read pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — read pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/b-identity.test.mjs:59:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[B3.4][C3] a stored (self-written) e-mail must not allow editing another person pending registration" time="0.026178" classname="test" failure="SECURITY EXPECTATION VIOLATED — edit pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — edit pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — edit pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — edit pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/b-identity.test.mjs:64:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[B3.5][C3][D2] an UNVERIFIED token e-mail must not allow claiming (deleting) a pre-provisioned profile" time="0.023500" classname="test" failure="SECURITY EXPECTATION VIOLATED — unverified e-mail deletes provisioned doc should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — unverified e-mail deletes provisioned doc should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — unverified e-mail deletes provisioned doc should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — unverified e-mail deletes provisioned doc should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/b-identity.test.mjs:69:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[B3.6][C1][D2] an UNVERIFIED token e-mail must not allow copying a pre-provisioned teacher role" time="0.023383" classname="test" failure="SECURITY EXPECTATION VIOLATED — unverified e-mail takes over provisioned teacher role should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — unverified e-mail takes over provisioned teacher role should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — unverified e-mail takes over provisioned teacher role should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — unverified e-mail takes over provisioned teacher role should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/b-identity.test.mjs:74:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[B3.C1] CONTROL: the verified owner of a pre-provisioned e-mail can claim (delete) the provisioned document" time="0.015840" classname="test"/>
+		<testcase name="[B4.1] e-mail comparison: an upper-case variant of the super admin e-mail grants nothing" time="0.020940" classname="test"/>
+		<testcase name="[B4.2] e-mail comparison: a whitespace-padded variant of the super admin e-mail grants nothing" time="0.030630" classname="test"/>
+		<testcase name="[B4.3][FUNCTIONAL] school with a mixed-case adminEmail is still readable by its verified admin (rules lower-case only the token side)" time="0.021078" classname="test" failure="LEGITIMATE FLOW BROKEN — verified admin reads school with mixed-case adminEmail should be ALLOWED but returned HTTP 403: &amp;quot;\nevaluation error at L981:21 for 'get' @ L981, false for 'get' @ L981&amp;quot;">
+			<failure type="testCodeFailure" message="LEGITIMATE FLOW BROKEN — verified admin reads school with mixed-case adminEmail should be ALLOWED but returned HTTP 403: &amp;quot;\nevaluation error at L981:21 for 'get' @ L981, false for 'get' @ L981&amp;quot;">
+[Error [ERR_TEST_FAILURE]: LEGITIMATE FLOW BROKEN — verified admin reads school with mixed-case adminEmail should be ALLOWED but returned HTTP 403: "\nevaluation error at L981:21 for 'get' @ L981, false for 'get' @ L981"] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: LEGITIMATE FLOW BROKEN — verified admin reads school with mixed-case adminEmail should be ALLOWED but returned HTTP 403: "\nevaluation error at L981:21 for 'get' @ L981, false for 'get' @ L981"
+      at expectAllowed (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:187:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/b-identity.test.mjs:97:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+	</testsuite>
+	<testsuite name="C. Parent-student linking" time="0.703148" disabled="0" errors="0" tests="20" failures="12" skipped="2" hostname="vm">
+		<testcase name="[C1.1][C4] unlinked parent cannot add itself to a student of another school" time="0.196722" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-link to ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-link to ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-link to ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+    at async Promise.all (index 0) {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-link to ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:20:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1442:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C1.2][C4] unlinked parent cannot add itself to a student whose parentEmail is someone else" time="0.039848" classname="test" failure="SECURITY EXPECTATION VIOLATED — self-link to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — self-link to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — self-link to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — self-link to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:25:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C1.3][C4] parent of one child cannot add itself to another child of the same school" time="0.032189" classname="test" failure="SECURITY EXPECTATION VIOLATED — parent1 self-links to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — parent1 self-links to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — parent1 self-links to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — parent1 self-links to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:29:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C2.1][C4][D1] matching verified e-mail is NOT enough: self-link without school approval is denied" time="0.027299" classname="test" failure="SECURITY EXPECTATION VIOLATED — verified-email self-link without approval should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — verified-email self-link without approval should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — verified-email self-link without approval should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — verified-email self-link without approval should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:34:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C2.2][C4][D1] parent cannot attach studentIds + schoolId to its own profile without approval" time="0.032275" classname="test" failure="SECURITY EXPECTATION VIOLATED — parent self-assigns studentIds/schoolId should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — parent self-assigns studentIds/schoolId should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — parent self-assigns studentIds/schoolId should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — parent self-assigns studentIds/schoolId should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:39:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C3.1][C4][D2] parent with an UNVERIFIED e-mail equal to parentEmail cannot self-link" time="0.025188" classname="test" failure="SECURITY EXPECTATION VIOLATED — unverified-email self-link should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — unverified-email self-link should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — unverified-email self-link should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — unverified-email self-link should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:44:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C4.1][C3][C4] stored profile e-mail different from the authenticated e-mail cannot be used to link" time="0.023179" classname="test" failure="SECURITY EXPECTATION VIOLATED — link via spoofed stored e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — link via spoofed stored e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — link via spoofed stored e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — link via spoofed stored e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:49:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C5.1] repeating an existing link does not create duplicate entries" time="0.030186" classname="test"/>
+		<testcase name="[C5.2][C4] parent cannot write a parentIds array containing duplicate / padded entries" time="0.024765" classname="test" failure="SECURITY EXPECTATION VIOLATED — duplicate parentIds write should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — duplicate parentIds write should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — duplicate parentIds write should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — duplicate parentIds write should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:59:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C5.3][D1] duplicate approval request for the same parent/student is rejected — NOT TESTABLE: approval-request workflow not implemented yet" time="0.010596" classname="test">
+			<skipped type="todo" message="true"/>
+		</testcase>
+		<testcase name="[C6.1][C4] two concurrent unapproved self-links to the same student are both denied and existing links survive" time="0.039181" classname="test" failure="SECURITY EXPECTATION VIOLATED — concurrent self-link A should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — concurrent self-link A should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — concurrent self-link A should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — concurrent self-link A should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:73:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C6.2][C4] concurrent full-array overwrites cannot evict the genuine parent" time="0.036921" classname="test" failure="parentIds must be unchanged, got [&amp;quot;n_c62b&amp;quot;]+ actual - expected  [+   'n_c62b'-   'u_parent1'  ]">
+			<failure type="testCodeFailure" message="parentIds must be unchanged, got [&amp;quot;n_c62b&amp;quot;]+ actual - expected  [+   'n_c62b'-   'u_parent1'  ]">
+[Error [ERR_TEST_FAILURE]: parentIds must be unchanged, got ["n_c62b"]
++ actual - expected
+
+  [
++   'n_c62b'
+-   'u_parent1'
+  ]
+] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: parentIds must be unchanged, got ["n_c62b"]
+  + actual - expected
+  
+    [
+  +   'n_c62b'
+  -   'u_parent1'
+    ]
+  
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:85:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'n_c62b' ],
+    expected: [ 'u_parent1' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C6.3][D1] two concurrent approval requests for the same student are serialised — NOT TESTABLE: approval-request workflow not implemented yet" time="0.009041" classname="test">
+			<skipped type="todo" message="true"/>
+		</testcase>
+		<testcase name="[C7.1] a denied link attempt that also tampers with schoolId leaves the student untouched" time="0.026252" classname="test"/>
+		<testcase name="[C7.2][C4] a linked parent cannot remove a co-parent from the student" time="0.023633" classname="test" failure="SECURITY EXPECTATION VIOLATED — parent evicts co-parent should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — parent evicts co-parent should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — parent evicts co-parent should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — parent evicts co-parent should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:100:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C8.1][C4] end-to-end: a stranger cannot obtain a child record + grades of another school" time="0.038183" classname="test" failure="SECURITY EXPECTATION VIOLATED — stranger reads ST2 after self-link attempts should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — stranger reads ST2 after self-link attempts should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — stranger reads ST2 after self-link attempts should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — stranger reads ST2 after self-link attempts should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/c-parent-linking.test.mjs:109:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[C.C1] CONTROL: school admin can link a parent to a student of its own school" time="0.019649" classname="test"/>
+		<testcase name="[C.C2] CONTROL: a linked parent can read its own child and grades" time="0.026224" classname="test"/>
+		<testcase name="[C.C3] CONTROL: admin of another school cannot link parents to S1 students" time="0.017869" classname="test"/>
+		<testcase name="[C.C4] CONTROL: parent cannot overwrite the whole student document" time="0.022011" classname="test"/>
+	</testsuite>
+	<testsuite name="D. School isolation" time="0.717662" disabled="0" errors="0" tests="20" failures="4" skipped="0" hostname="vm">
+		<testcase name="[D1.1] admin of S1 cannot read school doc of S2" time="0.182207" classname="test"/>
+		<testcase name="[D1.1] admin of S1 cannot read school settings of S2" time="0.028836" classname="test"/>
+		<testcase name="[D1.1] admin of S1 cannot read student of S2" time="0.025889" classname="test"/>
+		<testcase name="[D1.1] admin of S1 cannot read grade of S2" time="0.017676" classname="test"/>
+		<testcase name="[D1.1] admin of S1 cannot read parent profile of S2" time="0.018937" classname="test"/>
+		<testcase name="[D1.2] admin of S1 cannot list students of S2" time="0.056515" classname="test"/>
+		<testcase name="[D2.1] teacher cannot read a student of an unassigned class in its own school" time="0.022103" classname="test"/>
+		<testcase name="[D2.2] teacher cannot read a student of another school" time="0.028557" classname="test"/>
+		<testcase name="[D2.3] teacher cannot read a class of another school" time="0.019722" classname="test"/>
+		<testcase name="[D2.C] CONTROL: teacher can read a student of its assigned class" time="0.022087" classname="test"/>
+		<testcase name="[D3.1] school assistant of S1 cannot read student / school of S2" time="0.028366" classname="test"/>
+		<testcase name="[D3.2][H2] a legacy &amp;quot;assistant&amp;quot; profile without a school is not a platform assistant (cannot read other schools)" time="0.042537" classname="test" failure="SECURITY EXPECTATION VIOLATED — schoolless assistant reads S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — schoolless assistant reads S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — schoolless assistant reads S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — schoolless assistant reads S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/d-school-isolation.test.mjs:40:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[D3.3][H2][H7] a legacy schoolless &amp;quot;assistant&amp;quot; with self-written permissions cannot read registration requests" time="0.020100" classname="test" failure="SECURITY EXPECTATION VIOLATED — schoolless assistant reads registrations should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — schoolless assistant reads registrations should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — schoolless assistant reads registrations should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — schoolless assistant reads registrations should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/d-school-isolation.test.mjs:44:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[D4.1] parent cannot read an unlinked student of its own school" time="0.018978" classname="test"/>
+		<testcase name="[D4.2] parent cannot read a student / grade of another school" time="0.028566" classname="test"/>
+		<testcase name="[D4.3][H3] parent cannot look up a student of another school by guessing its registration number" time="0.054979" classname="test" failure="SECURITY EXPECTATION VIOLATED — registration-number lookup across schools (leaked ST2@S2) should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — registration-number lookup across schools (leaked ST2@S2) should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — registration-number lookup across schools (leaked ST2@S2) should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — registration-number lookup across schools (leaked ST2@S2) should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/d-school-isolation.test.mjs:58:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[D5.1] admin of S1 cannot create an attendance record for S2" time="0.027805" classname="test"/>
+		<testcase name="[D5.2] admin of S1 cannot pull a student of S2 into S1 by rewriting schoolId" time="0.023501" classname="test"/>
+		<testcase name="[D5.3] admin of S1 cannot create a student inside S2" time="0.022715" classname="test"/>
+		<testcase name="[D5.4][C1] a self-written schoolId on a self-created profile grants no access to that school" time="0.025465" classname="test" failure="SECURITY EXPECTATION VIOLATED — forged admin of S2 reads ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — forged admin of S2 reads ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — forged admin of S2 reads ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — forged admin of S2 reads ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/d-school-isolation.test.mjs:74:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+	</testsuite>
+	<testsuite name="F. Password storage (Firestore rules)" time="0.253605" disabled="0" errors="0" tests="5" failures="3" skipped="0" hostname="vm">
+		<testcase name="[F1.1][H7] an anonymous registration request carrying customerInfo.password is rejected" time="0.173960" classname="test" failure="SECURITY EXPECTATION VIOLATED — anonymous registration with password should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — anonymous registration with password should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — anonymous registration with password should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+    at async Promise.all (index 0) {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — anonymous registration with password should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/f-password-rules.test.mjs:12:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1442:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[F1.2][H7] a signed-in registration request carrying password / adminPassword is rejected" time="0.020669" classname="test" failure="SECURITY EXPECTATION VIOLATED — registration with password fields should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — registration with password fields should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — registration with password fields should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — registration with password fields should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/f-password-rules.test.mjs:17:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[F1.3][H7] a school admin cannot store a parent password on a student document" time="0.024038" classname="test"/>
+		<testcase name="[F1.4][H7] a user cannot store a password field on its own profile" time="0.017961" classname="test" failure="SECURITY EXPECTATION VIOLATED — profile with password should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — profile with password should be DENIED but the emulator returned HTTP 200 (ALLOWED).">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — profile with password should be DENIED but the emulator returned HTTP 200 (ALLOWED).] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — profile with password should be DENIED but the emulator returned HTTP 200 (ALLOWED).
+      at expectDenied (file:///home/user/SchoolixiQ-/scripts/security/lib/harness.mjs:181:10)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/rules/f-password-rules.test.mjs:26:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[F1.C] CONTROL: a registration request without any password field is accepted" time="0.015806" classname="test"/>
+	</testsuite>
+	<testsuite name="E. Backend: custom claims, trusted role source, dismissal, logs" time="3.576860" disabled="0" errors="0" tests="17" failures="9" skipped="0" hostname="vm">
+		<testcase name="[E1.1][C5] a Firestore-only role=superadmin (no claim) is rejected by the admin API" time="0.473903" classname="test" failure="SECURITY EXPECTATION VIOLATED — admin API with Firestore-only superadmin should be rejected (401/403) but the server returned 200: {&amp;quot;ok&amp;quot;:true,&amp;quot;items&amp;quot;:[]}">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — admin API with Firestore-only superadmin should be rejected (401/403) but the server returned 200: {&amp;quot;ok&amp;quot;:true,&amp;quot;items&amp;quot;:[]}">
+Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — admin API with Firestore-only superadmin should be rejected (401/403) but the server returned 200: {"ok":true,"items":[]}
+    at async Promise.all (index 0) {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — admin API with Firestore-only superadmin should be rejected (401/403) but the server returned 200: {"ok":true,"items":[]}
+      at expectForbidden (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:39:47)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:87:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1442:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[E1.2][C5] calling the admin API must not write role=superadmin into custom claims from Firestore data" time="0.107058" classname="test" failure="SECURITY EXPECTATION VIOLATED — server promoted Firestore role into custom claims: {&amp;quot;role&amp;quot;:&amp;quot;superadmin&amp;quot;,&amp;quot;schoolId&amp;quot;:&amp;quot;&amp;quot;,&amp;quot;sv&amp;quot;:4,&amp;quot;p&amp;quot;:null}">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — server promoted Firestore role into custom claims: {&amp;quot;role&amp;quot;:&amp;quot;superadmin&amp;quot;,&amp;quot;schoolId&amp;quot;:&amp;quot;&amp;quot;,&amp;quot;sv&amp;quot;:4,&amp;quot;p&amp;quot;:null}">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — server promoted Firestore role into custom claims: {"role":"superadmin","schoolId":"","sv":4,"p":null}] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — server promoted Firestore role into custom claims: {"role":"superadmin","schoolId":"","sv":4,"p":null}
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:94:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'superadmin',
+    expected: 'superadmin',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[E1.3][C5] a stale superadmin claim is rejected once the Firestore profile is demoted" time="0.159149" classname="test" failure="SECURITY EXPECTATION VIOLATED — backup with stale superadmin claim should be rejected (401/403) but the server returned 200: {&amp;quot;timestamp&amp;quot;:&amp;quot;2026-11-20T16:10:05.566Z&amp;quot;,&amp;quot;collections&amp;quot;:{&amp;quot;schools&amp;quot;:[{&amp;quot;id&amp;quot;:&amp;quot;S1&amp;quot;,&amp;quot;name&amp;quot;:&amp;quot;Synthetic School One&amp;quot;,&amp;quot;status&amp;quot;:&amp;quot;active&amp;quot;,&amp;quot;subscriptionStatus&amp;quot;:&amp;quot;active&amp;quot;,&amp;quot;admi">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — backup with stale superadmin claim should be rejected (401/403) but the server returned 200: {&amp;quot;timestamp&amp;quot;:&amp;quot;2026-11-20T16:10:05.566Z&amp;quot;,&amp;quot;collections&amp;quot;:{&amp;quot;schools&amp;quot;:[{&amp;quot;id&amp;quot;:&amp;quot;S1&amp;quot;,&amp;quot;name&amp;quot;:&amp;quot;Synthetic School One&amp;quot;,&amp;quot;status&amp;quot;:&amp;quot;active&amp;quot;,&amp;quot;subscriptionStatus&amp;quot;:&amp;quot;active&amp;quot;,&amp;quot;admi">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — backup with stale superadmin claim should be rejected (401/403) but the server returned 200: {"timestamp":"2026-11-20T16:10:05.566Z","collections":{"schools":[{"id":"S1","name":"Synthetic School One","status":"active","subscriptionStatus":"active","admi] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — backup with stale superadmin claim should be rejected (401/403) but the server returned 200: {"timestamp":"2026-11-20T16:10:05.566Z","collections":{"schools":[{"id":"S1","name":"Synthetic School One","status":"active","subscriptionStatus":"active","admi
+      at expectForbidden (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:39:47)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:100:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[E1.4][H2] a legacy schoolless &amp;quot;assistant&amp;quot; profile is not accepted as a platform assistant" time="0.060355" classname="test"/>
+		<testcase name="[E2.1][C6] create-user ignores additionalData.role / schoolId (no superadmin via payload)" time="0.084145" classname="test" failure="SECURITY EXPECTATION VIOLATED — create-user (HTTP 200) stored role=superadmin schoolId=&amp;quot;&amp;quot; from additionalData">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — create-user (HTTP 200) stored role=superadmin schoolId=&amp;quot;&amp;quot; from additionalData">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — create-user (HTTP 200) stored role=superadmin schoolId="" from additionalData] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — create-user (HTTP 200) stored role=superadmin schoolId="" from additionalData
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:114:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[E2.2][C6] create-user ignores client-supplied additionalData.permissions in custom claims" time="0.105305" classname="test" failure="SECURITY EXPECTATION VIOLATED — client permissions copied into claims: [&amp;quot;manage_users&amp;quot;,&amp;quot;manage_system&amp;quot;]">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — client permissions copied into claims: [&amp;quot;manage_users&amp;quot;,&amp;quot;manage_system&amp;quot;]">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — client permissions copied into claims: ["manage_users","manage_system"]] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — client permissions copied into claims: ["manage_users","manage_system"]
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:123:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[E2.3][C6] staff (allowed to create parents) cannot mint a superadmin profile through additionalData" time="0.061032" classname="test" failure="SECURITY EXPECTATION VIOLATED — staff minted a superadmin profile">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — staff minted a superadmin profile">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — staff minted a superadmin profile] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — staff minted a superadmin profile
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:131:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'superadmin',
+    expected: 'superadmin',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[E2.4] CONTROL: school admin cannot create users for another school via the schoolId field" time="0.051493" classname="test"/>
+		<testcase name="[E2.5] CONTROL: school admin can create a parent in its own school" time="0.072507" classname="test"/>
+		<testcase name="[E3.1] a registration request carrying role=superadmin grants nothing" time="0.049959" classname="test"/>
+		<testcase name="[E4.1][M1] school admin cannot reset the password of a co-admin via create-user" time="0.070548" classname="test" failure="SECURITY EXPECTATION VIOLATED — co-admin password was replaced by another admin">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — co-admin password was replaced by another admin">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — co-admin password was replaced by another admin] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — co-admin password was replaced by another admin
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:159:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[E4.2][M3] super admin &amp;quot;sync-claims&amp;quot; must not promote a tampered Firestore role into claims" time="0.056223" classname="test" failure="SECURITY EXPECTATION VIOLATED — privileged role synced from Firestore data">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — privileged role synced from Firestore data">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — privileged role synced from Firestore data] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — privileged role synced from Firestore data
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:165:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'superadmin',
+    expected: 'superadmin',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[E4.3] CONTROL: school admin cannot sync claims of a user outside its school" time="0.055617" classname="test"/>
+		<testcase name="[E5.1][C4][D1] a parent link that was never approved by the school must not allow a pickup request" time="0.099933" classname="test" failure="SECURITY EXPECTATION VIOLATED — pickup request by unapproved parent should be rejected (401/403) but the server returned 200: {&amp;quot;id&amp;quot;:&amp;quot;Zzjt77ILUTAyIIEopLhU&amp;quot;,&amp;quot;token&amp;quot;:&amp;quot;K2P3-VTAH&amp;quot;,&amp;quot;status&amp;quot;:&amp;quot;REQUESTED&amp;quot;,&amp;quot;derivedStatus&amp;quot;:&amp;quot;REQUESTED&amp;quot;,&amp;quot;dismissalSnapshot&amp;quot;:{&amp;quot;requestId&amp;quot;:&amp;quot;Zzjt77ILUTAyIIEopLhU&amp;quot;,&amp;quot;deriv">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — pickup request by unapproved parent should be rejected (401/403) but the server returned 200: {&amp;quot;id&amp;quot;:&amp;quot;Zzjt77ILUTAyIIEopLhU&amp;quot;,&amp;quot;token&amp;quot;:&amp;quot;K2P3-VTAH&amp;quot;,&amp;quot;status&amp;quot;:&amp;quot;REQUESTED&amp;quot;,&amp;quot;derivedStatus&amp;quot;:&amp;quot;REQUESTED&amp;quot;,&amp;quot;dismissalSnapshot&amp;quot;:{&amp;quot;requestId&amp;quot;:&amp;quot;Zzjt77ILUTAyIIEopLhU&amp;quot;,&amp;quot;deriv">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — pickup request by unapproved parent should be rejected (401/403) but the server returned 200: {"id":"Zzjt77ILUTAyIIEopLhU","token":"K2P3-VTAH","status":"REQUESTED","derivedStatus":"REQUESTED","dismissalSnapshot":{"requestId":"Zzjt77ILUTAyIIEopLhU","deriv] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — pickup request by unapproved parent should be rejected (401/403) but the server returned 200: {"id":"Zzjt77ILUTAyIIEopLhU","token":"K2P3-VTAH","status":"REQUESTED","derivedStatus":"REQUESTED","dismissalSnapshot":{"requestId":"Zzjt77ILUTAyIIEopLhU","deriv
+      at expectForbidden (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:39:47)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/server/e-admin-api.test.mjs:177:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[E5.2] CONTROL: an unlinked parent cannot request a pickup" time="0.066266" classname="test"/>
+		<testcase name="[E5.3] CONTROL: the genuine parent can request a pickup and a guard of another school cannot verify it" time="0.129469" classname="test"/>
+		<testcase name="[F2.1][H7] passwords sent to create-user never appear in server logs, audit logs or profiles" time="0.616342" classname="test"/>
+	</testsuite>
+	<testsuite name="F. Password storage (source code)" time="0.009295" disabled="0" errors="0" tests="5" failures="3" skipped="0" hostname="vm">
+		<testcase name="[F3.1][H7] the public registration form does not persist a password into Firestore (src/views/Login.tsx)" time="0.002655" classname="test" failure="SECURITY EXPECTATION VIOLATED — subscriptionForm holds a password (line 207) and is stored as registrations.customerInfo (line 355)">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — subscriptionForm holds a password (line 207) and is stored as registrations.customerInfo (line 355)">
+Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — subscriptionForm holds a password (line 207) and is stored as registrations.customerInfo (line 355)
+    at new Promise (&lt;anonymous>)
+    at Array.map (&lt;anonymous>) {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — subscriptionForm holds a password (line 207) and is stored as registrations.customerInfo (line 355)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/static/f-password-sources.test.mjs:18:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1047:25)
+      at Test.start (node:internal/test_runner/test:944:17)
+      at node:internal/test_runner/test:1440:71
+      at node:internal/per_context/primordials:466:82
+      at new Promise (&lt;anonymous>)
+      at new SafePromise (node:internal/per_context/primordials:435:3)
+      at node:internal/per_context/primordials:466:9
+      at Array.map (&lt;anonymous>) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[F3.2][H7] school activation does not reuse a stored plaintext password (src/lib/auth/schoolActivation.ts)" time="0.000317" classname="test" failure="SECURITY EXPECTATION VIOLATED — activation reads stored request/customerInfo password (line 129)">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — activation reads stored request/customerInfo password (line 129)">
+Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — activation reads stored request/customerInfo password (line 129)
+    at async Promise.all (index 0) {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — activation reads stored request/customerInfo password (line 129)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/static/f-password-sources.test.mjs:25:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1047:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:744:18)
+      at Test.postRun (node:internal/test_runner/test:1173:19)
+      at Test.run (node:internal/test_runner/test:1101:12)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1442:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[F3.3][H7] the super admin dashboard does not read stored registration passwords (src/views/SuperAdminDashboard.tsx)" time="0.001418" classname="test" failure="SECURITY EXPECTATION VIOLATED — dashboard reads customerInfo.password (line 1401)">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — dashboard reads customerInfo.password (line 1401)">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — dashboard reads customerInfo.password (line 1401)] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — dashboard reads customerInfo.password (line 1401)
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/static/f-password-sources.test.mjs:31:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1047:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:744:18)
+      at Test.postRun (node:internal/test_runner/test:1173:19)
+      at Test.run (node:internal/test_runner/test:1101:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[F3.4] server logging statements never interpolate a raw password value (server.ts)" time="0.003266" classname="test"/>
+		<testcase name="[F3.5] audit logging of create-user never includes the password" time="0.000594" classname="test"/>
+	</testsuite>
+	<testsuite name="F. credentialScrub worker" time="0.480981" disabled="0" errors="0" tests="4" failures="2" skipped="0" hostname="vm">
+		<testcase name="[F4.1] CONTROL: removes plaintext passwords from schools, students, users and non-pending registrations" time="0.254314" classname="test"/>
+		<testcase name="[F4.2][H7] no plaintext password remains in pending registration requests after the scrub" time="0.056072" classname="test" failure="SECURITY EXPECTATION VIOLATED — pending registrations keep a plaintext password by design (keep() rule)+ actual - expected+ 'Synthetic-Only-Not-Real-9!'- undefined">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — pending registrations keep a plaintext password by design (keep() rule)+ actual - expected+ 'Synthetic-Only-Not-Real-9!'- undefined">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — pending registrations keep a plaintext password by design (keep() rule)
++ actual - expected
+
++ 'Synthetic-Only-Not-Real-9!'
+- undefined
+] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — pending registrations keep a plaintext password by design (keep() rule)
+  + actual - expected
+  
+  + 'Synthetic-Only-Not-Real-9!'
+  - undefined
+  
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/worker/f-credential-scrub.test.mjs:49:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'Synthetic-Only-Not-Real-9!',
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[F4.3][H7] more than 400 pending requests must not shield an approved request from the scrub" time="0.116382" classname="test" failure="SECURITY EXPECTATION VIOLATED — approved request skipped because the first page held only pending requests+ actual - expected+ 'Synthetic-Only-Not-Real-9!'- undefined">
+			<failure type="testCodeFailure" message="SECURITY EXPECTATION VIOLATED — approved request skipped because the first page held only pending requests+ actual - expected+ 'Synthetic-Only-Not-Real-9!'- undefined">
+[Error [ERR_TEST_FAILURE]: SECURITY EXPECTATION VIOLATED — approved request skipped because the first page held only pending requests
++ actual - expected
+
++ 'Synthetic-Only-Not-Real-9!'
+- undefined
+] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: SECURITY EXPECTATION VIOLATED — approved request skipped because the first page held only pending requests
+  + actual - expected
+  
+  + 'Synthetic-Only-Not-Real-9!'
+  - undefined
+  
+      at TestContext.&lt;anonymous> (file:///home/user/SchoolixiQ-/scripts/security/worker/f-credential-scrub.test.mjs:62:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'Synthetic-Only-Not-Real-9!',
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="[F4.4] the scrub never logs password values" time="0.053227" classname="test"/>
+	</testsuite>
+	<!-- tests 128 -->
+	<!-- suites 8 -->
+	<!-- pass 63 -->
+	<!-- fail 63 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 2 -->
+	<!-- duration_ms 8451.537336 -->
+</testsuites>

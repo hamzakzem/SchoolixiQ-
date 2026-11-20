@@ -1,0 +1,790 @@
+{
+  "runId": "2026-11-20T16-11-12-558Z",
+  "project": "demo-schoolixiq-security",
+  "files": [
+    "rules/a-privilege-escalation.test.mjs",
+    "rules/b-identity.test.mjs",
+    "rules/c-parent-linking.test.mjs",
+    "rules/d-school-isolation.test.mjs",
+    "rules/f-password-rules.test.mjs",
+    "server/e-admin-api.test.mjs",
+    "static/f-password-sources.test.mjs",
+    "worker/f-credential-scrub.test.mjs"
+  ],
+  "total": 128,
+  "passed": 63,
+  "failed": 63,
+  "notTestable": 2,
+  "skipped": 0,
+  "provenWeaknesses": [
+    "[A1.2][H4] new user cannot self-create role=superadmin even when users/metadata is missing",
+    "[A2.1][C1] new user cannot self-create role=admin for an existing school it does not own",
+    "[A2.2][C1][D2] self-create role=admin for the school whose adminEmail matches is denied when the e-mail is NOT verified",
+    "[A2.3][C1] new user cannot self-create role=teacher inside a school",
+    "[A2.3][C1] new user cannot self-create role=staff inside a school",
+    "[A2.3][C1] new user cannot self-create role=guard inside a school",
+    "[A2.3][C1] new user cannot self-create role=assistant inside a school",
+    "[A4.2][C4] parent without a school cannot attach its profile to an arbitrary school",
+    "[A4.3][H1] school admin cannot move its own profile to another school",
+    "[A5.2][C1] new user cannot self-create a profile that already carries permissions",
+    "[A5.3][C2] school assistant cannot grant itself permissions",
+    "[A6.1][C2] school assistant cannot promote itself to school admin",
+    "[A6.2][C2] school assistant cannot promote itself to superadmin",
+    "[A6.3][H2] new user cannot self-create a legacy \"assistant\" with no school (treated as platform assistant)",
+    "[A7.1][C2] school admin cannot promote itself to superadmin",
+    "[A7.2][C2] school admin cannot promote a teacher of its school to superadmin",
+    "[A7.3][C2] school admin cannot promote a teacher of its school to platform_assistant",
+    "[A7.4][C7] school admin cannot pre-provision a users document with role=superadmin",
+    "[A7.5][C1+C2] end-to-end: anonymous sign-up cannot reach super-admin-only data",
+    "[A8.3][H4] a self-escalated account cannot delete users/metadata (re-opening the bootstrap path)",
+    "[A8.4][H4] hardening: even a genuine superadmin cannot delete users/metadata",
+    "[B1.2] a user cannot create a users document that claims another UID inside its own path",
+    "[B2.4] school admin cannot delete a co-admin of its own school",
+    "[B3.1][C3] a stored (self-written) e-mail must not allow deleting the super admin profile",
+    "[B3.2][C3] a stored (self-written) e-mail must not allow reading the super admin profile",
+    "[B3.3][C3] a stored (self-written) e-mail must not expose another person registration request",
+    "[B3.4][C3] a stored (self-written) e-mail must not allow editing another person pending registration",
+    "[B3.5][C3][D2] an UNVERIFIED token e-mail must not allow claiming (deleting) a pre-provisioned profile",
+    "[B3.6][C1][D2] an UNVERIFIED token e-mail must not allow copying a pre-provisioned teacher role",
+    "[B4.3][FUNCTIONAL] school with a mixed-case adminEmail is still readable by its verified admin (rules lower-case only the token side)",
+    "[C1.1][C4] unlinked parent cannot add itself to a student of another school",
+    "[C1.2][C4] unlinked parent cannot add itself to a student whose parentEmail is someone else",
+    "[C1.3][C4] parent of one child cannot add itself to another child of the same school",
+    "[C2.1][C4][D1] matching verified e-mail is NOT enough: self-link without school approval is denied",
+    "[C2.2][C4][D1] parent cannot attach studentIds + schoolId to its own profile without approval",
+    "[C3.1][C4][D2] parent with an UNVERIFIED e-mail equal to parentEmail cannot self-link",
+    "[C4.1][C3][C4] stored profile e-mail different from the authenticated e-mail cannot be used to link",
+    "[C5.2][C4] parent cannot write a parentIds array containing duplicate / padded entries",
+    "[C6.1][C4] two concurrent unapproved self-links to the same student are both denied and existing links survive",
+    "[C6.2][C4] concurrent full-array overwrites cannot evict the genuine parent",
+    "[C7.2][C4] a linked parent cannot remove a co-parent from the student",
+    "[C8.1][C4] end-to-end: a stranger cannot obtain a child record + grades of another school",
+    "[D3.2][H2] a legacy \"assistant\" profile without a school is not a platform assistant (cannot read other schools)",
+    "[D3.3][H2][H7] a legacy schoolless \"assistant\" with self-written permissions cannot read registration requests",
+    "[D4.3][H3] parent cannot look up a student of another school by guessing its registration number",
+    "[D5.4][C1] a self-written schoolId on a self-created profile grants no access to that school",
+    "[F1.1][H7] an anonymous registration request carrying customerInfo.password is rejected",
+    "[F1.2][H7] a signed-in registration request carrying password / adminPassword is rejected",
+    "[F1.4][H7] a user cannot store a password field on its own profile",
+    "[E1.1][C5] a Firestore-only role=superadmin (no claim) is rejected by the admin API",
+    "[E1.2][C5] calling the admin API must not write role=superadmin into custom claims from Firestore data",
+    "[E1.3][C5] a stale superadmin claim is rejected once the Firestore profile is demoted",
+    "[E2.1][C6] create-user ignores additionalData.role / schoolId (no superadmin via payload)",
+    "[E2.2][C6] create-user ignores client-supplied additionalData.permissions in custom claims",
+    "[E2.3][C6] staff (allowed to create parents) cannot mint a superadmin profile through additionalData",
+    "[E4.1][M1] school admin cannot reset the password of a co-admin via create-user",
+    "[E4.2][M3] super admin \"sync-claims\" must not promote a tampered Firestore role into claims",
+    "[E5.1][C4][D1] a parent link that was never approved by the school must not allow a pickup request",
+    "[F3.1][H7] the public registration form does not persist a password into Firestore (src/views/Login.tsx)",
+    "[F3.2][H7] school activation does not reuse a stored plaintext password (src/lib/auth/schoolActivation.ts)",
+    "[F3.3][H7] the super admin dashboard does not read stored registration passwords (src/views/SuperAdminDashboard.tsx)",
+    "[F4.2][H7] no plaintext password remains in pending registration requests after the scrub",
+    "[F4.3][H7] more than 400 pending requests must not shield an approved request from the scrub"
+  ],
+  "brokenControls": [],
+  "cases": [
+    {
+      "suite": "test",
+      "name": "[A1.1] new user cannot self-create role=superadmin while users/metadata exists",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A1.2][H4] new user cannot self-create role=superadmin even when users/metadata is missing",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create superadmin without metadata (legacy bootstrap path) should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A9.1] users/metadata blocks the legacy bootstrap path by existence alone (initialized=false still blocks)",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A2.1][C1] new user cannot self-create role=admin for an existing school it does not own",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create admin of S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.2][C1][D2] self-create role=admin for the school whose adminEmail matches is denied when the e-mail is NOT verified",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create admin with unverified e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=teacher inside a school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create teacher of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=staff inside a school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create staff of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=guard inside a school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create guard of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=assistant inside a school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create assistant of S1 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A2.3][C1] new user cannot self-create role=school_assistant inside a school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A2.C1] CONTROL: new user can self-create a plain parent profile with no school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A2.C2] CONTROL: new school admin can self-create an admin draft without a school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A3.1] parent cannot change its own role to superadmin",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A3.2] teacher cannot change its own role to superadmin",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A4.1] linked parent cannot move its own profile to another school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A4.2][C4] parent without a school cannot attach its profile to an arbitrary school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — unlinked parent sets schoolId=S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A4.3][H1] school admin cannot move its own profile to another school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin S1 -> S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A5.1] parent cannot grant itself permissions",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A5.2][C1] new user cannot self-create a profile that already carries permissions",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create with permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A5.3][C2] school assistant cannot grant itself permissions",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — assistant self-grants permissions should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A5.4] staff member cannot grant itself extra permissions",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A6.1][C2] school assistant cannot promote itself to school admin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — assistant -> admin should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A6.2][C2] school assistant cannot promote itself to superadmin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — assistant -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A6.3][H2] new user cannot self-create a legacy \"assistant\" with no school (treated as platform assistant)",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-create schoolless assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.1][C2] school admin cannot promote itself to superadmin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin -> superadmin (self) should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.2][C2] school admin cannot promote a teacher of its school to superadmin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin promotes teacher -> superadmin should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.3][C2] school admin cannot promote a teacher of its school to platform_assistant",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin promotes teacher -> platform_assistant should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.4][C7] school admin cannot pre-provision a users document with role=superadmin",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin pre-provisions superadmin doc should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.5][C1+C2] end-to-end: anonymous sign-up cannot reach super-admin-only data",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — read system_config after chain (create=200, promote=200) should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A7.C1] CONTROL: school admin can change a teacher of its school to staff",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A7.C2] CONTROL: school admin can pre-provision a teacher document for its school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.1] parent1 cannot delete users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.2] parent1 cannot overwrite users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.1] teacher1 cannot delete users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.2] teacher1 cannot overwrite users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.1] admin1 cannot delete users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.2] admin1 cannot overwrite users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.1] sassist1 cannot delete users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.2] sassist1 cannot overwrite users/metadata",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[A8.3][H4] a self-escalated account cannot delete users/metadata (re-opening the bootstrap path)",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-escalated account deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[A8.4][H4] hardening: even a genuine superadmin cannot delete users/metadata",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — superadmin deletes metadata should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[B1.1] a user cannot create a users document under a UID that is not its own",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[B1.2] a user cannot create a users document that claims another UID inside its own path",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — own path with uid field = u_super should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[B2.1] parent cannot edit another parent profile",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[B2.2] parent cannot delete another parent profile",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[B2.3] school admin cannot edit the admin of another school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[B2.4] school admin cannot delete a co-admin of its own school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin1 deletes co-admin should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[B3.1][C3] a stored (self-written) e-mail must not allow deleting the super admin profile",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — delete super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[B3.2][C3] a stored (self-written) e-mail must not allow reading the super admin profile",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — read super admin doc via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[B3.3][C3] a stored (self-written) e-mail must not expose another person registration request",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — read pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[B3.4][C3] a stored (self-written) e-mail must not allow editing another person pending registration",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — edit pending registration via spoofed e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[B3.5][C3][D2] an UNVERIFIED token e-mail must not allow claiming (deleting) a pre-provisioned profile",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — unverified e-mail deletes provisioned doc should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[B3.6][C1][D2] an UNVERIFIED token e-mail must not allow copying a pre-provisioned teacher role",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — unverified e-mail takes over provisioned teacher role should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[B3.C1] CONTROL: the verified owner of a pre-provisioned e-mail can claim (delete) the provisioned document",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[B4.1] e-mail comparison: an upper-case variant of the super admin e-mail grants nothing",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[B4.2] e-mail comparison: a whitespace-padded variant of the super admin e-mail grants nothing",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[B4.3][FUNCTIONAL] school with a mixed-case adminEmail is still readable by its verified admin (rules lower-case only the token side)",
+      "status": "failed",
+      "message": "LEGITIMATE FLOW BROKEN — verified admin reads school with mixed-case adminEmail should be ALLOWED but returned HTTP 403: \"\\nevaluation error at L981:21 for 'get' @ L981, false for 'get' @ L981\""
+    },
+    {
+      "suite": "test",
+      "name": "[C1.1][C4] unlinked parent cannot add itself to a student of another school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-link to ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C1.2][C4] unlinked parent cannot add itself to a student whose parentEmail is someone else",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — self-link to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C1.3][C4] parent of one child cannot add itself to another child of the same school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — parent1 self-links to ST1b should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C2.1][C4][D1] matching verified e-mail is NOT enough: self-link without school approval is denied",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — verified-email self-link without approval should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C2.2][C4][D1] parent cannot attach studentIds + schoolId to its own profile without approval",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — parent self-assigns studentIds/schoolId should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C3.1][C4][D2] parent with an UNVERIFIED e-mail equal to parentEmail cannot self-link",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — unverified-email self-link should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C4.1][C3][C4] stored profile e-mail different from the authenticated e-mail cannot be used to link",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — link via spoofed stored e-mail should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C5.1] repeating an existing link does not create duplicate entries",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[C5.2][C4] parent cannot write a parentIds array containing duplicate / padded entries",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — duplicate parentIds write should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C5.3][D1] duplicate approval request for the same parent/student is rejected — NOT TESTABLE: approval-request workflow not implemented yet",
+      "status": "not-testable"
+    },
+    {
+      "suite": "test",
+      "name": "[C6.1][C4] two concurrent unapproved self-links to the same student are both denied and existing links survive",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — concurrent self-link A should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C6.2][C4] concurrent full-array overwrites cannot evict the genuine parent",
+      "status": "failed",
+      "message": "parentIds must be unchanged, got [\"n_c62b\"]+ actual - expected  [+   'n_c62b'-   'u_parent1'  ]"
+    },
+    {
+      "suite": "test",
+      "name": "[C6.3][D1] two concurrent approval requests for the same student are serialised — NOT TESTABLE: approval-request workflow not implemented yet",
+      "status": "not-testable"
+    },
+    {
+      "suite": "test",
+      "name": "[C7.1] a denied link attempt that also tampers with schoolId leaves the student untouched",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[C7.2][C4] a linked parent cannot remove a co-parent from the student",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — parent evicts co-parent should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C8.1][C4] end-to-end: a stranger cannot obtain a child record + grades of another school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — stranger reads ST2 after self-link attempts should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[C.C1] CONTROL: school admin can link a parent to a student of its own school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[C.C2] CONTROL: a linked parent can read its own child and grades",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[C.C3] CONTROL: admin of another school cannot link parents to S1 students",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[C.C4] CONTROL: parent cannot overwrite the whole student document",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D1.1] admin of S1 cannot read school doc of S2",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D1.1] admin of S1 cannot read school settings of S2",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D1.1] admin of S1 cannot read student of S2",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D1.1] admin of S1 cannot read grade of S2",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D1.1] admin of S1 cannot read parent profile of S2",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D1.2] admin of S1 cannot list students of S2",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D2.1] teacher cannot read a student of an unassigned class in its own school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D2.2] teacher cannot read a student of another school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D2.3] teacher cannot read a class of another school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D2.C] CONTROL: teacher can read a student of its assigned class",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D3.1] school assistant of S1 cannot read student / school of S2",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D3.2][H2] a legacy \"assistant\" profile without a school is not a platform assistant (cannot read other schools)",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — schoolless assistant reads S2 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[D3.3][H2][H7] a legacy schoolless \"assistant\" with self-written permissions cannot read registration requests",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — schoolless assistant reads registrations should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[D4.1] parent cannot read an unlinked student of its own school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D4.2] parent cannot read a student / grade of another school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D4.3][H3] parent cannot look up a student of another school by guessing its registration number",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — registration-number lookup across schools (leaked ST2@S2) should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[D5.1] admin of S1 cannot create an attendance record for S2",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D5.2] admin of S1 cannot pull a student of S2 into S1 by rewriting schoolId",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D5.3] admin of S1 cannot create a student inside S2",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[D5.4][C1] a self-written schoolId on a self-created profile grants no access to that school",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — forged admin of S2 reads ST2 should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[F1.1][H7] an anonymous registration request carrying customerInfo.password is rejected",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — anonymous registration with password should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[F1.2][H7] a signed-in registration request carrying password / adminPassword is rejected",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — registration with password fields should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[F1.3][H7] a school admin cannot store a parent password on a student document",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[F1.4][H7] a user cannot store a password field on its own profile",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — profile with password should be DENIED but the emulator returned HTTP 200 (ALLOWED)."
+    },
+    {
+      "suite": "test",
+      "name": "[F1.C] CONTROL: a registration request without any password field is accepted",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[E1.1][C5] a Firestore-only role=superadmin (no claim) is rejected by the admin API",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — admin API with Firestore-only superadmin should be rejected (401/403) but the server returned 200: {\"ok\":true,\"items\":[]}"
+    },
+    {
+      "suite": "test",
+      "name": "[E1.2][C5] calling the admin API must not write role=superadmin into custom claims from Firestore data",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — server promoted Firestore role into custom claims: {\"role\":\"superadmin\",\"schoolId\":\"\",\"sv\":4,\"p\":null}"
+    },
+    {
+      "suite": "test",
+      "name": "[E1.3][C5] a stale superadmin claim is rejected once the Firestore profile is demoted",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — backup with stale superadmin claim should be rejected (401/403) but the server returned 200: {\"timestamp\":\"2026-11-20T16:11:18.142Z\",\"collections\":{\"schools\":[{\"id\":\"S1\",\"name\":\"Synthetic School One\",\"status\":\"active\",\"subscriptionStatus\":\"active\",\"admi"
+    },
+    {
+      "suite": "test",
+      "name": "[E1.4][H2] a legacy schoolless \"assistant\" profile is not accepted as a platform assistant",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[E2.1][C6] create-user ignores additionalData.role / schoolId (no superadmin via payload)",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — create-user (HTTP 200) stored role=superadmin schoolId=\"\" from additionalData"
+    },
+    {
+      "suite": "test",
+      "name": "[E2.2][C6] create-user ignores client-supplied additionalData.permissions in custom claims",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — client permissions copied into claims: [\"manage_users\",\"manage_system\"]"
+    },
+    {
+      "suite": "test",
+      "name": "[E2.3][C6] staff (allowed to create parents) cannot mint a superadmin profile through additionalData",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — staff minted a superadmin profile"
+    },
+    {
+      "suite": "test",
+      "name": "[E2.4] CONTROL: school admin cannot create users for another school via the schoolId field",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[E2.5] CONTROL: school admin can create a parent in its own school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[E3.1] a registration request carrying role=superadmin grants nothing",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[E4.1][M1] school admin cannot reset the password of a co-admin via create-user",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — co-admin password was replaced by another admin"
+    },
+    {
+      "suite": "test",
+      "name": "[E4.2][M3] super admin \"sync-claims\" must not promote a tampered Firestore role into claims",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — privileged role synced from Firestore data"
+    },
+    {
+      "suite": "test",
+      "name": "[E4.3] CONTROL: school admin cannot sync claims of a user outside its school",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[E5.1][C4][D1] a parent link that was never approved by the school must not allow a pickup request",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — pickup request by unapproved parent should be rejected (401/403) but the server returned 200: {\"id\":\"pPDDwThtd8gAneM8XQrE\",\"token\":\"BMXV-3WQP\",\"status\":\"REQUESTED\",\"derivedStatus\":\"REQUESTED\",\"dismissalSnapshot\":{\"requestId\":\"pPDDwThtd8gAneM8XQrE\",\"deriv"
+    },
+    {
+      "suite": "test",
+      "name": "[E5.2] CONTROL: an unlinked parent cannot request a pickup",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[E5.3] CONTROL: the genuine parent can request a pickup and a guard of another school cannot verify it",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[F2.1][H7] passwords sent to create-user never appear in server logs, audit logs or profiles",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[F3.1][H7] the public registration form does not persist a password into Firestore (src/views/Login.tsx)",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — subscriptionForm holds a password (line 207) and is stored as registrations.customerInfo (line 355)"
+    },
+    {
+      "suite": "test",
+      "name": "[F3.2][H7] school activation does not reuse a stored plaintext password (src/lib/auth/schoolActivation.ts)",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — activation reads stored request/customerInfo password (line 129)"
+    },
+    {
+      "suite": "test",
+      "name": "[F3.3][H7] the super admin dashboard does not read stored registration passwords (src/views/SuperAdminDashboard.tsx)",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — dashboard reads customerInfo.password (line 1401)"
+    },
+    {
+      "suite": "test",
+      "name": "[F3.4] server logging statements never interpolate a raw password value (server.ts)",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[F3.5] audit logging of create-user never includes the password",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[F4.1] CONTROL: removes plaintext passwords from schools, students, users and non-pending registrations",
+      "status": "passed"
+    },
+    {
+      "suite": "test",
+      "name": "[F4.2][H7] no plaintext password remains in pending registration requests after the scrub",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — pending registrations keep a plaintext password by design (keep() rule)+ actual - expected+ 'Synthetic-Only-Not-Real-9!'- undefined"
+    },
+    {
+      "suite": "test",
+      "name": "[F4.3][H7] more than 400 pending requests must not shield an approved request from the scrub",
+      "status": "failed",
+      "message": "SECURITY EXPECTATION VIOLATED — approved request skipped because the first page held only pending requests+ actual - expected+ 'Synthetic-Only-Not-Real-9!'- undefined"
+    },
+    {
+      "suite": "test",
+      "name": "[F4.4] the scrub never logs password values",
+      "status": "passed"
+    }
+  ]
+}
